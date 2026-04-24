@@ -1,4 +1,17 @@
-.PHONY: install test lint format smoke schema clean
+.PHONY: install test lint fmt format smoke schema clean help
+
+help:
+	@echo "Targets: install test lint fmt smoke schema clean"
+	@echo "  install  venv + editable install with dev deps"
+	@echo "  test     pytest -v"
+	@echo "  lint     ruff + black --check"
+	@echo "  fmt      alias for format"
+	@echo "  format   ruff --fix + black"
+	@echo "  smoke    run agent 5 steps against mock env"
+	@echo "  schema   dump JSON schemas"
+	@echo "  clean    nuke .venv + caches"
+
+fmt: format
 
 PY ?= python3
 VENV ?= .venv
