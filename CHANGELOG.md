@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### CLI — introspection & validation
+- `oyster-agent list-envs` — print registered environments (table or
+  `--json`) with status and description columns
+- `oyster-agent list-providers` — same for LLM providers, including the
+  new `claude-vision` / `openai-vision` keys
+- `oyster-agent validate-task <path>` — validate a JSON `AgentTask`
+  file against the Pydantic schema; renders the task on success or a
+  structured Pydantic error report on failure (exit 1)
+- README: documents the three new commands
+- 12 new tests (happy + error paths + JSON flag for each)
+
 ### RAG memory
 - `TrajectoryMemory` — in-memory store of `(text, embedding, metadata)`
   records with top-k cosine-similarity retrieval

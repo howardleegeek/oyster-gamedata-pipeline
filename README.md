@@ -81,6 +81,13 @@ oyster-agent run --env mock --task "do ten noops" --provider mock --max-steps 20
 
 # Inspect schema
 oyster-agent schema
+
+# Discover what's wired up
+oyster-agent list-envs
+oyster-agent list-providers
+
+# Validate a task JSON before running
+oyster-agent validate-task path/to/task.json
 ```
 
 With Anthropic credentials (the recommended provider):

@@ -35,6 +35,64 @@ app = typer.Typer(
 console = Console()
 
 
+# --- Registries --------------------------------------------------------------
+#
+# `ENV_REGISTRY` / `PROVIDER_REGISTRY` are the single source of truth for
+# the `run`, `list-envs`, and `list-providers` commands. Each entry is a
+# `{key, description, status}` row so listing is a one-liner.
+
+ENV_REGISTRY: list[dict[str, str]] = [
+    {
+        "key": "mock",
+        "description": "Deterministic fake for tests and smoke-checks",
+        "status": "ready",
+    },
+    {
+        "key": "minecraft",
+        "description": "MineRL (pixel) or Mineflayer (headless) — see module docs",
+        "status": "stub",
+    },
+    {
+        "key": "factorio",
+        "description": "Factorio RCON; accepts rcon://[pw@]host[:port] URI",
+        "status": "stub (RCON parsing live)",
+    },
+    {
+        "key": "gym:<env_id>",
+        "description": "gymnasium.make(env_id); works if gymnasium is installed",
+        "status": "real-if-installed",
+    },
+]
+
+PROVIDER_REGISTRY: list[dict[str, str]] = [
+    {
+        "key": "mock",
+        "description": "Canned reasoning + action — deterministic, always available",
+        "status": "ready",
+    },
+    {
+        "key": "claude",
+        "description": "Anthropic Claude (text only)",
+        "status": "needs ANTHROPIC_API_KEY",
+    },
+    {
+        "key": "openai",
+        "description": "OpenAI Chat Completions (text only)",
+        "status": "needs OPENAI_API_KEY",
+    },
+    {
+        "key": "claude-vision",
+        "description": "Anthropic Claude + PNG frame as image content block",
+        "status": "needs ANTHROPIC_API_KEY",
+    },
+    {
+        "key": "openai-vision",
+        "description": "OpenAI + data:URI image_url content block",
+        "status": "needs OPENAI_API_KEY",
+    },
+]
+
+
 def _make_environment(env_key: str) -> Environment:
     """Resolve an env key to a concrete Environment.
 
@@ -42,7 +100,7 @@ def _make_environment(env_key: str) -> Environment:
       mock               deterministic fake (always available)
       minecraft          STUB — raises NotImplementedError on reset
       factorio           STUB — raises NotImplementedError on reset
-      gym:<env_id>       STUB — raises NotImplementedError on reset
+      gym:<env_id>       real wrapper if gymnasium is installed, stub otherwise
     """
     if env_key == "mock":
         return MockEnvironment()
@@ -179,6 +237,95 @@ def schema_cmd() -> None:
         "TaskResult": TaskResult.model_json_schema(),
     }
     console.print_json(json.dumps(schemas))
+
+
+@app.command("list-envs")
+def list_envs_cmd(
+    as_json: Annotated[
+        bool, typer.Option("--json", help="Emit machine-readable JSON instead of a table")
+    ] = False,
+) -> None:
+    """Print the registered environments available to `oyster-agent run`."""
+    if as_json:
+        console.print_json(json.dumps(ENV_REGISTRY))
+        return
+    table = Table(title="Environments", border_style="blue")
+    table.add_column("key", style="bold cyan")
+    table.add_column("status", style="magenta")
+    table.add_column("description")
+    for row in ENV_REGISTRY:
+        table.add_row(row["key"], row["status"], row["description"])
+    console.print(table)
+
+
+@app.command("list-providers")
+def list_providers_cmd(
+    as_json: Annotated[
+        bool, typer.Option("--json", help="Emit machine-readable JSON instead of a table")
+    ] = False,
+) -> None:
+    """Print the registered LLM providers available to `oyster-agent run`."""
+    if as_json:
+        console.print_json(json.dumps(PROVIDER_REGISTRY))
+        return
+    table = Table(title="Providers", border_style="blue")
+    table.add_column("key", style="bold cyan")
+    table.add_column("status", style="magenta")
+    table.add_column("description")
+    for row in PROVIDER_REGISTRY:
+        table.add_row(row["key"], row["status"], row["description"])
+    console.print(table)
+
+
+@app.command("validate-task")
+def validate_task_cmd(
+    task_path: Annotated[Path, typer.Argument(help="Path to a JSON AgentTask file.")],
+    as_json: Annotated[
+        bool,
+        typer.Option("--json", help="Emit the validated task as JSON on success."),
+    ] = False,
+) -> None:
+    """Validate an `AgentTask` JSON file against the schema.
+
+    Exits 0 and prints the parsed task (pretty-rendered or JSON) on
+    success. Exits 1 with a human-readable Pydantic error report on
+    failure.
+    """
+    from pydantic import ValidationError
+
+    from oyster_agent_runner.schema import AgentTask
+
+    try:
+        raw = task_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        console.print(f"[red]cannot read file: {exc}[/red]")
+        raise typer.Exit(code=2) from exc
+
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        console.print(f"[red]invalid JSON:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    try:
+        task = AgentTask.model_validate(data)
+    except ValidationError as exc:
+        console.print("[red]validation failed[/red]")
+        # Pydantic's JSON error report is already structured — print it
+        # as JSON for machine consumption + human readability.
+        console.print_json(exc.json(indent=2))
+        raise typer.Exit(code=1) from exc
+
+    if as_json:
+        console.print_json(task.model_dump_json())
+        return
+
+    table = Table(title="AgentTask (valid)", border_style="green")
+    table.add_column("field", style="bold")
+    table.add_column("value")
+    for key, value in task.model_dump().items():
+        table.add_row(key, str(value))
+    console.print(table)
 
 
 if __name__ == "__main__":
