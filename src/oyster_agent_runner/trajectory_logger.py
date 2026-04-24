@@ -121,6 +121,19 @@ class TrajectoryLogger:
                 )
             )
 
+    def write_event(self, event: TrajectoryEvent) -> None:
+        """Write a raw `TrajectoryEvent` as-is.
+
+        Useful for subsystems (tool-use, memory retrieval, custom
+        telemetry) that want to emit events outside the core
+        START / AGENT_STEP / OBSERVATION / ACTION / RENDER / END
+        pipeline. Keeps the monotonic-timestamp invariant so downstream
+        consumers can assume non-decreasing ordering.
+        """
+        if event.timestamp > self._last_step_timestamp:
+            self._last_step_timestamp = event.timestamp
+        self._write_event(event)
+
     def end(
         self,
         *,

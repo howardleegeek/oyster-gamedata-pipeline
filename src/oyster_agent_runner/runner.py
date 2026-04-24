@@ -30,7 +30,13 @@ from oyster_agent_runner.environments.base import (
     has_vision,
 )
 from oyster_agent_runner.providers.base import LLMProvider
-from oyster_agent_runner.schema import AgentTask, TaskResult, TrajectoryEntry
+from oyster_agent_runner.schema import AgentTask, TaskResult, TrajectoryEntry, TrajectoryEvent
+from oyster_agent_runner.tools import (
+    EVENT_TOOL_CALL,
+    EVENT_TOOL_RESULT,
+    ToolProvider,
+    tool_catalog_prompt,
+)
 from oyster_agent_runner.trajectory_logger import TrajectoryLogger
 
 # --- Prompt template ---------------------------------------------------------
@@ -81,6 +87,7 @@ class AgentRunner:
         environment: Environment,
         provider: LLMProvider,
         output_dir: Path,
+        tools: ToolProvider | None = None,
     ) -> TaskResult:
         """Execute the run and return a `TaskResult`.
 
@@ -88,9 +95,15 @@ class AgentRunner:
         `termination_reason="error"` and the exception is captured on
         `TaskResult.error_message` — the caller is expected to inspect
         that rather than catching.
+
+        If `tools` is provided, actions shaped like
+        `{"op": "call_tool", "tool": "<name>", "args": {...}}` are
+        dispatched to the tool provider rather than the environment.
+        The tool's return value is fed back into the agent's next user
+        message and also logged as `TOOL_CALL` + `TOOL_RESULT` events.
         """
         output_dir = Path(output_dir)
-        system_prompt = self._build_system_prompt(task)
+        system_prompt = self._build_system_prompt(task, tools=tools)
         wall_start = time.monotonic()
 
         step = 0
@@ -142,6 +155,39 @@ class AgentRunner:
                         # Capture the frame BEFORE stepping — it depicts the state
                         # the agent observed and reasoned over.
                         frame = self._safe_render(environment)
+
+                        # Route tool calls without advancing the env.
+                        if tools is not None and action.get("op") == "call_tool":
+                            tool_result, tool_error = self._dispatch_tool(tools, action)
+                            self._log_tool_events(
+                                logger, action, tool_result, tool_error, wall_start
+                            )
+                            # Feed the result back into the next turn.
+                            messages.append(
+                                {
+                                    "role": "user",
+                                    "content": self._format_tool_result(
+                                        tool_name=action.get("tool", ""),
+                                        result=tool_result,
+                                        error=tool_error,
+                                    ),
+                                }
+                            )
+                            # Log the "action" event for the tool call for
+                            # trace continuity, but don't step or reset obs.
+                            entry = TrajectoryEntry(
+                                step=step,
+                                timestamp_sec=time.monotonic() - wall_start,
+                                observation=obs,
+                                llm_reasoning=reasoning,
+                                action=action,
+                                reward=None,
+                                success_flag=False,
+                            )
+                            logger.append(entry, frame_png=frame)
+                            steps_executed = step + 1
+                            consecutive_errors = 0
+                            continue
 
                         # Step the environment.
                         next_obs, reward, done, _info = environment.step(action)
@@ -226,17 +272,89 @@ class AgentRunner:
     # Internals ---------------------------------------------------------------
 
     @staticmethod
-    def _build_system_prompt(task: AgentTask) -> str:
+    def _build_system_prompt(task: AgentTask, tools: ToolProvider | None = None) -> str:
         criteria = (
             "\n".join(f"  - {c}" for c in task.success_criteria)
             if task.success_criteria
             else "  (none — the environment signals completion via its `done` flag)"
         )
-        return SYSTEM_PROMPT_TEMPLATE.format(
+        prompt = SYSTEM_PROMPT_TEMPLATE.format(
             environment=task.environment,
             instruction=task.natural_language_instruction,
             criteria=criteria,
         )
+        if tools is not None:
+            catalog = tool_catalog_prompt(tools.list_tools())
+            if catalog:
+                prompt = f"{prompt}\n{catalog}\n"
+        return prompt
+
+    @staticmethod
+    def _dispatch_tool(tools: ToolProvider, action: Action) -> tuple[Any | None, str | None]:
+        """Invoke the requested tool. Returns (result, error_message)."""
+        name = action.get("tool")
+        args = action.get("args", {}) or {}
+        if not isinstance(name, str) or not name:
+            return None, "missing_tool_name"
+        if not isinstance(args, dict):
+            return None, "args_must_be_object"
+        try:
+            return tools.call(name, args), None
+        except KeyError as exc:
+            return None, f"unknown_tool: {exc}"
+        except Exception as exc:
+            return None, f"{type(exc).__name__}: {exc}"
+
+    @staticmethod
+    def _log_tool_events(
+        logger: TrajectoryLogger,
+        action: Action,
+        result: Any,
+        error: str | None,
+        wall_start: float,
+    ) -> None:
+        """Emit TOOL_CALL + TOOL_RESULT events into the trajectory."""
+        ts = time.monotonic() - wall_start
+        logger.write_event(
+            TrajectoryEvent(
+                timestamp=ts,
+                event_type=EVENT_TOOL_CALL,
+                event_args={
+                    "tool": action.get("tool", ""),
+                    "args": action.get("args", {}),
+                },
+            )
+        )
+        # Round-trip result via repr if it's not JSON-native to avoid
+        # pydantic choking on exotic return types.
+        safe_result: Any
+        try:
+            json.dumps(result)
+            safe_result = result
+        except (TypeError, ValueError):
+            safe_result = repr(result)
+        logger.write_event(
+            TrajectoryEvent(
+                timestamp=ts + 1e-9,  # keep monotonic ordering CALL → RESULT
+                event_type=EVENT_TOOL_RESULT,
+                event_args={
+                    "tool": action.get("tool", ""),
+                    "result": safe_result,
+                    "error": error,
+                },
+            )
+        )
+
+    @staticmethod
+    def _format_tool_result(tool_name: str, result: Any, error: str | None) -> str:
+        """Render a tool invocation result for the next user message."""
+        if error is not None:
+            return f"[tool:{tool_name}] error: {error}"
+        try:
+            body = json.dumps(result, sort_keys=True, default=str)
+        except (TypeError, ValueError):
+            body = repr(result)
+        return f"[tool:{tool_name}] result: {body}"
 
     @staticmethod
     def _format_observation(obs: Observation | str, step: int) -> str:

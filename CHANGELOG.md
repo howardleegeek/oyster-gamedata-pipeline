@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Tool-use protocol
+- `Tool` frozen dataclass + `ToolProvider` Protocol + `SimpleToolProvider`
+  reference implementation in `tools.py`
+- Runner accepts an optional `tools=...` kwarg; agent actions shaped
+  `{"op": "call_tool", "tool": "<name>", "args": {...}}` are dispatched
+  to the provider rather than the env
+- Tool results are fed back to the agent on the next turn as a user
+  message (`[tool:<name>] result: ...`) and logged as `TOOL_CALL` +
+  `TOOL_RESULT` events in the trajectory JSONL
+- `tool_catalog_prompt()` renders the tool list into the system prompt
+  so the agent knows what's available
+- New public `TrajectoryLogger.write_event(event)` for subsystems that
+  need to emit their own event types (tools, memory, custom telemetry)
+- 10 new tests
+
 ### Vision-capable LLM providers
 - `ClaudeVisionProvider` — Anthropic SDK wrapper that injects PNG frames
   as `image`-type content blocks on every user turn
