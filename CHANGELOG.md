@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### RAG memory
+- `TrajectoryMemory` — in-memory store of `(text, embedding, metadata)`
+  records with top-k cosine-similarity retrieval
+- Pluggable `Embedder` callable (`str → Sequence[float]`) — zero runtime
+  deps on numpy / FAISS / sentence-transformers
+- `hashing_embedder(dim)` deterministic fallback (hashing-trick bag of
+  words, unit-normalized) for CI/tests without a real model
+- JSONL save/load (`save_jsonl`, `load_jsonl` with append mode)
+- Tie-breaking: identical similarity preserves insertion order
+- 17 new tests covering similarity math, embedder, retrieval ordering,
+  persistence round-trips, and ranking stability
+
 ### Tool-use protocol
 - `Tool` frozen dataclass + `ToolProvider` Protocol + `SimpleToolProvider`
   reference implementation in `tools.py`
