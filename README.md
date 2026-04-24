@@ -1,5 +1,8 @@
 # oyster-agent-runner — Oyster Labs Layer 4
 
+[![CI](https://github.com/howardleegeek/oyster-agent-runner/actions/workflows/ci.yml/badge.svg)](https://github.com/howardleegeek/oyster-agent-runner/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+
 **LLM-agent-driven gameplay data generation for world-model training.**
 
 This is the structural moat. Chinese network-cafe commodity farms can deliver
