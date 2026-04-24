@@ -1,15 +1,18 @@
-.PHONY: install test lint fmt format smoke schema clean help
+.PHONY: install test coverage lint fmt format smoke schema clean help precommit-install precommit-run
 
 help:
-	@echo "Targets: install test lint fmt smoke schema clean"
-	@echo "  install  venv + editable install with dev deps"
-	@echo "  test     pytest -v"
-	@echo "  lint     ruff + black --check"
-	@echo "  fmt      alias for format"
-	@echo "  format   ruff --fix + black"
-	@echo "  smoke    run agent 5 steps against mock env"
-	@echo "  schema   dump JSON schemas"
-	@echo "  clean    nuke .venv + caches"
+	@echo "Targets: install test coverage lint fmt smoke schema precommit-install precommit-run clean"
+	@echo "  install            venv + editable install with dev deps"
+	@echo "  test               pytest -v"
+	@echo "  coverage           pytest with html + term coverage (htmlcov/)"
+	@echo "  lint               ruff + black --check"
+	@echo "  fmt                alias for format"
+	@echo "  format             ruff --fix + black"
+	@echo "  precommit-install  install git hooks from .pre-commit-config.yaml"
+	@echo "  precommit-run      run all pre-commit hooks on every file"
+	@echo "  smoke              run agent 5 steps against mock env"
+	@echo "  schema             dump JSON schemas"
+	@echo "  clean              nuke .venv + caches"
 
 fmt: format
 
@@ -26,6 +29,21 @@ install: $(VENV)/bin/activate  ## Create venv and install package with dev deps
 
 test: install  ## Run the full test suite
 	$(BIN)/pytest -v
+
+coverage: install  ## Run tests with html + term coverage (htmlcov/)
+	$(BIN)/pytest \
+		--cov=src/oyster_agent_runner \
+		--cov-report=html \
+		--cov-report=term-missing
+	@echo ""
+	@echo "HTML report: htmlcov/index.html"
+
+precommit-install: install  ## Install git hooks from .pre-commit-config.yaml
+	$(BIN)/pip install pre-commit
+	$(BIN)/pre-commit install
+
+precommit-run: install  ## Run all pre-commit hooks on every file
+	$(BIN)/pre-commit run --all-files
 
 lint: install  ## Run ruff + black --check
 	$(BIN)/ruff check src tests
