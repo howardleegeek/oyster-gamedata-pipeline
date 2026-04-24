@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Vision-capable LLM providers
+- `ClaudeVisionProvider` — Anthropic SDK wrapper that injects PNG frames
+  as `image`-type content blocks on every user turn
+- `OpenAIVisionProvider` — OpenAI SDK wrapper that injects frames as
+  `image_url` blocks using a `data:image/png;base64,...` URI
+- Both providers declare `wants_vision = True` and expose a
+  single-use `set_next_frame(bytes)` setter; the runner feature-detects
+  both the provider and the env and threads the current frame through
+  on each step (zero change for text-only providers)
+- CLI gains `claude-vision` / `openai-vision` provider keys
+- 10 new tests for vision providers (includes runner-level wiring)
+
 ### Environment primitives + runner fail-safe
 - `VisionCapableEnvironment` protocol + `has_vision(env)` helper; envs
   may expose `last_frame()` returning the most recent PNG bytes

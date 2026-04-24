@@ -23,7 +23,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from oyster_agent_runner.environments.base import Action, Environment, Observation
+from oyster_agent_runner.environments.base import (
+    Action,
+    Environment,
+    Observation,
+    has_vision,
+)
 from oyster_agent_runner.providers.base import LLMProvider
 from oyster_agent_runner.schema import AgentTask, TaskResult, TrajectoryEntry
 from oyster_agent_runner.trajectory_logger import TrajectoryLogger
@@ -112,6 +117,18 @@ class AgentRunner:
                     )
 
                     try:
+                        # Vision seam: if both the provider and env opt in,
+                        # hand the current frame to the provider before
+                        # `chat(...)`. Env + provider feature-detection keeps
+                        # the legacy text-only path byte-identical.
+                        if getattr(provider, "wants_vision", False) and has_vision(environment):
+                            frame_for_llm = _safe_last_frame(environment) or self._safe_render(
+                                environment
+                            )
+                            setter = getattr(provider, "set_next_frame", None)
+                            if callable(setter):
+                                setter(frame_for_llm)
+
                         llm_text = provider.chat(
                             system=system_prompt,
                             messages=messages,
@@ -258,6 +275,17 @@ class AgentRunner:
             return env.render_frame()
         except Exception:
             return None
+
+
+def _safe_last_frame(env: Environment) -> bytes | None:
+    """Best-effort access to `env.last_frame()` — never raises."""
+    getter = getattr(env, "last_frame", None)
+    if not callable(getter):
+        return None
+    try:
+        return getter()
+    except Exception:
+        return None
 
 
 __all__ = ["AgentRunner", "RunnerConfig"]

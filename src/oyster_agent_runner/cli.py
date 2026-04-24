@@ -59,9 +59,11 @@ def _make_provider(provider_key: str, model: str) -> LLMProvider:
     """Resolve a provider key to a concrete LLMProvider.
 
     Keys:
-      mock      canned responses (always available)
-      claude    Anthropic (requires ANTHROPIC_API_KEY)
-      openai    OpenAI    (requires OPENAI_API_KEY)
+      mock             canned responses (always available)
+      claude           Anthropic           (ANTHROPIC_API_KEY)
+      openai           OpenAI              (OPENAI_API_KEY)
+      claude-vision    Anthropic + images  (ANTHROPIC_API_KEY)
+      openai-vision    OpenAI + images     (OPENAI_API_KEY)
     """
     if provider_key == "mock":
         return MockLLMProvider()
@@ -73,6 +75,14 @@ def _make_provider(provider_key: str, model: str) -> LLMProvider:
         from oyster_agent_runner.providers.openai_provider import OpenAIProvider
 
         return OpenAIProvider(model=model)
+    if provider_key == "claude-vision":
+        from oyster_agent_runner.providers.claude_vision import ClaudeVisionProvider
+
+        return ClaudeVisionProvider(model=model)
+    if provider_key == "openai-vision":
+        from oyster_agent_runner.providers.openai_vision import OpenAIVisionProvider
+
+        return OpenAIVisionProvider(model=model)
     raise typer.BadParameter(f"Unknown provider: {provider_key!r}")
 
 
@@ -80,7 +90,10 @@ def _make_provider(provider_key: str, model: str) -> LLMProvider:
 def run_cmd(
     env: Annotated[str, typer.Option(help="Environment key: mock, minecraft, factorio, gym:<id>")],
     task: Annotated[str, typer.Option("--task", help="Natural-language task instruction")],
-    provider: Annotated[str, typer.Option(help="LLM provider: mock, claude, or openai")] = "mock",
+    provider: Annotated[
+        str,
+        typer.Option(help="LLM provider: mock, claude, openai, claude-vision, openai-vision"),
+    ] = "mock",
     model: Annotated[str, typer.Option(help="Model id for the provider")] = "claude-sonnet-4-5",
     max_steps: Annotated[int, typer.Option(help="Hard cap on agent steps")] = 100,
     hours: Annotated[
