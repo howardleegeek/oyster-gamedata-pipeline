@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Environment primitives + runner fail-safe
+- `VisionCapableEnvironment` protocol + `has_vision(env)` helper; envs
+  may expose `last_frame()` returning the most recent PNG bytes
+- `MockEnvironment` now caches and returns its last rendered frame, and
+  clears it on `reset()`
+- `GymEnvironment` conditional implementation — delegates to real
+  `gymnasium` when the package is importable, stubs cleanly otherwise
+  (exposed via `is_stub` property); PNG encoding via Pillow if present
+- `FactorioEnvironment` accepts an `rcon_uri` (`rcon://[pw@]host[:port]`);
+  shipped as a standalone `RconConnection` dataclass + documented Lua
+  mod + action-dispatch contract
+- `MinecraftEnvironment` documents MineRL (pixel / research) vs
+  Mineflayer (symbolic / headless) tradeoff and stores a `path` attr so
+  downstream wrappers branch cleanly
+- `RunnerConfig.max_consecutive_errors` fail-safe: soft-skip individual
+  step failures, abort the run only after N consecutive errors
+  (default 5, `None` disables); prevents runaway token burn on persistent
+  env/provider outages
+- 22 new tests (env adapters + fail-safe semantics)
+
 ### Initial scaffold (Layer 4 agent runner)
 - Pydantic v2 schema with `extra="forbid"` — `AgentTask`, `TrajectoryEntry`,
   `TaskResult`, `TrajectoryEvent`

@@ -14,8 +14,7 @@ class LLMProvider(Protocol):
     The provider MUST return the full text of the assistant's reply.
     """
 
-    def chat(self, system: str, messages: list[dict], temperature: float) -> str:
-        ...
+    def chat(self, system: str, messages: list[dict], temperature: float) -> str: ...
 
 
 # --- Mock provider for tests -------------------------------------------------
@@ -32,7 +31,9 @@ class MockLLMProvider:
     in `canned_action`, making end-to-end tests fully deterministic.
     """
 
-    def __init__(self, canned_action: dict | None = None, reasoning: str = "mock reasoning") -> None:
+    def __init__(
+        self, canned_action: dict | None = None, reasoning: str = "mock reasoning"
+    ) -> None:
         self.canned_action = canned_action if canned_action is not None else {"op": "noop"}
         self.reasoning = reasoning
         self.call_count = 0

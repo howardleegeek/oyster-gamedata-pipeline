@@ -56,6 +56,10 @@ class RunnerConfig:
     write_frames: bool = True
     # Seconds — best-effort wall-clock cap checked between steps. None = unlimited.
     wall_clock_cap_sec: float | None = None
+    # If the env / provider raises this many times in a row, abort with
+    # termination_reason="error" rather than burning tokens forever.
+    # Set to None to disable the fail-safe entirely (legacy behavior).
+    max_consecutive_errors: int | None = 5
 
 
 class AgentRunner:
@@ -91,6 +95,7 @@ class AgentRunner:
         error_message: str | None = None
         final_reward: float | None = None
         messages: list[dict[str, str]] = []
+        consecutive_errors = 0
 
         with TrajectoryLogger(output_dir, write_frames=self.config.write_frames) as logger:
             logger.start(
@@ -106,22 +111,41 @@ class AgentRunner:
                         {"role": "user", "content": self._format_observation(obs, step)}
                     )
 
-                    llm_text = provider.chat(
-                        system=system_prompt,
-                        messages=messages,
-                        temperature=self.config.temperature,
-                    )
-                    reasoning, action = self._parse_llm_response(llm_text)
+                    try:
+                        llm_text = provider.chat(
+                            system=system_prompt,
+                            messages=messages,
+                            temperature=self.config.temperature,
+                        )
+                        reasoning, action = self._parse_llm_response(llm_text)
 
-                    # Record assistant turn so the LLM sees its own history.
-                    messages.append({"role": "assistant", "content": llm_text})
+                        # Record assistant turn so the LLM sees its own history.
+                        messages.append({"role": "assistant", "content": llm_text})
 
-                    # Capture the frame BEFORE stepping — it depicts the state
-                    # the agent observed and reasoned over.
-                    frame = self._safe_render(environment)
+                        # Capture the frame BEFORE stepping — it depicts the state
+                        # the agent observed and reasoned over.
+                        frame = self._safe_render(environment)
 
-                    # Step the environment.
-                    next_obs, reward, done, _info = environment.step(action)
+                        # Step the environment.
+                        next_obs, reward, done, _info = environment.step(action)
+                    except Exception as step_exc:
+                        # One failed step = don't blow up the run; increment
+                        # consecutive_errors and maybe abort.
+                        consecutive_errors += 1
+                        # Pop the user message we just added — otherwise the
+                        # history will have an unanswered prompt.
+                        messages.pop()
+                        cap = self.config.max_consecutive_errors
+                        if cap is not None and consecutive_errors >= cap:
+                            termination_reason = "error"
+                            error_message = (
+                                f"aborted after {consecutive_errors} consecutive errors: "
+                                f"{type(step_exc).__name__}: {step_exc}"
+                            )
+                            steps_executed = step
+                            break
+                        # Soft-fail: skip this step, continue the run.
+                        continue
 
                     entry = TrajectoryEntry(
                         step=step,
@@ -135,6 +159,7 @@ class AgentRunner:
                     logger.append(entry, frame_png=frame)
                     final_reward = reward
                     steps_executed = step + 1
+                    consecutive_errors = 0  # success → reset the counter
 
                     if done:
                         success = True

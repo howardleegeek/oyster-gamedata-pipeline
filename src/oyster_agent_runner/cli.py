@@ -80,12 +80,8 @@ def _make_provider(provider_key: str, model: str) -> LLMProvider:
 def run_cmd(
     env: Annotated[str, typer.Option(help="Environment key: mock, minecraft, factorio, gym:<id>")],
     task: Annotated[str, typer.Option("--task", help="Natural-language task instruction")],
-    provider: Annotated[
-        str, typer.Option(help="LLM provider: mock, claude, or openai")
-    ] = "mock",
-    model: Annotated[
-        str, typer.Option(help="Model id for the provider")
-    ] = "claude-sonnet-4-5",
+    provider: Annotated[str, typer.Option(help="LLM provider: mock, claude, or openai")] = "mock",
+    model: Annotated[str, typer.Option(help="Model id for the provider")] = "claude-sonnet-4-5",
     max_steps: Annotated[int, typer.Option(help="Hard cap on agent steps")] = 100,
     hours: Annotated[
         float | None,
@@ -143,7 +139,9 @@ def run_cmd(
     result = runner.run(agent_task, environment, llm_provider, run_output_dir)
 
     # Render result summary.
-    table = Table(title="Result", show_header=False, border_style="green" if result.success else "red")
+    table = Table(
+        title="Result", show_header=False, border_style="green" if result.success else "red"
+    )
     table.add_column("field", style="bold")
     table.add_column("value")
     table.add_row("success", str(result.success))

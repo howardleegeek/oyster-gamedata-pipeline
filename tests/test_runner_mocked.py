@@ -137,7 +137,9 @@ def test_runner_parses_malformed_action_gracefully(tmp_path: Path) -> None:
         required_provider_model="mock",
     )
     runner = AgentRunner(RunnerConfig(write_frames=False))
-    result = runner.run(task, MockEnvironment(done_after_steps=100), NoTagProvider(), tmp_path / "run")
+    result = runner.run(
+        task, MockEnvironment(done_after_steps=100), NoTagProvider(), tmp_path / "run"
+    )
 
     traj = _read_jsonl(Path(result.trajectory_path))
     actions = [e for e in traj if e["event_type"] == "ACTION"]

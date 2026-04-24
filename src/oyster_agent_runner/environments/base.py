@@ -7,6 +7,16 @@ integrations wrapped in sub-modules.
 
 `MockEnvironment` is a pure-Python fake that lets the whole runner be
 integration-tested end-to-end without any game installed.
+
+Vision support
+--------------
+The optional `last_frame()` method exposes the most recent rendered
+frame as raw PNG bytes. Vision-aware LLM providers (see
+`providers.claude_vision` / `providers.openai_vision`) call this *after*
+`reset()` / `step()` so they can include the image in the next
+`messages.create` call. Environments that don't implement `last_frame`
+are still fully supported — the runner only calls it when the provider
+opts in via `wants_vision = True`.
 """
 
 from __future__ import annotations
@@ -67,10 +77,39 @@ class Environment(Protocol):
         ...
 
 
+@runtime_checkable
+class VisionCapableEnvironment(Environment, Protocol):
+    """Optional extension — env can surface its last rendered frame.
+
+    Implemented by `MockEnvironment` and any real env that wants to
+    participate in vision-based agent loops. Consumers should use
+    `has_vision(env)` rather than `isinstance(env, VisionCapableEnvironment)`
+    since not every real env subclasses Protocols explicitly.
+    """
+
+    def last_frame(self) -> bytes | None:
+        """Return the most recently rendered frame, or None if unavailable."""
+        ...
+
+
+def has_vision(env: object) -> bool:
+    """True if `env` exposes a callable `last_frame()` method.
+
+    Structural check — Python Protocols don't enforce at runtime unless
+    decorated with `@runtime_checkable` AND the callsite uses
+    `isinstance`, but that still requires explicit inheritance for
+    non-Protocol subclasses. `hasattr` is the cheapest, most permissive
+    check and matches the duck-typing spirit of the rest of the package.
+    """
+    return callable(getattr(env, "last_frame", None))
+
+
 # --- MockEnvironment ----------------------------------------------------------
 
 
-def _tiny_png(width: int = 2, height: int = 2, color: tuple[int, int, int] = (128, 128, 128)) -> bytes:
+def _tiny_png(
+    width: int = 2, height: int = 2, color: tuple[int, int, int] = (128, 128, 128)
+) -> bytes:
     """Hand-build a minimal valid PNG — avoids pulling Pillow into the core.
 
     Deterministic: same (width, height, color) -> identical bytes.
@@ -111,6 +150,9 @@ class MockEnvironment:
         self._seed: int = 0
         self._last_action: Action | None = None
         self._is_shutdown = False
+        # Cache last rendered frame so VisionCapableEnvironment protocol works
+        # without a fresh render call (and without re-encoding a PNG).
+        self._last_frame: bytes | None = None
 
     def reset(self, seed: int | None = None) -> Observation:
         if self._is_shutdown:
@@ -118,6 +160,7 @@ class MockEnvironment:
         self._step_count = 0
         self._seed = seed if seed is not None else 0
         self._last_action = None
+        self._last_frame = None
         return self._observation()
 
     def step(self, action: Action) -> tuple[Observation, float, bool, dict[str, Any]]:
@@ -133,7 +176,12 @@ class MockEnvironment:
         # Deterministic tiny PNG whose grey channel encodes progress — lets
         # visual pipelines be tested without real screenshots.
         progress = min(255, int(255 * self._step_count / max(1, self.done_after_steps)))
-        return _tiny_png(width=2, height=2, color=(progress, progress, progress))
+        self._last_frame = _tiny_png(width=2, height=2, color=(progress, progress, progress))
+        return self._last_frame
+
+    def last_frame(self) -> bytes | None:
+        """Return the most recently rendered frame (or None if never rendered)."""
+        return self._last_frame
 
     def shutdown(self) -> None:
         self._is_shutdown = True
@@ -153,4 +201,6 @@ __all__ = [
     "Environment",
     "MockEnvironment",
     "Observation",
+    "VisionCapableEnvironment",
+    "has_vision",
 ]
