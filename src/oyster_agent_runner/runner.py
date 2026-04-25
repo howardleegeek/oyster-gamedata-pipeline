@@ -16,6 +16,7 @@ even if the agent crashes mid-run.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import re
 import time
@@ -244,11 +245,9 @@ class AgentRunner:
                 termination_reason = "error"
                 error_message = f"{type(exc).__name__}: {exc}"
             finally:
-                try:
+                # Best-effort shutdown — we're already on the terminal path.
+                with contextlib.suppress(Exception):
                     environment.shutdown()
-                except Exception:
-                    # Best-effort — we're already on the terminal path.
-                    pass
                 logger.end(
                     success=success,
                     total_steps=steps_executed,
@@ -358,10 +357,7 @@ class AgentRunner:
 
     @staticmethod
     def _format_observation(obs: Observation | str, step: int) -> str:
-        if isinstance(obs, str):
-            obs_repr = obs
-        else:
-            obs_repr = json.dumps(obs, sort_keys=True, default=str)
+        obs_repr = obs if isinstance(obs, str) else json.dumps(obs, sort_keys=True, default=str)
         return f"[step {step}] observation:\n{obs_repr}"
 
     @staticmethod
