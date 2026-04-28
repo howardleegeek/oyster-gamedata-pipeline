@@ -31,7 +31,13 @@ from oyster_agent_runner.environments.base import (
     has_vision,
 )
 from oyster_agent_runner.providers.base import LLMProvider
-from oyster_agent_runner.schema import AgentTask, TaskResult, TrajectoryEntry, TrajectoryEvent
+from oyster_agent_runner.schema import (
+    EVENT_LLM_THINKING,
+    AgentTask,
+    TaskResult,
+    TrajectoryEntry,
+    TrajectoryEvent,
+)
 from oyster_agent_runner.tools import (
     EVENT_TOOL_CALL,
     EVENT_TOOL_RESULT,
@@ -148,6 +154,29 @@ class AgentRunner:
                             messages=messages,
                             temperature=self.config.temperature,
                         )
+
+                        # Thinking-mode hook: providers that capture
+                        # extended-thinking content expose a `last_thinking`
+                        # str attribute populated by the most recent chat()
+                        # call. We emit a dedicated `LLM_THINKING` event
+                        # *before* the regular `LLM_REASONING` so the
+                        # trajectory orders chain-of-thought (the agent's
+                        # private deliberation) before the externalized
+                        # reasoning + action.
+                        if getattr(provider, "wants_thinking_capture", False):
+                            thinking_text = getattr(provider, "last_thinking", None)
+                            if thinking_text:
+                                logger.write_event(
+                                    TrajectoryEvent(
+                                        timestamp=time.monotonic() - wall_start,
+                                        event_type=EVENT_LLM_THINKING,
+                                        event_args={
+                                            "step": step,
+                                            "text": thinking_text,
+                                        },
+                                    )
+                                )
+
                         reasoning, action = self._parse_llm_response(llm_text)
 
                         # Record assistant turn so the LLM sees its own history.
