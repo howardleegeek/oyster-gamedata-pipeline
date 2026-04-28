@@ -1,0 +1,17 @@
+{
+  "task_id": "MC-tutorial-001",
+  "natural_language_instruction": "Spawn in survival mode. Find the nearest oak tree (or any wood-bearing tree). Approach it and break exactly one log block by digging it. Stop once a single oak_log (or any *_log variant) is in your inventory. Avoid hostile mobs.",
+  "success_criteria": [
+    "inventory contains >= 1 oak_log (or any *_log)",
+    "bot.health > 0"
+  ],
+  "max_steps": 50,
+  "target_hours": 0.1,
+  "environment": "minecraft",
+  "required_provider_model": "claude-sonnet-4-5",
+  "world_seed": 42,
+  "spawn_position": null,
+  "max_minutes": 5,
+  "thinking_budget_tokens": 16000,
+  "model_required": "claude-sonnet-4-5"
+}

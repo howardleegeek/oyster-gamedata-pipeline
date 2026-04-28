@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -22,9 +23,10 @@ from oyster_agent_runner.environments.base import Environment, MockEnvironment
 from oyster_agent_runner.environments.factorio import FactorioEnvironment
 from oyster_agent_runner.environments.gym_env import GymEnvironment
 from oyster_agent_runner.environments.minecraft import MinecraftEnvironment
+from oyster_agent_runner.minecraft_streams import MinecraftStreamWriter
 from oyster_agent_runner.providers.base import LLMProvider, MockLLMProvider
 from oyster_agent_runner.runner import AgentRunner, RunnerConfig
-from oyster_agent_runner.schema import AgentTask
+from oyster_agent_runner.schema import AgentTask, TrajectoryEvent
 
 app = typer.Typer(
     name="oyster-agent",
@@ -49,8 +51,11 @@ ENV_REGISTRY: list[dict[str, str]] = [
     },
     {
         "key": "minecraft",
-        "description": "MineRL (pixel) or Mineflayer (headless) — see module docs",
-        "status": "stub",
+        "description": (
+            "Mineflayer subprocess (Phase 1 LIVE — needs Node.js + Paper server). "
+            "MineRL path still stubbed."
+        ),
+        "status": "live (mineflayer)",
     },
     {
         "key": "factorio",
@@ -90,6 +95,11 @@ PROVIDER_REGISTRY: list[dict[str, str]] = [
         "description": "OpenAI + data:URI image_url content block",
         "status": "needs OPENAI_API_KEY",
     },
+    {
+        "key": "claude-thinking",
+        "description": "Anthropic Claude with extended-thinking capture (Phase 1 Minecraft)",
+        "status": "needs ANTHROPIC_API_KEY",
+    },
 ]
 
 
@@ -98,7 +108,7 @@ def _make_environment(env_key: str) -> Environment:
 
     Keys:
       mock               deterministic fake (always available)
-      minecraft          STUB — raises NotImplementedError on reset
+      minecraft          Mineflayer subprocess (Phase 1 LIVE — see run-mc command)
       factorio           STUB — raises NotImplementedError on reset
       gym:<env_id>       real wrapper if gymnasium is installed, stub otherwise
     """
@@ -111,6 +121,17 @@ def _make_environment(env_key: str) -> Environment:
     if env_key.startswith("gym:"):
         return GymEnvironment(env_id=env_key.split(":", 1)[1])
     raise typer.BadParameter(f"Unknown environment: {env_key!r}")
+
+
+def _make_minecraft_environment(host: str, port: int, username: str) -> Environment:
+    """Factory used by `run-mc` so tests can monkey-patch a fake env in.
+
+    Real callers always get a `MinecraftEnvironment`. The seam exists
+    purely so the unit test for `run-mc` can substitute `MockEnvironment`
+    without spawning a Mineflayer subprocess (which requires `npm install`
+    in `mineflayer/` — see PHASE1_RUNBOOK.md).
+    """
+    return MinecraftEnvironment(host=host, port=port, username=username)
 
 
 def _make_provider(provider_key: str, model: str) -> LLMProvider:
@@ -141,6 +162,10 @@ def _make_provider(provider_key: str, model: str) -> LLMProvider:
         from oyster_agent_runner.providers.openai_vision import OpenAIVisionProvider
 
         return OpenAIVisionProvider(model=model)
+    if provider_key == "claude-thinking":
+        from oyster_agent_runner.providers.claude_thinking import ClaudeThinkingProvider
+
+        return ClaudeThinkingProvider(model=model)
     raise typer.BadParameter(f"Unknown provider: {provider_key!r}")
 
 
@@ -325,6 +350,202 @@ def validate_task_cmd(
     table.add_column("value")
     for key, value in task.model_dump().items():
         table.add_row(key, str(value))
+    console.print(table)
+
+
+@app.command("run-mc")
+def run_mc_cmd(
+    task_file: Annotated[
+        Path,
+        typer.Option("--task-file", help="Path to a JSON AgentTask definition."),
+    ],
+    output_dir: Annotated[
+        Path,
+        typer.Option(
+            "--output-dir",
+            help="Directory to write cot.jsonl, metadata.jsonl, inputs.jsonl, manifest.json into.",
+        ),
+    ],
+    minecraft_server: Annotated[
+        str,
+        typer.Option(
+            "--minecraft-server",
+            help="host:port of the Paper/Spigot server (default: localhost:25565)",
+        ),
+    ] = "localhost:25565",
+    provider: Annotated[
+        str,
+        typer.Option(
+            "--provider",
+            help="LLM provider key (recommended: claude-thinking)",
+        ),
+    ] = "claude-thinking",
+    model: Annotated[
+        str | None,
+        typer.Option(
+            "--model",
+            help="Model id override. If unset, uses task.required_provider_model.",
+        ),
+    ] = None,
+    max_steps: Annotated[
+        int | None,
+        typer.Option("--max-steps", help="Override task.max_steps."),
+    ] = None,
+    bot_username: Annotated[
+        str,
+        typer.Option("--bot-username", help="Mineflayer bot username (offline-mode auth)."),
+    ] = "oyster_bot",
+) -> None:
+    """Run a Minecraft Phase 1 trajectory: cot.jsonl + metadata.jsonl + inputs.jsonl + manifest.json.
+
+    Phase 1 deliberately omits the video stream (`video.mp4` + `frames.jsonl`).
+    Phase 2 plugs in the OBS spectator pipeline. See
+    `docs/MINECRAFT_TRAJECTORY_SPEC.md` for the product context and
+    `docs/PHASE1_RUNBOOK.md` for operator instructions.
+
+    The command exits 0 on a clean run regardless of `success` (the
+    manifest's `result.success` carries that signal); exits non-zero only
+    on bootstrap failure (bad task file, missing server, etc).
+    """
+    # 1. Load task.
+    try:
+        raw = task_file.read_text(encoding="utf-8")
+        task_data = json.loads(raw)
+    except OSError as exc:
+        console.print(f"[red]cannot read task file: {exc}[/red]")
+        raise typer.Exit(code=2) from exc
+    except json.JSONDecodeError as exc:
+        console.print(f"[red]invalid JSON in task file:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    # Allow the task JSON to declare schema fields that AgentTask doesn't yet
+    # know about (thinking_budget_tokens, world_seed, spawn_position) — we
+    # consume them at the CLI layer to keep the AgentTask schema stable.
+    extras = {
+        k: task_data.pop(k, None)
+        for k in (
+            "world_seed",
+            "spawn_position",
+            "max_minutes",
+            "thinking_budget_tokens",
+            "model_required",
+        )
+    }
+    if "max_minutes" in task_data:
+        # Already popped above; this branch never executes — kept for clarity.
+        pass
+
+    if max_steps is not None:
+        task_data["max_steps"] = max_steps
+
+    try:
+        agent_task = AgentTask.model_validate(task_data)
+    except Exception as exc:  # noqa: BLE001 — pydantic surface is broad
+        console.print(f"[red]invalid AgentTask:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    resolved_model = model or agent_task.required_provider_model
+
+    # 2. Parse server URI.
+    if ":" not in minecraft_server:
+        host = minecraft_server
+        port = 25565
+    else:
+        host, port_str = minecraft_server.rsplit(":", 1)
+        try:
+            port = int(port_str)
+        except ValueError as exc:
+            console.print(f"[red]invalid port in --minecraft-server:[/red] {port_str}")
+            raise typer.Exit(code=1) from exc
+
+    output_dir = output_dir.expanduser().resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    console.print(
+        Panel.fit(
+            f"[bold]Minecraft Phase 1 trajectory[/bold] "
+            f"task=[cyan]{agent_task.task_id}[/cyan]\n"
+            f"server=[green]{host}:{port}[/green]  provider=[green]{provider}[/green]  "
+            f"model=[green]{resolved_model}[/green]\n"
+            f"max_steps={agent_task.max_steps}  bot_username={bot_username}\n"
+            f"output_dir={output_dir}",
+            title="oyster-agent run-mc",
+            border_style="blue",
+        )
+    )
+
+    # 3. Build env + provider.
+    environment = _make_minecraft_environment(host=host, port=port, username=bot_username)
+    llm_provider = _make_provider(provider, resolved_model)
+
+    # 4. Anchor the wall clock now.
+    anchor_utc = datetime.now(UTC)
+    runner = AgentRunner(RunnerConfig(write_frames=False))
+
+    # 5. Run.
+    result = runner.run(agent_task, environment, llm_provider, output_dir)
+
+    # 6. Demux trajectory.jsonl → cot/metadata/inputs + manifest.
+    trajectory_path = Path(result.trajectory_path)
+    if not trajectory_path.exists():
+        console.print(
+            f"[red]runner exited but trajectory.jsonl is missing at {trajectory_path}[/red]"
+        )
+        raise typer.Exit(code=2)
+
+    with MinecraftStreamWriter(output_dir) as streams:
+        with trajectory_path.open(encoding="utf-8") as fh:
+            for ln in fh:
+                ln = ln.strip()
+                if not ln:
+                    continue
+                try:
+                    payload = json.loads(ln)
+                except json.JSONDecodeError:
+                    continue
+                try:
+                    event = TrajectoryEvent.model_validate(payload)
+                except Exception:  # noqa: BLE001 — be permissive on a logged file
+                    continue
+                streams.write(event)
+
+        thinking_budget = extras.get("thinking_budget_tokens")
+        streams.finalize_manifest(
+            task_id=agent_task.task_id,
+            model=resolved_model,
+            provider=provider,
+            environment=agent_task.environment,
+            anchor_utc=anchor_utc,
+            success=result.success,
+            termination_reason=result.termination_reason,
+            total_steps=result.total_steps,
+            wall_clock_sec=result.wall_clock_sec,
+            thinking_budget_tokens=thinking_budget,
+            license="train-only",
+            extra={
+                k: v for k, v in extras.items() if v is not None and k != "thinking_budget_tokens"
+            },
+        )
+
+    # 7. Render summary table.
+    table = Table(
+        title="Phase 1 Result",
+        show_header=False,
+        border_style="green" if result.success else "red",
+    )
+    table.add_column("field", style="bold")
+    table.add_column("value")
+    table.add_row("task_id", agent_task.task_id)
+    table.add_row("success", str(result.success))
+    table.add_row("termination_reason", result.termination_reason)
+    table.add_row("total_steps", str(result.total_steps))
+    table.add_row("wall_clock_sec", f"{result.wall_clock_sec:.2f}")
+    if result.error_message:
+        table.add_row("error", result.error_message)
+    table.add_row("manifest", str(output_dir / "manifest.json"))
+    table.add_row("cot.jsonl", str(output_dir / "cot.jsonl"))
+    table.add_row("metadata.jsonl", str(output_dir / "metadata.jsonl"))
+    table.add_row("inputs.jsonl", str(output_dir / "inputs.jsonl"))
     console.print(table)
 
 

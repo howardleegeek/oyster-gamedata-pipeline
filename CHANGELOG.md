@@ -2,6 +2,48 @@
 
 ## [Unreleased]
 
+### Minecraft Phase 1 — CoT + metadata + inputs trajectory pipeline
+- `mineflayer/bot.js` — Node.js subprocess implementing the
+  Mineflayer half of the JSON-line stdio protocol (`hello`, `spawn`,
+  `action`, `observation`, `error`, `goodbye` messages); supports four
+  Phase 1 actions: `move_to`, `dig`, `look`, `chat`. Defensive against
+  malformed parent input, mineflayer crashes, and unknown ops.
+- `mineflayer/protocol.md` — versioned wire-protocol contract.
+- `MinecraftEnvironment` upgraded from stub to a Mineflayer-backed
+  `Environment` implementation. Spawns the bot as a subprocess, performs
+  hello+spawn handshake, dispatches actions, surfaces fatal errors as
+  `RuntimeError` so the runner's fail-safe handles them. MineRL path
+  remains stubbed for Phase 3+.
+- `ClaudeThinkingProvider` — Anthropic Messages API wrapper with
+  `thinking={"type":"enabled","budget_tokens":16000}` enabled by default.
+  Captures all `thinking`-type content blocks into `last_thinking` for
+  the runner to emit as a separate `LLM_THINKING` event. Forces
+  `temperature=1.0` per Anthropic API requirement.
+- Runner change: when `provider.wants_thinking_capture` is True, emit a
+  new `LLM_THINKING` event (with the full chain-of-thought text) before
+  the `LLM_REASONING` event each step. Backwards-compatible — providers
+  without the flag see no behavior change.
+- `MinecraftStreamWriter` — Phase 1 multi-stream demuxer that writes
+  `cot.jsonl` (thinking + reasoning + actions), `metadata.jsonl`
+  (observations + ticks), `inputs.jsonl` (action stream), and
+  `manifest.json` (session metadata + alignment proof) sharing a single
+  wall-clock anchor.
+- `oyster-agent run-mc` CLI command — drives a single Phase 1
+  trajectory end-to-end: load task JSON → spawn bot → run agent loop →
+  demux trajectory.jsonl into the four Phase 1 files.
+- `tasks/MC-tutorial-001.json` — first task definition (punch a tree,
+  collect 1 log) following the spec § 4 schema.
+- `docs/PHASE1_RUNBOOK.md` — operator-facing runbook covering Paper
+  server install, npm install, the run command, expected output sizes,
+  cost estimates, troubleshooting.
+- 37 new tests (all mock-based, no Minecraft server required for CI):
+  Mineflayer protocol parser, env lifecycle with fake subprocess,
+  `ClaudeThinkingProvider` with mocked SDK responses, runner thinking-
+  event emission semantics, multi-stream writer, run-mc CLI integration.
+
+Phase 1 deliberately omits the video stream (`video.mp4` +
+`frames.jsonl`) — that lands in Phase 2 with the OBS spectator pipeline.
+
 ### CLI — introspection & validation
 - `oyster-agent list-envs` — print registered environments (table or
   `--json`) with status and description columns
