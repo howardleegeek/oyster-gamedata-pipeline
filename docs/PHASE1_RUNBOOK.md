@@ -229,6 +229,15 @@ couldn't make progress; consider chunking the goal.
 
 ## 6. Manual integration smoke test
 
+> **Automated path:** for the common case, run `bin/smoke_phase1.sh` instead
+> of the steps below. The script auto-detects `java`/`node`/`npm` (gracefully
+> skips with exit 0 when any are missing), downloads a pinned Paper jar to
+> `bin/.cache/paper-1.20.4.jar`, runs `npm install` if `mineflayer/node_modules/`
+> is absent, boots Paper, runs `run-mc` with `--max-steps 5`, validates the
+> four output files, and tears Paper down. Use `--dry-run` to exercise the
+> script's plumbing in CI without launching Paper, and `--no-download` to
+> reuse an already-cached jar. Exit 0 = pass or skip; exit 1 = real failure.
+
 The unit tests use a mocked subprocess. To verify the real wiring:
 
 ```bash
