@@ -100,6 +100,14 @@ PROVIDER_REGISTRY: list[dict[str, str]] = [
         "description": "Anthropic Claude with extended-thinking capture (Phase 1 Minecraft)",
         "status": "needs ANTHROPIC_API_KEY",
     },
+    {
+        "key": "gpt-thinking",
+        "description": (
+            "OpenAI reasoning models (o1 / gpt-5-thinking) — "
+            "structural placeholder; stub response when OPENAI_API_KEY unset"
+        ),
+        "status": "stub (no key) / experimental (with key)",
+    },
 ]
 
 
@@ -166,6 +174,10 @@ def _make_provider(provider_key: str, model: str) -> LLMProvider:
         from oyster_agent_runner.providers.claude_thinking import ClaudeThinkingProvider
 
         return ClaudeThinkingProvider(model=model)
+    if provider_key == "gpt-thinking":
+        from oyster_agent_runner.providers.gpt_thinking import GPTThinkingProvider
+
+        return GPTThinkingProvider(model=model)
     raise typer.BadParameter(f"Unknown provider: {provider_key!r}")
 
 
@@ -643,6 +655,77 @@ def replay_cmd(
             "yes" if s.success_flag else "",
         )
     console.print(table)
+
+
+@app.command("package-trajectory")
+def package_trajectory_cmd(
+    bundle_dir: Annotated[
+        Path,
+        typer.Option(
+            "--bundle-dir",
+            help="Path to a Phase 1 bundle directory (manifest.json + 3 streams).",
+        ),
+    ],
+    output: Annotated[
+        Path,
+        typer.Option(
+            "--output",
+            help="Destination zip path. Parent dirs are created as needed.",
+        ),
+    ],
+    verify: Annotated[
+        bool,
+        typer.Option(
+            "--verify",
+            help="After packaging, round-trip extract the zip and check checksums.",
+        ),
+    ] = False,
+) -> None:
+    """Wrap a Phase 1 bundle in the L1-parity envelope and emit a buyer-ready zip.
+
+    Adds ``provenance.json`` (git SHA + package version + model identifiers
+    + ISO 8601 packaging timestamp) and ``packaged.manifest.json`` (original
+    manifest extended with a ``checksums`` block) alongside the original
+    streams, all zipped together.
+    """
+    from oyster_agent_runner.trajectory_packager import TrajectoryPackager
+
+    try:
+        packager = TrajectoryPackager(bundle_dir)
+    except FileNotFoundError as exc:
+        console.print(f"[red]cannot load bundle:[/red] {exc}")
+        raise typer.Exit(code=2) from exc
+
+    try:
+        zip_path = packager.package(output)
+    except ValueError as exc:
+        console.print(f"[red]packaging failed:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title="Trajectory Bundle Packaged", border_style="green", show_header=False)
+    table.add_column("field", style="bold")
+    table.add_column("value")
+    table.add_row("bundle_dir", str(bundle_dir.resolve()))
+    table.add_row("zip", str(zip_path.resolve()))
+    table.add_row("size_bytes", str(zip_path.stat().st_size))
+    console.print(table)
+
+    if verify:
+        report = packager.verify_package(zip_path)
+        verdict_color = "green" if report.ok else "red"
+        v_table = Table(title="Verification", border_style=verdict_color, show_header=False)
+        v_table.add_column("field", style="bold")
+        v_table.add_column("value")
+        v_table.add_row("ok", str(report.ok))
+        v_table.add_row("step_count", str(report.step_count))
+        v_table.add_row("manifest_matches_streams", str(report.manifest_matches_streams))
+        console.print(v_table)
+        if report.issues:
+            console.print("[yellow]issues:[/yellow]")
+            for issue in report.issues:
+                console.print(f"  - {issue}")
+        if not report.ok:
+            raise typer.Exit(code=1)
 
 
 @app.command("quote")
