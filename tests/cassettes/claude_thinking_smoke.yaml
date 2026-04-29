@@ -1,0 +1,62 @@
+# SYNTHETIC CASSETTE — handwritten, not recorded.
+#
+# This file was NOT produced by a real Anthropic API call. It is a hand-crafted
+# YAML that mimics the wire format vcrpy produces, sufficient for replay against
+# `client.messages.create(...)` from the `anthropic` Python SDK.
+#
+# To regenerate this cassette from a real API call, set both:
+#   OYSTER_RECORD_VCR=1
+#   ANTHROPIC_API_KEY=sk-ant-...
+# and run:
+#   pytest tests/test_claude_thinking_provider_vcr.py -v
+#
+# When recording, the test fixture redacts `x-api-key` and `authorization`
+# headers via vcrpy's `filter_headers` option before writing — so the recorded
+# cassette is also safe to commit. See docs/VCR_TESTING.md for details.
+#
+# Structure: one interaction (POST /v1/messages) returning a thinking block
+# followed by a text block. The text content is intentionally short ("OK") and
+# the model is the default `claude-sonnet-4-5` to match production wiring.
+interactions:
+- request:
+    body: '{"model": "claude-sonnet-4-5", "max_tokens": 2048, "messages": [{"role":
+      "user", "content": "Say OK."}], "system": "You are a smoke test. Reply with exactly
+      OK.", "temperature": 1.0, "thinking": {"type": "enabled", "budget_tokens": 1024}}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      anthropic-version:
+      - '2023-06-01'
+      connection:
+      - keep-alive
+      content-type:
+      - application/json
+      host:
+      - api.anthropic.com
+      user-agent:
+      - Anthropic/Python
+      x-api-key:
+      - REDACTED
+      authorization:
+      - REDACTED
+    method: POST
+    uri: https://api.anthropic.com/v1/messages
+  response:
+    body:
+      string: '{"id":"msg_synthetic_smoke_01","type":"message","role":"assistant","model":"claude-sonnet-4-5","content":[{"type":"thinking","thinking":"The
+        user asked me to say OK. This is a simple smoke test. I should reply with exactly
+        OK to honor the system prompt.","signature":"synthetic_signature_value"},{"type":"text","text":"OK"}],"stop_reason":"end_turn","stop_sequence":null,"usage":{"input_tokens":42,"output_tokens":35,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}'
+      encoding: null
+    headers:
+      content-type:
+      - application/json
+      anthropic-organization-id:
+      - synthetic-org
+      request-id:
+      - req_synthetic_smoke_01
+    status:
+      code: 200
+      message: OK
+version: 1
