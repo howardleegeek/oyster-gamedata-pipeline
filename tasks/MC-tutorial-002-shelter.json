@@ -1,0 +1,20 @@
+{
+  "task_id": "MC-tutorial-002-shelter",
+  "natural_language_instruction": "Spawn in survival mode. The sun is going down — you have roughly 10 in-game minutes before mobs start spawning. Gather at least 8 oak (or any wood) logs, craft 16 wood planks, and place them as a 1-block-thick enclosed shelter (4 walls + roof, minimum 3x3 footprint) before nightfall. Door optional. Stay alive: bot.health > 0 throughout.",
+  "success_criteria": [
+    "shelter encloses bot's spawn area on all 4 sides + roof, 1 block thick",
+    "at least 16 plank blocks placed",
+    "bot.health > 0 at end",
+    "{\"type\": \"inventory_used\", \"item\": \"oak_planks\", \"min_count\": 16}",
+    "{\"type\": \"world_time\", \"phase\": \"day_or_dusk_at_completion\"}"
+  ],
+  "max_steps": 30,
+  "target_hours": 0.25,
+  "environment": "minecraft",
+  "required_provider_model": "claude-sonnet-4-5",
+  "world_seed": 42,
+  "spawn_position": null,
+  "max_minutes": 15,
+  "thinking_budget_tokens": 16000,
+  "model_required": "claude-sonnet-4-5"
+}

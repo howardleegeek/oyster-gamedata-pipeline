@@ -1,0 +1,23 @@
+{
+  "task_id": "MC-craft-001-furnace-and-bake",
+  "natural_language_instruction": "Spawn in survival mode. Multi-step crafting chain: (1) gather wood and craft a crafting_table, (2) gather 8 cobblestone, craft a furnace, (3) acquire raw_iron (at least 1) and coal (at least 1) by mining, (4) place the furnace, smelt 1 raw_iron into 1 iron_ingot using coal as fuel, (5) end the run with at least 1 iron_ingot in inventory and the furnace still placed in the world. bot.health > 0.",
+  "success_criteria": [
+    "inventory contains >= 1 iron_ingot",
+    "a furnace block is placed in the world (within 32 blocks of bot final position)",
+    "a crafting_table block is placed in the world (within 32 blocks of bot final position)",
+    "bot.health > 0 at end",
+    "{\"type\": \"inventory_contains\", \"item\": \"iron_ingot\", \"min_count\": 1}",
+    "{\"type\": \"block_placed_in_world\", \"block\": \"furnace\", \"radius_from_bot\": 32}",
+    "{\"type\": \"block_placed_in_world\", \"block\": \"crafting_table\", \"radius_from_bot\": 32}",
+    "{\"type\": \"smelting_history_includes\", \"item\": \"iron_ingot\", \"min_count\": 1}"
+  ],
+  "max_steps": 60,
+  "target_hours": 0.75,
+  "environment": "minecraft",
+  "required_provider_model": "claude-sonnet-4-5",
+  "world_seed": 42,
+  "spawn_position": null,
+  "max_minutes": 45,
+  "thinking_budget_tokens": 16000,
+  "model_required": "claude-sonnet-4-5"
+}

@@ -1,0 +1,21 @@
+{
+  "task_id": "MC-mine-001-coal",
+  "natural_language_instruction": "Spawn in survival mode with a stone pickaxe in your starting inventory. Explore the surface and any nearby caves to find coal_ore deposits. Mine at least 5 coal ore blocks (yielding raw coal). Return to the surface with at least 5 coal in your inventory and bot.health > 0. Avoid lava and creepers; bring torches if you have them.",
+  "success_criteria": [
+    "inventory contains >= 5 coal",
+    "bot.health > 0 at end",
+    "bot is at surface y-level (y >= 60) at end",
+    "{\"type\": \"inventory_contains\", \"item\": \"coal\", \"min_count\": 5}",
+    "{\"type\": \"blocks_mined_count\", \"block\": \"coal_ore\", \"min_count\": 5}",
+    "{\"type\": \"position_at_end\", \"axis\": \"y\", \"min\": 60.0}"
+  ],
+  "max_steps": 40,
+  "target_hours": 0.4,
+  "environment": "minecraft",
+  "required_provider_model": "claude-sonnet-4-5",
+  "world_seed": 2025,
+  "spawn_position": null,
+  "max_minutes": 25,
+  "thinking_budget_tokens": 16000,
+  "model_required": "claude-sonnet-4-5"
+}

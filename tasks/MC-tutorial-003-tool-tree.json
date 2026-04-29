@@ -1,0 +1,22 @@
+{
+  "task_id": "MC-tutorial-003-tool-tree",
+  "natural_language_instruction": "Spawn in survival mode. Climb the full early-game tool progression: (1) collect wood and craft a wooden pickaxe, (2) mine cobblestone and craft a stone pickaxe, (3) find and mine raw iron, smelt it in a furnace, and craft an iron pickaxe. End with one iron_pickaxe in inventory. Avoid creepers and don't die in lava.",
+  "success_criteria": [
+    "inventory contains >= 1 iron_pickaxe",
+    "inventory contains (or contained at any point) >= 1 wooden_pickaxe",
+    "inventory contains (or contained at any point) >= 1 stone_pickaxe",
+    "bot.health > 0 at end",
+    "{\"type\": \"inventory_contains\", \"item\": \"iron_pickaxe\", \"min_count\": 1}",
+    "{\"type\": \"crafting_history_includes\", \"recipes\": [\"wooden_pickaxe\", \"stone_pickaxe\", \"iron_pickaxe\"]}",
+    "{\"type\": \"smelting_history_includes\", \"item\": \"iron_ingot\", \"min_count\": 3}"
+  ],
+  "max_steps": 80,
+  "target_hours": 1.0,
+  "environment": "minecraft",
+  "required_provider_model": "claude-sonnet-4-5",
+  "world_seed": 42,
+  "spawn_position": null,
+  "max_minutes": 60,
+  "thinking_budget_tokens": 16000,
+  "model_required": "claude-sonnet-4-5"
+}

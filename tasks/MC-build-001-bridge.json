@@ -1,0 +1,21 @@
+{
+  "task_id": "MC-build-001-bridge",
+  "natural_language_instruction": "Spawn at the edge of a 10-block horizontal gap (e.g. ravine, river, void seam). You have a stack of cobblestone in your starting inventory. Bridge the gap by placing exactly 10 cobblestone blocks in a straight line connecting the two edges, then walk across to the far side. The bridge must be 1 block wide, fully connected, and you must end the run standing on the far edge with bot.health > 0. Do not pillar up; do not place water/lava.",
+  "success_criteria": [
+    "10 cobblestone blocks placed in a straight horizontal line spanning the gap",
+    "bot final position is on the opposite edge from the start position",
+    "bot.health > 0 at end",
+    "no fall_damage events recorded",
+    "{\"type\": \"blocks_placed_count\", \"item\": \"cobblestone\", \"min_count\": 10, \"max_count\": 12}",
+    "{\"type\": \"position_delta\", \"axis\": \"horizontal\", \"min_distance\": 10.0}"
+  ],
+  "max_steps": 25,
+  "target_hours": 0.15,
+  "environment": "minecraft",
+  "required_provider_model": "claude-sonnet-4-5",
+  "world_seed": 1337,
+  "spawn_position": null,
+  "max_minutes": 10,
+  "thinking_budget_tokens": 16000,
+  "model_required": "claude-sonnet-4-5"
+}
