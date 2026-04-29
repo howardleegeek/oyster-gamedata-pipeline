@@ -549,5 +549,177 @@ def run_mc_cmd(
     console.print(table)
 
 
+@app.command("replay")
+def replay_cmd(
+    manifest: Annotated[
+        Path,
+        typer.Option("--manifest", help="Path to manifest.json inside a Phase 1 bundle."),
+    ],
+    check: Annotated[
+        bool,
+        typer.Option("--check", help="Run verify_consistency() and print the report."),
+    ] = False,
+    re_execute: Annotated[
+        bool,
+        typer.Option(
+            "--re-execute",
+            help="Replay actions against a fresh MockEnvironment and report drift.",
+        ),
+    ] = False,
+) -> None:
+    """Walk a Phase 1 bundle: list steps, verify consistency, or re-execute.
+
+    Default (no flags) prints a per-step summary table.
+    """
+    from oyster_agent_runner.replay import Replayer
+
+    try:
+        replayer = Replayer(manifest)
+    except (FileNotFoundError, ValueError) as exc:
+        console.print(f"[red]cannot load bundle:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    if check:
+        report = replayer.verify_consistency()
+        verdict_color = "green" if report.ok else "red"
+        table = Table(title="Consistency", border_style=verdict_color, show_header=False)
+        table.add_column("field", style="bold")
+        table.add_column("value")
+        table.add_row("ok", str(report.ok))
+        table.add_row("step_count", str(report.step_count))
+        table.add_row("cot_event_count", str(report.cot_event_count))
+        table.add_row("metadata_event_count", str(report.metadata_event_count))
+        table.add_row("input_event_count", str(report.input_event_count))
+        table.add_row("max_timestamp_sec", f"{report.max_timestamp_sec:.6f}")
+        table.add_row("manifest_matches_streams", str(report.manifest_matches_streams))
+        console.print(table)
+        if report.issues:
+            console.print("[yellow]issues:[/yellow]")
+            for issue in report.issues:
+                console.print(f"  - {issue}")
+        if not report.ok:
+            raise typer.Exit(code=1)
+        return
+
+    if re_execute:
+        drift = replayer.replay_against()
+        verdict_color = "green" if drift.ok else "red"
+        table = Table(title="Replay drift", border_style=verdict_color, show_header=False)
+        table.add_column("field", style="bold")
+        table.add_column("value")
+        table.add_row("ok", str(drift.ok))
+        table.add_row("steps_executed", str(drift.steps_executed))
+        table.add_row("steps_diverged", str(drift.steps_diverged))
+        if drift.early_termination_step is not None:
+            table.add_row("early_termination_step", str(drift.early_termination_step))
+        if drift.error_message:
+            table.add_row("error", drift.error_message)
+        console.print(table)
+        if drift.divergence_reasons:
+            console.print("[yellow]divergence reasons:[/yellow]")
+            for step_idx, reason in drift.divergence_reasons.items():
+                console.print(f"  - step {step_idx}: {reason}")
+        if not drift.ok:
+            raise typer.Exit(code=1)
+        return
+
+    # Default: list steps.
+    steps = replayer.iter_steps()
+    table = Table(title=f"Replay ({len(steps)} steps)", border_style="blue")
+    table.add_column("step", style="bold cyan")
+    table.add_column("timing_ms", justify="right")
+    table.add_column("action")
+    table.add_column("reward", justify="right")
+    table.add_column("done", justify="center")
+    for s in steps:
+        action_repr = json.dumps(s.action) if s.action is not None else "<none>"
+        if len(action_repr) > 60:
+            action_repr = action_repr[:57] + "..."
+        table.add_row(
+            str(s.step_idx),
+            f"{s.timing_ms:.2f}",
+            action_repr,
+            "" if s.reward is None else f"{s.reward:.3f}",
+            "yes" if s.success_flag else "",
+        )
+    console.print(table)
+
+
+@app.command("quote")
+def quote_cmd(
+    task: Annotated[
+        Path,
+        typer.Option("--task", help="Path to a JSON AgentTask file."),
+    ],
+    steps: Annotated[
+        int,
+        typer.Option("--steps", help="Number of agent steps to project."),
+    ] = 50,
+    provider: Annotated[
+        str,
+        typer.Option(
+            "--provider",
+            help=(
+                "Pricing key: claude-thinking | claude-vision | gpt-thinking-stub. "
+                "See src/oyster_agent_runner/pricing.py."
+            ),
+        ),
+    ] = "claude-thinking",
+    thinking_budget: Annotated[
+        int | None,
+        typer.Option(
+            "--thinking-budget",
+            help="Override thinking-token budget (default: task field or 16,000).",
+        ),
+    ] = None,
+    max_tokens: Annotated[
+        int | None,
+        typer.Option(
+            "--max-tokens",
+            help="Sanity bound; must exceed thinking_budget if provided.",
+        ),
+    ] = None,
+    include_replay_cost: Annotated[
+        bool,
+        typer.Option(
+            "--include-replay-cost",
+            help="Add a replay --re-execute cost line (currently $0; see note).",
+        ),
+    ] = False,
+    as_json: Annotated[
+        bool,
+        typer.Option("--json", help="Emit machine-readable JSON instead of text."),
+    ] = False,
+) -> None:
+    """Print a sales-grade token + dollar quote for a task trajectory."""
+    from oyster_agent_runner.quote import build_quote, render_json, render_text
+
+    try:
+        quote = build_quote(
+            task_path=task,
+            steps=steps,
+            provider_key=provider,
+            thinking_budget=thinking_budget,
+            max_tokens=max_tokens,
+            include_replay_cost=include_replay_cost,
+        )
+    except FileNotFoundError as exc:
+        console.print(f"[red]task file not found:[/red] {exc}")
+        raise typer.Exit(code=2) from exc
+    except KeyError as exc:
+        console.print(f"[red]unknown provider:[/red] {exc.args[0]}")
+        raise typer.Exit(code=1) from exc
+    except (ValueError, json.JSONDecodeError) as exc:
+        console.print(f"[red]invalid input:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    if as_json:
+        # `console.print_json` emits the JSON without Rich wrapping it
+        # against the terminal width — matches `validate-task --json`.
+        console.print_json(render_json(quote))
+    else:
+        console.print(render_text(quote))
+
+
 if __name__ == "__main__":
     app()
