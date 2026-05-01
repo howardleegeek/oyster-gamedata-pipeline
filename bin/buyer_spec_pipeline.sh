@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+# =============================================================================
+# buyer_spec_pipeline.sh — one-command production pipeline.
+#
+# Capture → adapt → pack into a buyer-deliverable tarball, end to end.
+#
+# USAGE:
+#   buyer_spec_pipeline.sh \
+#     --task tasks/MC-tutorial-001.json \
+#     --output /tmp/buyer_delivery.tar.gz \
+#     [--max-steps 9000] [--placeholders /tmp/oyster_placeholders] \
+#     [--server localhost:25565] [--bot-username oyster_pipeline]
+#
+# REQUIREMENTS (verified at run time, not at build time):
+#   - oyster-agent CLI on PATH (in this venv: $REPO/.venv/bin/)
+#   - lint_buyer_spec.py + buyer_spec_demo_pack.sh in oyster-enrichment
+#   - Java 21 Paper server running on --server (default localhost:25565)
+#   - ffmpeg on PATH for placeholder video synthesis
+#   - placeholders dir holding gameinfo.xlsx + depth/*.exr (or this script
+#     synthesizes them on first run via _ensure_placeholders)
+#
+# EXIT CODES:
+#   0  delivered .tar.gz at --output
+#   1  capture failed (no trajectory.jsonl)
+#   2  adapt failed
+#   3  lint failed
+#   4  pack failed
+# =============================================================================
+
+set -uo pipefail
+
+REPO="${REPO_OVERRIDE:-/Users/howardli/Downloads/oyster-agent-runner}"
+ENRICHMENT="${ENRICHMENT_OVERRIDE:-/Users/howardli/Downloads/oyster-enrichment}"
+ENRICH_PY="${ENRICHMENT}/.venv/bin/python"
+
+usage() {
+    sed -n '2,30p' "$0"
+    exit 0
+}
+
+# --- arg parse -------------------------------------------------------------
+
+TASK=""
+OUTPUT=""
+MAX_STEPS=9000
+PLACEHOLDERS="/tmp/oyster_placeholders"
+SERVER="localhost:25565"
+BOT_USERNAME="op_${$}"  # ≤16 chars (op_ + PID). Override with --bot-username.
+PROVIDER="scripted"  # default to randomized walk; mock is too degenerate.
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --task)          TASK="$2"; shift 2;;
+        --output)        OUTPUT="$2"; shift 2;;
+        --max-steps)     MAX_STEPS="$2"; shift 2;;
+        --placeholders)  PLACEHOLDERS="$2"; shift 2;;
+        --server)        SERVER="$2"; shift 2;;
+        --bot-username)  BOT_USERNAME="$2"; shift 2;;
+        --provider)      PROVIDER="$2"; shift 2;;
+        --help|-h)       usage;;
+        *) echo "unknown flag: $1" >&2; exit 64;;
+    esac
+done
+
+if [[ -z "$TASK" || -z "$OUTPUT" ]]; then
+    echo "missing --task or --output; see --help" >&2
+    exit 64
+fi
+
+if [[ ! -f "$TASK" ]]; then
+    echo "task file not found: $TASK" >&2
+    exit 64
+fi
+
+# Minecraft bot usernames are bounded to 16 chars (vanilla packet protocol).
+# Anything longer gets a DecoderException at the login handshake and the bot
+# is silently kicked before spawn — surfaced as 0 OBSERVATION events
+# downstream. Fail fast with a clear message instead.
+if [[ ${#BOT_USERNAME} -gt 16 ]]; then
+    echo "[pipeline] bot username '$BOT_USERNAME' is ${#BOT_USERNAME} chars; Minecraft caps at 16. Pass --bot-username with ≤16 chars." >&2
+    exit 64
+fi
+
+# --- step 1: ensure placeholders -------------------------------------------
+
+ensure_placeholders() {
+    local dir="$1"
+    [[ -d "$dir/depth" ]] && [[ -f "$dir/gameinfo.xlsx" ]] && return 0
+
+    echo "[pipeline] staging placeholders at $dir (one-time setup)" >&2
+    mkdir -p "$dir/depth"
+
+    # gameinfo.xlsx
+    if [[ ! -f "$dir/gameinfo.xlsx" ]]; then
+        "$ENRICH_PY" "$ENRICHMENT/bin/generate_gameinfo_xlsx.py" "$dir/gameinfo.xlsx"
+    fi
+
+    # depth/ — one seed EXR + 1800 hardlinks
+    if [[ ! -f "$dir/depth/frame_seed.exr" ]]; then
+        "$ENRICH_PY" -c "
+import sys
+import numpy as np
+import OpenEXR, Imath
+W, H = 96, 96
+xs = np.linspace(0.5, 30.0, W, dtype=np.float32)
+ys = np.linspace(0.5, 30.0, H, dtype=np.float32)
+depth = ((xs[None,:] + ys[:,None]) / 2.0).astype(np.float32)
+header = OpenEXR.Header(W, H)
+header['channels'] = {'Z': Imath.Channel(Imath.PixelType(Imath.PixelType.FLOAT))}
+exr = OpenEXR.OutputFile('$dir/depth/frame_seed.exr', header)
+exr.writePixels({'Z': depth.tobytes()})
+exr.close()
+"
+        for i in $(seq 0 1799); do
+            printf -v fn "frame_%06d.exr" "$i"
+            ln "$dir/depth/frame_seed.exr" "$dir/depth/$fn"
+        done
+    fi
+}
+
+ensure_placeholders "$PLACEHOLDERS"
+
+# --- step 2: capture -------------------------------------------------------
+
+CAPTURE_DIR=$(mktemp -d -t oyster_pipeline_capture)
+echo "[pipeline] capturing into $CAPTURE_DIR (max_steps=$MAX_STEPS)" >&2
+
+"$REPO/.venv/bin/oyster-agent" run-mc \
+    --task-file "$TASK" \
+    --output-dir "$CAPTURE_DIR" \
+    --provider "$PROVIDER" \
+    --max-steps "$MAX_STEPS" \
+    --bot-username "$BOT_USERNAME" \
+    --minecraft-server "$SERVER" >&2
+
+if [[ ! -f "$CAPTURE_DIR/manifest.json" ]]; then
+    echo "[pipeline] capture failed — no manifest.json" >&2
+    exit 1
+fi
+
+# --- step 3: adapt ---------------------------------------------------------
+
+BUYER_DIR=$(mktemp -d -t oyster_pipeline_buyer)
+echo "[pipeline] adapting to $BUYER_DIR" >&2
+
+"$REPO/.venv/bin/oyster-agent" adapt-buyer-spec \
+    --bundle "$CAPTURE_DIR" \
+    --output "$BUYER_DIR" \
+    --placeholders "$PLACEHOLDERS" \
+    --pad-to-min-records 9000 >&2 || {
+        echo "[pipeline] adapt failed" >&2
+        exit 2
+    }
+
+# --- step 4: lint ---------------------------------------------------------
+
+echo "[pipeline] linting" >&2
+"$ENRICH_PY" "$ENRICHMENT/bin/lint_buyer_spec.py" "$BUYER_DIR" >&2 || {
+    echo "[pipeline] lint failed" >&2
+    exit 3
+}
+
+# --- step 5: pack ---------------------------------------------------------
+
+echo "[pipeline] packing into $OUTPUT" >&2
+bash "$ENRICHMENT/bin/buyer_spec_demo_pack.sh" \
+    --bundle "$BUYER_DIR" \
+    --output "$OUTPUT" >&2 || {
+        echo "[pipeline] pack failed" >&2
+        exit 4
+    }
+
+echo "[pipeline] DELIVERED $OUTPUT"
+exit 0

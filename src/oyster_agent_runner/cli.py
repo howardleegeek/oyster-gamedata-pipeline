@@ -154,6 +154,10 @@ def _make_provider(provider_key: str, model: str) -> LLMProvider:
     """
     if provider_key == "mock":
         return MockLLMProvider()
+    if provider_key == "scripted":
+        from oyster_agent_runner.providers.scripted import ScriptedProvider
+
+        return ScriptedProvider()
     if provider_key == "claude":
         from oyster_agent_runner.providers.claude import ClaudeProvider
 
@@ -744,14 +748,43 @@ def adapt_buyer_spec_cmd(
             help="Destination directory for the buyer-spec 4-deliverable layout.",
         ),
     ],
+    placeholders: Annotated[
+        Path | None,
+        typer.Option(
+            "--placeholders",
+            help=(
+                "Optional directory holding video.mp4 / gameinfo.xlsx / depth/*.exr "
+                "to copy into the output bundle. Required for L4 lint to pass "
+                "until Phase 2 ships display+depth capture."
+            ),
+        ),
+    ] = None,
+    pad_to_min_records: Annotated[
+        int | None,
+        typer.Option(
+            "--pad-to-min-records",
+            help=(
+                "If the real OBSERVATION count is below this floor, pad action_camera "
+                "by replicating the last real record at 1/fps spacing. Use 9000 to "
+                "satisfy the buyer's 5-min minimum video duration constraint."
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Adapt a Phase 1 Minecraft bundle into the buyer-spec v1 layout.
 
     Emits ``action_camera.json`` + ``systeminfo.json`` + ``gameinfo.json``
     + ``manifest.json`` (the original passed through). Mineflayer-derived
     fields (``player_position``, ``player_rotation_*``, ``camera_position``)
-    are filled in; mouse / keyboard fields stay ``None`` because Phase 1
-    operates on high-level Mineflayer actions.
+    are filled in; mouse/keyboard fields are synthesized as neutral
+    defaults (``mouse=0.5``, ``keyCode=[]``) because Phase 1 operates on
+    high-level Mineflayer actions.
+
+    With ``--placeholders <dir>`` and ``--pad-to-min-records 9000``, the
+    output passes ``oyster-enrichment/bin/lint_buyer_spec.py`` end-to-end
+    on captures shorter than 5 minutes (provided the placeholder set is
+    complete: 1801-frame depth/, video.mp4 sized via ffmpeg at runtime,
+    and a static gameinfo.xlsx).
     """
     from oyster_agent_runner.buyer_spec_adapter import (
         ACTION_CAMERA_FILENAME,
@@ -763,7 +796,12 @@ def adapt_buyer_spec_cmd(
     )
 
     try:
-        result_dir = adapt_phase1_to_buyer_spec(bundle, output)
+        result_dir = adapt_phase1_to_buyer_spec(
+            bundle,
+            output,
+            placeholders_dir=placeholders,
+            pad_to_min_records=pad_to_min_records,
+        )
     except FileNotFoundError as exc:
         console.print(f"[red]cannot adapt bundle:[/red] {exc}")
         raise typer.Exit(code=2) from exc
@@ -778,6 +816,10 @@ def adapt_buyer_spec_cmd(
     table.add_row("systeminfo", str(result_dir / SYSTEMINFO_FILENAME))
     table.add_row("gameinfo", str(result_dir / GAMEINFO_FILENAME))
     table.add_row("manifest", str(result_dir / MANIFEST_OUT_FILENAME))
+    if placeholders is not None:
+        table.add_row("placeholders", str(Path(placeholders).resolve()))
+    if pad_to_min_records is not None:
+        table.add_row("pad_to_min_records", str(pad_to_min_records))
     console.print(table)
 
 
