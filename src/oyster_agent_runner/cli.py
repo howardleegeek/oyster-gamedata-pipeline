@@ -728,6 +728,59 @@ def package_trajectory_cmd(
             raise typer.Exit(code=1)
 
 
+@app.command("adapt-buyer-spec")
+def adapt_buyer_spec_cmd(
+    bundle: Annotated[
+        Path,
+        typer.Option(
+            "--bundle",
+            help="Path to a Phase 1 bundle directory (manifest.json + 3 streams).",
+        ),
+    ],
+    output: Annotated[
+        Path,
+        typer.Option(
+            "--output",
+            help="Destination directory for the buyer-spec 4-deliverable layout.",
+        ),
+    ],
+) -> None:
+    """Adapt a Phase 1 Minecraft bundle into the buyer-spec v1 layout.
+
+    Emits ``action_camera.json`` + ``systeminfo.json`` + ``gameinfo.json``
+    + ``manifest.json`` (the original passed through). Mineflayer-derived
+    fields (``player_position``, ``player_rotation_*``, ``camera_position``)
+    are filled in; mouse / keyboard fields stay ``None`` because Phase 1
+    operates on high-level Mineflayer actions.
+    """
+    from oyster_agent_runner.buyer_spec_adapter import (
+        ACTION_CAMERA_FILENAME,
+        DELIVERABLE_COUNT,
+        GAMEINFO_FILENAME,
+        MANIFEST_OUT_FILENAME,
+        SYSTEMINFO_FILENAME,
+        adapt_phase1_to_buyer_spec,
+    )
+
+    try:
+        result_dir = adapt_phase1_to_buyer_spec(bundle, output)
+    except FileNotFoundError as exc:
+        console.print(f"[red]cannot adapt bundle:[/red] {exc}")
+        raise typer.Exit(code=2) from exc
+
+    table = Table(title="Buyer-Spec Adapted", border_style="green", show_header=False)
+    table.add_column("field", style="bold")
+    table.add_column("value")
+    table.add_row("bundle", str(bundle.resolve()))
+    table.add_row("output_dir", str(result_dir))
+    table.add_row("deliverables", str(DELIVERABLE_COUNT))
+    table.add_row("action_camera", str(result_dir / ACTION_CAMERA_FILENAME))
+    table.add_row("systeminfo", str(result_dir / SYSTEMINFO_FILENAME))
+    table.add_row("gameinfo", str(result_dir / GAMEINFO_FILENAME))
+    table.add_row("manifest", str(result_dir / MANIFEST_OUT_FILENAME))
+    console.print(table)
+
+
 @app.command("quote")
 def quote_cmd(
     task: Annotated[
