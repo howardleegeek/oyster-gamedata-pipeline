@@ -37,6 +37,16 @@ dev = [
     "ruff>=0.5",
     "black>=24.0",
 ]
+test = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "numpy>=1.26",
+    "openpyxl>=3.1",
+]
+exr = ["OpenEXR>=3.0", "numpy>=1.26"]
+xlsx = ["openpyxl>=3.1"]
+cs2 = ["demoparser2>=0.41"]
+beamng = ["beamngpy>=1.27"]
 
 [project.scripts]
 oyster-agent = "oyster_agent_runner.cli:app"
