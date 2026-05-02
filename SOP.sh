@@ -77,7 +77,7 @@ fi
 
 source .venv/bin/activate
 pip install --upgrade pip >/dev/null 2>&1
-pip install -e .[test] >/dev/null 2>&1
+pip install -e .[test,exr,xlsx] >/dev/null 2>&1
 echo "[STEP 2/8] ✓ Installed repo with test dependencies"
 
 # -----------------------------------------------------------------------------
