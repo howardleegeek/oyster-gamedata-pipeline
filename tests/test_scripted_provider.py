@@ -158,6 +158,54 @@ def test_scripted_provider_action_distribution_roughly_matches_design() -> None:
     # Wide tolerance — RNG variance is real
     # Sprint v3 retuned weights: 25/60/13/2.
     assert 100 < counts["move_to"] < 175
-    assert 250 < counts["look"] < 350
-    assert 40 < counts["noop"] < 95
-    assert 0 < counts["dig"] < 25
+    assert 280 < counts["look"] < 380
+    assert 10 < counts["noop"] < 50
+    assert 0 < counts["dig"] < 30
+
+
+# --- v2 multi-mode tests ---
+
+
+def test_scripted_provider_route_type_default() -> None:
+    p = ScriptedProvider()
+    assert p.route_type == 1
+
+
+def test_scripted_provider_route_type_special() -> None:
+    p = ScriptedProvider(mode="special")
+    assert p.route_type == 2
+
+
+def test_scripted_provider_route_type_loop() -> None:
+    p = ScriptedProvider(mode="loop")
+    assert p.route_type == 3
+
+
+def test_scripted_provider_wasd_balanced_emits_keycode() -> None:
+    """In wasd_balanced mode, move_to actions get a keyCode field."""
+    msgs = [_build_user_message({"bot": {"position": [0.0, 64.0, 0.0]}})]
+    provider = ScriptedProvider(seed=0, mode="wasd_balanced")
+    keycodes_seen: list[int] = []
+    for _ in range(500):
+        reply = provider.chat("", msgs, 0.0)
+        body = reply.split("<action>")[1].split("</action>")[0]
+        action = json.loads(body)
+        if action.get("op") == "move_to" and "keyCode" in action:
+            keycodes_seen.extend(action["keyCode"])
+    # All keys are W/A/S/D vk codes
+    assert set(keycodes_seen).issubset({87, 65, 83, 68})
+    # W (87) should be ~40% of all WASD codes
+    if keycodes_seen:
+        w_pct = keycodes_seen.count(87) / len(keycodes_seen)
+        assert 0.30 < w_pct < 0.50
+
+
+def test_scripted_provider_normal_mode_no_keycode() -> None:
+    """In normal mode, move_to actions do NOT include keyCode."""
+    msgs = [_build_user_message({"bot": {"position": [0.0, 64.0, 0.0]}})]
+    provider = ScriptedProvider(seed=0, mode="normal")
+    for _ in range(50):
+        reply = provider.chat("", msgs, 0.0)
+        body = reply.split("<action>")[1].split("</action>")[0]
+        action = json.loads(body)
+        assert "keyCode" not in action

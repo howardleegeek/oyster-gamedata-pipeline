@@ -96,14 +96,20 @@ class ScriptedProvider:
         Max XZ offset for ``move_to`` targets, in blocks. Default 3.0.
     """
 
-    def __init__(self, seed: int = 0, move_radius: float = 1.5) -> None:
+    def __init__(self, seed: int = 0, mode: str = "normal", move_radius: float = 1.5) -> None:
         # move_radius lowered 3.0 → 1.5: Mineflayer pathfinder default
         # 60s timeout was hanging iter-sprint runs ~30 min/iter when
         # targets were unreachable. Within 1.5 blocks the pathfinder
         # almost always succeeds <1s.
         self._rng = random.Random(seed)
         self._move_radius = float(move_radius)
+        self._mode = mode
         self.call_count = 0
+
+    @property
+    def route_type(self) -> int:
+        """Buyer-spec route_type: 1=normal/wasd, 2=special, 3=loop."""
+        return {"special": 2, "loop": 3}.get(self._mode, 1)
 
     def chat(self, system: str, messages: list[dict], temperature: float) -> str:
         del system, temperature  # unused — keeps Protocol contract
@@ -130,9 +136,9 @@ class ScriptedProvider:
         roll = self._rng.random()
         if roll < 0.25:
             return self._move_to_action(latest_user_text)
-        if roll < 0.85:
+        if roll < 0.92:
             return self._look_action()
-        if roll < 0.98:
+        if roll < 0.97:
             return {"op": "noop"}
         return self._dig_action(latest_user_text)
 
@@ -143,7 +149,20 @@ class ScriptedProvider:
         x, y, z = pos
         dx = self._rng.uniform(-self._move_radius, self._move_radius)
         dz = self._rng.uniform(-self._move_radius, self._move_radius)
-        return {"op": "move_to", "target": [round(x + dx, 2), y, round(z + dz, 2)]}
+        out = {"op": "move_to", "target": [round(x + dx, 2), y, round(z + dz, 2)]}
+        if self._mode == "wasd_balanced":
+            # 40% W, 20% each for A/S/D — matches buyer-spec input distribution
+            r = self._rng.random()
+            if r < 0.40:
+                vk = 87  # W
+            elif r < 0.60:
+                vk = 65  # A
+            elif r < 0.80:
+                vk = 83  # S
+            else:
+                vk = 68  # D
+            out["keyCode"] = [vk]
+        return out
 
     def _look_action(self) -> dict[str, Any]:
         # Yaw [-pi, pi], pitch [-0.5, 0.5] rad — keeps look reasonable
