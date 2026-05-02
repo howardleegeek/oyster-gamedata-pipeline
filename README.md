@@ -7,7 +7,7 @@ oyster-agent-runner is a Layer 4 LLM-agent gameplay capture system that records,
 ## Quick start
 
 ```bash
-git clone https://github.com/howardleegeek/oyster-agent-runner
+git clone https://github.com/howardleegeek/oyster-gamedata-pipeline
 cd oyster-agent-runner
 bash SOP.sh
 ```

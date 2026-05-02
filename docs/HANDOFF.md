@@ -5,7 +5,7 @@
 
 ## 1. TL;DR (3 bullets)
 
-- **1 repo:** Single source of truth at https://github.com/howardleegeek/oyster-agent-runner
+- **1 repo:** Single source of truth at https://github.com/howardleegeek/oyster-gamedata-pipeline
 - **1 PR:** All changes consolidated in one pull request for easy review and deployment
 - **1 SOP script:** `SOP.sh` automates the entire buyer-spec pipeline from setup to artifact generation
 
@@ -17,7 +17,7 @@ Execute these exact 3 commands to get started:
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/howardleegeek/oyster-agent-runner
+git clone https://github.com/howardleegeek/oyster-gamedata-pipeline
 cd oyster-agent-runner
 
 # 2. Merge the buyer-spec pipeline branch
@@ -161,7 +161,7 @@ The following stubs need real implementation in Phase 2:
 | `./SOP.sh --clean` | Clean artifacts | <10 seconds |
 | `./SOP.sh --help` | Show all options | Instant |
 
-**Repository:** https://github.com/howardleegeek/oyster-agent-runner  
+**Repository:** https://github.com/howardleegeek/oyster-gamedata-pipeline  
 **Main Branch:** `main`  
 **Artifact:** `buyer.tar.gz`  
 **Primary Contact:** Pipeline maintainer (rotating weekly)
