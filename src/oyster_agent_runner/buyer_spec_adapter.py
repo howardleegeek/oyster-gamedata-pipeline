@@ -248,6 +248,12 @@ def minecraft_yaw_pitch_to_buyer_oula(mc_yaw_rad: float, mc_pitch_rad: float) ->
     """
     pitch_deg = -math.degrees(float(mc_pitch_rad))
     yaw_deg = math.degrees(float(mc_yaw_rad))
+    # Mineflayer can transiently report yaw outside [-π, π] after look+move
+    # combinations. Buyer-spec lint enforces oula elements in [-180, 180],
+    # so we wrap yaw and clamp pitch to physical range. Surfaced by the
+    # 100-iter v2 sprint (iter_0002 / iter_0003 tripped this without wrap).
+    yaw_deg = ((yaw_deg + 180.0) % 360.0) - 180.0
+    pitch_deg = max(-90.0, min(90.0, pitch_deg))
     return [pitch_deg, yaw_deg, 0.0]
 
 

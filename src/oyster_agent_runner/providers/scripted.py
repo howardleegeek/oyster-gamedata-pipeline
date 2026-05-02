@@ -96,7 +96,11 @@ class ScriptedProvider:
         Max XZ offset for ``move_to`` targets, in blocks. Default 3.0.
     """
 
-    def __init__(self, seed: int = 0, move_radius: float = 3.0) -> None:
+    def __init__(self, seed: int = 0, move_radius: float = 1.5) -> None:
+        # move_radius lowered 3.0 → 1.5: Mineflayer pathfinder default
+        # 60s timeout was hanging iter-sprint runs ~30 min/iter when
+        # targets were unreachable. Within 1.5 blocks the pathfinder
+        # almost always succeeds <1s.
         self._rng = random.Random(seed)
         self._move_radius = float(move_radius)
         self.call_count = 0
@@ -118,12 +122,17 @@ class ScriptedProvider:
     # ------------------------------------------------------------------
 
     def _next_action(self, latest_user_text: str) -> dict[str, Any]:
+        # Action mix tuned for sprint speed: 25% move (1.5-block radius,
+        # pathfinder finishes <1s), 60% look (immediate), 13% noop, 2% dig.
+        # First sprint at 60% move with 3-block radius hung on pathfinder
+        # timeouts (~30 min/iter). This redistribution keeps data
+        # non-degenerate but caps wall-clock to <2s/step on average.
         roll = self._rng.random()
-        if roll < 0.60:
+        if roll < 0.25:
             return self._move_to_action(latest_user_text)
         if roll < 0.85:
             return self._look_action()
-        if roll < 0.95:
+        if roll < 0.98:
             return {"op": "noop"}
         return self._dig_action(latest_user_text)
 

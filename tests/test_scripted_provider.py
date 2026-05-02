@@ -156,7 +156,8 @@ def test_scripted_provider_action_distribution_roughly_matches_design() -> None:
         op = json.loads(body)["op"]
         counts[op] = counts.get(op, 0) + 1
     # Wide tolerance — RNG variance is real
-    assert 250 < counts["move_to"] < 350  # design ~300
-    assert 100 < counts["look"] < 175  # design ~125
-    assert 30 < counts["noop"] < 70  # design ~50
-    assert 10 < counts["dig"] < 50  # design ~25
+    # Sprint v3 retuned weights: 25/60/13/2.
+    assert 100 < counts["move_to"] < 175
+    assert 250 < counts["look"] < 350
+    assert 40 < counts["noop"] < 95
+    assert 0 < counts["dig"] < 25
