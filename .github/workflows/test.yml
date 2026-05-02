@@ -1,0 +1,56 @@
+name: Test
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip and .venv
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            .venv
+          key: ${{ runner.os }}-pip-venv-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-venv-
+
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -e ".[test]"
+
+      - name: Lint with ruff
+        run: |
+          source .venv/bin/activate
+          ruff check src/ tests/
+
+      - name: Check formatting with black
+        run: |
+          source .venv/bin/activate
+          black --check src/ tests/
+
+      - name: Run tests
+        run: |
+          source .venv/bin/activate
+          pytest tests/ -q --no-header -x
+
+      - name: Run tests with coverage
+        run: |
+          source .venv/bin/activate
+          pytest tests/ -q --no-header -x --cov=oyster_agent_runner --cov-report=term
