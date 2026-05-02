@@ -2,6 +2,9 @@
 Tests for depth_anything_v2 module.
 """
 import sys
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "oyster_agent_runner" / "phase2"))
 import pytest
 import numpy as np
 from unittest.mock import Mock, patch, MagicMock
