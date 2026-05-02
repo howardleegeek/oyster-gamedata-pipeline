@@ -218,26 +218,9 @@ echo "[STEP 7/8] ✓ Placeholder farm staged"
 # -----------------------------------------------------------------------------
 echo "[STEP 8/8] Running end-to-end pipeline..."
 
-# Run oyster-agent run-mc
-echo "  → Running oyster-agent run-mc..."
-if ! oyster-agent run-mc; then
-    echo "[ERROR] oyster-agent run-mc failed"
-    exit 1
-fi
-
-# Run adapt-buyer-spec
-echo "  → Running adapt-buyer-spec..."
-if ! adapt-buyer-spec; then
-    echo "[ERROR] adapt-buyer-spec failed"
-    exit 1
-fi
-
-# Run lint_buyer_spec.py and verify exit 0
-echo "  → Running lint_buyer_spec.py..."
-if ! lint_buyer_spec.py; then
-    echo "[ERROR] lint_buyer_spec.py failed (exit non-zero)"
-    exit 1
-fi
+# Use the Aliyun-tested e2e_smoke.sh which has all the right flags
+echo "  → Running bin/e2e_smoke.sh (capture → adapt → lint)..."
+PLACEHOLDERS="$REPO_ROOT/placeholders" bash "$REPO_ROOT/bin/e2e_smoke.sh"
 
 echo "[STEP 8/8] ✓ End-to-end pipeline passed"
 
