@@ -86,3 +86,23 @@ All development happens on the `main` branch. Open a PR for any pipeline changes
 **Internal Oyster Labs** — Proprietary and confidential. Not for external distribution.
 
 © 2025 Oyster Labs. All rights reserved.
+
+## GameData ecosystem (vendored as submodules)
+
+This repo is the integration hub for the full GameData product line. Sister repos pinned as submodules:
+
+| Path | Source repo | Role |
+|---|---|---|
+| `vendor/recorder/` | [gamedata-recorder](https://github.com/howardleegeek/gamedata-recorder) | Windows screen + input capture (Rust, OWL-Control fork) |
+| `vendor/input-logger/` | [gamedata-input-logger](https://github.com/howardleegeek/gamedata-input-logger) | High-precision keyboard/mouse/gamepad logger |
+| `vendor/enrichment/` | [oyster-enrichment](https://github.com/howardleegeek/oyster-enrichment) | Layer 1 ML enrichment (MASt3R-SLAM + UniDepth V2) + buyer-spec linter |
+
+To clone with everything:
+```bash
+git clone --recursive https://github.com/howardleegeek/oyster-gamedata-pipeline
+```
+
+Or after a non-recursive clone:
+```bash
+git submodule update --init --recursive
+```

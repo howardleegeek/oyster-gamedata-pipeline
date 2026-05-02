@@ -65,6 +65,12 @@ fi
 
 echo "[STEP 1/8] ✓ All prerequisites satisfied"
 
+# Initialize submodules if not already (recorder/input-logger/enrichment)
+if [[ -f .gitmodules ]] && [[ ! -d vendor/recorder/.git ]] && [[ ! -f vendor/recorder/.git ]]; then
+    echo "  → initializing GameData submodules..."
+    git submodule update --init --recursive --quiet || echo "  (submodule init failed; continue without)"
+fi
+
 # -----------------------------------------------------------------------------
 # STEP 2/8: Create .venv and install repo with pip
 # -----------------------------------------------------------------------------
