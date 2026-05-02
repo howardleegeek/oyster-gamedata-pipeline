@@ -610,3 +610,19 @@ def test_adapter_handles_missing_placeholders_silently(
     assert (output / MANIFEST_OUT_FILENAME).is_file()
     assert not (output / "gameinfo.xlsx").exists()
     assert not (output / "depth").exists()
+
+
+def test_adapter_default_route_type_is_1(basic_bundle, tmp_path):
+    output = tmp_path / "rt_default"
+    adapt_phase1_to_buyer_spec(basic_bundle, output)
+    records = json.loads((output / ACTION_CAMERA_FILENAME).read_text(encoding="utf-8"))
+    for rec in records:
+        assert rec["route_type"] == 1
+
+
+def test_adapter_emits_route_type_2_when_specified(basic_bundle, tmp_path):
+    output = tmp_path / "rt_2"
+    adapt_phase1_to_buyer_spec(basic_bundle, output, route_type=2)
+    records = json.loads((output / ACTION_CAMERA_FILENAME).read_text(encoding="utf-8"))
+    for rec in records:
+        assert rec["route_type"] == 2

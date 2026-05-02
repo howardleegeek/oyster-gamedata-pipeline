@@ -455,6 +455,7 @@ def _build_buyer_records(
     *,
     fps: float,
     pad_to_min_records: int | None = None,
+    route_type: int = 1,
 ) -> list[dict[str, Any]]:
     """Walk metadata events, emit one buyer-spec record per OBSERVATION/TICK.
 
@@ -528,7 +529,7 @@ def _build_buyer_records(
             "frame": len(records),
             "time": _format_time(ts),
             "fps": float(fps),
-            "route_type": 1,
+            "route_type": int(route_type),
             # Phase 1 dispatches high-level Mineflayer actions; no mouse/keyboard
             # layer exists. Buyer spec requires non-null values, so we synthesize
             # neutral defaults that downstream consumers can detect via systeminfo
@@ -700,6 +701,7 @@ def adapt_phase1_to_buyer_spec(
     output_dir: Path,
     placeholders_dir: Path | None = None,
     pad_to_min_records: int | None = None,
+    route_type: int = 1,
 ) -> Path:
     """Adapt a Phase 1 Minecraft bundle into the buyer-spec 4-deliverable layout.
 
@@ -759,6 +761,7 @@ def adapt_phase1_to_buyer_spec(
         metadata_events,
         fps=fps,
         pad_to_min_records=pad_to_min_records,
+        route_type=route_type,
     )
     (output_dir / ACTION_CAMERA_FILENAME).write_text(
         json.dumps(records, indent=2) + "\n", encoding="utf-8"

@@ -759,6 +759,13 @@ def adapt_buyer_spec_cmd(
             ),
         ),
     ] = None,
+    route_type: Annotated[
+        int,
+        typer.Option(
+            "--route-type",
+            help="Buyer-spec route_type (1=normal, 2=special, 3=loop). Default 1.",
+        ),
+    ] = 1,
     pad_to_min_records: Annotated[
         int | None,
         typer.Option(
@@ -801,6 +808,7 @@ def adapt_buyer_spec_cmd(
             output,
             placeholders_dir=placeholders,
             pad_to_min_records=pad_to_min_records,
+            route_type=route_type,
         )
     except FileNotFoundError as exc:
         console.print(f"[red]cannot adapt bundle:[/red] {exc}")
