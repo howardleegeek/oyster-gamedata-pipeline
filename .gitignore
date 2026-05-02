@@ -55,3 +55,9 @@ runs/
 .env
 .env.*
 !.env.example
+
+# Mineflayer Node deps + Paper server jar — large binary blobs, not source
+mineflayer/node_modules/
+mineflayer/npm-debug.log*
+bin/.cache/
+*.jar

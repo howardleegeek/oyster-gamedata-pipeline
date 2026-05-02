@@ -1,0 +1,9 @@
+[submodule "vendor/recorder"]
+	path = vendor/recorder
+	url = https://github.com/howardleegeek/gamedata-recorder.git
+[submodule "vendor/input-logger"]
+	path = vendor/input-logger
+	url = https://github.com/howardleegeek/gamedata-input-logger.git
+[submodule "vendor/enrichment"]
+	path = vendor/enrichment
+	url = https://github.com/howardleegeek/oyster-enrichment.git

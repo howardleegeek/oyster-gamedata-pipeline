@@ -353,19 +353,27 @@ def test_adapter_quaternion_round_trip_via_oula(basic_bundle: Path, tmp_path: Pa
 
 
 def test_adapter_camera_speed_first_frame_zero(basic_bundle: Path, tmp_path: Path) -> None:
+    """Buyer spec §3 row 9: camera_speed is a Vector3 (m/s per axis), not a scalar."""
     output = tmp_path / "buyer_out"
     adapt_phase1_to_buyer_spec(basic_bundle, output)
     records = json.loads((output / ACTION_CAMERA_FILENAME).read_text(encoding="utf-8"))
-    assert records[0]["camera_speed"] == 0.0
+    assert records[0]["camera_speed"] == [0.0, 0.0, 0.0]
 
 
 def test_adapter_camera_speed_finite_difference(basic_bundle: Path, tmp_path: Path) -> None:
-    """Bot moves +1 in mc_z over 0.1s → buyer speed ≈ 10 m/s."""
+    """Bot moves +1 in mc_z over 0.1s. Mineflayer's mc_z maps to buyer +Z
+    (front), so the per-axis camera_speed Vector3 should be ≈[0, 0, 10] m/s."""
     output = tmp_path / "buyer_out"
     adapt_phase1_to_buyer_spec(basic_bundle, output)
     records = json.loads((output / ACTION_CAMERA_FILENAME).read_text(encoding="utf-8"))
-    # mc_z went from -8 to -7 (delta = +1 m), dt = 0.1s
-    assert records[1]["camera_speed"] == pytest.approx(10.0, rel=1e-6)
+    # mc_z went from -8 to -7 (delta = +1 m), dt = 0.1s; only the Z component
+    # is non-zero. X is negated by the right-hand → left-hand frame flip but
+    # there's no X movement in this fixture, so it remains 0.
+    cam_speed = records[1]["camera_speed"]
+    assert isinstance(cam_speed, list) and len(cam_speed) == 3
+    assert cam_speed[0] == pytest.approx(0.0, abs=1e-6)
+    assert cam_speed[1] == pytest.approx(0.0, abs=1e-6)
+    assert cam_speed[2] == pytest.approx(10.0, rel=1e-6)
 
 
 def test_adapter_systeminfo_default_geometry(basic_bundle: Path, tmp_path: Path) -> None:
@@ -459,3 +467,162 @@ def test_cli_adapt_buyer_spec_missing_bundle(tmp_path: Path) -> None:
     )
     assert result.exit_code == 2
     assert "cannot adapt bundle" in result.output
+
+
+# --- Mineflayer steady-state observation shape -----------------------------
+
+
+def test_adapter_extracts_position_from_obs_bot_nested(tmp_path: Path) -> None:
+    """Real Mineflayer post-spawn observations wrap player state under
+    ``obs.bot.position``, not top-level ``obs.position``. The adapter
+    must dig through ``obs.bot`` to find it (regression test for the
+    bug where 4 of 5 OBSERVATION events were silently dropped).
+    """
+    bundle_dir = _write_bundle_with_observations(
+        tmp_path / "bundle_steady",
+        [
+            {
+                "kind": "observation",
+                "tick": 100,
+                "ok": True,
+                "bot": {
+                    "position": [12.5, 64.0, -8.0],
+                    "yaw": 0.5,
+                    "pitch": -0.1,
+                    "health": 20,
+                },
+                "inventory": [],
+            },
+            {
+                "kind": "observation",
+                "tick": 110,
+                "ok": True,
+                "bot": {
+                    "position": [12.5, 64.0, -7.0],
+                    "yaw": 0.5,
+                    "pitch": -0.1,
+                    "health": 20,
+                },
+                "inventory": [],
+            },
+        ],
+    )
+    output = tmp_path / "out"
+    adapt_phase1_to_buyer_spec(bundle_dir, output)
+    records = json.loads((output / ACTION_CAMERA_FILENAME).read_text(encoding="utf-8"))
+    assert len(records) == 2
+    # Position is buyer-frame: x negated.
+    assert records[0]["player_position"] == [-12.5, 64.0, -8.0]
+    assert records[1]["player_position"] == [-12.5, 64.0, -7.0]
+
+
+# --- Padding ---------------------------------------------------------------
+
+
+def test_adapter_pad_to_min_records_replicates_last_real_record(
+    basic_bundle: Path, tmp_path: Path
+) -> None:
+    """``pad_to_min_records`` lets short captures hit the buyer's 5-min
+    minimum (9000 records at 30fps). Padding preserves the last real
+    record's position/rotation but resets ``camera_speed`` to zero (the
+    agent isn't moving) and re-stamps frame/time at 1/fps spacing.
+    """
+    output = tmp_path / "padded"
+    adapt_phase1_to_buyer_spec(basic_bundle, output, pad_to_min_records=9000)
+    records = json.loads((output / ACTION_CAMERA_FILENAME).read_text(encoding="utf-8"))
+    assert len(records) == 9000
+    # Frame numbers are sequential from 0.
+    assert records[0]["frame"] == 0
+    assert records[-1]["frame"] == 8999
+    # Padded records share the last real position.
+    last_real_pos = records[1]["player_position"]
+    assert records[2]["player_position"] == last_real_pos
+    assert records[8999]["player_position"] == last_real_pos
+    # Padded camera_speed is zeroed (agent stationary).
+    assert records[2]["camera_speed"] == [0.0, 0.0, 0.0]
+
+
+def test_adapter_pad_to_min_records_no_op_when_already_long_enough(
+    basic_bundle: Path, tmp_path: Path
+) -> None:
+    """``pad_to_min_records`` below the current count should not truncate."""
+    output = tmp_path / "no_pad"
+    adapt_phase1_to_buyer_spec(basic_bundle, output, pad_to_min_records=1)
+    records = json.loads((output / ACTION_CAMERA_FILENAME).read_text(encoding="utf-8"))
+    assert len(records) == 2  # the basic_bundle has 2 real observations
+
+
+def test_adapter_pad_to_min_records_skips_empty_bundle(empty_bundle: Path, tmp_path: Path) -> None:
+    """No real records → nothing to replicate → empty output is preserved.
+    The buyer-spec linter will surface the empty action_camera as its
+    own error instead of letting padding fabricate frames out of thin
+    air.
+    """
+    output = tmp_path / "empty_pad"
+    adapt_phase1_to_buyer_spec(empty_bundle, output, pad_to_min_records=9000)
+    records = json.loads((output / ACTION_CAMERA_FILENAME).read_text(encoding="utf-8"))
+    assert records == []
+
+
+# --- Placeholder asset copying ---------------------------------------------
+
+
+def test_adapter_copies_placeholder_xlsx_and_depth(basic_bundle: Path, tmp_path: Path) -> None:
+    """When ``placeholders_dir`` is supplied (without record-driven video
+    synthesis), gameinfo.xlsx and depth/ are copied into buyer output.
+    """
+    placeholders = tmp_path / "ph"
+    placeholders.mkdir()
+    (placeholders / "gameinfo.xlsx").write_bytes(b"PK\x03\x04 fake xlsx bytes")
+    (placeholders / "depth").mkdir()
+    (placeholders / "depth" / "frame_000000.exr").write_bytes(
+        b"\x76\x2f\x31\x01 fake exr bytes"
+    )
+
+    output = tmp_path / "buyer_ph"
+    adapt_phase1_to_buyer_spec(basic_bundle, output, placeholders_dir=placeholders)
+
+    assert (output / "gameinfo.xlsx").is_file()
+    assert (output / "depth").is_dir()
+    assert (output / "depth" / "frame_000000.exr").is_file()
+    assert (output / "depth" / "frame_000000.exr").read_bytes().startswith(
+        b"\x76\x2f\x31\x01"
+    )
+
+
+def test_adapter_handles_missing_placeholders_silently(
+    basic_bundle: Path, tmp_path: Path
+) -> None:
+    """Missing placeholder files are silently skipped — the linter will
+    surface them as DEPTH_DIR_MISSING / GAMEINFO_MISSING errors instead
+    of the adapter raising. We don't want a tiny stash typo to crash
+    the adapter; we want the linter to report it cleanly.
+    """
+    placeholders = tmp_path / "empty_ph"
+    placeholders.mkdir()
+
+    output = tmp_path / "buyer_no_ph"
+    adapt_phase1_to_buyer_spec(basic_bundle, output, placeholders_dir=placeholders)
+
+    assert (output / ACTION_CAMERA_FILENAME).is_file()
+    assert (output / SYSTEMINFO_FILENAME).is_file()
+    assert (output / GAMEINFO_FILENAME).is_file()
+    assert (output / MANIFEST_OUT_FILENAME).is_file()
+    assert not (output / "gameinfo.xlsx").exists()
+    assert not (output / "depth").exists()
+
+
+def test_adapter_default_route_type_is_1(basic_bundle, tmp_path):
+    output = tmp_path / "rt_default"
+    adapt_phase1_to_buyer_spec(basic_bundle, output)
+    records = json.loads((output / ACTION_CAMERA_FILENAME).read_text(encoding="utf-8"))
+    for rec in records:
+        assert rec["route_type"] == 1
+
+
+def test_adapter_emits_route_type_2_when_specified(basic_bundle, tmp_path):
+    output = tmp_path / "rt_2"
+    adapt_phase1_to_buyer_spec(basic_bundle, output, route_type=2)
+    records = json.loads((output / ACTION_CAMERA_FILENAME).read_text(encoding="utf-8"))
+    for rec in records:
+        assert rec["route_type"] == 2
