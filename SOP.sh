@@ -28,7 +28,18 @@ check_cmd() {
 }
 
 MISSING=0
-check_cmd "java" "brew install openjdk@21" || MISSING=1
+# Prefer Homebrew openjdk@21 over Apple system java stub
+JAVA_BIN="$(command -v java || true)"
+for HB_JAVA in /opt/homebrew/opt/openjdk@21/bin/java /usr/local/opt/openjdk@21/bin/java; do
+    [[ -x "$HB_JAVA" ]] && JAVA_BIN="$HB_JAVA" && break
+done
+if [[ -n "${JAVA_BIN:-}" && -x "$JAVA_BIN" ]]; then
+    echo "  ✓ java found: $JAVA_BIN"
+    export PATH="$(dirname "$JAVA_BIN"):$PATH"
+else
+    echo "  ✗ java NOT FOUND — install hint: brew install openjdk@21"
+    MISSING=1
+fi
 check_cmd "node" "brew install node@18" || MISSING=1
 check_cmd "ffmpeg" "brew install ffmpeg" || MISSING=1
 check_cmd "python3" "brew install python3" || MISSING=1
