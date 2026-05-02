@@ -176,41 +176,61 @@ fi
 echo "[STEP 6/8] ✓ Paper server ready"
 
 # -----------------------------------------------------------------------------
-# STEP 7/8: Stage placeholder farm (1801 EXR hardlinks)
+# STEP 7/8: Stage placeholder farm (1801 real EXR hardlinks + gameinfo.xlsx)
 # -----------------------------------------------------------------------------
 echo "[STEP 7/8] Staging placeholder farm..."
 
 PLACEHOLDER_DIR="$REPO_ROOT/placeholders/depth"
 mkdir -p "$PLACEHOLDER_DIR"
+SEED_FILE="$PLACEHOLDER_DIR/frame_seed.exr"
 
-# Create a seed EXR file if it doesn't exist
-SEED_FILE="$PLACEHOLDER_DIR/seed.exr"
 if [[ ! -f "$SEED_FILE" ]]; then
-    # Create a minimal EXR file (placeholder)
-    # Using python to create a minimal EXR-like file for testing
-    python3 << 'PYEOF'
-import struct
-import os
-# Minimal EXR header (very simplified for placeholder)
-# Real EXR files are complex; this creates a stub for hardlinking
-with open("placeholders/depth/seed.exr", "wb") as f:
-    # Write EXR magic number
-    f.write(b'\x76\x2f\x31\x01')  # EXR file magic
-    # Write a minimal header
-    f.write(b'\x00')  # null terminator for empty channel list
-PYEOF
+    "$REPO_ROOT/.venv/bin/python" - << EOF
+import numpy as np, OpenEXR, Imath
+W, H = 96, 96
+xs = np.linspace(0.5, 30.0, W, dtype=np.float32)
+ys = np.linspace(0.5, 30.0, H, dtype=np.float32)
+depth = ((xs[None,:] + ys[:,None]) / 2.0).astype(np.float32)
+hdr = OpenEXR.Header(W, H)
+hdr["channels"] = {"Z": Imath.Channel(Imath.PixelType(Imath.PixelType.FLOAT))}
+exr = OpenEXR.OutputFile("$SEED_FILE", hdr)
+exr.writePixels({"Z": depth.tobytes()})
+exr.close()
+EOF
 fi
 
-# Create 1801 hardlinks from seed
-COUNT=1801
-for i in $(seq 1 $COUNT); do
-    LINK_PATH="$PLACEHOLDER_DIR/depth_$(printf "%04d" $i).exr"
-    if [[ ! -f "$LINK_PATH" ]]; then
-        ln "$SEED_FILE" "$LINK_PATH"
-    fi
-done
+# Hardlink 1800 copies named frame_NNNNNN.exr
+EXR_COUNT=$(ls "$PLACEHOLDER_DIR"/frame_*.exr 2>/dev/null | wc -l | tr -d " ")
+if [[ "$EXR_COUNT" -lt 1800 ]]; then
+    for i in $(seq 0 1799); do
+        printf -v fn "frame_%06d.exr" "$i"
+        ln -f "$SEED_FILE" "$PLACEHOLDER_DIR/$fn"
+    done
+fi
 
-echo "  ✓ Created $COUNT hardlinks in $PLACEHOLDER_DIR"
+# Generate gameinfo.xlsx if missing
+if [[ ! -f "$REPO_ROOT/placeholders/gameinfo.xlsx" ]]; then
+    "$REPO_ROOT/.venv/bin/python" - << EOF
+import openpyxl
+wb = openpyxl.Workbook()
+ws = wb.active
+ws.title = "metadata"
+ws["A1"] = "field"
+ws["B1"] = "value"
+ws["A2"] = "game_name"
+ws["B2"] = "Minecraft"
+ws["A3"] = "fps"
+ws["B3"] = 30.0
+ws["A4"] = "width"
+ws["B4"] = 1920
+ws["A5"] = "height"
+ws["B5"] = 1080
+wb.save("$REPO_ROOT/placeholders/gameinfo.xlsx")
+EOF
+fi
+
+echo "  ✓ EXR farm: $(ls $PLACEHOLDER_DIR/frame_*.exr | wc -l | tr -d " ") files at $PLACEHOLDER_DIR"
+echo "  ✓ gameinfo.xlsx at $REPO_ROOT/placeholders/gameinfo.xlsx"
 echo "[STEP 7/8] ✓ Placeholder farm staged"
 
 # -----------------------------------------------------------------------------
