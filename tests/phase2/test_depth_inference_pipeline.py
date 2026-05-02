@@ -1,265 +1,237 @@
-"""
-Tests for depth_inference_pipeline.py
-"""
-
+"""Tests for depth inference pipeline."""
 import pytest
-import sys
 import os
-from unittest.mock import Mock, patch, MagicMock
+import sys
+import subprocess
 from pathlib import Path
-import tempfile
-import shutil
+from unittest.mock import MagicMock, patch
 
 
-def test_extract_frames_invokes_ffmpeg():
-    """Test that extract_frames calls ffmpeg with correct arguments."""
-    from depth_inference_pipeline import extract_frames
-    
-    # Create a mock video file
-    with tempfile.TemporaryDirectory() as tmpdir:
-        video_path = Path(tmpdir) / "test.mp4"
-        video_path.touch()  # Create empty file
+class TestExtractFrames:
+    """Test cases for extract_frames function."""
+
+    def test_extract_frames_calls_ffmpeg(self, monkeypatch, tmp_path):
+        """Test that extract_frames calls ffmpeg with correct arguments."""
+        from depth_inference_pipeline import extract_frames
         
-        output_dir = Path(tmpdir) / "frames"
+        video_path = str(tmp_path / "test_video.mp4")
+        output_dir = str(tmp_path / "frames")
         
-        # Mock subprocess.run
-        mock_run = Mock()
-        mock_run.return_value = Mock(returncode=0)
+        # Create a dummy video file
+        Path(video_path).touch()
         
-        with patch('subprocess.run', mock_run):
-            # Call the function
-            result = extract_frames(str(video_path), str(output_dir), fps=10.0)
-            
-            # Verify subprocess.run was called
-            assert mock_run.called
-            
-            # Get the call arguments
-            call_args = mock_run.call_args[0][0]
-            
-            # Verify ffmpeg command structure
-            assert call_args[0] == "ffmpeg"
-            assert "-i" in call_args
-            assert str(video_path) in call_args
-            
-            # Verify fps argument
-            fps_index = call_args.index("-vf")
-            assert "fps=10.0" in call_args[fps_index + 1]
-            
-            # Verify output pattern
-            assert "frame_%06d.png" in call_args[-1]
-            
-            # Function should return empty list since we mocked subprocess
-            # and no actual frames were created
-            assert isinstance(result, list)
+        # Track subprocess.run calls
+        run_calls = []
+        
+        def mock_run(cmd, capture_output=False, text=False):
+            run_calls.append(cmd)
+            # Create fake frame files
+            os.makedirs(output_dir, exist_ok=True)
+            for i in range(3):
+                Path(os.path.join(output_dir, f"frame_{i+1:04d}.png")).touch()
+            return MagicMock(returncode=0, stderr="", stdout="")
+        
+        monkeypatch.setattr(subprocess, "run", mock_run)
+        
+        frames = extract_frames(video_path, output_dir, fps=30)
+        
+        # Verify ffmpeg was called correctly
+        assert len(run_calls) == 1
+        cmd = run_calls[0]
+        assert cmd[0] == "ffmpeg"
+        assert "-i" in cmd
+        assert video_path in cmd
+        assert any("fps=30" in arg for arg in cmd)
+        
+        # Verify frames were returned
+        assert len(frames) == 3
+        assert all(f.endswith('.png') for f in frames)
+
+    def test_extract_frames_handles_ffmpeg_error(self, monkeypatch, tmp_path):
+        """Test that extract_frames raises error on ffmpeg failure."""
+        from depth_inference_pipeline import extract_frames, DepthInferenceError
+        
+        video_path = str(tmp_path / "test_video.mp4")
+        output_dir = str(tmp_path / "frames")
+        
+        Path(video_path).touch()
+        
+        def mock_run(cmd, capture_output=False, text=False):
+            return MagicMock(
+                returncode=1,
+                stderr="ffmpeg error: invalid codec",
+                stdout=""
+            )
+        
+        monkeypatch.setattr(subprocess, "run", mock_run)
+        
+        with pytest.raises(DepthInferenceError, match="ffmpeg failed"):
+            extract_frames(video_path, output_dir)
 
 
-def test_extract_frames_raises_on_missing_video():
-    """Test that extract_frames raises FileNotFoundError for missing video."""
-    from depth_inference_pipeline import extract_frames
-    
-    with tempfile.TemporaryDirectory() as tmpdir:
-        video_path = Path(tmpdir) / "nonexistent.mp4"
-        output_dir = Path(tmpdir) / "frames"
-        
-        with pytest.raises(FileNotFoundError):
-            extract_frames(str(video_path), str(output_dir))
+class TestInferDepth:
+    """Test cases for infer_depth function."""
 
-
-def test_extract_frames_raises_on_ffmpeg_failure():
-    """Test that extract_frames raises RuntimeError when ffmpeg fails."""
-    from depth_inference_pipeline import extract_frames
-    
-    with tempfile.TemporaryDirectory() as tmpdir:
-        video_path = Path(tmpdir) / "test.mp4"
-        video_path.touch()
-        output_dir = Path(tmpdir) / "frames"
+    def test_infer_depth_skips_when_torch_missing(self, monkeypatch, tmp_path):
+        """Test that infer_depth raises error when torch is not available."""
+        from depth_inference_pipeline import infer_depth, DepthInferenceError
         
-        # Mock subprocess.run to raise FileNotFoundError (simulating ffmpeg not found)
-        mock_run = Mock()
-        mock_run.side_effect = FileNotFoundError("ffmpeg not found")
+        frame_path = str(tmp_path / "frame_0001.png")
+        output_path = str(tmp_path / "depth_0001.png")
         
-        with patch('subprocess.run', mock_run):
-            with pytest.raises(RuntimeError, match="ffmpeg not found"):
-                extract_frames(str(video_path), str(output_dir))
-
-
-def test_infer_depth_batch_skips_when_torch_missing():
-    """Test that infer_depth_batch raises RuntimeError when torch is missing."""
-    from depth_inference_pipeline import infer_depth_batch
-    
-    with tempfile.TemporaryDirectory() as tmpdir:
-        rgb_paths = [str(Path(tmpdir) / "test.png")]
+        # Create a dummy frame file
+        Path(frame_path).touch()
         
-        # Create a dummy file
-        Path(rgb_paths[0]).touch()
+        # Remove torch from sys.modules to simulate it being missing
+        original_torch = sys.modules.get('torch')
+        original_numpy = sys.modules.get('numpy')
+        original_pil = sys.modules.get('PIL')
         
-        # Mock the import inside the function to raise ImportError
-        with patch('depth_inference_pipeline.__import__') as mock_import:
-            def side_effect(name, *args, **kwargs):
-                if name == "torch":
-                    raise ImportError("No module named 'torch'")
-                # For other imports, use the real import
-                return __builtins__.__import__(name, *args, **kwargs)
+        try:
+            # Remove modules
+            if 'torch' in sys.modules:
+                del sys.modules['torch']
+            if 'numpy' in sys.modules:
+                del sys.modules['numpy']
+            if 'PIL' in sys.modules:
+                del sys.modules['PIL']
             
-            mock_import.side_effect = side_effect
+            # Block imports
+            import builtins
+            real_import = builtins.__import__
             
-            with pytest.raises(RuntimeError, match="Missing dependency"):
-                infer_depth_batch(rgb_paths, tmpdir)
-
-
-def test_infer_depth_batch_raises_on_invalid_near_far():
-    """Test that infer_depth_batch raises ValueError when near >= far."""
-    from depth_inference_pipeline import infer_depth_batch
-    
-    with tempfile.TemporaryDirectory() as tmpdir:
-        rgb_paths = [str(Path(tmpdir) / "test.png")]
-        Path(rgb_paths[0]).touch()
-        
-        # Mock all the imports to avoid actual dependency issues
-        with patch('depth_inference_pipeline.__import__') as mock_import:
-            # Create mock modules
-            mock_torch = Mock()
-            mock_torch.device = Mock(return_value="cpu")
-            mock_torch.cuda = Mock(is_available=Mock(return_value=False))
+            def block_import(name, *args, **kwargs):
+                if name in ('torch', 'numpy', 'PIL'):
+                    raise ImportError(f"No module named '{name}'")
+                return real_import(name, *args, **kwargs)
             
-            mock_transformers = Mock()
-            mock_transformers.pipeline = Mock(return_value=Mock(
-                model=Mock(to=Mock(return_value=None))
-            ))
+            monkeypatch.setattr(builtins, '__import__', block_import)
             
-            mock_np = Mock()
-            mock_np.array = Mock(return_value=Mock(
-                min=Mock(return_value=0.0),
-                max=Mock(return_value=1.0),
-                shape=(100, 100),
-                astype=Mock(return_value=b"")
-            ))
-            mock_np.float32 = float
-            mock_np.full_like = Mock(return_value=Mock(
-                astype=Mock(return_value=b"")
-            ))
-            mock_np.clip = Mock(return_value=Mock(
-                astype=Mock(return_value=b"")
-            ))
-            
-            mock_openexr = Mock()
-            mock_openexr.Header = Mock(return_value={'channels': {}})
-            mock_openexr.OutputFile = Mock(return_value=Mock(
-                writePixels=Mock(),
-                close=Mock()
-            ))
-            
-            mock_imath = Mock()
-            mock_imath.Channel = Mock()
-            mock_imath.PixelType = Mock(FLOAT=Mock())
-            
-            mock_pil = Mock()
-            mock_pil.Image = Mock(open=Mock(return_value=Mock(
-                __enter__=Mock(return_value=Mock(
-                    __exit__=Mock()
-                ))
-            )))
-            
-            def import_side_effect(name, *args, **kwargs):
-                if name == "torch":
-                    return mock_torch
-                elif name == "transformers":
-                    return mock_transformers
-                elif name == "numpy":
-                    return mock_np
-                elif name == "OpenEXR":
-                    return mock_openexr
-                elif name == "Imath":
-                    return mock_imath
-                elif name == "PIL.Image":
-                    return mock_pil
-                else:
-                    return __builtins__.__import__(name, *args, **kwargs)
-            
-            mock_import.side_effect = import_side_effect
-            
-            # Try with near >= far
-            with pytest.raises(ValueError, match="must be less than"):
-                infer_depth_batch(rgb_paths, tmpdir, near_m=10.0, far_m=5.0)
-
-
-def test_video_to_depth_exrs_chains_correctly():
-    """Test that video_to_depth_exrs calls extract_frames and infer_depth_batch in order."""
-    from depth_inference_pipeline import video_to_depth_exrs
-    
-    with tempfile.TemporaryDirectory() as tmpdir:
-        video_path = Path(tmpdir) / "test.mp4"
-        video_path.touch()
-        output_dir = Path(tmpdir) / "output"
-        
-        # Mock both functions
-        mock_extract = Mock(return_value=["frame1.png", "frame2.png"])
-        mock_infer = Mock(return_value=2)
-        
-        with patch('depth_inference_pipeline.extract_frames', mock_extract):
-            with patch('depth_inference_pipeline.infer_depth_batch', mock_infer):
-                # Call the function
-                result = video_to_depth_exrs(str(video_path), str(output_dir))
+            with pytest.raises(DepthInferenceError, match="Missing dependency"):
+                infer_depth(frame_path, output_path)
                 
-                # Verify extract_frames was called first with correct args
-                assert mock_extract.called
-                extract_args = mock_extract.call_args
-                # First arg should be video path
-                assert extract_args[0][0] == str(video_path)
-                # Second arg should contain temp dir
-                assert "_temp_frames" in extract_args[0][1]
-                # Check fps kwarg
-                assert extract_args[1]["fps"] == 6.0  # default
-                
-                # Verify infer_depth_batch was called with frames from extract_frames
-                assert mock_infer.called
-                infer_args = mock_infer.call_args
-                # First arg should be the frame list
-                assert infer_args[0][0] == ["frame1.png", "frame2.png"]
-                # Second arg should be output dir
-                assert infer_args[0][1] == str(output_dir)
-                
-                # Verify result comes from infer_depth_batch
-                assert result == 2
+        finally:
+            # Restore modules
+            if original_torch is not None:
+                sys.modules['torch'] = original_torch
+            if original_numpy is not None:
+                sys.modules['numpy'] = original_numpy
+            if original_pil is not None:
+                sys.modules['PIL'] = original_pil
 
 
-def test_video_to_depth_exrs_cleans_up_temp_dir():
-    """Test that video_to_depth_exrs cleans up temporary directory even on error."""
-    from depth_inference_pipeline import video_to_depth_exrs
-    
-    with tempfile.TemporaryDirectory() as tmpdir:
-        video_path = Path(tmpdir) / "test.mp4"
-        video_path.touch()
-        output_dir = Path(tmpdir) / "output"
+class TestVideoToDepth:
+    """Test cases for video_to_depth function."""
+
+    def test_video_to_depth_chains(self, monkeypatch, tmp_path):
+        """Test that video_to_depth chains extract_frames and infer_depth."""
+        from depth_inference_pipeline import video_to_depth
         
-        # Mock extract_frames to raise an exception
-        mock_extract = Mock(side_effect=RuntimeError("Test error"))
+        video_path = str(tmp_path / "test_video.mp4")
+        output_dir = str(tmp_path / "depth_maps")
         
-        with patch('depth_inference_pipeline.extract_frames', mock_extract):
-            # This should raise the exception
-            with pytest.raises(RuntimeError, match="Test error"):
-                video_to_depth_exrs(str(video_path), str(output_dir))
-            
-            # Verify extract_frames was called
-            assert mock_extract.called
+        Path(video_path).touch()
+        
+        # Track function calls
+        extract_called = []
+        infer_called = []
+        
+        def mock_extract_frames(video, out_dir, fps=30):
+            extract_called.append((video, out_dir, fps))
+            # Create fake frames
+            os.makedirs(out_dir, exist_ok=True)
+            frames = []
+            for i in range(3):
+                frame_path = os.path.join(out_dir, f"frame_{i:04d}.png")
+                Path(frame_path).touch()
+                frames.append(frame_path)
+            return frames
+        
+        def mock_infer_depth(frame_path, out_path):
+            infer_called.append((frame_path, out_path))
+            Path(out_path).touch()
+            return out_path
+        
+        monkeypatch.setattr(
+            "depth_inference_pipeline.extract_frames", 
+            mock_extract_frames
+        )
+        monkeypatch.setattr(
+            "depth_inference_pipeline.infer_depth", 
+            mock_infer_depth
+        )
+        
+        result = video_to_depth(video_path, output_dir, cleanup=False)
+        
+        # Verify extract_frames was called
+        assert len(extract_called) == 1
+        assert extract_called[0][0] == video_path
+        
+        # Verify infer_depth was called for each frame
+        assert len(infer_called) == 3
+        
+        # Verify result contains depth maps
+        assert len(result) == 3
 
-
-def test_module_imports_without_dependencies():
-    """Test that the module can be imported without external dependencies."""
-    # This test verifies the module doesn't fail on import
-    import depth_inference_pipeline
-    
-    # Check that the functions exist
-    assert hasattr(depth_inference_pipeline, 'extract_frames')
-    assert hasattr(depth_inference_pipeline, 'infer_depth_batch')
-    assert hasattr(depth_inference_pipeline, 'video_to_depth_exrs')
-    
-    # Check they are callable
-    assert callable(depth_inference_pipeline.extract_frames)
-    assert callable(depth_inference_pipeline.infer_depth_batch)
-    assert callable(depth_inference_pipeline.video_to_depth_exrs)
-
-
-if __name__ == "__main__":
-    # Run tests
-    pytest.main([__file__, "-v"])
+    def test_video_to_depth_cleans_up_temp(self, monkeypatch, tmp_path):
+        """Test that video_to_depth cleans up temporary files."""
+        from depth_inference_pipeline import video_to_depth
+        
+        video_path = str(tmp_path / "test_video.mp4")
+        output_dir = str(tmp_path / "depth_maps")
+        
+        Path(video_path).touch()
+        
+        temp_dirs_created = []
+        
+        def mock_extract_frames(video, out_dir, fps=30):
+            temp_dirs_created.append(out_dir)
+            os.makedirs(out_dir, exist_ok=True)
+            # Create some temp files
+            for i in range(2):
+                Path(os.path.join(out_dir, f"frame_{i:04d}.png")).touch()
+            return [os.path.join(out_dir, f"frame_{i:04d}.png") for i in range(2)]
+        
+        def mock_infer_depth(frame_path, out_path):
+            os.makedirs(os.path.dirname(out_path), exist_ok=True)
+            Path(out_path).touch()
+            return out_path
+        
+        # Track mkdtemp and rmtree
+        original_mkdtemp = __import__('tempfile').mkdtemp
+        original_rmtree = __import__('shutil').rmtree
+        
+        mkdtemp_calls = []
+        rmtree_calls = []
+        
+        def mock_mkdtemp(prefix=None):
+            temp_dir = original_mkdtemp(prefix=prefix)
+            mkdtemp_calls.append(temp_dir)
+            return temp_dir
+        
+        def mock_rmtree(path):
+            rmtree_calls.append(path)
+            original_rmtree(path)
+        
+        monkeypatch.setattr("tempfile.mkdtemp", mock_mkdtemp)
+        monkeypatch.setattr("shutil.rmtree", mock_rmtree)
+        monkeypatch.setattr(
+            "depth_inference_pipeline.extract_frames", 
+            mock_extract_frames
+        )
+        monkeypatch.setattr(
+            "depth_inference_pipeline.infer_depth", 
+            mock_infer_depth
+        )
+        
+        result = video_to_depth(video_path, output_dir, cleanup=True)
+        
+        # Verify temp directory was created
+        assert len(mkdtemp_calls) == 1
+        
+        # Verify cleanup was called
+        assert len(rmtree_calls) == 1
+        assert rmtree_calls[0] == mkdtemp_calls[0]
+        
+        # Verify temp dir no longer exists
+        assert not os.path.exists(mkdtemp_calls[0])
