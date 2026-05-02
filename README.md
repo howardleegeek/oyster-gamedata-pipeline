@@ -1,4 +1,17 @@
-# oyster-agent-runner — Production buyer-spec v1 pipeline
+# oyster-gamedata-pipeline — GameData v1 production line
+
+> **🎯 Vendor / Partner: 直接看 [`docs/PRD.md`](docs/PRD.md) — 完整 PRD,拿到即可报价 + 启动第一批**
+>
+> | 文档 | 用途 |
+> |---|---|
+> | [`docs/PRD.md`](docs/PRD.md) | **整体 PRD** — 业务背景 + SOW + 单价方向 + 联络 |
+> | [`docs/VENDOR_ONBOARDING.md`](docs/VENDOR_ONBOARDING.md) | **8 步 onboarding** — 60 分钟产出第一个合格 clip |
+> | [`docs/SUBMISSION_FORMAT.md`](docs/SUBMISSION_FORMAT.md) | **提交格式** — tarball 命名 / 上传方式 / 自助验收 |
+> | [`docs/BUYER_SPEC_V1.md`](docs/BUYER_SPEC_V1.md) | 字段级技术规格(20 字段 schema) |
+>
+> **报价请发 → howard.linra@gmail.com** · WhatsApp +1 (341) 250-6526
+
+---
 
 ## What this is
 
@@ -61,6 +74,17 @@ That's it — the SOP orchestrator will bootstrap the environment, run the full 
 📊 Full sprint metrics and historical trends: [SPRINT_REPORT](SPRINT_REPORT.md)
 
 ## Documentation
+
+### For external partners / vendors (start here)
+
+| Document | Description |
+|----------|-------------|
+| [docs/PRD.md](docs/PRD.md) | **整体 PRD v1.0** — 业务背景 + SOW + 单价方向 + 联络人 |
+| [docs/VENDOR_ONBOARDING.md](docs/VENDOR_ONBOARDING.md) | **8 步 vendor onboarding** — 60 分钟产出第一个合格 clip |
+| [docs/SUBMISSION_FORMAT.md](docs/SUBMISSION_FORMAT.md) | **tarball 命名 / 上传方式 / 自助验收** |
+| [docs/BUYER_SPEC_V1.md](docs/BUYER_SPEC_V1.md) | 字段级技术规格(20 字段 schema + acceptance gates) |
+
+### For internal contributors
 
 | Document | Description |
 |----------|-------------|
