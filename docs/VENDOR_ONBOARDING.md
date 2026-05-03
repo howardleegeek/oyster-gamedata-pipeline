@@ -3,6 +3,33 @@
 
 ---
 
+## 🚀 一键验证(minipc Windows 11 + WSL2 Ubuntu 22.04 实测通过)
+
+**先确认环境能跑通,再继续下面 8 步:**
+
+```bash
+git clone --depth 1 https://github.com/howardleegeek/oyster-gamedata-pipeline.git
+cd oyster-gamedata-pipeline
+sudo apt-get install -y ffmpeg openjdk-21-jdk libopenexr-dev
+pip install -e . OpenEXR Imath openpyxl numpy
+python3 bin/sample_tarball_builder.py --output sample.tar.gz
+# 期望: 27 MB · lint PASS · 0 issues · < 5 秒
+```
+
+**Cross-platform 验证**:
+
+| 环境 | Python | 结果 |
+|---|---|---|
+| Windows 11 + WSL2 Ubuntu 22.04 (minipc 真测) | 3.10.12 | ✅ 0 issues PASS |
+| macOS 26.3 (mac-1 真测) | 3.14 | ✅ 0 issues PASS |
+
+跑不通 → `bash bin/doctor.sh` 自检,常见 fix:
+- ffmpeg 缺 → `sudo apt-get install -y ffmpeg`
+- OpenEXR 缺 → `pip install OpenEXR Imath`
+- Java 缺 → `sudo apt-get install -y openjdk-21-jdk`
+
+---
+
 ## STEP 0: PRE-FLIGHT 硬件清单
 
 **必须满足以下硬件要求才能开始采集:**

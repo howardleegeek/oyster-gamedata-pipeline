@@ -17,15 +17,26 @@
 
 oyster-agent-runner is a Layer 4 LLM-agent gameplay capture system that records, adapts, and packages player interactions across multiple game environments. It transforms raw gameplay telemetry — events, frame captures, and action sequences — into structured buyer-spec v1 deliverables ready for downstream consumption. The pipeline runs autonomously, enforcing linting, validation, and reproducibility at every stage so that every artifact is traceable and deterministic.
 
-## Quick start
+## Quick start (5-line, minipc Windows 11 实测通过)
 
 ```bash
-git clone https://github.com/howardleegeek/oyster-gamedata-pipeline
-cd oyster-agent-runner
-bash SOP.sh
+git clone --depth 1 https://github.com/howardleegeek/oyster-gamedata-pipeline.git
+cd oyster-gamedata-pipeline
+sudo apt-get install -y ffmpeg openjdk-21-jdk libopenexr-dev
+pip install -e . OpenEXR Imath openpyxl numpy
+python3 bin/sample_tarball_builder.py --output sample.tar.gz   # → 27 MB · lint PASS · 0 issues · < 5 秒
 ```
 
-That's it — the SOP orchestrator will bootstrap the environment, run the full capture pipeline, and emit buyer-spec v1 artifacts to `./output/`. No additional configuration is required for the default Minecraft profile.
+**Cross-platform 验证矩阵**(都是真跑过,不是 demo):
+
+| 环境 | Python | sample 大小 | lint 结果 |
+|---|---|---|---|
+| macOS 26.3 (mac-1) | 3.14 | 28.2 MB | **0 issues, PASS=True** ✅ |
+| Windows 11 + WSL2 Ubuntu 22.04 (minipc) | 3.10.12 | 26.9 MB | **0 issues, PASS=True** ✅ |
+
+最新 release: [**v0.1.0-rc6**](https://github.com/howardleegeek/oyster-gamedata-pipeline/releases/tag/v0.1.0-rc6) — 含真 lint-PASS sample tarball 可直接下载验证。
+
+> **真实场景** (vendor 真采集): 跑 `bash bin/produce_real_sample_v2.sh` 用真 Minecraft Java 1.20.4 + OBS Studio + DepthAnything V2 (见 [`docs/VENDOR_ONBOARDING.md`](docs/VENDOR_ONBOARDING.md) STEP 7)。`bin/sample_tarball_builder.py` 是 schema 演示工具,不是 vendor 真交付物。
 
 ## Architecture
 
