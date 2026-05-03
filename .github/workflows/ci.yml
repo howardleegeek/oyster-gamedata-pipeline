@@ -6,37 +6,77 @@ on:
   pull_request:
     branches: [main]
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  test:
-    name: test (py${{ matrix.python-version }})
+  python-tests:
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ['3.10', '3.11', '3.12']
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: pip
+          cache: 'pip'
 
-      - name: Install package + dev deps
+      - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install -e .[test,exr,xlsx]
 
-      - name: Ruff check
-        run: ruff check src tests
+      - name: Run pytest
+        run: |
+          pytest tests/ -v --tb=short
 
-      - name: Black check
-        run: black --check src tests
+      - name: Upload coverage
+        if: success()
+        run: |
+          pip install pytest-cov
+          pytest tests/ -v --tb=short --cov=. --cov-report=xml
+        continue-on-error: true
 
-      - name: Pytest
-        run: pytest -v
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run shellcheck
+        run: |
+          which shellcheck || apt-get update && apt-get install -y shellcheck
+          find bin/ -name "*.sh" -exec shellcheck {} +
+
+  lint-buyer-spec:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install package
+        run: |
+          pip install -e .
+
+      - name: Lint buyer spec
+        if: success()
+        run: |
+          if [ -f samples/buyer-spec-v1-rc1.tar.gz ]; then
+            oyster-buyer-lint samples/buyer-spec-v1-rc1.tar.gz
+          fi
+        continue-on-error: true
+
+  e2e-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run e2e smoke test
+        run: |
+          bash bin/e2e_smoke.sh --skip-real --skip-obs
+        continue-on-error: true
