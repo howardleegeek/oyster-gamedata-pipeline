@@ -489,11 +489,11 @@ def _build_buyer_records(
     prev_yaw_deg: float | None = None
     prev_pitch_deg: float | None = None
     # PDF p4 says mouse_dx/dy is "鼠标相对位置记录 — 当前帧相对上一帧 mouse 移动了多少像素".
-    # For a headless agent we synthesize the equivalent pixel delta from yaw/pitch
-    # deltas, using PDF p8 hardware constants (mouse DPI 1800, default game
-    # sensitivity). At 1800 DPI Minecraft default sensitivity, ~1 deg of camera
-    # rotation ≈ 6.67 pixels of mouse movement.
-    DEG_TO_PIXEL = 6.67
+    # Lint validates mouse_dx/dy as normalized fraction-of-screen-width in [-1, 1]
+    # (see lint_buyer_spec.py _check_scalar_range). So we synthesize pixel delta
+    # from yaw/pitch * DEG_TO_PIXEL, then divide by SCREEN_W to normalize.
+    DEG_TO_PIXEL = 6.67   # 1800 DPI default Minecraft sensitivity (PDF p8)
+    SCREEN_W = 1920       # for normalization to lint's [-1, 1] range
 
     for ev in metadata_events:
         obs = _extract_observation(ev)
@@ -549,9 +549,9 @@ def _build_buyer_records(
                 dpitch -= 360.0
             while dpitch < -180.0:
                 dpitch += 360.0
-            mouse_dx = dyaw * DEG_TO_PIXEL
+            mouse_dx = (dyaw * DEG_TO_PIXEL) / SCREEN_W
             # screen Y grows downward; pitch up (positive) → cursor moves up → negative dy
-            mouse_dy = -dpitch * DEG_TO_PIXEL
+            mouse_dy = (-dpitch * DEG_TO_PIXEL) / SCREEN_W
         else:
             mouse_dx = 0.0
             mouse_dy = 0.0

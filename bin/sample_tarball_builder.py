@@ -91,18 +91,21 @@ def synthesize_action_camera(out_path: str, frame_count: int = 9000) -> str:
     """
     import json as _json
     import math as _math
+    from datetime import datetime, timedelta
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Cycle through W/A/S/D weighted 40/20/20/20.
     wasd_pattern = [87] * 40 + [65] * 20 + [83] * 20 + [68] * 20  # 100 frames
+    SCREEN_W = 1920  # for mouse_dx/dy normalization to [-1, 1] per lint
+    DEG_TO_PIXEL = 6.67  # 1800 DPI default Minecraft sensitivity (PDF p8)
+    base_time = datetime(2026, 5, 2, 12, 0, 0)
     records = []
     prev_yaw = 0.0
     for i in range(frame_count):
-        # Smooth yaw drift to produce non-zero mouse_dx
-        yaw = ((i * 0.5) % 360.0) - 180.0
+        # Smooth yaw drift, kept small so |dyaw| < 1° → mouse_dx in valid range
+        yaw = ((i * 0.05) % 360.0) - 180.0
         pitch = _math.sin(i * 0.01) * 30.0  # ±30°
-        # quaternion (z-axis yaw + x-axis pitch, simplified)
         cy = _math.cos(_math.radians(yaw) / 2)
         sy = _math.sin(_math.radians(yaw) / 2)
         cp = _math.cos(_math.radians(pitch) / 2)
@@ -111,33 +114,40 @@ def synthesize_action_camera(out_path: str, frame_count: int = 9000) -> str:
         qy = cp * sy
         qz = -sp * sy
         qw = cp * cy
-        # mouse_dx/dy from yaw/pitch delta * DEG_TO_PIXEL (1800 DPI default)
-        DEG_TO_PIXEL = 6.67
         dyaw = yaw - prev_yaw
         if dyaw > 180:
             dyaw -= 360
         if dyaw < -180:
             dyaw += 360
+        # Vector3 / Vector4 fields use list[float] format (matches
+        # buyer_spec_adapter.minecraft_position_to_buyer + lint expectation
+        # of "list of 3/4 finite numbers"). Engineer iter rc4-2 fix.
+        # Time: use timedelta to handle minute overflow (was 12:00:60 → invalid)
+        t = base_time + timedelta(seconds=i / 30.0)
+        time_str = t.strftime("%Y-%m-%d %H:%M:%S.") + f"{t.microsecond // 1000:03d}"
+        # mouse_dx normalized to fraction of screen width (lint expects [-1, 1])
+        mouse_dx = (dyaw * DEG_TO_PIXEL) / SCREEN_W
+
         records.append({
             "frame": i,
-            "time": f"2026-05-02 12:00:{i//30:02d}.{(i%30)*33:03d}",
+            "time": time_str,
             "fps": 30.0,
             "route_type": 1,
             "mouse_x": 0.5,
             "mouse_y": 0.5,
-            "mouse_dx": dyaw * DEG_TO_PIXEL,
+            "mouse_dx": mouse_dx,
             "mouse_dy": 0.0,
             "keyCode": [wasd_pattern[i % 100]],
-            "camera_position": {"x": float(i) * 0.05, "y": 64.0, "z": 0.0},
-            "camera_rotation_oula": {"x": pitch, "y": yaw, "z": 0.0},
-            "camera_rotation_quaternion": {"x": qx, "y": qy, "z": qz, "w": qw},
-            "camera_Follow Offset": {"x": 0.0, "y": 1.6, "z": 0.0},
+            "camera_position": [float(i) * 0.05, 64.0, 0.0],
+            "camera_rotation_oula": [pitch, yaw, 0.0],
+            "camera_rotation_quaternion": [qx, qy, qz, qw],
+            "camera_Follow Offset": [0.0, 1.6, 0.0],
             "camera_intrinsics": {"fx": 960.0, "fy": 960.0, "cx": 960.0, "cy": 540.0},
-            "camera_speed": {"x": 1.5, "y": 0.0, "z": 0.0},
-            "player_position": {"x": float(i) * 0.05, "y": 64.0, "z": 0.0},
-            "player_rotation_oula": {"x": pitch, "y": yaw, "z": 0.0},
-            "player_rotation_quaternion": {"x": qx, "y": qy, "z": qz, "w": qw},
-            "player_speed": {"x": 1.5, "y": 0.0, "z": 0.0},
+            "camera_speed": [1.5, 0.0, 0.0],
+            "player_position": [float(i) * 0.05, 64.0, 0.0],
+            "player_rotation_oula": [pitch, yaw, 0.0],
+            "player_rotation_quaternion": [qx, qy, qz, qw],
+            "player_speed": [1.5, 0.0, 0.0],
             "metric_scale": 1.0,
         })
         prev_yaw = yaw
