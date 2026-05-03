@@ -76,37 +76,57 @@ class TestSynthesizeActionCamera:
     """Tests for synthesize_action_camera function."""
     
     def test_synthesize_action_camera_returns_valid_records(self):
-        """Test that synthesize_action_camera creates valid binary records."""
+        """Test synthesize_action_camera produces PDF-compliant JSON records.
+
+        rc4 changed format .bin → .json (PDF p7 file 2). Test now validates
+        JSON structure + the 20 required fields per PDF + Vector3/4 list types.
+        """
+        import json
+
         with tempfile.TemporaryDirectory() as tmpdir:
-            output_path = os.path.join(tmpdir, "action_camera.bin")
-            
+            output_path = os.path.join(tmpdir, "action_camera.json")
+
             result = synthesize_action_camera(output_path, frame_count=100)
-            
-            # Verify file was created
+
             assert result == output_path
             assert os.path.exists(output_path)
-            
-            # Verify file size: 100 records * (8 + 24*4) bytes = 100 * 104 = 10400 bytes
-            file_size = os.path.getsize(output_path)
-            assert file_size == 100 * 104, f"Expected {100 * 104} bytes, got {file_size}"
-            
-            # Verify record structure by reading first record
-            import numpy as np
-            with open(output_path, 'rb') as f:
-                timestamp = np.frombuffer(f.read(8), dtype=np.float64)[0]
-                frame_data = np.frombuffer(f.read(24 * 4), dtype=np.float32)
-                
-                # First record should have timestamp ~0.0
-                assert abs(timestamp - 0.0) < 0.01
-                assert len(frame_data) == 24
-                # Values should be normalized (between 0 and 1)
-                assert all(0 <= v <= 1 for v in frame_data)
+
+            with open(output_path) as f:
+                records = json.load(f)
+            assert isinstance(records, list)
+            assert len(records) == 100
+
+            # 20 PDF-spec fields per record
+            required_fields = [
+                "frame", "time", "fps", "route_type",
+                "mouse_x", "mouse_y", "mouse_dx", "mouse_dy", "keyCode",
+                "camera_position", "camera_rotation_oula",
+                "camera_rotation_quaternion", "camera_Follow Offset",
+                "camera_intrinsics", "camera_speed",
+                "player_position", "player_rotation_oula",
+                "player_rotation_quaternion", "player_speed",
+                "metric_scale",
+            ]
+            first = records[0]
+            for field in required_fields:
+                assert field in first, f"Missing PDF field: {field}"
+
+            # Vector3 fields list[float] length 3 (lint contract)
+            assert isinstance(first["camera_position"], list)
+            assert len(first["camera_position"]) == 3
+            # Quaternion list[float] length 4
+            assert len(first["camera_rotation_quaternion"]) == 4
+            # camera_intrinsics dict with fx == fy (PDF lint #8)
+            assert first["camera_intrinsics"]["fx"] == first["camera_intrinsics"]["fy"]
+            # frame continuity (PDF lint #4)
+            for i, r in enumerate(records):
+                assert r["frame"] == i
     
     def test_synthesize_action_camera_deterministic(self):
         """Test that synthesize_action_camera produces deterministic output."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            path1 = os.path.join(tmpdir, "test1.bin")
-            path2 = os.path.join(tmpdir, "test2.bin")
+            path1 = os.path.join(tmpdir, "test1.json")
+            path2 = os.path.join(tmpdir, "test2.json")
             
             synthesize_action_camera(path1, frame_count=10)
             synthesize_action_camera(path2, frame_count=10)
@@ -171,7 +191,7 @@ class TestBuildSampleTarball:
                 
                 # Check all 4 assets are present
                 assert "video.mp4" in names, "Missing video.mp4"
-                assert "action_camera.bin" in names, "Missing action_camera.bin"
+                assert "action_camera.json" in names, "Missing action_camera.json"
                 assert "gameinfo.xlsx" in names, "Missing gameinfo.xlsx"
                 assert any(n.startswith("depth/") for n in names), "Missing depth/ directory"
     
