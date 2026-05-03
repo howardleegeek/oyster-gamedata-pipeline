@@ -392,6 +392,7 @@ def build_sample_tarball(
         print("Creating tarball...")
         with tarfile.open(output_path, 'w:gz') as tar:
             tar.add(video_path, arcname="video.mp4")
+            tar.add(systeminfo_path, arcname="systeminfo.json")
             tar.add(action_camera_path, arcname="action_camera.json")
             tar.add(gameinfo_path, arcname="gameinfo.xlsx")
             tar.add(depth_dir, arcname="depth")
