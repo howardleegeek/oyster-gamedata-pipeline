@@ -350,9 +350,10 @@ manifest_sha256: ...
 - Operator names recorded as `vendor-NNN-op-X` only
 
 ### 9.4 Confidentiality
-- This PRD + internal docs **may not be redistributed publicly without written consent**
-- Reference repo is MIT-licensed and may be public; do not bundle the PRD with it
-- External discussions use the project codename **"GameData"**
+- This PRD and reference repo are **publicly published** (GitHub repo public + release v0.1.0-rc2). Vendors may freely share these links.
+- **Commercial terms remain confidential**: specific unit prices, customer rosters, monthly capacity caps, and privately negotiated discounts must not be disclosed externally.
+- **Personally Identifiable Information** (operator real names, emails, phone numbers, IP addresses) must never appear in deliverables.
+- External discussions of this project use the codename **"GameData"** (to avoid confusion with vendor's own clients).
 
 ---
 
