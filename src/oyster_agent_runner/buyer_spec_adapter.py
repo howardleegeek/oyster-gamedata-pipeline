@@ -486,6 +486,14 @@ def _build_buyer_records(
     records: list[dict[str, Any]] = []
     prev_cam_pos: list[float] | None = None
     prev_ts: float | None = None
+    prev_yaw_deg: float | None = None
+    prev_pitch_deg: float | None = None
+    # PDF p4 says mouse_dx/dy is "鼠标相对位置记录 — 当前帧相对上一帧 mouse 移动了多少像素".
+    # For a headless agent we synthesize the equivalent pixel delta from yaw/pitch
+    # deltas, using PDF p8 hardware constants (mouse DPI 1800, default game
+    # sensitivity). At 1800 DPI Minecraft default sensitivity, ~1 deg of camera
+    # rotation ≈ 6.67 pixels of mouse movement.
+    DEG_TO_PIXEL = 6.67
 
     for ev in metadata_events:
         obs = _extract_observation(ev)
@@ -526,19 +534,43 @@ def _build_buyer_records(
         prev_cam_pos = camera_position
         prev_ts = ts
 
+        # PDF p11-12 lint #3 ("输入映射正确性: dx/dy 数值变化与画面镜头移动精确对齐").
+        # Synthesize mouse pixel deltas from yaw/pitch deltas (with 360° wrap).
+        if player_oula is not None and prev_yaw_deg is not None and prev_pitch_deg is not None:
+            cur_pitch, cur_yaw, _ = player_oula
+            dyaw = cur_yaw - prev_yaw_deg
+            dpitch = cur_pitch - prev_pitch_deg
+            # wrap to shortest angle
+            while dyaw > 180.0:
+                dyaw -= 360.0
+            while dyaw < -180.0:
+                dyaw += 360.0
+            while dpitch > 180.0:
+                dpitch -= 360.0
+            while dpitch < -180.0:
+                dpitch += 360.0
+            mouse_dx = dyaw * DEG_TO_PIXEL
+            # screen Y grows downward; pitch up (positive) → cursor moves up → negative dy
+            mouse_dy = -dpitch * DEG_TO_PIXEL
+        else:
+            mouse_dx = 0.0
+            mouse_dy = 0.0
+        if player_oula is not None:
+            prev_pitch_deg = player_oula[0]
+            prev_yaw_deg = player_oula[1]
+
         rec = {
             "frame": len(records),
             "time": _format_time(ts),
             "fps": float(fps),
             "route_type": int(route_type),
-            # Phase 1 dispatches high-level Mineflayer actions; no mouse/keyboard
-            # layer exists. Buyer spec requires non-null values, so we synthesize
-            # neutral defaults that downstream consumers can detect via systeminfo
-            # provenance ("input_modality": "high_level_agent").
+            # mouse_x/y stays normalized-center (0.5,0.5) for first-person locked
+            # cursor (PDF p4 "鼠标绝对移动像素 归一化"). mouse_dx/dy synthesized
+            # from yaw/pitch deltas above per PDF lint #3.
             "mouse_x": 0.5,
             "mouse_y": 0.5,
-            "mouse_dx": 0.0,
-            "mouse_dy": 0.0,
+            "mouse_dx": mouse_dx,
+            "mouse_dy": mouse_dy,
             "keyCode": [],
             "camera_position": camera_position,
             # camera rotation matches player rotation (third-person follow,

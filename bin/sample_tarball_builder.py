@@ -4,7 +4,7 @@ R010 · bin/sample_tarball_builder.py — One-click generation of samples/buyer-
 
 This script creates a sample tarball containing:
 - Video file (H.264 1080p testsrc)
-- action_camera.bin with 9000 records
+- action_camera.json with 9000 records
 - gameinfo.xlsx
 - depth/ directory with 1800 OpenEXR files
 """
@@ -71,39 +71,105 @@ def synthesize_video(out_path: str, duration_sec: float = 300, fps: int = 30) ->
 
 def synthesize_action_camera(out_path: str, frame_count: int = 9000) -> str:
     """
-    Generate valid action_camera records using buyer_spec_adapter logic + ScriptedProvider mock.
-    
-    Creates a binary file with frame_count records following the action_camera format:
-    - Each record: timestamp (float64) + frame_data (24 floats) + padding
-    
+    Generate valid action_camera records as buyer-spec-compliant JSON
+    (PDF p7 file 2 = action_camera.json, NOT binary).
+
+    Each record has the 20 fields per BUYER_SPEC_V1.md. Values are
+    deterministic synthetic but pass lint:
+      - frame continuous 0..N-1
+      - WASD distribution W=40 A=20 S=20 D=20
+      - mouse_dx/dy derived from synthetic yaw delta
+      - quaternion unit-norm
+      - fx == fy
+
     Args:
-        out_path: Output binary file path
-        frame_count: Number of records to generate (default 9000)
-    
+        out_path: Output JSON file path
+        frame_count: Number of records (default 9000 = 5 min × 30 fps)
+
     Returns:
-        Path to the created binary file
+        Path to the created JSON file
     """
+    import json as _json
+    import math as _math
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    # Mock ScriptedProvider - generate deterministic data
-    # Format: per frame, we have timestamp + 24 float values (action camera data)
-    # Total: 8 bytes (timestamp) + 24 * 4 bytes (float32) = 104 bytes per record
-    
-    with open(out_path, 'wb') as f:
-        for i in range(frame_count):
-            # Timestamp: 0.0 to ~300 seconds (5 min at 30fps)
-            timestamp = i / 30.0
-            f.write(np.float64(timestamp).tobytes())
-            
-            # 24 float32 values representing action camera data
-            # Using deterministic pattern based on frame index
-            frame_data = np.array([
-                np.sin(i * 0.01 + j * 0.1) * 0.5 + 0.5  # Normalized values
-                for j in range(24)
-            ], dtype=np.float32)
-            f.write(frame_data.tobytes())
-    
+
+    # Cycle through W/A/S/D weighted 40/20/20/20.
+    wasd_pattern = [87] * 40 + [65] * 20 + [83] * 20 + [68] * 20  # 100 frames
+    records = []
+    prev_yaw = 0.0
+    for i in range(frame_count):
+        # Smooth yaw drift to produce non-zero mouse_dx
+        yaw = ((i * 0.5) % 360.0) - 180.0
+        pitch = _math.sin(i * 0.01) * 30.0  # ±30°
+        # quaternion (z-axis yaw + x-axis pitch, simplified)
+        cy = _math.cos(_math.radians(yaw) / 2)
+        sy = _math.sin(_math.radians(yaw) / 2)
+        cp = _math.cos(_math.radians(pitch) / 2)
+        sp = _math.sin(_math.radians(pitch) / 2)
+        qx = sp * cy
+        qy = cp * sy
+        qz = -sp * sy
+        qw = cp * cy
+        # mouse_dx/dy from yaw/pitch delta * DEG_TO_PIXEL (1800 DPI default)
+        DEG_TO_PIXEL = 6.67
+        dyaw = yaw - prev_yaw
+        if dyaw > 180:
+            dyaw -= 360
+        if dyaw < -180:
+            dyaw += 360
+        records.append({
+            "frame": i,
+            "time": f"2026-05-02 12:00:{i//30:02d}.{(i%30)*33:03d}",
+            "fps": 30.0,
+            "route_type": 1,
+            "mouse_x": 0.5,
+            "mouse_y": 0.5,
+            "mouse_dx": dyaw * DEG_TO_PIXEL,
+            "mouse_dy": 0.0,
+            "keyCode": [wasd_pattern[i % 100]],
+            "camera_position": {"x": float(i) * 0.05, "y": 64.0, "z": 0.0},
+            "camera_rotation_oula": {"x": pitch, "y": yaw, "z": 0.0},
+            "camera_rotation_quaternion": {"x": qx, "y": qy, "z": qz, "w": qw},
+            "camera_Follow Offset": {"x": 0.0, "y": 1.6, "z": 0.0},
+            "camera_intrinsics": {"fx": 960.0, "fy": 960.0, "cx": 960.0, "cy": 540.0},
+            "camera_speed": {"x": 1.5, "y": 0.0, "z": 0.0},
+            "player_position": {"x": float(i) * 0.05, "y": 64.0, "z": 0.0},
+            "player_rotation_oula": {"x": pitch, "y": yaw, "z": 0.0},
+            "player_rotation_quaternion": {"x": qx, "y": qy, "z": qz, "w": qw},
+            "player_speed": {"x": 1.5, "y": 0.0, "z": 0.0},
+            "metric_scale": 1.0,
+        })
+        prev_yaw = yaw
+
+    with open(out_path, "w", encoding="utf-8") as f:
+        _json.dump(records, f, ensure_ascii=False)
+
+    return str(out_path)
+
+
+def synthesize_systeminfo(out_path: str) -> str:
+    """Generate systeminfo.json (PDF p7 file 1, schema per PDF p3 文件1)."""
+    import json as _json
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    data = {
+        "gameProcessName": "minecraft.exe",
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080,
+        "recordDpi": 1.0,
+        "map_scale": 1.0,
+        "map_bounds": {
+            "min_x": -10000,
+            "min_z": -10000,
+            "max_x": 10000,
+            "max_z": 10000,
+        },
+    }
+    with open(out_path, "w", encoding="utf-8") as f:
+        _json.dump(data, f, indent=2)
     return str(out_path)
 
 
@@ -240,7 +306,7 @@ def run_lint(tarball_path: str) -> bool:
     try:
         with tarfile.open(tarball_path, 'r:gz') as tar:
             names = tar.getnames()
-            required = ['video.mp4', 'action_camera.bin', 'gameinfo.xlsx']
+            required = ['video.mp4', 'systeminfo.json', 'action_camera.json', 'gameinfo.xlsx']
             for req in required:
                 if req not in names:
                     print(f"✗ Missing required file: {req}")
@@ -295,9 +361,14 @@ def build_sample_tarball(
             with open(video_path, 'wb') as f:
                 f.write(b'\x00' * 1024)
         
-        # 2. Action camera data
-        print("Generating action_camera.bin...")
-        action_camera_path = tmpdir / "action_camera.bin"
+        # 2. systeminfo.json (PDF p7 file 1, was missing pre v0.1.0-rc4)
+        print("Generating systeminfo.json...")
+        systeminfo_path = tmpdir / "systeminfo.json"
+        synthesize_systeminfo(str(systeminfo_path))
+
+        # 3. Action camera data (JSON per PDF, not binary)
+        print("Generating action_camera.json...")
+        action_camera_path = tmpdir / "action_camera.json"
         synthesize_action_camera(str(action_camera_path), frame_count=9000)
         
         # 3. Game info
@@ -321,7 +392,7 @@ def build_sample_tarball(
         print("Creating tarball...")
         with tarfile.open(output_path, 'w:gz') as tar:
             tar.add(video_path, arcname="video.mp4")
-            tar.add(action_camera_path, arcname="action_camera.bin")
+            tar.add(action_camera_path, arcname="action_camera.json")
             tar.add(gameinfo_path, arcname="gameinfo.xlsx")
             tar.add(depth_dir, arcname="depth")
         

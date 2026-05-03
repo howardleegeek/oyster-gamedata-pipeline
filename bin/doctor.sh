@@ -3,7 +3,9 @@
 # GameData Onboarding Doctor · v1.0
 # Checks vendor machine dependencies for PRD onboarding
 #
-set -euo pipefail
+set -uo pipefail
+# NOTE: -e intentionally omitted so individual checks can return non-zero
+# without halting the script. Each check function returns PASS/WARN/FAIL.
 
 # Version
 VERSION="1.0"
@@ -76,16 +78,33 @@ get_package_manager() {
     esac
 }
 
+# Map a generic package name to platform-specific apt/yum/brew name
+# This avoids invalid commands like `apt install openjdk@21` (brew syntax)
+get_pkg_name() {
+    local generic="$1" pm="$2"
+    case "$pm:$generic" in
+        apt:openjdk@21)    echo "openjdk-21-jdk" ;;
+        apt:python@3.11)   echo "python3.11 python3.11-venv python3-pip" ;;
+        apt:ffmpeg)        echo "ffmpeg" ;;
+        apt:openexr)       echo "libopenexr-dev" ;;
+        yum:openjdk@21)    echo "java-21-openjdk-devel" ;;
+        yum:python@3.11)   echo "python3.11" ;;
+        yum:openexr)       echo "OpenEXR-devel" ;;
+        *)                 echo "$generic" ;;
+    esac
+}
+
 # Get install command for a package
 get_install_cmd() {
     local package="$1"
-    local pm
+    local pm pkg
     pm=$(get_package_manager)
+    pkg=$(get_pkg_name "$package" "$pm")
     case "$pm" in
-        brew) echo "brew install $package" ;;
-        apt) echo "sudo apt-get install -y $package" ;;
-        yum) echo "sudo yum install -y $package" ;;
-        *) echo "Install $package using your package manager" ;;
+        brew) echo "brew install $pkg" ;;
+        apt)  echo "sudo apt-get install -y $pkg" ;;
+        yum)  echo "sudo yum install -y $pkg" ;;
+        *)    echo "Install $package using your package manager" ;;
     esac
 }
 

@@ -11,8 +11,12 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import numpy as np
 import pytest
+
+# numpy is only required by tests that exercise depth-array math.
+# Skip the whole module if numpy isn't installed (Windows minipc / vendor
+# without ML stack will skip rather than error during collection).
+np = pytest.importorskip("numpy")
 
 
 class TestNormalizeDepth:
