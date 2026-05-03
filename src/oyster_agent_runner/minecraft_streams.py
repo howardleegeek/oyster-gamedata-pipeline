@@ -34,7 +34,8 @@ Used by `cli.py`'s `run-mc` command. Pure-Python, no test dependencies.
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+UTC = timezone.utc
 from pathlib import Path
 from typing import Any
 

@@ -34,7 +34,8 @@ import hashlib
 import json
 import subprocess
 import zipfile
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+UTC = timezone.utc
 from importlib import metadata as importlib_metadata
 from pathlib import Path
 from typing import Any
