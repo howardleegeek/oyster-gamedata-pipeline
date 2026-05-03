@@ -127,13 +127,13 @@ class TestInferBatch:
         """Test that infer_batch processes files correctly."""
         sys.path.insert(0, str(Path(__file__).parent.parent.parent / "bin"))
 
+        # Skip if PIL/Pillow not installed (vendor without ML stack)
+        Image = pytest.importorskip("PIL.Image")
+
         # Create test PNG files
         rgb_dir = tmp_path / "rgb"
         rgb_dir.mkdir()
         out_dir = tmp_path / "depth"
-
-        # Create dummy PNG files
-        from PIL import Image
 
         for i in range(3):
             img = Image.new("RGB", (64, 64), color=(128, 128, 128))

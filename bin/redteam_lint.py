@@ -95,7 +95,8 @@ def attack_action_camera_pitch_out_of_range(b: Path):
     p = b / "action_camera.json"
     arr = json.loads(p.read_text())
     for r in arr[:5]:
-        r["camera_rotation_oula"]["x"] = 250.0
+        # Vector3 fields are list[float] [pitch, yaw, roll] (index 0 = pitch)
+        r["camera_rotation_oula"][0] = 250.0
     p.write_text(json.dumps(arr))
 
 
