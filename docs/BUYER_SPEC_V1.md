@@ -11,14 +11,37 @@ Train interactive world models from human gameplay traces. The data must be:
 - **Character + camera** trajectories (not UI clicks / menu interaction)
 - Goal: model how the world responds to player actions
 
-## 4 deliverables per recording
+## 5 deliverables per recording (PDF p7 — file 0..4)
 
 | # | File | Format | Purpose |
 |---|---|---|---|
-| 1 | `video.mp4` | mp4 | 5–6 min, 1920×1080, 30 fps |
+| 0 | `video.mp4` | mp4 | 5–6 min, 1920×1080, 30 fps |
+| 1 | `systeminfo.json` | json | gameProcessName / window x,y / width,height / recordDpi / map_scale / map_bounds |
 | 2 | `action_camera.json` | json | Per-frame 20-field telemetry |
 | 3 | `gameinfo.xlsx` | excel | Operator-curated metadata |
 | 4 | `depth/*.exr` | OpenEXR (single-channel) | View-space metric depth, 6 fps |
+
+### systeminfo.json schema (file 1, PDF p3 文件1)
+
+```json
+{
+  "gameProcessName": "minecraft.exe",
+  "x": 0, "y": 0,
+  "width": 1920, "height": 1080,
+  "recordDpi": 1.0,
+  "map_scale": 1.0,
+  "map_bounds": {
+    "min_x": -10000, "min_z": -10000,
+    "max_x": 10000, "max_z": 10000
+  }
+}
+```
+
+- `gameProcessName`: process name (e.g. `minecraft.exe`)
+- `x`, `y`: game window top-left in screen coordinates
+- `width`, `height`: rendered resolution (must be 1920×1080)
+- `recordDpi`: OS scaling factor (1.0 / 1.5 / 2.0)
+- `map_scale` + `map_bounds`: world map scale + 4-corner bounds (PDF "提供地图比例 + 地图边界 4 个坐标")
 
 ## Hard requirements
 

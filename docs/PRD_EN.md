@@ -100,6 +100,8 @@ Each deliverable corresponds to **one 5–6 minute recording**, packaged as one 
 
 ### 3.1 video.mp4 hard constraints
 - **Duration**: 5 ≤ x ≤ 6 minutes (out-of-range rejected)
+- **Same map scene**: ≤ 30 minutes recording (rotate to a new scene afterwards)
+- **Per operator per game**: ≤ 240 clips (20 hours; rotate operators afterwards)
 - **Resolution**: 1920×1080 (system fullscreen AND game window)
 - **Frame rate**: 30 fps **stable** (no dynamic FPS, no 60→30 downsample)
 - **Latency**: action-to-frame ≤ 20 ms
@@ -195,6 +197,25 @@ Full table in [`BUYER_SPEC_V1.md`](BUYER_SPEC_V1.md#action_camerajson--20-fields
 - ❌ Death / respawn / scene change (must stay in same area ≤ 30 min)
 - ❌ Single-clip frame **frozen ≥ 2 s** (loading screens count)
 
+#### Character appearance
+- ❌ Frequent equipment switching / transformation / mount switching that changes character appearance or state
+
+#### 7 issues automation scripts MUST avoid (PDF p9-11)
+- ❌ Mesh clipping + crash
+- ❌ Continuous spinning in place
+- ❌ Screen flicker
+- ❌ Frequent clipping through trees
+- ❌ Character suddenly drifting after getting stuck
+- ❌ Model loading while running
+- ❌ Terrain pop-in (sudden mountain appearance)
+
+#### Character actions (>90% must be)
+- ✅ Walking / running / camera rotation
+- ❌ Interaction depth > 2 layers (open inventory → select item → use item already = 3 layers)
+- ❌ >10% time main subject idle in place
+- ❌ Monotonic forward micro-movement
+- ❌ NPC-driven scene changes (e.g. NPC opens chest)
+
 ---
 
 ## 5. Recording methodology
@@ -228,13 +249,25 @@ Any tech stack that meets the PRD acceptance gates is acceptable, e.g.:
 | Resource | Min | Recommended |
 |---|---|---|
 | OS | Win 10 / macOS 13 / Ubuntu 22.04 | Win 11 / macOS 14+ |
-| CPU | 4-core 3.0 GHz | 8-core 3.5 GHz+ |
+| CPU | i5-12400F / Ryzen 5 5600 | i7-12700K / Ryzen 7 5800X+ |
 | RAM | 16 GB | 32 GB |
-| GPU | GTX 1660 / Apple M1 | RTX 3060 / Apple M2 Pro+ |
+| GPU | 1080p ≥ RTX 3060 / 2k ≥ 4060Ti / 4k ≥ 4070 | RTX 3070+ / Apple M2 Pro+ |
 | Disk | 1 TB SSD/month | 4 TB SSD |
-| Network | 50 Mbps up | 200 Mbps up |
+| Network upstream | 50 Mbps | 200 Mbps |
+| Network latency | < 20 ms | — |
+| **Mouse DPI** | **1800** (Logitech / Razer / Alienware brands with DPI driver) | — |
+| **System pointer speed** | **win10 = 6 / win11 = 10** (system default — do not change) | — |
 
 **Single-machine capacity**: 100–300 clips/month (scene-and-skill-dependent)
+
+### 5.4 Game complexity tiers (PDF p2, affects pricing)
+| Complexity | Single-game total recording | Price coefficient | Suitable scenes |
+|---|---|---|---|
+| **High** | 20h+ | 1.0× | Comprehensive large scenes / Modern cities / Ancient cities / Complex ecosystems |
+| **Mid** | 1-20h | 0.7× | 3+ city blocks / Wilderness / Castles / Sci-fi facilities |
+| **Low** | < 1h | 0.4× | 1-2 blocks / Abandoned cities / Factories / Caves / Plains / Lakes |
+
+(Coefficients are quotation references only; final price negotiated mutually.)
 
 ---
 
