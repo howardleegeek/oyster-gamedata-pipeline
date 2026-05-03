@@ -7,7 +7,7 @@ name = "oyster-agent-runner"
 version = "0.1.0"
 description = "Oyster Labs Layer 4 — LLM-agent-driven gameplay data generation in mod-friendly games."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 license = { text = "Proprietary" }
 authors = [
     { name = "Oyster Labs", email = "howard.li@berkeley.edu" },
