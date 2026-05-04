@@ -1,0 +1,186 @@
+version: 1
+last_updated: 2026-05-03
+gaps:
+- id: G001
+  title: bin/preflight_check_v2.py
+  purpose: Granular hardware/network/deps pre-run validator (JSON output)
+  status: pending
+  priority: P1
+  lines_estimate: 150
+  deps: []
+- id: G002
+  title: bin/secure_subprocess_lib.py
+  purpose: Safe subprocess wrapper rejecting shell=True, allowlist binaries
+  status: pending
+  priority: P0
+  lines_estimate: 120
+- id: G003
+  title: bin/cn_mirror_setup.sh
+  purpose: China vendor pip+npm+HF mirror configuration (idempotent, --revert)
+  status: pending
+  priority: P1
+  lines_estimate: 80
+- id: G004
+  title: bin/disk_full_guard.py
+  purpose: Independent disk-space monitor that kills parent on threshold breach
+  status: pending
+  priority: P1
+  lines_estimate: 100
+- id: G005
+  title: src/oyster_agent_runner/safe_paths.py
+  purpose: mktemp-based concurrency-safe path manager + dynamic port allocator
+  status: pending
+  priority: P0
+  lines_estimate: 90
+- id: G006
+  title: bin/network_test.py
+  purpose: Vendor network upload speed + latency + DNS resolution check
+  status: pending
+  priority: P2
+  lines_estimate: 100
+- id: G007
+  title: bin/eula_consent.py
+  purpose: Interactive EULA presenter logging vendor accept timestamp
+  status: pending
+  priority: P0
+  lines_estimate: 80
+- id: G008
+  title: bin/depth_anything_offline_install.sh
+  purpose: HF mirror + offline cache pre-warm (China-friendly)
+  status: pending
+  priority: P1
+  lines_estimate: 60
+- id: G009
+  title: bin/anti_virus_allowlist_check.ps1
+  purpose: Windows PowerShell script verifying Defender exclusions for ffmpeg/Java/paper.jar
+  status: pending
+  priority: P2
+  lines_estimate: 70
+- id: G010
+  title: bin/ci_health_check.py
+  purpose: Daily CI health probe (lint pass rate, test count, redteam coverage)
+  status: pending
+  priority: P2
+  lines_estimate: 100
+- id: G011
+  title: bin/server_ingest_worker.py
+  purpose: SQS consumer + S3 download + lint dispatch + Postgres write
+  status: pending
+  priority: P0
+  lines_estimate: 250
+- id: G012
+  title: bin/dashboard_app.py
+  purpose: Flask + htmx vendor submission dashboard (read-only)
+  status: pending
+  priority: P1
+  lines_estimate: 300
+- id: G013
+  title: bin/acceptance_signal_api.py
+  purpose: Webhook API to notify vendor of accept/reject status
+  status: pending
+  priority: P1
+  lines_estimate: 150
+- id: G014
+  title: bin/cost_estimator.py
+  purpose: Daily S3 cost report (storage + egress + lifecycle stage projection)
+  status: pending
+  priority: P2
+  lines_estimate: 150
+- id: G015
+  title: docs/SECURITY_AUDIT_RESPONSE.md
+  purpose: Formal response to 14 security audit findings with fix status table
+  status: pending
+  priority: P1
+  lines_estimate: 250
+- id: G016
+  title: docs/QA_AUDIT_RESPONSE.md
+  purpose: Formal response to chaos/QA findings with mitigation table
+  status: pending
+  priority: P1
+  lines_estimate: 200
+- id: G017
+  title: docs/CODE_AUDIT_RESPONSE.md
+  purpose: Formal response to senior code reviewer findings
+  status: pending
+  priority: P1
+  lines_estimate: 180
+- id: G018
+  title: docs/ARCHITECT_AUDIT_RESPONSE.md
+  purpose: Formal response to distributed systems architect findings
+  status: pending
+  priority: P1
+  lines_estimate: 250
+- id: G019
+  title: docs/TROUBLESHOOTING.md
+  purpose: 30+ vendor common errors with symptom→fix entries
+  status: pending
+  priority: P0
+  lines_estimate: 400
+- id: G020
+  title: docs/PRICING_GUIDE.md
+  purpose: Vendor quote template (3-tier complexity + volume + rush)
+  status: pending
+  priority: P1
+  lines_estimate: 200
+- id: G021
+  title: docs/ALPHA_RUNBOOK.md
+  purpose: 1-week alpha vendor test protocol (Phase C from architect)
+  status: pending
+  priority: P1
+  lines_estimate: 200
+- id: G022
+  title: docs/INGEST_ARCHITECTURE.md
+  purpose: Backend pipeline detailed design (S3→SQS→Lambda→PG→Dashboard)
+  status: skipped
+  priority: P0
+  lines_estimate: 600
+  skip_reason: file already in repo
+- id: G023
+  title: bin/redteam_attacks_v2.py
+  purpose: 5 new adversarial scenarios (quat drift / timestamp regression / partial
+    stuck-key / EXR wrong channel / tarball extras)
+  status: pending
+  priority: P1
+  lines_estimate: 200
+- id: G024
+  title: bin/buyer_spec_validator_v2.py
+  purpose: Stricter independent validator (cross-checks, semantic + structural)
+  status: pending
+  priority: P1
+  lines_estimate: 250
+- id: G025
+  title: src/oyster_agent_runner/camera_synthesizer.py
+  purpose: Independent camera-rotation synthesizer (NOT player) per PDF p3
+  status: pending
+  priority: P0
+  lines_estimate: 150
+- id: G026
+  title: bin/upload_resume_helper.py
+  purpose: Standalone resumable S3 multipart helper with checkpoint state
+  status: pending
+  priority: P1
+  lines_estimate: 200
+- id: G027
+  title: bin/vendor_alpha_dashboard.py
+  purpose: Local CLI showing single-vendor daily metrics during alpha
+  status: pending
+  priority: P2
+  lines_estimate: 180
+- id: G028
+  title: bin/exe_packager.py
+  purpose: PyInstaller wrapper script for one-click vendor binary
+  status: pending
+  priority: P3
+  lines_estimate: 100
+- id: G029
+  title: bin/sentry_init.py
+  purpose: Optional Sentry DSN integration for vendor-side error reporting
+  status: pending
+  priority: P2
+  lines_estimate: 80
+- id: G030
+  title: bin/structured_logger.py
+  purpose: JSON-line structured logger with correlation IDs (vendor + clip + step)
+  status: pending
+  priority: P2
+  lines_estimate: 120
