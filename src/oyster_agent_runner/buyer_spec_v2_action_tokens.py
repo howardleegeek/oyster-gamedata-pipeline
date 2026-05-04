@@ -20,6 +20,12 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from typing import TYPE_CHECKING
+
+# numpy used only as a type hint (annotations stringified by __future__ import)
+# and lazy-loaded at runtime via _np() — never required at import time.
+if TYPE_CHECKING:
+    import numpy
 
 _numpy = None
 
