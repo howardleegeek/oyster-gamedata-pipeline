@@ -549,9 +549,10 @@ gaps:
   title: bin/vendor_scenario_no_gpu.py
   purpose: 'Walkthrough: no CUDA / Metal — DepthAnything inference falls back to onnx-cpu
     within SLA'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 130
+  dispatched_at: '2026-05-04 05:35:46'
 - id: G067
   title: bin/vendor_scenario_alpha_week.py
   purpose: 'Walkthrough: alpha-week first 50 vendors — concurrent ingest + per-vendor
@@ -592,10 +593,11 @@ gaps:
   title: bin/prd_test_wasd_balance.py
   purpose: 'PRD p6 #4: WASD action balance — no single key over 60 percent in long
     captures'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 100
   dispatched_at: '2026-05-04 05:23:22'
+  completed_at: '2026-05-04 05:33:35'
 - id: G072
   title: bin/prd_test_stationary_threshold.py
   purpose: 'PRD p6 #5: stationary frames over 5s must trigger clip stop — verify cutoff'
@@ -635,16 +637,18 @@ gaps:
   title: bin/prd_test_metric_units_meters.py
   purpose: 'PRD p3 #5: positions in meters — sanity-bound camera_position within world
     cube radius'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 95
+  dispatched_at: '2026-05-04 05:37:27'
 - id: G077
   title: bin/prd_test_speed_units_mps.py
   purpose: 'PRD p3 #6: linear_velocity in m/s — bound to player walk run sprint speeds'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 100
   dispatched_at: '2026-05-04 05:28:06'
+  completed_at: '2026-05-04 05:33:37'
 - id: G078
   title: bin/prd_test_240_clip_cap.py
   purpose: 'PRD p7 #2: max 240 clips per scene — adapter stops at 241st'
@@ -692,10 +696,11 @@ gaps:
   title: bin/prd_test_audio_continuity.py
   purpose: 'PRD p4 #2: video audio track continuous (no gaps over 50ms) — ffprobe
     + numpy diff check'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 120
   dispatched_at: '2026-05-04 05:29:10'
+  completed_at: '2026-05-04 05:33:38'
 - id: G084
   title: bin/red_team_oversized_json.py
   purpose: 'Red team: 100 MB action_camera.json — confirm adapter rejects or streams
@@ -717,10 +722,11 @@ gaps:
 - id: G086
   title: bin/red_team_year_9999_timestamp.py
   purpose: 'Red team: timestamp year 9999 — schema clamps within sane window'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 85
   dispatched_at: '2026-05-04 05:30:01'
+  completed_at: '2026-05-04 05:33:40'
 - id: G087
   title: bin/red_team_path_traversal.py
   purpose: 'Red team: tarball entry name contains ../../etc — extractor must refuse
@@ -733,9 +739,10 @@ gaps:
 - id: G088
   title: bin/red_team_duplicate_frame_id.py
   purpose: 'Red team: two records with same frame_id — lint detects dupe and rejects'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 95
+  dispatched_at: '2026-05-04 05:40:20'
 - id: G089
   title: bin/red_team_concurrent_writers.py
   purpose: 'Red team: two adapter procs write same tarball simultaneously — file lock
@@ -806,9 +813,10 @@ gaps:
   title: bin/red_team_mixed_vector_format.py
   purpose: 'Red team: same file mixes dict and list Vector3 forms — lint rejects format
     inconsistency'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 100
+  dispatched_at: '2026-05-04 05:47:46'
 - id: G098
   title: bin/red_team_clock_skew.py
   purpose: 'Red team: capture machine clock jumps backward 1 hour — adapter switches
@@ -840,9 +848,10 @@ gaps:
   title: src/oyster_agent_runner/defense_timestamp_range.py
   purpose: 'Blue team for G086: enforce timestamps within 2024-01-01 to 2030-01-01
     range'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 80
+  dispatched_at: '2026-05-04 05:49:04'
 - id: G102
   title: src/oyster_agent_runner/defense_path_sanitize.py
   purpose: 'Blue team for G087: tarball path sanitizer rejecting absolute / traversal
@@ -1128,4 +1137,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-04T12:33:02Z'
+  last_heartbeat: '2026-05-04T12:49:04Z'
