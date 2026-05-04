@@ -4,34 +4,39 @@ gaps:
 - id: G001
   title: bin/preflight_check_v2.py
   purpose: Granular hardware/network/deps pre-run validator (JSON output)
-  status: pending
+  status: skipped
   priority: P1
   lines_estimate: 150
   deps: []
+  skip_reason: file already in repo
 - id: G002
   title: bin/secure_subprocess_lib.py
   purpose: Safe subprocess wrapper rejecting shell=True, allowlist binaries
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 120
+  dispatched_at: '2026-05-03 22:51:20'
 - id: G003
   title: bin/cn_mirror_setup.sh
   purpose: China vendor pip+npm+HF mirror configuration (idempotent, --revert)
-  status: pending
+  status: skipped
   priority: P1
   lines_estimate: 80
+  skip_reason: file already in repo
 - id: G004
   title: bin/disk_full_guard.py
   purpose: Independent disk-space monitor that kills parent on threshold breach
-  status: pending
+  status: skipped
   priority: P1
   lines_estimate: 100
+  skip_reason: file already in repo
 - id: G005
   title: src/oyster_agent_runner/safe_paths.py
   purpose: mktemp-based concurrency-safe path manager + dynamic port allocator
-  status: pending
+  status: skipped
   priority: P0
   lines_estimate: 90
+  skip_reason: file already in repo
 - id: G006
   title: bin/network_test.py
   purpose: Vendor network upload speed + latency + DNS resolution check
@@ -41,15 +46,17 @@ gaps:
 - id: G007
   title: bin/eula_consent.py
   purpose: Interactive EULA presenter logging vendor accept timestamp
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 80
+  dispatched_at: '2026-05-03 22:52:14'
 - id: G008
   title: bin/depth_anything_offline_install.sh
   purpose: HF mirror + offline cache pre-warm (China-friendly)
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 60
+  dispatched_at: '2026-05-03 23:05:16'
 - id: G009
   title: bin/anti_virus_allowlist_check.ps1
   purpose: Windows PowerShell script verifying Defender exclusions for ffmpeg/Java/paper.jar
@@ -65,9 +72,10 @@ gaps:
 - id: G011
   title: bin/server_ingest_worker.py
   purpose: SQS consumer + S3 download + lint dispatch + Postgres write
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 250
+  dispatched_at: '2026-05-03 22:55:04'
 - id: G012
   title: bin/dashboard_app.py
   purpose: Flask + htmx vendor submission dashboard (read-only)
@@ -113,9 +121,10 @@ gaps:
 - id: G019
   title: docs/TROUBLESHOOTING.md
   purpose: 30+ vendor common errors with symptom→fix entries
-  status: pending
+  status: skipped
   priority: P0
   lines_estimate: 400
+  skip_reason: file already in repo
 - id: G020
   title: docs/PRICING_GUIDE.md
   purpose: Vendor quote template (3-tier complexity + volume + rush)
@@ -151,9 +160,10 @@ gaps:
 - id: G025
   title: src/oyster_agent_runner/camera_synthesizer.py
   purpose: Independent camera-rotation synthesizer (NOT player) per PDF p3
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 150
+  dispatched_at: '2026-05-03 22:56:14'
 - id: G026
   title: bin/upload_resume_helper.py
   purpose: Standalone resumable S3 multipart helper with checkpoint state
@@ -184,34 +194,40 @@ gaps:
   status: pending
   priority: P2
   lines_estimate: 120
-# ============== GameData functional progression (W7) ==============
 - id: G031
   title: bin/obs_websocket_smoke.py
-  purpose: Standalone smoke test that boots OBS Studio (subprocess) and verifies WebSocket v5 connect + auth + StartRecord/StopRecord opcodes
-  status: pending
+  purpose: Standalone smoke test that boots OBS Studio (subprocess) and verifies WebSocket
+    v5 connect + auth + StartRecord/StopRecord opcodes
+  status: dispatched
   priority: P0
   lines_estimate: 200
+  dispatched_at: '2026-05-03 22:58:29'
 - id: G032
   title: bin/depth_anything_smoke.py
-  purpose: Load DepthAnything V2 Small model + run inference on 1 RGB sample + write valid OpenEXR float32 Z + read-back validate
+  purpose: Load DepthAnything V2 Small model + run inference on 1 RGB sample + write
+    valid OpenEXR float32 Z + read-back validate
   status: pending
   priority: P0
   lines_estimate: 180
 - id: G033
   title: bin/mc_client_smoke.py
-  purpose: Launch real Minecraft Java 1.20.4 client in offline mode + screenshot at t=10s + verify pixels-not-black
-  status: pending
+  purpose: Launch real Minecraft Java 1.20.4 client in offline mode + screenshot at
+    t=10s + verify pixels-not-black
+  status: dispatched
   priority: P0
   lines_estimate: 200
+  dispatched_at: '2026-05-03 23:03:31'
 - id: G034
   title: bin/scene_diversity_scorer.py
-  purpose: Compute Habitat-style scene diversity metric (pixel histogram clustering across video frames) — flags vendor monotone-scene clips
+  purpose: Compute Habitat-style scene diversity metric (pixel histogram clustering
+    across video frames) — flags vendor monotone-scene clips
   status: pending
   priority: P1
   lines_estimate: 180
 - id: G035
   title: bin/clip_validator_strict.py
-  purpose: Stricter clip-level validator — cross-checks audio mute/silent / black-frame rate / repeated-frame rate / motion entropy
+  purpose: Stricter clip-level validator — cross-checks audio mute/silent / black-frame
+    rate / repeated-frame rate / motion entropy
   status: pending
   priority: P1
   lines_estimate: 250
@@ -223,13 +239,19 @@ gaps:
   lines_estimate: 150
 - id: G037
   title: bin/network_throttle_test.py
-  purpose: Simulate weak vendor network (200 Kbps upload) using tc/dummynet wrapper — validates upload_s3.sh truly handles slow links
+  purpose: Simulate weak vendor network (200 Kbps upload) using tc/dummynet wrapper
+    — validates upload_s3.sh truly handles slow links
   status: pending
   priority: P2
   lines_estimate: 130
 - id: G038
   title: bin/buyer_spec_validator_v2.py
-  purpose: Strict independent v2 validator (cross-file consistency checks beyond lint_buyer_spec — manifest sha vs files / xlsx semantic / EXR temporal alignment)
+  purpose: Strict independent v2 validator (cross-file consistency checks beyond lint_buyer_spec
+    — manifest sha vs files / xlsx semantic / EXR temporal alignment)
   status: pending
   priority: P1
   lines_estimate: 280
+harness_lock:
+  host: Howards-MacBook-Air-4.local
+  pid: 7837
+  last_heartbeat: '2026-05-04T06:05:16Z'
