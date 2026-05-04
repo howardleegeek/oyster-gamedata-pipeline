@@ -115,19 +115,70 @@ def load_gaps() -> dict[str, Any]:
 
 
 def save_gaps(data: dict[str, Any]) -> None:
-    """Validated YAML writer.
+    """Validated YAML writer with 3-way merge (ISC-11, 2026-05-04).
 
-    Writes via yaml.safe_dump (guaranteed parseable), then immediately
-    re-loads to confirm — refuses to leave a corrupt file on disk.
+    Layered safety:
+      1. ALWAYS git pull right before save so we have the freshest state.
+      2. Re-load disk YAML; for any gap.id we don't know about, ADD IT to
+         our in-memory data (someone added it concurrently while we worked).
+      3. For any gap.id we both know, OUR daemon-maintained fields
+         (status / dispatched_at / completed_at / fail_reason / retries)
+         override theirs; everything else preserves disk state.
+      4. Write via yaml.safe_dump (guaranteed parseable).
+      5. Round-trip parse check; if poisoned, restore HEAD.
+
+    Why this exists: 2026-05-04 the daemon stomped 22+22+22 specs across 3
+    separate commits because save_gaps overwrote the working tree with a
+    pre-pull snapshot. Three-way merge fixes the entire failure class.
     """
     try:
         import yaml  # noqa: PLC0415
     except ImportError:
         log.warning("PyYAML missing; skipping write — install with `pip install pyyaml`")
         return
+
+    # Step 1: pull latest disk state (concurrent commits may have added gaps)
+    try:
+        run(["git", "-C", str(REPO_ROOT), "pull", "--rebase", "--autostash",
+             "origin", "main"], check=False, timeout=30)
+    except Exception as e:
+        log.warning(f"  save_gaps pull-before-write skipped: {e}")
+
+    # Step 2: 3-way merge — preserve concurrent gap additions
+    DAEMON_OWNED_FIELDS = {"status", "dispatched_at", "completed_at",
+                            "fail_reason", "retries", "skip_reason"}
+    try:
+        if GAPS_YAML.exists():
+            disk = yaml.safe_load(GAPS_YAML.read_text()) or {}
+            disk_gaps = {g["id"]: g for g in disk.get("gaps", []) if "id" in g}
+            our_gaps = {g["id"]: g for g in data.get("gaps", []) if "id" in g}
+
+            # New on disk that we don't know → add to our state
+            for gid, dg in disk_gaps.items():
+                if gid not in our_gaps:
+                    data.setdefault("gaps", []).append(dg)
+
+            # Common: our daemon-owned fields win, everything else from disk wins
+            merged_gaps = []
+            for g in data.get("gaps", []):
+                gid = g.get("id")
+                if gid in disk_gaps:
+                    merged = dict(disk_gaps[gid])
+                    for k in DAEMON_OWNED_FIELDS:
+                        if k in g:
+                            merged[k] = g[k]
+                        elif k in disk_gaps[gid]:
+                            merged[k] = disk_gaps[gid][k]
+                    merged_gaps.append(merged)
+                else:
+                    merged_gaps.append(g)
+            data["gaps"] = merged_gaps
+    except yaml.YAMLError as e:
+        log.warning(f"  3-way merge skipped (disk YAML invalid): {e}")
+
+    # Step 3: write + validate
     out = yaml.safe_dump(data, sort_keys=False, allow_unicode=True)
     GAPS_YAML.write_text(out)
-    # Round-trip check: if for any reason the result doesn't parse, restore HEAD.
     try:
         yaml.safe_load(out)
     except yaml.YAMLError as e:
