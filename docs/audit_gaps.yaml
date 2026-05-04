@@ -352,9 +352,10 @@ gaps:
   title: bin/edge_test_unicode_filenames.py
   purpose: 'Boundary test: Chinese / emoji / RTL filenames in tarball entries — verify
     utf-8 manifest support'
-  status: pending
+  status: dispatched
   priority: P2
   lines_estimate: 100
+  dispatched_at: '2026-05-04 07:11:06'
 - id: G043
   title: bin/edge_test_missing_optional_fields.py
   purpose: 'Boundary test: skip optional Vector4 quat field — adapter must default-fill
@@ -368,9 +369,10 @@ gaps:
   title: bin/edge_test_extra_unknown_fields.py
   purpose: 'Boundary test: vendor adds extra keys to action_camera record — lint warns
     but accepts'
-  status: pending
+  status: dispatched
   priority: P2
   lines_estimate: 90
+  dispatched_at: '2026-05-04 07:12:07'
 - id: G045
   title: bin/edge_test_nan_inf_floats.py
   purpose: 'Boundary test: NaN / +Inf in Vector3 — lint must reject as buyer spec
@@ -1046,9 +1048,10 @@ gaps:
   title: bin/autoresearch_action_entropy.py
   purpose: 'Autoresearch: Shannon entropy of action stream — low entropy suggests
     AFK / scripted vendor'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 110
+  dispatched_at: '2026-05-04 07:02:03'
 - id: G124
   title: bin/observability_metrics_emitter.py
   purpose: 'Production: prometheus-style counters / histograms emitted to stdout for
@@ -1087,10 +1090,11 @@ gaps:
 - id: G128
   title: bin/circuit_breaker.py
   purpose: 'Production: trip after N consecutive S3 failures — halt uploads and alert'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 130
   dispatched_at: '2026-05-04 06:44:23'
+  completed_at: '2026-05-04 06:59:10'
 - id: G129
   title: bin/rate_limiter.py
   purpose: 'Production: token-bucket per vendor key — enforce per-day clip budget
@@ -1126,9 +1130,10 @@ gaps:
   title: bin/dependency_pinning_check.py
   purpose: 'Production: assert all pip deps pinned to exact version — fail CI if any
     range'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 90
+  dispatched_at: '2026-05-04 07:09:25'
 - id: G134
   title: bin/installer_one_click.py
   purpose: 'Customer: single bash script that detects OS / installs deps / sets up
@@ -1142,10 +1147,11 @@ gaps:
   title: bin/error_message_translator.py
   purpose: 'Customer: convert internal exception traces into vendor-friendly remediation
     message'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 120
   dispatched_at: '2026-05-04 06:55:42'
+  completed_at: '2026-05-04 06:59:14'
 - id: G136
   title: bin/onboarding_smoke_test.py
   purpose: 'Customer: post-install verify — captures 10s clip and lints, reports go
@@ -1166,11 +1172,12 @@ gaps:
   title: bin/diag_bundle_collector.py
   purpose: 'Customer: gather logs / systeminfo / last 3 manifests into a tarball for
     support tickets'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 130
   dispatched_at: '2026-05-04 06:58:36'
+  completed_at: '2026-05-04 06:59:16'
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-04T13:58:36Z'
+  last_heartbeat: '2026-05-04T14:15:08Z'
