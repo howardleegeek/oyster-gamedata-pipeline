@@ -233,29 +233,45 @@ def scp_from(remote: str, local: Path) -> None:
 
 
 def dispatch(gap: dict) -> bool:
-    """scp spec to mac-2 + launch nohup minimax_agent_simple.py."""
-    gap_id = gap["id"]
-    spec = SPEC_DIR / gap_id / "spec.md"
-    spec.parent.mkdir(parents=True, exist_ok=True)
-    spec.write_text(generate_spec(gap))
+    """scp spec to mac-2 + launch nohup minimax_agent_simple.py.
 
-    remote_dir = f"{MAC2_WORK}/{gap_id}"
-    ssh_run(f"mkdir -p {remote_dir}")
-    scp_to(spec, f"{remote_dir}/spec.md")
-    cmd = (
-        f"cd {remote_dir} && "
-        f"SPEC_FILE=spec.md WORKING_DIR=. TASK_ID={gap_id} "
-        f"nohup python3 {MINIMAX} > agent.log 2>&1 & "
-        f"echo $!"
-    )
-    res = ssh_run(cmd)
-    if res.returncode != 0:
-        log.error(f"  dispatch failed for {gap_id}: {res.stderr}")
+    Wrapped in try/except so transient ssh/scp failures don't crash the
+    whole daemon — gap stays 'pending' and gets re-tried next iteration.
+    Increased timeout to 180s for ssh dispatch (was 60s, mac-2 sometimes
+    slow when busy with prior wave).
+    """
+    gap_id = gap["id"]
+    try:
+        spec = SPEC_DIR / gap_id / "spec.md"
+        spec.parent.mkdir(parents=True, exist_ok=True)
+        spec.write_text(generate_spec(gap))
+
+        remote_dir = f"{MAC2_WORK}/{gap_id}"
+        ssh_run(f"mkdir -p {remote_dir}", timeout=120)
+        scp_to(spec, f"{remote_dir}/spec.md")
+        cmd = (
+            f"cd {remote_dir} && "
+            f"SPEC_FILE=spec.md WORKING_DIR=. TASK_ID={gap_id} "
+            f"nohup python3 {MINIMAX} > agent.log 2>&1 & "
+            f"echo $!"
+        )
+        res = ssh_run(cmd, timeout=180)
+        if res.returncode != 0:
+            log.error(f"  dispatch failed for {gap_id}: {res.stderr[:200]}")
+            return False
+        log.info(f"  → {gap_id} dispatched (PID={res.stdout.strip()})")
+        gap["status"] = "dispatched"
+        gap["dispatched_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        return True
+    except subprocess.TimeoutExpired as e:
+        log.error(f"  dispatch TIMEOUT for {gap_id}: {e}")
         return False
-    log.info(f"  → {gap_id} dispatched (PID={res.stdout.strip()})")
-    gap["status"] = "dispatched"
-    gap["dispatched_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
-    return True
+    except subprocess.CalledProcessError as e:
+        log.error(f"  dispatch CALLED-ERR for {gap_id}: {e}")
+        return False
+    except Exception as e:
+        log.error(f"  dispatch unexpected error for {gap_id}: {e}")
+        return False
 
 
 # ----------------------------------------------------------------- collection
