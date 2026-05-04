@@ -13,7 +13,9 @@ agent trajectories with zero schema changes.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+UTC = timezone.utc
 
 UTC = UTC
 from typing import Any, Literal

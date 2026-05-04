@@ -26,7 +26,9 @@ iteration[i] (1..9) so we get a focused diff on the first drift.
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+UTC = timezone.utc
 
 UTC = UTC
 from pathlib import Path
