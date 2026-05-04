@@ -418,51 +418,6 @@ gaps:
   lines_estimate: 100
   dispatched_at: '2026-05-04 04:13:56'
   completed_at: '2026-05-04 04:19:13'
-- id: G050
-  title: bin/edge_test_leap_second.py
-  purpose: 'Boundary test: leap-second insertion at 23:59:60 — adapter handles or
-    rejects cleanly'
-  status: completed
-  priority: P3
-  lines_estimate: 95
-  dispatched_at: '2026-05-04 07:46:26'
-  completed_at: '2026-05-04 07:47:00'
-- id: G051
-  title: bin/edge_test_high_precision_floats.py
-  purpose: 'Boundary test: 1e-300 tiny floats in camera position — verify json round-trip
-    preserves precision'
-  status: completed
-  priority: P2
-  lines_estimate: 90
-  dispatched_at: '2026-05-04 07:26:17'
-  completed_at: '2026-05-04 07:31:30'
-- id: G052
-  title: bin/edge_test_quaternion_norm_drift.py
-  purpose: 'Boundary test: quaternion magnitude 1.0001 from float drift — lint tolerates
-    within epsilon'
-  status: completed
-  priority: P1
-  lines_estimate: 110
-  dispatched_at: '2026-05-04 04:15:34'
-  completed_at: '2026-05-04 04:19:15'
-- id: G053
-  title: bin/edge_test_camera_pitch_singularity.py
-  purpose: 'Boundary test: pitch exactly 90.0 / -90.0 gimbal-lock case — adapter clamps
-    not wraps'
-  status: completed
-  priority: P0
-  lines_estimate: 100
-  dispatched_at: '2026-05-04 02:13:32'
-  completed_at: '2026-05-04 02:24:42'
-- id: G054
-  title: bin/stress_test_50_concurrent_lints.py
-  purpose: 'Stress test: spawn 50 lint processes against same tarball — verify no
-    shared-state corruption'
-  status: completed
-  priority: P1
-  lines_estimate: 130
-  dispatched_at: '2026-05-04 04:20:42'
-  completed_at: '2026-05-04 04:36:22'
 - id: G055
   title: bin/stress_test_huge_tarball_5gb.py
   purpose: 'Stress test: build 5 GB tarball (long capture + 6fps depth) — verify upload_s3.sh
@@ -1403,7 +1358,52 @@ gaps:
   lines_estimate: 220
   dispatched_at: '2026-05-04 10:46:31'
   completed_at: '2026-05-04 10:47:10'
+- id: G050
+  title: bin/edge_test_leap_second.py
+  purpose: 'Boundary test: leap-second insertion at 23:59:60 — adapter handles or
+    rejects cleanly'
+  status: completed
+  priority: P3
+  lines_estimate: 95
+  dispatched_at: '2026-05-04 07:46:26'
+  completed_at: '2026-05-04 07:47:00'
+- id: G051
+  title: bin/edge_test_high_precision_floats.py
+  purpose: 'Boundary test: 1e-300 tiny floats in camera position — verify json round-trip
+    preserves precision'
+  status: completed
+  priority: P2
+  lines_estimate: 90
+  dispatched_at: '2026-05-04 07:26:17'
+  completed_at: '2026-05-04 07:31:30'
+- id: G052
+  title: bin/edge_test_quaternion_norm_drift.py
+  purpose: 'Boundary test: quaternion magnitude 1.0001 from float drift — lint tolerates
+    within epsilon'
+  status: completed
+  priority: P1
+  lines_estimate: 110
+  dispatched_at: '2026-05-04 04:15:34'
+  completed_at: '2026-05-04 04:19:15'
+- id: G053
+  title: bin/edge_test_camera_pitch_singularity.py
+  purpose: 'Boundary test: pitch exactly 90.0 / -90.0 gimbal-lock case — adapter clamps
+    not wraps'
+  status: completed
+  priority: P0
+  lines_estimate: 100
+  dispatched_at: '2026-05-04 02:13:32'
+  completed_at: '2026-05-04 02:24:42'
+- id: G054
+  title: bin/stress_test_50_concurrent_lints.py
+  purpose: 'Stress test: spawn 50 lint processes against same tarball — verify no
+    shared-state corruption'
+  status: completed
+  priority: P1
+  lines_estimate: 130
+  dispatched_at: '2026-05-04 04:20:42'
+  completed_at: '2026-05-04 04:36:22'
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-04T18:33:00Z'
+  last_heartbeat: '2026-05-04T18:33:32Z'
