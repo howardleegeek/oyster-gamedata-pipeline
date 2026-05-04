@@ -549,10 +549,11 @@ gaps:
   title: bin/vendor_scenario_no_gpu.py
   purpose: 'Walkthrough: no CUDA / Metal — DepthAnything inference falls back to onnx-cpu
     within SLA'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 130
   dispatched_at: '2026-05-04 05:35:46'
+  completed_at: '2026-05-04 05:49:38'
 - id: G067
   title: bin/vendor_scenario_alpha_week.py
   purpose: 'Walkthrough: alpha-week first 50 vendors — concurrent ingest + per-vendor
@@ -637,10 +638,11 @@ gaps:
   title: bin/prd_test_metric_units_meters.py
   purpose: 'PRD p3 #5: positions in meters — sanity-bound camera_position within world
     cube radius'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 95
   dispatched_at: '2026-05-04 05:37:27'
+  completed_at: '2026-05-04 05:49:40'
 - id: G077
   title: bin/prd_test_speed_units_mps.py
   purpose: 'PRD p3 #6: linear_velocity in m/s — bound to player walk run sprint speeds'
@@ -739,10 +741,11 @@ gaps:
 - id: G088
   title: bin/red_team_duplicate_frame_id.py
   purpose: 'Red team: two records with same frame_id — lint detects dupe and rejects'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 95
   dispatched_at: '2026-05-04 05:40:20'
+  completed_at: '2026-05-04 05:49:41'
 - id: G089
   title: bin/red_team_concurrent_writers.py
   purpose: 'Red team: two adapter procs write same tarball simultaneously — file lock
@@ -813,10 +816,11 @@ gaps:
   title: bin/red_team_mixed_vector_format.py
   purpose: 'Red team: same file mixes dict and list Vector3 forms — lint rejects format
     inconsistency'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 100
   dispatched_at: '2026-05-04 05:47:46'
+  completed_at: '2026-05-04 05:49:43'
 - id: G098
   title: bin/red_team_clock_skew.py
   purpose: 'Red team: capture machine clock jumps backward 1 hour — adapter switches
@@ -848,10 +852,11 @@ gaps:
   title: src/oyster_agent_runner/defense_timestamp_range.py
   purpose: 'Blue team for G086: enforce timestamps within 2024-01-01 to 2030-01-01
     range'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 80
   dispatched_at: '2026-05-04 05:49:04'
+  completed_at: '2026-05-04 05:49:45'
 - id: G102
   title: src/oyster_agent_runner/defense_path_sanitize.py
   purpose: 'Blue team for G087: tarball path sanitizer rejecting absolute / traversal
@@ -865,9 +870,10 @@ gaps:
   title: src/oyster_agent_runner/defense_dedup_frames.py
   purpose: 'Blue team for G088: in-memory set tracker rejecting duplicate frame_id
     within scene'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 90
+  dispatched_at: '2026-05-04 05:58:14'
 - id: G104
   title: src/oyster_agent_runner/defense_file_lock.py
   purpose: 'Blue team for G089: fcntl flock wrapper around tarball open — prevents
@@ -938,9 +944,10 @@ gaps:
   title: src/oyster_agent_runner/defense_vector_uniform.py
   purpose: 'Blue team for G097: scan first record format and enforce uniform Vector3
     shape across file'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 100
+  dispatched_at: '2026-05-04 06:07:06'
 - id: G113
   title: src/oyster_agent_runner/defense_monotonic_clock.py
   purpose: 'Blue team for G098: prefer time.monotonic_ns inside capture loop, wall
@@ -954,9 +961,10 @@ gaps:
   title: bin/autoresearch_lint_perf.py
   purpose: 'Autoresearch: benchmark lint_buyer_spec on 100-tarball corpus — surface
     p50 / p95 / p99'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 130
+  dispatched_at: '2026-05-04 06:09:15'
 - id: G115
   title: bin/autoresearch_adapter_quality.py
   purpose: 'Autoresearch: golden-corpus diff vs hand-labeled mineflayer scenes — coverage
@@ -1137,4 +1145,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-04T12:49:04Z'
+  last_heartbeat: '2026-05-04T13:09:15Z'
