@@ -222,13 +222,29 @@ def _check_naming(d: Path, rpt: LintReport) -> None:
                        "All valid" if not bad else f"{len(bad)} invalid", {"samples": bad[:5]}))
 
 def _check_structure(d: Path, rpt: LintReport) -> None:
-    """Criterion 24: Directory structure validation."""
-    expected = ["video", "image", "audio", "metadata"]
-    existing = [x.name for x in d.iterdir() if x.is_dir()]
-    missing = [e for e in expected if e not in existing]
-    rpt.add(LintResult(24, "Directory Structure", len(missing) <= 2,
-                       "Structure valid" if not missing else f"Missing: {missing}",
-                       {"expected": expected, "existing": existing}))
+    """Criterion 24: PRD 5-file delivery layout (Lark p7).
+
+    Required at root of the tarball:
+      0. video.mp4
+      1. systeminfo.json
+      2. action_camera.json
+      3. gameinfo.xlsx
+      4. depth/ (directory of .exr files)
+
+    Earlier cluster draft expected ['video','image','audio','metadata']
+    directories — that was hallucinated structure, not the PRD spec.
+    """
+    required_files = ["video.mp4", "systeminfo.json", "action_camera.json", "gameinfo.xlsx"]
+    required_dirs = ["depth"]
+    existing_files = {f.name for f in d.iterdir() if f.is_file()}
+    existing_dirs = {x.name for x in d.iterdir() if x.is_dir()}
+    missing_files = [f for f in required_files if f not in existing_files]
+    missing_dirs = [x for x in required_dirs if x not in existing_dirs]
+    missing = missing_files + missing_dirs
+    rpt.add(LintResult(24, "Directory Structure", not missing,
+                       "5-file PRD delivery valid" if not missing else f"Missing: {missing}",
+                       {"required_files": required_files, "required_dirs": required_dirs,
+                        "existing_files": sorted(existing_files), "existing_dirs": sorted(existing_dirs)}))
 
 def run_all_checks(data_dir: Path) -> LintReport:
     """Run all 24 lint checks on the data directory."""

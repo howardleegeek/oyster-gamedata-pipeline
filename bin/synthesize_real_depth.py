@@ -76,14 +76,19 @@ def _inject_invalid_pixels(
     invalid_ratio: float,
     rng: np.random.Generator,
 ) -> np.ndarray:
-    """Replace a fraction of pixels with NaN, capped at *invalid_ratio*."""
+    """Mark a fraction of pixels as invalid using PRD sentinel = 0.
+
+    PRD page 11 mandates the invalid-pixel marker for the entire dataset is
+    chosen from {0, inf, NaN} and held CONSTANT — this doc explicitly sets
+    it to 0. Cluster's earlier draft used NaN, which violates the spec.
+    """
     total = depth.size
     max_invalid = int(total * min(invalid_ratio, 0.001))  # hard cap 0.1 %
     if max_invalid <= 0:
         return depth
     flat = depth.ravel()
     idx = rng.choice(total, size=max_invalid, replace=False)
-    flat[idx] = np.float32(np.nan)
+    flat[idx] = np.float32(0.0)  # PRD: invalid_pixel = 0 (consistent across dataset)
     return depth
 
 
