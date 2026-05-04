@@ -446,10 +446,11 @@ gaps:
   title: bin/stress_test_50_concurrent_lints.py
   purpose: 'Stress test: spawn 50 lint processes against same tarball — verify no
     shared-state corruption'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 130
   dispatched_at: '2026-05-04 04:20:42'
+  completed_at: '2026-05-04 04:36:22'
 - id: G055
   title: bin/stress_test_huge_tarball_5gb.py
   purpose: 'Stress test: build 5 GB tarball (long capture + 6fps depth) — verify upload_s3.sh
@@ -475,9 +476,10 @@ gaps:
   title: bin/stress_test_memory_leak_check.py
   purpose: 'Stress test: 1000-iteration adapter run with tracemalloc — assert RSS
     growth less than 50MB'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 130
+  dispatched_at: '2026-05-04 04:44:33'
 - id: G059
   title: bin/vendor_scenario_first_clip.py
   purpose: 'Walkthrough: vendor follows README from zero, uploads first clip — measure
@@ -491,10 +493,11 @@ gaps:
   title: bin/vendor_scenario_china_mirror.py
   purpose: 'Walkthrough: vendor in CN behind GFW — pip mirror + S3 region selection
     works without VPN'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 130
   dispatched_at: '2026-05-04 04:31:44'
+  completed_at: '2026-05-04 04:36:24'
 - id: G061
   title: bin/vendor_scenario_resume_after_crash.py
   purpose: 'Walkthrough: kill capture mid-clip, restart — confirm no partial tarball
@@ -507,17 +510,19 @@ gaps:
 - id: G062
   title: bin/vendor_scenario_low_bandwidth.py
   purpose: 'Walkthrough: 200 Kbps upload — chunked retry succeeds within 30 min budget'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 130
+  dispatched_at: '2026-05-04 04:46:45'
 - id: G063
   title: bin/vendor_scenario_low_disk.py
   purpose: 'Walkthrough: 1 GB free disk — capture pre-flight check warns and aborts
     safely'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 110
   dispatched_at: '2026-05-04 04:35:49'
+  completed_at: '2026-05-04 04:36:28'
 - id: G064
   title: bin/vendor_scenario_mac_only.py
   purpose: 'Walkthrough: vendor on M1 Mac no GPU — depth provider falls back to CPU
@@ -545,16 +550,18 @@ gaps:
   title: bin/vendor_scenario_alpha_week.py
   purpose: 'Walkthrough: alpha-week first 50 vendors — concurrent ingest + per-vendor
     quota holds'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 140
+  dispatched_at: '2026-05-04 04:51:47'
 - id: G068
   title: bin/vendor_scenario_rejection_loop.py
   purpose: 'Walkthrough: vendor uploads malformed clip — rejection email + retry guide
     reaches them'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 130
+  dispatched_at: '2026-05-04 04:54:11'
 - id: G069
   title: bin/prd_test_video_no_ui.py
   purpose: 'PRD p4 #3: video must contain no overlay UI / chat / dialogs — OCR scan
@@ -1105,4 +1112,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-04T11:35:49Z'
+  last_heartbeat: '2026-05-04T11:54:11Z'
