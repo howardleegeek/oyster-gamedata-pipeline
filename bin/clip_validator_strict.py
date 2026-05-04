@@ -119,7 +119,6 @@ def compute_audio_metrics(
 ) -> Tuple[float, float]:
     """
     Compute audio mute and silent ratios via ffprobe volumedetect.
-
     Returns (mute_ratio, silent_ratio) each in [0, 1].
     """
     if not _has_audio_stream(video_path):
@@ -331,7 +330,6 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Optional[List[str]] = None) -> int:
     """
     Entry point for the clip validator CLI.
-
     Returns: 0 if valid, 1 if invalid, 2 on error.
     """
     parser = build_parser()
