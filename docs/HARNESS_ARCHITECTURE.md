@@ -216,6 +216,19 @@ daemon 自动写 `harness_lock.last_heartbeat`。手动改可能造成两台同�
 ### 5.4 不要 push 时绕开 lock
 即使你 git push 了 docs/audit_gaps.yaml 改 status=completed,daemon 下一轮 pull 会看到。但**永远不要在 daemon 跑时手动 commit 同 file** — 会 git push reject(non-fast-forward)。
 
+### 5.5 audit_gaps.yaml 修改必须走 yaml.safe_dump(2026-05-04 加)
+**Why**: 2026-05-03 我用 Python 字符串拼接追加 specs 产生 line 447 col 22 invalid YAML,daemon 全停。
+
+**正确方式**:
+- 加新 specs → 用 `bin/spec_generator.py`(已经走 yaml.safe_dump,不可能产生坏 YAML)
+- 改 status / heartbeat → 让 daemon 自己改,不要手动编辑
+- 极端情况手动编辑 → 编完立刻 `python3 -c "import yaml; yaml.safe_load(open('docs/audit_gaps.yaml'))"` 验证
+
+**已部署的安全网**(load_gaps + save_gaps):
+1. 启动时 yaml.safe_load 失败 → auto-revert HEAD → retry
+2. 还失败 → 返回 {} 让 daemon idle 而非 crash-loop
+3. save_gaps 写完立刻 round-trip parse,失败则 restore HEAD
+
 ---
 
 ## 6. Decision Log(避免重蹈覆辙)
@@ -231,6 +244,8 @@ daemon 自动写 `harness_lock.last_heartbeat`。手动改可能造成两台同�
 | YAML lazy import (PyYAML 可选) | bootstrap 时 vendor 可能没装;有 fallback minimal parser |
 | Subprocess timeout 180s | 60s 在 mac-2 busy 时太短(实际 dispatch crashed once) |
 | Try/except 包 dispatch | 单 gap fail 不能 take down 整 daemon |
+| YAML auto-revert(2026-05-04) | 字符串拼接坏 YAML 灾难;daemon 必须能 self-heal |
+| Watchdog 用 `bin/harness_loop.py` 匹配(2026-05-04) | 之前 `python3 bin/...` 不匹配 Python.app;mac-2 spawn 10+ zombie |
 
 ---
 
