@@ -118,13 +118,14 @@ let frame = 0;
 const t0 = Date.now();
 bot.once('spawn', () => {
   console.log('Bot spawned at', bot.entity.position);
+  const MAX_FRAMES = Math.floor((DUR / 1000) * 30);  // exactly 30 fps × duration
   const tick = setInterval(() => {
     const e = Date.now() - t0;
-    if (e >= DUR) {
+    if (e >= DUR || frame >= MAX_FRAMES) {
       clearInterval(tick);
       bot.quit();
       w.end();
-      console.log(`Wrote ${frame} frames`);
+      console.log(`Wrote ${frame} frames (cap=${MAX_FRAMES})`);
       process.exit(0);
     }
     bot.look((e / 1000) * 0.5, 0, true);
