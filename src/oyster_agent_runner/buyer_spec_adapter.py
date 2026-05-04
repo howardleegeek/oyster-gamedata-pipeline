@@ -249,12 +249,14 @@ def minecraft_yaw_pitch_to_buyer_oula(mc_yaw_rad: float, mc_pitch_rad: float) ->
     pitch_deg = -math.degrees(float(mc_pitch_rad))
     yaw_deg = math.degrees(float(mc_yaw_rad))
     # Per PDF spec p3, all three Euler angles (pitch/yaw/roll) live in
-    # [-180, 180] — wrap (not clamp) so a third-person camera that pitches
-    # past 90° (looking down at feet) round-trips correctly.
-    # Surfaced by the 100-iter v2 sprint (iter_0002/0003 tripped yaw without wrap)
-    # and by Howard's PDF compliance audit (commit 2026-05-02 R018 cluster spec).
+    # Yaw wraps to [-180, 180]; Pitch is physically constrained to [-90, 90]
+    # (gimbal lock at ±90 — cameras can't pitch past straight-up/down).
+    # Senior code review (R033) corrected the rc6 wrap → clamp: 270° wrap
+    # producing -90° silently turns "looking down" into a different orientation.
+    # PDF p3 spec [-180,180] for Pitch is an inherited typo from yaw/roll; the
+    # physically/optically correct range is [-90, 90].
     yaw_deg = ((yaw_deg + 180.0) % 360.0) - 180.0
-    pitch_deg = ((pitch_deg + 180.0) % 360.0) - 180.0
+    pitch_deg = max(-90.0, min(90.0, pitch_deg))
     return [pitch_deg, yaw_deg, 0.0]
 
 
