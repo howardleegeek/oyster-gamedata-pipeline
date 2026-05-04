@@ -12,13 +12,11 @@ gaps:
 - id: G002
   title: bin/secure_subprocess_lib.py
   purpose: Safe subprocess wrapper rejecting shell=True, allowlist binaries
-  status: skipped
+  status: completed
   priority: P0
   lines_estimate: 120
   dispatched_at: '2026-05-03 22:51:20'
-  fail_reason: git push failed
-  retries: 1
-  skip_reason: file already in repo
+  completed_at: '2026-05-03 23:10:37'
 - id: G003
   title: bin/cn_mirror_setup.sh
   purpose: China vendor pip+npm+HF mirror configuration (idempotent, --revert)
@@ -53,15 +51,14 @@ gaps:
   priority: P0
   lines_estimate: 80
   dispatched_at: '2026-05-03 22:52:14'
-  completed_at: '2026-05-03 23:05:49'
+  completed_at: '2026-05-03 23:10:39'
 - id: G008
   title: bin/depth_anything_offline_install.sh
   purpose: HF mirror + offline cache pre-warm (China-friendly)
-  status: completed
+  status: dispatched
   priority: P1
   lines_estimate: 60
   dispatched_at: '2026-05-03 23:05:16'
-  completed_at: '2026-05-03 23:05:51'
 - id: G009
   title: bin/anti_virus_allowlist_check.ps1
   purpose: Windows PowerShell script verifying Defender exclusions for ffmpeg/Java/paper.jar
@@ -77,28 +74,26 @@ gaps:
 - id: G011
   title: bin/server_ingest_worker.py
   purpose: SQS consumer + S3 download + lint dispatch + Postgres write
-  status: skipped
+  status: completed
   priority: P0
   lines_estimate: 250
   dispatched_at: '2026-05-03 22:55:04'
-  fail_reason: git push failed
-  retries: 1
-  skip_reason: file already in repo
+  completed_at: '2026-05-03 23:10:41'
 - id: G012
   title: bin/dashboard_app.py
   purpose: Flask + htmx vendor submission dashboard (read-only)
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 300
-  dispatched_at: '2026-05-03 23:21:35'
+  dispatched_at: '2026-05-03 23:13:41'
+  completed_at: '2026-05-03 23:21:16'
 - id: G013
   title: bin/acceptance_signal_api.py
   purpose: Webhook API to notify vendor of accept/reject status
-  status: completed
+  status: dispatched
   priority: P1
   lines_estimate: 150
-  dispatched_at: '2026-05-03 23:13:05'
-  completed_at: '2026-05-03 23:18:24'
+  dispatched_at: '2026-05-03 23:14:42'
 - id: G014
   title: bin/cost_estimator.py
   purpose: Daily S3 cost report (storage + egress + lifecycle stage projection)
@@ -132,7 +127,7 @@ gaps:
   status: dispatched
   priority: P1
   lines_estimate: 250
-  dispatched_at: '2026-05-03 23:14:58'
+  dispatched_at: '2026-05-03 23:23:05'
 - id: G019
   title: docs/TROUBLESHOOTING.md
   purpose: 30+ vendor common errors with symptom→fix entries
@@ -168,28 +163,31 @@ gaps:
   status: dispatched
   priority: P1
   lines_estimate: 200
-  dispatched_at: '2026-05-03 23:17:50'
+  dispatched_at: '2026-05-03 23:24:57'
 - id: G024
   title: bin/buyer_spec_validator_v2.py
   purpose: Stricter independent validator (cross-checks, semantic + structural)
   status: dispatched
   priority: P1
   lines_estimate: 250
-  dispatched_at: '2026-05-03 23:24:22'
+  dispatched_at: '2026-05-03 23:24:59'
 - id: G025
   title: src/oyster_agent_runner/camera_synthesizer.py
   purpose: Independent camera-rotation synthesizer (NOT player) per PDF p3
-  status: completed
+  status: skipped
   priority: P0
   lines_estimate: 150
   dispatched_at: '2026-05-03 22:56:14'
-  completed_at: '2026-05-03 23:05:53'
+  fail_reason: git push failed
+  retries: 1
+  skip_reason: file already in repo
 - id: G026
   title: bin/upload_resume_helper.py
   purpose: Standalone resumable S3 multipart helper with checkpoint state
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 200
+  dispatched_at: '2026-05-03 23:27:29'
 - id: G027
   title: bin/vendor_alpha_dashboard.py
   purpose: Local CLI showing single-vendor daily metrics during alpha
@@ -218,28 +216,33 @@ gaps:
   title: bin/obs_websocket_smoke.py
   purpose: Standalone smoke test that boots OBS Studio (subprocess) and verifies WebSocket
     v5 connect + auth + StartRecord/StopRecord opcodes
-  status: completed
+  status: skipped
   priority: P0
   lines_estimate: 200
   dispatched_at: '2026-05-03 22:58:29'
-  completed_at: '2026-05-03 23:18:26'
+  fail_reason: git push failed
+  retries: 1
+  skip_reason: file already in repo
 - id: G032
   title: bin/depth_anything_smoke.py
   purpose: Load DepthAnything V2 Small model + run inference on 1 RGB sample + write
     valid OpenEXR float32 Z + read-back validate
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 180
-  dispatched_at: '2026-05-03 23:19:47'
+  dispatched_at: '2026-05-03 23:12:07'
+  completed_at: '2026-05-03 23:21:19'
 - id: G033
   title: bin/mc_client_smoke.py
   purpose: Launch real Minecraft Java 1.20.4 client in offline mode + screenshot at
     t=10s + verify pixels-not-black
-  status: completed
+  status: skipped
   priority: P0
   lines_estimate: 200
   dispatched_at: '2026-05-03 23:03:31'
-  completed_at: '2026-05-03 23:05:55'
+  fail_reason: git push failed
+  retries: 1
+  skip_reason: file already in repo
 - id: G034
   title: bin/scene_diversity_scorer.py
   purpose: Compute Habitat-style scene diversity metric (pixel histogram clustering
@@ -247,15 +250,14 @@ gaps:
   status: dispatched
   priority: P1
   lines_estimate: 180
-  dispatched_at: '2026-05-03 23:29:52'
+  dispatched_at: '2026-05-03 23:29:30'
 - id: G035
   title: bin/clip_validator_strict.py
   purpose: Stricter clip-level validator — cross-checks audio mute/silent / black-frame
     rate / repeated-frame rate / motion entropy
-  status: dispatched
+  status: pending
   priority: P1
   lines_estimate: 250
-  dispatched_at: '2026-05-03 23:31:56'
 - id: G036
   title: bin/manifest_signer.py
   purpose: GPG-sign manifest.yaml for tamper-evidence + verify signature on receive
@@ -278,5 +280,5 @@ gaps:
   lines_estimate: 280
 harness_lock:
   host: Howards-MacBook-Air-4.local
-  pid: 7837
-  last_heartbeat: '2026-05-04T06:31:56Z'
+  pid: 14591
+  last_heartbeat: '2026-05-04T06:32:30Z'
