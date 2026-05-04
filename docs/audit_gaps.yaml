@@ -423,9 +423,10 @@ gaps:
   title: bin/edge_test_camera_pitch_singularity.py
   purpose: 'Boundary test: pitch exactly 90.0 / -90.0 gimbal-lock case — adapter clamps
     not wraps'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 100
+  dispatched_at: '2026-05-04 02:13:32'
 - id: G054
   title: bin/stress_test_50_concurrent_lints.py
   purpose: 'Stress test: spawn 50 lint processes against same tarball — verify no
@@ -481,10 +482,11 @@ gaps:
   title: bin/vendor_scenario_resume_after_crash.py
   purpose: 'Walkthrough: kill capture mid-clip, restart — confirm no partial tarball
     poisons s3 + manifest detects gap'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 150
   dispatched_at: '2026-05-04 02:02:49'
+  completed_at: '2026-05-04 02:12:54'
 - id: G062
   title: bin/vendor_scenario_low_bandwidth.py
   purpose: 'Walkthrough: 200 Kbps upload — chunked retry succeeds within 30 min budget'
@@ -577,18 +579,20 @@ gaps:
   title: bin/prd_test_camera_intrinsics_pinhole.py
   purpose: 'PRD p3 #2: camera projection must be pinhole — fov + aspect populated,
     no fisheye distortion params'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 120
   dispatched_at: '2026-05-04 02:03:52'
+  completed_at: '2026-05-04 02:12:56'
 - id: G075
   title: bin/prd_test_left_hand_coordinates.py
   purpose: 'PRD p3 #4: left-hand coordinate system — assert handedness via cross-product
     sign on Vector3 axes'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 100
   dispatched_at: '2026-05-04 02:06:42'
+  completed_at: '2026-05-04 02:12:57'
 - id: G076
   title: bin/prd_test_metric_units_meters.py
   purpose: 'PRD p3 #5: positions in meters — sanity-bound camera_position within world
@@ -605,38 +609,43 @@ gaps:
 - id: G078
   title: bin/prd_test_240_clip_cap.py
   purpose: 'PRD p7 #2: max 240 clips per scene — adapter stops at 241st'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 90
   dispatched_at: '2026-05-04 02:08:19'
+  completed_at: '2026-05-04 02:12:59'
 - id: G079
   title: bin/prd_test_30min_scene_cap.py
   purpose: 'PRD p7 #3: max 30 min per scene — clock cap enforced'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 95
+  dispatched_at: '2026-05-04 02:14:04'
 - id: G080
   title: bin/prd_test_systeminfo_required.py
   purpose: 'PRD p7 file 1: required keys (gpu, cpu, ram_gb, os, build) all present
     — fail-closed if missing'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 100
   dispatched_at: '2026-05-04 02:12:21'
+  completed_at: '2026-05-04 02:13:00'
 - id: G081
   title: bin/prd_test_depth_invalid_marker.py
   purpose: 'PRD p4 #6: depth invalid pixel sentinel value (zero or NaN) preserved
     through OpenEXR roundtrip'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 110
+  dispatched_at: '2026-05-04 02:16:56'
 - id: G082
   title: bin/prd_test_depth_6fps_alignment.py
   purpose: 'PRD p4 #5: depth EXR 6fps alignment with 30fps video — frame index ratio
     5:1 exact'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 105
+  dispatched_at: '2026-05-04 02:19:08'
 - id: G083
   title: bin/prd_test_audio_continuity.py
   purpose: 'PRD p4 #2: video audio track continuous (no gaps over 50ms) — ffprobe
@@ -648,16 +657,18 @@ gaps:
   title: bin/red_team_oversized_json.py
   purpose: 'Red team: 100 MB action_camera.json — confirm adapter rejects or streams
     without OOM'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 110
+  dispatched_at: '2026-05-04 02:21:03'
 - id: G085
   title: bin/red_team_nan_coordinates.py
   purpose: 'Red team: inject NaN into camera_position — lint must reject not silently
     propagate'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 90
+  dispatched_at: '2026-05-04 02:23:01'
 - id: G086
   title: bin/red_team_year_9999_timestamp.py
   purpose: 'Red team: timestamp year 9999 — schema clamps within sane window'
@@ -668,9 +679,10 @@ gaps:
   title: bin/red_team_path_traversal.py
   purpose: 'Red team: tarball entry name contains ../../etc — extractor must refuse
     traversal'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 100
+  dispatched_at: '2026-05-04 02:24:08'
 - id: G088
   title: bin/red_team_duplicate_frame_id.py
   purpose: 'Red team: two records with same frame_id — lint detects dupe and rejects'
@@ -1023,4 +1035,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-04T09:12:21Z'
+  last_heartbeat: '2026-05-04T09:24:08Z'
