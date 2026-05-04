@@ -43,8 +43,10 @@ def _handle_signal(signum: int, _frame: Any) -> None:
 
 def load_config() -> dict[str, Any]:
     """Load configuration from environment variables."""
-    required = ["SQS_QUEUE_URL", "S3_BUCKET", "DB_HOST", "DB_PORT",
-                "DB_NAME", "DB_USER", "DB_PASSWORD", "LINT_SERVICE_URL"]
+    required = [
+        "SQS_QUEUE_URL", "S3_BUCKET", "DB_HOST", "DB_PORT",
+        "DB_NAME", "DB_USER", "DB_PASSWORD", "LINT_SERVICE_URL",
+    ]
     missing = [k for k in required if not os.environ.get(k)]
     if missing:
         raise ValueError(f"Missing required env vars: {', '.join(missing)}")
@@ -90,43 +92,32 @@ class SQSClient:
 
     def receive(self, wait_seconds: int = 10) -> Optional[dict[str, Any]]:
         """Receive a single message with long-polling."""
-        try:
-            response = self.client.receive_message(
-                QueueUrl=self.queue_url,
-                MaxNumberOfMessages=1,
-                WaitTimeSeconds=wait_seconds,
-                AttributeNames=["All"],
-                MessageAttributeNames=["All"],
-            )
-            messages = response.get("Messages", [])
-            if messages:
-                msg = messages[0]
-                logger.info("Received message ID: %s", msg["MessageId"])
-                return {
-                    "receipt_handle": msg["ReceiptHandle"],
-                    "message_id": msg["MessageId"],
-                    "body": json.loads(msg["Body"]),
-                    "attributes": msg.get("Attributes", {}),
-                    "message_attributes": msg.get("MessageAttributes", {}),
-                }
-        except Exception as e:
-            logger.error("Failed to receive SQS message: %s", e)
-        return None
+        resp = self.client.receive_message(
+            QueueUrl=self.queue_url,
+            MaxNumberOfMessages=1,
+            WaitTimeSeconds=wait_seconds,
+            VisibilityTimeout=60,
+        )
+        messages = resp.get("Messages", [])
+        if not messages:
+            return None
+        msg = messages[0]
+        return {
+            "receipt_handle": msg["ReceiptHandle"],
+            "body": msg["Body"],
+            "message_id": msg["MessageId"],
+        }
 
     def delete(self, receipt_handle: str) -> None:
-        """Delete a message from the queue."""
-        try:
-            self.client.delete_message(
-                QueueUrl=self.queue_url,
-                ReceiptHandle=receipt_handle,
-            )
-            logger.debug("Deleted message from queue")
-        except Exception as e:
-            logger.error("Failed to delete SQS message: %s", e)
+        """Delete a processed message from the queue."""
+        self.client.delete_message(
+            QueueUrl=self.queue_url,
+            ReceiptHandle=receipt_handle,
+        )
 
 
-class S3Client:
-    """Thin wrapper around boto3 S3 for file downloads."""
+class S3Downloader:
+    """Download objects from S3 to a local temp directory."""
 
     def __init__(self, bucket: str, region: str) -> None:
         self.bucket = bucket
@@ -141,268 +132,166 @@ class S3Client:
             self._client = boto3.client("s3", region_name=self.region)
         return self._client
 
-    def download(self, key: str, dest_path: Path) -> bool:
-        """Download a file from S3 to local path."""
-        try:
-            logger.info("Downloading s3://%s/%s to %s", self.bucket, key, dest_path)
-            self.client.download_file(self.bucket, key, str(dest_path))
-            return True
-        except Exception as e:
-            logger.error("Failed to download S3 object %s: %s", key, e)
-            return False
+    def download(self, key: str, dest_dir: str) -> Path:
+        """Download an S3 object to *dest_dir* and return the local path."""
+        dest = Path(dest_dir) / Path(key).name
+        self.client.download_file(self.bucket, key, str(dest))
+        return dest
 
 
-class PostgresClient:
-    """Thin wrapper around psycopg2 for database operations."""
-
-    def __init__(self, host: str, port: int, database: str,
-                 user: str, password: str, schema: str = "public") -> None:
-        self.host = host
-        self.port = port
-        self.database = database
-        self.user = user
-        self.password = password
-        self.schema = schema
-        self._conn: Any = None
-
-    @property
-    def conn(self) -> Any:
-        """Lazily initialise the psycopg2 connection."""
-        if self._conn is None or self._conn.closed:
-            import psycopg2
-            self._conn = psycopg2.connect(
-                host=self.host,
-                port=self.port,
-                database=self.database,
-                user=self.user,
-                password=self.password,
-            )
-            self._conn.autocommit = False
-        return self._conn
-
-    def write_result(self, message_id: str, s3_key: str, lint_result: dict[str, Any]) -> bool:
-        """Write lint result to database."""
-        try:
-            with self.conn.cursor() as cur:
-                # Create table if not exists
-                cur.execute(f"""
-                    CREATE TABLE IF NOT EXISTS {self.schema}.lint_results (
-                        id SERIAL PRIMARY KEY,
-                        message_id VARCHAR(255) NOT NULL,
-                        s3_key VARCHAR(1024) NOT NULL,
-                        lint_status VARCHAR(50) NOT NULL,
-                        lint_output JSONB,
-                        error_message TEXT,
-                        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                        UNIQUE(message_id)
-                    )
-                """)
-                
-                # Insert result
-                cur.execute(f"""
-                    INSERT INTO {self.schema}.lint_results 
-                    (message_id, s3_key, lint_status, lint_output, error_message)
-                    VALUES (%s, %s, %s, %s, %s)
-                    ON CONFLICT (message_id) DO UPDATE SET
-                        s3_key = EXCLUDED.s3_key,
-                        lint_status = EXCLUDED.lint_status,
-                        lint_output = EXCLUDED.lint_output,
-                        error_message = EXCLUDED.error_message,
-                        created_at = NOW()
-                """, (
-                    message_id,
-                    s3_key,
-                    lint_result.get("status", "unknown"),
-                    json.dumps(lint_result.get("output", {})),
-                    lint_result.get("error"),
-                ))
-                
-                self.conn.commit()
-                logger.info("Wrote result to database for message %s", message_id)
-                return True
-        except Exception as e:
-            logger.error("Failed to write to database: %s", e)
-            try:
-                self.conn.rollback()
-            except Exception:
-                pass
-            return False
-
-    def close(self) -> None:
-        """Close database connection."""
-        if self._conn and not self._conn.closed:
-            self._conn.close()
+def compute_sha256(path: Path) -> str:
+    """Return the hex SHA-256 digest of a file."""
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(8192), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
-def call_lint_service(url: str, file_path: Path) -> dict[str, Any]:
-    """Call lint service with file upload."""
+def dispatch_lint(lint_url: str, file_path: Path, file_hash: str) -> dict[str, Any]:
+    """POST a file to the lint service and return the JSON result."""
+    url = f"{lint_url}/lint"
+    boundary = "----FormBoundary" + hashlib.md5(os.urandom(8)).hexdigest()
+    body_parts: list[bytes] = []
+    body_parts.append(f"--{boundary}\r\n".encode())
+    body_parts.append(
+        b'Content-Disposition: form-data; name="file"; '
+        + f'filename="{file_path.name}"\r\n'.encode()
+    )
+    body_parts.append(b"Content-Type: application/octet-stream\r\n\r\n")
+    body_parts.append(file_path.read_bytes())
+    body_parts.append(f"\r\n--{boundary}\r\n".encode())
+    body_parts.append(
+        f'Content-Disposition: form-data; name="file_hash"\r\n\r\n'
+        f"{file_hash}\r\n--{boundary}--\r\n".encode()
+    )
+    body = b"".join(body_parts)
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        return json.loads(resp.read().decode())
+
+
+def write_result_to_db(
+    config: dict[str, Any],
+    message_id: str,
+    s3_key: str,
+    file_hash: str,
+    lint_result: dict[str, Any],
+) -> None:
+    """Insert a lint result row into Postgres using psycopg2."""
+    import psycopg2
+
+    status = lint_result.get("status", "unknown")
+    issues = json.dumps(lint_result.get("issues", []))
+    created_at = datetime.now(timezone.utc).isoformat()
+
+    conn = psycopg2.connect(
+        host=config["db_host"],
+        port=config["db_port"],
+        dbname=config["db_name"],
+        user=config["db_user"],
+        password=config["db_password"],
+    )
     try:
-        import mimetypes
-        mime_type, _ = mimetypes.guess_type(str(file_path))
-        if not mime_type:
-            mime_type = "application/octet-stream"
-        
-        with open(file_path, "rb") as f:
-            import requests
-            files = {"file": (file_path.name, f, mime_type)}
-            response = requests.post(url, files=files, timeout=30)
-            response.raise_for_status()
-            return {"status": "success", "output": response.json()}
-    except requests.exceptions.RequestException as e:
-        logger.error("Lint service request failed: %s", e)
-        return {"status": "error", "error": str(e)}
-    except Exception as e:
-        logger.error("Unexpected error calling lint service: %s", e)
-        return {"status": "error", "error": str(e)}
+        cur = conn.cursor()
+        schema = config["db_schema"]
+        cur.execute(
+            f"""
+            INSERT INTO {schema}.ingest_results
+                (message_id, s3_key, file_hash, status, issues, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (message_id, s3_key, file_hash, status, issues, created_at),
+        )
+        conn.commit()
+        logger.info("Wrote result for message_id=%s", message_id)
+    finally:
+        conn.close()
 
 
 def process_message(
+    config: dict[str, Any],
+    sqs: SQSClient,
+    s3: S3Downloader,
     message: dict[str, Any],
-    s3_client: S3Client,
-    pg_client: PostgresClient,
-    lint_service_url: str,
-    max_retries: int = 3,
 ) -> bool:
-    """Process a single SQS message."""
-    message_id = message["message_id"]
-    receipt_handle = message["receipt_handle"]
-    body = message["body"]
-    
-    # Extract S3 key from message
-    s3_key = body.get("s3_key") or body.get("key") or body.get("object_key")
+    """Download, lint, and persist a single SQS message. Returns True on success."""
+    body = json.loads(message["body"])
+    s3_key = body.get("s3_key") or body.get("key")
     if not s3_key:
-        logger.error("Message %s missing s3_key", message_id)
+        logger.error("No s3_key in message %s", message["message_id"])
         return False
-    
-    # Create temporary directory for downloads
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmp_path = Path(tmpdir)
-        dest_path = tmp_path / Path(s3_key).name
-        
-        # Download from S3
-        if not s3_client.download(s3_key, dest_path):
-            return False
-        
-        # Calculate file hash
-        file_hash = hashlib.sha256()
-        with open(dest_path, "rb") as f:
-            for chunk in iter(lambda: f.read(4096), b""):
-                file_hash.update(chunk)
-        
-        logger.info("Downloaded %s (SHA256: %s)", s3_key, file_hash.hexdigest())
-        
-        # Call lint service
-        lint_result = call_lint_service(lint_service_url, dest_path)
-        
-        # Write result to database
-        success = pg_client.write_result(message_id, s3_key, lint_result)
-        
-        if success:
-            logger.info("Successfully processed message %s", message_id)
-        else:
-            logger.error("Failed to write result for message %s", message_id)
-        
-        return success
 
-
-def main_loop(config: dict[str, Any], run_once: bool = False) -> None:
-    """Main processing loop."""
-    sqs_client = SQSClient(config["sqs_queue_url"], config["region"])
-    s3_client = S3Client(config["s3_bucket"], config["region"])
-    pg_client = PostgresClient(
-        config["db_host"],
-        config["db_port"],
-        config["db_name"],
-        config["db_user"],
-        config["db_password"],
-        config["db_schema"],
-    )
-    
-    logger.info("Starting worker (run_once=%s)", run_once)
-    
+    tmpdir = tempfile.mkdtemp(prefix="ingest_")
     try:
-        while not _SHUTDOWN:
-            # Receive message
-            message = sqs_client.receive(wait_seconds=config["poll_interval"])
-            
-            if message:
-                # Process message
-                success = process_message(
-                    message,
-                    s3_client,
-                    pg_client,
-                    config["lint_service_url"],
-                    config["max_retries"],
-                )
-                
-                # Delete message if processed successfully
-                if success:
-                    sqs_client.delete(message["receipt_handle"])
-                else:
-                    logger.warning("Message %s processing failed, leaving in queue", 
-                                 message["message_id"])
-            
-            # Break if run_once mode
-            if run_once:
-                break
-            
-            # Sleep briefly if no message
-            if not message and not _SHUTDOWN:
-                time.sleep(1)
-    
-    except KeyboardInterrupt:
-        logger.info("Keyboard interrupt received")
-    except Exception as e:
-        logger.error("Unexpected error in main loop: %s", e)
-        raise
+        local_path = s3.download(s3_key, tmpdir)
+        file_hash = compute_sha256(local_path)
+        lint_result = dispatch_lint(config["lint_service_url"], local_path, file_hash)
+        write_result_to_db(
+            config, message["message_id"], s3_key, file_hash, lint_result,
+        )
+        sqs.delete(message["receipt_handle"])
+        logger.info("Successfully processed %s", s3_key)
+        return True
+    except Exception:
+        logger.exception("Failed to process message %s", message["message_id"])
+        return False
     finally:
-        pg_client.close()
-        logger.info("Worker stopped")
+        import shutil
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
-def main(argv: list[str]) -> int:
-    """Main entry point."""
-    parser = argparse.ArgumentParser(
-        description="SQS consumer + S3 download + lint dispatch + Postgres write"
+def main(argv: list[str] | None = None) -> int:
+    """Entry point: parse args, configure, and run the SQS consumer loop."""
+    parser = argparse.ArgumentParser(description="SQS ingest worker")
+    parser.add_argument(
+        "--log-level", default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="Logging verbosity",
     )
     parser.add_argument(
-        "--log-level",
-        default="INFO",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        help="Logging level",
-    )
-    parser.add_argument(
-        "--once",
-        action="store_true",
+        "--once", action="store_true",
         help="Process a single message and exit",
     )
-    
-    args = parser.parse_args(argv[1:])
-    
-    # Setup logging
+    args = parser.parse_args(argv)
+
     setup_logging(args.log_level)
-    
-    # Setup signal handlers
+
+    try:
+        config = load_config()
+    except ValueError as exc:
+        logger.error(str(exc))
+        return 1
+
     signal.signal(signal.SIGINT, _handle_signal)
     signal.signal(signal.SIGTERM, _handle_signal)
-    
-    try:
-        # Load configuration
-        config = load_config()
-        logger.debug("Configuration loaded: %s", {k: v for k, v in config.items() 
-                                                 if k != "db_password"})
-        
-        # Run main loop
-        main_loop(config, run_once=args.once)
-        return 0
-        
-    except ValueError as e:
-        logger.error("Configuration error: %s", e)
-        return 1
-    except Exception as e:
-        logger.error("Fatal error: %s", e)
-        return 1
+
+    sqs = SQSClient(config["sqs_queue_url"], config["region"])
+    s3 = S3Downloader(config["s3_bucket"], config["region"])
+
+    logger.info("Worker started (once=%s)", args.once)
+    while not _SHUTDOWN:
+        msg = sqs.receive(wait_seconds=min(config["poll_interval"], 20))
+        if msg is None:
+            if args.once:
+                logger.info("No messages; exiting (--once)")
+                return 0
+            continue
+
+        success = process_message(config, sqs, s3, msg)
+        if args.once:
+            return 0 if success else 1
+
+    logger.info("Shutdown complete")
+    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+    sys.exit(main())
