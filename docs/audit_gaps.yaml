@@ -325,24 +325,27 @@ gaps:
   title: bin/edge_test_zero_records.py
   purpose: 'Boundary test: action_camera.json with empty records list — adapter must
     fail-closed not crash'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 80
   dispatched_at: '2026-05-04 03:55:22'
+  completed_at: '2026-05-04 04:06:13'
 - id: G040
   title: bin/edge_test_negative_timestamps.py
   purpose: 'Boundary test: timestamp 1970-01-01 negative epoch — schema must reject
     pre-2020 explicitly'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 90
+  dispatched_at: '2026-05-04 04:08:50'
 - id: G041
   title: bin/edge_test_gigantic_record_count.py
   purpose: 'Boundary test: 1,000,000 records in single action_camera.json — confirm
     adapter streams not loads-all'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 110
+  dispatched_at: '2026-05-04 04:09:50'
 - id: G042
   title: bin/edge_test_unicode_filenames.py
   purpose: 'Boundary test: Chinese / emoji / RTL filenames in tarball entries — verify
@@ -354,9 +357,10 @@ gaps:
   title: bin/edge_test_missing_optional_fields.py
   purpose: 'Boundary test: skip optional Vector4 quat field — adapter must default-fill
     not crash'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 95
+  dispatched_at: '2026-05-04 04:11:24'
 - id: G044
   title: bin/edge_test_extra_unknown_fields.py
   purpose: 'Boundary test: vendor adds extra keys to action_camera record — lint warns
@@ -376,10 +380,11 @@ gaps:
 - id: G046
   title: bin/edge_test_empty_strings.py
   purpose: 'Boundary test: empty string for required string field (route_type) — fail-closed'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 80
   dispatched_at: '2026-05-04 04:05:39'
+  completed_at: '2026-05-04 04:06:15'
 - id: G047
   title: bin/edge_test_max_int_values.py
   purpose: 'Boundary test: int64 max for frame_id — confirm no overflow in adapter
@@ -397,9 +402,10 @@ gaps:
   title: bin/edge_test_dst_clock_change.py
   purpose: 'Boundary test: capture spans DST transition — UTC timestamps must remain
     monotonic'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 100
+  dispatched_at: '2026-05-04 04:13:56'
 - id: G050
   title: bin/edge_test_leap_second.py
   purpose: 'Boundary test: leap-second insertion at 23:59:60 — adapter handles or
@@ -418,9 +424,10 @@ gaps:
   title: bin/edge_test_quaternion_norm_drift.py
   purpose: 'Boundary test: quaternion magnitude 1.0001 from float drift — lint tolerates
     within epsilon'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 110
+  dispatched_at: '2026-05-04 04:15:34'
 - id: G053
   title: bin/edge_test_camera_pitch_singularity.py
   purpose: 'Boundary test: pitch exactly 90.0 / -90.0 gimbal-lock case — adapter clamps
@@ -999,10 +1006,11 @@ gaps:
 - id: G127
   title: bin/idempotency_token.py
   purpose: 'Production: per-clip uuid with at-least-once dedup on backend ingest path'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 100
   dispatched_at: '2026-05-04 03:50:25'
+  completed_at: '2026-05-04 04:06:17'
 - id: G128
   title: bin/circuit_breaker.py
   purpose: 'Production: trip after N consecutive S3 failures — halt uploads and alert'
@@ -1051,9 +1059,10 @@ gaps:
   title: bin/installer_one_click.py
   purpose: 'Customer: single bash script that detects OS / installs deps / sets up
     PATH for vendors'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 150
+  dispatched_at: '2026-05-04 04:07:45'
 - id: G135
   title: bin/error_message_translator.py
   purpose: 'Customer: convert internal exception traces into vendor-friendly remediation
@@ -1087,4 +1096,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-04T11:05:39Z'
+  last_heartbeat: '2026-05-04T11:18:35Z'
