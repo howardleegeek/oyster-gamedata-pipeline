@@ -12,9 +12,10 @@ gaps:
 - id: G002
   title: bin/secure_subprocess_lib.py
   purpose: Safe subprocess wrapper rejecting shell=True, allowlist binaries
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 120
+  dispatched_at: '2026-05-03 22:51:20'
 - id: G003
   title: bin/cn_mirror_setup.sh
   purpose: China vendor pip+npm+HF mirror configuration (idempotent, --revert)
@@ -45,17 +46,19 @@ gaps:
 - id: G007
   title: bin/eula_consent.py
   purpose: Interactive EULA presenter logging vendor accept timestamp
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 80
-  dispatched_at: '2026-05-03 23:05:34'
+  dispatched_at: '2026-05-03 22:52:14'
+  completed_at: '2026-05-03 23:05:49'
 - id: G008
   title: bin/depth_anything_offline_install.sh
   purpose: HF mirror + offline cache pre-warm (China-friendly)
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 60
-  dispatched_at: '2026-05-03 23:15:48'
+  dispatched_at: '2026-05-03 23:05:16'
+  completed_at: '2026-05-03 23:05:51'
 - id: G009
   title: bin/anti_virus_allowlist_check.ps1
   purpose: Windows PowerShell script verifying Defender exclusions for ffmpeg/Java/paper.jar
@@ -74,7 +77,7 @@ gaps:
   status: dispatched
   priority: P0
   lines_estimate: 250
-  dispatched_at: '2026-05-03 23:06:22'
+  dispatched_at: '2026-05-03 22:55:04'
 - id: G012
   title: bin/dashboard_app.py
   purpose: Flask + htmx vendor submission dashboard (read-only)
@@ -84,9 +87,10 @@ gaps:
 - id: G013
   title: bin/acceptance_signal_api.py
   purpose: Webhook API to notify vendor of accept/reject status
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 150
+  dispatched_at: '2026-05-03 23:13:05'
 - id: G014
   title: bin/cost_estimator.py
   purpose: Daily S3 cost report (storage + egress + lifecycle stage projection)
@@ -96,27 +100,31 @@ gaps:
 - id: G015
   title: docs/SECURITY_AUDIT_RESPONSE.md
   purpose: Formal response to 14 security audit findings with fix status table
-  status: pending
+  status: skipped
   priority: P1
   lines_estimate: 250
+  skip_reason: file already in repo
 - id: G016
   title: docs/QA_AUDIT_RESPONSE.md
   purpose: Formal response to chaos/QA findings with mitigation table
-  status: pending
+  status: skipped
   priority: P1
   lines_estimate: 200
+  skip_reason: file already in repo
 - id: G017
   title: docs/CODE_AUDIT_RESPONSE.md
   purpose: Formal response to senior code reviewer findings
-  status: pending
+  status: skipped
   priority: P1
   lines_estimate: 180
+  skip_reason: file already in repo
 - id: G018
   title: docs/ARCHITECT_AUDIT_RESPONSE.md
   purpose: Formal response to distributed systems architect findings
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 250
+  dispatched_at: '2026-05-03 23:14:58'
 - id: G019
   title: docs/TROUBLESHOOTING.md
   purpose: 30+ vendor common errors with symptom→fix entries
@@ -127,15 +135,17 @@ gaps:
 - id: G020
   title: docs/PRICING_GUIDE.md
   purpose: Vendor quote template (3-tier complexity + volume + rush)
-  status: pending
+  status: skipped
   priority: P1
   lines_estimate: 200
+  skip_reason: file already in repo
 - id: G021
   title: docs/ALPHA_RUNBOOK.md
   purpose: 1-week alpha vendor test protocol (Phase C from architect)
-  status: pending
+  status: skipped
   priority: P1
   lines_estimate: 200
+  skip_reason: file already in repo
 - id: G022
   title: docs/INGEST_ARCHITECTURE.md
   purpose: Backend pipeline detailed design (S3→SQS→Lambda→PG→Dashboard)
@@ -147,9 +157,10 @@ gaps:
   title: bin/redteam_attacks_v2.py
   purpose: 5 new adversarial scenarios (quat drift / timestamp regression / partial
     stuck-key / EXR wrong channel / tarball extras)
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 200
+  dispatched_at: '2026-05-03 23:17:50'
 - id: G024
   title: bin/buyer_spec_validator_v2.py
   purpose: Stricter independent validator (cross-checks, semantic + structural)
@@ -159,10 +170,11 @@ gaps:
 - id: G025
   title: src/oyster_agent_runner/camera_synthesizer.py
   purpose: Independent camera-rotation synthesizer (NOT player) per PDF p3
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 150
-  dispatched_at: '2026-05-03 23:08:15'
+  dispatched_at: '2026-05-03 22:56:14'
+  completed_at: '2026-05-03 23:05:53'
 - id: G026
   title: bin/upload_resume_helper.py
   purpose: Standalone resumable S3 multipart helper with checkpoint state
@@ -197,25 +209,26 @@ gaps:
   title: bin/obs_websocket_smoke.py
   purpose: Standalone smoke test that boots OBS Studio (subprocess) and verifies WebSocket
     v5 connect + auth + StartRecord/StopRecord opcodes
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 200
+  dispatched_at: '2026-05-03 22:58:29'
 - id: G032
   title: bin/depth_anything_smoke.py
   purpose: Load DepthAnything V2 Small model + run inference on 1 RGB sample + write
     valid OpenEXR float32 Z + read-back validate
-  status: dispatched
+  status: pending
   priority: P0
   lines_estimate: 180
-  dispatched_at: '2026-05-03 23:12:35'
 - id: G033
   title: bin/mc_client_smoke.py
   purpose: Launch real Minecraft Java 1.20.4 client in offline mode + screenshot at
     t=10s + verify pixels-not-black
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 200
-  dispatched_at: '2026-05-03 23:14:58'
+  dispatched_at: '2026-05-03 23:03:31'
+  completed_at: '2026-05-03 23:05:55'
 - id: G034
   title: bin/scene_diversity_scorer.py
   purpose: Compute Habitat-style scene diversity metric (pixel histogram clustering
@@ -252,5 +265,5 @@ gaps:
   lines_estimate: 280
 harness_lock:
   host: Howards-MacBook-Air-4.local
-  pid: 11046
-  last_heartbeat: '2026-05-04T06:15:48Z'
+  pid: 7837
+  last_heartbeat: '2026-05-04T06:17:50Z'
