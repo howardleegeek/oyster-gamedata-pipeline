@@ -243,10 +243,11 @@ gaps:
 - id: G030
   title: bin/structured_logger.py
   purpose: JSON-line structured logger with correlation IDs (vendor + clip + step)
-  status: dispatched
+  status: completed
   priority: P2
   lines_estimate: 120
   dispatched_at: '2026-05-04 00:29:38'
+  completed_at: '2026-05-04 00:29:42'
 - id: G031
   title: bin/obs_websocket_smoke.py
   purpose: Standalone smoke test that boots OBS Studio (subprocess) and verifies WebSocket
@@ -321,5 +322,5 @@ gaps:
   completed_at: '2026-05-03 23:34:27'
 harness_lock:
   host: Howards-MacBook-Air-4.local
-  pid: 11046
-  last_heartbeat: '2026-05-04T07:29:38Z'
+  pid: 7837
+  last_heartbeat: '2026-05-04T07:29:42Z'
