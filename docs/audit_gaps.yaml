@@ -716,10 +716,11 @@ gaps:
   title: bin/red_team_disk_full.py
   purpose: 'Red team: simulate ENOSPC during write — adapter aborts cleanly with clear
     error'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 110
   dispatched_at: '2026-05-04 02:46:16'
+  completed_at: '2026-05-04 02:58:46'
 - id: G092
   title: bin/red_team_out_of_order_frames.py
   purpose: 'Red team: shuffle frame ordering in JSON — lint rejects non-monotonic
@@ -779,18 +780,20 @@ gaps:
   title: src/oyster_agent_runner/defense_size_limit.py
   purpose: 'Blue team for G084: per-file size cap defender (10 MB action_camera, 500
     MB video)'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 110
   dispatched_at: '2026-05-04 02:48:38'
+  completed_at: '2026-05-04 02:58:47'
 - id: G100
   title: src/oyster_agent_runner/defense_finite_check.py
   purpose: 'Blue team for G085: assert_finite helper running on every Vector3 value
     before write'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 90
   dispatched_at: '2026-05-04 02:49:27'
+  completed_at: '2026-05-04 02:58:49'
 - id: G101
   title: src/oyster_agent_runner/defense_timestamp_range.py
   purpose: 'Blue team for G086: enforce timestamps within 2024-01-01 to 2030-01-01
@@ -816,23 +819,26 @@ gaps:
   title: src/oyster_agent_runner/defense_file_lock.py
   purpose: 'Blue team for G089: fcntl flock wrapper around tarball open — prevents
     concurrent corruption'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 110
   dispatched_at: '2026-05-04 02:55:12'
+  completed_at: '2026-05-04 02:58:51'
 - id: G105
   title: src/oyster_agent_runner/defense_atomic_write.py
   purpose: 'Blue team for G090: write_atomic helper using tempfile + os.replace'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 95
+  dispatched_at: '2026-05-04 03:06:03'
 - id: G106
   title: src/oyster_agent_runner/defense_disk_check.py
   purpose: 'Blue team for G091: pre-flight shutil.disk_usage check requiring 5 GB
     free before capture'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 90
+  dispatched_at: '2026-05-04 03:07:31'
 - id: G107
   title: src/oyster_agent_runner/defense_frame_order.py
   purpose: 'Blue team for G092: streaming validator asserting frame_id strictly increases
@@ -858,15 +864,17 @@ gaps:
   title: src/oyster_agent_runner/defense_systeminfo_required.py
   purpose: 'Blue team for G095: systeminfo schema with REQUIRED_KEYS list and pydantic-lite
     validator'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 100
+  dispatched_at: '2026-05-04 03:11:42'
 - id: G111
   title: src/oyster_agent_runner/defense_fps_strict.py
   purpose: 'Blue team for G096: ffprobe wrapper asserting r_frame_rate exactly 30/1'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 90
+  dispatched_at: '2026-05-04 03:13:07'
 - id: G112
   title: src/oyster_agent_runner/defense_vector_uniform.py
   purpose: 'Blue team for G097: scan first record format and enforce uniform Vector3
@@ -1056,4 +1064,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-04T09:58:12Z'
+  last_heartbeat: '2026-05-04T10:13:07Z'
