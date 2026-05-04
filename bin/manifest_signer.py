@@ -7,16 +7,15 @@ to ensure tamper-evidence in build/deployment pipelines.
 
 Usage:
     Sign a manifest:
-        python manifest_signer.py sign --input manifest.yaml --output manifest.yaml.sig
+        python manifest_signer.py sign -i manifest.yaml -o manifest.yaml.sig
 
     Verify a signature:
-        python manifest_signer.py verify --input manifest.yaml --signature manifest.yaml.sig
+        python manifest_signer.py verify -i manifest.yaml -s manifest.yaml.sig
 """
 
 import argparse
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -109,31 +108,28 @@ def verify_manifest(manifest_path: Path, signature_path: Path) -> int:
 
     returncode, stdout, stderr = run_gpg(gpg_args)
 
-    output = stdout.decode("utf-8", errors="replace") + stderr.decode("utf-8", errors="replace")
-
     if returncode != 0:
-        print(f"Signature verification FAILED: {output}", file=sys.stderr)
+        print(f"Signature verification failed: {stderr.decode('utf-8', errors='replace')}", file=sys.stderr)
         return 1
 
-    print(f"Signature verification PASSED for: {manifest_path}")
+    print(f"Signature verified successfully for: {manifest_path}")
     return 0
 
 
 def main(argv: list[str]) -> int:
     """
-    Main entry point for manifest signer CLI.
+    Main entry point for the manifest signer CLI.
 
     Args:
-        argv: Command-line arguments (excluding program name).
+        argv: Command-line arguments.
 
     Returns:
-        0 on success, non-zero on failure.
+        Exit code (0 for success, non-zero for failure).
     """
     parser = argparse.ArgumentParser(
-        prog="manifest_signer",
-        description="GPG-sign manifest.yaml for tamper-evidence and verify signatures."
+        description="GPG sign and verify manifest.yaml files for tamper-evidence"
     )
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(dest="command", required=True, help="Command to execute")
 
     # Sign subcommand
     sign_parser = subparsers.add_parser("sign", help="Sign a manifest file")
@@ -141,7 +137,7 @@ def main(argv: list[str]) -> int:
         "--input", "-i",
         type=Path,
         required=True,
-        help="Path to manifest.yaml to sign"
+        help="Path to manifest.yaml file to sign"
     )
     sign_parser.add_argument(
         "--output", "-o",
@@ -153,7 +149,7 @@ def main(argv: list[str]) -> int:
         "--keyid", "-k",
         type=str,
         default=None,
-        help="GPG key ID to use for signing (default: use default key)"
+        help="GPG key ID to use for signing (default: uses default key)"
     )
 
     # Verify subcommand
@@ -162,7 +158,7 @@ def main(argv: list[str]) -> int:
         "--input", "-i",
         type=Path,
         required=True,
-        help="Path to manifest.yaml to verify"
+        help="Path to manifest.yaml file"
     )
     verify_parser.add_argument(
         "--signature", "-s",
