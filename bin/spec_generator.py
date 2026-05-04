@@ -417,6 +417,23 @@ SPECS: list[dict] = [
     {"id": "G160", "title": "bin/data_diversity_dashboard.py",
      "purpose": "Cluster E: per-cohort diversity dashboard (route_type / biome / time-of-day / action-entropy histograms) for buyer pre-purchase verification",
      "lines": 220, "priority": "P2"},
+    # ─── W19 PRD-grounded fixes from full Lark spec audit (5 specs) ────────
+    # Source: docs/PRD_AUDIT_2026_05_04.md (synthesis from full 14-page PDF read)
+    {"id": "G161", "title": "bin/synthesize_real_depth.py",
+     "purpose": "Cluster A: 1920x1080 float32 single-channel EXR depth synthesis with realistic Z-buffer (distance-to-plane) — replaces 16x16 all-zeros placeholder; cap invalid-pixel ratio at 0.1 percent",
+     "lines": 200, "priority": "P0"},
+    {"id": "G162", "title": "bin/synthesize_route_diversity.py",
+     "purpose": "Cluster A: route_type distribution 50 percent normal + 50 percent special/loop; WASD distribution W=40 percent / A=S=D=20 percent each — replaces 100 percent route_type=1 mono-distribution",
+     "lines": 150, "priority": "P0"},
+    {"id": "G163", "title": "src/oyster_agent_runner/keycode_int_normalizer.py",
+     "purpose": "Cluster A: convert list-form keyCode arrays to single int per record per PRD page 11 spec (W=87 ASCII), or expand list into multiple frame records",
+     "lines": 80, "priority": "P0"},
+    {"id": "G164", "title": "src/oyster_agent_runner/intrinsics_capital_keys.py",
+     "purpose": "Cluster A: rename camera_intrinsics dict keys from lowercase fx/fy/cx/cy to PRD-specified fx/fy/Cx/Cy (capital Cx Cy) per p5",
+     "lines": 60, "priority": "P0"},
+    {"id": "G165", "title": "bin/lint_v3_prd_grounded.py",
+     "purpose": "Cluster A: full PRD page-by-page lint — checks all 24 acceptance criteria including audio quality / route distribution / camera_intrinsics fx==fy / quaternion xyzw order / depth invalid-pixel ratio / keyCode int format / 5-6 min duration / 1920x1080 strict / no UI overlay / no logo / no popup",
+     "lines": 350, "priority": "P0"},
 ]
 
 
