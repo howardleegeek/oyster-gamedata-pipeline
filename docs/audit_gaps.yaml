@@ -184,3 +184,52 @@ gaps:
   status: pending
   priority: P2
   lines_estimate: 120
+# ============== GameData functional progression (W7) ==============
+- id: G031
+  title: bin/obs_websocket_smoke.py
+  purpose: Standalone smoke test that boots OBS Studio (subprocess) and verifies WebSocket v5 connect + auth + StartRecord/StopRecord opcodes
+  status: pending
+  priority: P0
+  lines_estimate: 200
+- id: G032
+  title: bin/depth_anything_smoke.py
+  purpose: Load DepthAnything V2 Small model + run inference on 1 RGB sample + write valid OpenEXR float32 Z + read-back validate
+  status: pending
+  priority: P0
+  lines_estimate: 180
+- id: G033
+  title: bin/mc_client_smoke.py
+  purpose: Launch real Minecraft Java 1.20.4 client in offline mode + screenshot at t=10s + verify pixels-not-black
+  status: pending
+  priority: P0
+  lines_estimate: 200
+- id: G034
+  title: bin/scene_diversity_scorer.py
+  purpose: Compute Habitat-style scene diversity metric (pixel histogram clustering across video frames) — flags vendor monotone-scene clips
+  status: pending
+  priority: P1
+  lines_estimate: 180
+- id: G035
+  title: bin/clip_validator_strict.py
+  purpose: Stricter clip-level validator — cross-checks audio mute/silent / black-frame rate / repeated-frame rate / motion entropy
+  status: pending
+  priority: P1
+  lines_estimate: 250
+- id: G036
+  title: bin/manifest_signer.py
+  purpose: GPG-sign manifest.yaml for tamper-evidence + verify signature on receive
+  status: pending
+  priority: P2
+  lines_estimate: 150
+- id: G037
+  title: bin/network_throttle_test.py
+  purpose: Simulate weak vendor network (200 Kbps upload) using tc/dummynet wrapper — validates upload_s3.sh truly handles slow links
+  status: pending
+  priority: P2
+  lines_estimate: 130
+- id: G038
+  title: bin/buyer_spec_validator_v2.py
+  purpose: Strict independent v2 validator (cross-file consistency checks beyond lint_buyer_spec — manifest sha vs files / xlsx semantic / EXR temporal alignment)
+  status: pending
+  priority: P1
+  lines_estimate: 280
