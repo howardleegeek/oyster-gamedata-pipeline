@@ -13,8 +13,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any
 
 __all__ = ["RLDSFlagProcessor", "main"]
 
@@ -26,10 +27,10 @@ class RLDSFlagProcessor:
         self.strict = strict
 
     def add_flags(
-        self, record: Dict[str, Any], *,
+        self, record: dict[str, Any], *,
         is_first: bool = False, is_last: bool = False,
-        is_terminal: Optional[bool] = None,
-    ) -> Dict[str, Any]:
+        is_terminal: bool | None = None,
+    ) -> dict[str, Any]:
         """Return *record* copy with RLDS boundary flags attached."""
         if is_terminal is None:
             is_terminal = is_last
@@ -39,7 +40,7 @@ class RLDSFlagProcessor:
         result.update(is_first=is_first, is_last=is_last, is_terminal=is_terminal)
         return result
 
-    def process_episode(self, steps: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def process_episode(self, steps: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
         """Flag every step: first→is_first, last→is_last+is_terminal."""
         if not steps:
             return []
@@ -50,9 +51,9 @@ class RLDSFlagProcessor:
             for i, s in enumerate(steps)
         ]
 
-    def validate(self, record: Dict[str, Any]) -> List[str]:
+    def validate(self, record: dict[str, Any]) -> list[str]:
         """Return list of error strings (empty = OK)."""
-        errors: List[str] = []
+        errors: list[str] = []
         for key in ("is_first", "is_last", "is_terminal"):
             if key not in record:
                 errors.append(f"Missing required flag: {key}")
@@ -62,10 +63,10 @@ class RLDSFlagProcessor:
             errors.append("is_last=True but is_terminal=False")
         return errors
 
-    def extract_boundaries(self, records: Sequence[Dict[str, Any]]) -> List[Dict[str, int]]:
+    def extract_boundaries(self, records: Sequence[dict[str, Any]]) -> list[dict[str, int]]:
         """Return [{start, end}, …] for each episode boundary."""
-        boundaries: List[Dict[str, int]] = []
-        start: Optional[int] = None
+        boundaries: list[dict[str, int]] = []
+        start: int | None = None
         for i, rec in enumerate(records):
             if rec.get("is_first"):
                 if start is not None:
@@ -92,21 +93,21 @@ def _build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry-point. Returns 0 on success, 1 on error."""
     args = _build_parser().parse_args(argv)
     if not args.input.exists():
         print(f"Error: input file not found: {args.input}", file=sys.stderr)
         return 1
-    with open(args.input, "r", encoding="utf-8") as fh:
+    with open(args.input, encoding="utf-8") as fh:
         data = json.load(fh)
     proc = RLDSFlagProcessor(strict=args.strict)
 
     if args.validate:
-        records: List[Dict[str, Any]] = []
+        records: list[dict[str, Any]] = []
         for ep in data if args.format == "episodes" else [data]:
             records.extend(ep)
-        all_errs: List[str] = []
+        all_errs: list[str] = []
         for idx, rec in enumerate(records):
             for e in proc.validate(rec):
                 all_errs.append(f"record[{idx}]: {e}")

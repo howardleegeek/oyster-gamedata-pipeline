@@ -13,14 +13,12 @@ import argparse
 import os
 import shutil
 import sys
-from typing import List, Tuple
-
 
 # Minimum required free space in bytes (5 GB)
 MIN_FREE_BYTES = 5 * 1024 * 1024 * 1024
 
 
-def get_disk_usage(path: str) -> Tuple[int, int, int]:
+def get_disk_usage(path: str) -> tuple[int, int, int]:
     """
     Get disk usage statistics for the given path.
 
@@ -38,7 +36,7 @@ def get_disk_usage(path: str) -> Tuple[int, int, int]:
     return shutil.disk_usage(path)
 
 
-def check_disk_space(path: str, min_bytes: int = MIN_FREE_BYTES) -> Tuple[bool, int]:
+def check_disk_space(path: str, min_bytes: int = MIN_FREE_BYTES) -> tuple[bool, int]:
     """
     Check if sufficient disk space is available at the given path.
 
@@ -64,7 +62,7 @@ def format_bytes(num_bytes: int) -> str:
     return f"{gb:.2f} GB"
 
 
-def main(argv: List[str]) -> int:
+def main(argv: list[str]) -> int:
     """
     CLI entry point for disk space check.
 

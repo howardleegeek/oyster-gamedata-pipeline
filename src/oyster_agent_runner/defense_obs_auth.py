@@ -15,7 +15,6 @@ import logging
 import sys
 import time
 from collections import defaultdict
-from typing import Dict, List, Optional, Tuple
 
 log = logging.getLogger(__name__)
 
@@ -27,8 +26,8 @@ class RateLimiter:
         self.max_failures = max_failures
         self.window_seconds = window_seconds
         self.cooldown_seconds = cooldown_seconds
-        self._failures: Dict[str, List[float]] = defaultdict(list)
-        self._cooldown_until: Dict[str, float] = {}
+        self._failures: dict[str, list[float]] = defaultdict(list)
+        self._cooldown_until: dict[str, float] = {}
 
     def record_failure(self, identity: str) -> None:
         """Record a failed auth attempt for *identity*."""
@@ -55,7 +54,7 @@ class RateLimiter:
         self._failures.pop(identity, None)
         self._cooldown_until.pop(identity, None)
 
-    def status(self, identity: str) -> Tuple[bool, int, Optional[float]]:
+    def status(self, identity: str) -> tuple[bool, int, float | None]:
         """Return (is_blocked, failure_count, seconds_remaining_in_cooldown)."""
         blocked = self.is_blocked(identity)
         count = len(self._failures.get(identity, []))
@@ -95,7 +94,7 @@ def verify_signature(secret: str, payload: str, signature: str, identity: str = 
     return True
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """CLI entry point for OBS auth helper."""
     parser = argparse.ArgumentParser(prog="defense_obs_auth", description="OBS auth helper with SHA256+base64 signing and rate-limiting")
     subparsers = parser.add_subparsers(dest="command", required=True)

@@ -11,10 +11,11 @@ import fcntl
 import os
 import sys
 import tempfile
+from collections.abc import Generator
 from contextlib import contextmanager
 from enum import Enum
 from types import TracebackType
-from typing import Generator, IO, Optional, Tuple, Type
+from typing import IO
 
 
 class LockType(Enum):
@@ -34,34 +35,34 @@ class FileLock:
     
     Provides safe concurrent access to files for tarball operations.
     """
-    
+
     def __init__(self, file_path: str, lock_type: LockType = LockType.EXCLUSIVE,
                  timeout: float = 0.0) -> None:
         self.file_path = os.path.abspath(file_path)
         self.lock_type = lock_type
         self.timeout = timeout
-        self._file_handle: Optional[IO] = None
+        self._file_handle: IO | None = None
         self._lock_acquired = False
-    
+
     def __enter__(self) -> IO:
         mode = "r+b" if self.lock_type == LockType.EXCLUSIVE else "rb"
-        
+
         if self.lock_type == LockType.EXCLUSIVE:
             parent_dir = os.path.dirname(self.file_path)
             if parent_dir and not os.path.exists(parent_dir):
                 os.makedirs(parent_dir, exist_ok=True)
             if not os.path.exists(self.file_path):
                 open(self.file_path, "wb").close()
-        
+
         try:
             self._file_handle = open(self.file_path, mode)
         except (FileNotFoundError, PermissionError) as e:
             raise FileLockError(f"Cannot open {self.file_path}: {e}") from e
-        
+
         lock_flag = self.lock_type.value
         if self.timeout == 0:
             lock_flag |= fcntl.LOCK_NB
-        
+
         try:
             fcntl.flock(self._file_handle.fileno(), lock_flag)
             self._lock_acquired = True
@@ -70,12 +71,12 @@ class FileLock:
                 self._file_handle.close()
                 self._file_handle = None
             raise FileLockError(f"Lock failed on {self.file_path}: {e}") from e
-        
+
         return self._file_handle
-    
-    def __exit__(self, exc_type: Optional[Type[BaseException]],
-                 exc_val: Optional[BaseException],
-                 exc_tb: Optional[TracebackType]) -> None:
+
+    def __exit__(self, exc_type: type[BaseException] | None,
+                 exc_val: BaseException | None,
+                 exc_tb: TracebackType | None) -> None:
         if self._file_handle:
             if self._lock_acquired:
                 try:
@@ -96,14 +97,14 @@ def file_lock(file_path: str, exclusive: bool = True,
         yield f
 
 
-def acquire_tarball_lock(tarball_path: str, for_write: bool = True) -> Tuple[IO, FileLock]:
+def acquire_tarball_lock(tarball_path: str, for_write: bool = True) -> tuple[IO, FileLock]:
     """Acquire lock on a tarball file for safe concurrent access."""
     lock_type = LockType.EXCLUSIVE if for_write else LockType.SHARED
     lock_obj = FileLock(tarball_path, lock_type)
     return lock_obj.__enter__(), lock_obj
 
 
-def main(argv: Optional[list] = None) -> int:
+def main(argv: list | None = None) -> int:
     """CLI entry point for file lock operations."""
     parser = argparse.ArgumentParser(description="File lock utility for tarball operations")
     parser.add_argument("--file", "-f", help="Path to file to lock")
@@ -112,15 +113,15 @@ def main(argv: Optional[list] = None) -> int:
     parser.add_argument("--timeout", "-t", type=float, default=0.0,
                        help="Timeout seconds (0=non-blocking)")
     parser.add_argument("--test", "-T", action="store_true", help="Run self-test")
-    
+
     args = parser.parse_args(argv)
-    
+
     if args.test:
         return _run_self_test()
-    
+
     if not args.file:
         parser.error("--file is required unless --test is specified")
-    
+
     exclusive = args.operation == "write"
     try:
         with file_lock(args.file, exclusive=exclusive, timeout=args.timeout) as f:
@@ -139,19 +140,19 @@ def _run_self_test() -> int:
     print("Running self-test...")
     with tempfile.TemporaryDirectory() as tmpdir:
         test_file = os.path.join(tmpdir, "test.tar")
-        
+
         print("  Testing exclusive lock...")
         with file_lock(test_file, exclusive=True) as f:
             f.write(b"test data")
-        
+
         print("  Testing shared lock...")
         with file_lock(test_file, exclusive=False) as f:
             assert f.read() == b"test data"
-        
+
         print("  Testing FileLock class...")
         with FileLock(test_file, LockType.EXCLUSIVE) as f:
             f.write(b"updated")
-        
+
     print("All tests passed!")
     return 0
 

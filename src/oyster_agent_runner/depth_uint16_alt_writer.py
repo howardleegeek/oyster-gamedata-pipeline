@@ -12,7 +12,6 @@ import argparse
 import logging
 import sys
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 from PIL import Image
@@ -62,7 +61,7 @@ def read_npy_depth(npy_path: Path) -> np.ndarray:
 
 def process_depth_file(
     input_path: Path,
-    output_path: Optional[Path] = None,
+    output_path: Path | None = None,
     scale: float = DEPTH_SCALE_M_TO_MM,
 ) -> Path:
     """Process a depth file (.exr or .npy) and write uint16 PNG output."""
@@ -80,7 +79,7 @@ def process_depth_file(
     return convert_depth_to_uint16_png(depth, output_path, scale=scale)
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """CLI entry point for depth_uint16_alt_writer."""
     parser = argparse.ArgumentParser(
         description="Convert float32 depth to uint16 PNG (mm) format.",

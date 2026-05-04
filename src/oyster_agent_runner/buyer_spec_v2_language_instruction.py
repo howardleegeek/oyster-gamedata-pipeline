@@ -19,10 +19,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # Lazy imports for optional heavy deps
 _YAML: Any = None
@@ -42,7 +41,7 @@ def _get_yaml() -> Any:
 
 VLA_MODELS = ("rt2", "openvla", "octo", "pi0")
 
-DEFAULT_TEMPLATES: Dict[str, str] = {
+DEFAULT_TEMPLATES: dict[str, str] = {
     "minimal": "Perform: {task}",
     "dense": "Execute: {task}. Follow these steps carefully.",
     "verbose": "Complete the following task with full narration: {task}",
@@ -52,8 +51,8 @@ DEFAULT_TEMPLATES: Dict[str, str] = {
 class LanguageInstructionGenerator:
     """Generate per-episode language instructions for VLA fine-tuning."""
 
-    def __init__(self, config_path: Optional[str] = None) -> None:
-        self._templates: Dict[str, str] = dict(DEFAULT_TEMPLATES)
+    def __init__(self, config_path: str | None = None) -> None:
+        self._templates: dict[str, str] = dict(DEFAULT_TEMPLATES)
         if config_path:
             self._load_config(config_path)
 
@@ -62,7 +61,7 @@ class LanguageInstructionGenerator:
     def _load_config(self, path: str) -> None:
         """Load optional JSON/YAML config to override templates."""
         p = Path(path)
-        with open(p, "r", encoding="utf-8") as fh:
+        with open(p, encoding="utf-8") as fh:
             if p.suffix.lower() in (".yaml", ".yml"):
                 yaml_mod = _get_yaml()
                 data = yaml_mod.safe_load(fh)
@@ -78,8 +77,8 @@ class LanguageInstructionGenerator:
         episode_id: str,
         task: str,
         mode: str = "minimal",
-        dense_narration: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        dense_narration: str | None = None,
+    ) -> dict[str, Any]:
         """Build a single-episode instruction spec.
 
         Args:
@@ -94,12 +93,12 @@ class LanguageInstructionGenerator:
         template = self._templates.get(mode, self._templates["minimal"])
         instruction = template.format(task=task)
 
-        spec: Dict[str, Any] = {
+        spec: dict[str, Any] = {
             "episode_id": episode_id,
             "instruction": instruction,
             "task": task,
             "narration_mode": mode,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "vla_compatible": {m: True for m in VLA_MODELS},
         }
 
@@ -112,9 +111,9 @@ class LanguageInstructionGenerator:
 
     def batch_generate(
         self,
-        episodes: List[Dict[str, Any]],
-        output: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        episodes: list[dict[str, Any]],
+        output: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Generate instructions for a batch of episodes.
 
         Args:
@@ -180,7 +179,7 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """Entry-point with argparse CLI. Returns 0 on success, 1 on error."""
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -190,7 +189,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     try:
         if args.batch:
             batch_path = Path(args.batch)
-            with open(batch_path, "r", encoding="utf-8") as fh:
+            with open(batch_path, encoding="utf-8") as fh:
                 episodes = json.load(fh)
             results = gen.batch_generate(episodes, output=args.out)
         elif args.task:

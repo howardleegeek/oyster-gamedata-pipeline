@@ -1,11 +1,9 @@
 """Tests for obs_capture.py."""
 
-import sys
-import os
 import base64
 import hashlib
-
-import pytest
+import os
+import sys
 
 # Ensure obs_capture.py is importable
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

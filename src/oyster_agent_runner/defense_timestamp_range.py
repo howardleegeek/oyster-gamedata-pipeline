@@ -8,7 +8,6 @@ Blue team defense for G086: enforce timestamps within 2024-01-01 to 2030-01-01 r
 import argparse
 import sys
 from datetime import datetime
-from typing import Optional, Tuple
 
 MIN_TIMESTAMP: datetime = datetime(2024, 1, 1, 0, 0, 0)
 MAX_TIMESTAMP: datetime = datetime(2030, 1, 1, 0, 0, 0)
@@ -28,7 +27,7 @@ def clamp_timestamp(ts: datetime) -> datetime:
     return ts
 
 
-def parse_timestamp(ts_str: str) -> Optional[datetime]:
+def parse_timestamp(ts_str: str) -> datetime | None:
     """Parse timestamp string (YYYY-MM-DD or ISO 8601). Returns None on failure."""
     formats = ["%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"]
     for fmt in formats:
@@ -39,7 +38,7 @@ def parse_timestamp(ts_str: str) -> Optional[datetime]:
     return None
 
 
-def process_timestamps(timestamps: list) -> Tuple[list, int]:
+def process_timestamps(timestamps: list) -> tuple[list, int]:
     """Process timestamps, returning (clamped_list, invalid_count)."""
     processed, invalid_count = [], 0
     for ts in timestamps:

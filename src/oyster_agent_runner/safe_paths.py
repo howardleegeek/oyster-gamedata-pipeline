@@ -8,9 +8,7 @@ from here instead of hardcoding paths.
 import shutil
 import socket
 import tempfile
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Generator, List
 
 
 def make_isolated_workspace(prefix: str = 'oyster_') -> Path:
@@ -63,7 +61,7 @@ class IsolatedRun:
             print(run.paper_port, run.rcon_port, run.obs_port)
         # Workspace is automatically cleaned up
     """
-    
+
     def __init__(self, prefix: str = 'oyster_'):
         """Initialize IsolatedRun.
         
@@ -76,7 +74,7 @@ class IsolatedRun:
         self._rcon_port: int | None = None
         self._obs_port: int | None = None
         self._cleaned_up = False
-    
+
     def __enter__(self) -> 'IsolatedRun':
         """Enter context: create workspace and allocate ports.
         
@@ -88,7 +86,7 @@ class IsolatedRun:
         self._rcon_port = pick_free_port()
         self._obs_port = pick_free_port()
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Exit context: clean up workspace.
         
@@ -98,7 +96,7 @@ class IsolatedRun:
             exc_tb: Exception traceback if an exception was raised.
         """
         self.cleanup_now()
-    
+
     @property
     def workspace(self) -> Path:
         """Get the workspace path.
@@ -112,7 +110,7 @@ class IsolatedRun:
         if self._workspace is None:
             raise RuntimeError("IsolatedRun not initialized - use within context manager")
         return self._workspace
-    
+
     @property
     def paper_port(self) -> int:
         """Get the paper server port.
@@ -126,7 +124,7 @@ class IsolatedRun:
         if self._paper_port is None:
             raise RuntimeError("IsolatedRun not initialized - use within context manager")
         return self._paper_port
-    
+
     @property
     def rcon_port(self) -> int:
         """Get the RCON port.
@@ -140,7 +138,7 @@ class IsolatedRun:
         if self._rcon_port is None:
             raise RuntimeError("IsolatedRun not initialized - use within context manager")
         return self._rcon_port
-    
+
     @property
     def obs_port(self) -> int:
         """Get the observation port.
@@ -154,7 +152,7 @@ class IsolatedRun:
         if self._obs_port is None:
             raise RuntimeError("IsolatedRun not initialized - use within context manager")
         return self._obs_port
-    
+
     def cleanup_now(self) -> None:
         """Immediately clean up the workspace.
         
@@ -163,8 +161,8 @@ class IsolatedRun:
         """
         if self._cleaned_up:
             return
-        
+
         if self._workspace is not None and self._workspace.exists():
             shutil.rmtree(self._workspace, ignore_errors=True)
-        
+
         self._cleaned_up = True

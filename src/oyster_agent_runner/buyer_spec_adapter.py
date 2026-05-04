@@ -128,6 +128,7 @@ import json
 import math
 import shutil
 import subprocess
+from datetime import UTC
 from pathlib import Path
 from typing import Any
 
@@ -619,8 +620,8 @@ def _format_time(seconds: float) -> str:
     ``convert_to_buyer_spec._format_buyer_time`` so the two adapters
     produce comparable timestamps for a smoke buyer's tooling.
     """
-    from datetime import datetime, timedelta, timezone
-    UTC = timezone.utc
+    from datetime import datetime, timedelta
+    UTC = UTC
 
     base = datetime.fromtimestamp(0, tz=UTC)
     if seconds >= 1_000_000_000:

@@ -20,7 +20,6 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import List, Optional, Tuple, Union
 
 _numpy = None
 
@@ -35,7 +34,7 @@ def _np():
 
 NUM_BINS: int = 256
 
-DEFAULT_BOUNDS: List[Tuple[float, float]] = [
+DEFAULT_BOUNDS: list[tuple[float, float]] = [
     (-0.5, 0.5), (-0.5, 0.5), (-0.5, 0.5),  # dx, dy, dz (m)
     (-0.5, 0.5), (-0.5, 0.5), (-0.5, 0.5),  # droll, dpitch, dyaw (rad)
     (0.0, 1.0),                               # gripper (0=closed, 1=open)
@@ -52,7 +51,7 @@ class ActionTokenDiscretizer:
     def __init__(
         self,
         num_bins: int = NUM_BINS,
-        bounds: Optional[List[Tuple[float, float]]] = None,
+        bounds: list[tuple[float, float]] | None = None,
     ) -> None:
         """
         Args:
@@ -63,12 +62,12 @@ class ActionTokenDiscretizer:
         if num_bins < 2:
             raise ValueError(f"num_bins must be >= 2, got {num_bins}")
         self.num_bins = num_bins
-        self.bounds: List[Tuple[float, float]] = (
+        self.bounds: list[tuple[float, float]] = (
             list(bounds) if bounds is not None else list(DEFAULT_BOUNDS)
         )
         self.dim = len(self.bounds)
 
-    def tokenize(self, values: Union[List[float], "numpy.ndarray"]) -> List[int]:
+    def tokenize(self, values: list[float] | numpy.ndarray) -> list[int]:
         """Discretize continuous values into token IDs.
 
         Args:
@@ -80,7 +79,7 @@ class ActionTokenDiscretizer:
         arr = np.asarray(values, dtype=np.float64).ravel()
         if arr.shape[0] != self.dim:
             raise ValueError(f"Expected {self.dim} values, got {arr.shape[0]}")
-        tokens: List[int] = []
+        tokens: list[int] = []
         for i, v in enumerate(arr):
             low, high = self.bounds[i]
             v_clamped = max(low, min(high, float(v)))
@@ -88,7 +87,7 @@ class ActionTokenDiscretizer:
             tokens.append(max(0, min(self.num_bins - 1, token)))
         return tokens
 
-    def detokenize(self, tokens: List[int]) -> List[float]:
+    def detokenize(self, tokens: list[int]) -> list[float]:
         """Reconstruct continuous values from token IDs (bin centers).
 
         Args:
@@ -98,7 +97,7 @@ class ActionTokenDiscretizer:
         """
         if len(tokens) != self.dim:
             raise ValueError(f"Expected {self.dim} tokens, got {len(tokens)}")
-        values: List[float] = []
+        values: list[float] = []
         for i, t in enumerate(tokens):
             low, high = self.bounds[i]
             if not (0 <= t < self.num_bins):
@@ -106,13 +105,13 @@ class ActionTokenDiscretizer:
             values.append(low + (t + 0.5) / self.num_bins * (high - low))
         return values
 
-    def roundtrip(self, values: Union[List[float], "numpy.ndarray"]) -> List[float]:
+    def roundtrip(self, values: list[float] | numpy.ndarray) -> list[float]:
         """Tokenize then detokenize; returns reconstructed values."""
         return self.detokenize(self.tokenize(values))
 
     def quantization_error(
-        self, values: Union[List[float], "numpy.ndarray"]
-    ) -> List[float]:
+        self, values: list[float] | numpy.ndarray
+    ) -> list[float]:
         """Per-dimension quantization error (original - reconstructed)."""
         np = _np()
         orig = np.asarray(values, dtype=np.float64).ravel()
@@ -124,7 +123,7 @@ class ActionTokenDiscretizer:
         return {"num_bins": self.num_bins, "dim": self.dim, "bounds": self.bounds}
 
     @classmethod
-    def from_dict(cls, cfg: dict) -> "ActionTokenDiscretizer":
+    def from_dict(cls, cfg: dict) -> ActionTokenDiscretizer:
         """Deserialize from a configuration dict."""
         return cls(
             num_bins=cfg.get("num_bins", NUM_BINS),
@@ -137,8 +136,8 @@ class ActionTokenDiscretizer:
 
 def tokenize_batch(
     discretizer: ActionTokenDiscretizer,
-    actions: Union[List[List[float]], "numpy.ndarray"],
-) -> List[List[int]]:
+    actions: list[list[float]] | numpy.ndarray,
+) -> list[list[int]]:
     """Tokenize a batch of action vectors."""
     np = _np()
     arr = np.asarray(actions, dtype=np.float64)
@@ -149,13 +148,13 @@ def tokenize_batch(
 
 def detokenize_batch(
     discretizer: ActionTokenDiscretizer,
-    token_seqs: List[List[int]],
-) -> List[List[float]]:
+    token_seqs: list[list[int]],
+) -> list[list[float]]:
     """Detokenize a batch of token sequences."""
     return [discretizer.detokenize(seq) for seq in token_seqs]
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """Entry point with argparse CLI."""
     parser = argparse.ArgumentParser(
         description="Action token discretizer for VLA training (RT-1/RT-2 style)."
@@ -180,7 +179,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     sub.add_parser("info", help="Print default configuration")
     args = parser.parse_args(argv)
 
-    bounds: Optional[List[Tuple[float, float]]] = None
+    bounds: list[tuple[float, float]] | None = None
     if getattr(args, "bounds", None):
         raw = json.loads(args.bounds)
         bounds = [tuple(pair) for pair in raw]

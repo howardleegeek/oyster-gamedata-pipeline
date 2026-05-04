@@ -12,6 +12,7 @@ env, every test in this module is skipped.
 from __future__ import annotations
 
 import json
+from datetime import UTC
 from pathlib import Path
 from typing import Any
 
@@ -218,8 +219,8 @@ def _write_phase1_bundle(tmp_path: Path) -> Path:
 
     Returns the path to manifest.json.
     """
-    from datetime import datetime, timezone
-    UTC = timezone.utc
+    from datetime import datetime
+    UTC = UTC
 
     from oyster_agent_runner.environments.base import MockEnvironment
     from oyster_agent_runner.minecraft_streams import MinecraftStreamWriter

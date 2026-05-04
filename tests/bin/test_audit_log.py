@@ -220,7 +220,7 @@ class TestAuditLog:
                 count = audit.export_csv(csv_path)
                 assert count == 3
 
-                with open(csv_path, "r") as f:
+                with open(csv_path) as f:
                     reader = csv.DictReader(f)
                     rows = list(reader)
                     assert len(rows) == 3
@@ -229,7 +229,7 @@ class TestAuditLog:
                 count = audit.export_csv(csv_path, vendor_id="vendor-001")
                 assert count == 2
 
-                with open(csv_path, "r") as f:
+                with open(csv_path) as f:
                     reader = csv.DictReader(f)
                     rows = list(reader)
                     assert len(rows) == 2

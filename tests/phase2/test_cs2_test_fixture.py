@@ -1,10 +1,9 @@
 """Tests for cs2_test_fixture helpers."""
-import math
 import pytest
 from cs2_test_fixture import (
-    make_synthetic_ticks_df,
-    make_synthetic_buyer_frames,
     assert_buyer_frames_well_formed,
+    make_synthetic_buyer_frames,
+    make_synthetic_ticks_df,
 )
 
 

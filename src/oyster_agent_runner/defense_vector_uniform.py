@@ -21,8 +21,9 @@ import argparse
 import csv
 import json
 import sys
+from collections.abc import Iterator, Sequence
 from pathlib import Path
-from typing import Iterator, Sequence, Union
+from typing import Union
 
 import numpy as np
 

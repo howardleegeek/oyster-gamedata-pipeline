@@ -13,10 +13,10 @@ Version: 1.0.0
 """
 
 import argparse
-import sys
-from typing import Set, Optional, List, Dict, Any
 import json
 import logging
+import sys
+from typing import Any
 
 # Configure logging
 logging.basicConfig(
@@ -38,18 +38,18 @@ class FrameDeduplicationDefense:
         seen_frame_ids: Set of frame IDs that have been processed in current scene
         scene_id: Optional identifier for the current scene being tracked
     """
-    
-    def __init__(self, scene_id: Optional[str] = None):
+
+    def __init__(self, scene_id: str | None = None):
         """
         Initialize a new frame deduplication defense instance.
         
         Args:
             scene_id: Optional identifier for the scene being tracked
         """
-        self.seen_frame_ids: Set[str] = set()
+        self.seen_frame_ids: set[str] = set()
         self.scene_id = scene_id
         logger.info(f"Initialized FrameDeduplicationDefense for scene: {scene_id}")
-    
+
     def check_duplicate(self, frame_id: str) -> bool:
         """
         Check if a frame ID has already been seen in the current scene.
@@ -61,7 +61,7 @@ class FrameDeduplicationDefense:
             True if the frame ID is a duplicate, False otherwise
         """
         is_duplicate = frame_id in self.seen_frame_ids
-        
+
         if is_duplicate:
             logger.warning(
                 f"Duplicate frame_id detected: {frame_id} "
@@ -69,9 +69,9 @@ class FrameDeduplicationDefense:
             )
         else:
             logger.debug(f"New frame_id: {frame_id}")
-            
+
         return is_duplicate
-    
+
     def add_frame(self, frame_id: str) -> None:
         """
         Add a frame ID to the tracking set.
@@ -84,11 +84,11 @@ class FrameDeduplicationDefense:
         """
         if not frame_id:
             raise ValueError("frame_id cannot be empty or None")
-        
+
         self.seen_frame_ids.add(frame_id)
         logger.debug(f"Added frame_id to tracking: {frame_id}")
-    
-    def process_frame(self, frame_id: str, frame_data: Optional[Dict[str, Any]] = None) -> bool:
+
+    def process_frame(self, frame_id: str, frame_data: dict[str, Any] | None = None) -> bool:
         """
         Process a frame by checking for duplicates and adding it if new.
         
@@ -103,10 +103,10 @@ class FrameDeduplicationDefense:
         """
         if self.check_duplicate(frame_id):
             return True  # Reject duplicate
-        
+
         self.add_frame(frame_id)
         return False  # Accept new frame
-    
+
     def clear(self) -> None:
         """
         Clear all tracked frame IDs, typically called between scenes.
@@ -117,8 +117,8 @@ class FrameDeduplicationDefense:
             f"Cleared {count} tracked frame_ids "
             f"(scene: {self.scene_id})"
         )
-    
-    def get_stats(self) -> Dict[str, Any]:
+
+    def get_stats(self) -> dict[str, Any]:
         """
         Get statistics about the current tracking state.
         
@@ -130,8 +130,8 @@ class FrameDeduplicationDefense:
             "unique_frames_seen": len(self.seen_frame_ids),
             "frame_ids": sorted(list(self.seen_frame_ids))
         }
-    
-    def reset_scene(self, new_scene_id: Optional[str] = None) -> None:
+
+    def reset_scene(self, new_scene_id: str | None = None) -> None:
         """
         Reset the defense for a new scene.
         
@@ -140,7 +140,7 @@ class FrameDeduplicationDefense:
         """
         if new_scene_id is not None:
             self.scene_id = new_scene_id
-        
+
         self.clear()
         logger.info(f"Reset defense for new scene: {self.scene_id}")
 
@@ -162,13 +162,13 @@ Examples:
   %(prog)s --stats-only --scene-id scene_001
         """
     )
-    
+
     parser.add_argument(
         "--scene-id",
         type=str,
         help="Scene identifier for tracking context"
     )
-    
+
     parser.add_argument(
         "--frame-id",
         type=str,
@@ -176,31 +176,31 @@ Examples:
         default=[],
         help="Frame ID to process (can be specified multiple times)"
     )
-    
+
     parser.add_argument(
         "--input-file",
         type=str,
         help="JSON file containing frame IDs to process"
     )
-    
+
     parser.add_argument(
         "--check-duplicates",
         action="store_true",
         help="Check for duplicates in provided frame IDs"
     )
-    
+
     parser.add_argument(
         "--stats-only",
         action="store_true",
         help="Only show statistics, don't process frames"
     )
-    
+
     parser.add_argument(
         "--verbose", "-v",
         action="store_true",
         help="Enable verbose logging"
     )
-    
+
     parser.add_argument(
         "--output-format",
         type=str,
@@ -208,11 +208,11 @@ Examples:
         default="text",
         help="Output format for results"
     )
-    
+
     return parser.parse_args()
 
 
-def load_frame_ids_from_file(file_path: str) -> List[str]:
+def load_frame_ids_from_file(file_path: str) -> list[str]:
     """
     Load frame IDs from a JSON file.
     
@@ -227,9 +227,9 @@ def load_frame_ids_from_file(file_path: str) -> List[str]:
         json.JSONDecodeError: If file contains invalid JSON
     """
     try:
-        with open(file_path, 'r') as f:
+        with open(file_path) as f:
             data = json.load(f)
-        
+
         # Support multiple formats: list of IDs or dict with frame_ids key
         if isinstance(data, list):
             return [str(item) for item in data]
@@ -245,7 +245,7 @@ def load_frame_ids_from_file(file_path: str) -> List[str]:
         raise
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """
     Main entry point for the frame deduplication defense.
     
@@ -257,16 +257,16 @@ def main(argv: Optional[List[str]] = None) -> int:
     """
     if argv is None:
         argv = sys.argv[1:]
-    
+
     args = parse_arguments()
-    
+
     # Configure logging level
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
-    
+
     # Initialize defense
     defense = FrameDeduplicationDefense(scene_id=args.scene_id)
-    
+
     # Load frame IDs from input file if specified
     frame_ids = list(args.frame_id)
     if args.input_file:
@@ -276,7 +276,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         except Exception as e:
             logger.error(f"Failed to process input file: {e}")
             return 1
-    
+
     # If stats only, just show stats and exit
     if args.stats_only:
         stats = defense.get_stats()
@@ -287,18 +287,18 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"Unique frames seen: {stats['unique_frames_seen']}")
             print(f"Frame IDs: {', '.join(stats['frame_ids'])}")
         return 0
-    
+
     # Process frame IDs
     duplicates = []
     new_frames = []
-    
+
     for frame_id in frame_ids:
         if defense.check_duplicate(frame_id):
             duplicates.append(frame_id)
         else:
             defense.add_frame(frame_id)
             new_frames.append(frame_id)
-    
+
     # Output results
     if args.output_format == "json":
         result = {
@@ -316,20 +316,20 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"Total frames processed: {len(frame_ids)}")
         print(f"Duplicates found: {len(duplicates)}")
         print(f"New frames added: {len(new_frames)}")
-        
+
         if duplicates:
             print("\nDuplicate frame IDs:")
             for dup in duplicates:
                 print(f"  - {dup}")
-        
+
         if new_frames:
             print("\nNew frame IDs:")
             for new in new_frames:
                 print(f"  - {new}")
-        
+
         stats = defense.get_stats()
         print(f"\nCurrent unique frames in scene: {stats['unique_frames_seen']}")
-    
+
     # Return non-zero exit code if duplicates were found (for scripting)
     return 1 if duplicates else 0
 

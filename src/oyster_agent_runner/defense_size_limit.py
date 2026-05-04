@@ -12,7 +12,6 @@ Provides CLI and programmatic API for file size validation.
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from pathlib import Path
 from typing import NamedTuple

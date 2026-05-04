@@ -27,7 +27,7 @@ def _import_torch():
 def _import_transformers():
     global _transformers
     if _transformers is None:
-        from transformers import AutoModel, AutoImageProcessor
+        from transformers import AutoImageProcessor, AutoModel
         _transformers = (AutoModel, AutoImageProcessor)
     return _transformers
 
@@ -35,8 +35,8 @@ def _import_transformers():
 def _import_openexr():
     global _openexr
     if _openexr is None:
-        import OpenEXR
         import Imath
+        import OpenEXR
         _openexr = (OpenEXR, Imath)
     return _openexr
 

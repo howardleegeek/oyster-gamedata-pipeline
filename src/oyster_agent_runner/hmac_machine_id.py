@@ -18,7 +18,6 @@ import os
 import sys
 import uuid
 from pathlib import Path
-from typing import Optional
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -75,7 +74,7 @@ def _collect_raw_identifiers() -> bytes:
 # ---------------------------------------------------------------------------
 # Key management
 # ---------------------------------------------------------------------------
-def _load_key(explicit_key: Optional[str] = None) -> bytes:
+def _load_key(explicit_key: str | None = None) -> bytes:
     """Return the current HMAC signing key.
 
     Priority: explicit CLI arg > env var > key file > generated fallback.
@@ -107,7 +106,7 @@ def _rotation_sequence() -> int:
 # ---------------------------------------------------------------------------
 # Core: HMAC fingerprint
 # ---------------------------------------------------------------------------
-def compute_machine_id(key: Optional[str] = None) -> str:
+def compute_machine_id(key: str | None = None) -> str:
     """Compute the HMAC-rotated machine fingerprint.
 
     Parameters

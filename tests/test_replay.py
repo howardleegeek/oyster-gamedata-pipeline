@@ -23,8 +23,9 @@ against a fake bundle that drifts from the production format.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
-UTC = timezone.utc
+from datetime import UTC, datetime
+
+UTC = UTC
 from pathlib import Path
 
 import pytest

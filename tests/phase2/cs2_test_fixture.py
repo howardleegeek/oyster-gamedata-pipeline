@@ -1,5 +1,6 @@
 """CS2 demo-shape test fixture helpers."""
-import math, random
+import math
+import random
 
 
 def make_synthetic_ticks_df(n: int = 100) -> dict:

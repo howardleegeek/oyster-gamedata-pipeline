@@ -17,10 +17,9 @@ import sys
 import tarfile
 import tempfile
 from pathlib import Path, PurePosixPath
-from typing import List, Tuple
 
 
-def is_safe_path(name: str, base_dir: str | None = None) -> Tuple[bool, str]:
+def is_safe_path(name: str, base_dir: str | None = None) -> tuple[bool, str]:
     """Return ``(True, "ok")`` if *name* is free of traversal / absolute attacks."""
     name = name.strip()
     if not name:
@@ -43,7 +42,7 @@ def is_safe_path(name: str, base_dir: str | None = None) -> Tuple[bool, str]:
     return True, "ok"
 
 
-def is_safe_link(member: tarfile.TarInfo, base_dir: str) -> Tuple[bool, str]:
+def is_safe_link(member: tarfile.TarInfo, base_dir: str) -> tuple[bool, str]:
     """Validate that a symlink / hardlink target stays inside *base_dir*."""
     if member.issym() or member.islnk():
         resolved = (Path(base_dir) / member.name).parent / member.linkname
@@ -54,9 +53,9 @@ def is_safe_link(member: tarfile.TarInfo, base_dir: str) -> Tuple[bool, str]:
     return True, "ok"
 
 
-def filter_safe_members(tar_path: str, extract_dir: str) -> List[tarfile.TarInfo]:
+def filter_safe_members(tar_path: str, extract_dir: str) -> list[tarfile.TarInfo]:
     """Return ``TarInfo`` objects from *tar_path* that pass all safety checks."""
-    safe: List[tarfile.TarInfo] = []
+    safe: list[tarfile.TarInfo] = []
     with tarfile.open(tar_path, "r:*") as tf:
         for member in tf.getmembers():
             ok, reason = is_safe_path(member.name, extract_dir)

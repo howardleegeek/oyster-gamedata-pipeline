@@ -9,7 +9,7 @@ import unittest
 # Ensure bin/ is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "bin"))
 
-from gameinfo_xlsx_validator import validate_xlsx, REQUIRED_FIELDS, EXPECTED_SHEETS
+from gameinfo_xlsx_validator import EXPECTED_SHEETS, REQUIRED_FIELDS, validate_xlsx
 
 
 def _write_xlsx(path: str, sheets: dict) -> None:

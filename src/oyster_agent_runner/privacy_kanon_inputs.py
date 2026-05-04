@@ -11,8 +11,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Sequence
+from typing import Any
 
 # Lazy import for optional dependencies
 try:
@@ -117,7 +118,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                       max_interval_ms=args.max_interval, num_buckets=args.num_buckets)
 
     if args.input:
-        with open(args.input, "r", encoding="utf-8") as f:
+        with open(args.input, encoding="utf-8") as f:
             data = json.load(f)
         mouse_events, key_events = data.get("mouse", []), data.get("key", [])
     else:

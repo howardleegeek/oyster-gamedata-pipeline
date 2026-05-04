@@ -16,12 +16,12 @@ import argparse
 import json
 import struct
 import sys
-from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import asdict, dataclass
+from typing import Any
 
 # Mouse button bit positions (VPT / MineWorld convention)
 BUTTON_LEFT, BUTTON_RIGHT, BUTTON_MIDDLE, BUTTON_4, BUTTON_5 = 0, 1, 2, 3, 4
-_BUTTON_NAMES: Dict[int, str] = {
+_BUTTON_NAMES: dict[int, str] = {
     BUTTON_LEFT: "left", BUTTON_RIGHT: "right", BUTTON_MIDDLE: "middle",
     BUTTON_4: "button4", BUTTON_5: "button5",
 }
@@ -60,7 +60,7 @@ class VPTMouseAction:
         if not (0 <= self.newButtons <= 0xFF):
             raise ValueError(f"newButtons={self.newButtons} out of uint8 range")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serialisable dict."""
         return asdict(self)
 
@@ -74,7 +74,7 @@ class VPTMouseAction:
                            self.dwheel, self.buttons, self.newButtons)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "VPTMouseAction":
+    def from_dict(cls, data: dict[str, Any]) -> VPTMouseAction:
         """Construct from a dict (JSON-decoded)."""
         return cls(scaledX=float(data.get("scaledX", 0.0)),
                    scaledY=float(data.get("scaledY", 0.0)),
@@ -83,23 +83,23 @@ class VPTMouseAction:
                    newButtons=int(data.get("newButtons", 0)))
 
     @classmethod
-    def from_json(cls, payload: str) -> "VPTMouseAction":
+    def from_json(cls, payload: str) -> VPTMouseAction:
         """Construct from a JSON string."""
         return cls.from_dict(json.loads(payload))
 
     @classmethod
-    def from_bytes(cls, raw: bytes) -> "VPTMouseAction":
+    def from_bytes(cls, raw: bytes) -> VPTMouseAction:
         """Construct from a binary VPT payload."""
         if len(raw) < _BINARY_SIZE:
             raise ValueError(f"payload too short: {len(raw)} bytes, expected {_BINARY_SIZE}")
         sx, sy, dw, btn, nbtn = struct.unpack(_BINARY_FORMAT, raw[:_BINARY_SIZE])
         return cls(scaledX=sx, scaledY=sy, dwheel=dw, buttons=btn, newButtons=nbtn)
 
-    def button_names(self) -> List[str]:
+    def button_names(self) -> list[str]:
         """Return list of currently-pressed button names."""
         return [n for b, n in _BUTTON_NAMES.items() if self.buttons & (1 << b)]
 
-    def new_button_names(self) -> List[str]:
+    def new_button_names(self) -> list[str]:
         """Return list of edge-triggered (newly pressed) button names."""
         return [n for b, n in _BUTTON_NAMES.items() if self.newButtons & (1 << b)]
 
@@ -113,7 +113,7 @@ def clamp_scaled(value: float) -> float:
     return max(_SCALED_MIN, min(_SCALED_MAX, value))
 
 
-def pixel_to_scaled(pixel_dx: int, pixel_dy: int, width: int, height: int) -> Tuple[float, float]:
+def pixel_to_scaled(pixel_dx: int, pixel_dy: int, width: int, height: int) -> tuple[float, float]:
     """Convert pixel deltas to VPT scaled coordinates."""
     sx = clamp_scaled(2.0 * pixel_dx / max(width, 1) - 1.0) if width else 0.0
     sy = clamp_scaled(2.0 * pixel_dy / max(height, 1) - 1.0) if height else 0.0
@@ -149,7 +149,7 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """CLI entry point. Returns 0 on success, 1 on error."""
     parser = _build_parser()
     args = parser.parse_args(argv)

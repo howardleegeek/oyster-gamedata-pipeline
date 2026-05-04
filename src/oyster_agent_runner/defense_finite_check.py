@@ -26,7 +26,8 @@ from __future__ import annotations
 import argparse
 import math
 import sys
-from typing import Iterable, Sequence, Union
+from collections.abc import Iterable, Sequence
+from typing import Union
 
 # ---------------------------------------------------------------------------
 # Public API

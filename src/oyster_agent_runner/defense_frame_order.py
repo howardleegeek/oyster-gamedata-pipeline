@@ -13,9 +13,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import sys
 import json
-from typing import Iterator, Optional
+import sys
+from collections.abc import Iterator
 
 
 class FrameOrderValidator:
@@ -24,7 +24,7 @@ class FrameOrderValidator:
     def __init__(self, allow_reset: bool = False, verbose: bool = False) -> None:
         self.allow_reset = allow_reset
         self.verbose = verbose
-        self._expected: Optional[int] = None
+        self._expected: int | None = None
         self._count = 0
         self._errors = 0
 

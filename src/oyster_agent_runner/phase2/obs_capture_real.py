@@ -22,7 +22,7 @@ import base64
 import hashlib
 import json
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -71,14 +71,14 @@ class OBSRecorder:
         self._password = password
         self._ws: Any = None
         self._msg_id: int = 0
-        self._pending: Dict[int, asyncio.Future] = {}
-        self._listener_task: Optional[asyncio.Task] = None
+        self._pending: dict[int, asyncio.Future] = {}
+        self._listener_task: asyncio.Task | None = None
 
     @property
     def _uri(self) -> str:
         return f"ws://{self._ws_host}:{self._ws_port}"
 
-    async def __aenter__(self) -> "OBSRecorder":
+    async def __aenter__(self) -> OBSRecorder:
         """Connect to OBS and complete authentication handshake."""
         ws = _get_websockets()
         self._ws = await ws.connect(self._uri)
@@ -102,7 +102,7 @@ class OBSRecorder:
         self._msg_id += 1
         return self._msg_id
 
-    async def _send_request(self, request_type: str, params: Optional[dict] = None) -> dict:
+    async def _send_request(self, request_type: str, params: dict | None = None) -> dict:
         """Send a request and await the matching response."""
         msg_id = self._next_id()
         payload: dict = {

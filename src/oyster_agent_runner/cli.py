@@ -10,8 +10,9 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
-UTC = timezone.utc
+from datetime import UTC, datetime
+
+UTC = UTC
 from pathlib import Path
 from typing import Annotated
 

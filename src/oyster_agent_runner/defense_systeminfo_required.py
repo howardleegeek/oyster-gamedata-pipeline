@@ -16,13 +16,13 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Schema definition
 # ---------------------------------------------------------------------------
 
-REQUIRED_KEYS: List[str] = [
+REQUIRED_KEYS: list[str] = [
     "hostname",
     "os_name",
     "os_version",
@@ -38,7 +38,7 @@ REQUIRED_KEYS: List[str] = [
 ]
 
 # Expected Python types for each required key (used by the validator).
-_KEY_TYPES: Dict[str, type] = {
+_KEY_TYPES: dict[str, type] = {
     "hostname": str,
     "os_name": str,
     "os_version": str,
@@ -59,10 +59,10 @@ _KEY_TYPES: Dict[str, type] = {
 
 
 def validate_systeminfo(
-    payload: Dict[str, Any],
+    payload: dict[str, Any],
     *,
     strict: bool = False,
-) -> Tuple[bool, List[str]]:
+) -> tuple[bool, list[str]]:
     """Validate a systeminfo dict against REQUIRED_KEYS and type hints.
 
     Args:
@@ -72,7 +72,7 @@ def validate_systeminfo(
     Returns:
         (is_valid, errors) — a tuple of bool and list of error strings.
     """
-    errors: List[str] = []
+    errors: list[str] = []
 
     # 1. Missing required keys
     for key in REQUIRED_KEYS:
@@ -114,7 +114,7 @@ def validate_systeminfo(
 # ---------------------------------------------------------------------------
 
 
-def _try_pydantic_model() -> Optional[Any]:
+def _try_pydantic_model() -> Any | None:
     """Attempt to build a pydantic BaseModel for systeminfo (lazy import).
 
     Returns None if pydantic is not installed.
@@ -132,8 +132,8 @@ def _try_pydantic_model() -> Optional[Any]:
         cpu_count: int = Field(ge=1)
         memory_bytes: int = Field(ge=0)
         disk_total_bytes: int = Field(ge=0)
-        ip_addresses: List[str]
-        mac_addresses: List[str]
+        ip_addresses: list[str]
+        mac_addresses: list[str]
         kernel_version: str
         uptime_seconds: float = Field(ge=0)
         timezone: str
@@ -141,7 +141,7 @@ def _try_pydantic_model() -> Optional[Any]:
     return SystemInfoModel
 
 
-def validate_with_pydantic(payload: Dict[str, Any]) -> Tuple[bool, List[str]]:
+def validate_with_pydantic(payload: dict[str, Any]) -> tuple[bool, list[str]]:
     """Validate using pydantic if available, else fall back to stdlib validator."""
     model_cls = _try_pydantic_model()
     if model_cls is None:
@@ -158,7 +158,7 @@ def validate_with_pydantic(payload: Dict[str, Any]) -> Tuple[bool, List[str]]:
 # ---------------------------------------------------------------------------
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """CLI entry-point for systeminfo validation.
 
     Args:
@@ -190,9 +190,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         if args.stdin:
             raw = sys.stdin.read()
         else:
-            with open(args.file, "r", encoding="utf-8") as fh:
+            with open(args.file, encoding="utf-8") as fh:
                 raw = fh.read()
-        payload: Dict[str, Any] = json.loads(raw)
+        payload: dict[str, Any] = json.loads(raw)
     except (OSError, json.JSONDecodeError) as exc:
         print(f"ERROR: failed to load JSON — {exc}", file=sys.stderr)
         return 2

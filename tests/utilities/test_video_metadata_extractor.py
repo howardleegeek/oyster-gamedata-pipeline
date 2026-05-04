@@ -2,11 +2,12 @@
 """Tests for bin/video_metadata_extractor.py."""
 
 import json
+import os
 import subprocess
+import sys
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "bin"))
 
 from video_metadata_extractor import extract_metadata

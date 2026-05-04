@@ -11,7 +11,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Any
 
 # Lazy imports for optional dependencies
 try:
@@ -24,14 +24,14 @@ except ImportError:
 
 class CameraIntrinsicsSpec:
     """Validate camera intrinsics (K matrix, distortion) and extrinsics (SE3 pose)."""
-    
+
     def __init__(self,
-                 K: Optional[List[List[float]]] = None,
-                 D: Optional[List[float]] = None,
-                 image_size: Optional[Tuple[int, int]] = None,
+                 K: list[list[float]] | None = None,
+                 D: list[float] | None = None,
+                 image_size: tuple[int, int] | None = None,
                  camera_name: str = "",
                  frame_id: str = "",
-                 T_world_cam: Optional[List[List[float]]] = None):
+                 T_world_cam: list[list[float]] | None = None):
         """
         Initialize camera intrinsics specification.
         
@@ -49,10 +49,10 @@ class CameraIntrinsicsSpec:
         self.camera_name = camera_name
         self.frame_id = frame_id
         self.T_world_cam = T_world_cam
-    
-    def validate(self) -> Tuple[bool, List[str]]:
+
+    def validate(self) -> tuple[bool, list[str]]:
         """Validate all camera parameters. Returns (is_valid, list of errors)."""
-        errors: List[str] = []
+        errors: list[str] = []
         if self.K is not None:
             _, k_err = self._validate_K()
             errors.extend(k_err)
@@ -63,10 +63,10 @@ class CameraIntrinsicsSpec:
             _, t_err = self._validate_T()
             errors.extend(t_err)
         return len(errors) == 0, errors
-    
-    def _validate_K(self) -> Tuple[bool, List[str]]:
+
+    def _validate_K(self) -> tuple[bool, list[str]]:
         """Validate intrinsic matrix K."""
-        errors: List[str] = []
+        errors: list[str] = []
         if not HAS_NUMPY:
             return False, ["NumPy required for K validation"]
         try:
@@ -86,10 +86,10 @@ class CameraIntrinsicsSpec:
         except (ValueError, TypeError) as e:
             errors.append(f"Invalid K matrix: {e}")
         return len(errors) == 0, errors
-    
-    def _validate_D(self) -> Tuple[bool, List[str]]:
+
+    def _validate_D(self) -> tuple[bool, list[str]]:
         """Validate distortion coefficients D."""
-        errors: List[str] = []
+        errors: list[str] = []
         if not isinstance(self.D, (list, tuple)):
             return False, [f"D must be list, got {type(self.D).__name__}"]
         if len(self.D) < 4:
@@ -98,10 +98,10 @@ class CameraIntrinsicsSpec:
             if not isinstance(d, (int, float)):
                 errors.append(f"D[{i}] is not numeric: {type(d).__name__}")
         return len(errors) == 0, errors
-    
-    def _validate_T(self) -> Tuple[bool, List[str]]:
+
+    def _validate_T(self) -> tuple[bool, list[str]]:
         """Validate SE3 transformation matrix T_world_cam."""
-        errors: List[str] = []
+        errors: list[str] = []
         if not HAS_NUMPY:
             return False, ["NumPy required for T validation"]
         try:
@@ -120,10 +120,10 @@ class CameraIntrinsicsSpec:
         except (ValueError, TypeError) as e:
             errors.append(f"Invalid T_world_cam matrix: {e}")
         return len(errors) == 0, errors
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         """Export to dictionary format."""
-        result: Dict[str, Any] = {"camera_name": self.camera_name, "frame_id": self.frame_id}
+        result: dict[str, Any] = {"camera_name": self.camera_name, "frame_id": self.frame_id}
         if self.K is not None:
             result["K"] = self.K
         if self.D:
@@ -133,9 +133,9 @@ class CameraIntrinsicsSpec:
         if self.T_world_cam is not None:
             result["T_world_cam"] = self.T_world_cam
         return result
-    
+
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CameraIntrinsicsSpec":
+    def from_dict(cls, data: dict[str, Any]) -> "CameraIntrinsicsSpec":
         """Create instance from dictionary (supports multiple naming conventions)."""
         K = data.get("K") or data.get("intrinsics_matrix")
         D = data.get("D") or data.get("distortion_coeffs") or data.get("distortion")
@@ -150,7 +150,7 @@ class CameraIntrinsicsSpec:
 def validate_file(path: Path, verbose: bool = False) -> int:
     """Validate a camera intrinsics JSON file. Returns 0 if valid, 1 if invalid, 2 on error."""
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
     except json.JSONDecodeError as e:
         print(f"Error: Invalid JSON in {path}: {e}", file=sys.stderr)
@@ -158,10 +158,10 @@ def validate_file(path: Path, verbose: bool = False) -> int:
     except FileNotFoundError:
         print(f"Error: File not found: {path}", file=sys.stderr)
         return 2
-    
+
     spec = CameraIntrinsicsSpec.from_dict(data)
     is_valid, errors = spec.validate()
-    
+
     if verbose:
         print(f"Camera: {spec.camera_name or 'unnamed'}")
         print(f"Frame: {spec.frame_id or 'unspecified'}")
@@ -170,8 +170,8 @@ def validate_file(path: Path, verbose: bool = False) -> int:
         if spec.D:
             print(f"Distortion: {len(spec.D)} coefficients")
         if spec.T_world_cam:
-            print(f"Extrinsics: 4x4 SE3 matrix present")
-    
+            print("Extrinsics: 4x4 SE3 matrix present")
+
     if is_valid:
         print(f"✓ Valid: {path}")
         return 0
@@ -181,35 +181,35 @@ def validate_file(path: Path, verbose: bool = False) -> int:
     return 1
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """Main entry point with argparse CLI. Returns exit code."""
     parser = argparse.ArgumentParser(description="Validate camera intrinsics specification files")
     parser.add_argument("files", nargs="+", type=Path, help="JSON files to validate")
     parser.add_argument("-v", "--verbose", action="store_true", help="Print detailed info")
     parser.add_argument("-o", "--output", type=Path, help="Output validated specs to JSON file")
     args = parser.parse_args(argv)
-    
+
     all_valid = True
-    specs_data: List[Dict[str, Any]] = []
-    
+    specs_data: list[dict[str, Any]] = []
+
     for filepath in args.files:
         result = validate_file(filepath, verbose=args.verbose)
         if result != 0:
             all_valid = False
         if args.output:
             try:
-                with open(filepath, "r", encoding="utf-8") as f:
+                with open(filepath, encoding="utf-8") as f:
                     data = json.load(f)
                 spec = CameraIntrinsicsSpec.from_dict(data)
                 specs_data.append(spec.to_dict())
             except Exception:
                 pass
-    
+
     if args.output and specs_data:
         with open(args.output, "w", encoding="utf-8") as f:
             json.dump(specs_data, f, indent=2)
         print(f"Wrote {len(specs_data)} specs to {args.output}")
-    
+
     return 0 if all_valid else 1
 
 

@@ -15,19 +15,18 @@ import random
 import sys
 import tempfile
 from pathlib import Path
-from typing import List, Optional, Tuple, Union
 
 
 class CameraRotationSynthesizer:
     """Synthesizes camera rotation data for testing and simulation."""
 
-    def __init__(self, seed: Optional[int] = None) -> None:
+    def __init__(self, seed: int | None = None) -> None:
         """Initialize synthesizer with optional random seed for reproducibility."""
         if seed is not None:
             random.seed(seed)
 
     @staticmethod
-    def _random_unit_vector() -> Tuple[float, float, float]:
+    def _random_unit_vector() -> tuple[float, float, float]:
         """Generate random unit vector uniformly distributed on sphere."""
         theta = random.uniform(0, 2 * math.pi)
         z = random.uniform(-1, 1)
@@ -36,8 +35,8 @@ class CameraRotationSynthesizer:
 
     @staticmethod
     def _axis_angle_to_quaternion(
-        axis: Tuple[float, float, float], angle: float
-    ) -> Tuple[float, float, float, float]:
+        axis: tuple[float, float, float], angle: float
+    ) -> tuple[float, float, float, float]:
         """Convert axis-angle to quaternion (w, x, y, z)."""
         half = angle / 2
         s = math.sin(half)
@@ -45,9 +44,9 @@ class CameraRotationSynthesizer:
 
     @staticmethod
     def _quaternion_multiply(
-        q1: Tuple[float, float, float, float],
-        q2: Tuple[float, float, float, float],
-    ) -> Tuple[float, float, float, float]:
+        q1: tuple[float, float, float, float],
+        q2: tuple[float, float, float, float],
+    ) -> tuple[float, float, float, float]:
         """Multiply two quaternions."""
         w1, x1, y1, z1 = q1
         w2, x2, y2, z2 = q2
@@ -60,8 +59,8 @@ class CameraRotationSynthesizer:
 
     @staticmethod
     def _normalize_quaternion(
-        q: Tuple[float, float, float, float]
-    ) -> Tuple[float, float, float, float]:
+        q: tuple[float, float, float, float]
+    ) -> tuple[float, float, float, float]:
         """Normalize quaternion to unit length."""
         w, x, y, z = q
         mag = math.sqrt(w * w + x * x + y * y + z * z)
@@ -69,8 +68,8 @@ class CameraRotationSynthesizer:
 
     @staticmethod
     def _quaternion_to_matrix(
-        q: Tuple[float, float, float, float]
-    ) -> List[List[float]]:
+        q: tuple[float, float, float, float]
+    ) -> list[list[float]]:
         """Convert quaternion to 3x3 rotation matrix."""
         w, x, y, z = q
         return [
@@ -80,11 +79,11 @@ class CameraRotationSynthesizer:
         ]
 
     @staticmethod
-    def _matrix_to_euler(m: List[List[float]]) -> Tuple[float, float, float]:
+    def _matrix_to_euler(m: list[list[float]]) -> tuple[float, float, float]:
         """Convert 3x3 rotation matrix to Euler angles (roll, pitch, yaw)."""
         sy = math.sqrt(m[0][0] ** 2 + m[1][0] ** 2)
         singular = sy < 1e-6
-        
+
         if not singular:
             roll = math.atan2(m[2][1], m[2][2])
             pitch = math.atan2(-m[2][0], sy)
@@ -93,7 +92,7 @@ class CameraRotationSynthesizer:
             roll = math.atan2(-m[1][2], m[1][1])
             pitch = math.atan2(-m[2][0], sy)
             yaw = 0.0
-            
+
         return (roll, pitch, yaw)
 
     def generate(
@@ -102,7 +101,7 @@ class CameraRotationSynthesizer:
         smoothness: float = 0.1,
         max_angle: float = 1.5708,
         output_type: str = "quaternion",
-    ) -> List[Union[Tuple[float, float, float, float], List[List[float]], Tuple[float, float, float]]]:
+    ) -> list[tuple[float, float, float, float] | list[list[float]] | tuple[float, float, float]]:
         """
         Generate a camera rotation trajectory.
         
@@ -121,7 +120,7 @@ class CameraRotationSynthesizer:
             raise ValueError("max_angle must be positive")
         if num_frames <= 0:
             raise ValueError("num_frames must be positive")
-            
+
         quat = (1.0, 0.0, 0.0, 0.0)  # Identity quaternion
         trajectory = []
 
@@ -142,10 +141,10 @@ class CameraRotationSynthesizer:
         else:
             raise ValueError(f"Unknown output_type: {output_type}")
 
-    def save(self, trajectory: List, path: Path, fmt: str = "json") -> None:
+    def save(self, trajectory: list, path: Path, fmt: str = "json") -> None:
         """Save trajectory to file in JSON or CSV format."""
         path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         if fmt == "json":
             with open(path, "w") as f:
                 json.dump(trajectory, f, indent=2)
@@ -159,7 +158,7 @@ class CameraRotationSynthesizer:
                         f.write("frame,roll,pitch,yaw\n")
                 elif trajectory and isinstance(trajectory[0], list):  # matrix
                     f.write("frame,m00,m01,m02,m10,m11,m12,m20,m21,m22\n")
-                
+
                 # Write data
                 for i, item in enumerate(trajectory):
                     if isinstance(item, tuple):
@@ -171,13 +170,13 @@ class CameraRotationSynthesizer:
                                 item[2][0], item[2][1], item[2][2]]
                     else:
                         vals = item
-                    
+
                     f.write(f"{i}," + ",".join(map(str, vals)) + "\n")
         else:
             raise ValueError(f"Unknown format: {fmt}")
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """Main entry point for camera synthesizer CLI."""
     parser = argparse.ArgumentParser(
         description="Synthesize camera rotation trajectories for testing and simulation."
@@ -199,7 +198,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         default="quaternion", help="Output format (default: quaternion)"
     )
     parser.add_argument(
-        "-o", "--output", type=Path, 
+        "-o", "--output", type=Path,
         help="Output file path (default: auto-generated in temp directory)"
     )
     parser.add_argument(
@@ -226,11 +225,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         else:
             temp_dir = Path(tempfile.mkdtemp())
             output_path = temp_dir / f"camera_trajectory.{args.format}"
-        
+
         synthesizer.save(trajectory, output_path, fmt=args.format)
         print(f"Generated {args.num_frames} frames -> {output_path}")
         return 0
-        
+
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1

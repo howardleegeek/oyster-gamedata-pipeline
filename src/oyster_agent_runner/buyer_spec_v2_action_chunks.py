@@ -18,12 +18,13 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 
-VALID_POLICIES: Tuple[str, ...] = ("octo", "openvla", "pi0")
-VALID_HORIZONS: Tuple[int, ...] = (4, 10)
+VALID_POLICIES: tuple[str, ...] = ("octo", "openvla", "pi0")
+VALID_HORIZONS: tuple[int, ...] = (4, 10)
 SPEC_VERSION: str = "v2"
 
 
@@ -62,7 +63,7 @@ class ActionChunk:
     def step_id(self) -> int:
         return self._step_id
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialise to a JSON-compatible dict."""
         return {
             "spec_version": SPEC_VERSION, "policy": self._policy,
@@ -72,7 +73,7 @@ class ActionChunk:
         }
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "ActionChunk":
+    def from_dict(cls, d: dict[str, Any]) -> ActionChunk:
         return cls(
             data=np.array(d["data"], dtype=np.float32),
             horizon=d["horizon"], policy=d["policy"],
@@ -88,7 +89,7 @@ class ActionChunk:
 
 def pack_chunks(
     chunks: Sequence[ActionChunk], *, pad_to_max: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Pack a sequence of ActionChunks into a buyer-spec v2 bundle."""
     if not chunks:
         raise ValueError("chunks must be non-empty")
@@ -97,7 +98,7 @@ def pack_chunks(
     for c in chunks:
         if c.data.shape[1] != dim:
             raise ValueError(f"Inconsistent action dim: expected {dim}")
-    packed: List[np.ndarray] = []
+    packed: list[np.ndarray] = []
     for c in chunks:
         arr = c.data
         if pad_to_max and arr.shape[0] < max_h:
@@ -116,7 +117,7 @@ def pack_chunks(
     }
 
 
-def unpack_chunks(bundle: Dict[str, Any]) -> List[ActionChunk]:
+def unpack_chunks(bundle: dict[str, Any]) -> list[ActionChunk]:
     """Reverse of :func:`pack_chunks`."""
     data = np.array(bundle["packed_data"], dtype=np.float32)
     policies = bundle.get("policies", ["octo"])
@@ -147,13 +148,13 @@ def load_npy_actions(path: str) -> np.ndarray:
     return np.load(path, allow_pickle=False)
 
 
-def save_bundle(bundle: Dict[str, Any], path: str) -> None:
+def save_bundle(bundle: dict[str, Any], path: str) -> None:
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(bundle, fh, indent=2)
 
 
-def load_bundle(path: str) -> Dict[str, Any]:
-    with open(path, "r", encoding="utf-8") as fh:
+def load_bundle(path: str) -> dict[str, Any]:
+    with open(path, encoding="utf-8") as fh:
         return json.load(fh)
 
 
@@ -174,14 +175,14 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """Entry-point for CLI usage."""
     args = _build_parser().parse_args(argv)
     if args.command == "pack":
         raw = load_npy_actions(args.input)
         if raw.ndim == 2:
             raw = raw[np.newaxis, ...]
-        chunks: List[ActionChunk] = []
+        chunks: list[ActionChunk] = []
         for idx in range(raw.shape[0]):
             chunk = ActionChunk(
                 data=raw[idx], horizon=args.horizon,
