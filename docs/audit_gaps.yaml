@@ -777,9 +777,10 @@ gaps:
   title: bin/red_team_out_of_order_frames.py
   purpose: 'Red team: shuffle frame ordering in JSON — lint rejects non-monotonic
     frame_id sequence'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 90
+  dispatched_at: '2026-05-04 06:11:01'
 - id: G093
   title: bin/red_team_wrong_obs_key.py
   purpose: 'Red team: WebSocket auth with wrong password — session refuses + audit
@@ -870,10 +871,11 @@ gaps:
   title: src/oyster_agent_runner/defense_dedup_frames.py
   purpose: 'Blue team for G088: in-memory set tracker rejecting duplicate frame_id
     within scene'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 90
   dispatched_at: '2026-05-04 05:58:14'
+  completed_at: '2026-05-04 06:09:49'
 - id: G104
   title: src/oyster_agent_runner/defense_file_lock.py
   purpose: 'Blue team for G089: fcntl flock wrapper around tarball open — prevents
@@ -904,16 +906,18 @@ gaps:
   title: src/oyster_agent_runner/defense_frame_order.py
   purpose: 'Blue team for G092: streaming validator asserting frame_id strictly increases
     by 1'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 100
+  dispatched_at: '2026-05-04 06:14:56'
 - id: G108
   title: src/oyster_agent_runner/defense_obs_auth.py
   purpose: 'Blue team for G093: SHA256+base64 OBS auth helper with rate-limit on failed
     attempts'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 110
+  dispatched_at: '2026-05-04 06:16:44'
 - id: G109
   title: src/oyster_agent_runner/defense_exr_validate.py
   purpose: 'Blue team for G094: post-write EXR validator scanning for NaN clusters
@@ -944,10 +948,11 @@ gaps:
   title: src/oyster_agent_runner/defense_vector_uniform.py
   purpose: 'Blue team for G097: scan first record format and enforce uniform Vector3
     shape across file'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 100
   dispatched_at: '2026-05-04 06:07:06'
+  completed_at: '2026-05-04 06:09:51'
 - id: G113
   title: src/oyster_agent_runner/defense_monotonic_clock.py
   purpose: 'Blue team for G098: prefer time.monotonic_ns inside capture loop, wall
@@ -961,17 +966,19 @@ gaps:
   title: bin/autoresearch_lint_perf.py
   purpose: 'Autoresearch: benchmark lint_buyer_spec on 100-tarball corpus — surface
     p50 / p95 / p99'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 130
   dispatched_at: '2026-05-04 06:09:15'
+  completed_at: '2026-05-04 06:09:53'
 - id: G115
   title: bin/autoresearch_adapter_quality.py
   purpose: 'Autoresearch: golden-corpus diff vs hand-labeled mineflayer scenes — coverage
     and recall metrics'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 150
+  dispatched_at: '2026-05-04 06:18:54'
 - id: G116
   title: bin/autoresearch_compression_ratio.py
   purpose: 'Autoresearch: compare H.264 vs H.265 vs AV1 sizes on same scene — recommend
@@ -983,16 +990,18 @@ gaps:
   title: bin/autoresearch_depth_quality.py
   purpose: 'Autoresearch: DepthAnything V2 vs Marigold MAE on 50 ground-truth Minecraft
     Z-buffer frames'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 160
+  dispatched_at: '2026-05-04 06:21:19'
 - id: G118
   title: bin/autoresearch_failure_modes.py
   purpose: 'Autoresearch: enumerate top 10 lint failure modes from 1000 vendor tarballs
     — drives spec backlog'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 140
+  dispatched_at: '2026-05-04 06:24:03'
 - id: G119
   title: bin/autoresearch_recovery_time.py
   purpose: 'Autoresearch: kill-9 then restart adapter — measure mean time to first
@@ -1145,4 +1154,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-04T13:09:15Z'
+  last_heartbeat: '2026-05-04T13:24:03Z'
