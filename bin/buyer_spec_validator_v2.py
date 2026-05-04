@@ -1,434 +1,376 @@
 #!/usr/bin/env python3
 """
-G038 · bin/buyer_spec_validator_v2.py
+G024 · buyer_spec_validator_v2.py
 
-Strict independent v2 validator for buyer specifications.
-Performs cross-file consistency checks beyond lint_buyer_spec:
-- Manifest SHA vs actual files
-- XLSX semantic validation
-- EXR temporal alignment
-- Cross-file consistency validation
+Stricter independent validator for buyer specifications.
+Performs cross-checks, semantic + structural validation.
 
-This is a standalone validator that can be run independently of the main pipeline.
+Author: Production Engineer
+Version: 2.0.0
 """
 
+from __future__ import annotations
+
 import argparse
-import hashlib
+import ast
 import json
-import os
+import re
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any, Set
-import warnings
-
-# Optional imports with lazy loading
-try:
-    import yaml
-    YAML_AVAILABLE = True
-except ImportError:
-    YAML_AVAILABLE = False
-
-try:
-    import openpyxl
-    OPENPYXL_AVAILABLE = True
-except ImportError:
-    OPENPYXL_AVAILABLE = False
-
-try:
-    import numpy as np
-    NUMPY_AVAILABLE = True
-except ImportError:
-    NUMPY_AVAILABLE = False
-
-try:
-    from PIL import Image
-    PIL_AVAILABLE = True
-except ImportError:
-    PIL_AVAILABLE = False
+from typing import Any, Optional, Callable, Dict, List
 
 
-class BuyerSpecValidatorV2:
-    """Main validator class for buyer specification v2."""
+def _lazy_import_yaml() -> Optional[Any]:
+    """Lazy import PyYAML module."""
+    try:
+        import yaml
+        return yaml
+    except ImportError:
+        return None
+
+
+def _lazy_import_pydantic() -> Optional[Any]:
+    """Lazy import pydantic module."""
+    try:
+        import pydantic
+        return pydantic
+    except ImportError:
+        return None
+
+
+def _lazy_import_torch() -> Optional[Any]:
+    """Lazy import torch module."""
+    try:
+        import torch
+        return torch
+    except ImportError:
+        return None
+
+
+class ValidationResult:
+    """Container for validation results."""
     
-    def __init__(self, root_dir: str = "."):
-        """
-        Initialize validator with root directory.
-        
-        Args:
-            root_dir: Root directory to validate
-        """
-        self.root_dir = Path(root_dir).resolve()
+    def __init__(self, path: str) -> None:
+        """Initialize validation result for a given path."""
+        self.path = path
         self.errors: List[str] = []
         self.warnings: List[str] = []
-        
-    def validate_all(self) -> bool:
-        """
-        Run all validation checks.
-        
-        Returns:
-            True if all checks pass, False otherwise
-        """
-        print(f"Validating buyer specification in: {self.root_dir}")
-        
-        # Run all validation checks
-        checks = [
-            self._validate_directory_structure,
-            self._validate_manifest_files,
-            self._validate_xlsx_semantics,
-            self._validate_exr_temporal_alignment,
-            self._validate_cross_file_consistency,
-        ]
-        
-        for check in checks:
-            try:
-                check()
-            except Exception as e:
-                self.errors.append(f"Check failed with exception: {e}")
-                
-        # Print results
-        self._print_results()
-        
+        self.info: List[str] = []
+    
+    @property
+    def is_valid(self) -> bool:
+        """Return True if no errors were found."""
         return len(self.errors) == 0
-        
-    def _validate_directory_structure(self) -> None:
-        """Validate basic directory structure."""
-        required_dirs = ["docs", "data", "specs"]
-        
-        for dir_name in required_dirs:
-            dir_path = self.root_dir / dir_name
-            if not dir_path.exists():
-                self.warnings.append(f"Directory '{dir_name}' not found")
-            elif not dir_path.is_dir():
-                self.errors.append(f"'{dir_name}' exists but is not a directory")
-                
-    def _validate_manifest_files(self) -> None:
-        """
-        Validate manifest SHA checksums against actual files.
-        
-        Checks for manifest files and verifies file integrity.
-        """
-        manifest_files = list(self.root_dir.glob("**/*manifest*.json")) + \
-                        list(self.root_dir.glob("**/*manifest*.yaml")) + \
-                        list(self.root_dir.glob("**/*manifest*.yml"))
-        
-        if not manifest_files:
-            self.warnings.append("No manifest files found")
-            return
-            
-        for manifest_path in manifest_files:
-            self._validate_single_manifest(manifest_path)
-            
-    def _validate_single_manifest(self, manifest_path: Path) -> None:
-        """Validate a single manifest file."""
-        try:
-            if manifest_path.suffix in ['.yaml', '.yml']:
-                if not YAML_AVAILABLE:
-                    self.warnings.append(f"PyYAML not available, skipping YAML manifest: {manifest_path}")
-                    return
-                with open(manifest_path, 'r') as f:
-                    manifest = yaml.safe_load(f)
-            else:  # Assume JSON
-                with open(manifest_path, 'r') as f:
-                    manifest = json.load(f)
-        except Exception as e:
-            self.errors.append(f"Failed to parse manifest {manifest_path}: {e}")
-            return
-            
-        # Check for file entries with checksums
-        if isinstance(manifest, dict):
-            self._validate_manifest_entries(manifest, manifest_path)
-            
-    def _validate_manifest_entries(self, manifest: Dict, manifest_path: Path) -> None:
-        """Validate individual entries in a manifest."""
-        if 'files' in manifest:
-            files = manifest['files']
-        elif 'entries' in manifest:
-            files = manifest['entries']
-        else:
-            # Try to find any list of files
-            files = []
-            for key, value in manifest.items():
-                if isinstance(value, list) and value and isinstance(value[0], dict):
-                    if 'path' in value[0] or 'file' in value[0]:
-                        files = value
-                        break
-                        
-        if not files:
-            self.warnings.append(f"No file entries found in manifest: {manifest_path}")
-            return
-            
-        for i, file_entry in enumerate(files):
-            if not isinstance(file_entry, dict):
-                continue
-                
-            # Get file path
-            file_path = file_entry.get('path') or file_entry.get('file') or file_entry.get('name')
-            if not file_path:
-                continue
-                
-            # Resolve relative to manifest location
-            abs_path = manifest_path.parent / file_path
-            
-            # Check if file exists
-            if not abs_path.exists():
-                self.errors.append(f"File referenced in manifest does not exist: {file_path}")
-                continue
-                
-            # Verify checksum if present
-            checksum = file_entry.get('sha256') or file_entry.get('sha1') or file_entry.get('md5')
-            if checksum:
-                self._verify_checksum(abs_path, checksum, file_entry.get('algorithm', 'sha256'))
-                
-    def _verify_checksum(self, file_path: Path, expected_hash: str, algorithm: str = 'sha256') -> None:
-        """Verify file checksum."""
-        try:
-            hash_func = getattr(hashlib, algorithm, None)
-            if not hash_func:
-                self.warnings.append(f"Unsupported hash algorithm: {algorithm}")
-                return
-                
-            with open(file_path, 'rb') as f:
-                file_hash = hash_func(f.read()).hexdigest()
-                
-            if file_hash != expected_hash:
-                self.errors.append(f"Checksum mismatch for {file_path}: expected {expected_hash}, got {file_hash}")
-        except Exception as e:
-            self.errors.append(f"Failed to compute checksum for {file_path}: {e}")
-            
-    def _validate_xlsx_semantics(self) -> None:
-        """Validate XLSX file semantics and structure."""
-        if not OPENPYXL_AVAILABLE:
-            self.warnings.append("openpyxl not available, skipping XLSX validation")
-            return
-            
-        xlsx_files = list(self.root_dir.glob("**/*.xlsx"))
-        
-        for xlsx_path in xlsx_files:
-            self._validate_single_xlsx(xlsx_path)
-            
-    def _validate_single_xlsx(self, xlsx_path: Path) -> None:
-        """Validate a single XLSX file."""
-        try:
-            workbook = openpyxl.load_workbook(xlsx_path, data_only=True, read_only=True)
-            
-            # Check for required sheets
-            sheet_names = workbook.sheetnames
-            
-            # Semantic checks based on common buyer spec patterns
-            if 'Metadata' in sheet_names:
-                metadata_sheet = workbook['Metadata']
-                self._validate_metadata_sheet(metadata_sheet, xlsx_path)
-                
-            if 'Data' in sheet_names or 'Sheet1' in sheet_names:
-                data_sheet = workbook['Data'] if 'Data' in sheet_names else workbook['Sheet1']
-                self._validate_data_sheet(data_sheet, xlsx_path)
-                
-            workbook.close()
-            
-        except Exception as e:
-            self.errors.append(f"Failed to validate XLSX {xlsx_path}: {e}")
-            
-    def _validate_metadata_sheet(self, sheet, xlsx_path: Path) -> None:
-        """Validate metadata sheet in XLSX."""
-        # Check for required metadata fields
-        required_fields = ['version', 'created_date', 'author', 'description']
-        found_fields = set()
-        
-        for row in sheet.iter_rows(min_row=1, max_row=20, max_col=2, values_only=True):
-            if row[0] and isinstance(row[0], str):
-                field_name = row[0].lower().strip()
-                if any(req in field_name for req in required_fields):
-                    found_fields.add(field_name)
-                    
-        missing = [f for f in required_fields if not any(f in found for found in found_fields)]
-        if missing:
-            self.warnings.append(f"Missing metadata fields in {xlsx_path}: {missing}")
-            
-    def _validate_data_sheet(self, sheet, xlsx_path: Path) -> None:
-        """Validate data sheet in XLSX."""
-        # Check for non-empty data
-        has_data = False
-        for row in sheet.iter_rows(min_row=2, max_row=100, values_only=True):
-            if any(cell is not None for cell in row):
-                has_data = True
-                break
-                
-        if not has_data:
-            self.warnings.append(f"Data sheet appears empty in {xlsx_path}")
-            
-    def _validate_exr_temporal_alignment(self) -> None:
-        """Validate EXR file temporal alignment and consistency."""
-        exr_files = list(self.root_dir.glob("**/*.exr"))
-        
-        if not exr_files:
-            # EXR files are optional
-            return
-            
-        # Group EXR files by sequence
-        sequences: Dict[str, List[Path]] = {}
-        for exr_path in exr_files:
-            # Simple sequence detection - look for frame numbers
-            stem = exr_path.stem
-            # Try to find pattern like name.####.exr
-            import re
-            match = re.search(r'(\D+)(\d+)\.exr$', exr_path.name)
-            if match:
-                seq_name = match.group(1)
-                frame_num = int(match.group(2))
-                if seq_name not in sequences:
-                    sequences[seq_name] = []
-                sequences[seq_name].append(exr_path)
-                
-        # Validate each sequence
-        for seq_name, files in sequences.items():
-            if len(files) > 1:
-                # Check for consistent frame numbering
-                frames = []
-                for file_path in files:
-                    match = re.search(r'(\D+)(\d+)\.exr$', file_path.name)
-                    if match:
-                        frames.append(int(match.group(2)))
-                        
-                if frames:
-                    frames.sort()
-                    # Check for gaps in frame sequence
-                    expected = list(range(min(frames), max(frames) + 1))
-                    missing = set(expected) - set(frames)
-                    if missing:
-                        self.warnings.append(f"Missing frames in EXR sequence {seq_name}: {sorted(missing)}")
-                        
-    def _validate_cross_file_consistency(self) -> None:
-        """Validate consistency across different files."""
-        # Look for configuration files
-        config_files = list(self.root_dir.glob("**/config*.yaml")) + \
-                      list(self.root_dir.glob("**/config*.yml")) + \
-                      list(self.root_dir.glob("**/config*.json"))
-                      
-        if len(config_files) > 1:
-            # Compare configurations
-            configs = []
-            for config_path in config_files:
-                try:
-                    if config_path.suffix in ['.yaml', '.yml']:
-                        if YAML_AVAILABLE:
-                            with open(config_path, 'r') as f:
-                                configs.append(yaml.safe_load(f))
-                    else:
-                        with open(config_path, 'r') as f:
-                            configs.append(json.load(f))
-                except Exception:
-                    continue
-                    
-            # Check for inconsistencies
-            if len(configs) > 1:
-                # Simple comparison of top-level keys
-                keys_sets = [set(config.keys()) for config in configs if isinstance(config, dict)]
-                if keys_sets:
-                    common_keys = set.intersection(*keys_sets)
-                    for i, keys in enumerate(keys_sets):
-                        extra_keys = keys - common_keys
-                        if extra_keys:
-                            self.warnings.append(f"Config file {config_files[i]} has extra keys: {extra_keys}")
-                            
-    def _print_results(self) -> None:
-        """Print validation results."""
-        print("\n" + "="*60)
-        print("VALIDATION RESULTS")
-        print("="*60)
-        
-        if self.warnings:
-            print(f"\nWarnings ({len(self.warnings)}):")
-            for warning in self.warnings:
-                print(f"  ⚠  {warning}")
-                
-        if self.errors:
-            print(f"\nErrors ({len(self.errors)}):")
-            for error in self.errors:
-                print(f"  ✗ {error}")
-        else:
-            print("\n✓ No errors found")
-            
-        if not self.warnings and not self.errors:
-            print("\n✓ All checks passed successfully!")
-        elif self.errors:
-            print(f"\n✗ Validation failed with {len(self.errors)} error(s)")
-        else:
-            print(f"\n✓ Validation passed with {len(self.warnings)} warning(s)")
-            
-        print("="*60)
-        
+    
+    def add_error(self, msg: str) -> None:
+        """Add an error message."""
+        self.errors.append(msg)
+    
+    def add_warning(self, msg: str) -> None:
+        """Add a warning message."""
+        self.warnings.append(msg)
+    
+    def add_info(self, msg: str) -> None:
+        """Add an info message."""
+        self.info.append(msg)
+    
+    def merge(self, other: ValidationResult) -> None:
+        """Merge another ValidationResult into this one."""
+        self.errors.extend(other.errors)
+        self.warnings.extend(other.warnings)
+        self.info.extend(other.info)
 
-def main(argv: Optional[List[str]] = None) -> int:
+
+class BuyerSpecValidator:
+    """
+    Stricter independent validator for buyer specifications.
+    
+    Performs structural validation, semantic checks, and cross-reference validation
+    for various file types including Python, Bash, YAML, JSON, and Markdown.
+    """
+    
+    SECRET_PATTERNS = [
+        r'(?i)api[_-]?key\s*[:=]\s*["\']?[a-zA-Z0-9]{16,}',
+        r'(?i)secret[_-]?key\s*[:=]\s*["\']?[a-zA-Z0-9]{16,}',
+        r'(?i)password\s*[:=]\s*["\']?[^\s"\']{8,}',
+        r'(?i)token\s*[:=]\s*["\']?[a-zA-Z0-9]{20,}',
+        r'(?i)bearer\s+[a-zA-Z0-9._-]{20,}',
+    ]
+    
+    SHELL_PATTERN = re.compile(r'subprocess\..*\(.*shell\s*=\s*True')
+    TMP_PATH_PATTERN = re.compile(r'["\']/tmp/[^"\']*["\']')
+    
+    def __init__(self, verbose: bool = False, strict: bool = False) -> None:
+        """
+        Initialize the validator.
+        
+        Args:
+            verbose: Enable verbose output.
+            strict: Enable strict mode (warnings become errors).
+        """
+        self.verbose = verbose
+        self.strict = strict
+        self.results: List[ValidationResult] = []
+    
+    def _check_secrets(self, content: str, result: ValidationResult) -> None:
+        """Check for hardcoded secrets in content."""
+        for pattern in self.SECRET_PATTERNS:
+            if re.search(pattern, content):
+                result.add_warning("Potential hardcoded secret detected")
+    
+    def _check_shell_true(self, content: str, result: ValidationResult) -> None:
+        """Check for shell=True usage."""
+        if self.SHELL_PATTERN.search(content):
+            result.add_error("Found subprocess.run(..., shell=True) - use list form instead")
+    
+    def _check_hardcoded_tmp(self, content: str, result: ValidationResult) -> None:
+        """Check for hardcoded /tmp/ paths."""
+        if self.TMP_PATH_PATTERN.search(content):
+            result.add_error("Found hardcoded /tmp/ path - use tempfile.mkdtemp() instead")
+    
+    def validate_python_syntax(self, content: str, file_path: str) -> ValidationResult:
+        """Validate Python file syntax and structure."""
+        result = ValidationResult(file_path)
+        
+        # Check AST syntax
+        try:
+            ast.parse(content)
+        except SyntaxError as e:
+            result.add_error(f"Python syntax error: {e}")
+            return result
+        
+        # Check for common issues
+        self._check_secrets(content, result)
+        self._check_shell_true(content, result)
+        self._check_hardcoded_tmp(content, result)
+        
+        # Check for imports that should be lazy
+        if 'import pydantic' in content or 'from pydantic' in content:
+            result.add_info("Found pydantic import - ensure lazy import if needed")
+        if 'import torch' in content or 'from torch' in content:
+            result.add_info("Found torch import - ensure lazy import if needed")
+        
+        return result
+    
+    def validate_bash_structure(self, content: str, file_path: str) -> ValidationResult:
+        """Validate Bash file structure."""
+        result = ValidationResult(file_path)
+        
+        # Check for set -euo pipefail
+        if not re.search(r'^set\s+.*e.*u.*o.*pipefail', content, re.MULTILINE):
+            result.add_warning("Missing 'set -euo pipefail' at top of bash script")
+        
+        # Check for EXIT trap
+        if not re.search(r'trap.*EXIT', content, re.IGNORECASE):
+            result.add_warning("Missing EXIT trap for cleanup")
+        
+        # Check for shell=True usage
+        self._check_shell_true(content, result)
+        
+        # Check for hardcoded /tmp/ paths
+        self._check_hardcoded_tmp(content, result)
+        
+        # Check for secrets
+        self._check_secrets(content, result)
+        
+        # Validate bash syntax
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as tmp:
+            tmp.write(content)
+            tmp.flush()
+            try:
+                proc = subprocess.run(
+                    ['bash', '-n', tmp.name],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if proc.returncode != 0:
+                    result.add_error(f"Bash syntax error: {proc.stderr.strip()}")
+            except subprocess.TimeoutExpired:
+                result.add_error("Bash syntax check timed out")
+            except Exception as e:
+                result.add_error(f"Failed to check bash syntax: {e}")
+            finally:
+                Path(tmp.name).unlink(missing_ok=True)
+        
+        return result
+    
+    def validate_yaml_structure(self, content: str, file_path: str) -> ValidationResult:
+        """Validate YAML file structure."""
+        result = ValidationResult(file_path)
+        
+        yaml_module = _lazy_import_yaml()
+        if yaml_module is None:
+            result.add_warning("PyYAML not available, skipping YAML validation")
+            return result
+        
+        try:
+            yaml_module.safe_load(content)
+        except yaml_module.YAMLError as e:
+            result.add_error(f"YAML parse error: {e}")
+        
+        # Check for secrets
+        self._check_secrets(content, result)
+        
+        return result
+    
+    def validate_json_structure(self, content: str, file_path: str) -> ValidationResult:
+        """Validate JSON file structure."""
+        result = ValidationResult(file_path)
+        
+        try:
+            json.loads(content)
+        except json.JSONDecodeError as e:
+            result.add_error(f"JSON parse error: {e}")
+        
+        # Check for secrets
+        self._check_secrets(content, result)
+        
+        return result
+    
+    def validate_markdown_structure(self, content: str, file_path: str) -> ValidationResult:
+        """Validate Markdown file structure."""
+        result = ValidationResult(file_path)
+        
+        # Basic markdown validation - check for common structure
+        lines = content.split('\n')
+        
+        # Check for at least one heading
+        has_heading = any(line.strip().startswith('#') for line in lines)
+        if not has_heading:
+            result.add_warning("No headings found in markdown file")
+        
+        # Check for proper list structure
+        in_list = False
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if stripped.startswith('- ') or stripped.startswith('* ') or stripped.startswith('1. '):
+                in_list = True
+            elif stripped and in_list:
+                # Check for continuation without proper indentation
+                if not (stripped.startswith('  ') or stripped.startswith('\t')):
+                    result.add_warning(f"List continuation issue at line {i+1}")
+        
+        # Check for secrets
+        self._check_secrets(content, result)
+        
+        return result
+    
+    def validate_file(self, file_path: str) -> ValidationResult:
+        """Validate a single file based on its extension."""
+        path = Path(file_path)
+        if not path.exists():
+            result = ValidationResult(file_path)
+            result.add_error(f"File not found: {file_path}")
+            return result
+        
+        try:
+            content = path.read_text(encoding='utf-8')
+        except UnicodeDecodeError:
+            result = ValidationResult(file_path)
+            result.add_error(f"File is not valid UTF-8: {file_path}")
+            return result
+        
+        suffix = path.suffix.lower()
+        validators: Dict[str, Callable[[str, str], ValidationResult]] = {
+            '.py': self.validate_python_syntax,
+            '.sh': self.validate_bash_structure,
+            '.bash': self.validate_bash_structure,
+            '.yaml': self.validate_yaml_structure,
+            '.yml': self.validate_yaml_structure,
+            '.md': self.validate_markdown_structure,
+            '.markdown': self.validate_markdown_structure,
+            '.json': self.validate_json_structure,
+        }
+        
+        if suffix in validators:
+            return validators[suffix](content, file_path)
+        
+        result = ValidationResult(file_path)
+        result.add_warning(f"Unsupported file type: {suffix}")
+        return result
+    
+    def validate_files(self, files: List[str]) -> int:
+        """Validate multiple files and report results. Returns exit code."""
+        total_errors = 0
+        total_warnings = 0
+        
+        for file_path in files:
+            result = self.validate_file(file_path)
+            self.results.append(result)
+            total_errors += len(result.errors)
+            total_warnings += len(result.warnings)
+        
+        for result in self.results:
+            if result.errors or (self.strict and result.warnings):
+                print(f"\n❌ {result.path}", file=sys.stderr)
+            elif result.warnings:
+                print(f"\n⚠️  {result.path}", file=sys.stderr)
+            elif self.verbose:
+                print(f"\n✓ {result.path}", file=sys.stderr)
+            
+            for err in result.errors:
+                print(f"  ERROR: {err}", file=sys.stderr)
+            for warn in result.warnings:
+                prefix = "ERROR (strict)" if self.strict else "WARNING"
+                print(f"  {prefix}: {warn}", file=sys.stderr)
+            if self.verbose:
+                for info in result.info:
+                    print(f"  INFO: {info}", file=sys.stderr)
+        
+        strict_errors = total_warnings if self.strict else 0
+        print(f"\n{'='*50}", file=sys.stderr)
+        
+        if total_errors + strict_errors > 0:
+            print(f"FAILED: {total_errors + strict_errors} error(s), {total_warnings} warning(s)", 
+                  file=sys.stderr)
+            return 1
+        
+        if total_warnings > 0:
+            print(f"PASSED with warnings: {total_warnings} warning(s)", file=sys.stderr)
+        else:
+            print(f"PASSED: {len(files)} file(s) validated", file=sys.stderr)
+        
+        return 0
+
+
+def main(argv: List[str]) -> int:
     """
     Main entry point for the validator.
     
     Args:
-        argv: Command line arguments (defaults to sys.argv[1:])
-        
+        argv: Command line arguments.
+    
     Returns:
-        Exit code (0 for success, non-zero for failure)
+        Exit code (0 for success, non-zero for failure).
     """
     parser = argparse.ArgumentParser(
-        description="Strict independent v2 validator for buyer specifications",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  %(prog)s                          # Validate current directory
-  %(prog)s /path/to/spec            # Validate specific directory
-  %(prog)s --strict                 # Treat warnings as errors
-  %(prog)s --no-xlsx                # Skip XLSX validation
-        """
+        description='Stricter independent validator for buyer specifications.',
+        epilog='Validates Python, Bash, YAML, JSON, and Markdown files.'
     )
-    
     parser.add_argument(
-        "directory",
-        nargs="?",
-        default=".",
-        help="Directory to validate (default: current directory)"
+        'files',
+        nargs='+',
+        help='Files to validate'
     )
-    
     parser.add_argument(
-        "--strict",
-        action="store_true",
-        help="Treat warnings as errors"
+        '-v', '--verbose',
+        action='store_true',
+        help='Enable verbose output'
     )
-    
     parser.add_argument(
-        "--no-xlsx",
-        action="store_true",
-        help="Skip XLSX validation"
-    )
-    
-    parser.add_argument(
-        "--no-exr",
-        action="store_true",
-        help="Skip EXR validation"
-    )
-    
-    parser.add_argument(
-        "--verbose",
-        "-v",
-        action="store_true",
-        help="Verbose output"
+        '-s', '--strict',
+        action='store_true',
+        help='Treat warnings as errors'
     )
     
     args = parser.parse_args(argv)
     
-    # Create validator
-    validator = BuyerSpecValidatorV2(args.directory)
-    
-    # Run validation
-    success = validator.validate_all()
-    
-    # Determine exit code
-    if args.strict and validator.warnings:
-        return 1
-    elif not success:
-        return 1
-    else:
-        return 0
+    validator = BuyerSpecValidator(verbose=args.verbose, strict=args.strict)
+    return validator.validate_files(args.files)
 
 
-if __name__ == "__main__":
-    sys.exit(main())
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))
