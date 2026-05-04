@@ -9,6 +9,9 @@ score falls below a configurable threshold are flagged as "monotone".
 Usage:
     python bin/scene_diversity_scorer.py video.mp4 [--threshold 0.35]
     python bin/scene_diversity_scorer.py --frames-dir /path/to/frames/
+
+Output:
+    JSON to stdout with keys: score, flagged, frame_count, threshold
 """
 
 from __future__ import annotations
@@ -106,155 +109,158 @@ def compute_frame_histograms(frame_paths: List[str], bins: int = 32) -> "numpy.n
     """
     np = _get_numpy()
     histograms = []
-    for path in frame_paths:
+    for fp in frame_paths:
         try:
-            histograms.append(compute_histogram(path, bins))
-        except Exception as exc:
-            print(f"  Skipping frame {path}: {exc}", file=sys.stderr)
+            hist = compute_histogram(fp, bins=bins)
+            histograms.append(hist)
+        except Exception as e:
+            print(f"Warning: failed to process {fp}: {e}", file=sys.stderr)
     if not histograms:
         raise ValueError("No valid frames could be processed")
-    return np.array(histograms)
+    return np.stack(histograms, axis=0)
 
 
 def compute_diversity_score(histograms: "numpy.ndarray") -> float:
     """Compute scene diversity score from frame histograms.
 
-    Uses pairwise chi-square distances to measure visual variety.
+    Uses pairwise histogram distances to measure visual diversity.
+    Higher scores indicate more diverse scenes.
 
     Args:
         histograms: Array of shape (num_frames, hist_dim).
 
     Returns:
-        Diversity score in [0, 1], where 1 = maximum diversity.
+        Diversity score in [0, 1].
     """
     np = _get_numpy()
-    n_frames = len(histograms)
-    if n_frames < 2:
+    if histograms.shape[0] < 2:
         return 0.0
+    # Compute pairwise chi-square distances
+    n = histograms.shape[0]
     distances = []
-    for i in range(n_frames):
-        for j in range(i + 1, n_frames):
-            diff = histograms[i] - histograms[j]
-            denom = histograms[i] + histograms[j] + 1e-10
-            chi_sq = np.sum((diff ** 2) / denom)
-            distances.append(chi_sq)
+    for i in range(n):
+        for j in range(i + 1, n):
+            d = np.sum((histograms[i] - histograms[j]) ** 2 /
+                       (histograms[i] + histograms[j] + 1e-10))
+            distances.append(d)
     mean_dist = np.mean(distances) if distances else 0.0
-    return float(min(mean_dist / 1.0, 1.0))
+    # Normalize to [0, 1] range (empirical scaling)
+    score = min(1.0, mean_dist / 2.0)
+    return float(score)
 
 
 def analyze_video(video_path: str, threshold: float = 0.35,
-                   max_frames: int = 30, bins: int = 32) -> Tuple[float, bool, dict]:
-    """Analyze a video file for scene diversity.
+                  max_frames: int = 30, bins: int = 32) -> dict:
+    """Analyze video for scene diversity.
 
     Args:
         video_path: Path to video file.
-        threshold: Diversity threshold for flagging.
+        threshold: Diversity threshold for flagging monotone clips.
         max_frames: Maximum frames to sample.
         bins: Histogram bins per channel.
 
     Returns:
-        Tuple of (diversity_score, is_monotone, metadata_dict).
+        Dict with score, flagged, frame_count, threshold.
     """
-    frame_dir = tempfile.mkdtemp(prefix="scene_diversity_frames_")
+    output_dir = tempfile.mkdtemp(prefix="scene_div_")
     try:
-        frame_paths = extract_frames(video_path, max_frames, frame_dir)
+        frame_paths = extract_frames(video_path, max_frames=max_frames,
+                                     output_dir=output_dir)
         if not frame_paths:
-            return 0.0, True, {"error": "No frames extracted"}
-        histograms = compute_frame_histograms(frame_paths, bins)
+            return {"score": 0.0, "flagged": True, "frame_count": 0,
+                    "threshold": threshold, "error": "No frames extracted"}
+        histograms = compute_frame_histograms(frame_paths, bins=bins)
         score = compute_diversity_score(histograms)
-        is_monotone = score < threshold
-        metadata = {
-            "video_path": video_path, "num_frames": len(frame_paths),
-            "diversity_score": round(score, 4), "threshold": threshold,
-            "is_monotone": is_monotone,
+        return {
+            "score": round(score, 4),
+            "flagged": score < threshold,
+            "frame_count": len(frame_paths),
+            "threshold": threshold
         }
-        return score, is_monotone, metadata
     finally:
-        for f in Path(frame_dir).glob("*"):
+        # Cleanup extracted frames
+        for f in Path(output_dir).glob("frame_*.jpg"):
             try:
                 f.unlink()
-            except OSError:
+            except Exception:
                 pass
         try:
-            Path(frame_dir).rmdir()
-        except OSError:
+            os.rmdir(output_dir)
+        except Exception:
             pass
 
 
 def analyze_frames_dir(frames_dir: str, threshold: float = 0.35,
-                       bins: int = 32) -> Tuple[float, bool, dict]:
-    """Analyze a directory of pre-extracted frames.
+                       bins: int = 32) -> dict:
+    """Analyze pre-extracted frames directory for scene diversity.
 
     Args:
-        frames_dir: Path to directory with frame images.
-        threshold: Diversity threshold for flagging.
+        frames_dir: Path to directory containing frame images.
+        threshold: Diversity threshold for flagging monotone clips.
         bins: Histogram bins per channel.
 
     Returns:
-        Tuple of (diversity_score, is_monotone, metadata_dict).
+        Dict with score, flagged, frame_count, threshold.
     """
-    frame_paths = sorted(
-        str(f) for f in Path(frames_dir).glob("*")
+    frame_paths = sorted([
+        str(f) for f in Path(frames_dir).iterdir()
         if f.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp"}
-    )
+    ])
     if not frame_paths:
-        return 0.0, True, {"error": "No frames found in directory"}
-    histograms = compute_frame_histograms(frame_paths, bins)
+        return {"score": 0.0, "flagged": True, "frame_count": 0,
+                "threshold": threshold, "error": "No frames found"}
+    histograms = compute_frame_histograms(frame_paths, bins=bins)
     score = compute_diversity_score(histograms)
-    is_monotone = score < threshold
-    metadata = {
-        "frames_dir": frames_dir, "num_frames": len(frame_paths),
-        "diversity_score": round(score, 4), "threshold": threshold,
-        "is_monotone": is_monotone,
+    return {
+        "score": round(score, 4),
+        "flagged": score < threshold,
+        "frame_count": len(frame_paths),
+        "threshold": threshold
     }
-    return score, is_monotone, metadata
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    """Main entry point for CLI.
+    """Main entry point with argparse CLI.
 
     Args:
         argv: Command-line arguments (defaults to sys.argv[1:]).
 
     Returns:
-        Exit code: 0 for success, 1 for flagged monotone clip, 2 for errors.
+        Exit code (0 for success, non-zero for errors).
     """
     parser = argparse.ArgumentParser(
-        description="Compute Habitat-style scene diversity metric for video clips."
+        description="Compute scene diversity score for video clips."
     )
-    parser.add_argument("input", nargs="?", help="Input video file path")
+    parser.add_argument("video", nargs="?", help="Path to video file")
     parser.add_argument("--frames-dir", help="Directory with pre-extracted frames")
-    parser.add_argument("--threshold", "-t", type=float, default=0.35,
+    parser.add_argument("--threshold", type=float, default=0.35,
                         help="Diversity threshold for flagging (default: 0.35)")
     parser.add_argument("--max-frames", type=int, default=30,
-                        help="Max frames to sample (default: 30)")
+                        help="Max frames to sample from video (default: 30)")
     parser.add_argument("--bins", type=int, default=32,
                         help="Histogram bins per channel (default: 32)")
-    parser.add_argument("--json", action="store_true", help="Output as JSON")
+    parser.add_argument("--output", "-o", help="Output JSON file (default: stdout)")
     args = parser.parse_args(argv)
 
-    if not args.input and not args.frames_dir:
-        parser.error("Either INPUT or --frames-dir must be specified")
+    if not args.video and not args.frames_dir:
+        parser.error("Either video path or --frames-dir is required")
 
     try:
         if args.frames_dir:
-            score, is_monotone, metadata = analyze_frames_dir(
-                args.frames_dir, args.threshold, args.bins)
+            result = analyze_frames_dir(args.frames_dir, threshold=args.threshold,
+                                        bins=args.bins)
         else:
-            score, is_monotone, metadata = analyze_video(
-                args.input, args.threshold, args.max_frames, args.bins)
-
-        if args.json:
-            print(json.dumps(metadata, indent=2))
+            result = analyze_video(args.video, threshold=args.threshold,
+                                   max_frames=args.max_frames, bins=args.bins)
+        output_json = json.dumps(result, indent=2)
+        if args.output:
+            Path(args.output).write_text(output_json)
         else:
-            status = "MONOTONE (flagged)" if is_monotone else "DIVERSE (ok)"
-            print(f"Scene diversity score: {score:.4f}")
-            print(f"Threshold: {args.threshold}")
-            print(f"Status: {status}")
-        return 1 if is_monotone else 0
-    except Exception as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        return 2
+            print(output_json)
+        return 0 if not result.get("error") else 1
+    except Exception as e:
+        print(json.dumps({"error": str(e)}), file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":
