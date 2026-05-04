@@ -33,7 +33,10 @@ class TestDepthAnythingV2:
 
         try:
             # This should not raise an ImportError
-            from depth_anything_v2 import infer_depth, is_available
+            from depth_anything_v2 import (  # noqa: F401 — availability check only
+                infer_depth,
+                is_available,
+            )
             # Module imported successfully
             assert True
         except ImportError as e:

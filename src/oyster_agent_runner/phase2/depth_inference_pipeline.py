@@ -22,15 +22,15 @@ from pathlib import Path
 def extract_frames(video_path: str, output_dir: str, fps: float = 6.0) -> list[str]:
     """
     Extract frames from a video file using ffmpeg.
-    
+
     Args:
         video_path: Path to the input video file
         output_dir: Directory where extracted frames will be saved
         fps: Frames per second to extract (default: 6.0)
-        
+
     Returns:
         List of paths to extracted PNG frames
-        
+
     Raises:
         FileNotFoundError: If video_path doesn't exist
         RuntimeError: If ffmpeg fails or is not installed
@@ -83,18 +83,18 @@ def infer_depth_batch(
 ) -> int:
     """
     Run depth inference on a batch of RGB images using Depth-Anything-V2-Small.
-    
+
     Args:
         rgb_paths: List of paths to RGB images
         output_dir: Directory where depth EXR files will be saved
         near_m: Near clipping plane in meters (default: 0.5)
         far_m: Far clipping plane in meters (default: 30.0)
-        
+
     Returns:
         Number of EXR files successfully written
-        
+
     Raises:
-        RuntimeError: If required dependencies (torch, transformers, OpenEXR) 
+        RuntimeError: If required dependencies (torch, transformers, OpenEXR)
                      are not installed
     """
     # Lazy import dependencies
@@ -217,15 +217,15 @@ def infer_depth_batch(
 def video_to_depth_exrs(video_path: str, output_dir: str, fps: float = 6.0) -> int:
     """
     Complete pipeline: extract frames from video and infer depth maps.
-    
+
     Args:
         video_path: Path to the input video file
         output_dir: Directory where depth EXR files will be saved
         fps: Frames per second to extract (default: 6.0)
-        
+
     Returns:
         Number of EXR files successfully written
-        
+
     Note:
         Creates temporary directory for intermediate PNGs and cleans it up.
     """

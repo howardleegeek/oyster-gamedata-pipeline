@@ -37,7 +37,8 @@ class OBSSpectatorCapture:
 
     def _auth_hash(self, challenge: str, salt: str) -> str:
         """Generate auth hash: base64(SHA256(base64(SHA256(password + salt)) + challenge))"""
-        if not self.password: return ""
+        if not self.password:
+            return ""
         secret = hashlib.sha256((self.password + salt).encode()).digest()
         secret_b64 = base64.b64encode(secret).decode()
         auth = hashlib.sha256((secret_b64 + challenge).encode()).digest()
@@ -58,7 +59,8 @@ class OBSSpectatorCapture:
 
     async def authenticate(self, challenge: str, salt: str) -> dict[str, Any]:
         """Authenticate with OBS WebSocket server."""
-        if not self.connected: raise ConnectionError("Not connected")
+        if not self.connected:
+            raise ConnectionError("Not connected")
 
         auth = self._auth_hash(challenge, salt)
         msg = {"op": self.OP_IDENTIFY, "d": {"rpcVersion": 1}}
@@ -72,12 +74,14 @@ class OBSSpectatorCapture:
 
     async def _send_request(self, req_type: str, data: dict | None = None) -> dict[str, Any]:
         """Send request and wait for response."""
-        if not self.connected: raise ConnectionError("Not connected")
+        if not self.connected:
+            raise ConnectionError("Not connected")
 
         self.request_id += 1
         req_id = f"req_{self.request_id}"
         msg = {"op": self.OP_REQUEST, "d": {"requestType": req_type, "requestId": req_id}}
-        if data: msg["d"]["requestData"] = data
+        if data:
+            msg["d"]["requestData"] = data
 
         future = asyncio.get_event_loop().create_future()
         self.pending[req_id] = future
@@ -136,7 +140,8 @@ class OBSSpectatorCapture:
         """Gracefully disconnect from OBS WebSocket."""
         if self.websocket:
             for fut in self.pending.values():
-                if not fut.done(): fut.cancel()
+                if not fut.done():
+                    fut.cancel()
             self.pending.clear()
             await self.websocket.close()
             self.websocket, self.connected = None, False

@@ -3,13 +3,17 @@
 EXR Validator - Scan for NaN clusters and shape mismatch.
 Blue team defense for G094 post-write validation.
 """
+from __future__ import annotations
 
 import argparse
 import json
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import numpy  # noqa: F401 — type-only; runtime via lazy _imports()
 
 # Lazy imports
 OpenEXR = Imath = None

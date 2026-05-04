@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Tests for spectator_follow.py"""
 
+import signal
 import struct
 from unittest.mock import Mock, call, patch
 
