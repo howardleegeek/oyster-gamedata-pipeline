@@ -332,21 +332,40 @@ def collect_artifact(gap: dict) -> Path | None:
     return target_path
 
 
-def verify_syntax(path: Path) -> bool:
-    """AST / bash -n / yaml.safe_load based on extension."""
+def verify_syntax(path: Path, gap: dict | None = None) -> bool:
+    """AST / bash -n / yaml.safe_load based on extension.
+
+    Plus truncation guard (added 2026-05-04): cluster sometimes writes a
+    5-line stub of a 200-line spec (rc6 disaster). For .py / .sh files we
+    require >= max(40, lines_estimate * 0.4) lines so a truncation can't
+    sneak past pure ast.parse.
+    """
     suffix = path.suffix
     try:
+        text = path.read_text()
         if suffix == ".py":
             import ast
-            ast.parse(path.read_text())
+            ast.parse(text)
         elif suffix == ".sh" or suffix == ".bash":
             run(["bash", "-n", str(path)])
         elif suffix in {".yml", ".yaml"}:
             import yaml
-            yaml.safe_load(path.read_text())
+            yaml.safe_load(text)
         elif suffix == ".md":
-            txt = path.read_text()
-            if len(txt) < 100:  # too small to be a real doc
+            if len(text) < 100:  # too small to be a real doc
+                return False
+
+        # Truncation guard: code files (.py / .sh / .bash) must hit a sane
+        # line floor relative to the spec's lines_estimate.
+        if suffix in {".py", ".sh", ".bash"}:
+            n_lines = len(text.splitlines())
+            estimate = (gap or {}).get("lines_estimate", 0) or 0
+            floor = max(40, int(estimate * 0.4))  # 40 LOC absolute, or 40% of estimate
+            if n_lines < floor:
+                log.error(
+                    f"  truncation guard tripped: {path} has {n_lines} LOC, "
+                    f"floor={floor} (estimate={estimate})"
+                )
                 return False
         return True
     except Exception as e:
@@ -470,9 +489,9 @@ def harness_loop(once: bool = False, dry_run: bool = False) -> int:
                     g["fail_reason"] = "artifact missing/too small"
                     g["retries"] = g.get("retries", 0) + 1
                     continue
-                if not verify_syntax(art):
+                if not verify_syntax(art, gap=g):
                     g["status"] = "failed"
-                    g["fail_reason"] = "syntax check failed"
+                    g["fail_reason"] = "syntax check failed (or truncation)"
                     g["retries"] = g.get("retries", 0) + 1
                     continue
                 if commit_and_push(g, art):
