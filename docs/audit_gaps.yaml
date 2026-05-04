@@ -325,9 +325,10 @@ gaps:
   title: bin/edge_test_zero_records.py
   purpose: 'Boundary test: action_camera.json with empty records list — adapter must
     fail-closed not crash'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 80
+  dispatched_at: '2026-05-04 03:55:22'
 - id: G040
   title: bin/edge_test_negative_timestamps.py
   purpose: 'Boundary test: timestamp 1970-01-01 negative epoch — schema must reject
@@ -375,9 +376,10 @@ gaps:
 - id: G046
   title: bin/edge_test_empty_strings.py
   purpose: 'Boundary test: empty string for required string field (route_type) — fail-closed'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 80
+  dispatched_at: '2026-05-04 04:05:39'
 - id: G047
   title: bin/edge_test_max_int_values.py
   purpose: 'Boundary test: int64 max for frame_id — confirm no overflow in adapter
@@ -863,10 +865,11 @@ gaps:
   title: src/oyster_agent_runner/defense_exr_validate.py
   purpose: 'Blue team for G094: post-write EXR validator scanning for NaN clusters
     and shape mismatch'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 120
   dispatched_at: '2026-05-04 03:34:17'
+  completed_at: '2026-05-04 03:48:30'
 - id: G110
   title: src/oyster_agent_runner/defense_systeminfo_required.py
   purpose: 'Blue team for G095: systeminfo schema with REQUIRED_KEYS list and pydantic-lite
@@ -895,10 +898,11 @@ gaps:
   title: src/oyster_agent_runner/defense_monotonic_clock.py
   purpose: 'Blue team for G098: prefer time.monotonic_ns inside capture loop, wall
     clock only for stamp'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 100
   dispatched_at: '2026-05-04 03:35:23'
+  completed_at: '2026-05-04 03:48:32'
 - id: G114
   title: bin/autoresearch_lint_perf.py
   purpose: 'Autoresearch: benchmark lint_buyer_spec on 100-tarball corpus — surface
@@ -995,9 +999,10 @@ gaps:
 - id: G127
   title: bin/idempotency_token.py
   purpose: 'Production: per-clip uuid with at-least-once dedup on backend ingest path'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 100
+  dispatched_at: '2026-05-04 03:50:25'
 - id: G128
   title: bin/circuit_breaker.py
   purpose: 'Production: trip after N consecutive S3 failures — halt uploads and alert'
@@ -1015,18 +1020,20 @@ gaps:
   title: bin/graceful_shutdown.py
   purpose: 'Production: SIGTERM handler flushes in-flight writes + closes tarball
     before exit'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 100
   dispatched_at: '2026-05-04 03:40:12'
+  completed_at: '2026-05-04 03:48:33'
 - id: G131
   title: bin/recovery_orchestrator.py
   purpose: 'Production: on startup, scan staging dir for half-baked tarballs and either
     resume or quarantine'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 140
   dispatched_at: '2026-05-04 03:42:54'
+  completed_at: '2026-05-04 03:48:35'
 - id: G132
   title: bin/secret_rotator.py
   purpose: 'Production: 90-day automatic S3 key rotation with overlap window — zero-downtime'
@@ -1058,10 +1065,11 @@ gaps:
   title: bin/onboarding_smoke_test.py
   purpose: 'Customer: post-install verify — captures 10s clip and lints, reports go
     / no-go'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 130
   dispatched_at: '2026-05-04 03:47:57'
+  completed_at: '2026-05-04 03:48:37'
 - id: G137
   title: bin/uninstall_clean.py
   purpose: 'Customer: remove all installed files and config — leaves zero trace including
@@ -1079,4 +1087,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-04T10:47:57Z'
+  last_heartbeat: '2026-05-04T11:05:39Z'
