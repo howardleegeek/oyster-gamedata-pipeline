@@ -43,6 +43,7 @@ test = [
     "pytest-asyncio>=0.23",
     "numpy>=1.26",
     "openpyxl>=3.1",
+    "Pillow>=10.0",  # PIL — required by tests/bin/test_real_depth_filler.py
 ]
 exr = ["OpenEXR>=3.0", "numpy>=1.26"]
 xlsx = ["openpyxl>=3.1"]
