@@ -10,6 +10,8 @@
 | # | Item | Status | Owner | Est |
 |---|---|---|---|---|
 | T1.1 | Attach `gamedata-recorder.exe` (27 MB) to v0.1.0-rc9 release | ✅ **DONE** | Claude | — |
+| T1.1.1 | Found bare-exe fails 0xC0000135 (DLL not found); ARM64 DLL contamination 0xC000007B; replaced with 45 MB x64 CI-built `gamedata-recorder-windows-x86_64.zip` | ✅ **DONE** | Claude | 30 min |
+| T1.1.2 | Verified bundle initializes on minipc (Win 11 + AMD Ryzen + Radeon 780M); OBS 32.0.4 loaded; audio + GPU detected; exits at `tray_icon.rs:69` only because SSH lacks interactive desktop session — by-design | ✅ **DONE** | Claude | 20 min |
 | T1.2 | Fix CI submodule clone (private oyster-enrichment 404'd) | ✅ **DONE** | Claude | — |
 | T1.3 | Fix CI ruff/black not-found (cache contamination) | ✅ **DONE** (cache key v2) | Claude | — |
 | T1.4 | This punch list doc | ✅ **DONE** | Claude | — |
