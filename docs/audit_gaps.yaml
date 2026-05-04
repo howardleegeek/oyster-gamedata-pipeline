@@ -1344,9 +1344,10 @@ gaps:
   title: bin/inventory_voxel_capture.py
   purpose: 'Cluster C: per-frame inventory + 3x3x3 voxel-window block-IDs around player
     (MineDojo / MineWorld multimodal observation)'
-  status: pending
+  status: dispatched
   priority: P2
   lines_estimate: 230
+  dispatched_at: '2026-05-04 10:43:11'
 - id: G155
   title: bin/parquet_manifest_writer.py
   purpose: 'Cluster D: gameinfo.parquet + action_camera.parquet shards keyed by (clip_id,
@@ -1369,33 +1370,37 @@ gaps:
   title: bin/lerobot_export.py
   purpose: 'Cluster D: convert tarball to LeRobot HuggingFace format — HF-hub distribution
     path for robotics buyers'
-  status: pending
+  status: dispatched
   priority: P2
   lines_estimate: 110
+  dispatched_at: '2026-05-04 10:45:53'
 - id: G158
   title: bin/hdf5_episode_pack.py
   purpose: 'Cluster D: optional episode.h5 packing all action / depth / seg / imu
     in one file (BEHAVIOR-1K / OmniGibson pattern)'
-  status: dispatched
+  status: completed
   priority: P3
   lines_estimate: 180
   dispatched_at: '2026-05-04 10:41:40'
+  completed_at: '2026-05-04 10:42:15'
 - id: G159
   title: bin/aesthetic_scorer.py
   purpose: 'Cluster E: per-clip aesthetic / motion / OCR-overlay / camera-jitter scores
     (Open-Sora 2.0 filter stack) — buyer reweighting / curation'
-  status: dispatched
+  status: completed
   priority: P2
   lines_estimate: 320
   dispatched_at: '2026-05-04 10:36:32'
+  completed_at: '2026-05-04 10:42:20'
 - id: G160
   title: bin/data_diversity_dashboard.py
   purpose: 'Cluster E: per-cohort diversity dashboard (route_type / biome / time-of-day
     / action-entropy histograms) for buyer pre-purchase verification'
-  status: pending
+  status: dispatched
   priority: P2
   lines_estimate: 220
+  dispatched_at: '2026-05-04 10:46:31'
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-04T17:41:40Z'
+  last_heartbeat: '2026-05-04T17:46:31Z'
