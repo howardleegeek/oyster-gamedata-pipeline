@@ -700,10 +700,11 @@ gaps:
   title: bin/red_team_concurrent_writers.py
   purpose: 'Red team: two adapter procs write same tarball simultaneously — file lock
     prevents corruption'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 130
   dispatched_at: '2026-05-04 03:16:09'
+  completed_at: '2026-05-04 03:32:37'
 - id: G090
   title: bin/red_team_sigkill_mid_write.py
   purpose: 'Red team: SIGKILL adapter mid action_camera write — atomic temp+rename
@@ -806,10 +807,11 @@ gaps:
   title: src/oyster_agent_runner/defense_path_sanitize.py
   purpose: 'Blue team for G087: tarball path sanitizer rejecting absolute / traversal
     members'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 100
   dispatched_at: '2026-05-04 03:18:19'
+  completed_at: '2026-05-04 03:32:39'
 - id: G103
   title: src/oyster_agent_runner/defense_dedup_frames.py
   purpose: 'Blue team for G088: in-memory set tracker rejecting duplicate frame_id
@@ -861,9 +863,10 @@ gaps:
   title: src/oyster_agent_runner/defense_exr_validate.py
   purpose: 'Blue team for G094: post-write EXR validator scanning for NaN clusters
     and shape mismatch'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 120
+  dispatched_at: '2026-05-04 03:34:17'
 - id: G110
   title: src/oyster_agent_runner/defense_systeminfo_required.py
   purpose: 'Blue team for G095: systeminfo schema with REQUIRED_KEYS list and pydantic-lite
@@ -892,9 +895,10 @@ gaps:
   title: src/oyster_agent_runner/defense_monotonic_clock.py
   purpose: 'Blue team for G098: prefer time.monotonic_ns inside capture loop, wall
     clock only for stamp'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 100
+  dispatched_at: '2026-05-04 03:35:23'
 - id: G114
   title: bin/autoresearch_lint_perf.py
   purpose: 'Autoresearch: benchmark lint_buyer_spec on 100-tarball corpus — surface
@@ -983,10 +987,11 @@ gaps:
   title: bin/audit_log_writer.py
   purpose: 'Production: append-only newline-delimited JSON audit log of every capture
     / lint / upload'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 110
   dispatched_at: '2026-05-04 03:26:03'
+  completed_at: '2026-05-04 03:32:40'
 - id: G127
   title: bin/idempotency_token.py
   purpose: 'Production: per-clip uuid with at-least-once dedup on backend ingest path'
@@ -1010,16 +1015,18 @@ gaps:
   title: bin/graceful_shutdown.py
   purpose: 'Production: SIGTERM handler flushes in-flight writes + closes tarball
     before exit'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 100
+  dispatched_at: '2026-05-04 03:40:12'
 - id: G131
   title: bin/recovery_orchestrator.py
   purpose: 'Production: on startup, scan staging dir for half-baked tarballs and either
     resume or quarantine'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 140
+  dispatched_at: '2026-05-04 03:42:54'
 - id: G132
   title: bin/secret_rotator.py
   purpose: 'Production: 90-day automatic S3 key rotation with overlap window — zero-downtime'
@@ -1051,9 +1058,10 @@ gaps:
   title: bin/onboarding_smoke_test.py
   purpose: 'Customer: post-install verify — captures 10s clip and lints, reports go
     / no-go'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 130
+  dispatched_at: '2026-05-04 03:47:57'
 - id: G137
   title: bin/uninstall_clean.py
   purpose: 'Customer: remove all installed files and config — leaves zero trace including
@@ -1071,4 +1079,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-04T10:32:03Z'
+  last_heartbeat: '2026-05-04T10:47:57Z'
