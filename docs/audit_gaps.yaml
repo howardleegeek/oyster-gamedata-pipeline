@@ -485,10 +485,11 @@ gaps:
   title: bin/stress_test_burst_50_clips.py
   purpose: 'Stress test: 50 clips per minute burst — lint queue must drain without
     deadlock'
-  status: dispatched
+  status: completed
   priority: P2
   lines_estimate: 120
   dispatched_at: '2026-05-04 07:47:56'
+  completed_at: '2026-05-04 07:51:42'
 - id: G058
   title: bin/stress_test_memory_leak_check.py
   purpose: 'Stress test: 1000-iteration adapter run with tracemalloc — assert RSS
@@ -1004,10 +1005,11 @@ gaps:
   title: bin/autoresearch_compression_ratio.py
   purpose: 'Autoresearch: compare H.264 vs H.265 vs AV1 sizes on same scene — recommend
     codec'
-  status: dispatched
+  status: completed
   priority: P2
   lines_estimate: 130
   dispatched_at: '2026-05-04 07:50:53'
+  completed_at: '2026-05-04 07:51:44'
 - id: G117
   title: bin/autoresearch_depth_quality.py
   purpose: 'Autoresearch: DepthAnything V2 vs Marigold MAE on 50 ground-truth Minecraft
@@ -1206,4 +1208,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-04T14:50:53Z'
+  last_heartbeat: '2026-05-04T14:51:44Z'
