@@ -1209,31 +1209,35 @@ gaps:
   title: src/oyster_agent_runner/buyer_spec_v2_camera_intrinsics.py
   purpose: 'Cluster A: per-frame K matrix + distortion + T_world_cam SE3 pose (Ego-Exo4D
     / nuScenes / DROID standard) — without K depth EXR is uninterpretable in 3D'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 200
+  dispatched_at: '2026-05-04 09:24:18'
 - id: G140
   title: src/oyster_agent_runner/buyer_spec_v2_rlds_flags.py
   purpose: 'Cluster A: is_first / is_last / is_terminal episode-boundary flags per
     record (Open X-Embodiment / RT-X mandatory) — unlocks OXE pooling'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 130
+  dispatched_at: '2026-05-04 09:26:17'
 - id: G141
   title: src/oyster_agent_runner/buyer_spec_v2_language_instruction.py
   purpose: 'Cluster A: per-episode instruction string + optional dense narration (RT-2
     / OpenVLA / Octo / Pi-0 require it) — unlocks VLA fine-tune ecosystem'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 150
+  dispatched_at: '2026-05-04 09:27:40'
 - id: G142
   title: src/oyster_agent_runner/buyer_spec_v2_vpt_mouse.py
   purpose: 'Cluster A: extend mouse with scaledX/Y + dwheel + buttons bitmask + newButtons
     edge-triggered (OpenAI VPT / MineWorld schema) — drop-in VPT compat'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 170
   dispatched_at: '2026-05-04 09:21:03'
+  completed_at: '2026-05-04 09:21:38'
 - id: G143
   title: src/oyster_agent_runner/buyer_spec_v2_action_tokens.py
   purpose: 'Cluster A: 256-bin per-dim discretization of action vector (RT-1 / RT-2
@@ -1252,43 +1256,44 @@ gaps:
   title: bin/c2pa_signer.py
   purpose: 'Cluster B: C2PA v2.1 signed manifest with AI/ML assertion + is_synthetic
     flag — mandatory under EU AI Act Aug 2026 + CA AB 2013 Jan 2026'
-  status: skipped
+  status: dispatched
   priority: P0
   lines_estimate: 220
-  skip_reason: deprioritized per Howard 2026-05-04 (loses skip status on every spec_generator
-    re-apply; revisit when buyer relationship established)
+  dispatched_at: '2026-05-04 09:30:35'
 - id: G146
   title: src/oyster_agent_runner/hmac_machine_id.py
   purpose: 'Cluster B: HMAC-rotated machine fingerprint replacing raw MAC/disk-serial
     hash — GDPR personal-data avoidance per EDPB 2024 guidance'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 100
   dispatched_at: '2026-05-04 09:17:25'
+  completed_at: '2026-05-04 09:21:39'
 - id: G147
   title: src/oyster_agent_runner/privacy_kanon_inputs.py
   purpose: 'Cluster B: k-anonymity bucketing on mouse/key inter-event intervals to
     defeat keystroke-dynamics re-identification (~99% re-id literature)'
-  status: skipped
+  status: dispatched
   priority: P1
   lines_estimate: 110
-  skip_reason: deprioritized per Howard 2026-05-04 (loses skip status on every spec_generator
-    re-apply; revisit when buyer relationship established)
+  dispatched_at: '2026-05-04 09:35:30'
 - id: G148
   title: bin/synthetic_disclosure_metadata.py
   purpose: 'Cluster B: ensure is_synthetic + engine + engine_version + capture_date
     in every JSON / manifest / video sidecar (synthetic-content disclosure mandate)'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 80
   dispatched_at: '2026-05-04 09:18:41'
+  completed_at: '2026-05-04 09:21:41'
 - id: G149
   title: bin/imu_provider.py
   purpose: 'Cluster C: synthetic IMU 6-axis (3-accel + 3-gyro) at 240Hz physics-tick
     rate from Mineflayer state (Ego-Exo4D / VIO papers — derived velocity is lossy)'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 250
+  dispatched_at: '2026-05-04 09:38:04'
 - id: G150
   title: bin/seg_track_provider.py
   purpose: 'Cluster C: per-pixel semantic + instance segmentation at 6fps (R=class_id
@@ -1366,46 +1371,7 @@ gaps:
   status: pending
   priority: P2
   lines_estimate: 220
-- id: G161
-  title: bin/synthesize_real_depth.py
-  purpose: 'Cluster A: 1920x1080 float32 single-channel EXR depth synthesis with realistic
-    Z-buffer (distance-to-plane) — replaces 16x16 all-zeros placeholder; cap invalid-pixel
-    ratio at 0.1 percent'
-  status: pending
-  priority: P0
-  lines_estimate: 200
-- id: G162
-  title: bin/synthesize_route_diversity.py
-  purpose: 'Cluster A: route_type distribution 50 percent normal + 50 percent special/loop;
-    WASD distribution W=40 percent / A=S=D=20 percent each — replaces 100 percent
-    route_type=1 mono-distribution'
-  status: pending
-  priority: P0
-  lines_estimate: 150
-- id: G163
-  title: src/oyster_agent_runner/keycode_int_normalizer.py
-  purpose: 'Cluster A: convert list-form keyCode arrays to single int per record per
-    PRD page 11 spec (W=87 ASCII), or expand list into multiple frame records'
-  status: pending
-  priority: P0
-  lines_estimate: 80
-- id: G164
-  title: src/oyster_agent_runner/intrinsics_capital_keys.py
-  purpose: 'Cluster A: rename camera_intrinsics dict keys from lowercase fx/fy/cx/cy
-    to PRD-specified fx/fy/Cx/Cy (capital Cx Cy) per p5'
-  status: pending
-  priority: P0
-  lines_estimate: 60
-- id: G165
-  title: bin/lint_v3_prd_grounded.py
-  purpose: 'Cluster A: full PRD page-by-page lint — checks all 24 acceptance criteria
-    including audio quality / route distribution / camera_intrinsics fx==fy / quaternion
-    xyzw order / depth invalid-pixel ratio / keyCode int format / 5-6 min duration
-    / 1920x1080 strict / no UI overlay / no logo / no popup'
-  status: pending
-  priority: P0
-  lines_estimate: 350
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-04T16:21:03Z'
+  last_heartbeat: '2026-05-04T16:38:04Z'
