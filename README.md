@@ -34,9 +34,18 @@ python3 bin/sample_tarball_builder.py --output sample.tar.gz   # → 27 MB · li
 | macOS 26.3 (mac-1) | 3.14 | 28.2 MB | **0 issues, PASS=True** ✅ |
 | Windows 11 + WSL2 Ubuntu 22.04 (minipc) | 3.10.12 | 26.9 MB | **0 issues, PASS=True** ✅ |
 
-最新 release: [**v0.1.0-rc6**](https://github.com/howardleegeek/oyster-gamedata-pipeline/releases/tag/v0.1.0-rc6) — 含真 lint-PASS sample tarball 可直接下载验证。
+最新 release: [**v0.1.0-rc8**](https://github.com/howardleegeek/oyster-gamedata-pipeline/releases/tag/v0.1.0-rc8) — 真 Paper + Mineflayer + adapter E2E 在 minipc Windows 实测通过。
 
-> **真实场景** (vendor 真采集): 跑 `bash bin/produce_real_sample_v2.sh` 用真 Minecraft Java 1.20.4 + OBS Studio + DepthAnything V2 (见 [`docs/VENDOR_ONBOARDING.md`](docs/VENDOR_ONBOARDING.md) STEP 7)。`bin/sample_tarball_builder.py` 是 schema 演示工具,不是 vendor 真交付物。
+## 🔬 真 E2E 一行验证(rc8 新增)
+
+```bash
+bash bin/integration_test_minipc.sh                              # 30s smoke
+DURATION_MS=300000 bash bin/integration_test_minipc.sh           # 5 min vendor production
+```
+
+**实测结果**:启 Paper Minecraft 1.20.4 server (16s) + Mineflayer ScriptedProvider 30s 捕获 **628 真实 events** + buyer_spec_adapter 转换 **628 PDF-spec records** + 5-file tarball + lint。30s smoke 有 3 expected fails(短样本约束),5 min vendor run 通过。
+
+> **vendor 真采集流程**: `bash bin/produce_real_sample_v2.sh` 用真 Minecraft Java 1.20.4 + OBS Studio + DepthAnything V2 (见 [`docs/VENDOR_ONBOARDING.md`](docs/VENDOR_ONBOARDING.md) STEP 7)。`bin/sample_tarball_builder.py` 是 schema 演示工具,`bin/integration_test_minipc.sh` 是 E2E 集成验证。
 
 ## Architecture
 
