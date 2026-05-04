@@ -61,3 +61,8 @@ mineflayer/node_modules/
 mineflayer/npm-debug.log*
 bin/.cache/
 *.jar
+
+# Harness daemon logs (per-host, never commit)
+harness.log
+watchdog.log
+nohup.out

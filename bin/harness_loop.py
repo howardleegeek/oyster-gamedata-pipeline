@@ -87,21 +87,52 @@ log = logging.getLogger("harness")
 
 # ----------------------------------------------------------------- yaml IO
 def load_gaps() -> dict[str, Any]:
-    """Lazy import yaml (PyYAML optional)."""
+    """Robust YAML loader.
+
+    Disaster-proofing layers:
+      1. Try strict yaml.safe_load.
+      2. On YAMLError: log loudly + auto-revert via `git checkout HEAD -- docs/audit_gaps.yaml`
+         (last-good is always in git since save_gaps commits every iteration), then retry.
+      3. On second failure: return {} — the iteration becomes a no-op so the daemon stays
+         up and the watchdog can keep heartbeating instead of crash-looping.
+      4. PyYAML missing: fall back to minimal parser for bootstrap.
+    """
     try:
-        import yaml
-        return yaml.safe_load(GAPS_YAML.read_text())
+        import yaml  # noqa: PLC0415
     except ImportError:
-        # Fallback: very minimal yaml subset
         return _parse_minimal_yaml(GAPS_YAML.read_text())
+
+    try:
+        return yaml.safe_load(GAPS_YAML.read_text()) or {}
+    except yaml.YAMLError as e:
+        log.error(f"YAML poisoned in {GAPS_YAML}: {e!r} — attempting auto-revert from HEAD")
+        try:
+            run(["git", "-C", str(REPO_ROOT), "checkout", "HEAD", "--", "docs/audit_gaps.yaml"])
+            return yaml.safe_load(GAPS_YAML.read_text()) or {}
+        except Exception as e2:
+            log.error(f"Auto-revert failed: {e2!r}; returning empty state to keep daemon alive")
+            return {}
 
 
 def save_gaps(data: dict[str, Any]) -> None:
+    """Validated YAML writer.
+
+    Writes via yaml.safe_dump (guaranteed parseable), then immediately
+    re-loads to confirm — refuses to leave a corrupt file on disk.
+    """
     try:
-        import yaml
-        GAPS_YAML.write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True))
+        import yaml  # noqa: PLC0415
     except ImportError:
         log.warning("PyYAML missing; skipping write — install with `pip install pyyaml`")
+        return
+    out = yaml.safe_dump(data, sort_keys=False, allow_unicode=True)
+    GAPS_YAML.write_text(out)
+    # Round-trip check: if for any reason the result doesn't parse, restore HEAD.
+    try:
+        yaml.safe_load(out)
+    except yaml.YAMLError as e:
+        log.error(f"save_gaps produced unparseable YAML?? {e!r} — restoring from HEAD")
+        run(["git", "-C", str(REPO_ROOT), "checkout", "HEAD", "--", "docs/audit_gaps.yaml"])
 
 
 def _parse_minimal_yaml(text: str) -> dict[str, Any]:

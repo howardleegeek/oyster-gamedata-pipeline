@@ -28,18 +28,30 @@ cd "$REPO_ROOT" || { log "FATAL: cannot cd $REPO_ROOT"; exit 1; }
 # Get latest state
 git pull --quiet --rebase origin main 2>/dev/null || log "WARN git pull failed"
 
-# Check daemon
-PID=$(pgrep -f 'python3 bin/harness_loop.py' | head -1)
+# Match daemon by full script path — works regardless of how python was invoked
+# (was: 'python3 bin/harness_loop.py' which missed Python.app from /Library/Developer)
+PIDS=($(pgrep -f 'bin/harness_loop.py'))
+PID="${PIDS[0]:-}"
+NUM_DAEMONS=${#PIDS[@]}
 
 restart_daemon() {
   log "RESTARTING harness daemon ..."
-  pkill -f 'python3 bin/harness_loop.py' 2>/dev/null
+  pkill -f 'bin/harness_loop.py' 2>/dev/null
   sleep 2
   cd "$REPO_ROOT"
   nohup "$PYTHON" bin/harness_loop.py >> harness.log 2>&1 &
   NEW_PID=$!
   log "RESTARTED PID=$NEW_PID"
 }
+
+# Clean up zombie swarm: keep PID #1, kill the rest
+if [ "$NUM_DAEMONS" -gt 1 ]; then
+  log "ZOMBIE SWARM detected ($NUM_DAEMONS daemons); keeping PID=$PID, killing the rest"
+  for extra_pid in "${PIDS[@]:1}"; do
+    kill -TERM "$extra_pid" 2>/dev/null && log "  killed zombie PID=$extra_pid"
+  done
+  sleep 1
+fi
 
 if [ -z "$PID" ]; then
   log "DAEMON DEAD (no PID); restarting"
