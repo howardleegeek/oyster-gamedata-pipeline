@@ -4,6 +4,7 @@
 .DESCRIPTION
     Checks if Windows Defender has appropriate exclusions configured for ffmpeg,
     Java runtime, and paper.jar to prevent scanning interference during runtime.
+    Outputs PASS/FAIL per item and returns exit code 0 (all pass) or 1 (any fail).
 .NOTES
     File: anti_virus_allowlist_check.ps1
     Requires: Windows PowerShell 5.1+ or PowerShell 7+, Administrator privileges
@@ -21,7 +22,6 @@ function Get-DefenderExclusionPaths {
     [CmdletBinding()]
     [OutputType([System.Array])]
     param()
-
     try {
         $prefs = Get-MpPreference -ErrorAction Stop
         return @($prefs.ExclusionPath)
@@ -52,7 +52,6 @@ function Test-ExclusionExists {
         [Parameter(Mandatory = $true)]
         [string]$Pattern
     )
-
     foreach ($exclusion in $Exclusions) {
         if ($exclusion -like "*$Pattern*") { return $true }
     }
@@ -96,8 +95,10 @@ function Main {
         Write-Host "All required exclusions are configured." -ForegroundColor Green
         return 0
     }
-    Write-Host "Some exclusions are missing. Please configure them." -ForegroundColor Red
-    return 1
+    else {
+        Write-Host "Some exclusions are missing. Please configure them." -ForegroundColor Red
+        return 1
+    }
 }
 
 # Script entry point
