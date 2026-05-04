@@ -1376,16 +1376,18 @@ gaps:
   title: bin/hdf5_episode_pack.py
   purpose: 'Cluster D: optional episode.h5 packing all action / depth / seg / imu
     in one file (BEHAVIOR-1K / OmniGibson pattern)'
-  status: pending
+  status: dispatched
   priority: P3
   lines_estimate: 180
+  dispatched_at: '2026-05-04 10:41:40'
 - id: G159
   title: bin/aesthetic_scorer.py
   purpose: 'Cluster E: per-clip aesthetic / motion / OCR-overlay / camera-jitter scores
     (Open-Sora 2.0 filter stack) — buyer reweighting / curation'
-  status: pending
+  status: dispatched
   priority: P2
   lines_estimate: 320
+  dispatched_at: '2026-05-04 10:36:32'
 - id: G160
   title: bin/data_diversity_dashboard.py
   purpose: 'Cluster E: per-cohort diversity dashboard (route_type / biome / time-of-day
@@ -1396,4 +1398,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-04T17:28:49Z'
+  last_heartbeat: '2026-05-04T17:41:40Z'
