@@ -1245,10 +1245,11 @@ gaps:
   title: src/oyster_agent_runner/buyer_spec_v2_action_tokens.py
   purpose: 'Cluster A: 256-bin per-dim discretization of action vector (RT-1 / RT-2
     actions-as-language) — table-stakes for VLA training'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 180
   dispatched_at: '2026-05-04 09:59:57'
+  completed_at: '2026-05-04 10:13:42'
 - id: G144
   title: src/oyster_agent_runner/buyer_spec_v2_action_chunks.py
   purpose: 'Cluster A: action_chunk_next_4 + action_chunk_next_10 packing for diffusion-decoded
@@ -1307,10 +1308,11 @@ gaps:
   title: bin/seg_track_provider.py
   purpose: 'Cluster C: per-pixel semantic + instance segmentation at 6fps (R=class_id
     from Minecraft block IDs, G+B=instance_id, CARLA / Habitat convention)'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 280
   dispatched_at: '2026-05-04 10:01:32'
+  completed_at: '2026-05-04 10:13:44'
 - id: G151
   title: src/oyster_agent_runner/depth_uint16_alt_writer.py
   purpose: 'Cluster C: alternative uint16 PNG mm depth output alongside float32 EXR
@@ -1333,10 +1335,11 @@ gaps:
   title: bin/embodiment_metadata.py
   purpose: 'Cluster C: per-scene embodiment.json with embodiment_id + agent_geometry
     + locomotion_mode (arxiv 2505.05753 scaling-laws axis)'
-  status: dispatched
+  status: completed
   priority: P2
   lines_estimate: 100
   dispatched_at: '2026-05-04 10:04:07'
+  completed_at: '2026-05-04 10:13:46'
 - id: G154
   title: bin/inventory_voxel_capture.py
   purpose: 'Cluster C: per-frame inventory + 3x3x3 voxel-window block-IDs around player
@@ -1357,10 +1360,11 @@ gaps:
   title: bin/rlds_export.py
   purpose: 'Cluster D: convert one tarball into TFDS RLDS-format shard (tf.data.Dataset
     compatible) — unlocks OXE pooling'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 280
   dispatched_at: '2026-05-04 10:02:45'
+  completed_at: '2026-05-04 10:13:47'
 - id: G157
   title: bin/lerobot_export.py
   purpose: 'Cluster D: convert tarball to LeRobot HuggingFace format — HF-hub distribution
@@ -1392,4 +1396,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-04T17:13:08Z'
+  last_heartbeat: '2026-05-04T17:28:49Z'
