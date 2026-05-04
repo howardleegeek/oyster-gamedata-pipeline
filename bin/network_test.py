@@ -82,7 +82,7 @@ def run_tests(dns_hosts: List[str], latency_host: str, latency_port: int,
         all_passed = False
     print(f"  {latency_host}:{latency_port}: {'PASS' if ok else 'FAIL'} ({elapsed*1000:.1f}ms)")
 
-    print(f"\n[Upload Speed Test] -> {upload_host}:{upload_port} ({upload_size_kb} KB)")
+    print(f"\n[Upload Test] -> {upload_host}:{upload_port} ({upload_size_kb}KB)")
     ok, speed, elapsed = measure_upload(upload_host, upload_port, upload_size_kb, timeout)
     if not ok:
         all_passed = False
@@ -95,23 +95,25 @@ def run_tests(dns_hosts: List[str], latency_host: str, latency_port: int,
 
 
 def main(argv: List[str] | None = None) -> int:
-    """Entry point with argparse CLI. Returns exit code 0 or 1."""
+    """CLI entry point with argparse. Returns exit code."""
     parser = argparse.ArgumentParser(
-        description="Vendor network upload speed + latency + DNS resolution check.")
-    parser.add_argument("--dns-hosts", nargs="+", default=["google.com", "cloudflare.com"],
-                        help="Hostnames for DNS resolution test")
-    parser.add_argument("--latency-host", default="google.com", help="Host for latency test")
-    parser.add_argument("--latency-port", type=int, default=443, help="Port for latency test")
-    parser.add_argument("--upload-host", default="google.com", help="Host for upload test")
-    parser.add_argument("--upload-port", type=int, default=443, help="Port for upload test")
-    parser.add_argument("--upload-size", type=int, default=100, help="Upload payload size in KB")
-    parser.add_argument("--timeout", type=float, default=10.0, help="Timeout in seconds")
+        description="Vendor network upload speed + latency + DNS resolution check."
+    )
+    parser.add_argument("--dns-hosts", nargs="+",
+                        default=["google.com", "cloudflare.com", "baidu.com"])
+    parser.add_argument("--latency-host", default="google.com")
+    parser.add_argument("--latency-port", type=int, default=443)
+    parser.add_argument("--upload-host", default="google.com")
+    parser.add_argument("--upload-port", type=int, default=443)
+    parser.add_argument("--upload-size", type=int, default=100)
+    parser.add_argument("--timeout", type=float, default=5.0)
     args = parser.parse_args(argv)
     return run_tests(
         dns_hosts=args.dns_hosts, latency_host=args.latency_host,
         latency_port=args.latency_port, upload_host=args.upload_host,
         upload_port=args.upload_port, upload_size_kb=args.upload_size,
-        timeout=args.timeout)
+        timeout=args.timeout,
+    )
 
 
 if __name__ == "__main__":
