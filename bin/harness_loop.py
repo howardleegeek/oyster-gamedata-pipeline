@@ -306,16 +306,86 @@ def commit_and_push(gap: dict, artifact: Path) -> bool:
         return False
 
 
+# ----------------------------------------------------------------- failover lock
+import socket as _socket
+
+LOCK_TTL_S = 180  # heartbeat older than this → other instance considered dead
+HOSTNAME = _socket.gethostname()
+
+
+def _now_iso() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def _parse_iso(s: str) -> float:
+    try:
+        return time.mktime(time.strptime(s, "%Y-%m-%dT%H:%M:%SZ"))
+    except Exception:
+        return 0.0
+
+
+def acquire_or_check_lock(data: dict) -> bool:
+    """Check audit_gaps.yaml top-level harness_lock field. Returns True if
+    THIS host owns/can-claim the lock. Returns False if another host has
+    a fresh heartbeat (we should exit gracefully).
+
+    Heartbeat freshness: < LOCK_TTL_S seconds = active, else stale (claim).
+    """
+    lock = data.get("harness_lock", {}) or {}
+    cur_host = lock.get("host", "")
+    cur_hb = _parse_iso(lock.get("last_heartbeat", ""))
+    age = time.time() - cur_hb if cur_hb else 9e9
+
+    if cur_host == HOSTNAME:
+        return True   # we are the owner; refresh heartbeat
+    if cur_host and age < LOCK_TTL_S:
+        log.warning(f"Lock held by {cur_host} (age={int(age)}s, ttl={LOCK_TTL_S}s); exiting.")
+        return False
+    log.info(f"Claiming lock from {cur_host or '<none>'} (stale age={int(age)}s)")
+    data["harness_lock"] = {
+        "host": HOSTNAME,
+        "pid": os.getpid(),
+        "last_heartbeat": _now_iso(),
+    }
+    return True
+
+
+def refresh_heartbeat(data: dict) -> None:
+    data.setdefault("harness_lock", {})
+    data["harness_lock"]["host"] = HOSTNAME
+    data["harness_lock"]["pid"] = os.getpid()
+    data["harness_lock"]["last_heartbeat"] = _now_iso()
+
+
+def git_pull() -> bool:
+    """Pull latest audit_gaps.yaml from origin. Idempotent."""
+    try:
+        run(["git", "-C", str(REPO_ROOT), "pull", "--rebase", "origin", "main"], timeout=60)
+        return True
+    except subprocess.CalledProcessError as e:
+        log.error(f"  git pull failed: {e}")
+        return False
+
+
 # ----------------------------------------------------------------- main loop
 def harness_loop(once: bool = False, dry_run: bool = False) -> int:
     SPEC_DIR.mkdir(parents=True, exist_ok=True)
     iteration = 0
+    log.info(f"Harness starting on host={HOSTNAME} pid={os.getpid()}")
 
     while True:
         iteration += 1
-        log.info(f"=== Harness iteration {iteration} ===")
+        log.info(f"=== Harness iteration {iteration} (host={HOSTNAME}) ===")
+
+        # Failover: pull latest state, check lock
+        if not dry_run:
+            git_pull()
 
         data = load_gaps()
+        if not dry_run and not acquire_or_check_lock(data):
+            log.info("Another host owns the lock — exiting cleanly")
+            return 0
+
         gaps_list = data.get("gaps", [])
 
         # Step 1: collect any 'dispatched' that are now completed
@@ -361,7 +431,22 @@ def harness_loop(once: bool = False, dry_run: bool = False) -> int:
                 else:
                     dispatch(g)
 
+        # Refresh heartbeat before save (proves we're alive this cycle)
+        if not dry_run:
+            refresh_heartbeat(data)
         save_gaps(data)
+
+        # Push lock + status update so other host sees fresh heartbeat
+        if not dry_run:
+            try:
+                run(["git", "-C", str(REPO_ROOT), "add", "docs/audit_gaps.yaml"])
+                run(["git", "-C", str(REPO_ROOT), "commit", "-m",
+                     f"chore(harness): heartbeat from {HOSTNAME} iter={iteration}",
+                     "--allow-empty"], check=False)
+                run(["git", "-C", str(REPO_ROOT), "push", "origin", "main"],
+                    check=False, timeout=60)
+            except Exception as e:
+                log.warning(f"  heartbeat push skipped: {e}")
 
         # Stats
         counts = {"pending": 0, "dispatched": 0, "completed": 0, "failed": 0, "skipped": 0}
