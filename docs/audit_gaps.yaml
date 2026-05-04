@@ -455,18 +455,20 @@ gaps:
   title: bin/stress_test_huge_tarball_5gb.py
   purpose: 'Stress test: build 5 GB tarball (long capture + 6fps depth) — verify upload_s3.sh
     chunked path holds'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 140
   dispatched_at: '2026-05-04 04:55:48'
+  completed_at: '2026-05-04 05:19:13'
 - id: G056
   title: bin/stress_test_long_capture_2h.py
   purpose: 'Stress test: simulate 2-hour scene with 30-min cap — confirm scene_id
     rotation and clip cap enforced'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 150
   dispatched_at: '2026-05-04 04:58:00'
+  completed_at: '2026-05-04 05:19:15'
 - id: G057
   title: bin/stress_test_burst_50_clips.py
   purpose: 'Stress test: 50 clips per minute burst — lint queue must drain without
@@ -581,17 +583,19 @@ gaps:
   title: bin/prd_test_route_type_distribution.py
   purpose: 'PRD p5 #2: route_type field across 240 clips must hit at least 5 distinct
     types — distribution check'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 110
   dispatched_at: '2026-05-04 05:05:15'
+  completed_at: '2026-05-04 05:19:17'
 - id: G071
   title: bin/prd_test_wasd_balance.py
   purpose: 'PRD p6 #4: WASD action balance — no single key over 60 percent in long
     captures'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 100
+  dispatched_at: '2026-05-04 05:23:22'
 - id: G072
   title: bin/prd_test_stationary_threshold.py
   purpose: 'PRD p6 #5: stationary frames over 5s must trigger clip stop — verify cutoff'
@@ -604,10 +608,11 @@ gaps:
   title: bin/prd_test_action_per_second.py
   purpose: 'PRD p6 #6: median actions-per-second 0.5 to 5.0 — out-of-band capture
     flagged as low-quality'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 100
   dispatched_at: '2026-05-04 05:15:04'
+  completed_at: '2026-05-04 05:19:19'
 - id: G074
   title: bin/prd_test_camera_intrinsics_pinhole.py
   purpose: 'PRD p3 #2: camera projection must be pinhole — fov + aspect populated,
@@ -636,9 +641,10 @@ gaps:
 - id: G077
   title: bin/prd_test_speed_units_mps.py
   purpose: 'PRD p3 #6: linear_velocity in m/s — bound to player walk run sprint speeds'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 100
+  dispatched_at: '2026-05-04 05:28:06'
 - id: G078
   title: bin/prd_test_240_clip_cap.py
   purpose: 'PRD p7 #2: max 240 clips per scene — adapter stops at 241st'
@@ -686,9 +692,10 @@ gaps:
   title: bin/prd_test_audio_continuity.py
   purpose: 'PRD p4 #2: video audio track continuous (no gaps over 50ms) — ffprobe
     + numpy diff check'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 120
+  dispatched_at: '2026-05-04 05:29:10'
 - id: G084
   title: bin/red_team_oversized_json.py
   purpose: 'Red team: 100 MB action_camera.json — confirm adapter rejects or streams
@@ -710,9 +717,10 @@ gaps:
 - id: G086
   title: bin/red_team_year_9999_timestamp.py
   purpose: 'Red team: timestamp year 9999 — schema clamps within sane window'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 85
+  dispatched_at: '2026-05-04 05:30:01'
 - id: G087
   title: bin/red_team_path_traversal.py
   purpose: 'Red team: tarball entry name contains ../../etc — extractor must refuse
@@ -1117,165 +1125,7 @@ gaps:
   status: pending
   priority: P1
   lines_estimate: 130
-- id: G139
-  title: src/oyster_agent_runner/buyer_spec_v2_camera_intrinsics.py
-  purpose: 'Cluster A: per-frame K matrix + distortion + T_world_cam SE3 pose (Ego-Exo4D
-    / nuScenes / DROID standard) — without K depth EXR is uninterpretable in 3D'
-  status: pending
-  priority: P0
-  lines_estimate: 200
-- id: G140
-  title: src/oyster_agent_runner/buyer_spec_v2_rlds_flags.py
-  purpose: 'Cluster A: is_first / is_last / is_terminal episode-boundary flags per
-    record (Open X-Embodiment / RT-X mandatory) — unlocks OXE pooling'
-  status: pending
-  priority: P0
-  lines_estimate: 130
-- id: G141
-  title: src/oyster_agent_runner/buyer_spec_v2_language_instruction.py
-  purpose: 'Cluster A: per-episode instruction string + optional dense narration (RT-2
-    / OpenVLA / Octo / Pi-0 require it) — unlocks VLA fine-tune ecosystem'
-  status: pending
-  priority: P0
-  lines_estimate: 150
-- id: G142
-  title: src/oyster_agent_runner/buyer_spec_v2_vpt_mouse.py
-  purpose: 'Cluster A: extend mouse with scaledX/Y + dwheel + buttons bitmask + newButtons
-    edge-triggered (OpenAI VPT / MineWorld schema) — drop-in VPT compat'
-  status: pending
-  priority: P1
-  lines_estimate: 170
-- id: G143
-  title: src/oyster_agent_runner/buyer_spec_v2_action_tokens.py
-  purpose: 'Cluster A: 256-bin per-dim discretization of action vector (RT-1 / RT-2
-    actions-as-language) — table-stakes for VLA training'
-  status: pending
-  priority: P1
-  lines_estimate: 180
-- id: G144
-  title: src/oyster_agent_runner/buyer_spec_v2_action_chunks.py
-  purpose: 'Cluster A: action_chunk_next_4 + action_chunk_next_10 packing for diffusion-decoded
-    policies (Octo / OpenVLA / Pi-0)'
-  status: pending
-  priority: P2
-  lines_estimate: 150
-- id: G145
-  title: bin/c2pa_signer.py
-  purpose: 'Cluster B: C2PA v2.1 signed manifest with AI/ML assertion + is_synthetic
-    flag — mandatory under EU AI Act Aug 2026 + CA AB 2013 Jan 2026'
-  status: skipped
-  priority: P0
-  lines_estimate: 220
-  skip_reason: deprioritized per Howard 2026-05-04 — revisit later
-- id: G146
-  title: src/oyster_agent_runner/hmac_machine_id.py
-  purpose: 'Cluster B: HMAC-rotated machine fingerprint replacing raw MAC/disk-serial
-    hash — GDPR personal-data avoidance per EDPB 2024 guidance'
-  status: skipped
-  priority: P0
-  lines_estimate: 100
-  skip_reason: deprioritized per Howard 2026-05-04 — revisit later
-- id: G147
-  title: src/oyster_agent_runner/privacy_kanon_inputs.py
-  purpose: 'Cluster B: k-anonymity bucketing on mouse/key inter-event intervals to
-    defeat keystroke-dynamics re-identification (~99% re-id literature)'
-  status: skipped
-  priority: P1
-  lines_estimate: 110
-  skip_reason: deprioritized per Howard 2026-05-04 — revisit later
-- id: G148
-  title: bin/synthetic_disclosure_metadata.py
-  purpose: 'Cluster B: ensure is_synthetic + engine + engine_version + capture_date
-    in every JSON / manifest / video sidecar (synthetic-content disclosure mandate)'
-  status: skipped
-  priority: P0
-  lines_estimate: 80
-  skip_reason: deprioritized per Howard 2026-05-04 — revisit later
-- id: G149
-  title: bin/imu_provider.py
-  purpose: 'Cluster C: synthetic IMU 6-axis (3-accel + 3-gyro) at 240Hz physics-tick
-    rate from Mineflayer state (Ego-Exo4D / VIO papers — derived velocity is lossy)'
-  status: pending
-  priority: P1
-  lines_estimate: 250
-- id: G150
-  title: bin/seg_track_provider.py
-  purpose: 'Cluster C: per-pixel semantic + instance segmentation at 6fps (R=class_id
-    from Minecraft block IDs, G+B=instance_id, CARLA / Habitat convention)'
-  status: pending
-  priority: P1
-  lines_estimate: 280
-- id: G151
-  title: src/oyster_agent_runner/depth_uint16_alt_writer.py
-  purpose: 'Cluster C: alternative uint16 PNG mm depth output alongside float32 EXR
-    (ScanNet++ / Habitat convention, 4x smaller)'
-  status: pending
-  priority: P2
-  lines_estimate: 130
-- id: G152
-  title: bin/reward_signal_provider.py
-  purpose: 'Cluster C: per-step sparse reward float + per-episode task_success bool
-    (DreamerV3-family world-model / RL training requirement)'
-  status: pending
-  priority: P2
-  lines_estimate: 160
-- id: G153
-  title: bin/embodiment_metadata.py
-  purpose: 'Cluster C: per-scene embodiment.json with embodiment_id + agent_geometry
-    + locomotion_mode (arxiv 2505.05753 scaling-laws axis)'
-  status: pending
-  priority: P2
-  lines_estimate: 100
-- id: G154
-  title: bin/inventory_voxel_capture.py
-  purpose: 'Cluster C: per-frame inventory + 3x3x3 voxel-window block-IDs around player
-    (MineDojo / MineWorld multimodal observation)'
-  status: pending
-  priority: P2
-  lines_estimate: 230
-- id: G155
-  title: bin/parquet_manifest_writer.py
-  purpose: 'Cluster D: gameinfo.parquet + action_camera.parquet shards keyed by (clip_id,
-    frame_idx) replacing xlsx (AV2 / OXE / DROID convention)'
-  status: pending
-  priority: P1
-  lines_estimate: 180
-- id: G156
-  title: bin/rlds_export.py
-  purpose: 'Cluster D: convert one tarball into TFDS RLDS-format shard (tf.data.Dataset
-    compatible) — unlocks OXE pooling'
-  status: pending
-  priority: P1
-  lines_estimate: 280
-- id: G157
-  title: bin/lerobot_export.py
-  purpose: 'Cluster D: convert tarball to LeRobot HuggingFace format — HF-hub distribution
-    path for robotics buyers'
-  status: pending
-  priority: P2
-  lines_estimate: 110
-- id: G158
-  title: bin/hdf5_episode_pack.py
-  purpose: 'Cluster D: optional episode.h5 packing all action / depth / seg / imu
-    in one file (BEHAVIOR-1K / OmniGibson pattern)'
-  status: pending
-  priority: P3
-  lines_estimate: 180
-- id: G159
-  title: bin/aesthetic_scorer.py
-  purpose: 'Cluster E: per-clip aesthetic / motion / OCR-overlay / camera-jitter scores
-    (Open-Sora 2.0 filter stack) — buyer reweighting / curation'
-  status: pending
-  priority: P2
-  lines_estimate: 320
-- id: G160
-  title: bin/data_diversity_dashboard.py
-  purpose: 'Cluster E: per-cohort diversity dashboard (route_type / biome / time-of-day
-    / action-entropy histograms) for buyer pre-purchase verification'
-  status: pending
-  priority: P2
-  lines_estimate: 220
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-04T12:17:05Z'
+  last_heartbeat: '2026-05-04T12:33:02Z'
