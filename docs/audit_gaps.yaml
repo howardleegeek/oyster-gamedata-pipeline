@@ -1209,26 +1209,29 @@ gaps:
   title: src/oyster_agent_runner/buyer_spec_v2_camera_intrinsics.py
   purpose: 'Cluster A: per-frame K matrix + distortion + T_world_cam SE3 pose (Ego-Exo4D
     / nuScenes / DROID standard) — without K depth EXR is uninterpretable in 3D'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 200
   dispatched_at: '2026-05-04 09:24:18'
+  completed_at: '2026-05-04 09:38:38'
 - id: G140
   title: src/oyster_agent_runner/buyer_spec_v2_rlds_flags.py
   purpose: 'Cluster A: is_first / is_last / is_terminal episode-boundary flags per
     record (Open X-Embodiment / RT-X mandatory) — unlocks OXE pooling'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 130
   dispatched_at: '2026-05-04 09:26:17'
+  completed_at: '2026-05-04 09:38:40'
 - id: G141
   title: src/oyster_agent_runner/buyer_spec_v2_language_instruction.py
   purpose: 'Cluster A: per-episode instruction string + optional dense narration (RT-2
     / OpenVLA / Octo / Pi-0 require it) — unlocks VLA fine-tune ecosystem'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 150
   dispatched_at: '2026-05-04 09:27:40'
+  completed_at: '2026-05-04 09:38:41'
 - id: G142
   title: src/oyster_agent_runner/buyer_spec_v2_vpt_mouse.py
   purpose: 'Cluster A: extend mouse with scaledX/Y + dwheel + buttons bitmask + newButtons
@@ -1249,17 +1252,19 @@ gaps:
   title: src/oyster_agent_runner/buyer_spec_v2_action_chunks.py
   purpose: 'Cluster A: action_chunk_next_4 + action_chunk_next_10 packing for diffusion-decoded
     policies (Octo / OpenVLA / Pi-0)'
-  status: pending
+  status: dispatched
   priority: P2
   lines_estimate: 150
+  dispatched_at: '2026-05-04 09:52:28'
 - id: G145
   title: bin/c2pa_signer.py
   purpose: 'Cluster B: C2PA v2.1 signed manifest with AI/ML assertion + is_synthetic
     flag — mandatory under EU AI Act Aug 2026 + CA AB 2013 Jan 2026'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 220
   dispatched_at: '2026-05-04 09:30:35'
+  completed_at: '2026-05-04 09:38:44'
 - id: G146
   title: src/oyster_agent_runner/hmac_machine_id.py
   purpose: 'Cluster B: HMAC-rotated machine fingerprint replacing raw MAC/disk-serial
@@ -1273,10 +1278,11 @@ gaps:
   title: src/oyster_agent_runner/privacy_kanon_inputs.py
   purpose: 'Cluster B: k-anonymity bucketing on mouse/key inter-event intervals to
     defeat keystroke-dynamics re-identification (~99% re-id literature)'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 110
   dispatched_at: '2026-05-04 09:35:30'
+  completed_at: '2026-05-04 09:38:45'
 - id: G148
   title: bin/synthetic_disclosure_metadata.py
   purpose: 'Cluster B: ensure is_synthetic + engine + engine_version + capture_date
@@ -1290,10 +1296,11 @@ gaps:
   title: bin/imu_provider.py
   purpose: 'Cluster C: synthetic IMU 6-axis (3-accel + 3-gyro) at 240Hz physics-tick
     rate from Mineflayer state (Ego-Exo4D / VIO papers — derived velocity is lossy)'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 250
   dispatched_at: '2026-05-04 09:38:04'
+  completed_at: '2026-05-04 09:38:47'
 - id: G150
   title: bin/seg_track_provider.py
   purpose: 'Cluster C: per-pixel semantic + instance segmentation at 6fps (R=class_id
@@ -1305,16 +1312,18 @@ gaps:
   title: src/oyster_agent_runner/depth_uint16_alt_writer.py
   purpose: 'Cluster C: alternative uint16 PNG mm depth output alongside float32 EXR
     (ScanNet++ / Habitat convention, 4x smaller)'
-  status: pending
+  status: dispatched
   priority: P2
   lines_estimate: 130
+  dispatched_at: '2026-05-04 09:54:35'
 - id: G152
   title: bin/reward_signal_provider.py
   purpose: 'Cluster C: per-step sparse reward float + per-episode task_success bool
     (DreamerV3-family world-model / RL training requirement)'
-  status: pending
+  status: dispatched
   priority: P2
   lines_estimate: 160
+  dispatched_at: '2026-05-04 09:56:49'
 - id: G153
   title: bin/embodiment_metadata.py
   purpose: 'Cluster C: per-scene embodiment.json with embodiment_id + agent_geometry
@@ -1333,9 +1342,10 @@ gaps:
   title: bin/parquet_manifest_writer.py
   purpose: 'Cluster D: gameinfo.parquet + action_camera.parquet shards keyed by (clip_id,
     frame_idx) replacing xlsx (AV2 / OXE / DROID convention)'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 180
+  dispatched_at: '2026-05-04 09:46:41'
 - id: G156
   title: bin/rlds_export.py
   purpose: 'Cluster D: convert one tarball into TFDS RLDS-format shard (tf.data.Dataset
@@ -1374,4 +1384,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-04T16:38:04Z'
+  last_heartbeat: '2026-05-04T16:56:49Z'
