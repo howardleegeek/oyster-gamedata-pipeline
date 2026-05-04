@@ -1344,10 +1344,11 @@ gaps:
   title: bin/inventory_voxel_capture.py
   purpose: 'Cluster C: per-frame inventory + 3x3x3 voxel-window block-IDs around player
     (MineDojo / MineWorld multimodal observation)'
-  status: dispatched
+  status: completed
   priority: P2
   lines_estimate: 230
   dispatched_at: '2026-05-04 10:43:11'
+  completed_at: '2026-05-04 10:47:06'
 - id: G155
   title: bin/parquet_manifest_writer.py
   purpose: 'Cluster D: gameinfo.parquet + action_camera.parquet shards keyed by (clip_id,
@@ -1370,10 +1371,11 @@ gaps:
   title: bin/lerobot_export.py
   purpose: 'Cluster D: convert tarball to LeRobot HuggingFace format — HF-hub distribution
     path for robotics buyers'
-  status: dispatched
+  status: completed
   priority: P2
   lines_estimate: 110
   dispatched_at: '2026-05-04 10:45:53'
+  completed_at: '2026-05-04 10:47:08'
 - id: G158
   title: bin/hdf5_episode_pack.py
   purpose: 'Cluster D: optional episode.h5 packing all action / depth / seg / imu
@@ -1396,11 +1398,12 @@ gaps:
   title: bin/data_diversity_dashboard.py
   purpose: 'Cluster E: per-cohort diversity dashboard (route_type / biome / time-of-day
     / action-entropy histograms) for buyer pre-purchase verification'
-  status: dispatched
+  status: completed
   priority: P2
   lines_estimate: 220
   dispatched_at: '2026-05-04 10:46:31'
+  completed_at: '2026-05-04 10:47:10'
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-04T17:46:31Z'
+  last_heartbeat: '2026-05-04T17:47:10Z'
