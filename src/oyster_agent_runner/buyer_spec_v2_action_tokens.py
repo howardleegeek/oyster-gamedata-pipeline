@@ -41,9 +41,13 @@ def _np():
 NUM_BINS: int = 256
 
 DEFAULT_BOUNDS: list[tuple[float, float]] = [
-    (-0.5, 0.5), (-0.5, 0.5), (-0.5, 0.5),  # dx, dy, dz (m)
-    (-0.5, 0.5), (-0.5, 0.5), (-0.5, 0.5),  # droll, dpitch, dyaw (rad)
-    (0.0, 1.0),                               # gripper (0=closed, 1=open)
+    (-0.5, 0.5),
+    (-0.5, 0.5),
+    (-0.5, 0.5),  # dx, dy, dz (m)
+    (-0.5, 0.5),
+    (-0.5, 0.5),
+    (-0.5, 0.5),  # droll, dpitch, dyaw (rad)
+    (0.0, 1.0),  # gripper (0=closed, 1=open)
 ]
 
 
@@ -115,9 +119,7 @@ class ActionTokenDiscretizer:
         """Tokenize then detokenize; returns reconstructed values."""
         return self.detokenize(self.tokenize(values))
 
-    def quantization_error(
-        self, values: list[float] | numpy.ndarray
-    ) -> list[float]:
+    def quantization_error(self, values: list[float] | numpy.ndarray) -> list[float]:
         """Per-dimension quantization error (original - reconstructed)."""
         np = _np()
         orig = np.asarray(values, dtype=np.float64).ravel()
@@ -169,18 +171,21 @@ def main(argv: list[str] | None = None) -> int:
 
     p_tok = sub.add_parser("tokenize", help="Continuous values -> token IDs")
     p_tok.add_argument("--values", type=float, nargs="+", required=True)
-    p_tok.add_argument("--bounds", type=str, default=None,
-                       help="JSON list of [low, high] pairs per dimension")
+    p_tok.add_argument(
+        "--bounds", type=str, default=None, help="JSON list of [low, high] pairs per dimension"
+    )
 
     p_detok = sub.add_parser("detokenize", help="Token IDs -> continuous values")
     p_detok.add_argument("--tokens", type=int, nargs="+", required=True)
-    p_detok.add_argument("--bounds", type=str, default=None,
-                         help="JSON list of [low, high] pairs per dimension")
+    p_detok.add_argument(
+        "--bounds", type=str, default=None, help="JSON list of [low, high] pairs per dimension"
+    )
 
     p_rt = sub.add_parser("roundtrip", help="Tokenize then detokenize")
     p_rt.add_argument("--values", type=float, nargs="+", required=True)
-    p_rt.add_argument("--bounds", type=str, default=None,
-                      help="JSON list of [low, high] pairs per dimension")
+    p_rt.add_argument(
+        "--bounds", type=str, default=None, help="JSON list of [low, high] pairs per dimension"
+    )
 
     sub.add_parser("info", help="Print default configuration")
     args = parser.parse_args(argv)
@@ -201,10 +206,16 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "roundtrip":
         reconstructed = discretizer.roundtrip(args.values)
         error = discretizer.quantization_error(args.values)
-        print(json.dumps({
-            "original": args.values, "reconstructed": reconstructed,
-            "error": error, "config": discretizer.to_dict(),
-        }))
+        print(
+            json.dumps(
+                {
+                    "original": args.values,
+                    "reconstructed": reconstructed,
+                    "error": error,
+                    "config": discretizer.to_dict(),
+                }
+            )
+        )
     elif args.command == "info":
         print(json.dumps(discretizer.to_dict(), indent=2))
 

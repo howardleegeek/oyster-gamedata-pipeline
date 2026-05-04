@@ -162,9 +162,7 @@ class TestInferBatch:
         # Mock _verify_exr_channel
         monkeypatch.setattr(real_depth_filler, "_verify_exr_channel", lambda x: True)
 
-        count = real_depth_filler.infer_batch(
-            str(rgb_dir), str(out_dir), batch_size=2
-        )
+        count = real_depth_filler.infer_batch(str(rgb_dir), str(out_dir), batch_size=2)
 
         assert count == 3
 

@@ -82,6 +82,7 @@ class TestDetectScreenDPI(unittest.TestCase):
     def test_detect_screen_dpi_timeout(self, mock_run):
         """Test DPI detection with timeout."""
         import subprocess
+
         mock_run.side_effect = subprocess.TimeoutExpired("cmd", 2)
 
         dpi = detect_screen_dpi()
@@ -101,12 +102,15 @@ class TestDetectWindowGeometry(unittest.TestCase):
 
         with patch("sys.platform", "darwin"):
             geometry = detect_window_geometry("Minecraft")
-            self.assertEqual(geometry, {
-                "x": 100,
-                "y": 200,
-                "width": 1200,  # 1300 - 100
-                "height": 700,  # 900 - 200
-            })
+            self.assertEqual(
+                geometry,
+                {
+                    "x": 100,
+                    "y": 200,
+                    "width": 1200,  # 1300 - 100
+                    "height": 700,  # 900 - 200
+                },
+            )
 
     @patch("subprocess.run")
     def test_detect_window_geometry_macos_failure(self, mock_run):
@@ -117,12 +121,15 @@ class TestDetectWindowGeometry(unittest.TestCase):
 
         with patch("sys.platform", "darwin"):
             geometry = detect_window_geometry("Minecraft")
-            self.assertEqual(geometry, {
-                "x": 0,
-                "y": 0,
-                "width": 1920,
-                "height": 1080,
-            })
+            self.assertEqual(
+                geometry,
+                {
+                    "x": 0,
+                    "y": 0,
+                    "width": 1920,
+                    "height": 1080,
+                },
+            )
 
     @patch("subprocess.run")
     def test_detect_window_geometry_linux_success(self, mock_run):
@@ -134,12 +141,15 @@ class TestDetectWindowGeometry(unittest.TestCase):
 
         with patch("sys.platform", "linux"):
             geometry = detect_window_geometry("Minecraft")
-            self.assertEqual(geometry, {
-                "x": 100,
-                "y": 200,
-                "width": 1200,
-                "height": 700,
-            })
+            self.assertEqual(
+                geometry,
+                {
+                    "x": 100,
+                    "y": 200,
+                    "width": 1200,
+                    "height": 700,
+                },
+            )
 
     @patch("subprocess.run")
     def test_detect_window_geometry_linux_failure(self, mock_run):
@@ -150,37 +160,47 @@ class TestDetectWindowGeometry(unittest.TestCase):
 
         with patch("sys.platform", "linux"):
             geometry = detect_window_geometry("Minecraft")
-            self.assertEqual(geometry, {
-                "x": 0,
-                "y": 0,
-                "width": 1920,
-                "height": 1080,
-            })
+            self.assertEqual(
+                geometry,
+                {
+                    "x": 0,
+                    "y": 0,
+                    "width": 1920,
+                    "height": 1080,
+                },
+            )
 
     def test_detect_window_geometry_unknown_platform(self):
         """Test window geometry detection on unknown platform."""
         with patch("sys.platform", "win32"):
             geometry = detect_window_geometry("Minecraft")
-            self.assertEqual(geometry, {
-                "x": 0,
-                "y": 0,
-                "width": 1920,
-                "height": 1080,
-            })
+            self.assertEqual(
+                geometry,
+                {
+                    "x": 0,
+                    "y": 0,
+                    "width": 1920,
+                    "height": 1080,
+                },
+            )
 
     @patch("subprocess.run")
     def test_detect_window_geometry_timeout(self, mock_run):
         """Test window geometry detection with timeout."""
         import subprocess
+
         mock_run.side_effect = subprocess.TimeoutExpired("cmd", 5)
 
         geometry = detect_window_geometry("Minecraft")
-        self.assertEqual(geometry, {
-            "x": 0,
-            "y": 0,
-            "width": 1920,
-            "height": 1080,
-        })
+        self.assertEqual(
+            geometry,
+            {
+                "x": 0,
+                "y": 0,
+                "width": 1920,
+                "height": 1080,
+            },
+        )
 
 
 class TestBuildSysteminfo(unittest.TestCase):
@@ -197,12 +217,15 @@ class TestBuildSysteminfo(unittest.TestCase):
         self.assertEqual(result["height"], 1080)
         self.assertEqual(result["recordDpi"], 1.0)
         self.assertEqual(result["map_scale"], 1.0)
-        self.assertEqual(result["map_bounds"], {
-            "min_x": -10000,
-            "min_z": -10000,
-            "max_x": 10000,
-            "max_z": 10000,
-        })
+        self.assertEqual(
+            result["map_bounds"],
+            {
+                "min_x": -10000,
+                "min_z": -10000,
+                "max_x": 10000,
+                "max_z": 10000,
+            },
+        )
 
     def test_build_systeminfo_with_overrides(self):
         """Test building systeminfo with custom values."""
@@ -237,12 +260,15 @@ class TestBuildSysteminfo(unittest.TestCase):
         """Test that map_bounds defaults to Minecraft values when None."""
         result = build_systeminfo(map_bounds=None)
 
-        self.assertEqual(result["map_bounds"], {
-            "min_x": -10000,
-            "min_z": -10000,
-            "max_x": 10000,
-            "max_z": 10000,
-        })
+        self.assertEqual(
+            result["map_bounds"],
+            {
+                "min_x": -10000,
+                "min_z": -10000,
+                "max_x": 10000,
+                "max_z": 10000,
+            },
+        )
 
     def test_build_systeminfo_dpi_validation(self):
         """Test that record_dpi must be greater than 0."""
@@ -345,18 +371,30 @@ class TestMainFunction(unittest.TestCase):
         try:
             # Run main with arguments
             test_args = [
-                "--output", temp_path,
-                "--game-process-name", "my_game.exe",
-                "--x", "100",
-                "--y", "200",
-                "--width", "2560",
-                "--height", "1440",
-                "--record-dpi", "2.0",
-                "--map-scale", "0.75",
-                "--map-bounds-min-x", "-5000",
-                "--map-bounds-min-z", "-5000",
-                "--map-bounds-max-x", "5000",
-                "--map-bounds-max-z", "5000",
+                "--output",
+                temp_path,
+                "--game-process-name",
+                "my_game.exe",
+                "--x",
+                "100",
+                "--y",
+                "200",
+                "--width",
+                "2560",
+                "--height",
+                "1440",
+                "--record-dpi",
+                "2.0",
+                "--map-scale",
+                "0.75",
+                "--map-bounds-min-x",
+                "-5000",
+                "--map-bounds-min-z",
+                "-5000",
+                "--map-bounds-max-x",
+                "5000",
+                "--map-bounds-max-z",
+                "5000",
             ]
 
             with patch("sys.argv", ["generate_systeminfo_json.py"] + test_args):
@@ -375,12 +413,15 @@ class TestMainFunction(unittest.TestCase):
             self.assertEqual(data["height"], 1440)
             self.assertEqual(data["recordDpi"], 2.0)
             self.assertEqual(data["map_scale"], 0.75)
-            self.assertEqual(data["map_bounds"], {
-                "min_x": -5000,
-                "min_z": -5000,
-                "max_x": 5000,
-                "max_z": 5000,
-            })
+            self.assertEqual(
+                data["map_bounds"],
+                {
+                    "min_x": -5000,
+                    "min_z": -5000,
+                    "max_x": 5000,
+                    "max_z": 5000,
+                },
+            )
         finally:
             os.unlink(temp_path)
 
@@ -403,7 +444,8 @@ class TestMainFunction(unittest.TestCase):
 
                     # Run main with auto-detect flags
                     test_args = [
-                        "--output", temp_path,
+                        "--output",
+                        temp_path,
                         "--auto-detect-dpi",
                         "--auto-detect-window",
                     ]
@@ -437,8 +479,10 @@ class TestMainFunction(unittest.TestCase):
         try:
             # Run main with invalid DPI
             test_args = [
-                "--output", temp_path,
-                "--record-dpi", "0.0",  # Invalid: must be > 0
+                "--output",
+                temp_path,
+                "--record-dpi",
+                "0.0",  # Invalid: must be > 0
             ]
 
             with patch("sys.argv", ["generate_systeminfo_json.py"] + test_args):

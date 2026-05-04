@@ -59,7 +59,7 @@ class CameraRotationSynthesizer:
 
     @staticmethod
     def _normalize_quaternion(
-        q: tuple[float, float, float, float]
+        q: tuple[float, float, float, float],
     ) -> tuple[float, float, float, float]:
         """Normalize quaternion to unit length."""
         w, x, y, z = q
@@ -67,9 +67,7 @@ class CameraRotationSynthesizer:
         return (w / mag, x / mag, y / mag, z / mag) if mag > 1e-10 else (1.0, 0.0, 0.0, 0.0)
 
     @staticmethod
-    def _quaternion_to_matrix(
-        q: tuple[float, float, float, float]
-    ) -> list[list[float]]:
+    def _quaternion_to_matrix(q: tuple[float, float, float, float]) -> list[list[float]]:
         """Convert quaternion to 3x3 rotation matrix."""
         w, x, y, z = q
         return [
@@ -104,13 +102,13 @@ class CameraRotationSynthesizer:
     ) -> list[tuple[float, float, float, float] | list[list[float]] | tuple[float, float, float]]:
         """
         Generate a camera rotation trajectory.
-        
+
         Args:
             num_frames: Number of frames in trajectory.
             smoothness: Smoothness factor (0.0-1.0).
             max_angle: Maximum rotation per frame in radians.
             output_type: Output format - "quaternion", "matrix", or "euler".
-        
+
         Returns:
             List of rotation values in specified format.
         """
@@ -165,9 +163,17 @@ class CameraRotationSynthesizer:
                         vals = item
                     elif isinstance(item, list) and all(isinstance(row, list) for row in item):
                         # Flatten matrix
-                        vals = [item[0][0], item[0][1], item[0][2],
-                                item[1][0], item[1][1], item[1][2],
-                                item[2][0], item[2][1], item[2][2]]
+                        vals = [
+                            item[0][0],
+                            item[0][1],
+                            item[0][2],
+                            item[1][0],
+                            item[1][1],
+                            item[1][2],
+                            item[2][0],
+                            item[2][1],
+                            item[2][2],
+                        ]
                     else:
                         vals = item
 
@@ -182,32 +188,47 @@ def main(argv: list[str] | None = None) -> int:
         description="Synthesize camera rotation trajectories for testing and simulation."
     )
     parser.add_argument(
-        "-n", "--num-frames", type=int, default=100,
-        help="Number of frames to generate (default: 100)"
+        "-n",
+        "--num-frames",
+        type=int,
+        default=100,
+        help="Number of frames to generate (default: 100)",
     )
     parser.add_argument(
-        "-s", "--smoothness", type=float, default=0.1,
-        help="Smoothness factor 0.0-1.0 (default: 0.1)"
+        "-s",
+        "--smoothness",
+        type=float,
+        default=0.1,
+        help="Smoothness factor 0.0-1.0 (default: 0.1)",
     )
     parser.add_argument(
-        "-m", "--max-angle", type=float, default=1.5708,
-        help="Max rotation per frame in radians (default: pi/2)"
+        "-m",
+        "--max-angle",
+        type=float,
+        default=1.5708,
+        help="Max rotation per frame in radians (default: pi/2)",
     )
     parser.add_argument(
-        "-t", "--output-type", choices=["quaternion", "matrix", "euler"],
-        default="quaternion", help="Output format (default: quaternion)"
+        "-t",
+        "--output-type",
+        choices=["quaternion", "matrix", "euler"],
+        default="quaternion",
+        help="Output format (default: quaternion)",
     )
     parser.add_argument(
-        "-o", "--output", type=Path,
-        help="Output file path (default: auto-generated in temp directory)"
+        "-o",
+        "--output",
+        type=Path,
+        help="Output file path (default: auto-generated in temp directory)",
     )
     parser.add_argument(
-        "-f", "--format", choices=["json", "csv"], default="json",
-        help="Output file format (default: json)"
+        "-f",
+        "--format",
+        choices=["json", "csv"],
+        default="json",
+        help="Output file format (default: json)",
     )
-    parser.add_argument(
-        "--seed", type=int, help="Random seed for reproducibility"
-    )
+    parser.add_argument("--seed", type=int, help="Random seed for reproducibility")
 
     args = parser.parse_args(argv)
 

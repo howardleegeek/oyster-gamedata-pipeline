@@ -1,4 +1,5 @@
 """Tests for OBS capture real module."""
+
 import json
 from unittest.mock import AsyncMock, patch
 
@@ -18,19 +19,19 @@ class TestOBSCaptureReal:
         # Create mock websocket
         mock_ws = AsyncMock()
         # Hello message without authentication challenge
-        mock_ws.recv = AsyncMock(return_value=json.dumps({
-            "op": 0,  # Hello
-            "d": {
-                "obsWebSocketVersion": "5.0.0",
-                "rpcVersion": 1,
-                "authentication": None
-            }
-        }))
+        mock_ws.recv = AsyncMock(
+            return_value=json.dumps(
+                {
+                    "op": 0,  # Hello
+                    "d": {"obsWebSocketVersion": "5.0.0", "rpcVersion": 1, "authentication": None},
+                }
+            )
+        )
         mock_ws.send = AsyncMock()
         mock_ws.close = AsyncMock()
 
         # Mock websockets.connect
-        with patch('websockets.connect', AsyncMock(return_value=mock_ws)) as mock_connect:
+        with patch("websockets.connect", AsyncMock(return_value=mock_ws)) as mock_connect:
             result = await obs.connect(authenticate=False)
 
             # Verify connection was made
@@ -58,18 +59,15 @@ class TestOBSCaptureReal:
             "d": {
                 "obsWebSocketVersion": "5.0.0",
                 "rpcVersion": 1,
-                "authentication": {
-                    "challenge": "test_challenge",
-                    "salt": "test_salt"
-                }
-            }
+                "authentication": {"challenge": "test_challenge", "salt": "test_salt"},
+            },
         }
 
         mock_ws.recv = AsyncMock(return_value=json.dumps(hello_msg))
         mock_ws.send = AsyncMock()
         mock_ws.close = AsyncMock()
 
-        with patch('websockets.connect', AsyncMock(return_value=mock_ws)):
+        with patch("websockets.connect", AsyncMock(return_value=mock_ws)):
             result = await obs.connect(authenticate=True)
             # First connect returns False indicating auth is needed
             # because the Hello message has authentication challenge
@@ -91,14 +89,18 @@ class TestOBSCaptureReal:
 
         # Create mock websocket
         mock_ws = AsyncMock()
-        mock_ws.recv = AsyncMock(return_value=json.dumps({
-            "op": 7,  # RequestResponse
-            "d": {
-                "requestType": "StartRecord",
-                "requestId": "start_record_1",
-                "requestStatus": {"result": True, "code": 100}
-            }
-        }))
+        mock_ws.recv = AsyncMock(
+            return_value=json.dumps(
+                {
+                    "op": 7,  # RequestResponse
+                    "d": {
+                        "requestType": "StartRecord",
+                        "requestId": "start_record_1",
+                        "requestStatus": {"result": True, "code": 100},
+                    },
+                }
+            )
+        )
         mock_ws.send = AsyncMock()
         mock_ws.close = AsyncMock()
         obs._ws = mock_ws
@@ -122,15 +124,19 @@ class TestOBSCaptureReal:
 
         # Create mock websocket
         mock_ws = AsyncMock()
-        mock_ws.recv = AsyncMock(return_value=json.dumps({
-            "op": 7,  # RequestResponse
-            "d": {
-                "requestType": "StopRecord",
-                "requestId": "stop_record_1",
-                "requestStatus": {"result": True, "code": 100},
-                "responseData": {"outputPath": "/path/to/video.mp4"}
-            }
-        }))
+        mock_ws.recv = AsyncMock(
+            return_value=json.dumps(
+                {
+                    "op": 7,  # RequestResponse
+                    "d": {
+                        "requestType": "StopRecord",
+                        "requestId": "stop_record_1",
+                        "requestStatus": {"result": True, "code": 100},
+                        "responseData": {"outputPath": "/path/to/video.mp4"},
+                    },
+                }
+            )
+        )
         mock_ws.send = AsyncMock()
         mock_ws.close = AsyncMock()
         obs._ws = mock_ws

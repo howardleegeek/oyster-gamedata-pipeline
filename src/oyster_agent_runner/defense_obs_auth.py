@@ -22,7 +22,9 @@ log = logging.getLogger(__name__)
 class RateLimiter:
     """Sliding-window rate-limiter tracking consecutive failed attempts."""
 
-    def __init__(self, max_failures: int = 5, window_seconds: float = 60.0, cooldown_seconds: float = 300.0) -> None:
+    def __init__(
+        self, max_failures: int = 5, window_seconds: float = 60.0, cooldown_seconds: float = 300.0
+    ) -> None:
         self.max_failures = max_failures
         self.window_seconds = window_seconds
         self.cooldown_seconds = cooldown_seconds
@@ -96,7 +98,10 @@ def verify_signature(secret: str, payload: str, signature: str, identity: str = 
 
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point for OBS auth helper."""
-    parser = argparse.ArgumentParser(prog="defense_obs_auth", description="OBS auth helper with SHA256+base64 signing and rate-limiting")
+    parser = argparse.ArgumentParser(
+        prog="defense_obs_auth",
+        description="OBS auth helper with SHA256+base64 signing and rate-limiting",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     sign_parser = subparsers.add_parser("sign", help="Sign a payload")

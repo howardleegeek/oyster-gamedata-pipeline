@@ -144,38 +144,53 @@ class LanguageInstructionGenerator:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def _build_parser() -> argparse.ArgumentParser:
     """Construct the argparse CLI parser."""
     parser = argparse.ArgumentParser(
         description="Generate VLA language instruction specs (Cluster A).",
     )
     parser.add_argument(
-        "--task", type=str, default=None,
+        "--task",
+        type=str,
+        default=None,
         help="Single task description (for one-off generation).",
     )
     parser.add_argument(
-        "--episode-id", type=str, default="ep_001",
+        "--episode-id",
+        type=str,
+        default="ep_001",
         help="Episode identifier (default: ep_001).",
     )
     parser.add_argument(
-        "--mode", type=str, default="minimal",
+        "--mode",
+        type=str,
+        default="minimal",
         choices=("minimal", "dense", "verbose"),
         help="Narration density level.",
     )
     parser.add_argument(
-        "--narration", type=str, default=None,
+        "--narration",
+        type=str,
+        default=None,
         help="Explicit dense narration string.",
     )
     parser.add_argument(
-        "--batch", type=str, default=None,
+        "--batch",
+        type=str,
+        default=None,
         help="Path to JSON file with episode list for batch mode.",
     )
     parser.add_argument(
-        "--config", type=str, default=None,
+        "--config",
+        type=str,
+        default=None,
         help="Path to JSON/YAML config with custom templates.",
     )
     parser.add_argument(
-        "--out", type=str, default=None,
+        "--out",
+        type=str,
+        default=None,
         help="Output file path (JSON or YAML).",
     )
     return parser

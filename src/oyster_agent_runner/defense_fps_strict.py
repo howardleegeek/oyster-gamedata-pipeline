@@ -21,9 +21,16 @@ from pathlib import Path
 def _probe_fps(path: Path) -> list[dict]:
     """Return per-stream probe info via ffprobe (list-form call)."""
     cmd = [
-        "ffprobe", "-v", "error", "-select_streams", "v",
-        "-show_entries", "stream=index,r_frame_rate,codec_name",
-        "-of", "json", str(path),
+        "ffprobe",
+        "-v",
+        "error",
+        "-select_streams",
+        "v",
+        "-show_entries",
+        "stream=index,r_frame_rate,codec_name",
+        "-of",
+        "json",
+        str(path),
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if result.returncode != 0:
@@ -61,7 +68,9 @@ def check_fps(path: Path, *, strict: bool = False) -> list[str]:
             errors.append(f"stream {idx} ({codec}): {exc}")
             continue
         if fps != 30.0:
-            errors.append(f"stream {idx} ({codec}): r_frame_rate={rfr} (expected 30/1, got {fps:.4f})")
+            errors.append(
+                f"stream {idx} ({codec}): r_frame_rate={rfr} (expected 30/1, got {fps:.4f})"
+            )
         if strict:
             afr = s.get("avg_frame_rate", "")
             if afr:
@@ -75,7 +84,9 @@ def check_fps(path: Path, *, strict: bool = False) -> list[str]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry-point.  Returns 0 on success, 1 on failure."""
-    parser = argparse.ArgumentParser(description="Assert r_frame_rate == 30/1 for all video streams.")
+    parser = argparse.ArgumentParser(
+        description="Assert r_frame_rate == 30/1 for all video streams."
+    )
     parser.add_argument("files", nargs="+", type=Path, help="Media file(s) to check")
     parser.add_argument("--strict", action="store_true", help="Also verify avg_frame_rate == 30/1")
     parser.add_argument("--json", action="store_true", dest="as_json", help="Emit results as JSON")

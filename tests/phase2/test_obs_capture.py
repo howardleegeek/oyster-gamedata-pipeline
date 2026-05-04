@@ -14,6 +14,7 @@ import obs_capture
 def test_module_imports():
     """Import succeeds."""
     import obs_capture  # noqa: F811
+
     assert hasattr(obs_capture, "OBSSpectatorCapture")
 
 

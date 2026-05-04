@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 # Add parent directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from bin.generate_gameinfo_xlsx import (
     FIELD_NAMES,
@@ -43,8 +43,9 @@ class TestBuildGameinfoDict:
         result = build_gameinfo_dict(recording_date=None)
 
         today_iso = date.today().isoformat()
-        assert result["recording_date"] == today_iso, \
-            f"Expected today's date {today_iso}, got {result['recording_date']}"
+        assert (
+            result["recording_date"] == today_iso
+        ), f"Expected today's date {today_iso}, got {result['recording_date']}"
 
     def test_recording_date_preserved_when_provided(self):
         """Test that recording_date is preserved when explicitly provided."""
@@ -95,7 +96,7 @@ class TestWriteReadRoundtrip:
         )
 
         # Write to temporary file
-        with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as f:
             temp_path = f.name
 
         try:
@@ -103,8 +104,7 @@ class TestWriteReadRoundtrip:
 
             # Check file size is under 100KB
             file_size = os.path.getsize(temp_path)
-            assert file_size < 100 * 1024, \
-                f"File size {file_size} exceeds 100KB limit"
+            assert file_size < 100 * 1024, f"File size {file_size} exceeds 100KB limit"
 
             # Read back
             result = read_xlsx(temp_path)
@@ -112,8 +112,9 @@ class TestWriteReadRoundtrip:
             # Verify all fields match
             for field in FIELD_NAMES:
                 assert field in result, f"Missing field after read: {field}"
-                assert result[field] == test_data[field], \
-                    f"Field {field} mismatch: {result[field]} != {test_data[field]}"
+                assert (
+                    result[field] == test_data[field]
+                ), f"Field {field} mismatch: {result[field]} != {test_data[field]}"
 
         finally:
             if os.path.exists(temp_path):
@@ -127,6 +128,7 @@ class TestNoOpenpyxlFallback:
         """Test that the fallback works when openpyxl is not available."""
         # Mock the import to fail
         import sys
+
         original_modules = sys.modules.copy()
 
         # Create a fake import error for openpyxl
@@ -135,21 +137,22 @@ class TestNoOpenpyxlFallback:
 
         try:
             # Remove openpyxl from sys.modules if present
-            if 'openpyxl' in sys.modules:
-                del sys.modules['openpyxl']
+            if "openpyxl" in sys.modules:
+                del sys.modules["openpyxl"]
 
             # Patch the import to raise ImportError
-            with patch.dict(sys.modules, {'openpyxl': None}):
+            with patch.dict(sys.modules, {"openpyxl": None}):
                 # Reload the module to pick up the patch
                 import importlib
 
                 import bin.generate_gameinfo_xlsx as module
+
                 importlib.reload(module)
 
                 # Test that write_xlsx still works
                 test_data = build_gameinfo_dict()
 
-                with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as f:
+                with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as f:
                     temp_path = f.name
 
                 try:
@@ -180,12 +183,18 @@ class TestMain:
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = os.path.join(tmpdir, "gameinfo.xlsx")
 
-            result = main([
-                "--output", output_path,
-                "--scene-name", "flat-overworld",
-                "--route-type", "1",
-                "--total-frames", "9000",
-            ])
+            result = main(
+                [
+                    "--output",
+                    output_path,
+                    "--scene-name",
+                    "flat-overworld",
+                    "--route-type",
+                    "1",
+                    "--total-frames",
+                    "9000",
+                ]
+            )
 
             assert result == 0, f"main() returned non-zero: {result}"
             assert os.path.exists(output_path), "Output file was not created"
@@ -200,23 +209,40 @@ class TestMain:
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = os.path.join(tmpdir, "gameinfo.xlsx")
 
-            result = main([
-                "--output", output_path,
-                "--game-name", "Terraria",
-                "--game-version", "1.4.4",
-                "--platform", "Steam",
-                "--scene-name", "world",
-                "--weather", "storm",
-                "--time-of-day", "dusk",
-                "--character-name", "Hero",
-                "--character-class", "mage",
-                "--operator-id", "op-999",
-                "--recording-date", "2023-12-25",
-                "--total-frames", "10000",
-                "--video-duration-sec", "400.0",
-                "--route-type", "3",
-                "--notes", "Full test",
-            ])
+            result = main(
+                [
+                    "--output",
+                    output_path,
+                    "--game-name",
+                    "Terraria",
+                    "--game-version",
+                    "1.4.4",
+                    "--platform",
+                    "Steam",
+                    "--scene-name",
+                    "world",
+                    "--weather",
+                    "storm",
+                    "--time-of-day",
+                    "dusk",
+                    "--character-name",
+                    "Hero",
+                    "--character-class",
+                    "mage",
+                    "--operator-id",
+                    "op-999",
+                    "--recording-date",
+                    "2023-12-25",
+                    "--total-frames",
+                    "10000",
+                    "--video-duration-sec",
+                    "400.0",
+                    "--route-type",
+                    "3",
+                    "--notes",
+                    "Full test",
+                ]
+            )
 
             assert result == 0
 
@@ -259,10 +285,14 @@ class TestRouteTypeValidation:
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = os.path.join(tmpdir, "gameinfo.xlsx")
 
-            result = main([
-                "--output", output_path,
-                "--route-type", "5",
-            ])
+            result = main(
+                [
+                    "--output",
+                    output_path,
+                    "--route-type",
+                    "5",
+                ]
+            )
 
             assert result == 1, "main() should return 1 for invalid route_type"
 

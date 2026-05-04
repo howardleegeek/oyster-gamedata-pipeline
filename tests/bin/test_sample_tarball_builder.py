@@ -35,13 +35,13 @@ class TestSynthesizeVideo:
             video_path = os.path.join(tmpdir, "test_video.mp4")
 
             # Mock subprocess.run to avoid actually calling ffmpeg
-            with mock.patch('subprocess.run') as mock_run:
+            with mock.patch("subprocess.run") as mock_run:
                 mock_run.return_value = mock.Mock(returncode=0, stderr="")
 
                 # Create a dummy file to simulate ffmpeg output
                 Path(video_path).parent.mkdir(parents=True, exist_ok=True)
-                with open(video_path, 'wb') as f:
-                    f.write(b'\x00' * 1024)  # Dummy video data
+                with open(video_path, "wb") as f:
+                    f.write(b"\x00" * 1024)  # Dummy video data
 
                 result = synthesize_video(video_path, duration_sec=1, fps=30)
 
@@ -61,10 +61,9 @@ class TestSynthesizeVideo:
         with tempfile.TemporaryDirectory() as tmpdir:
             video_path = os.path.join(tmpdir, "test_video.mp4")
 
-            with mock.patch('subprocess.run') as mock_run:
+            with mock.patch("subprocess.run") as mock_run:
                 mock_run.return_value = mock.Mock(
-                    returncode=1,
-                    stderr="ffmpeg error: invalid codec"
+                    returncode=1, stderr="ffmpeg error: invalid codec"
                 )
 
                 with pytest.raises(RuntimeError, match="ffmpeg failed"):
@@ -97,13 +96,25 @@ class TestSynthesizeActionCamera:
 
             # 20 PDF-spec fields per record
             required_fields = [
-                "frame", "time", "fps", "route_type",
-                "mouse_x", "mouse_y", "mouse_dx", "mouse_dy", "keyCode",
-                "camera_position", "camera_rotation_oula",
-                "camera_rotation_quaternion", "camera_Follow Offset",
-                "camera_intrinsics", "camera_speed",
-                "player_position", "player_rotation_oula",
-                "player_rotation_quaternion", "player_speed",
+                "frame",
+                "time",
+                "fps",
+                "route_type",
+                "mouse_x",
+                "mouse_y",
+                "mouse_dx",
+                "mouse_dy",
+                "keyCode",
+                "camera_position",
+                "camera_rotation_oula",
+                "camera_rotation_quaternion",
+                "camera_Follow Offset",
+                "camera_intrinsics",
+                "camera_speed",
+                "player_position",
+                "player_rotation_oula",
+                "player_rotation_quaternion",
+                "player_speed",
                 "metric_scale",
             ]
             first = records[0]
@@ -131,7 +142,7 @@ class TestSynthesizeActionCamera:
             synthesize_action_camera(path2, frame_count=10)
 
             # Same seed should produce same output
-            with open(path1, 'rb') as f1, open(path2, 'rb') as f2:
+            with open(path1, "rb") as f1, open(path2, "rb") as f2:
                 assert f1.read() == f2.read()
 
 
@@ -185,7 +196,7 @@ class TestBuildSampleTarball:
             assert os.path.exists(output_path)
 
             # Verify tarball contents
-            with tarfile.open(output_path, 'r:gz') as tar:
+            with tarfile.open(output_path, "r:gz") as tar:
                 names = tar.getnames()
 
                 # Check all 4 assets are present
@@ -210,7 +221,7 @@ class TestBuildSampleTarball:
             assert os.path.exists(output_path)
 
             # Video should be minimal placeholder
-            with tarfile.open(output_path, 'r:gz') as tar:
+            with tarfile.open(output_path, "r:gz") as tar:
                 video_member = tar.getmember("video.mp4")
                 # Placeholder should be small (< 10KB)
                 assert video_member.size < 10 * 1024
@@ -225,7 +236,7 @@ class TestBuildSampleTarball:
             output_path = os.path.join(tmpdir, "test_sha.tar.gz")
 
             # Capture stdout
-            with mock.patch('builtins.print'):
+            with mock.patch("builtins.print"):
                 build_sample_tarball(
                     output_path=output_path,
                     skip_video=True,
@@ -234,13 +245,13 @@ class TestBuildSampleTarball:
 
             # Verify we can compute SHA-256
             sha256 = hashlib.sha256()
-            with open(output_path, 'rb') as f:
+            with open(output_path, "rb") as f:
                 sha256.update(f.read())
 
             # Should have valid hex digest
             digest = sha256.hexdigest()
             assert len(digest) == 64  # SHA-256 produces 64 hex chars
-            assert all(c in '0123456789abcdef' for c in digest)
+            assert all(c in "0123456789abcdef" for c in digest)
 
 
 class TestMain:
@@ -253,8 +264,10 @@ class TestMain:
 
             # Test with custom arguments
             argv = [
-                "--output", output_path,
-                "--clip-id", "test-clip-123",
+                "--output",
+                output_path,
+                "--clip-id",
+                "test-clip-123",
                 "--skip-video",
                 "--skip-depth",
             ]
@@ -265,7 +278,7 @@ class TestMain:
             assert os.path.exists(output_path)
 
             # Verify clip ID was used
-            with tarfile.open(output_path, 'r:gz') as tar:
+            with tarfile.open(output_path, "r:gz") as tar:
                 # Extract and check gameinfo.xlsx
                 with tempfile.TemporaryDirectory() as extract_dir:
                     tar.extract("gameinfo.xlsx", extract_dir)

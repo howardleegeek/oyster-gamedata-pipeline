@@ -13,14 +13,18 @@ from typing import Any
 # Lazy import
 _websockets = None
 
+
 def _import_websockets():
     global _websockets
     if _websockets is None:
         try:
             import websockets
+
             _websockets = websockets
         except ImportError:
-            raise ImportError("websockets library not installed. Install with: pip install websockets")
+            raise ImportError(
+                "websockets library not installed. Install with: pip install websockets"
+            )
     return _websockets
 
 

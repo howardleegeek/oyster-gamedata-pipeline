@@ -34,7 +34,11 @@ class ActionChunk:
     __slots__ = ("_data", "_horizon", "_policy", "_step_id")
 
     def __init__(
-        self, data: np.ndarray, horizon: int, policy: str, step_id: int = 0,
+        self,
+        data: np.ndarray,
+        horizon: int,
+        policy: str,
+        step_id: int = 0,
     ) -> None:
         if horizon not in VALID_HORIZONS:
             raise ValueError(f"horizon must be in {VALID_HORIZONS}")
@@ -66,9 +70,12 @@ class ActionChunk:
     def to_dict(self) -> dict[str, Any]:
         """Serialise to a JSON-compatible dict."""
         return {
-            "spec_version": SPEC_VERSION, "policy": self._policy,
-            "horizon": self._horizon, "step_id": self._step_id,
-            "shape": list(self._data.shape), "dtype": str(self._data.dtype),
+            "spec_version": SPEC_VERSION,
+            "policy": self._policy,
+            "horizon": self._horizon,
+            "step_id": self._step_id,
+            "shape": list(self._data.shape),
+            "dtype": str(self._data.dtype),
             "data": self._data.tolist(),
         }
 
@@ -76,7 +83,8 @@ class ActionChunk:
     def from_dict(cls, d: dict[str, Any]) -> ActionChunk:
         return cls(
             data=np.array(d["data"], dtype=np.float32),
-            horizon=d["horizon"], policy=d["policy"],
+            horizon=d["horizon"],
+            policy=d["policy"],
             step_id=d.get("step_id", 0),
         )
 
@@ -88,7 +96,9 @@ class ActionChunk:
 
 
 def pack_chunks(
-    chunks: Sequence[ActionChunk], *, pad_to_max: bool = True,
+    chunks: Sequence[ActionChunk],
+    *,
+    pad_to_max: bool = True,
 ) -> dict[str, Any]:
     """Pack a sequence of ActionChunks into a buyer-spec v2 bundle."""
     if not chunks:
@@ -109,11 +119,14 @@ def pack_chunks(
         packed.append(arr)
     stacked = np.stack(packed, axis=0)
     return {
-        "spec_version": SPEC_VERSION, "n_chunks": len(chunks),
-        "horizon": max_h, "action_dim": dim,
+        "spec_version": SPEC_VERSION,
+        "n_chunks": len(chunks),
+        "horizon": max_h,
+        "action_dim": dim,
         "policies": list({c.policy for c in chunks}),
         "step_ids": [c.step_id for c in chunks],
-        "packed_shape": list(stacked.shape), "packed_data": stacked.tolist(),
+        "packed_shape": list(stacked.shape),
+        "packed_data": stacked.tolist(),
     }
 
 
@@ -123,8 +136,12 @@ def unpack_chunks(bundle: dict[str, Any]) -> list[ActionChunk]:
     policies = bundle.get("policies", ["octo"])
     step_ids = bundle.get("step_ids", list(range(bundle["n_chunks"])))
     return [
-        ActionChunk(data=data[i], horizon=bundle["horizon"],
-                    policy=policies[i % len(policies)], step_id=step_ids[i])
+        ActionChunk(
+            data=data[i],
+            horizon=bundle["horizon"],
+            policy=policies[i % len(policies)],
+            step_id=step_ids[i],
+        )
         for i in range(bundle["n_chunks"])
     ]
 
@@ -139,8 +156,10 @@ def interpolate_horizon(chunk: ActionChunk, target_horizon: int) -> ActionChunk:
     for d in range(chunk.data.shape[1]):
         resampled[:, d] = np.interp(dst_x, src_x, chunk.data[:, d])
     return ActionChunk(
-        data=resampled, horizon=target_horizon,
-        policy=chunk.policy, step_id=chunk.step_id,
+        data=resampled,
+        horizon=target_horizon,
+        policy=chunk.policy,
+        step_id=chunk.step_id,
     )
 
 
@@ -185,8 +204,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         chunks: list[ActionChunk] = []
         for idx in range(raw.shape[0]):
             chunk = ActionChunk(
-                data=raw[idx], horizon=args.horizon,
-                policy=args.policy, step_id=idx,
+                data=raw[idx],
+                horizon=args.horizon,
+                policy=args.policy,
+                step_id=idx,
             )
             if args.target_horizon is not None:
                 chunk = interpolate_horizon(chunk, args.target_horizon)

@@ -39,11 +39,10 @@ def _get_websockets():
     """Lazy-import websockets to allow module load without the dependency."""
     try:
         import websockets
+
         return websockets
     except ImportError:
-        raise ImportError(
-            "websockets is required. Install with: pip install websockets"
-        )
+        raise ImportError("websockets is required. Install with: pip install websockets")
 
 
 class OBSRecorder:
@@ -143,15 +142,11 @@ class OBSRecorder:
         if auth_required and self._password:
             # SHA256 base64 challenge: base64(SHA256(password + salt + challenge))
             secret = base64.b64encode(
-                hashlib.sha256(
-                    (self._password + salt + challenge).encode("utf-8")
-                ).digest()
+                hashlib.sha256((self._password + salt + challenge).encode("utf-8")).digest()
             ).decode("utf-8")
             identify_data["authentication"] = secret
         elif auth_required and not self._password:
-            raise ConnectionError(
-                "OBS requires authentication but no password was provided."
-            )
+            raise ConnectionError("OBS requires authentication but no password was provided.")
 
         identify_payload = {
             "op": OP_IDENTIFY,
@@ -190,9 +185,7 @@ class OBSRecorder:
                             fut.set_result(data.get("responseData", {}))
                         else:
                             fut.set_exception(
-                                RuntimeError(
-                                    f"OBS request failed: {data.get('requestStatus', {})}"
-                                )
+                                RuntimeError(f"OBS request failed: {data.get('requestStatus', {})}")
                             )
                 elif op == 9:  # Event
                     logger.debug("OBS event: %s", data.get("eventType"))
@@ -201,9 +194,7 @@ class OBSRecorder:
         except Exception as exc:
             logger.debug("Response listener exited: %s", exc)
 
-    async def start(
-        self, output_path: str, profile: str = "spectator-1080p30"
-    ) -> None:
+    async def start(self, output_path: str, profile: str = "spectator-1080p30") -> None:
         """Start OBS recording.
 
         Args:

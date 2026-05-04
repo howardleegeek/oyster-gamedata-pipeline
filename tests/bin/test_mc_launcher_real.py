@@ -201,7 +201,7 @@ def test_rcon_command_constructs_packet() -> None:
     recv_calls = [
         (4, auth_response_length),  # First recv(4) gets length
         (10, auth_response_packet),  # Then recv(10) gets rest (14-4=10)
-        (4, cmd_response_length),   # First recv(4) for command response length
+        (4, cmd_response_length),  # First recv(4) for command response length
         (23, cmd_response_packet),  # Then recv(23) gets rest (27-4=23)
     ]
 
@@ -220,10 +220,7 @@ def test_rcon_command_constructs_packet() -> None:
 
     with mock.patch("socket.socket", return_value=mock_sock):
         response = mc_launcher_real.send_rcon_command(
-            host="localhost",
-            port=25575,
-            password="testpass",
-            command="test command"
+            host="localhost", port=25575, password="testpass", command="test command"
         )
 
         # Verify response
@@ -262,10 +259,7 @@ def test_rcon_command_auth_failure() -> None:
     with mock.patch("socket.socket", return_value=mock_sock):
         with pytest.raises(RuntimeError, match="RCON authentication failed"):
             mc_launcher_real.send_rcon_command(
-                host="localhost",
-                port=25575,
-                password="wrongpass",
-                command="test"
+                host="localhost", port=25575, password="wrongpass", command="test"
             )
 
 
@@ -278,10 +272,7 @@ def test_rcon_command_connection_error() -> None:
 
         with pytest.raises(ConnectionError):
             mc_launcher_real.send_rcon_command(
-                host="localhost",
-                port=25575,
-                password="testpass",
-                command="test"
+                host="localhost", port=25575, password="testpass", command="test"
             )
 
 
@@ -305,15 +296,24 @@ def test_main_argparse() -> None:
 
     # Test with custom arguments
     test_args = [
-        "--server", "example.com:25566",
-        "--username", "TestPlayer",
-        "--gamemode", "spectator",
-        "--duration", "300",
-        "--log-dir", "/custom/logs",
-        "--rcon-password", "secret",
-        "--rcon-port", "25576",
-        "--version", "1.19.4",
-        "--java-xmx", "2G"
+        "--server",
+        "example.com:25566",
+        "--username",
+        "TestPlayer",
+        "--gamemode",
+        "spectator",
+        "--duration",
+        "300",
+        "--log-dir",
+        "/custom/logs",
+        "--rcon-password",
+        "secret",
+        "--rcon-port",
+        "25576",
+        "--version",
+        "1.19.4",
+        "--java-xmx",
+        "2G",
     ]
 
     with mock.patch("sys.argv", ["mc_launcher_real.py"] + test_args):
@@ -338,7 +338,9 @@ def test_main_argparse() -> None:
 def test_launch_minecraft_fallback() -> None:
     """Test fallback to direct Java invocation when launcher not found."""
     # Mock find_minecraft_launcher to raise RuntimeError
-    with mock.patch("mc_launcher_real.find_minecraft_launcher", side_effect=RuntimeError("No launcher")):
+    with mock.patch(
+        "mc_launcher_real.find_minecraft_launcher", side_effect=RuntimeError("No launcher")
+    ):
         # Mock shutil.which to return a Java path
         with mock.patch("shutil.which", return_value="/usr/bin/java"):
             # Mock subprocess.Popen
@@ -370,7 +372,9 @@ def test_launch_minecraft_with_minecraft_launcher_lib() -> None:
     mock_lib.command.get_minecraft_command.return_value = ["/fake/launcher", "--args"]
 
     with mock.patch.dict(sys.modules, {"minecraft_launcher_lib": mock_lib}):
-        with mock.patch("mc_launcher_real.find_minecraft_launcher", return_value="minecraft-launcher-lib"):
+        with mock.patch(
+            "mc_launcher_real.find_minecraft_launcher", return_value="minecraft-launcher-lib"
+        ):
             with mock.patch("subprocess.Popen") as mock_popen:
                 mock_process = mock.MagicMock()
                 mock_process.stdout = io.StringIO()
@@ -388,7 +392,9 @@ def test_launch_minecraft_with_minecraft_launcher_lib() -> None:
 
 def test_launch_minecraft_with_system_launcher() -> None:
     """Test using system launcher binary."""
-    with mock.patch("mc_launcher_real.find_minecraft_launcher", return_value="/usr/bin/minecraft-launcher"):
+    with mock.patch(
+        "mc_launcher_real.find_minecraft_launcher", return_value="/usr/bin/minecraft-launcher"
+    ):
         with mock.patch("subprocess.Popen") as mock_popen:
             mock_process = mock.MagicMock()
             mock_process.stdout = io.StringIO()
@@ -407,7 +413,9 @@ def test_launch_minecraft_with_system_launcher() -> None:
 def test_launch_minecraft_java_not_found() -> None:
     """Test error when Java not found in fallback mode."""
     # Mock find_minecraft_launcher to raise RuntimeError
-    with mock.patch("mc_launcher_real.find_minecraft_launcher", side_effect=RuntimeError("No launcher")):
+    with mock.patch(
+        "mc_launcher_real.find_minecraft_launcher", side_effect=RuntimeError("No launcher")
+    ):
         # Mock shutil.which to return None (Java not found)
         with mock.patch("shutil.which", return_value=None):
             with pytest.raises(FileNotFoundError, match="Java not found"):
@@ -457,10 +465,9 @@ def test_main_with_rcon_commands() -> None:
                         mock_rcon.return_value = "OK"
 
                         with mock.patch("time.sleep"):
-                            result = mc_launcher_real.main([
-                                "--rcon-password", "testpass",
-                                "--duration", "10"
-                            ])
+                            result = mc_launcher_real.main(
+                                ["--rcon-password", "testpass", "--duration", "10"]
+                            )
 
                             # Should have sent RCON commands
                             assert mock_rcon.call_count == 2

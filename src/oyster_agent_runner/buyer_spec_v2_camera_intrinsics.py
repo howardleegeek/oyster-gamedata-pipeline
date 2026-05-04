@@ -16,6 +16,7 @@ from typing import Any
 # Lazy imports for optional dependencies
 try:
     import numpy as np
+
     HAS_NUMPY = True
 except ImportError:
     HAS_NUMPY = False
@@ -25,16 +26,18 @@ except ImportError:
 class CameraIntrinsicsSpec:
     """Validate camera intrinsics (K matrix, distortion) and extrinsics (SE3 pose)."""
 
-    def __init__(self,
-                 K: list[list[float]] | None = None,
-                 D: list[float] | None = None,
-                 image_size: tuple[int, int] | None = None,
-                 camera_name: str = "",
-                 frame_id: str = "",
-                 T_world_cam: list[list[float]] | None = None):
+    def __init__(
+        self,
+        K: list[list[float]] | None = None,
+        D: list[float] | None = None,
+        image_size: tuple[int, int] | None = None,
+        camera_name: str = "",
+        frame_id: str = "",
+        T_world_cam: list[list[float]] | None = None,
+    ):
         """
         Initialize camera intrinsics specification.
-        
+
         Args:
             K: 3x3 intrinsic matrix [[fx, s, cx], [0, fy, cy], [0, 0, 1]]
             D: Distortion coefficients [k1, k2, p1, p2, k3, ...]
@@ -143,8 +146,14 @@ class CameraIntrinsicsSpec:
         w = data.get("width") or data.get("image_width")
         h = data.get("height") or data.get("image_height")
         image_size = (w, h) if w and h else data.get("image_size")
-        return cls(K=K, D=D, image_size=image_size, camera_name=data.get("camera_name", ""),
-                   frame_id=data.get("frame_id", ""), T_world_cam=T)
+        return cls(
+            K=K,
+            D=D,
+            image_size=image_size,
+            camera_name=data.get("camera_name", ""),
+            frame_id=data.get("frame_id", ""),
+            T_world_cam=T,
+        )
 
 
 def validate_file(path: Path, verbose: bool = False) -> int:

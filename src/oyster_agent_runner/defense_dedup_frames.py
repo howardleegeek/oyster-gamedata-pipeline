@@ -20,8 +20,7 @@ from typing import Any
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -29,11 +28,11 @@ logger = logging.getLogger(__name__)
 class FrameDeduplicationDefense:
     """
     In-memory defense mechanism for tracking and rejecting duplicate frame IDs.
-    
+
     This class maintains a set of seen frame IDs within a scene context and
     provides methods to check for duplicates, add new frames, and clear the
     tracking state between scenes.
-    
+
     Attributes:
         seen_frame_ids: Set of frame IDs that have been processed in current scene
         scene_id: Optional identifier for the current scene being tracked
@@ -42,7 +41,7 @@ class FrameDeduplicationDefense:
     def __init__(self, scene_id: str | None = None):
         """
         Initialize a new frame deduplication defense instance.
-        
+
         Args:
             scene_id: Optional identifier for the scene being tracked
         """
@@ -53,20 +52,17 @@ class FrameDeduplicationDefense:
     def check_duplicate(self, frame_id: str) -> bool:
         """
         Check if a frame ID has already been seen in the current scene.
-        
+
         Args:
             frame_id: The frame ID to check
-            
+
         Returns:
             True if the frame ID is a duplicate, False otherwise
         """
         is_duplicate = frame_id in self.seen_frame_ids
 
         if is_duplicate:
-            logger.warning(
-                f"Duplicate frame_id detected: {frame_id} "
-                f"(scene: {self.scene_id})"
-            )
+            logger.warning(f"Duplicate frame_id detected: {frame_id} " f"(scene: {self.scene_id})")
         else:
             logger.debug(f"New frame_id: {frame_id}")
 
@@ -75,10 +71,10 @@ class FrameDeduplicationDefense:
     def add_frame(self, frame_id: str) -> None:
         """
         Add a frame ID to the tracking set.
-        
+
         Args:
             frame_id: The frame ID to add to the tracking set
-            
+
         Raises:
             ValueError: If frame_id is empty or None
         """
@@ -91,13 +87,13 @@ class FrameDeduplicationDefense:
     def process_frame(self, frame_id: str, frame_data: dict[str, Any] | None = None) -> bool:
         """
         Process a frame by checking for duplicates and adding it if new.
-        
+
         This is a convenience method that combines check_duplicate and add_frame.
-        
+
         Args:
             frame_id: The frame ID to process
             frame_data: Optional frame data (not used for dedup, for API compatibility)
-            
+
         Returns:
             True if the frame is a duplicate and should be rejected, False otherwise
         """
@@ -113,28 +109,25 @@ class FrameDeduplicationDefense:
         """
         count = len(self.seen_frame_ids)
         self.seen_frame_ids.clear()
-        logger.info(
-            f"Cleared {count} tracked frame_ids "
-            f"(scene: {self.scene_id})"
-        )
+        logger.info(f"Cleared {count} tracked frame_ids " f"(scene: {self.scene_id})")
 
     def get_stats(self) -> dict[str, Any]:
         """
         Get statistics about the current tracking state.
-        
+
         Returns:
             Dictionary containing tracking statistics
         """
         return {
             "scene_id": self.scene_id,
             "unique_frames_seen": len(self.seen_frame_ids),
-            "frame_ids": sorted(list(self.seen_frame_ids))
+            "frame_ids": sorted(list(self.seen_frame_ids)),
         }
 
     def reset_scene(self, new_scene_id: str | None = None) -> None:
         """
         Reset the defense for a new scene.
-        
+
         Args:
             new_scene_id: Optional new scene ID (if None, keeps current)
         """
@@ -148,7 +141,7 @@ class FrameDeduplicationDefense:
 def parse_arguments() -> argparse.Namespace:
     """
     Parse command line arguments.
-    
+
     Returns:
         Parsed arguments namespace
     """
@@ -160,53 +153,37 @@ Examples:
   %(prog)s --scene-id scene_001 --frame-id frame_001 --frame-id frame_002
   %(prog)s --check-duplicates --input-file frames.json
   %(prog)s --stats-only --scene-id scene_001
-        """
+        """,
     )
 
-    parser.add_argument(
-        "--scene-id",
-        type=str,
-        help="Scene identifier for tracking context"
-    )
+    parser.add_argument("--scene-id", type=str, help="Scene identifier for tracking context")
 
     parser.add_argument(
         "--frame-id",
         type=str,
         action="append",
         default=[],
-        help="Frame ID to process (can be specified multiple times)"
+        help="Frame ID to process (can be specified multiple times)",
+    )
+
+    parser.add_argument("--input-file", type=str, help="JSON file containing frame IDs to process")
+
+    parser.add_argument(
+        "--check-duplicates", action="store_true", help="Check for duplicates in provided frame IDs"
     )
 
     parser.add_argument(
-        "--input-file",
-        type=str,
-        help="JSON file containing frame IDs to process"
+        "--stats-only", action="store_true", help="Only show statistics, don't process frames"
     )
 
-    parser.add_argument(
-        "--check-duplicates",
-        action="store_true",
-        help="Check for duplicates in provided frame IDs"
-    )
-
-    parser.add_argument(
-        "--stats-only",
-        action="store_true",
-        help="Only show statistics, don't process frames"
-    )
-
-    parser.add_argument(
-        "--verbose", "-v",
-        action="store_true",
-        help="Enable verbose logging"
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
 
     parser.add_argument(
         "--output-format",
         type=str,
         choices=["text", "json"],
         default="text",
-        help="Output format for results"
+        help="Output format for results",
     )
 
     return parser.parse_args()
@@ -215,13 +192,13 @@ Examples:
 def load_frame_ids_from_file(file_path: str) -> list[str]:
     """
     Load frame IDs from a JSON file.
-    
+
     Args:
         file_path: Path to JSON file
-        
+
     Returns:
         List of frame IDs
-        
+
     Raises:
         FileNotFoundError: If file doesn't exist
         json.JSONDecodeError: If file contains invalid JSON
@@ -248,10 +225,10 @@ def load_frame_ids_from_file(file_path: str) -> list[str]:
 def main(argv: list[str] | None = None) -> int:
     """
     Main entry point for the frame deduplication defense.
-    
+
     Args:
         argv: Command line arguments (defaults to sys.argv[1:])
-        
+
     Returns:
         Exit code (0 for success, non-zero for error)
     """
@@ -308,7 +285,7 @@ def main(argv: list[str] | None = None) -> int:
             "new_frames_added": len(new_frames),
             "duplicate_frame_ids": duplicates,
             "new_frame_ids": new_frames,
-            "stats": defense.get_stats()
+            "stats": defense.get_stats(),
         }
         print(json.dumps(result, indent=2))
     else:

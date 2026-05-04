@@ -56,14 +56,11 @@ def assert_finite(vec: Vector3, label: str = "Vector3") -> None:
     """
     values: list[float] = [float(v) for v in vec]
     if len(values) != 3:
-        raise ValueError(
-            f"{label}: expected 3 components, got {len(values)}"
-        )
+        raise ValueError(f"{label}: expected 3 components, got {len(values)}")
     for idx, v in enumerate(values):
         if not math.isfinite(v):
             raise ValueError(
-                f"{label}[{idx}] = {v!r} is not finite "
-                f"(NaN/Inf detected before write)"
+                f"{label}[{idx}] = {v!r} is not finite " f"(NaN/Inf detected before write)"
             )
 
 

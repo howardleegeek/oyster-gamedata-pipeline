@@ -28,7 +28,7 @@ class DefenseClock:
     @staticmethod
     def wallclock_iso() -> str:
         """ISO format wall clock timestamp."""
-        return time.strftime('%Y-%m-%dT%H:%M:%S', time.localtime())
+        return time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
 
 
 def capture_loop_monotonic(
@@ -38,7 +38,7 @@ def capture_loop_monotonic(
 ) -> dict:
     """
     Capture loop using monotonic timing.
-    
+
     Uses monotonic_ns() for interval control to avoid clock skew.
     Wall clock only used if process_func needs timestamps.
     """
@@ -66,11 +66,11 @@ def capture_loop_monotonic(
     # Return stats
     if durations:
         return {
-            'iterations': len(durations),
-            'total_ns': sum(durations),
-            'avg_ns': sum(durations) / len(durations),
-            'min_ns': min(durations),
-            'max_ns': max(durations),
+            "iterations": len(durations),
+            "total_ns": sum(durations),
+            "avg_ns": sum(durations) / len(durations),
+            "min_ns": min(durations),
+            "max_ns": max(durations),
         }
     return {}
 
@@ -78,20 +78,20 @@ def capture_loop_monotonic(
 def create_timestamped_event(event_type: str, data: dict) -> dict:
     """Create event with wall clock timestamp and monotonic reference."""
     return {
-        'event_type': event_type,
-        'timestamp_ns': DefenseClock.wallclock_ns(),  # Wall for stamp
-        'timestamp_iso': DefenseClock.wallclock_iso(),
-        'data': data,
-        'monotonic_ref': DefenseClock.monotonic_ns(),  # Mono for reference
+        "event_type": event_type,
+        "timestamp_ns": DefenseClock.wallclock_ns(),  # Wall for stamp
+        "timestamp_iso": DefenseClock.wallclock_iso(),
+        "data": data,
+        "monotonic_ref": DefenseClock.monotonic_ns(),  # Mono for reference
     }
 
 
 def main(argv=None) -> int:
     """CLI for defense monotonic clock."""
     parser = argparse.ArgumentParser(
-        description='Use monotonic_ns() for timing, wall clock for stamps'
+        description="Use monotonic_ns() for timing, wall clock for stamps"
     )
-    parser.add_argument('--demo', action='store_true', help='Run demo')
+    parser.add_argument("--demo", action="store_true", help="Run demo")
 
     args = parser.parse_args(argv)
 
@@ -107,10 +107,7 @@ def main(argv=None) -> int:
         print()
 
         print("2. Timestamped event:")
-        event = create_timestamped_event(
-            "demo",
-            {"message": "Using monotonic for timing"}
-        )
+        event = create_timestamped_event("demo", {"message": "Using monotonic for timing"})
         print(f"   Event: {event['event_type']}")
         print(f"   Time: {event['timestamp_iso']}")
         print(f"   Mono ref: {event['monotonic_ref']}")
@@ -128,16 +125,12 @@ def main(argv=None) -> int:
                 print(f"    Iter {i}")
             time.sleep(0.05)
 
-        stats = capture_loop_monotonic(
-            process,
-            interval_ms=150.0,
-            max_iterations=3
-        )
+        stats = capture_loop_monotonic(process, interval_ms=150.0, max_iterations=3)
 
         print()
         print("4. Timing statistics:")
         for key, value in stats.items():
-            if key.endswith('_ns'):
+            if key.endswith("_ns"):
                 print(f"   {key}: {value / 1_000_000:.2f} ms")
             else:
                 print(f"   {key}: {value}")

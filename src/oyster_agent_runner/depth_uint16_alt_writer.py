@@ -87,15 +87,26 @@ def main(argv: list[str] | None = None) -> int:
         epilog="Examples:\n  %(prog)s depth.exr\n  %(prog)s depth.exr -o depth_uint16.png",
     )
     parser.add_argument("input", type=Path, help="Input depth file (.exr or .npy)")
-    parser.add_argument("-o", "--output", type=Path, default=None,
-                        help="Output PNG path (default: input stem + .png)")
-    parser.add_argument("--scale", type=float, default=DEPTH_SCALE_M_TO_MM,
-                        help=f"Scale factor (default: {DEPTH_SCALE_M_TO_MM})")
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=Path,
+        default=None,
+        help="Output PNG path (default: input stem + .png)",
+    )
+    parser.add_argument(
+        "--scale",
+        type=float,
+        default=DEPTH_SCALE_M_TO_MM,
+        help=f"Scale factor (default: {DEPTH_SCALE_M_TO_MM})",
+    )
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logging")
 
     args = parser.parse_args(argv)
-    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
-                        format="%(asctime)s - %(levelname)s - %(message)s")
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+    )
 
     try:
         output = process_depth_file(args.input, args.output, args.scale)

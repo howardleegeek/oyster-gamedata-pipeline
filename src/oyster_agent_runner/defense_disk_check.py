@@ -76,20 +76,20 @@ def main(argv: list[str]) -> int:
         description="Check available disk space before capture operations."
     )
     parser.add_argument(
-        "-p", "--path",
+        "-p",
+        "--path",
         default=".",
-        help="Path to check disk space for (default: current directory)"
+        help="Path to check disk space for (default: current directory)",
     )
     parser.add_argument(
-        "-m", "--min-gb",
+        "-m",
+        "--min-gb",
         type=float,
         default=5.0,
-        help="Minimum required free space in GB (default: 5.0)"
+        help="Minimum required free space in GB (default: 5.0)",
     )
     parser.add_argument(
-        "-q", "--quiet",
-        action="store_true",
-        help="Suppress output, only return exit code"
+        "-q", "--quiet", action="store_true", help="Suppress output, only return exit code"
     )
 
     args = parser.parse_args(argv)
@@ -110,7 +110,7 @@ def main(argv: list[str]) -> int:
             print(
                 f"INSUFFICIENT: {format_bytes(free_bytes)} free "
                 f"(required: {format_bytes(min_bytes)})",
-                file=sys.stderr
+                file=sys.stderr,
             )
 
     return 0 if is_sufficient else 1

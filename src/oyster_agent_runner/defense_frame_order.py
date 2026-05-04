@@ -129,9 +129,7 @@ def main(argv: list[str]) -> int:
     Returns:
         Exit code: 0 on success, 1 on validation failure.
     """
-    parser = argparse.ArgumentParser(
-        description="Validate frame_id ordering (Blue Team for G092)"
-    )
+    parser = argparse.ArgumentParser(description="Validate frame_id ordering (Blue Team for G092)")
     parser.add_argument(
         "--input",
         "-i",
@@ -145,9 +143,7 @@ def main(argv: list[str]) -> int:
         action="store_true",
         help="Allow frame_id to reset to 0 (new stream)",
     )
-    parser.add_argument(
-        "--verbose", "-v", action="store_true", help="Verbose error output"
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose error output")
     parser.add_argument(
         "--stop-on-error",
         "-s",

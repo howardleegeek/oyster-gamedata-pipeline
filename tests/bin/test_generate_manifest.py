@@ -111,34 +111,30 @@ class TestExtractMetadata:
             temp_path = os.path.join(tmpdir, "vendor-001_batch-2026-05-A_clip-00042_v1.tar.gz")
 
             # Create tarball with action_camera.json
-            action_camera_data = {
-                "duration_sec": 120.5,
-                "frame_count": 3600,
-                "route_type": 1
-            }
+            action_camera_data = {"duration_sec": 120.5, "frame_count": 3600, "route_type": 1}
 
-            with tarfile.open(temp_path, 'w:gz') as tar:
+            with tarfile.open(temp_path, "w:gz") as tar:
                 # Add action_camera.json
-                json_bytes = json.dumps(action_camera_data).encode('utf-8')
-                json_info = tarfile.TarInfo(name='clip-00042/action_camera.json')
+                json_bytes = json.dumps(action_camera_data).encode("utf-8")
+                json_info = tarfile.TarInfo(name="clip-00042/action_camera.json")
                 json_info.size = len(json_bytes)
                 tar.addfile(json_info, BytesIO(json_bytes))
 
                 # Add some depth EXRs
                 for i in range(5):
-                    exr_info = tarfile.TarInfo(name=f'clip-00042/depth_{i:04d}.exr')
+                    exr_info = tarfile.TarInfo(name=f"clip-00042/depth_{i:04d}.exr")
                     exr_info.size = 0
-                    tar.addfile(exr_info, BytesIO(b''))
+                    tar.addfile(exr_info, BytesIO(b""))
 
             result = extract_clip_metadata(temp_path)
 
-            assert result['clip_id'] == 'clip-00042'
-            assert result['duration_sec'] == 120.5
-            assert result['frame_count'] == 3600
-            assert result['route_type'] == 1
-            assert result['depth_count'] == 5
-            assert result['scene'] == ''  # No gameinfo.xlsx
-            assert result['operator_id'] == ''  # No gameinfo.xlsx
+            assert result["clip_id"] == "clip-00042"
+            assert result["duration_sec"] == 120.5
+            assert result["frame_count"] == 3600
+            assert result["route_type"] == 1
+            assert result["depth_count"] == 5
+            assert result["scene"] == ""  # No gameinfo.xlsx
+            assert result["operator_id"] == ""  # No gameinfo.xlsx
 
     def test_extract_metadata_with_gameinfo_xlsx(self):
         """Test extraction with gameinfo.xlsx (requires openpyxl)."""
@@ -151,36 +147,32 @@ class TestExtractMetadata:
             # Create a simple xlsx in memory
             wb = Workbook()
             ws = wb.active
-            ws['A1'] = 'scene'
-            ws['B1'] = 'outdoor_forest'
-            ws['A2'] = 'operator_id'
-            ws['B2'] = 'operator-001'
+            ws["A1"] = "scene"
+            ws["B1"] = "outdoor_forest"
+            ws["A2"] = "operator_id"
+            ws["B2"] = "operator-001"
 
             xlsx_buffer = BytesIO()
             wb.save(xlsx_buffer)
             xlsx_data = xlsx_buffer.getvalue()
 
-            action_camera_data = {
-                "duration_sec": 60.0,
-                "frame_count": 1800,
-                "route_type": 0
-            }
+            action_camera_data = {"duration_sec": 60.0, "frame_count": 1800, "route_type": 0}
 
-            with tarfile.open(temp_path, 'w:gz') as tar:
-                json_bytes = json.dumps(action_camera_data).encode('utf-8')
-                json_info = tarfile.TarInfo(name='clip-00100/action_camera.json')
+            with tarfile.open(temp_path, "w:gz") as tar:
+                json_bytes = json.dumps(action_camera_data).encode("utf-8")
+                json_info = tarfile.TarInfo(name="clip-00100/action_camera.json")
                 json_info.size = len(json_bytes)
                 tar.addfile(json_info, BytesIO(json_bytes))
 
-                xlsx_info = tarfile.TarInfo(name='clip-00100/gameinfo.xlsx')
+                xlsx_info = tarfile.TarInfo(name="clip-00100/gameinfo.xlsx")
                 xlsx_info.size = len(xlsx_data)
                 tar.addfile(xlsx_info, BytesIO(xlsx_data))
 
             result = extract_clip_metadata(temp_path)
 
-            assert result['clip_id'] == 'clip-00100'
-            assert result['scene'] == 'outdoor_forest'
-            assert result['operator_id'] == 'operator-001'
+            assert result["clip_id"] == "clip-00100"
+            assert result["scene"] == "outdoor_forest"
+            assert result["operator_id"] == "operator-001"
 
 
 class TestListBatchTarballs:
@@ -244,49 +236,51 @@ class TestBuildManifest:
                 action_camera_data = {
                     "duration_sec": 60.0 + i,
                     "frame_count": 1800 + i * 30,
-                    "route_type": i % 3  # 1, 2, 0, 1, 2
+                    "route_type": i % 3,  # 1, 2, 0, 1, 2
                 }
 
-                with tarfile.open(filepath, 'w:gz') as tar:
-                    json_bytes = json.dumps(action_camera_data).encode('utf-8')
-                    json_info = tarfile.TarInfo(name=f'clip-{clip_id}/action_camera.json')
+                with tarfile.open(filepath, "w:gz") as tar:
+                    json_bytes = json.dumps(action_camera_data).encode("utf-8")
+                    json_info = tarfile.TarInfo(name=f"clip-{clip_id}/action_camera.json")
                     json_info.size = len(json_bytes)
                     tar.addfile(json_info, BytesIO(json_bytes))
 
             # Mock extract_clip_metadata to add operator info
             original_extract = extract_clip_metadata
-            operators = ['op-001', 'op-001', 'op-002', 'op-001', 'op-002']
+            operators = ["op-001", "op-001", "op-002", "op-001", "op-002"]
 
             def mock_extract(path):
                 result = original_extract(path)
-                idx = int(result['clip_id'].split('-')[1]) - 1
+                idx = int(result["clip_id"].split("-")[1]) - 1
                 if idx < len(operators):
-                    result['operator_id'] = operators[idx]
+                    result["operator_id"] = operators[idx]
                 return result
 
-            with mock.patch('bin.generate_manifest.extract_clip_metadata', side_effect=mock_extract):
-                manifest = build_manifest(tmpdir, 'vendor-001', 'vendor-001_batch-2026-05-A')
+            with mock.patch(
+                "bin.generate_manifest.extract_clip_metadata", side_effect=mock_extract
+            ):
+                manifest = build_manifest(tmpdir, "vendor-001", "vendor-001_batch-2026-05-A")
 
-            assert manifest['total_clips'] == 5
-            assert manifest['vendor_id'] == 'vendor-001'
-            assert manifest['batch_id'] == 'vendor-001_batch-2026-05-A'
-            assert manifest['spec_version'] == 'v1'
+            assert manifest["total_clips"] == 5
+            assert manifest["vendor_id"] == "vendor-001"
+            assert manifest["batch_id"] == "vendor-001_batch-2026-05-A"
+            assert manifest["spec_version"] == "v1"
 
             # Check operator aggregation
-            operators_dict = {op['operator_id']: op for op in manifest['operators']}
-            assert operators_dict['op-001']['clip_count'] == 3
-            assert operators_dict['op-002']['clip_count'] == 2
+            operators_dict = {op["operator_id"]: op for op in manifest["operators"]}
+            assert operators_dict["op-001"]["clip_count"] == 3
+            assert operators_dict["op-002"]["clip_count"] == 2
 
             # Check route aggregation
             # op-001 has clips 1, 2, 4 with route_types 1, 2, 1 -> special:2, loop:1, normal:0
-            assert operators_dict['op-001']['routes']['special'] == 2
-            assert operators_dict['op-001']['routes']['loop'] == 1
-            assert operators_dict['op-001']['routes']['normal'] == 0
+            assert operators_dict["op-001"]["routes"]["special"] == 2
+            assert operators_dict["op-001"]["routes"]["loop"] == 1
+            assert operators_dict["op-001"]["routes"]["normal"] == 0
 
             # op-002 has clips 3, 5 with route_types 0, 2 -> normal:1, loop:1, special:0
-            assert operators_dict['op-002']['routes']['normal'] == 1
-            assert operators_dict['op-002']['routes']['loop'] == 1
-            assert operators_dict['op-002']['routes']['special'] == 0
+            assert operators_dict["op-002"]["routes"]["normal"] == 1
+            assert operators_dict["op-002"]["routes"]["loop"] == 1
+            assert operators_dict["op-002"]["routes"]["special"] == 0
 
 
 class TestWriteManifestYaml:
@@ -297,15 +291,13 @@ class TestWriteManifestYaml:
         pytest.importorskip("yaml")
 
         manifest = {
-            'batch_id': 'test-batch',
-            'vendor_id': 'vendor-001',
-            'total_clips': 2,
-            'clips': [
-                {'clip_id': 'clip-00001', 'sha256': 'abc123', 'size_bytes': 1000}
-            ]
+            "batch_id": "test-batch",
+            "vendor_id": "vendor-001",
+            "total_clips": 2,
+            "clips": [{"clip_id": "clip-00001", "sha256": "abc123", "size_bytes": 1000}],
         }
 
-        with tempfile.NamedTemporaryFile(suffix='.yaml', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as tmp:
             temp_path = tmp.name
 
         try:
@@ -314,12 +306,12 @@ class TestWriteManifestYaml:
             with open(temp_path) as f:
                 content = f.read()
 
-            assert 'batch_id' in content
-            assert 'test-batch' in content
-            assert 'vendor_id' in content
-            assert 'vendor-001' in content
-            assert 'total_clips' in content
-            assert '2' in content
+            assert "batch_id" in content
+            assert "test-batch" in content
+            assert "vendor_id" in content
+            assert "vendor-001" in content
+            assert "total_clips" in content
+            assert "2" in content
 
         finally:
             os.unlink(temp_path)
@@ -327,41 +319,42 @@ class TestWriteManifestYaml:
     def test_write_manifest_yaml_no_pyyaml(self):
         """Test writing YAML without PyYAML (manual fallback)."""
         manifest = {
-            'batch_id': 'test-batch',
-            'vendor_id': 'vendor-001',
-            'total_clips': 2,
-            'notes': 'some notes',
-            'clips': [
-                {'clip_id': 'clip-00001', 'sha256': 'abc123', 'size_bytes': 1000, 'route_type': 0}
-            ]
+            "batch_id": "test-batch",
+            "vendor_id": "vendor-001",
+            "total_clips": 2,
+            "notes": "some notes",
+            "clips": [
+                {"clip_id": "clip-00001", "sha256": "abc123", "size_bytes": 1000, "route_type": 0}
+            ],
         }
 
-        with tempfile.NamedTemporaryFile(suffix='.yaml', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as tmp:
             temp_path = tmp.name
 
         try:
             # Mock the yaml module to raise ImportError
             import builtins
+
             real_import = builtins.__import__
 
             def mock_import(name, *args, **kwargs):
-                if name == 'yaml':
+                if name == "yaml":
                     raise ImportError("No yaml module")
                 return real_import(name, *args, **kwargs)
 
-            with mock.patch('builtins.__import__', side_effect=mock_import):
+            with mock.patch("builtins.__import__", side_effect=mock_import):
                 write_manifest_yaml(manifest, temp_path)
 
             with open(temp_path) as f:
                 content = f.read()
 
             # Check that key content is present (format may vary)
-            assert 'batch_id' in content
-            assert 'test-batch' in content
-            assert 'vendor_id' in content
-            assert 'vendor-001' in content
-            assert 'total_clips' in content
-            assert 'clips' in content
+            assert "batch_id" in content
+            assert "test-batch" in content
+            assert "vendor_id" in content
+            assert "vendor-001" in content
+            assert "total_clips" in content
+            assert "clips" in content
 
         finally:
             os.unlink(temp_path)
@@ -379,14 +372,14 @@ class TestValidateManifest:
             filepath = os.path.join(tmpdir, "vendor-001_batch-2026-05-A_clip-00001_v1.tar.gz")
             action_camera_data = {"duration_sec": 60.0, "frame_count": 1800, "route_type": 0}
 
-            with tarfile.open(filepath, 'w:gz') as tar:
-                json_bytes = json.dumps(action_camera_data).encode('utf-8')
-                json_info = tarfile.TarInfo(name='clip-00001/action_camera.json')
+            with tarfile.open(filepath, "w:gz") as tar:
+                json_bytes = json.dumps(action_camera_data).encode("utf-8")
+                json_info = tarfile.TarInfo(name="clip-00001/action_camera.json")
                 json_info.size = len(json_bytes)
                 tar.addfile(json_info, BytesIO(json_bytes))
 
-            manifest = build_manifest(tmpdir, 'vendor-001', 'vendor-001_batch-2026-05-A')
-            manifest_path = os.path.join(tmpdir, 'manifest.yaml')
+            manifest = build_manifest(tmpdir, "vendor-001", "vendor-001_batch-2026-05-A")
+            manifest_path = os.path.join(tmpdir, "manifest.yaml")
             write_manifest_yaml(manifest, manifest_path)
 
             ok, errors = validate_manifest(manifest_path)
@@ -402,28 +395,30 @@ class TestValidateManifest:
             filepath = os.path.join(tmpdir, "vendor-001_batch-2026-05-A_clip-00001_v1.tar.gz")
             action_camera_data = {"duration_sec": 60.0, "frame_count": 1800, "route_type": 0}
 
-            with tarfile.open(filepath, 'w:gz') as tar:
-                json_bytes = json.dumps(action_camera_data).encode('utf-8')
-                json_info = tarfile.TarInfo(name='clip-00001/action_camera.json')
+            with tarfile.open(filepath, "w:gz") as tar:
+                json_bytes = json.dumps(action_camera_data).encode("utf-8")
+                json_info = tarfile.TarInfo(name="clip-00001/action_camera.json")
                 json_info.size = len(json_bytes)
                 tar.addfile(json_info, BytesIO(json_bytes))
 
-            manifest = build_manifest(tmpdir, 'vendor-001', 'vendor-001_batch-2026-05-A')
+            manifest = build_manifest(tmpdir, "vendor-001", "vendor-001_batch-2026-05-A")
 
             # Corrupt the manifest_sha256
-            manifest['manifest_sha256'] = '0' * 64
+            manifest["manifest_sha256"] = "0" * 64
 
-            manifest_path = os.path.join(tmpdir, 'manifest.yaml')
+            manifest_path = os.path.join(tmpdir, "manifest.yaml")
             write_manifest_yaml(manifest, manifest_path)
 
             ok, errors = validate_manifest(manifest_path)
 
             assert not ok
-            assert any('SHA256 mismatch' in err or 'manifest_sha256' in err.lower() for err in errors)
+            assert any(
+                "SHA256 mismatch" in err or "manifest_sha256" in err.lower() for err in errors
+            )
 
     def test_validate_manifest_missing_required_field(self):
         """Test validation fails when required field is missing."""
-        with tempfile.NamedTemporaryFile(suffix='.yaml', delete=False, mode='w') as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False, mode="w") as tmp:
             tmp.write("batch_id: test-batch\n")
             tmp.write("vendor_id: vendor-001\n")
             # Missing spec_version, upload_date, etc.
@@ -432,7 +427,7 @@ class TestValidateManifest:
         try:
             ok, errors = validate_manifest(temp_path)
             assert not ok
-            assert any('spec_version' in err for err in errors)
+            assert any("spec_version" in err for err in errors)
         finally:
             os.unlink(temp_path)
 
@@ -447,19 +442,23 @@ class TestMain:
             filepath = os.path.join(tmpdir, "vendor-001_batch-2026-05-A_clip-00001_v1.tar.gz")
             action_camera_data = {"duration_sec": 60.0, "frame_count": 1800, "route_type": 0}
 
-            with tarfile.open(filepath, 'w:gz') as tar:
-                json_bytes = json.dumps(action_camera_data).encode('utf-8')
-                json_info = tarfile.TarInfo(name='clip-00001/action_camera.json')
+            with tarfile.open(filepath, "w:gz") as tar:
+                json_bytes = json.dumps(action_camera_data).encode("utf-8")
+                json_info = tarfile.TarInfo(name="clip-00001/action_camera.json")
                 json_info.size = len(json_bytes)
                 tar.addfile(json_info, BytesIO(json_bytes))
 
-            output_path = os.path.join(tmpdir, 'manifest.yaml')
+            output_path = os.path.join(tmpdir, "manifest.yaml")
 
             argv = [
-                '--batch-dir', tmpdir,
-                '--vendor-id', 'vendor-001',
-                '--batch-id', 'vendor-001_batch-2026-05-A',
-                '--output', output_path
+                "--batch-dir",
+                tmpdir,
+                "--vendor-id",
+                "vendor-001",
+                "--batch-id",
+                "vendor-001_batch-2026-05-A",
+                "--output",
+                output_path,
             ]
 
             result = main(argv)
@@ -476,17 +475,17 @@ class TestMain:
             filepath = os.path.join(tmpdir, "vendor-001_batch-2026-05-A_clip-00001_v1.tar.gz")
             action_camera_data = {"duration_sec": 60.0, "frame_count": 1800, "route_type": 0}
 
-            with tarfile.open(filepath, 'w:gz') as tar:
-                json_bytes = json.dumps(action_camera_data).encode('utf-8')
-                json_info = tarfile.TarInfo(name='clip-00001/action_camera.json')
+            with tarfile.open(filepath, "w:gz") as tar:
+                json_bytes = json.dumps(action_camera_data).encode("utf-8")
+                json_info = tarfile.TarInfo(name="clip-00001/action_camera.json")
                 json_info.size = len(json_bytes)
                 tar.addfile(json_info, BytesIO(json_bytes))
 
-            manifest = build_manifest(tmpdir, 'vendor-001', 'vendor-001_batch-2026-05-A')
-            manifest_path = os.path.join(tmpdir, 'manifest.yaml')
+            manifest = build_manifest(tmpdir, "vendor-001", "vendor-001_batch-2026-05-A")
+            manifest_path = os.path.join(tmpdir, "manifest.yaml")
             write_manifest_yaml(manifest, manifest_path)
 
-            argv = ['--validate', manifest_path]
+            argv = ["--validate", manifest_path]
             result = main(argv)
 
             assert result == 0
@@ -495,14 +494,17 @@ class TestMain:
         """Test CLI with empty directory."""
         with tempfile.TemporaryDirectory() as tmpdir:
             argv = [
-                '--batch-dir', tmpdir,
-                '--vendor-id', 'vendor-001',
-                '--batch-id', 'vendor-001_batch-2026-05-A'
+                "--batch-dir",
+                tmpdir,
+                "--vendor-id",
+                "vendor-001",
+                "--batch-id",
+                "vendor-001_batch-2026-05-A",
             ]
 
             result = main(argv)
             assert result == 1  # Error code for no tarballs
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

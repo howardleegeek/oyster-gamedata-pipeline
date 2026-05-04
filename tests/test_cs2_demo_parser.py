@@ -16,7 +16,13 @@ from pathlib import Path
 import pytest
 
 # Load the script directly (it lives under bin/, not the package src/).
-_BIN = Path(__file__).resolve().parents[1] / "src" / "oyster_agent_runner" / "cs2" / "cs2_demo_parser.py"
+_BIN = (
+    Path(__file__).resolve().parents[1]
+    / "src"
+    / "oyster_agent_runner"
+    / "cs2"
+    / "cs2_demo_parser.py"
+)
 _spec = importlib.util.spec_from_file_location("cs2_demo_module", _BIN)
 assert _spec is not None and _spec.loader is not None
 cs2_demo_module = importlib.util.module_from_spec(_spec)

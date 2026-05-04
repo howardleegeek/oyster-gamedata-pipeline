@@ -48,23 +48,19 @@ def extract_frames(video_path: str, output_dir: str, fps: float = 6.0) -> list[s
     # Build ffmpeg command
     cmd = [
         "ffmpeg",
-        "-i", str(video_path),
-        "-vf", f"fps={fps}",
-        "-vsync", "vfr",
-        str(frame_pattern)
+        "-i",
+        str(video_path),
+        "-vf",
+        f"fps={fps}",
+        "-vsync",
+        "vfr",
+        str(frame_pattern),
     ]
 
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError as e:
-        raise RuntimeError(
-            f"ffmpeg failed with code {e.returncode}: {e.stderr}"
-        ) from e
+        raise RuntimeError(f"ffmpeg failed with code {e.returncode}: {e.stderr}") from e
     except FileNotFoundError as e:
         raise RuntimeError(
             "ffmpeg not found. Please install ffmpeg and ensure it's in your PATH."
@@ -76,10 +72,7 @@ def extract_frames(video_path: str, output_dir: str, fps: float = 6.0) -> list[s
 
 
 def infer_depth_batch(
-    rgb_paths: list[str],
-    output_dir: str,
-    near_m: float = 0.5,
-    far_m: float = 30.0
+    rgb_paths: list[str], output_dir: str, near_m: float = 0.5, far_m: float = 30.0
 ) -> int:
     """
     Run depth inference on a batch of RGB images using Depth-Anything-V2-Small.
@@ -104,8 +97,7 @@ def infer_depth_batch(
         from transformers import pipeline
     except ImportError as e:
         raise RuntimeError(
-            f"Missing dependency: {e}. "
-            "Please install with: pip install torch transformers numpy"
+            f"Missing dependency: {e}. " "Please install with: pip install torch transformers numpy"
         ) from e
 
     try:
@@ -113,8 +105,7 @@ def infer_depth_batch(
         import OpenEXR
     except ImportError as e:
         raise RuntimeError(
-            f"Missing dependency: {e}. "
-            "Please install with: pip install openexr"
+            f"Missing dependency: {e}. " "Please install with: pip install openexr"
         ) from e
 
     # Validate near and far values
@@ -127,8 +118,7 @@ def infer_depth_batch(
     # Load depth estimation model
     try:
         depth_pipeline = pipeline(
-            task="depth-estimation",
-            model="depth-anything/Depth-Anything-V2-Small-hf"
+            task="depth-estimation", model="depth-anything/Depth-Anything-V2-Small-hf"
         )
     except Exception as e:
         raise RuntimeError(
@@ -177,6 +167,7 @@ def infer_depth_batch(
             # For Depth-Anything, we'll assume very bright pixels might be sky
             # This is a simple heuristic - in practice you might want more sophisticated logic
             from PIL import Image
+
             rgb_img = Image.open(rgb_path)
             rgb_array = np.array(rgb_img)
 
@@ -195,14 +186,14 @@ def infer_depth_batch(
 
             # Create EXR header
             header = OpenEXR.Header(width, height)
-            header['channels'] = {'Z': Imath.Channel(Imath.PixelType(Imath.PixelType.FLOAT))}
+            header["channels"] = {"Z": Imath.Channel(Imath.PixelType(Imath.PixelType.FLOAT))}
 
             # Write EXR file
             exr = OpenEXR.OutputFile(str(exr_path), header)
 
             # Convert to bytes and write
             z_data = scaled.astype(np.float32).tobytes()
-            exr.writePixels({'Z': z_data})
+            exr.writePixels({"Z": z_data})
             exr.close()
 
             exr_count += 1
@@ -264,13 +255,12 @@ if __name__ == "__main__":
     # Example usage
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="Convert video to depth EXR files"
-    )
+    parser = argparse.ArgumentParser(description="Convert video to depth EXR files")
     parser.add_argument("video", help="Input video file")
     parser.add_argument("output_dir", help="Output directory for EXR files")
-    parser.add_argument("--fps", type=float, default=6.0,
-                       help="Frames per second to extract (default: 6.0)")
+    parser.add_argument(
+        "--fps", type=float, default=6.0, help="Frames per second to extract (default: 6.0)"
+    )
 
     args = parser.parse_args()
 

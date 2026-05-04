@@ -494,8 +494,8 @@ def _build_buyer_records(
     # Lint validates mouse_dx/dy as normalized fraction-of-screen-width in [-1, 1]
     # (see lint_buyer_spec.py _check_scalar_range). So we synthesize pixel delta
     # from yaw/pitch * DEG_TO_PIXEL, then divide by SCREEN_W to normalize.
-    DEG_TO_PIXEL = 6.67   # 1800 DPI default Minecraft sensitivity (PDF p8)
-    SCREEN_W = 1920       # for normalization to lint's [-1, 1] range
+    DEG_TO_PIXEL = 6.67  # 1800 DPI default Minecraft sensitivity (PDF p8)
+    SCREEN_W = 1920  # for normalization to lint's [-1, 1] range
 
     for ev in metadata_events:
         obs = _extract_observation(ev)
@@ -620,6 +620,7 @@ def _format_time(seconds: float) -> str:
     produce comparable timestamps for a smoke buyer's tooling.
     """
     from datetime import datetime, timedelta, timezone
+
     UTC = timezone.utc
 
     base = datetime.fromtimestamp(0, tz=UTC)

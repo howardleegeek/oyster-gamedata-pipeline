@@ -3,6 +3,7 @@
 EXR Validator - Scan for NaN clusters and shape mismatch.
 Blue team defense for G094 post-write validation.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -18,6 +19,7 @@ if TYPE_CHECKING:
 # Lazy imports
 OpenEXR = Imath = None
 
+
 def _imports() -> bool:
     """Lazy import OpenEXR and numpy."""
     global OpenEXR, Imath
@@ -25,12 +27,14 @@ def _imports() -> bool:
         import Imath
         import numpy
         import OpenEXR
-        globals()['np'] = numpy
+
+        globals()["np"] = numpy
         return True
     except ImportError:
         return False
 
-def _nan_clusters(arr: 'numpy.ndarray', thresh: int = 3) -> list[tuple[int, int, int, int]]:
+
+def _nan_clusters(arr: "numpy.ndarray", thresh: int = 3) -> list[tuple[int, int, int, int]]:
     """Find NaN clusters using BFS."""
     from collections import deque
 
@@ -49,7 +53,7 @@ def _nan_clusters(arr: 'numpy.ndarray', thresh: int = 3) -> list[tuple[int, int,
                 pixels = [(r, c)]
                 while q:
                     cr, cc = q.popleft()
-                    for dr, dc in [(-1,0),(1,0),(0,-1),(0,1)]:
+                    for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
                         nr, nc = cr + dr, cc + dc
                         if 0 <= nr < h and 0 <= nc < w and mask[nr, nc] and not visited[nr, nc]:
                             visited[nr, nc] = True
@@ -61,6 +65,7 @@ def _nan_clusters(arr: 'numpy.ndarray', thresh: int = 3) -> list[tuple[int, int,
                     clusters.append((min(rows), min(cols), max(rows), max(cols)))
     return clusters
 
+
 def validate(path: Path, thresh: int = 3) -> dict[str, Any]:
     """Validate EXR file."""
     if not _imports():
@@ -70,13 +75,19 @@ def validate(path: Path, thresh: int = 3) -> dict[str, Any]:
     import numpy as np
     import OpenEXR
 
-    res = {"file": str(path), "valid": True, "error": None,
-           "nan_clusters": [], "shape_mismatch": None, "channels": []}
+    res = {
+        "file": str(path),
+        "valid": True,
+        "error": None,
+        "nan_clusters": [],
+        "shape_mismatch": None,
+        "channels": [],
+    }
 
     try:
         exr = OpenEXR.InputFile(str(path))
         hdr = exr.header()
-        chans = list(hdr.get('channels', {}).keys())
+        chans = list(hdr.get("channels", {}).keys())
         res["channels"] = chans
 
         if not chans:
@@ -84,10 +95,10 @@ def validate(path: Path, thresh: int = 3) -> dict[str, Any]:
             res["error"] = "No channels"
             return res
 
-        dw = hdr['dataWindow']
+        dw = hdr["dataWindow"]
         w, h = dw.max.x - dw.min.x + 1, dw.max.y - dw.min.y + 1
 
-        if hdr.get('displayWindow', dw) != dw:
+        if hdr.get("displayWindow", dw) != dw:
             res["valid"] = False
             res["shape_mismatch"] = "DataWindow != DisplayWindow"
 
@@ -109,10 +120,16 @@ def validate(path: Path, thresh: int = 3) -> dict[str, Any]:
         for cn, arr in data.items():
             clusters = _nan_clusters(arr, thresh)
             if clusters:
-                res["nan_clusters"].extend([
-                    {"channel": cn, "bbox": f"({r1},{c1})-({r2},{c2})", "size": (r2-r1+1)*(c2-c1+1)}
-                    for r1, c1, r2, c2 in clusters
-                ])
+                res["nan_clusters"].extend(
+                    [
+                        {
+                            "channel": cn,
+                            "bbox": f"({r1},{c1})-({r2},{c2})",
+                            "size": (r2 - r1 + 1) * (c2 - c1 + 1),
+                        }
+                        for r1, c1, r2, c2 in clusters
+                    ]
+                )
                 res["valid"] = False
 
         if data:
@@ -124,14 +141,20 @@ def validate(path: Path, thresh: int = 3) -> dict[str, Any]:
 
     return res
 
-def scan(path: Path, pattern: str = "*.exr", thresh: int = 3, recurse: bool = False) -> list[dict[str, Any]]:
+
+def scan(
+    path: Path, pattern: str = "*.exr", thresh: int = 3, recurse: bool = False
+) -> list[dict[str, Any]]:
     """Scan directory for EXR files."""
     files = list(path.rglob(pattern) if recurse else path.glob(pattern))
     return [validate(f, thresh) for f in files if f.is_file()]
 
+
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point."""
-    p = argparse.ArgumentParser(description="Validate EXR files for NaN clusters and shape mismatches")
+    p = argparse.ArgumentParser(
+        description="Validate EXR files for NaN clusters and shape mismatches"
+    )
     p.add_argument("path", nargs="?", help="EXR file or directory")
     p.add_argument("-d", "--directory", help="Directory to scan")
     p.add_argument("-o", "--output", help="Output JSON report")
@@ -154,10 +177,14 @@ def main(argv: list[str] | None = None) -> int:
         print("Error: OpenEXR and numpy required", file=sys.stderr)
         return 1
 
-    results = [validate(path, args.threshold)] if path.is_file() else scan(path, "*.exr", args.threshold, args.recursive)
+    results = (
+        [validate(path, args.threshold)]
+        if path.is_file()
+        else scan(path, "*.exr", args.threshold, args.recursive)
+    )
 
     if args.output:
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as tf:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tf:
             json.dump(results, tf, indent=2, default=str)
             tf_path = Path(tf.name)
         tf_path.rename(args.output)
@@ -177,6 +204,7 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"    NaN clusters: {len(r['nan_clusters'])}")
 
     return 1 if any(not r["valid"] for r in results) else 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

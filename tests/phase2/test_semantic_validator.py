@@ -1,6 +1,7 @@
 """
 Tests for semantic_validator.py
 """
+
 import json
 import os
 import tempfile
@@ -23,7 +24,7 @@ def create_valid_record(frame_num: int) -> dict:
         "route_type": "1",
         "oula": {"x": 45.0, "y": -30.0, "z": 90.0},
         "quaternion": [0.707, 0.0, 0.707, 0.0],  # Approximately unit norm
-        "camera_intrinsics": {"fx": 800.0, "fy": 800.0}
+        "camera_intrinsics": {"fx": 800.0, "fy": 800.0},
     }
 
 
@@ -145,7 +146,7 @@ def test_cli_valid_file():
     """Test CLI with valid JSON file."""
     records = [create_valid_record(i) for i in range(10)]
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         json.dump(records, f)
         temp_file = f.name
 
@@ -162,7 +163,7 @@ def test_cli_valid_file():
 
 def test_cli_invalid_file():
     """Test CLI with invalid JSON file."""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         f.write("invalid json")
         temp_file = f.name
 

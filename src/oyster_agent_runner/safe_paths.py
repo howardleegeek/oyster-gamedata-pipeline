@@ -11,15 +11,15 @@ import tempfile
 from pathlib import Path
 
 
-def make_isolated_workspace(prefix: str = 'oyster_') -> Path:
+def make_isolated_workspace(prefix: str = "oyster_") -> Path:
     """Create an isolated workspace directory using tempfile.mkdtemp.
-    
+
     Args:
         prefix: Prefix for the temporary directory name.
-        
+
     Returns:
         Path object pointing to the created directory.
-        
+
     Note:
         The caller is responsible for cleanup. For automatic cleanup,
         use the IsolatedRun context manager instead.
@@ -29,15 +29,15 @@ def make_isolated_workspace(prefix: str = 'oyster_') -> Path:
 
 def pick_free_port() -> int:
     """Find a free port by binding to port 0.
-    
+
     Creates a socket, binds to port 0 (OS assigns free port),
     reads the assigned port number, and closes the socket.
-    
+
     Returns:
         An available port number as int.
     """
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(('', 0))
+        s.bind(("", 0))
         s.listen(1)
         port = s.getsockname()[1]
     return port
@@ -45,16 +45,16 @@ def pick_free_port() -> int:
 
 class IsolatedRun:
     """Context manager for isolated run environment.
-    
+
     Creates a workspace directory and allocates 3 ports (paper/rcon/obs).
     Automatically cleans up on exit.
-    
+
     Attributes:
         workspace: Path to the isolated workspace directory.
         paper_port: Port allocated for paper server.
         rcon_port: Port allocated for RCON.
         obs_port: Port allocated for observation/monitoring.
-        
+
     Example:
         with IsolatedRun() as run:
             print(run.workspace)
@@ -62,9 +62,9 @@ class IsolatedRun:
         # Workspace is automatically cleaned up
     """
 
-    def __init__(self, prefix: str = 'oyster_'):
+    def __init__(self, prefix: str = "oyster_"):
         """Initialize IsolatedRun.
-        
+
         Args:
             prefix: Prefix for the temporary workspace directory.
         """
@@ -75,9 +75,9 @@ class IsolatedRun:
         self._obs_port: int | None = None
         self._cleaned_up = False
 
-    def __enter__(self) -> 'IsolatedRun':
+    def __enter__(self) -> "IsolatedRun":
         """Enter context: create workspace and allocate ports.
-        
+
         Returns:
             Self for use in with statement.
         """
@@ -89,7 +89,7 @@ class IsolatedRun:
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Exit context: clean up workspace.
-        
+
         Args:
             exc_type: Exception type if an exception was raised.
             exc_val: Exception value if an exception was raised.
@@ -100,10 +100,10 @@ class IsolatedRun:
     @property
     def workspace(self) -> Path:
         """Get the workspace path.
-        
+
         Returns:
             Path to the isolated workspace directory.
-            
+
         Raises:
             RuntimeError: If accessed outside of context manager.
         """
@@ -114,10 +114,10 @@ class IsolatedRun:
     @property
     def paper_port(self) -> int:
         """Get the paper server port.
-        
+
         Returns:
             Port number for paper server.
-            
+
         Raises:
             RuntimeError: If accessed outside of context manager.
         """
@@ -128,10 +128,10 @@ class IsolatedRun:
     @property
     def rcon_port(self) -> int:
         """Get the RCON port.
-        
+
         Returns:
             Port number for RCON.
-            
+
         Raises:
             RuntimeError: If accessed outside of context manager.
         """
@@ -142,10 +142,10 @@ class IsolatedRun:
     @property
     def obs_port(self) -> int:
         """Get the observation port.
-        
+
         Returns:
             Port number for observation/monitoring.
-            
+
         Raises:
             RuntimeError: If accessed outside of context manager.
         """
@@ -155,7 +155,7 @@ class IsolatedRun:
 
     def cleanup_now(self) -> None:
         """Immediately clean up the workspace.
-        
+
         Removes the workspace directory if it exists. Safe to call
         multiple times - subsequent calls are no-ops.
         """

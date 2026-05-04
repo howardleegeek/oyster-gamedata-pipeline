@@ -22,8 +22,11 @@ from typing import Any
 # Mouse button bit positions (VPT / MineWorld convention)
 BUTTON_LEFT, BUTTON_RIGHT, BUTTON_MIDDLE, BUTTON_4, BUTTON_5 = 0, 1, 2, 3, 4
 _BUTTON_NAMES: dict[int, str] = {
-    BUTTON_LEFT: "left", BUTTON_RIGHT: "right", BUTTON_MIDDLE: "middle",
-    BUTTON_4: "button4", BUTTON_5: "button5",
+    BUTTON_LEFT: "left",
+    BUTTON_RIGHT: "right",
+    BUTTON_MIDDLE: "middle",
+    BUTTON_4: "button4",
+    BUTTON_5: "button5",
 }
 _SCALED_MIN, _SCALED_MAX = -1.0, 1.0
 _BINARY_FORMAT: str = "<ffhBB"
@@ -42,6 +45,7 @@ class VPTMouseAction:
         newButtons: Edge-triggered bitmask — bits set only for buttons that
             transitioned from released to pressed since the previous frame.
     """
+
     scaledX: float = 0.0
     scaledY: float = 0.0
     dwheel: int = 0
@@ -70,17 +74,20 @@ class VPTMouseAction:
 
     def to_bytes(self) -> bytes:
         """Pack into the VPT binary payload format."""
-        return struct.pack(_BINARY_FORMAT, self.scaledX, self.scaledY,
-                           self.dwheel, self.buttons, self.newButtons)
+        return struct.pack(
+            _BINARY_FORMAT, self.scaledX, self.scaledY, self.dwheel, self.buttons, self.newButtons
+        )
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> VPTMouseAction:
         """Construct from a dict (JSON-decoded)."""
-        return cls(scaledX=float(data.get("scaledX", 0.0)),
-                   scaledY=float(data.get("scaledY", 0.0)),
-                   dwheel=int(data.get("dwheel", 0)),
-                   buttons=int(data.get("buttons", 0)),
-                   newButtons=int(data.get("newButtons", 0)))
+        return cls(
+            scaledX=float(data.get("scaledX", 0.0)),
+            scaledY=float(data.get("scaledY", 0.0)),
+            dwheel=int(data.get("dwheel", 0)),
+            buttons=int(data.get("buttons", 0)),
+            newButtons=int(data.get("newButtons", 0)),
+        )
 
     @classmethod
     def from_json(cls, payload: str) -> VPTMouseAction:
@@ -120,11 +127,20 @@ def pixel_to_scaled(pixel_dx: int, pixel_dy: int, width: int, height: int) -> tu
     return sx, sy
 
 
-def build_action(scaled_x: float = 0.0, scaled_y: float = 0.0, dwheel: int = 0,
-                 buttons: int = 0, previous_buttons: int = 0) -> VPTMouseAction:
+def build_action(
+    scaled_x: float = 0.0,
+    scaled_y: float = 0.0,
+    dwheel: int = 0,
+    buttons: int = 0,
+    previous_buttons: int = 0,
+) -> VPTMouseAction:
     """Convenience factory that auto-computes newButtons."""
-    action = VPTMouseAction(scaledX=clamp_scaled(scaled_x), scaledY=clamp_scaled(scaled_y),
-                            dwheel=dwheel, buttons=buttons & 0xFF)
+    action = VPTMouseAction(
+        scaledX=clamp_scaled(scaled_x),
+        scaledY=clamp_scaled(scaled_y),
+        dwheel=dwheel,
+        buttons=buttons & 0xFF,
+    )
     object.__setattr__(action, "newButtons", action.compute_new_buttons(previous_buttons))
     return action
 
@@ -132,7 +148,8 @@ def build_action(scaled_x: float = 0.0, scaled_y: float = 0.0, dwheel: int = 0,
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="buyer_spec_v2_vpt_mouse",
-        description="VPT-compatible mouse action encoder/decoder (Cluster A).")
+        description="VPT-compatible mouse action encoder/decoder (Cluster A).",
+    )
     sub = parser.add_subparsers(dest="command")
     enc = sub.add_parser("encode", help="Encode mouse action to JSON or binary")
     enc.add_argument("--x", type=float, default=0.0, help="scaledX [-1,1]")
@@ -154,16 +171,24 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
     if args.command == "encode":
-        action = build_action(scaled_x=args.x, scaled_y=args.y, dwheel=args.dwheel,
-                              buttons=args.buttons, previous_buttons=args.prev_buttons)
+        action = build_action(
+            scaled_x=args.x,
+            scaled_y=args.y,
+            dwheel=args.dwheel,
+            buttons=args.buttons,
+            previous_buttons=args.prev_buttons,
+        )
         if args.binary:
             sys.stdout.buffer.write(action.to_bytes())
         else:
             print(action.to_json())
     elif args.command == "decode":
         try:
-            action = (VPTMouseAction.from_bytes(bytes.fromhex(args.payload))
-                      if args.binary else VPTMouseAction.from_json(args.payload))
+            action = (
+                VPTMouseAction.from_bytes(bytes.fromhex(args.payload))
+                if args.binary
+                else VPTMouseAction.from_json(args.payload)
+            )
             print(json.dumps(action.to_dict(), indent=2))
         except (ValueError, json.JSONDecodeError) as exc:
             print(f"decode error: {exc}", file=sys.stderr)

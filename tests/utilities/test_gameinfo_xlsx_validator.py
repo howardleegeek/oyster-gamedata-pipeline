@@ -18,6 +18,7 @@ def _write_xlsx(path: str, sheets: dict) -> None:
     *sheets* maps sheet_name -> list-of-rows (each row is a list of values).
     """
     import openpyxl
+
     wb = openpyxl.Workbook()
     # Remove default sheet
     default = wb.sheetnames[0]

@@ -1,4 +1,5 @@
 """Tests for cs2_test_fixture helpers."""
+
 import pytest
 from cs2_test_fixture import (
     assert_buyer_frames_well_formed,

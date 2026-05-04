@@ -262,9 +262,7 @@ class TestCLI:
         # Verify tables exist
         conn = sqlite3.connect(temp_db)
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='submissions'"
-        )
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='submissions'")
         assert cursor.fetchone() is not None
         conn.close()
 
@@ -272,31 +270,49 @@ class TestCLI:
         """Test CLI --record-submission."""
         main(["--init", "--db", temp_db])
 
-        result = main([
-            "--record-submission",
-            "--db", temp_db,
-            "--vendor-id", "vendor-001",
-            "--batch-id", "batch-A",
-            "--clip-id", "clip-00042",
-            "--sha256", "abc123",
-            "--size", "524288000",
-            "--lint-status", "PASS",
-        ])
+        result = main(
+            [
+                "--record-submission",
+                "--db",
+                temp_db,
+                "--vendor-id",
+                "vendor-001",
+                "--batch-id",
+                "batch-A",
+                "--clip-id",
+                "clip-00042",
+                "--sha256",
+                "abc123",
+                "--size",
+                "524288000",
+                "--lint-status",
+                "PASS",
+            ]
+        )
         assert result == 0
 
     def test_cli_vendor_summary(self, temp_db, capsys):
         """Test CLI --vendor-summary."""
         main(["--init", "--db", temp_db])
-        main([
-            "--record-submission",
-            "--db", temp_db,
-            "--vendor-id", "vendor-001",
-            "--batch-id", "batch-A",
-            "--clip-id", "clip-001",
-            "--sha256", "hash1",
-            "--size", "1000",
-            "--lint-status", "PASS",
-        ])
+        main(
+            [
+                "--record-submission",
+                "--db",
+                temp_db,
+                "--vendor-id",
+                "vendor-001",
+                "--batch-id",
+                "batch-A",
+                "--clip-id",
+                "clip-001",
+                "--sha256",
+                "hash1",
+                "--size",
+                "1000",
+                "--lint-status",
+                "PASS",
+            ]
+        )
 
         # Clear previous captures
         capsys.readouterr()
@@ -311,16 +327,25 @@ class TestCLI:
     def test_cli_batch_status(self, temp_db, capsys):
         """Test CLI --batch-status."""
         main(["--init", "--db", temp_db])
-        main([
-            "--record-submission",
-            "--db", temp_db,
-            "--vendor-id", "vendor-001",
-            "--batch-id", "batch-A",
-            "--clip-id", "clip-001",
-            "--sha256", "hash1",
-            "--size", "1000",
-            "--lint-status", "PASS",
-        ])
+        main(
+            [
+                "--record-submission",
+                "--db",
+                temp_db,
+                "--vendor-id",
+                "vendor-001",
+                "--batch-id",
+                "batch-A",
+                "--clip-id",
+                "clip-001",
+                "--sha256",
+                "hash1",
+                "--size",
+                "1000",
+                "--lint-status",
+                "PASS",
+            ]
+        )
 
         # Clear previous captures
         capsys.readouterr()
@@ -336,16 +361,25 @@ class TestCLI:
     def test_cli_export_csv(self, temp_db, capsys):
         """Test CLI --export-csv."""
         main(["--init", "--db", temp_db])
-        main([
-            "--record-submission",
-            "--db", temp_db,
-            "--vendor-id", "vendor-001",
-            "--batch-id", "batch-A",
-            "--clip-id", "clip-001",
-            "--sha256", "hash1",
-            "--size", "1000",
-            "--lint-status", "PASS",
-        ])
+        main(
+            [
+                "--record-submission",
+                "--db",
+                temp_db,
+                "--vendor-id",
+                "vendor-001",
+                "--batch-id",
+                "batch-A",
+                "--clip-id",
+                "clip-001",
+                "--sha256",
+                "hash1",
+                "--size",
+                "1000",
+                "--lint-status",
+                "PASS",
+            ]
+        )
 
         with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
             csv_path = f.name

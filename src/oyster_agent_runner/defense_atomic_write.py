@@ -69,8 +69,7 @@ def write_atomic(
 def main(argv: list[str] | None = None) -> int:
     """Command line interface."""
     parser = argparse.ArgumentParser(
-        prog="defense_atomic_write",
-        description="Atomically write data to a file"
+        prog="defense_atomic_write", description="Atomically write data to a file"
     )
     parser.add_argument("file", help="Target file path")
     parser.add_argument("data", nargs="?", help="Data (stdin if omitted)")

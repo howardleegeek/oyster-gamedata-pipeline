@@ -20,6 +20,7 @@ def _import_torch():
     global _torch
     if _torch is None:
         import torch
+
         _torch = torch
     return _torch
 
@@ -28,6 +29,7 @@ def _import_transformers():
     global _transformers
     if _transformers is None:
         from transformers import AutoImageProcessor, AutoModel
+
         _transformers = (AutoModel, AutoImageProcessor)
     return _transformers
 
@@ -37,6 +39,7 @@ def _import_openexr():
     if _openexr is None:
         import Imath
         import OpenEXR
+
         _openexr = (OpenEXR, Imath)
     return _openexr
 

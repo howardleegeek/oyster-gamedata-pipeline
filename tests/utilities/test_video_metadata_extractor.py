@@ -27,14 +27,16 @@ class TestExtractMetadata(unittest.TestCase):
     def test_basic_video(self, mock_run):
         mock_run.return_value = MagicMock(
             stdout=self._mock_ffprobe(
-                streams=[{
-                    "codec_type": "video",
-                    "width": 1920,
-                    "height": 1080,
-                    "r_frame_rate": "30/1",
-                    "codec_name": "h264",
-                    "duration": "10.5",
-                }],
+                streams=[
+                    {
+                        "codec_type": "video",
+                        "width": 1920,
+                        "height": 1080,
+                        "r_frame_rate": "30/1",
+                        "codec_name": "h264",
+                        "duration": "10.5",
+                    }
+                ],
                 format_info={"duration": "10.5"},
             )
         )
@@ -49,14 +51,16 @@ class TestExtractMetadata(unittest.TestCase):
     def test_fractional_fps(self, mock_run):
         mock_run.return_value = MagicMock(
             stdout=self._mock_ffprobe(
-                streams=[{
-                    "codec_type": "video",
-                    "width": 1280,
-                    "height": 720,
-                    "r_frame_rate": "24000/1001",
-                    "codec_name": "vp9",
-                    "duration": "5.0",
-                }]
+                streams=[
+                    {
+                        "codec_type": "video",
+                        "width": 1280,
+                        "height": 720,
+                        "r_frame_rate": "24000/1001",
+                        "codec_name": "vp9",
+                        "duration": "5.0",
+                    }
+                ]
             )
         )
         result = extract_metadata("dummy.webm")
@@ -68,13 +72,15 @@ class TestExtractMetadata(unittest.TestCase):
         """When stream has no duration, fall back to format duration."""
         mock_run.return_value = MagicMock(
             stdout=self._mock_ffprobe(
-                streams=[{
-                    "codec_type": "video",
-                    "width": 640,
-                    "height": 480,
-                    "r_frame_rate": "25/1",
-                    "codec_name": "mpeg4",
-                }],
+                streams=[
+                    {
+                        "codec_type": "video",
+                        "width": 640,
+                        "height": 480,
+                        "r_frame_rate": "25/1",
+                        "codec_name": "mpeg4",
+                    }
+                ],
                 format_info={"duration": "30.0"},
             )
         )
@@ -84,9 +90,7 @@ class TestExtractMetadata(unittest.TestCase):
     @patch("video_metadata_extractor.subprocess.run")
     def test_no_video_stream_raises(self, mock_run):
         mock_run.return_value = MagicMock(
-            stdout=self._mock_ffprobe(
-                streams=[{"codec_type": "audio"}]
-            )
+            stdout=self._mock_ffprobe(streams=[{"codec_type": "audio"}])
         )
         with self.assertRaises(ValueError):
             extract_metadata("audio_only.mp3")
@@ -100,9 +104,16 @@ class TestIntegration(unittest.TestCase):
         """Create a small test video."""
         subprocess.run(
             [
-                "ffmpeg", "-y", "-f", "lavfi",
-                "-i", "color=c=red:s=320x240:r=25:d=1",
-                "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                "ffmpeg",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=c=red:s=320x240:r=25:d=1",
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
                 "/tmp/test_meta.mp4",
             ],
             capture_output=True,

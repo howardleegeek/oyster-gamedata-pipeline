@@ -29,7 +29,7 @@ def test_get_git_log_summary_parses_format():
     mock_output = """abc123|Howard Li|feat: bin/mc_launcher_real.py (Aliyun R001)|2026-05-02 18:25:00 +0800
 def456|Howard Li|fix: bin/spectator_follow.py (Aliyun R002)|2026-05-02 18:20:00 +0800"""
 
-    with patch('subprocess.run') as mock_run:
+    with patch("subprocess.run") as mock_run:
         mock_result = MagicMock()
         mock_result.stdout = mock_output
         mock_result.returncode = 0
@@ -50,7 +50,7 @@ def456|Howard Li|fix: bin/spectator_follow.py (Aliyun R002)|2026-05-02 18:20:00 
 
 def test_get_git_log_summary_handles_empty():
     """Test empty git log output."""
-    with patch('subprocess.run') as mock_run:
+    with patch("subprocess.run") as mock_run:
         mock_result = MagicMock()
         mock_result.stdout = ""
         mock_result.returncode = 0
@@ -62,7 +62,7 @@ def test_get_git_log_summary_handles_empty():
 
 def test_get_git_log_summary_git_not_found():
     """Test when git is not found."""
-    with patch('subprocess.run', side_effect=FileNotFoundError("git not found")):
+    with patch("subprocess.run", side_effect=FileNotFoundError("git not found")):
         # Should exit with code 2
         try:
             get_git_log_summary("1 day ago")
@@ -172,7 +172,7 @@ def test_build_dashboard_produces_markdown():
         # Mock git log to return test data
         mock_git_output = """abc123|Howard Li|feat: test feature|2026-05-02 18:25:00 +0800"""
 
-        with patch('subprocess.run') as mock_run:
+        with patch("subprocess.run") as mock_run:
             mock_result = MagicMock()
             mock_result.stdout = mock_git_output
             mock_result.returncode = 0
@@ -184,9 +184,7 @@ def test_build_dashboard_produces_markdown():
                 f.write("12 passed, 3 failed in 0.5s")
 
             dashboard = build_dashboard(
-                repo_root=tmpdir,
-                since="1 day ago",
-                sprint_name="Test Sprint"
+                repo_root=tmpdir, since="1 day ago", sprint_name="Test Sprint"
             )
 
         # Check basic structure
@@ -210,7 +208,7 @@ def test_build_dashboard_no_pytest_file():
     with tempfile.TemporaryDirectory() as tmpdir:
         os.makedirs(os.path.join(tmpdir, ".git"))
 
-        with patch('subprocess.run') as mock_run:
+        with patch("subprocess.run") as mock_run:
             mock_result = MagicMock()
             mock_result.stdout = ""
             mock_result.returncode = 0
@@ -228,19 +226,25 @@ def test_main_writes_to_file():
         output_file = os.path.join(tmpdir, "dashboard.md")
 
         # Mock git to avoid actual git calls
-        with patch('subprocess.run') as mock_run:
+        with patch("subprocess.run") as mock_run:
             mock_result = MagicMock()
             mock_result.stdout = ""
             mock_result.returncode = 0
             mock_run.return_value = mock_result
 
             # Run main with output file
-            exit_code = main([
-                "--since", "1 day ago",
-                "--sprint-name", "Test Sprint",
-                "--output", output_file,
-                "--repo-root", tmpdir
-            ])
+            exit_code = main(
+                [
+                    "--since",
+                    "1 day ago",
+                    "--sprint-name",
+                    "Test Sprint",
+                    "--output",
+                    output_file,
+                    "--repo-root",
+                    tmpdir,
+                ]
+            )
 
             assert exit_code == 0
             assert os.path.exists(output_file)
@@ -253,19 +257,16 @@ def test_main_writes_to_file():
 
 def test_main_stdout():
     """Test main function outputs to stdout."""
-    with patch('subprocess.run') as mock_run:
+    with patch("subprocess.run") as mock_run:
         mock_result = MagicMock()
         mock_result.stdout = ""
         mock_result.returncode = 0
         mock_run.return_value = mock_result
 
-        with patch('sys.stdout') as mock_stdout:
+        with patch("sys.stdout") as mock_stdout:
             mock_stdout.write = MagicMock()
 
-            exit_code = main([
-                "--since", "1 day ago",
-                "--repo-root", "."
-            ])
+            exit_code = main(["--since", "1 day ago", "--repo-root", "."])
 
             assert exit_code == 0
             # Should have called write
@@ -274,18 +275,23 @@ def test_main_stdout():
 
 def test_main_error_writing_file():
     """Test main handles file write errors."""
-    with patch('subprocess.run') as mock_run:
+    with patch("subprocess.run") as mock_run:
         mock_result = MagicMock()
         mock_result.stdout = ""
         mock_result.returncode = 0
         mock_run.return_value = mock_result
 
         # Try to write to a directory (should fail)
-        exit_code = main([
-            "--since", "1 day ago",
-            "--output", "/",  # Root directory, can't write file here
-            "--repo-root", "."
-        ])
+        exit_code = main(
+            [
+                "--since",
+                "1 day ago",
+                "--output",
+                "/",  # Root directory, can't write file here
+                "--repo-root",
+                ".",
+            ]
+        )
 
         # Should return error code 1
         assert exit_code == 1

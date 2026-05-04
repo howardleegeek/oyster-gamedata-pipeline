@@ -1,4 +1,5 @@
 """Tests for aggregate_sprint_report.py"""
+
 import json
 import os
 import sys

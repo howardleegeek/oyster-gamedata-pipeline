@@ -1,4 +1,5 @@
 """Tests for depth inference pipeline."""
+
 import os
 import subprocess
 import sys
@@ -46,7 +47,7 @@ class TestExtractFrames:
 
         # Verify frames were returned
         assert len(frames) == 3
-        assert all(f.endswith('.png') for f in frames)
+        assert all(f.endswith(".png") for f in frames)
 
     def test_extract_frames_handles_ffmpeg_error(self, monkeypatch, tmp_path):
         """Test that extract_frames raises error on ffmpeg failure."""
@@ -58,11 +59,7 @@ class TestExtractFrames:
         Path(video_path).touch()
 
         def mock_run(cmd, capture_output=False, text=False):
-            return MagicMock(
-                returncode=1,
-                stderr="ffmpeg error: invalid codec",
-                stdout=""
-            )
+            return MagicMock(returncode=1, stderr="ffmpeg error: invalid codec", stdout="")
 
         monkeypatch.setattr(subprocess, "run", mock_run)
 
@@ -84,29 +81,30 @@ class TestInferDepth:
         Path(frame_path).touch()
 
         # Remove torch from sys.modules to simulate it being missing
-        original_torch = sys.modules.get('torch')
-        original_numpy = sys.modules.get('numpy')
-        original_pil = sys.modules.get('PIL')
+        original_torch = sys.modules.get("torch")
+        original_numpy = sys.modules.get("numpy")
+        original_pil = sys.modules.get("PIL")
 
         try:
             # Remove modules
-            if 'torch' in sys.modules:
-                del sys.modules['torch']
-            if 'numpy' in sys.modules:
-                del sys.modules['numpy']
-            if 'PIL' in sys.modules:
-                del sys.modules['PIL']
+            if "torch" in sys.modules:
+                del sys.modules["torch"]
+            if "numpy" in sys.modules:
+                del sys.modules["numpy"]
+            if "PIL" in sys.modules:
+                del sys.modules["PIL"]
 
             # Block imports
             import builtins
+
             real_import = builtins.__import__
 
             def block_import(name, *args, **kwargs):
-                if name in ('torch', 'numpy', 'PIL'):
+                if name in ("torch", "numpy", "PIL"):
                     raise ImportError(f"No module named '{name}'")
                 return real_import(name, *args, **kwargs)
 
-            monkeypatch.setattr(builtins, '__import__', block_import)
+            monkeypatch.setattr(builtins, "__import__", block_import)
 
             with pytest.raises(DepthInferenceError, match="Missing dependency"):
                 infer_depth(frame_path, output_path)
@@ -114,11 +112,11 @@ class TestInferDepth:
         finally:
             # Restore modules
             if original_torch is not None:
-                sys.modules['torch'] = original_torch
+                sys.modules["torch"] = original_torch
             if original_numpy is not None:
-                sys.modules['numpy'] = original_numpy
+                sys.modules["numpy"] = original_numpy
             if original_pil is not None:
-                sys.modules['PIL'] = original_pil
+                sys.modules["PIL"] = original_pil
 
 
 class TestVideoToDepth:
@@ -153,14 +151,8 @@ class TestVideoToDepth:
             Path(out_path).touch()
             return out_path
 
-        monkeypatch.setattr(
-            "depth_inference_pipeline.extract_frames",
-            mock_extract_frames
-        )
-        monkeypatch.setattr(
-            "depth_inference_pipeline.infer_depth",
-            mock_infer_depth
-        )
+        monkeypatch.setattr("depth_inference_pipeline.extract_frames", mock_extract_frames)
+        monkeypatch.setattr("depth_inference_pipeline.infer_depth", mock_infer_depth)
 
         result = video_to_depth(video_path, output_dir, cleanup=False)
 
@@ -199,8 +191,8 @@ class TestVideoToDepth:
             return out_path
 
         # Track mkdtemp and rmtree
-        original_mkdtemp = __import__('tempfile').mkdtemp
-        original_rmtree = __import__('shutil').rmtree
+        original_mkdtemp = __import__("tempfile").mkdtemp
+        original_rmtree = __import__("shutil").rmtree
 
         mkdtemp_calls = []
         rmtree_calls = []
@@ -216,14 +208,8 @@ class TestVideoToDepth:
 
         monkeypatch.setattr("tempfile.mkdtemp", mock_mkdtemp)
         monkeypatch.setattr("shutil.rmtree", mock_rmtree)
-        monkeypatch.setattr(
-            "depth_inference_pipeline.extract_frames",
-            mock_extract_frames
-        )
-        monkeypatch.setattr(
-            "depth_inference_pipeline.infer_depth",
-            mock_infer_depth
-        )
+        monkeypatch.setattr("depth_inference_pipeline.extract_frames", mock_extract_frames)
+        monkeypatch.setattr("depth_inference_pipeline.infer_depth", mock_infer_depth)
 
         result = video_to_depth(video_path, output_dir, cleanup=True)
 

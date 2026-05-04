@@ -19,12 +19,13 @@ from typing import NamedTuple
 # Size limits in bytes
 SIZE_LIMITS: dict[str, int] = {
     "action_camera": 10 * 1024 * 1024,  # 10 MB
-    "video": 500 * 1024 * 1024,          # 500 MB
+    "video": 500 * 1024 * 1024,  # 500 MB
 }
 
 
 class SizeCheckResult(NamedTuple):
     """Result of a size limit check."""
+
     file_path: str
     file_size: int
     limit_name: str
@@ -66,7 +67,9 @@ def format_size(size_bytes: int) -> str:
     return f"{size_bytes:.1f} TB"
 
 
-def scan_directory(directory: str | Path, limit_name: str, recursive: bool = True) -> list[SizeCheckResult]:
+def scan_directory(
+    directory: str | Path, limit_name: str, recursive: bool = True
+) -> list[SizeCheckResult]:
     """Scan directory for files exceeding size limit."""
     dir_path = Path(directory)
     results = []
@@ -102,7 +105,9 @@ def main(argv: list[str] | None = None) -> int:
             result = check_file_size(path, args.limit)
             if args.report:
                 status = "OK" if result.is_within_limit else "EXCEEDS"
-                print(f"{status}: {result.file_path} ({format_size(result.file_size)} / {format_size(result.limit_bytes)})")
+                print(
+                    f"{status}: {result.file_path} ({format_size(result.file_size)} / {format_size(result.limit_bytes)})"
+                )
             if not result.is_within_limit:
                 print(f"ERROR: {path} exceeds {args.limit} limit", file=sys.stderr)
                 return 1
@@ -119,7 +124,9 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Total: {len(results)}, Violations: {len(violations)}")
 
             if violations:
-                print(f"ERROR: {len(violations)} file(s) exceed {args.limit} limit", file=sys.stderr)
+                print(
+                    f"ERROR: {len(violations)} file(s) exceed {args.limit} limit", file=sys.stderr
+                )
                 return 1
             return 0
 

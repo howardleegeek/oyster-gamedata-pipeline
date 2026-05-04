@@ -24,7 +24,9 @@ def test_find_node_returns_path():
             assert result == "/usr/bin/node"
             mock_run.assert_called_once_with(
                 ["/usr/bin/node", "--version"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
 
 
@@ -83,8 +85,12 @@ def test_mode_validation():
     with patch("mineflayer_runner.find_node_executable", return_value="/usr/bin/node"):
         with pytest.raises(ValueError, match="Invalid mode"):
             mr.build_node_args(
-                bot_script="x", server_host="h", server_port=1,
-                username="u", mode="INVALID", duration_sec=1,
+                bot_script="x",
+                server_host="h",
+                server_port=1,
+                username="u",
+                mode="INVALID",
+                duration_sec=1,
                 output_dir="o",
             )
 
@@ -127,15 +133,24 @@ def test_run_mineflayer_uses_subprocess_run(tmp_path):
 def test_main_argparse():
     """main() should parse CLI args and call run_mineflayer."""
     with patch("mineflayer_runner.run_mineflayer", return_value=0) as mock_run:
-        rc = mr.main([
-            "--server", "mc.test.com",
-            "--port", "25566",
-            "--username", "CLI_Bot",
-            "--mode", "special",
-            "--duration", "90",
-            "--output", "/tmp/cli_out",
-            "--seed", "7",
-        ])
+        rc = mr.main(
+            [
+                "--server",
+                "mc.test.com",
+                "--port",
+                "25566",
+                "--username",
+                "CLI_Bot",
+                "--mode",
+                "special",
+                "--duration",
+                "90",
+                "--output",
+                "/tmp/cli_out",
+                "--seed",
+                "7",
+            ]
+        )
         assert rc == 0
         mock_run.assert_called_once_with(
             server_host="mc.test.com",

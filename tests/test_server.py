@@ -219,6 +219,7 @@ def _write_phase1_bundle(tmp_path: Path) -> Path:
     Returns the path to manifest.json.
     """
     from datetime import datetime, timezone
+
     UTC = timezone.utc
 
     from oyster_agent_runner.environments.base import MockEnvironment

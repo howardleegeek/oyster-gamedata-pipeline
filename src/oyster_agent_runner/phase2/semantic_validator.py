@@ -12,10 +12,10 @@ import sys
 def validate_action_camera_semantics(records: list[dict]) -> dict:
     """
     Validate semantic compliance of action camera records.
-    
+
     Args:
         records: List of action camera records
-        
+
     Returns:
         Dict with validation results
     """
@@ -24,7 +24,14 @@ def validate_action_camera_semantics(records: list[dict]) -> dict:
             "iter_count": 0,
             "stationary_pct": 0.0,
             "stationary_within_10pct": False,
-            "wasd_distribution": {"W": 0.0, "A": 0.0, "S": 0.0, "D": 0.0, "other": 0.0, "empty": 0.0},
+            "wasd_distribution": {
+                "W": 0.0,
+                "A": 0.0,
+                "S": 0.0,
+                "D": 0.0,
+                "other": 0.0,
+                "empty": 0.0,
+            },
             "wasd_within_tolerance": False,
             "route_type_distribution": {"1": 0.0, "2": 0.0, "3": 0.0},
             "frame_continuous": False,
@@ -32,7 +39,7 @@ def validate_action_camera_semantics(records: list[dict]) -> dict:
             "quaternion_unit_norm": False,
             "fx_equals_fy": False,
             "summary_pass": False,
-            "issues": ["No records provided"]
+            "issues": ["No records provided"],
         }
 
     # Initialize counters
@@ -62,7 +69,7 @@ def validate_action_camera_semantics(records: list[dict]) -> dict:
         vx = player_speed.get("vx", 0)
         vy = player_speed.get("vy", 0)
         vz = player_speed.get("vz", 0)
-        speed_magnitude = math.sqrt(vx*vx + vy*vy + vz*vz)
+        speed_magnitude = math.sqrt(vx * vx + vy * vy + vz * vz)
         if abs(speed_magnitude) < 1e-9:
             stationary_count += 1
 
@@ -99,11 +106,16 @@ def validate_action_camera_semantics(records: list[dict]) -> dict:
         quaternion = record.get("quaternion", [])
         if len(quaternion) == 4:
             q0, q1, q2, q3 = quaternion
-            norm_sq = q0*q0 + q1*q1 + q2*q2 + q3*q3
+            norm_sq = q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3
             if abs(norm_sq - 1.0) >= 1e-3:
                 quaternion_unit_norm = False
-                if f"Quaternion norm squared={norm_sq:.6f} not unit (diff={abs(norm_sq-1.0):.6f})" not in issues:
-                    issues.append(f"Quaternion norm squared={norm_sq:.6f} not unit (diff={abs(norm_sq-1.0):.6f})")
+                if (
+                    f"Quaternion norm squared={norm_sq:.6f} not unit (diff={abs(norm_sq-1.0):.6f})"
+                    not in issues
+                ):
+                    issues.append(
+                        f"Quaternion norm squared={norm_sq:.6f} not unit (diff={abs(norm_sq-1.0):.6f})"
+                    )
 
         # Check camera intrinsics fx == fy
         camera_intrinsics = record.get("camera_intrinsics", {})
@@ -135,20 +147,24 @@ def validate_action_camera_semantics(records: list[dict]) -> dict:
     d_pct = wasd_distribution.get("D", 0.0)
 
     wasd_within_tolerance = (
-        0.30 <= w_pct <= 0.50 and
-        0.10 <= a_pct <= 0.30 and
-        0.10 <= s_pct <= 0.30 and
-        0.10 <= d_pct <= 0.30
+        0.30 <= w_pct <= 0.50
+        and 0.10 <= a_pct <= 0.30
+        and 0.10 <= s_pct <= 0.30
+        and 0.10 <= d_pct <= 0.30
     )
 
     if not wasd_within_tolerance:
-        issues.append(f"WASD distribution out of tolerance: W={w_pct:.2f}, A={a_pct:.2f}, S={s_pct:.2f}, D={d_pct:.2f}")
+        issues.append(
+            f"WASD distribution out of tolerance: W={w_pct:.2f}, A={a_pct:.2f}, S={s_pct:.2f}, D={d_pct:.2f}"
+        )
 
     # Calculate route type distribution
     route_type_distribution = {}
     total_routes = sum(route_type_counts.values())
     for key in route_type_counts:
-        route_type_distribution[key] = route_type_counts[key] / total_routes if total_routes > 0 else 0.0
+        route_type_distribution[key] = (
+            route_type_counts[key] / total_routes if total_routes > 0 else 0.0
+        )
 
     # Check frame continuity
     if len(frames) > 1:
@@ -161,12 +177,12 @@ def validate_action_camera_semantics(records: list[dict]) -> dict:
 
     # Determine overall pass
     summary_pass = (
-        stationary_within_10pct and
-        wasd_within_tolerance and
-        frame_continuous and
-        rotation_in_range and
-        quaternion_unit_norm and
-        fx_equals_fy
+        stationary_within_10pct
+        and wasd_within_tolerance
+        and frame_continuous
+        and rotation_in_range
+        and quaternion_unit_norm
+        and fx_equals_fy
     )
 
     return {
@@ -181,7 +197,7 @@ def validate_action_camera_semantics(records: list[dict]) -> dict:
         "quaternion_unit_norm": quaternion_unit_norm,
         "fx_equals_fy": fx_equals_fy,
         "summary_pass": summary_pass,
-        "issues": issues
+        "issues": issues,
     }
 
 

@@ -579,9 +579,7 @@ def test_adapter_copies_placeholder_xlsx_and_depth(basic_bundle: Path, tmp_path:
     placeholders.mkdir()
     (placeholders / "gameinfo.xlsx").write_bytes(b"PK\x03\x04 fake xlsx bytes")
     (placeholders / "depth").mkdir()
-    (placeholders / "depth" / "frame_000000.exr").write_bytes(
-        b"\x76\x2f\x31\x01 fake exr bytes"
-    )
+    (placeholders / "depth" / "frame_000000.exr").write_bytes(b"\x76\x2f\x31\x01 fake exr bytes")
 
     output = tmp_path / "buyer_ph"
     adapt_phase1_to_buyer_spec(basic_bundle, output, placeholders_dir=placeholders)
@@ -589,14 +587,10 @@ def test_adapter_copies_placeholder_xlsx_and_depth(basic_bundle: Path, tmp_path:
     assert (output / "gameinfo.xlsx").is_file()
     assert (output / "depth").is_dir()
     assert (output / "depth" / "frame_000000.exr").is_file()
-    assert (output / "depth" / "frame_000000.exr").read_bytes().startswith(
-        b"\x76\x2f\x31\x01"
-    )
+    assert (output / "depth" / "frame_000000.exr").read_bytes().startswith(b"\x76\x2f\x31\x01")
 
 
-def test_adapter_handles_missing_placeholders_silently(
-    basic_bundle: Path, tmp_path: Path
-) -> None:
+def test_adapter_handles_missing_placeholders_silently(basic_bundle: Path, tmp_path: Path) -> None:
     """Missing placeholder files are silently skipped — the linter will
     surface them as DEPTH_DIR_MISSING / GAMEINFO_MISSING errors instead
     of the adapter raising. We don't want a tiny stash typo to crash
