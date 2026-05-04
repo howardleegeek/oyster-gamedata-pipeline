@@ -140,7 +140,7 @@ bot.once('spawn', () => {
       },
     }) + '\n');
     frame++;
-  }, 50);
+  }, 33);  // 30 Hz tick (matches buyer-spec fps=30)
 });
 bot.on('error', e => console.error('bot error:', e.message));
 JSEOF
@@ -157,7 +157,7 @@ import sys, json
 sys.path.insert(0, 'src')
 from oyster_agent_runner.buyer_spec_adapter import _build_buyer_records
 events = [json.loads(l) for l in open('$BOT_DIR/events.jsonl')]
-records = _build_buyer_records(events, fps=20.0, route_type=1)
+records = _build_buyer_records(events, fps=30.0, route_type=1)
 with open('$BOT_DIR/action_camera.json', 'w') as f:
     json.dump(records, f)
 print(f'Adapter: {len(events)} events → {len(records)} buyer-spec records')
@@ -179,7 +179,7 @@ from sample_tarball_builder import (
     create_gameinfo_xlsx, synthesize_depth_dir,
 )
 b = Path('/tmp/real_bundle')
-synthesize_video(str(b / 'video.mp4'), duration_sec=$((DURATION_MS/1000)), fps=20)
+synthesize_video(str(b / 'video.mp4'), duration_sec=$((DURATION_MS/1000)), fps=30)
 synthesize_systeminfo(str(b / 'systeminfo.json'))
 create_gameinfo_xlsx(str(b / 'gameinfo.xlsx'), clip_id='integ-real-001')
 synthesize_depth_dir(str(b / 'depth'), count=int($DURATION_MS / 1000) * 6)
