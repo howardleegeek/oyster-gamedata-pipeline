@@ -12,10 +12,9 @@ gaps:
 - id: G002
   title: bin/secure_subprocess_lib.py
   purpose: Safe subprocess wrapper rejecting shell=True, allowlist binaries
-  status: dispatched
+  status: pending
   priority: P0
   lines_estimate: 120
-  dispatched_at: '2026-05-03 22:51:20'
 - id: G003
   title: bin/cn_mirror_setup.sh
   purpose: China vendor pip+npm+HF mirror configuration (idempotent, --revert)
@@ -49,14 +48,14 @@ gaps:
   status: dispatched
   priority: P0
   lines_estimate: 80
-  dispatched_at: '2026-05-03 22:52:14'
+  dispatched_at: '2026-05-03 23:05:34'
 - id: G008
   title: bin/depth_anything_offline_install.sh
   purpose: HF mirror + offline cache pre-warm (China-friendly)
   status: dispatched
   priority: P1
   lines_estimate: 60
-  dispatched_at: '2026-05-03 23:05:16'
+  dispatched_at: '2026-05-03 23:15:48'
 - id: G009
   title: bin/anti_virus_allowlist_check.ps1
   purpose: Windows PowerShell script verifying Defender exclusions for ffmpeg/Java/paper.jar
@@ -75,7 +74,7 @@ gaps:
   status: dispatched
   priority: P0
   lines_estimate: 250
-  dispatched_at: '2026-05-03 22:55:04'
+  dispatched_at: '2026-05-03 23:06:22'
 - id: G012
   title: bin/dashboard_app.py
   purpose: Flask + htmx vendor submission dashboard (read-only)
@@ -163,7 +162,7 @@ gaps:
   status: dispatched
   priority: P0
   lines_estimate: 150
-  dispatched_at: '2026-05-03 22:56:14'
+  dispatched_at: '2026-05-03 23:08:15'
 - id: G026
   title: bin/upload_resume_helper.py
   purpose: Standalone resumable S3 multipart helper with checkpoint state
@@ -198,17 +197,17 @@ gaps:
   title: bin/obs_websocket_smoke.py
   purpose: Standalone smoke test that boots OBS Studio (subprocess) and verifies WebSocket
     v5 connect + auth + StartRecord/StopRecord opcodes
-  status: dispatched
+  status: pending
   priority: P0
   lines_estimate: 200
-  dispatched_at: '2026-05-03 22:58:29'
 - id: G032
   title: bin/depth_anything_smoke.py
   purpose: Load DepthAnything V2 Small model + run inference on 1 RGB sample + write
     valid OpenEXR float32 Z + read-back validate
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 180
+  dispatched_at: '2026-05-03 23:12:35'
 - id: G033
   title: bin/mc_client_smoke.py
   purpose: Launch real Minecraft Java 1.20.4 client in offline mode + screenshot at
@@ -216,7 +215,7 @@ gaps:
   status: dispatched
   priority: P0
   lines_estimate: 200
-  dispatched_at: '2026-05-03 23:03:31'
+  dispatched_at: '2026-05-03 23:14:58'
 - id: G034
   title: bin/scene_diversity_scorer.py
   purpose: Compute Habitat-style scene diversity metric (pixel histogram clustering
@@ -253,5 +252,5 @@ gaps:
   lines_estimate: 280
 harness_lock:
   host: Howards-MacBook-Air-4.local
-  pid: 7837
-  last_heartbeat: '2026-05-04T06:05:16Z'
+  pid: 11046
+  last_heartbeat: '2026-05-04T06:15:48Z'
