@@ -289,6 +289,79 @@ gaps:
   priority: P1
   lines_estimate: 280
   dispatched_at: '2026-05-03 23:33:29'
+# ============== W8: Testing + Audit + Polish ==============
+- id: G039
+  title: tests/integration/test_full_pipeline.py
+  purpose: End-to-end integration test exercising adapter + lint + 5-file tarball + sample_tarball_builder in one pytest run
+  status: pending
+  priority: P0
+  lines_estimate: 250
+- id: G040
+  title: bin/audit_replay.py
+  purpose: Replay an existing committed file through senior code review checklist (PEP 8, type hints, docstring, no shell=True, no hardcoded /tmp, no fake fallbacks) and emit issues report
+  status: pending
+  priority: P1
+  lines_estimate: 220
+- id: G041
+  title: bin/e2e_smoke_v2.sh
+  purpose: Cross-platform smoke test (macOS + Linux + WSL2) — runs sample_tarball_builder + lint + redteam in one script with platform detection
+  status: pending
+  priority: P1
+  lines_estimate: 180
+- id: G042
+  title: docs/CHANGELOG.md
+  purpose: Auto-generated changelog from git log grouped by RC tag with categorized entries (feat/fix/docs/test)
+  status: pending
+  priority: P2
+  lines_estimate: 400
+- id: G043
+  title: bin/security_self_audit.py
+  purpose: Run bandit + grep for shell=True / unsafe deserialization / hardcoded creds across whole repo, JSON output for CI
+  status: pending
+  priority: P0
+  lines_estimate: 180
+- id: G044
+  title: bin/perf_profiler.py
+  purpose: Time profiler for sample_tarball_builder + lint + adapter — identifies hot loops vendor will hit at scale
+  status: pending
+  priority: P2
+  lines_estimate: 150
+- id: G045
+  title: tests/unit/test_camera_synthesizer.py
+  purpose: Unit tests for src/oyster_agent_runner/camera_synthesizer.py — verify camera != player rotation per PDF p3
+  status: pending
+  priority: P0
+  lines_estimate: 150
+- id: G046
+  title: tests/integration/test_redteam_extended.py
+  purpose: Pytest wrapping bin/redteam_lint.py runs — fails CI if any attack passes through lint
+  status: pending
+  priority: P1
+  lines_estimate: 100
+- id: G047
+  title: bin/dependency_audit.py
+  purpose: Scan all imports across repo, detect missing pyproject.toml deps, vulnerable versions (pip-audit wrapper)
+  status: pending
+  priority: P1
+  lines_estimate: 130
+- id: G048
+  title: docs/SECURITY_HARDENING.md
+  purpose: Production hardening checklist — secrets management / TLS / IAM / VPC / firewall / log redaction
+  status: pending
+  priority: P1
+  lines_estimate: 300
+- id: G049
+  title: bin/release_notes_v2.py
+  purpose: Auto-generate release notes from git log + tag + audit_gaps.yaml progress between tags
+  status: pending
+  priority: P2
+  lines_estimate: 180
+- id: G050
+  title: tests/integration/test_failover_lock.py
+  purpose: Unit test for harness_loop.py acquire_or_check_lock + heartbeat freshness logic
+  status: pending
+  priority: P1
+  lines_estimate: 200
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 14591
