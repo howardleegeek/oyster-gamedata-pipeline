@@ -1,119 +1,114 @@
 #!/usr/bin/env python3
 """
-acceptance_signal_api.py
+G013 Acceptance Signal API
 
 Webhook API to notify vendor of accept/reject status.
-
-This module provides a CLI tool and programmatic interface to send acceptance
-signals (accept/reject) to a vendor's webhook endpoint via HTTP POST requests
-with JSON payloads containing the signal type and associated metadata.
+Sends HTTP POST requests with JSON payloads containing signal type,
+transaction ID, timestamp, and optional metadata.
 """
 
 import argparse
 import json
 import sys
-import urllib.request
 import urllib.error
-from typing import Optional
+import urllib.parse
+import urllib.request
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional, Tuple
 
 
-def send_webhook(
+def send_signal(
     url: str,
-    signal_type: str,
+    signal: str,
     transaction_id: str,
-    payload: Optional[dict] = None,
+    metadata: Optional[Dict[str, Any]] = None,
     timeout: int = 30,
-) -> tuple[int, str]:
+) -> Tuple[int, str]:
     """
-    Send acceptance signal to vendor webhook endpoint.
+    Send accept/reject signal to vendor webhook.
 
     Args:
         url: Webhook endpoint URL.
-        signal_type: Either "accept" or "reject".
-        transaction_id: Unique identifier for the transaction.
-        payload: Optional additional metadata to include.
+        signal: Either 'accept' or 'reject'.
+        transaction_id: Unique transaction identifier.
+        metadata: Optional additional metadata as dictionary.
         timeout: Request timeout in seconds.
 
     Returns:
         Tuple of (HTTP status code, response body).
 
     Raises:
-        ValueError: If signal_type is invalid.
+        ValueError: If signal is invalid or URL is malformed.
         RuntimeError: If connection fails.
     """
-    if signal_type not in ("accept", "reject"):
-        raise ValueError(
-            f"Invalid signal_type: {signal_type}. Must be 'accept' or 'reject'."
-        )
+    if signal not in ("accept", "reject"):
+        raise ValueError(f"Signal must be 'accept' or 'reject', got '{signal}'")
 
-    data = {
-        "signal": signal_type,
+    parsed = urllib.parse.urlparse(url)
+    if not parsed.scheme or not parsed.netloc:
+        raise ValueError(f"Invalid URL format: {url}")
+
+    payload = {
+        "signal": signal,
         "transaction_id": transaction_id,
-        "timestamp": _get_iso_timestamp(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
-    if payload:
-        data["metadata"] = payload
+    if metadata:
+        payload["metadata"] = metadata
 
-    json_data = json.dumps(data).encode("utf-8")
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json",
+        "User-Agent": "G013-Acceptance-Signal-API/1.0",
     }
 
     request = urllib.request.Request(
         url,
-        data=json_data,
+        data=json.dumps(payload).encode("utf-8"),
         headers=headers,
         method="POST",
     )
 
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
-            response_body = response.read().decode("utf-8")
-            return response.status, response_body
+            return response.status, response.read().decode("utf-8")
     except urllib.error.HTTPError as e:
         error_body = e.read().decode("utf-8") if e.fp else ""
         return e.code, error_body
     except urllib.error.URLError as e:
-        raise RuntimeError(f"Failed to connect to webhook: {e.reason}") from e
-
-
-def _get_iso_timestamp() -> str:
-    """Return current UTC timestamp in ISO 8601 format."""
-    from datetime import datetime, timezone
-    return datetime.now(timezone.utc).isoformat()
+        raise RuntimeError(f"Connection failed: {e.reason}") from e
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
-    """Parse command-line arguments."""
+    """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Send acceptance/rejection signal to vendor webhook.",
+        description="Send acceptance/rejection signal to vendor webhook",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s --url https://vendor.example.com/webhook accept TXN-12345
-  %(prog)s --url https://vendor.example.com/webhook reject TXN-67890 --metadata '{"reason": "quality"}'
-  %(prog)s --url https://vendor.example.com/webhook accept TXN-11111 --timeout 60
+  %(prog)s --url https://vendor.example/webhook accept TXN-12345
+  %(prog)s --url https://vendor.example/webhook reject TXN-67890 -m '{"reason":"quality"}'
         """,
+    )
+    parser.add_argument(
+        "--url",
+        required=True,
+        help="Webhook endpoint URL",
     )
     parser.add_argument(
         "signal",
         choices=["accept", "reject"],
-        help="Accept or reject signal to send",
+        help="Signal type to send",
     )
     parser.add_argument(
         "transaction_id",
         help="Unique transaction identifier",
     )
     parser.add_argument(
-        "--url",
-        required=True,
-        help="Vendor webhook endpoint URL",
-    )
-    parser.add_argument(
+        "-m",
         "--metadata",
         type=json.loads,
-        help="Optional JSON metadata to include in webhook payload",
+        help="Optional JSON metadata to include",
     )
     parser.add_argument(
         "--timeout",
@@ -122,6 +117,7 @@ Examples:
         help="Request timeout in seconds (default: 30)",
     )
     parser.add_argument(
+        "-q",
         "--quiet",
         action="store_true",
         help="Suppress output on success",
@@ -129,15 +125,15 @@ Examples:
     return parser.parse_args(argv)
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """
-    Main entry point for CLI execution.
+    Main entry point for acceptance signal API CLI.
 
     Args:
-        argv: Command-line arguments (defaults to sys.argv[1:]).
+        argv: Command line arguments (defaults to sys.argv[1:]).
 
     Returns:
-        Exit code: 0 on success, non-zero on failure.
+        Exit code: 0 on success, 1 on failure.
     """
     if argv is None:
         argv = sys.argv[1:]
@@ -145,36 +141,29 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = parse_args(argv)
 
     try:
-        status_code, response_body = send_webhook(
+        status, body = send_signal(
             url=args.url,
-            signal_type=args.signal,
+            signal=args.signal,
             transaction_id=args.transaction_id,
-            payload=args.metadata,
+            metadata=args.metadata,
             timeout=args.timeout,
         )
-
-        if not args.quiet:
-            print(f"Signal: {args.signal}")
-            print(f"Transaction: {args.transaction_id}")
-            print(f"Status: {status_code}")
-            if response_body:
-                print(f"Response: {response_body}")
-
-        # Return 0 for 2xx status codes, non-zero otherwise
-        return 0 if 200 <= status_code < 300 else 1
-
-    except ValueError as e:
+    except (ValueError, RuntimeError) as e:
         print(f"Error: {e}", file=sys.stderr)
-        return 2
-    except RuntimeError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 3
-    except json.JSONDecodeError as e:
-        print(f"Invalid JSON metadata: {e}", file=sys.stderr)
-        return 4
-    except Exception as e:
-        print(f"Unexpected error: {e}", file=sys.stderr)
         return 1
+
+    if not args.quiet:
+        print(f"Status: {status}")
+        try:
+            resp_json = json.loads(body)
+            print(f"Response: {json.dumps(resp_json, indent=2)}")
+        except json.JSONDecodeError:
+            print(f"Response: {body}")
+
+    if 200 <= status < 300:
+        return 0
+    print(f"Request failed with status {status}", file=sys.stderr)
+    return 1
 
 
 if __name__ == "__main__":
