@@ -422,10 +422,11 @@ gaps:
   title: bin/edge_test_leap_second.py
   purpose: 'Boundary test: leap-second insertion at 23:59:60 — adapter handles or
     rejects cleanly'
-  status: dispatched
+  status: completed
   priority: P3
   lines_estimate: 95
   dispatched_at: '2026-05-04 07:46:26'
+  completed_at: '2026-05-04 07:47:00'
 - id: G051
   title: bin/edge_test_high_precision_floats.py
   purpose: 'Boundary test: 1e-300 tiny floats in camera position — verify json round-trip
@@ -484,9 +485,10 @@ gaps:
   title: bin/stress_test_burst_50_clips.py
   purpose: 'Stress test: 50 clips per minute burst — lint queue must drain without
     deadlock'
-  status: pending
+  status: dispatched
   priority: P2
   lines_estimate: 120
+  dispatched_at: '2026-05-04 07:47:56'
 - id: G058
   title: bin/stress_test_memory_leak_check.py
   purpose: 'Stress test: 1000-iteration adapter run with tracemalloc — assert RSS
@@ -1002,9 +1004,10 @@ gaps:
   title: bin/autoresearch_compression_ratio.py
   purpose: 'Autoresearch: compare H.264 vs H.265 vs AV1 sizes on same scene — recommend
     codec'
-  status: pending
+  status: dispatched
   priority: P2
   lines_estimate: 130
+  dispatched_at: '2026-05-04 07:50:53'
 - id: G117
   title: bin/autoresearch_depth_quality.py
   purpose: 'Autoresearch: DepthAnything V2 vs Marigold MAE on 50 ground-truth Minecraft
@@ -1045,18 +1048,20 @@ gaps:
   title: bin/autoresearch_clip_density.py
   purpose: 'Autoresearch: action density across scene types (combat / build / explore)
     — diversity metric'
-  status: dispatched
+  status: completed
   priority: P2
   lines_estimate: 120
   dispatched_at: '2026-05-04 07:42:01'
+  completed_at: '2026-05-04 07:47:01'
 - id: G122
   title: bin/autoresearch_data_diversity.py
   purpose: 'Autoresearch: biome / time-of-day / weather distribution per 1000 clips
     — flag undersampled'
-  status: dispatched
+  status: completed
   priority: P2
   lines_estimate: 130
   dispatched_at: '2026-05-04 07:43:17'
+  completed_at: '2026-05-04 07:47:03'
 - id: G123
   title: bin/autoresearch_action_entropy.py
   purpose: 'Autoresearch: Shannon entropy of action stream — low entropy suggests
@@ -1139,10 +1144,11 @@ gaps:
 - id: G132
   title: bin/secret_rotator.py
   purpose: 'Production: 90-day automatic S3 key rotation with overlap window — zero-downtime'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 130
   dispatched_at: '2026-05-04 07:33:00'
+  completed_at: '2026-05-04 07:47:05'
 - id: G133
   title: bin/dependency_pinning_check.py
   purpose: 'Production: assert all pip deps pinned to exact version — fail CI if any
@@ -1183,10 +1189,11 @@ gaps:
   title: bin/uninstall_clean.py
   purpose: 'Customer: remove all installed files and config — leaves zero trace including
     launchd plists'
-  status: dispatched
+  status: completed
   priority: P2
   lines_estimate: 110
   dispatched_at: '2026-05-04 07:44:45'
+  completed_at: '2026-05-04 07:47:07'
 - id: G138
   title: bin/diag_bundle_collector.py
   purpose: 'Customer: gather logs / systeminfo / last 3 manifests into a tarball for
@@ -1199,4 +1206,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-04T14:46:26Z'
+  last_heartbeat: '2026-05-04T14:50:53Z'
