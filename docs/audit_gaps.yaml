@@ -40,10 +40,11 @@ gaps:
 - id: G006
   title: bin/network_test.py
   purpose: Vendor network upload speed + latency + DNS resolution check
-  status: dispatched
+  status: completed
   priority: P2
   lines_estimate: 100
   dispatched_at: '2026-05-03 23:36:57'
+  completed_at: '2026-05-04 00:18:19'
 - id: G007
   title: bin/eula_consent.py
   purpose: Interactive EULA presenter logging vendor accept timestamp
@@ -65,18 +66,20 @@ gaps:
 - id: G009
   title: bin/anti_virus_allowlist_check.ps1
   purpose: Windows PowerShell script verifying Defender exclusions for ffmpeg/Java/paper.jar
-  status: completed
+  status: dispatched
   priority: P2
   lines_estimate: 70
-  dispatched_at: '2026-05-04 00:07:55'
-  completed_at: '2026-05-04 00:16:48'
+  dispatched_at: '2026-05-04 00:08:02'
 - id: G010
   title: bin/ci_health_check.py
   purpose: Daily CI health probe (lint pass rate, test count, redteam coverage)
-  status: dispatched
+  status: skipped
   priority: P2
   lines_estimate: 100
-  dispatched_at: '2026-05-04 00:10:51'
+  dispatched_at: '2026-05-04 00:10:49'
+  fail_reason: git push failed
+  retries: 1
+  skip_reason: file already in repo
 - id: G011
   title: bin/server_ingest_worker.py
   purpose: SQS consumer + S3 download + lint dispatch + Postgres write
@@ -108,11 +111,10 @@ gaps:
 - id: G014
   title: bin/cost_estimator.py
   purpose: Daily S3 cost report (storage + egress + lifecycle stage projection)
-  status: completed
+  status: skipped
   priority: P2
   lines_estimate: 150
-  dispatched_at: '2026-05-04 00:13:51'
-  completed_at: '2026-05-04 00:16:50'
+  skip_reason: file already in repo
 - id: G015
   title: docs/SECURITY_AUDIT_RESPONSE.md
   purpose: Formal response to 14 security audit findings with fix status table
@@ -210,25 +212,30 @@ gaps:
 - id: G027
   title: bin/vendor_alpha_dashboard.py
   purpose: Local CLI showing single-vendor daily metrics during alpha
-  status: completed
+  status: skipped
   priority: P2
   lines_estimate: 180
-  dispatched_at: '2026-05-04 00:15:16'
-  completed_at: '2026-05-04 00:16:52'
+  dispatched_at: '2026-05-04 00:16:32'
+  fail_reason: git push failed
+  retries: 1
+  skip_reason: file already in repo
 - id: G028
   title: bin/exe_packager.py
   purpose: PyInstaller wrapper script for one-click vendor binary
   status: dispatched
   priority: P3
   lines_estimate: 100
-  dispatched_at: '2026-05-04 00:25:59'
+  dispatched_at: '2026-05-04 00:27:35'
 - id: G029
   title: bin/sentry_init.py
   purpose: Optional Sentry DSN integration for vendor-side error reporting
-  status: dispatched
+  status: skipped
   priority: P2
   lines_estimate: 80
-  dispatched_at: '2026-05-04 00:16:13'
+  dispatched_at: '2026-05-04 00:17:46'
+  fail_reason: git push failed
+  retries: 1
+  skip_reason: file already in repo
 - id: G030
   title: bin/structured_logger.py
   purpose: JSON-line structured logger with correlation IDs (vendor + clip + step)
@@ -289,15 +296,14 @@ gaps:
   status: dispatched
   priority: P2
   lines_estimate: 150
-  dispatched_at: '2026-05-04 00:21:56'
+  dispatched_at: '2026-05-04 00:22:37'
 - id: G037
   title: bin/network_throttle_test.py
   purpose: Simulate weak vendor network (200 Kbps upload) using tc/dummynet wrapper
     — validates upload_s3.sh truly handles slow links
-  status: dispatched
+  status: pending
   priority: P2
   lines_estimate: 130
-  dispatched_at: '2026-05-04 00:24:23'
 - id: G038
   title: bin/buyer_spec_validator_v2.py
   purpose: Strict independent v2 validator (cross-file consistency checks beyond lint_buyer_spec
@@ -309,5 +315,5 @@ gaps:
   completed_at: '2026-05-03 23:34:27'
 harness_lock:
   host: Howards-MacBook-Air-4.local
-  pid: 7837
-  last_heartbeat: '2026-05-04T07:25:59Z'
+  pid: 11046
+  last_heartbeat: '2026-05-04T07:27:35Z'
