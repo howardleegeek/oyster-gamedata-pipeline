@@ -396,17 +396,19 @@ gaps:
   title: bin/edge_test_max_int_values.py
   purpose: 'Boundary test: int64 max for frame_id — confirm no overflow in adapter
     math'
-  status: dispatched
+  status: completed
   priority: P2
   lines_estimate: 85
   dispatched_at: '2026-05-04 07:23:37'
+  completed_at: '2026-05-04 07:31:26'
 - id: G048
   title: bin/edge_test_min_int_values.py
   purpose: 'Boundary test: int64 min for frame_id — confirm no underflow'
-  status: dispatched
+  status: completed
   priority: P2
   lines_estimate: 85
   dispatched_at: '2026-05-04 07:25:24'
+  completed_at: '2026-05-04 07:31:29'
 - id: G049
   title: bin/edge_test_dst_clock_change.py
   purpose: 'Boundary test: capture spans DST transition — UTC timestamps must remain
@@ -420,17 +422,19 @@ gaps:
   title: bin/edge_test_leap_second.py
   purpose: 'Boundary test: leap-second insertion at 23:59:60 — adapter handles or
     rejects cleanly'
-  status: pending
+  status: dispatched
   priority: P3
   lines_estimate: 95
+  dispatched_at: '2026-05-04 07:46:26'
 - id: G051
   title: bin/edge_test_high_precision_floats.py
   purpose: 'Boundary test: 1e-300 tiny floats in camera position — verify json round-trip
     preserves precision'
-  status: dispatched
+  status: completed
   priority: P2
   lines_estimate: 90
   dispatched_at: '2026-05-04 07:26:17'
+  completed_at: '2026-05-04 07:31:30'
 - id: G052
   title: bin/edge_test_quaternion_norm_drift.py
   purpose: 'Boundary test: quaternion magnitude 1.0001 from float drift — lint tolerates
@@ -540,10 +544,11 @@ gaps:
   title: bin/vendor_scenario_mac_only.py
   purpose: 'Walkthrough: vendor on M1 Mac no GPU — depth provider falls back to CPU
     model'
-  status: dispatched
+  status: completed
   priority: P2
   lines_estimate: 120
   dispatched_at: '2026-05-04 07:30:51'
+  completed_at: '2026-05-04 07:31:32'
 - id: G065
   title: bin/vendor_scenario_old_python_310.py
   purpose: 'Walkthrough: vendor on Ubuntu 22.04 default Python 3.10 — adapter runs
@@ -1040,16 +1045,18 @@ gaps:
   title: bin/autoresearch_clip_density.py
   purpose: 'Autoresearch: action density across scene types (combat / build / explore)
     — diversity metric'
-  status: pending
+  status: dispatched
   priority: P2
   lines_estimate: 120
+  dispatched_at: '2026-05-04 07:42:01'
 - id: G122
   title: bin/autoresearch_data_diversity.py
   purpose: 'Autoresearch: biome / time-of-day / weather distribution per 1000 clips
     — flag undersampled'
-  status: pending
+  status: dispatched
   priority: P2
   lines_estimate: 130
+  dispatched_at: '2026-05-04 07:43:17'
 - id: G123
   title: bin/autoresearch_action_entropy.py
   purpose: 'Autoresearch: Shannon entropy of action stream — low entropy suggests
@@ -1106,10 +1113,11 @@ gaps:
   title: bin/rate_limiter.py
   purpose: 'Production: token-bucket per vendor key — enforce per-day clip budget
     on adapter side'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 110
   dispatched_at: '2026-05-04 07:18:25'
+  completed_at: '2026-05-04 07:31:36'
 - id: G130
   title: bin/graceful_shutdown.py
   purpose: 'Production: SIGTERM handler flushes in-flight writes + closes tarball
@@ -1131,9 +1139,10 @@ gaps:
 - id: G132
   title: bin/secret_rotator.py
   purpose: 'Production: 90-day automatic S3 key rotation with overlap window — zero-downtime'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 130
+  dispatched_at: '2026-05-04 07:33:00'
 - id: G133
   title: bin/dependency_pinning_check.py
   purpose: 'Production: assert all pip deps pinned to exact version — fail CI if any
@@ -1174,9 +1183,10 @@ gaps:
   title: bin/uninstall_clean.py
   purpose: 'Customer: remove all installed files and config — leaves zero trace including
     launchd plists'
-  status: pending
+  status: dispatched
   priority: P2
   lines_estimate: 110
+  dispatched_at: '2026-05-04 07:44:45'
 - id: G138
   title: bin/diag_bundle_collector.py
   purpose: 'Customer: gather logs / systeminfo / last 3 manifests into a tarball for
@@ -1189,4 +1199,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-04T14:30:51Z'
+  last_heartbeat: '2026-05-04T14:46:26Z'
