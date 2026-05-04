@@ -352,10 +352,11 @@ gaps:
   title: bin/edge_test_unicode_filenames.py
   purpose: 'Boundary test: Chinese / emoji / RTL filenames in tarball entries — verify
     utf-8 manifest support'
-  status: dispatched
+  status: completed
   priority: P2
   lines_estimate: 100
   dispatched_at: '2026-05-04 07:11:06'
+  completed_at: '2026-05-04 07:15:45'
 - id: G043
   title: bin/edge_test_missing_optional_fields.py
   purpose: 'Boundary test: skip optional Vector4 quat field — adapter must default-fill
@@ -369,10 +370,11 @@ gaps:
   title: bin/edge_test_extra_unknown_fields.py
   purpose: 'Boundary test: vendor adds extra keys to action_camera record — lint warns
     but accepts'
-  status: dispatched
+  status: completed
   priority: P2
   lines_estimate: 90
   dispatched_at: '2026-05-04 07:12:07'
+  completed_at: '2026-05-04 07:15:47'
 - id: G045
   title: bin/edge_test_nan_inf_floats.py
   purpose: 'Boundary test: NaN / +Inf in Vector3 — lint must reject as buyer spec
@@ -394,15 +396,17 @@ gaps:
   title: bin/edge_test_max_int_values.py
   purpose: 'Boundary test: int64 max for frame_id — confirm no overflow in adapter
     math'
-  status: pending
+  status: dispatched
   priority: P2
   lines_estimate: 85
+  dispatched_at: '2026-05-04 07:23:37'
 - id: G048
   title: bin/edge_test_min_int_values.py
   purpose: 'Boundary test: int64 min for frame_id — confirm no underflow'
-  status: pending
+  status: dispatched
   priority: P2
   lines_estimate: 85
+  dispatched_at: '2026-05-04 07:25:24'
 - id: G049
   title: bin/edge_test_dst_clock_change.py
   purpose: 'Boundary test: capture spans DST transition — UTC timestamps must remain
@@ -423,9 +427,10 @@ gaps:
   title: bin/edge_test_high_precision_floats.py
   purpose: 'Boundary test: 1e-300 tiny floats in camera position — verify json round-trip
     preserves precision'
-  status: pending
+  status: dispatched
   priority: P2
   lines_estimate: 90
+  dispatched_at: '2026-05-04 07:26:17'
 - id: G052
   title: bin/edge_test_quaternion_norm_drift.py
   purpose: 'Boundary test: quaternion magnitude 1.0001 from float drift — lint tolerates
@@ -535,9 +540,10 @@ gaps:
   title: bin/vendor_scenario_mac_only.py
   purpose: 'Walkthrough: vendor on M1 Mac no GPU — depth provider falls back to CPU
     model'
-  status: pending
+  status: dispatched
   priority: P2
   lines_estimate: 120
+  dispatched_at: '2026-05-04 07:30:51'
 - id: G065
   title: bin/vendor_scenario_old_python_310.py
   purpose: 'Walkthrough: vendor on Ubuntu 22.04 default Python 3.10 — adapter runs
@@ -1048,10 +1054,11 @@ gaps:
   title: bin/autoresearch_action_entropy.py
   purpose: 'Autoresearch: Shannon entropy of action stream — low entropy suggests
     AFK / scripted vendor'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 110
   dispatched_at: '2026-05-04 07:02:03'
+  completed_at: '2026-05-04 07:15:48'
 - id: G124
   title: bin/observability_metrics_emitter.py
   purpose: 'Production: prometheus-style counters / histograms emitted to stdout for
@@ -1099,9 +1106,10 @@ gaps:
   title: bin/rate_limiter.py
   purpose: 'Production: token-bucket per vendor key — enforce per-day clip budget
     on adapter side'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 110
+  dispatched_at: '2026-05-04 07:18:25'
 - id: G130
   title: bin/graceful_shutdown.py
   purpose: 'Production: SIGTERM handler flushes in-flight writes + closes tarball
@@ -1130,10 +1138,11 @@ gaps:
   title: bin/dependency_pinning_check.py
   purpose: 'Production: assert all pip deps pinned to exact version — fail CI if any
     range'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 90
   dispatched_at: '2026-05-04 07:09:25'
+  completed_at: '2026-05-04 07:15:50'
 - id: G134
   title: bin/installer_one_click.py
   purpose: 'Customer: single bash script that detects OS / installs deps / sets up
@@ -1180,4 +1189,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-04T14:15:08Z'
+  last_heartbeat: '2026-05-04T14:30:51Z'
