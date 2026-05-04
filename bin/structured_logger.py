@@ -1,328 +1,166 @@
 #!/usr/bin/env python3
 """
-Structured JSON-line logger with correlation IDs (vendor + clip + step).
+G030 · Structured JSON-line logger with correlation IDs.
 
-This module provides a structured logging system that outputs JSON lines with
-correlation IDs for tracking operations across distributed systems. Each log
-entry includes vendor, clip, and step identifiers for traceability.
+Provides a JSON-lines logger that embeds vendor, clip, and step correlation
+IDs into every log entry.  Designed for pipeline tracing and downstream
+log aggregation (e.g. ELK, CloudWatch).
 
-Example:
-    >>> logger = StructuredLogger("vendor1", "clip123", "processing")
-    >>> logger.info("Processing started", duration_ms=150)
-    {"level": "INFO", "vendor": "vendor1", "clip": "clip123", "step": "processing",
-     "message": "Processing started", "timestamp": "2024-01-15T10:30:00Z", "duration_ms": 150}
+Usage (CLI):
+    python bin/structured_logger.py --vendor acme --clip vid_001 --step encode \
+        --level INFO "Starting encode step"
+
+Usage (library):
+    from bin.structured_logger import StructuredLogger
+    log = StructuredLogger(vendor="acme", clip="vid_001", step="encode")
+    log.info("Processing frame", frame=42, fps=30)
 """
 
+import argparse
 import json
 import sys
-import argparse
-import logging
-from datetime import datetime
-from typing import Optional, Dict, Any, TextIO, Union
-from enum import Enum
-from contextlib import contextmanager
-import time
+from datetime import datetime, timezone
+from enum import IntEnum
+from typing import Any, Dict, Optional, TextIO
 
 
-class LogLevel(Enum):
-    """Log level enumeration matching standard logging levels."""
-    DEBUG = "DEBUG"
-    INFO = "INFO"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
-    CRITICAL = "CRITICAL"
-    
-    @classmethod
-    def from_string(cls, level_str: str) -> "LogLevel":
-        """Convert string to LogLevel, defaulting to INFO for invalid values."""
-        try:
-            return cls[level_str.upper()]
-        except KeyError:
-            return cls.INFO
+class LogLevel(IntEnum):
+    """Numeric log levels compatible with stdlib logging."""
+    DEBUG = 10
+    INFO = 20
+    WARNING = 30
+    ERROR = 40
+    CRITICAL = 50
+
+
+_LEVEL_NAMES: Dict[str, LogLevel] = {lv.name: lv for lv in LogLevel}
 
 
 class StructuredLogger:
+    """JSON-line structured logger with vendor/clip/step correlation IDs.
+
+    Every emitted line is a single JSON object containing at minimum:
+      - level:   uppercase log level name
+      - vendor:  vendor identifier
+      - clip:    clip identifier
+      - step:    pipeline step name
+      - message: human-readable log message
+      - timestamp: ISO-8601 UTC timestamp (when enabled)
+
+    Additional keyword arguments passed to any log method are merged into
+    the JSON object as extra fields.
     """
-    JSON-line logger with vendor/clip/step correlation IDs.
-    
-    Attributes:
-        vendor: Vendor identifier
-        clip: Clip identifier  
-        step: Step identifier
-        output: Output stream for log entries
-        min_level: Minimum log level to output
-        include_timestamp: Whether to include timestamps in logs
-    """
-    
-    def __init__(self, vendor: str, clip: str, step: str, 
-                 output: TextIO = sys.stdout, 
-                 min_level: Union[str, LogLevel] = LogLevel.INFO,
-                 include_timestamp: bool = True):
-        """
-        Initialize structured logger.
-        
-        Args:
-            vendor: Vendor identifier
-            clip: Clip identifier
-            step: Step identifier
-            output: Output stream (default: stdout)
-            min_level: Minimum log level (string or LogLevel)
-            include_timestamp: Include timestamp in logs (default: True)
-        """
+
+    def __init__(
+        self,
+        vendor: str,
+        clip: str,
+        step: str,
+        output: TextIO = sys.stdout,
+        min_level: LogLevel = LogLevel.INFO,
+        include_timestamp: bool = True,
+    ) -> None:
         self.vendor = vendor
         self.clip = clip
         self.step = step
         self.output = output
+        self.min_level = min_level
         self.include_timestamp = include_timestamp
-        
-        if isinstance(min_level, str):
-            self.min_level = LogLevel.from_string(min_level)
-        else:
-            self.min_level = min_level
-    
-    def _should_log(self, level: LogLevel) -> bool:
-        """Check if message should be logged based on level priority."""
-        level_priority = {
-            LogLevel.DEBUG: 0,
-            LogLevel.INFO: 1,
-            LogLevel.WARNING: 2,
-            LogLevel.ERROR: 3,
-            LogLevel.CRITICAL: 4
-        }
-        return level_priority[level] >= level_priority[self.min_level]
-    
-    def _log(self, level: LogLevel, message: str, **kwargs: Any) -> None:
-        """
-        Internal logging method.
-        
-        Args:
-            level: Log level
-            message: Log message
-            **kwargs: Additional fields to include in log entry
-        """
-        if not self._should_log(level):
+
+    # -- public log methods ------------------------------------------------
+
+    def debug(self, message: str, **kwargs: Any) -> None:
+        """Log a DEBUG-level message."""
+        self._emit(LogLevel.DEBUG, message, **kwargs)
+
+    def info(self, message: str, **kwargs: Any) -> None:
+        """Log an INFO-level message."""
+        self._emit(LogLevel.INFO, message, **kwargs)
+
+    def warning(self, message: str, **kwargs: Any) -> None:
+        """Log a WARNING-level message."""
+        self._emit(LogLevel.WARNING, message, **kwargs)
+
+    def error(self, message: str, **kwargs: Any) -> None:
+        """Log an ERROR-level message."""
+        self._emit(LogLevel.ERROR, message, **kwargs)
+
+    def critical(self, message: str, **kwargs: Any) -> None:
+        """Log a CRITICAL-level message."""
+        self._emit(LogLevel.CRITICAL, message, **kwargs)
+
+    # -- internal ----------------------------------------------------------
+
+    def _emit(self, level: LogLevel, message: str, **kwargs: Any) -> None:
+        """Build and write a single JSON log line if level >= min_level."""
+        if level < self.min_level:
             return
-            
-        entry: Dict[str, Any] = {
-            "level": level.value,
+        record: Dict[str, Any] = {
+            "level": level.name,
             "vendor": self.vendor,
             "clip": self.clip,
             "step": self.step,
             "message": message,
         }
-        
         if self.include_timestamp:
-            entry["timestamp"] = datetime.utcnow().isoformat() + "Z"
-        
-        # Add any additional fields
-        if kwargs:
-            entry.update(kwargs)
-        
-        # Write JSON line
-        json.dump(entry, self.output)
-        self.output.write("\n")
+            record["timestamp"] = datetime.now(timezone.utc).isoformat()
+        record.update(kwargs)
+        self.output.write(json.dumps(record, default=str) + "\n")
         self.output.flush()
-    
-    def debug(self, message: str, **kwargs: Any) -> None:
-        """Log debug message."""
-        self._log(LogLevel.DEBUG, message, **kwargs)
-    
-    def info(self, message: str, **kwargs: Any) -> None:
-        """Log info message."""
-        self._log(LogLevel.INFO, message, **kwargs)
-    
-    def warning(self, message: str, **kwargs: Any) -> None:
-        """Log warning message."""
-        self._log(LogLevel.WARNING, message, **kwargs)
-    
-    def error(self, message: str, **kwargs: Any) -> None:
-        """Log error message."""
-        self._log(LogLevel.ERROR, message, **kwargs)
-    
-    def critical(self, message: str, **kwargs: Any) -> None:
-        """Log critical message."""
-        self._log(LogLevel.CRITICAL, message, **kwargs)
-    
-    @contextmanager
-    def timed_operation(self, operation_name: str, **kwargs: Any):
-        """
-        Context manager for timing operations.
-        
-        Args:
-            operation_name: Name of the operation being timed
-            **kwargs: Additional fields to include in start/end logs
-            
-        Yields:
-            None
-            
-        Example:
-            with logger.timed_operation("image_processing", image_id="img123"):
-                process_image()
-        """
-        start_time = time.time()
-        self.info(f"Starting operation: {operation_name}", 
-                  operation=operation_name, **kwargs)
-        
-        try:
-            yield
-        except Exception as e:
-            end_time = time.time()
-            duration_ms = int((end_time - start_time) * 1000)
-            self.error(f"Operation failed: {operation_name}", 
-                       operation=operation_name, 
-                       duration_ms=duration_ms,
-                       error=str(type(e).__name__),
-                       error_message=str(e),
-                       **kwargs)
-            raise
-        else:
-            end_time = time.time()
-            duration_ms = int((end_time - start_time) * 1000)
-            self.info(f"Completed operation: {operation_name}", 
-                      operation=operation_name, 
-                      duration_ms=duration_ms,
-                      **kwargs)
 
 
-def create_logger(vendor: str, clip: str, step: str, 
-                  output: TextIO = sys.stdout,
-                  level: Union[str, LogLevel] = "INFO",
-                  **kwargs: Any) -> StructuredLogger:
-    """
-    Factory function to create a structured logger.
-    
-    Args:
-        vendor: Vendor identifier
-        clip: Clip identifier
-        step: Step identifier
-        output: Output stream (default: stdout)
-        level: Minimum log level (string or LogLevel)
-        **kwargs: Additional arguments passed to StructuredLogger
-        
-    Returns:
-        StructuredLogger instance
-    """
-    return StructuredLogger(vendor, clip, step, output, level, **kwargs)
-
-
-def main(argv=None) -> int:
-    """
-    Command-line interface for structured logger.
-    
-    Args:
-        argv: Command line arguments (default: sys.argv[1:])
-        
-    Returns:
-        Exit code (0 for success, non-zero for error)
-    """
+def _build_parser() -> argparse.ArgumentParser:
+    """Return the CLI argument parser."""
     parser = argparse.ArgumentParser(
-        description="Structured JSON-line logger with correlation IDs"
+        description="Emit a structured JSON log line to stdout.",
     )
+    parser.add_argument("--vendor", required=True, help="Vendor identifier")
+    parser.add_argument("--clip", required=True, help="Clip identifier")
+    parser.add_argument("--step", required=True, help="Pipeline step name")
     parser.add_argument(
-        "--vendor", "-v", 
-        required=True,
-        help="Vendor identifier"
-    )
-    parser.add_argument(
-        "--clip", "-c", 
-        required=True,
-        help="Clip identifier"
-    )
-    parser.add_argument(
-        "--step", "-s", 
-        required=True,
-        help="Step identifier"
-    )
-    parser.add_argument(
-        "--level", "-l",
+        "--level",
         default="INFO",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        help="Minimum log level (default: INFO)"
+        choices=list(_LEVEL_NAMES),
+        help="Minimum log level (default: INFO)",
     )
     parser.add_argument(
         "--no-timestamp",
         action="store_true",
-        help="Disable timestamp in log entries"
-    )
-    parser.add_argument(
-        "--output", "-o",
-        type=argparse.FileType("w"),
-        default=sys.stdout,
-        help="Output file (default: stdout)"
-    )
-    parser.add_argument(
-        "message",
-        nargs="?",
-        help="Log message (if not provided, reads from stdin)"
+        help="Omit the timestamp field",
     )
     parser.add_argument(
         "--extra",
-        "-e",
         action="append",
-        nargs=2,
-        metavar=("KEY", "VALUE"),
-        help="Extra key-value pairs to include in log"
+        default=[],
+        metavar="KEY=VALUE",
+        help="Extra key=value pairs to include in the log record",
     )
-    
+    parser.add_argument("message", help="Log message text")
+    return parser
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    """CLI entry-point: parse args, emit one JSON log line, return exit code."""
+    parser = _build_parser()
     args = parser.parse_args(argv)
-    
-    # Create logger
-    logger = create_logger(
+
+    extra: Dict[str, Any] = {}
+    for pair in args.extra:
+        if "=" not in pair:
+            print(f"error: --extra must be KEY=VALUE, got: {pair}", file=sys.stderr)
+            return 1
+        key, value = pair.split("=", 1)
+        extra[key] = value
+
+    min_level = _LEVEL_NAMES[args.level]
+    logger = StructuredLogger(
         vendor=args.vendor,
         clip=args.clip,
         step=args.step,
-        output=args.output,
-        level=args.level,
-        include_timestamp=not args.no_timestamp
+        min_level=min_level,
+        include_timestamp=not args.no_timestamp,
     )
-    
-    # Parse extra fields
-    extra_fields = {}
-    if args.extra:
-        for key, value in args.extra:
-            extra_fields[key] = value
-    
-    # Get message
-    if args.message:
-        message = args.message
-    else:
-        # Read from stdin
-        message = sys.stdin.read().strip()
-        if not message:
-            print("Error: No message provided", file=sys.stderr)
-            return 1
-    
-    # Determine log level from message prefix if present
-    level = args.level
-    message_lower = message.lower()
-    
-    if message_lower.startswith("debug:"):
-        level = "DEBUG"
-        message = message[6:].strip()
-    elif message_lower.startswith("info:"):
-        level = "INFO"
-        message = message[5:].strip()
-    elif message_lower.startswith("warning:"):
-        level = "WARNING"
-        message = message[8:].strip()
-    elif message_lower.startswith("error:"):
-        level = "ERROR"
-        message = message[6:].strip()
-    elif message_lower.startswith("critical:"):
-        level = "CRITICAL"
-        message = message[9:].strip()
-    
-    # Log the message
-    log_method = {
-        "DEBUG": logger.debug,
-        "INFO": logger.info,
-        "WARNING": logger.warning,
-        "ERROR": logger.error,
-        "CRITICAL": logger.critical
-    }[level]
-    
-    log_method(message, **extra_fields)
-    
+    logger.info(args.message, **extra)
     return 0
 
 
