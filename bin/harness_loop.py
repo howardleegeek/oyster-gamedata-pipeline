@@ -193,20 +193,42 @@ NO need to write tests for this gap — main repo CI runs them separately.
 
 
 # ----------------------------------------------------------------- mac-2 dispatch
+import socket as _net
+
+# When this daemon runs ON mac-2 itself, skip ssh — operate directly on local fs.
+IS_LOCAL_TO_MAC2 = (
+    "Howards-MacBook-Pro-2" in _net.gethostname()
+    or os.environ.get("HARNESS_LOCAL_MAC2") == "1"
+)
+
+
 def run(cmd: list[str], check: bool = True, capture: bool = True, timeout: int = 60) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, check=check, capture_output=capture, text=True, timeout=timeout)
 
 
 def ssh_run(remote_cmd: str, timeout: int = 60) -> subprocess.CompletedProcess:
+    """Run a command on mac-2 cluster. If we're already on mac-2, skip ssh."""
+    if IS_LOCAL_TO_MAC2:
+        return run(["bash", "-lc", remote_cmd], check=False, timeout=timeout)
     return run(["ssh", MAC2_HOST, remote_cmd], check=False, timeout=timeout)
 
 
 def scp_to(local: Path, remote: str) -> None:
+    """Copy local file to mac-2 path. If already on mac-2, just cp."""
+    if IS_LOCAL_TO_MAC2:
+        Path(remote).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(str(local), remote)
+        return
     run(["scp", "-q", str(local), f"{MAC2_HOST}:{remote}"], timeout=120)
 
 
 def scp_from(remote: str, local: Path) -> None:
+    """Copy file FROM mac-2 to local. If already on mac-2, cp from path."""
     local.parent.mkdir(parents=True, exist_ok=True)
+    if IS_LOCAL_TO_MAC2:
+        if Path(remote).exists():
+            shutil.copy(remote, str(local))
+        return
     run(["scp", "-q", f"{MAC2_HOST}:{remote}", str(local)], timeout=120)
 
 
