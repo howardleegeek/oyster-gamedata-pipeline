@@ -707,17 +707,19 @@ gaps:
   title: bin/red_team_sigkill_mid_write.py
   purpose: 'Red team: SIGKILL adapter mid action_camera write — atomic temp+rename
     leaves no half-file'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 120
   dispatched_at: '2026-05-04 02:30:36'
+  completed_at: '2026-05-04 02:42:00'
 - id: G091
   title: bin/red_team_disk_full.py
   purpose: 'Red team: simulate ENOSPC during write — adapter aborts cleanly with clear
     error'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 110
+  dispatched_at: '2026-05-04 02:46:16'
 - id: G092
   title: bin/red_team_out_of_order_frames.py
   purpose: 'Red team: shuffle frame ordering in JSON — lint rejects non-monotonic
@@ -736,24 +738,27 @@ gaps:
   title: bin/red_team_corrupt_exr.py
   purpose: 'Red team: zero-fill 1 KB inside EXR — validator detects corruption via
     numpy isnan/isinf scan'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 110
   dispatched_at: '2026-05-04 02:35:33'
+  completed_at: '2026-05-04 02:42:02'
 - id: G095
   title: bin/red_team_invalid_systeminfo.py
   purpose: 'Red team: systeminfo.json missing required gpu key — lint v2 fails closed'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 80
   dispatched_at: '2026-05-04 02:37:04'
+  completed_at: '2026-05-04 02:42:03'
 - id: G096
   title: bin/red_team_wrong_fps.py
   purpose: 'Red team: video tagged 60fps — lint rejects (PRD requires exactly 30fps)'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 90
   dispatched_at: '2026-05-04 02:38:44'
+  completed_at: '2026-05-04 02:42:05'
 - id: G097
   title: bin/red_team_mixed_vector_format.py
   purpose: 'Red team: same file mixes dict and list Vector3 forms — lint rejects format
@@ -765,24 +770,27 @@ gaps:
   title: bin/red_team_clock_skew.py
   purpose: 'Red team: capture machine clock jumps backward 1 hour — adapter switches
     to monotonic clock'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 110
   dispatched_at: '2026-05-04 02:41:26'
+  completed_at: '2026-05-04 02:42:06'
 - id: G099
   title: src/oyster_agent_runner/defense_size_limit.py
   purpose: 'Blue team for G084: per-file size cap defender (10 MB action_camera, 500
     MB video)'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 110
+  dispatched_at: '2026-05-04 02:48:38'
 - id: G100
   title: src/oyster_agent_runner/defense_finite_check.py
   purpose: 'Blue team for G085: assert_finite helper running on every Vector3 value
     before write'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 90
+  dispatched_at: '2026-05-04 02:49:27'
 - id: G101
   title: src/oyster_agent_runner/defense_timestamp_range.py
   purpose: 'Blue team for G086: enforce timestamps within 2024-01-01 to 2030-01-01
@@ -808,9 +816,10 @@ gaps:
   title: src/oyster_agent_runner/defense_file_lock.py
   purpose: 'Blue team for G089: fcntl flock wrapper around tarball open — prevents
     concurrent corruption'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 110
+  dispatched_at: '2026-05-04 02:55:12'
 - id: G105
   title: src/oyster_agent_runner/defense_atomic_write.py
   purpose: 'Blue team for G090: write_atomic helper using tempfile + os.replace'
@@ -1047,4 +1056,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-04T09:41:26Z'
+  last_heartbeat: '2026-05-04T09:58:12Z'
