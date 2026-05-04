@@ -2,320 +2,305 @@
 """
 G012 · bin/dashboard_app.py — Flask + htmx vendor submission dashboard (read-only).
 
-Provides a lightweight web UI for browsing vendor submission data stored as
-CSV / Excel files in a configurable data directory.  All endpoints are
-read-only; no mutations are exposed.
-
-Usage:
-    python bin/dashboard_app.py [--host HOST] [--port PORT] [--data-dir DIR]
-
-Dependencies: Flask (required), openpyxl (optional, for .xlsx support).
-htmx is loaded from CDN; no local JS build step required.
+Lightweight web UI for browsing vendor submission data from CSV/Excel files.
+Read-only interface with HTMX for dynamic updates.
 """
 from __future__ import annotations
 
 import argparse
 import csv
-import io
 import logging
 import os
 import sys
-import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 _flask: Any = None
 _openpyxl: Any = None
-logger = logging.getLogger("dashboard_app")
+logger = logging.getLogger(__name__)
 
 
 def _import_flask() -> Any:
-    """Lazy-import Flask; raise a friendly error if unavailable."""
+    """Lazy-import Flask."""
     global _flask
     if _flask is None:
         try:
-            import flask as _flask  # noqa: F811
+            import flask as _flask
         except ImportError:
-            print("ERROR: Flask is required. Install with: pip install flask", file=sys.stderr)
+            print("ERROR: Install Flask: pip install flask", file=sys.stderr)
             sys.exit(1)
     return _flask
 
 
 def _import_openpyxl() -> Any:
-    """Lazy-import openpyxl for Excel support."""
+    """Lazy-import openpyxl."""
     global _openpyxl
     if _openpyxl is None:
         try:
-            import openpyxl as _openpyxl  # noqa: F811
+            import openpyxl as _openpyxl
         except ImportError:
             pass
     return _openpyxl
 
 
-def _read_csv(path: Path) -> Tuple[List[str], List[Dict[str, str]]]:
-    """Read a CSV/TSV file and return (headers, rows-as-dicts)."""
-    with open(path, newline="", encoding="utf-8-sig") as fh:
-        reader = csv.DictReader(fh)
-        headers: List[str] = list(reader.fieldnames or [])
-        rows: List[Dict[str, str]] = [dict(r) for r in reader]
-    return headers, rows
-
-
-def _read_excel(path: Path) -> Tuple[List[str], List[Dict[str, str]]]:
-    """Read the first sheet of an Excel workbook."""
-    oxl = _import_openpyxl()
-    if oxl is None:
-        raise RuntimeError("openpyxl is required to read .xlsx files")
-    wb = oxl.load_workbook(path, read_only=True, data_only=True)
-    ws = wb.active
-    if ws is None:
-        return [], []
-    rows_iter = ws.iter_rows(values_only=True)
+def read_csv(path: Path) -> Tuple[List[str], List[Dict[str, str]]]:
+    """Read CSV/TSV file."""
     try:
-        headers = [str(c) for c in next(rows_iter)]
-    except StopIteration:
+        with open(path, newline="", encoding="utf-8-sig") as f:
+            sample = f.read(4096)
+            f.seek(0)
+            delimiter = "\t" if "\t" in sample and sample.count("\t") > sample.count(",") else ","
+            reader = csv.DictReader(f, delimiter=delimiter)
+            headers = list(reader.fieldnames or [])
+            rows = [{k: str(v) if v is not None else "" for k, v in r.items()} for r in reader]
+            return headers, rows
+    except Exception as e:
+        logger.error(f"CSV error {path}: {e}")
         return [], []
-    rows: List[Dict[str, str]] = []
-    for row in rows_iter:
-        rows.append({h: str(v) if v is not None else "" for h, v in zip(headers, row)})
-    wb.close()
-    return headers, rows
 
 
-def load_data(data_dir: Path) -> Tuple[List[str], List[Dict[str, str]]]:
-    """Scan *data_dir* for the first supported data file and return its contents."""
+def read_excel(path: Path) -> Tuple[List[str], List[Dict[str, str]]]:
+    """Read Excel file."""
+    oxl = _import_openpyxl()
+    if not oxl:
+        logger.error("Install openpyxl for Excel support")
+        return [], []
+    try:
+        wb = oxl.load_workbook(path, read_only=True, data_only=True)
+        ws = wb.active
+        if not ws:
+            return [], []
+        rows = list(ws.iter_rows(values_only=True))
+        if not rows:
+            return [], []
+        headers = [str(c) if c is not None else "" for c in rows[0]]
+        data = []
+        for row in rows[1:]:
+            data.append({h: str(v) if v is not None else "" for h, v in zip(headers, row)})
+        wb.close()
+        return headers, data
+    except Exception as e:
+        logger.error(f"Excel error {path}: {e}")
+        return [], []
+
+
+def load_data(data_dir: Path) -> Tuple[List[str], List[Dict[str, str]], str]:
+    """Load first supported file in data_dir."""
     if not data_dir.is_dir():
-        logger.warning("Data directory does not exist: %s", data_dir)
-        return [], []
-    for ext, reader_fn in ((".csv", _read_csv), (".tsv", _read_csv),
-                           (".xlsx", _read_excel), (".xls", _read_excel)):
-        candidates = sorted(data_dir.glob(f"*{ext}"))
-        if candidates:
-            logger.info("Loading data from %s", candidates[0])
-            return reader_fn(candidates[0])
-    logger.warning("No supported data files found in %s", data_dir)
-    return [], []
-
-
-class _DataCache:
-    """Simple cache for dashboard data — sufficient for read-only use."""
-
-    def __init__(self) -> None:
-        self._headers: List[str] = []
-        self._rows: List[Dict[str, str]] = []
-        self._loaded: bool = False
-
-    def ensure_loaded(self, data_dir: Path) -> None:
-        if not self._loaded:
-            self._headers, self._rows = load_data(data_dir)
-            self._loaded = True
-
-    @property
-    def headers(self) -> List[str]:
-        return self._headers
-
-    @property
-    def rows(self) -> List[Dict[str, str]]:
-        return self._rows
-
-    @property
-    def total(self) -> int:
-        return len(self._rows)
-
-
-cache = _DataCache()
-
-
-def _clamp(value: int, lo: int, hi: int) -> int:
-    """Clamp *value* between *lo* and *hi* inclusive."""
-    return max(lo, min(hi, value))
-
-
-def _esc(s: str) -> str:
-    """Minimal HTML escaping for table cells."""
-    return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
-
-
-_HTMX_CDN = "https://unpkg.com/htmx.org@1.9.12"
-_STYLE = """
-<style>
-  :root{--bg:#f8f9fa;--fg:#212529;--accent:#0d6efd;--border:#dee2e6}
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--fg);padding:1.5rem}
-  h1{margin-bottom:.5rem}
-  .toolbar{display:flex;gap:.75rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap}
-  .toolbar input{padding:.4rem .6rem;border:1px solid var(--border);border-radius:4px;min-width:220px}
-  .toolbar button{padding:.4rem .8rem;background:var(--accent);color:#fff;border:none;border-radius:4px;cursor:pointer}
-  table{width:100%;border-collapse:collapse;background:#fff;border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08)}
-  th,td{padding:.5rem .75rem;text-align:left;border-bottom:1px solid var(--border);font-size:.875rem}
-  th{background:#e9ecef;position:sticky;top:0}
-  th a{color:inherit;text-decoration:none}
-  th a:hover{color:var(--accent)}
-  .pagination{display:flex;gap:.5rem;align-items:center;margin-top:1rem;font-size:.875rem}
-  .pagination button{padding:.3rem .6rem;border:1px solid var(--border);background:#fff;border-radius:4px;cursor:pointer}
-  .pagination button:disabled{opacity:.4;cursor:default}
-  .badge{display:inline-block;background:var(--accent);color:#fff;padding:.15rem .5rem;border-radius:999px;font-size:.75rem}
-  .meta{color:#6c757d;font-size:.8rem;margin-bottom:.5rem}
-</style>"""
-
-
-def _render_index(headers: List[str], rows: List[Dict[str, str]], total: int) -> str:
-    """Render the full dashboard page."""
-    return f"""<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Vendor Submission Dashboard</title><script src="{_HTMX_CDN}"></script>{_STYLE}</head>
-<body><h1>📦 Vendor Submission Dashboard</h1>
-<p class="meta">Read-only · <span class="badge">{total} rows</span> · {len(headers)} columns</p>
-<div class="toolbar">
-  <input type="search" id="search-box" name="q" placeholder="Search all columns…"
-         hx-get="/htx/table" hx-target="#table-body" hx-trigger="keyup changed delay:300ms"
-         hx-indicator="#spinner">
-  <span id="spinner" class="htmx-indicator">⏳</span>
-  <span id="result-count">{total} result(s)</span>
-  <a href="/api/export" style="margin-left:auto"><button type="button">⬇ Export CSV</button></a>
-</div>
-<div id="table-container" hx-get="/htx/table" hx-trigger="load"><p>Loading…</p></div>
-</body></html>"""
-
-
-def _render_table_fragment(headers, rows, page, pages, total, sort_col, sort_dir, query):
-    """Render the <table> + pagination fragment for htmx swap."""
-    q_param = f"&q={query}" if query else ""
-
-    def _sort_link(col):
-        d = "desc" if (col == sort_col and sort_dir == "asc") else "asc"
-        arrow = " ▲" if (col == sort_col and sort_dir == "asc") else (" ▼" if (col == sort_col and sort_dir == "desc") else "")
-        return f'<a hx-get="/htx/table?sort={col}&dir={d}{q_param}&page={page}" hx-target="#table-container">{col}{arrow}</a>'
-
-    ths = "".join(f"<th>{_sort_link(h)}</th>" for h in headers)
-    tds_rows = ""
-    for r in rows:
-        tds_rows += "<tr>" + "".join(f"<td>{_esc(r.get(h, ''))}</td>" for h in headers) + "</tr>"
-    if not rows:
-        tds_rows = f'<tr><td colspan="{len(headers)}" style="text-align:center;color:#999">No results</td></tr>'
-
-    prev = f'<button hx-get="/htx/table?page={page-1}{q_param}" hx-target="#table-container" {"disabled" if page<=1 else ""}>◀ Prev</button>'
-    nxt = f'<button hx-get="/htx/table?page={page+1}{q_param}" hx-target="#table-container" {"disabled" if page>=pages else ""}>Next ▶</button>'
-    return f"""<div id="table-container"><table><thead><tr>{ths}</tr></thead>
-<tbody id="table-body">{tds_rows}</tbody></table>
-<div class="pagination">{prev}<span>Page {page} of {pages} ({total} rows)</span>{nxt}</div></div>"""
+        return [], [], ""
+    
+    for pattern, reader in [("*.csv", read_csv), ("*.tsv", read_csv), 
+                           ("*.xlsx", read_excel), ("*.xls", read_excel)]:
+        for f in sorted(data_dir.glob(pattern)):
+            headers, rows = reader(f)
+            if headers:
+                return headers, rows, f.name
+    return [], [], ""
 
 
 def create_app(data_dir: Path) -> Any:
-    """Create and configure the Flask application."""
+    """Create Flask app."""
     flask = _import_flask()
     app = flask.Flask(__name__)
-
+    headers, rows, filename = load_data(data_dir)
+    
+    def render_rows(rows_slice: List[Dict[str, str]], cols: int = 10) -> str:
+        """Render table rows HTML."""
+        if not rows_slice:
+            return '<tr><td colspan="10" style="padding:2rem;text-align:center">No data</td></tr>'
+        
+        html = []
+        for r in rows_slice:
+            cells = []
+            for h in headers[:cols]:
+                val = r.get(h, "")
+                if len(val) > 100:
+                    val = val[:97] + "..."
+                cells.append(f"<td>{val}</td>")
+            html.append(f"<tr>{''.join(cells)}</tr>")
+        return "\n".join(html)
+    
     @app.route("/")
-    def index():
-        cache.ensure_loaded(data_dir)
-        return _render_index(cache.headers, cache.rows, cache.total)
-
-    @app.route("/api/summary")
-    def api_summary():
-        cache.ensure_loaded(data_dir)
-        return flask.jsonify({"total_rows": cache.total, "columns": cache.headers, "column_count": len(cache.headers)})
-
-    @app.route("/htx/table")
-    def htx_table():
-        """htmx endpoint: filtered/sorted/paginated table fragment."""
-        cache.ensure_loaded(data_dir)
-        page = _clamp(int(flask.request.args.get("page", "1")), 1, 10000)
-        size = _clamp(int(flask.request.args.get("size", "25")), 1, 200)
-        sort_col = flask.request.args.get("sort", "")
-        sort_dir = flask.request.args.get("dir", "asc")
-        query = flask.request.args.get("q", "").strip().lower()
-        rows = list(cache.rows)
-        if query:
-            rows = [r for r in rows if any(query in str(v).lower() for v in r.values())]
-        if sort_col and sort_col in cache.headers:
-            rows.sort(key=lambda r: r.get(sort_col, ""), reverse=(sort_dir.lower() == "desc"))
-        total = len(rows)
-        pages = max(1, (total + size - 1) // size)
-        page = _clamp(page, 1, pages)
-        return _render_table_fragment(cache.headers, rows[(page-1)*size:page*size], page, pages, total, sort_col, sort_dir, query)
-
-    @app.route("/htx/search")
-    def htx_search():
-        """htmx endpoint: return row count for a search query."""
-        cache.ensure_loaded(data_dir)
-        query = flask.request.args.get("q", "").strip().lower()
-        count = cache.total if not query else sum(1 for r in cache.rows if any(query in str(v).lower() for v in r.values()))
-        return f'<span id="result-count">{count} result(s)</span>'
-
-    @app.route("/api/export")
-    def api_export():
-        """Export current (filtered) data as CSV download."""
-        cache.ensure_loaded(data_dir)
-        query = flask.request.args.get("q", "").strip().lower()
-        rows = cache.rows if not query else [r for r in cache.rows if any(query in str(v).lower() for v in r.values())]
-        output = io.StringIO()
-        writer = csv.DictWriter(output, fieldnames=cache.headers)
-        writer.writeheader()
-        writer.writerows(rows)
-        return flask.Response(output.getvalue(), mimetype="text/csv",
-                              headers={"Content-Disposition": "attachment; filename=export.csv"})
-
-    @app.errorhandler(404)
-    def not_found(e):
-        return "<h1>404 — Not Found</h1>", 404
-
-    @app.errorhandler(500)
-    def server_error(e):
-        return "<h1>500 — Internal Server Error</h1>", 500
-
+    def index() -> str:
+        """Main dashboard."""
+        cols = min(10, len(headers))
+        return f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Vendor Dashboard</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <style>
+        body {{ font-family: sans-serif; margin: 0; background: #f5f7fa; }}
+        .container {{ max-width: 1200px; margin: auto; padding: 1rem; }}
+        header {{ background: #2563eb; color: white; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem; }}
+        .stats {{ display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }}
+        .stat {{ background: white; padding: 1rem; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); flex: 1; min-width: 150px; }}
+        .stat-value {{ font-size: 2rem; font-weight: bold; color: #2563eb; }}
+        .stat-label {{ color: #64748b; font-size: 0.875rem; }}
+        .controls {{ display: flex; gap: 1rem; margin-bottom: 1rem; }}
+        input[type="search"] {{ flex: 1; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; }}
+        table {{ width: 100%; border-collapse: collapse; background: white; border-radius: 0.5rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }}
+        th {{ padding: 0.75rem; text-align: left; background: #f1f5f9; border-bottom: 2px solid #cbd5e1; cursor: pointer; }}
+        td {{ padding: 0.5rem 0.75rem; border-bottom: 1px solid #e2e8f0; }}
+        tr:hover {{ background: #f8fafc; }}
+        footer {{ text-align: center; margin-top: 2rem; color: #64748b; font-size: 0.875rem; }}
+        #loading {{ display: none; text-align: center; padding: 1rem; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Vendor Submission Dashboard</h1>
+            <div>{filename or 'No data file'}</div>
+        </header>
+        
+        <div class="stats" id="stats">
+            <div class="stat">
+                <div class="stat-value">{len(rows)}</div>
+                <div class="stat-label">Submissions</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">{len(headers)}</div>
+                <div class="stat-label">Columns</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">{cols}</div>
+                <div class="stat-label">Displayed</div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <input type="search" placeholder="Search..." hx-get="/search" hx-trigger="keyup changed delay:300ms" hx-target="#tbody" name="q">
+            <select hx-get="/sort" hx-trigger="change" hx-target="#tbody" name="col">
+                <option value="">Sort by</option>
+                {"".join(f'<option value="{h}">{h}</option>' for h in headers[:cols])}
+            </select>
+        </div>
+        
+        <div id="loading">Loading...</div>
+        
+        <table>
+            <thead>
+                <tr>{"".join(f'<th hx-get="/sort?col={h}" hx-trigger="click" hx-target="#tbody">{h}</th>' for h in headers[:cols])}</tr>
+            </thead>
+            <tbody id="tbody">
+                {render_rows(rows[:50], cols)}
+            </tbody>
+        </table>
+        
+        <div style="display: flex; justify-content: center; gap: 0.5rem; margin-top: 1rem;">
+            <button hx-get="/page?p=0" hx-target="#tbody" disabled>First</button>
+            <button hx-get="/page?p=0" hx-target="#tbody">Prev</button>
+            <span>Page 1</span>
+            <button hx-get="/page?p=1" hx-target="#tbody">Next</button>
+            <button hx-get="/page?p={(len(rows)-1)//50}" hx-target="#tbody">Last</button>
+        </div>
+        
+        <footer>
+            <p>Vendor Dashboard • Read-only • Data from {data_dir.absolute()}</p>
+        </footer>
+    </div>
+    
+    <script>
+        document.addEventListener('htmx:beforeRequest', () => {{
+            document.getElementById('loading').style.display = 'block';
+        }});
+        document.addEventListener('htmx:afterRequest', () => {{
+            document.getElementById('loading').style.display = 'none';
+        }});
+    </script>
+</body>
+</html>"""
+    
+    @app.route("/search")
+    def search() -> str:
+        """Search endpoint."""
+        q = flask.request.args.get("q", "").lower()
+        if not q:
+            return render_rows(rows[:50])
+        
+        filtered = [r for r in rows if any(q in str(v).lower() for v in r.values())]
+        return render_rows(filtered[:50])
+    
+    @app.route("/sort")
+    def sort() -> str:
+        """Sort endpoint."""
+        col = flask.request.args.get("col", "")
+        if not col or col not in headers:
+            return render_rows(rows[:50])
+        
+        dir_param = flask.request.args.get("dir", "asc")
+        reverse = dir_param == "desc"
+        sorted_rows = sorted(rows, key=lambda x: x.get(col, "").lower(), reverse=reverse)
+        return render_rows(sorted_rows[:50])
+    
+    @app.route("/page")
+    def page() -> str:
+        """Pagination endpoint."""
+        try:
+            p = int(flask.request.args.get("p", "0"))
+        except:
+            p = 0
+        page_size = 50
+        start = p * page_size
+        return render_rows(rows[start:start + page_size])
+    
+    @app.route("/stats")
+    def stats() -> str:
+        """Stats update endpoint."""
+        return f"""
+        <div class="stat">
+            <div class="stat-value">{len(rows)}</div>
+            <div class="stat-label">Submissions</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value">{len(headers)}</div>
+            <div class="stat-label">Columns</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value">{min(10, len(headers))}</div>
+            <div class="stat-label">Displayed</div>
+        </div>
+        """
+    
     return app
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    """Parse CLI arguments and launch the Flask development server.
-
-    Parameters
-    ----------
-    argv : list[str] | None
-        Command-line arguments (defaults to sys.argv[1:]).
-
-    Returns
-    -------
-    int : Exit code (0 on success, 1 on error).
-    """
-    parser = argparse.ArgumentParser(description="Vendor Submission Dashboard — read-only Flask + htmx UI")
-    parser.add_argument("--host", default="127.0.0.1", help="Bind address (default: 127.0.0.1)")
-    parser.add_argument("--port", type=int, default=5000, help="Port to listen on (default: 5000)")
-    parser.add_argument("--data-dir", type=Path, default=Path(os.environ.get("DASHBOARD_DATA_DIR", "data")),
-                        help="Directory containing vendor submission CSV/XLSX files")
-    parser.add_argument("--debug", action="store_true", help="Enable Flask debug mode")
-    parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
-
+    """CLI entry point."""
+    if argv is None:
+        argv = sys.argv[1:]
+    
+    parser = argparse.ArgumentParser(description="Vendor submission dashboard")
+    parser.add_argument("--host", default="127.0.0.1", help="Host to bind")
+    parser.add_argument("--port", type=int, default=5000, help="Port to bind")
+    parser.add_argument("--data-dir", type=Path, default=Path("."), help="Data directory")
+    parser.add_argument("--debug", action="store_true", help="Debug mode")
+    
     args = parser.parse_args(argv)
-    logging.basicConfig(level=getattr(logging, args.log_level),
-                        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
-
-    if not args.data_dir.is_dir():
-        logger.warning("Data directory '%s' not found; using temporary sample data.", args.data_dir)
-        tmp_dir = Path(tempfile.mkdtemp(prefix="dashboard_data_"))
-        (tmp_dir / "sample_submissions.csv").write_text(
-            "vendor_id,vendor_name,status,submission_date,amount\n"
-            "V001,Acme Corp,approved,2024-01-15,12500.00\n"
-            "V002,Globex Inc,pending,2024-02-20,8750.50\n"
-            "V003,Initech,approved,2024-03-01,3200.00\n"
-            "V004,Umbrella Co,rejected,2024-03-10,15000.00\n"
-            "V005,Stark Industries,approved,2024-04-05,42000.00\n")
-        args.data_dir = tmp_dir
-        logger.info("Using temporary sample data at %s", tmp_dir)
-
-    app = create_app(args.data_dir)
-    print(f"🚀 Dashboard starting → http://{args.host}:{args.port}")
-    print(f"   Data directory: {args.data_dir}")
-
-    try:
-        app.run(host=args.host, port=args.port, debug=args.debug)
-    except KeyboardInterrupt:
-        print("\nShutting down.")
-        return 0
-    except OSError as exc:
-        logger.error("Failed to start server: %s", exc)
+    
+    logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO,
+                       format="%(levelname)s: %(message)s")
+    
+    if not args.data_dir.exists():
+        logger.error(f"Data dir not found: {args.data_dir}")
         return 1
+    
+    app = create_app(args.data_dir)
+    
+    logger.info(f"Starting at http://{args.host}:{args.port}")
+    logger.info(f"Data from {args.data_dir.absolute()}")
+    
+    try:
+        app.run(host=args.host, port=args.port, debug=args.debug, use_reloader=False)
+    except KeyboardInterrupt:
+        logger.info("Stopped")
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        return 1
+    
     return 0
 
 
