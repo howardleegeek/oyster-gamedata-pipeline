@@ -25,15 +25,18 @@ jobs:
           path: |
             ~/.cache/pip
             .venv
-          key: ${{ runner.os }}-pip-venv-${{ hashFiles('**/pyproject.toml') }}
+          # cache key v2 — busts stale venvs that pre-date ruff/black being in test extras
+          key: ${{ runner.os }}-pip-venv-v2-${{ hashFiles('**/pyproject.toml') }}
           restore-keys: |
-            ${{ runner.os }}-pip-venv-
+            ${{ runner.os }}-pip-venv-v2-
 
       - name: Install dependencies
         run: |
+          rm -rf .venv
           python -m venv .venv
           source .venv/bin/activate
           pip install -e ".[test]"
+          pip install ruff black pytest pytest-cov
 
       - name: Lint with ruff
         run: |

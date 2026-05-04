@@ -18,7 +18,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          # public submodules only; oyster-enrichment is private and the
+          # default GITHUB_TOKEN can't clone cross-repo private code.
+          # Pipeline tests don't depend on enrichment's internals.
+          submodules: false
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
