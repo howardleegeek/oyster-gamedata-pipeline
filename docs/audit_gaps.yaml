@@ -299,10 +299,11 @@ gaps:
 - id: G036
   title: bin/manifest_signer.py
   purpose: GPG-sign manifest.yaml for tamper-evidence + verify signature on receive
-  status: dispatched
+  status: completed
   priority: P2
   lines_estimate: 150
   dispatched_at: '2026-05-04 00:22:37'
+  completed_at: '2026-05-04 00:31:16'
 - id: G037
   title: bin/network_throttle_test.py
   purpose: Simulate weak vendor network (200 Kbps upload) using tc/dummynet wrapper
@@ -322,5 +323,5 @@ gaps:
   completed_at: '2026-05-03 23:34:27'
 harness_lock:
   host: Howards-MacBook-Air-4.local
-  pid: 14591
-  last_heartbeat: '2026-05-04T07:30:51Z'
+  pid: 11046
+  last_heartbeat: '2026-05-04T07:31:16Z'
