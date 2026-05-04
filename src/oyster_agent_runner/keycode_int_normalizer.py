@@ -71,8 +71,8 @@ def _expand_keycode(record: Record, key: str = "keyCode") -> List[Record]:
 # Public API
 # ---------------------------------------------------------------------------
 
-def normalize(records: List[Record], mode: str = "collapse",
-              key: str = "keyCode") -> List[Record]:
+
+def normalize(records: List[Record], mode: str = "collapse", key: str = "keyCode") -> List[Record]:
     """Normalize keyCode fields across *records*.
 
     Parameters
@@ -109,19 +109,24 @@ def normalize(records: List[Record], mode: str = "collapse",
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main(argv: List[str] | None = None) -> int:
     """Entry-point for command-line usage."""
-    p = argparse.ArgumentParser(
-        description="Normalize keyCode arrays (collapse or expand).")
-    p.add_argument("--input", "-i", required=True,
-                   help="Path to input JSON file (list of records).")
-    p.add_argument("--output", "-o", required=True,
-                   help="Path to output JSON file.")
-    p.add_argument("--mode", "-m", choices=("collapse", "expand"),
-                   default="collapse",
-                   help="Normalization mode (default: collapse).")
-    p.add_argument("--key", "-k", default="keyCode",
-                   help="Field name holding keyCode (default: keyCode).")
+    p = argparse.ArgumentParser(description="Normalize keyCode arrays (collapse or expand).")
+    p.add_argument(
+        "--input", "-i", required=True, help="Path to input JSON file (list of records)."
+    )
+    p.add_argument("--output", "-o", required=True, help="Path to output JSON file.")
+    p.add_argument(
+        "--mode",
+        "-m",
+        choices=("collapse", "expand"),
+        default="collapse",
+        help="Normalization mode (default: collapse).",
+    )
+    p.add_argument(
+        "--key", "-k", default="keyCode", help="Field name holding keyCode (default: keyCode)."
+    )
     args = p.parse_args(argv)
 
     inp = Path(args.input)
@@ -138,8 +143,7 @@ def main(argv: List[str] | None = None) -> int:
 
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(normalized, indent=2, ensure_ascii=False),
-                   encoding="utf-8")
+    out.write_text(json.dumps(normalized, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"Wrote {len(normalized)} record(s) → {out}")
     return 0
 
