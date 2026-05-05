@@ -29,7 +29,10 @@
 
 | ID | Date | Reporter | Version | Symptom | Hypothesis | Fix Version | Outcome | Remote Log URL |
 |---|---|---|---|---|---|---|---|---|
-| T-003 | 2026-05-05 | Howard (relay) | recorder-v0.1.0 → v0.3.0 | "他们一进去minecraft 马上闪退到主页" | Our auto-spawned ffmpeg `gdigrab -i desktop` interferes with MC's exclusive-fullscreen DirectX/OpenGL context, forcing MC out of game | recorder-v0.4.0 (diagnostic) → v0.6.0 if confirmed | WAITING (tester runs v0.4.0 diagnostic protocol) | (none yet — pre-v0.5.0) |
+| T-003 | 2026-05-05 | Howard (relay) | recorder-v0.1.0 → v0.3.0 | "他们一进去minecraft 马上闪退到主页" | Auto-spawned ffmpeg gdigrab interferes with MC's exclusive-fullscreen DirectX/OpenGL context | recorder-v0.4.0 (diagnostic) + v0.6.0 (minimize-on-arm) | WAITING (Howard now sees the recorder DID record successfully — see T-006) | (none yet — pre-v0.5.0) |
+| T-004 | 2026-05-05 | Howard (direct) | recorder-v0.1.0 → v0.5.0 | "界面 / 影响玩游戏" | Tk window competes with MC for screen real estate + focus; in exclusive fullscreen this can crash MC and is always distracting | recorder-v0.6.0 — `self.iconify()` on arm, auto `deiconify()` after recording ends | WAITING (build queued, ETA <5 min) | (will use v0.5.0+ ix.io) |
+| T-005 | 2026-05-05 | Howard (direct) | recorder-v0.1.0 (minipc) | "好像还是录了。就是不知道有没有录到买家想要的东西" | Lite recorder produces only video.mp4, missing 4/5 PRD files (systeminfo, action_camera, gameinfo, depth/) — buyer needs full 5-file tarball | recorder-v0.7.0 — auto-runs G165 lint v3 inline after every recording, shows N/24 PRD verdict in GUI without separate validator | RESOLVED (v0.7.0 live, awaits tester upgrade from v0.1.0 to v0.7.0) | (will populate via v0.5.0+ telemetry) |
+| T-006 | 2026-05-05 | Engineer (direct SSH read) | recorder-v0.1.0 (on minipc) | Tester actually recorded `clip-20260505-142357.mp4` (31 MB) successfully — but it's just video, no PRD shape | This invalidates T-003's "MC crashes when our recorder runs" theory — tester's MC must have crashed on its own (not because of us). MC was running again when SSH-checked (javaw 5GB) | n/a — informational | INVALIDATES T-003 hypothesis. Tester's MC self-issue (Java/driver/mod) is separate from our recorder; we're cleared. | n/a (direct SSH) |
 
 ## Closed
 
