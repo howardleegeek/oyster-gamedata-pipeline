@@ -1192,11 +1192,57 @@ class RecorderApp(tk.Tk):
             pass
         return out_tar
 
+    def _detect_audio_device(self) -> Optional[str]:
+        """Probe ffmpeg dshow for the first audio input device.
+
+        Returns the alt-name for use as `-i audio=<name>`. Returns None
+        if no device found or probe fails — caller should record video
+        only in that case. v0.11.0.
+        """
+        if os.name != "nt":
+            return None
+        try:
+            res = subprocess.run(
+                [str(_FFMPEG), "-hide_banner", "-list_devices", "true",
+                 "-f", "dshow", "-i", "dummy"],
+                capture_output=True, timeout=8, text=True,
+                creationflags=0x08000000 if os.name == "nt" else 0,
+            )
+            # ffmpeg writes device list to stderr
+            output = res.stderr or res.stdout or ""
+        except Exception as e:
+            _trace(f"audio_probe: ffmpeg list_devices failed: {e}")
+            return None
+
+        # Parse "DirectShow audio devices" section, capture device names.
+        # Format: [dshow @ 0x...]  "Microphone (Realtek...)" (audio)
+        in_audio = False
+        first_audio = None
+        for line in output.splitlines():
+            if "DirectShow audio devices" in line:
+                in_audio = True
+                continue
+            if in_audio:
+                if "DirectShow video devices" in line:
+                    break
+                # Match: '"<device-name>"'
+                if '"' in line and "Alternative name" not in line:
+                    name = line.split('"')[1] if '"' in line else None
+                    if name and first_audio is None:
+                        first_audio = name
+                        break
+        _trace(f"audio_probe: device={first_audio!r}")
+        return first_audio
+
     def _start_ffmpeg(self, out_path: Path) -> None:
         """Spawn ffmpeg with gdigrab to record the Minecraft window.
 
         gdigrab title="Minecraft*" filter records ONLY the MC window. If
         no exact match, falls back to full desktop capture.
+
+        v0.11.0: also captures audio via dshow if a device is detected.
+        Falls back to video-only if no audio device or audio capture
+        fails to start.
         """
         # H.265 encoded MP4, output locked to 1920x1080 @ 30 fps to
         # match the buyer-spec PRD (criteria 1 + 3). -draw_mouse 0 hides
@@ -1205,16 +1251,30 @@ class RecorderApp(tk.Tk):
         # (tester might have 4K, ultrawide, etc).
         # -t 360 = 6-minute hard cap so even if Python misses MC exit,
         # ffmpeg self-terminates and lint won't reject for over-length.
+        # v0.11.0: try to capture audio alongside video.
+        audio_dev = self._detect_audio_device()
+        audio_inputs = []
+        audio_codec = []
+        if audio_dev:
+            audio_inputs = ["-f", "dshow", "-i", f"audio={audio_dev}"]
+            # AAC at 128kbps, 48kHz stereo — common buyer-spec compatible.
+            audio_codec = ["-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2"]
+            _trace(f"ffmpeg: capturing audio from '{audio_dev}'")
+        else:
+            _trace("ffmpeg: no audio device found, recording video only")
+
         cmd = [
             str(_FFMPEG),
             "-f", "gdigrab",
             "-framerate", "30",
             "-draw_mouse", "0",
             "-i", "desktop",
+            *audio_inputs,
             "-vf", "scale=1920:1080:flags=lanczos",
             "-c:v", "libx265",
             "-preset", "ultrafast",
             "-pix_fmt", "yuv420p",
+            *audio_codec,
             "-r", "30",
             "-t", "360",
             "-y",
