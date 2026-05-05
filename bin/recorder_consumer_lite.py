@@ -54,10 +54,15 @@ import time
 import traceback
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import tkinter as tk
 from tkinter import messagebox
+
+# pynput is lazily imported in InputCapture.start() so that startup of
+# the .exe doesn't fail if pynput's hooks misbehave on a tester's box.
+# PyInstaller still picks it up because we --hidden-import it in the
+# workflow.
 
 # When PyInstaller-frozen, ffmpeg.exe lives in sys._MEIPASS.
 if getattr(sys, "frozen", False):
@@ -82,6 +87,113 @@ def _output_dir() -> Path:
 
 # Process names treated as "Minecraft" — both Java and Bedrock variants.
 MC_PROCESS_NAMES = {"javaw.exe", "java.exe", "Minecraft.exe", "MinecraftLauncher.exe"}
+
+
+class InputCapture:
+    """Lightweight keyboard + mouse capture into a JSON Lines buffer.
+
+    Each event is a dict with: timestamp_ms (relative to start), event_type
+    (key_down / key_up / mouse_move / mouse_click), and event-specific
+    fields (keyCode int, mouseX, mouseY, button). Used to populate
+    action_camera.json's `records` array (real data for the keyboard +
+    mouse fields; camera/quaternion fields stay placeholder until the
+    Rust app's shader pack lands).
+
+    pynput's Listener runs on its own thread. We tee events into an
+    in-memory list (self.events) which is later flushed to disk.
+    """
+
+    def __init__(self) -> None:
+        self.events: list[dict[str, Any]] = []
+        self._kbd_listener = None
+        self._mouse_listener = None
+        self._start_time = 0.0
+        self._lock = threading.Lock()
+
+    def _now_ms(self) -> int:
+        return int((time.time() - self._start_time) * 1000)
+
+    def start(self) -> bool:
+        """Begin listening. Returns False if pynput unavailable."""
+        try:
+            from pynput import keyboard, mouse
+        except Exception:  # noqa: BLE001 — best-effort
+            return False
+
+        self._start_time = time.time()
+
+        def on_press(key):  # noqa: ANN001
+            self._record_key(key, "key_down")
+
+        def on_release(key):  # noqa: ANN001
+            self._record_key(key, "key_up")
+
+        def on_move(x, y):  # noqa: ANN001
+            with self._lock:
+                self.events.append({
+                    "timestamp_ms": self._now_ms(),
+                    "event_type": "mouse_move",
+                    "mouseX": int(x),
+                    "mouseY": int(y),
+                })
+
+        def on_click(x, y, button, pressed):  # noqa: ANN001
+            with self._lock:
+                self.events.append({
+                    "timestamp_ms": self._now_ms(),
+                    "event_type": "mouse_click",
+                    "mouseX": int(x),
+                    "mouseY": int(y),
+                    "button": str(button),
+                    "pressed": bool(pressed),
+                })
+
+        self._kbd_listener = keyboard.Listener(
+            on_press=on_press, on_release=on_release
+        )
+        self._mouse_listener = mouse.Listener(
+            on_move=on_move, on_click=on_click
+        )
+        self._kbd_listener.start()
+        self._mouse_listener.start()
+        return True
+
+    def _record_key(self, key: Any, event_type: str) -> None:
+        # PRD requires keyCode as an int. pynput exposes Key.<name> for
+        # special keys and KeyCode(char='X') for char keys. Map to a
+        # stable int via vk (Windows virtual-key) when available, else
+        # fall back to the Unicode codepoint of the char.
+        kc: int = -1
+        try:
+            vk = getattr(key, "vk", None)
+            if isinstance(vk, int):
+                kc = vk
+            else:
+                ch = getattr(key, "char", None)
+                if ch:
+                    kc = ord(ch)
+                else:
+                    name = getattr(key, "name", None)
+                    if name:
+                        kc = hash(name) & 0xFFFF
+        except Exception:
+            kc = -1
+        with self._lock:
+            self.events.append({
+                "timestamp_ms": self._now_ms(),
+                "event_type": event_type,
+                "keyCode": kc,
+            })
+
+    def stop(self) -> list[dict[str, Any]]:
+        for L in (self._kbd_listener, self._mouse_listener):
+            try:
+                if L is not None:
+                    L.stop()
+            except Exception:
+                pass
+        with self._lock:
+            return list(self.events)
 
 
 def _write_minimal_xlsx(path: Path) -> None:
@@ -191,6 +303,8 @@ class RecorderApp(tk.Tk):
         self._ffmpeg_proc: Optional[subprocess.Popen] = None
         self._output_path: Optional[Path] = None
         self._stop_event = threading.Event()
+        self._input_capture: Optional[InputCapture] = None
+        self._captured_events: list[dict[str, Any]] = []
 
         self._build_ui()
         # Start background watcher immediately — testers do not click anything.
@@ -265,8 +379,18 @@ class RecorderApp(tk.Tk):
                       f"{type(exc).__name__}: {exc}")
             return
 
-        self._set("● 正在录制", RED,
-                  "玩你的 Minecraft 即可，退出游戏会自动停止录制。")
+        # Start input capture in parallel with video. If pynput fails
+        # (rare — e.g. tester hardened OS), record video only and note
+        # in subtitle so the tester knows.
+        self._input_capture = InputCapture()
+        input_ok = self._input_capture.start()
+        if input_ok:
+            self._set("● 正在录制", RED,
+                      "玩你的 Minecraft 即可，退出游戏会自动停止录制。"
+                      "（视频 + 键鼠输入同步采集中）")
+        else:
+            self._set("● 正在录制（仅视频）", RED,
+                      "键鼠采集未启动，仅录制视频。继续玩游戏即可。")
 
         # Phase 3: wait for MC to exit OR for 6 minutes elapsed (PRD cap).
         # PRD spec requires 5-6 min duration; auto-stop at 6 min so the
@@ -285,8 +409,12 @@ class RecorderApp(tk.Tk):
             self._stop_ffmpeg()
             return
 
-        # Phase 4: finalize ffmpeg, then package the 5-file PRD tarball.
+        # Phase 4: finalize ffmpeg + input capture, then package.
         self._stop_ffmpeg()
+        if self._input_capture is not None:
+            self._captured_events = self._input_capture.stop()
+        else:
+            self._captured_events = []
         try:
             output_tar = self._package_tarball(ts)
         except Exception as exc:  # noqa: BLE001
@@ -345,16 +473,46 @@ class RecorderApp(tk.Tk):
             json.dumps(sys_info, indent=2), encoding="utf-8"
         )
 
-        # 3. action_camera.json — placeholder empty array (PRD wants
-        # 9000 records × 20 fields; the Rust app provides those).
+        # 3. action_camera.json — REAL keyboard + mouse data from
+        # InputCapture, plus placeholder camera/quaternion fields. The
+        # Rust app's shader pack (G198) provides per-frame camera data;
+        # in this stop-gap we expose only what we can collect from
+        # user-space (key/mouse).
+        action_records = []
+        for ev in self._captured_events:
+            rec: dict[str, Any] = {
+                "timestamp_ms": ev.get("timestamp_ms", 0),
+                "event_type": ev.get("event_type", "unknown"),
+                # Required PRD field: keyCode is int. -1 for non-key events.
+                "keyCode": int(ev.get("keyCode", -1)),
+                # Mouse position (real for mouse events, 0 otherwise).
+                "mouseX": int(ev.get("mouseX", 0)),
+                "mouseY": int(ev.get("mouseY", 0)),
+                # Camera fields placeholder until Rust app's depth shader.
+                "cameraX": 0.0, "cameraY": 0.0, "cameraZ": 0.0,
+                # Quaternion xyzw order per PRD (criterion 14).
+                "cameraQX": 0.0, "cameraQY": 0.0,
+                "cameraQZ": 0.0, "cameraQW": 1.0,
+            }
+            # Carry button info on mouse_click for downstream ML.
+            if "button" in ev:
+                rec["mouseButton"] = str(ev["button"])
+                rec["pressed"] = bool(ev.get("pressed", False))
+            action_records.append(rec)
+
         (clip_dir / "action_camera.json").write_text(
             json.dumps(
                 {
-                    "_placeholder": True,
-                    "_note": "stop-gap; full 9000×20 action+camera in Rust app",
-                    "records": [],
+                    "_placeholder_camera": True,
+                    "_note": (
+                        "key + mouse fields are real; camera/quaternion "
+                        "fields are placeholder until Rust app's depth "
+                        "shader (G198) lands"
+                    ),
+                    "recordCount": len(action_records),
+                    "records": action_records,
                 },
-                indent=2,
+                separators=(",", ":"),  # compact for large arrays
             ),
             encoding="utf-8",
         )
