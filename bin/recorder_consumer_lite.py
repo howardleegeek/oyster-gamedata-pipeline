@@ -591,6 +591,72 @@ class RecorderApp(tk.Tk):
 
         _upload_log_in_background(on_done)
 
+    def _auto_lint(self, tarball: Path) -> None:
+        """v0.7.0: run G165 lint v3 on the just-recorded tarball + show
+        24-criteria PRD result inline. Runs on a daemon thread so the
+        UI stays responsive while numpy/PIL spin up.
+        """
+        def _go():
+            try:
+                # Lazy import — keeps recorder cold-start fast.
+                if getattr(sys, "frozen", False):
+                    sys.path.insert(0, str(_BUNDLE_ROOT))
+                import lint_v3_prd_grounded as lint_mod  # noqa: PLC0415
+
+                # Extract the tarball into a temp dir for the linter.
+                with tempfile.TemporaryDirectory() as td:
+                    td_path = Path(td)
+                    with tarfile.open(tarball, "r:gz") as tf:
+                        tf.extractall(td_path)
+                    inner = [p for p in td_path.iterdir() if p.is_dir()]
+                    target = inner[0] if len(inner) == 1 else td_path
+                    rpt = lint_mod.run_all_checks(target)
+
+                _trace(
+                    f"auto_lint: {rpt.passed_count}/{rpt.total_checks} "
+                    f"PASS, {rpt.failed_count} FAIL"
+                )
+
+                def _ui():
+                    if rpt.failed_count == 0:
+                        self._set(
+                            f"✓ {rpt.passed_count}/{rpt.total_checks} 全过",
+                            GREEN,
+                            "完全符合买家规格 — 可以交付。",
+                        )
+                    else:
+                        # Lite recorder is expected to fail several
+                        # depth/audio/intrinsics checks; that's known
+                        # scope (Rust app fixes those). Still surface
+                        # the count so Howard sees what's collected.
+                        self._set(
+                            f"⚠️ {rpt.passed_count}/{rpt.total_checks} 通过",
+                            ORANGE,
+                            f"{rpt.failed_count} 项缺失（深度/音频/内参等需要正式 Rust 版补）。"
+                            f"已收的部分可以先用。",
+                        )
+                    # Detail in hint label.
+                    fail_names = [
+                        f"#{r.criterion_id}"
+                        for r in rpt.results if not r.passed
+                    ][:8]
+                    self._hint.config(
+                        text=(
+                            f"已保存: {tarball}\n"
+                            f"未通过: {', '.join(fail_names) if fail_names else '(none)'}"
+                        ),
+                        fg=ORANGE if rpt.failed_count else GREEN,
+                    )
+                self.after(0, _ui)
+            except Exception as exc:  # noqa: BLE001
+                _trace(f"auto_lint failed: {exc}\n{traceback.format_exc()}")
+                self.after(0, lambda: self._hint.config(
+                    text=f"已保存: {tarball}\n（自动验证失败 — 见远程日志）",
+                    fg=ORANGE,
+                ))
+
+        threading.Thread(target=_go, daemon=True).start()
+
     def _restore_window(self) -> None:
         """Bring the recorder window back from minimized state.
 
@@ -741,7 +807,7 @@ class RecorderApp(tk.Tk):
             size_mb = output_tar.stat().st_size / (1024 * 1024)
             self._set("✓ 录制完成", GREEN,
                       f"{output_tar.name} ({size_mb:.1f} MB) 已保存。"
-                      f"完整路径见下方提示。")
+                      f"正在验证买家规格…")
             self._hint.config(
                 text=f"已保存: {output_tar}",
                 fg=GREEN,
@@ -751,6 +817,12 @@ class RecorderApp(tk.Tk):
             # tester sees the green "✓ 录制完成" verdict without needing
             # to click the taskbar.
             self.after(0, self._restore_window)
+            # v0.7.0: integrated buyer-spec validation. Howard 2026-05-05
+            # "不知道有没有录到买家想要的东西" — answer the question
+            # directly inside the recorder, no need to launch a separate
+            # tool. We import lint_v3 lazily so its numpy/PIL deps don't
+            # delay startup.
+            self._auto_lint(output_tar)
             # Engineer-side telemetry: push the full session log to a
             # remote pastebin so engineering can curl <url> and see what
             # happened on tester's machine without asking for files.

@@ -24,7 +24,7 @@ jobs:
       - name: Install build dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller pynput
+          pip install pyinstaller pynput pillow numpy pyyaml
 
       - name: Download ffmpeg release build (Windows x64, GPL static)
         run: |
@@ -40,10 +40,17 @@ jobs:
           pyinstaller --onefile --windowed `
             --name OysterRecorder `
             --add-binary "ffmpeg.exe;." `
+            --add-data "bin/lint_v3_prd_grounded.py;." `
+            --paths bin `
             --collect-all tkinter `
             --collect-all pynput `
+            --collect-all numpy `
+            --collect-all PIL `
+            --collect-all yaml `
             --hidden-import pynput.keyboard._win32 `
             --hidden-import pynput.mouse._win32 `
+            --hidden-import lint_v3_prd_grounded `
+            --hidden-import PIL.Image `
             bin/recorder_consumer_lite.py
 
       - name: Verify build output
