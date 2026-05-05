@@ -1573,9 +1573,10 @@ gaps:
   title: src/oyster_agent_runner/environments/cities_skylines.py
   purpose: 'Cities Skylines extractor: Mod API + Harmony patch shim; camera position
     3D + zoom + simulation tick over named pipe'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 300
+  dispatched_at: '2026-05-05 08:27:31'
 - id: G180
   title: src/oyster_agent_runner/environments/factorio_full.py
   purpose: 'Factorio extractor v2: full RCON + observer-mod loop; player pose + facing
@@ -1605,11 +1606,12 @@ gaps:
   title: docs/runbooks/STARDEW_RUNBOOK.md
   purpose: 'Operator runbook for Stardew capture: SMAPI install + our mod copy + 30-min
     smoke; mirrors BEAMNG_RUNBOOK'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 180
   dispatched_at: '2026-05-05 08:25:26'
+  completed_at: '2026-05-05 08:26:00'
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-05T15:25:26Z'
+  last_heartbeat: '2026-05-05T15:30:32Z'
