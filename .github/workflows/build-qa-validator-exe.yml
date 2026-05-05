@@ -58,35 +58,11 @@ jobs:
             --add-data "bin/lint_v3_prd_grounded.py;." `
             bin/qa_validator_gui.py
 
-      - name: Build console-mode diagnostic .exe
-        # Identical to the windowed build EXCEPT:
-        #   - no --windowed flag (so a console window opens, exposing
-        #     Python tracebacks that --windowed otherwise swallows)
-        #   - different --name so both .exes coexist in dist/
-        # Engineers / Howard ship this one to a tester only when the
-        # main .exe fails silently and we need a visible traceback.
-        run: |
-          pyinstaller --onefile `
-            --name OysterClipValidator-Diag `
-            --paths bin `
-            --collect-all numpy `
-            --collect-all PIL `
-            --collect-all yaml `
-            --collect-all tkinter `
-            --hidden-import lint_v3_prd_grounded `
-            --hidden-import PIL.Image `
-            --add-data "bin/lint_v3_prd_grounded.py;." `
-            bin/qa_validator_gui.py
-
       - name: Verify build output
         run: |
           dir dist
           if (-not (Test-Path dist/OysterClipValidator.exe)) {
-            Write-Error "Windowed build artifact missing"
-            exit 1
-          }
-          if (-not (Test-Path dist/OysterClipValidator-Diag.exe)) {
-            Write-Error "Diagnostic build artifact missing"
+            Write-Error "Build artifact missing"
             exit 1
           }
 
@@ -94,56 +70,38 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: OysterClipValidator-windows
-          path: |
-            dist/OysterClipValidator.exe
-            dist/OysterClipValidator-Diag.exe
+          path: dist/OysterClipValidator.exe
           if-no-files-found: error
 
       - name: Attach to GitHub Release (tag push only)
         if: startsWith(github.ref, 'refs/tags/qa-validator-v')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            dist/OysterClipValidator.exe
-            dist/OysterClipValidator-Diag.exe
+          files: dist/OysterClipValidator.exe
           generate_release_notes: true
           body: |
-            ## What this is
-            Single-file Windows .exe for **non-programmer testers** to validate
-            recorded gameplay clips against the Lark PDF buyer-spec
-            (24 PRD acceptance criteria, G165 lint v3).
+            # Oyster Clip 验证器
 
-            ## How testers use it (the normal path)
-            1. Download **`OysterClipValidator.exe`** from the **Assets** below.
-            2. Double-click it. (No installer; no admin; no Python.)
-            3. If Windows shows "Windows protected your PC" / SmartScreen,
-               click **More info** then **Run anyway** — the .exe is unsigned,
-               which is expected for now.
-            4. Click **Choose Clip...** and pick a `clip-YYYYMMDD-HHMMSS.tar.gz`.
-            5. Read the green / red banner. If red, the per-criterion list
-               below the banner says exactly which checks failed.
+            给**测试人员**用：双击就出 GUI，选一个 clip 文件，立刻看绿色或红色结果。
 
-            ## If the normal .exe fails silently
-            Download **`OysterClipValidator-Diag.exe`** instead. It opens a
-            black console window in addition to the GUI; any Python error
-            shows up there in plain text. Screenshot the console and send it
-            to engineering — that gives us the traceback we need to fix it.
+            ## 测试人员的 3 步
 
-            ## Engineer triage
-            If a tester reports a red verdict, ask for a screenshot of the
-            detail panel and the clip filename. Engineers can run the same
-            lint locally with:
+            1. 下载下面 **Assets** 里的 `OysterClipValidator.exe`
+            2. 双击它。如果 Windows 弹蓝色 "保护你的电脑"，点
+               **更多信息 → 仍要运行**（.exe 没签名，这一步未来会去掉）
+            3. 点蓝色按钮 **"选择 clip 文件…"**，选你录的 `.tar.gz`
+               → 立刻显示绿色 ✓ 通过 24/24 或红色 ✗ 失败 N/24
+
+            **就这样。** 没有"先点 Run 再看结果"两步走，没有英文术语，
+            没有需要看的命令行。
+
+            ## 如果是红色"失败"
+
+            点窗口底部 **"查看详情"** 链接，会展开一个面板列出 24 项检查
+            里到底哪几项 fail 了 — 截图发给工程师就行，不需要测试人员自己看懂。
+
+            ## 工程师本地复现
+
             ```
             python3 bin/lint_v3_prd_grounded.py <extracted-clip-dir>
             ```
-            and reproduce the failure offline.
-
-            ## v0.1.1 changes from v0.1.0
-            - `--collect-all numpy / PIL / yaml / tkinter` (was `--hidden-import`):
-              bundles all DLLs and submodules; fixes silent startup-flash
-              when numpy MKL or PIL C-extensions weren't being copied.
-            - Top-level `try/except` in `main()` now pops a Tk messagebox with
-              the full traceback, so even a crash before the main window can
-              be screenshotted by a tester.
-            - Companion `OysterClipValidator-Diag.exe` console build for cases
-              where the main .exe still misbehaves silently.
