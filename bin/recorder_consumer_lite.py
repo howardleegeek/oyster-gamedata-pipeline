@@ -819,6 +819,45 @@ class RecorderApp(tk.Tk):
                 fg=ORANGE,
             ))
 
+    def _tick_recording_status(self) -> None:
+        """v0.12.0: tick once per second while ffmpeg is alive, updating
+        the subtitle with elapsed time + current video file size +
+        progress toward 6-minute cap. Self-stops when ffmpeg dies.
+        """
+        if self._ffmpeg_proc is None or self._ffmpeg_proc.poll() is not None:
+            return  # ffmpeg has exited; let watch_loop's finalizer take over
+        try:
+            elapsed = max(0.0, time.time() - self._record_started_at)
+        except Exception:
+            elapsed = 0.0
+        # Format mm:ss
+        mm = int(elapsed // 60)
+        ss = int(elapsed % 60)
+        # Read current video file size; the file may not exist for the
+        # first ~1s as ffmpeg sets up its container.
+        size_str = "—"
+        try:
+            if self._video_path and self._video_path.exists():
+                mb = self._video_path.stat().st_size / (1024 * 1024)
+                size_str = f"{mb:.1f} MB"
+        except Exception:
+            pass
+        # Progress bar visual (caps at 6 min = 360s)
+        cap = 360.0
+        pct = min(100, int((elapsed / cap) * 100))
+        bar_w = 18
+        filled = int(bar_w * pct / 100)
+        bar = "█" * filled + "░" * (bar_w - filled)
+        try:
+            self._subtitle.config(
+                text=f"⏱  {mm}分{ss:02d}秒  /  6 分钟  ({pct}%)\n[{bar}]\n📦 视频文件 {size_str}",
+                fg=RED,
+            )
+        except Exception:
+            pass
+        # Schedule next tick.
+        self.after(1000, self._tick_recording_status)
+
     def _restore_window(self) -> None:
         """Bring the recorder window back from minimized state.
 
@@ -968,6 +1007,11 @@ class RecorderApp(tk.Tk):
         else:
             self._set("● 正在录制（仅视频）", RED,
                       "键鼠采集未启动，仅录制视频。继续玩游戏即可。")
+
+        # v0.12.0: live progress ticker so the tester knows recording is
+        # actually working. Updates every second with elapsed seconds +
+        # current video file size. Self-stops when ffmpeg ends.
+        self.after(0, self._tick_recording_status)
 
         # Phase 3: wait for MC to exit OR for 6 minutes elapsed (PRD cap)
         # OR for the user to disarm.
