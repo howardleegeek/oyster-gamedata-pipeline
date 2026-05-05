@@ -22,10 +22,20 @@
 ```bash
 git clone https://github.com/howardleegeek/oyster-gamedata-pipeline.git
 cd oyster-gamedata-pipeline
-bash bin/smoke_phase1.sh           # 自动下载 paper-1.20.4.jar 并启动
+bash bin/smoke_phase1.sh           # 自动下载 paper-1.20.4.jar、自动配 online-mode=false
 cd mineflayer && npm install && cd ..
-bash bin/produce_real_sample_v2.sh # 端到端采一份样本数据
+
+# 选 1:不要 API key 的快速测试(走 mock provider)
+.venv/bin/python -m oyster_agent_runner.cli run-mc \
+    --task-file tasks/MC-tutorial-001.json \
+    --output-dir ./out --provider mock --max-steps 5
+
+# 选 2:完整真实采集(需要 ANTHROPIC_API_KEY 或 OPENAI_API_KEY)
+export ANTHROPIC_API_KEY=sk-ant-...
+bash bin/produce_real_sample_v2.sh # 端到端采 5-min 真实样本数据
 ```
+
+**关键配置**:服务端 `server.properties` 必须有 `online-mode=false`(我们的脚本默认会这么写;手动建服务时要自己改),否则 bot 连不上(报错 `unverified_username`)。
 
 ## 五、产出验证
 
@@ -46,10 +56,15 @@ python3 dist/oyster-qa-tool.pyz check --quick
 | 用 Bedrock 客户端 | ❌ 协议完全不兼容 |
 | 只装 Java 17 | ⚠️ Paper 1.20.4 还能跑但 1.20.5+ 强制要 Java 21,统一上 21 |
 
-## 卡住的 3 种典型报错
+## 卡住的 4 种典型报错
 
 1. `UnsupportedClassVersionError 65.0` → Java 不是 21,装一下
 2. `Cannot find supported version` → 服务端版本不是 1.20.4
 3. `Connection lost: Outdated server!` → 同上
+4. `bot died before spawn: kicked: unverified_username` → server.properties 里 `online-mode=true`,改成 `false` 重启
+
+## Howard 本机实测验证 (2026-05-05)
+
+mac-air-4 跑完整 pipeline:Paper 7s 启 + Mineflayer bot 连上 + mock provider 5-step + 63 真实事件落盘(12 cot + 7 inputs + 17 metadata + 27 trajectory),clean exit。**stack OK,老刘可以照 SOP 复刻。**
 
 **就这些。**
