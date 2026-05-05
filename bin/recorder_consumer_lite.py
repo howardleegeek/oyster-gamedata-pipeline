@@ -591,8 +591,30 @@ class RecorderApp(tk.Tk):
 
         _upload_log_in_background(on_done)
 
+    def _restore_window(self) -> None:
+        """Bring the recorder window back from minimized state.
+
+        Called from the watcher thread (via self.after) after recording
+        finishes, so the tester sees the verdict banner without having
+        to find us in the taskbar.
+        """
+        try:
+            self.deiconify()
+            self.lift()
+            _trace("window restored from taskbar")
+        except Exception as e:
+            _trace(f"deiconify failed: {e}")
+
     def _toggle_arm(self) -> None:
-        """Tester clicked the arm button. Toggle recording state."""
+        """Tester clicked the arm button. Toggle recording state.
+
+        v0.6.0: Howard 反馈 '界面 影响玩游戏'. As soon as recording is
+        armed we minimize ourselves to the taskbar so MC reclaims full
+        screen focus. Critical for exclusive-fullscreen MC sessions
+        where our window stealing focus could crash MC. The user can
+        click the taskbar icon any time to bring us back and click
+        '停止录制'.
+        """
         if not self._record_armed:
             # Arm
             self._record_armed = True
@@ -602,6 +624,12 @@ class RecorderApp(tk.Tk):
                 activebackground="#b71c1c",
             )
             _trace("recording armed by user click")
+            # Get out of MC's way.
+            try:
+                self.iconify()
+                _trace("window iconified to taskbar")
+            except Exception as e:
+                _trace(f"iconify failed: {e}")
         else:
             # Disarm — request the watcher to stop any in-flight ffmpeg.
             self._record_armed = False
@@ -718,6 +746,11 @@ class RecorderApp(tk.Tk):
                 text=f"已保存: {output_tar}",
                 fg=GREEN,
             )
+            # v0.6.0: window was iconified when arm was pressed to free
+            # MC focus. MC has now exited, so restore our window so the
+            # tester sees the green "✓ 录制完成" verdict without needing
+            # to click the taskbar.
+            self.after(0, self._restore_window)
             # Engineer-side telemetry: push the full session log to a
             # remote pastebin so engineering can curl <url> and see what
             # happened on tester's machine without asking for files.
