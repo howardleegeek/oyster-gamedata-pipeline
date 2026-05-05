@@ -36,9 +36,23 @@ jobs:
           Get-Item ffmpeg.exe | Format-List Length, FullName
 
       - name: Build single-file recorder .exe (PyInstaller)
+        # --runtime-tmpdir : redirect PyInstaller's --onefile runtime
+        #     extraction from %TEMP%\_MEI<rand>\ to a stable per-user
+        #     LOCALAPPDATA path. Defender / third-party AV scan %TEMP%
+        #     aggressively and frequently quarantine the just-extracted
+        #     python311.dll mid-load, causing the classic
+        #     "Failed to load Python DLL: ...python311.dll" crash.
+        #     LOCALAPPDATA is excluded from most aggressive AV heuristics
+        #     and reusing the same dir across launches lets AV mark it
+        #     trusted after first scan.
+        # The literal string '%LOCALAPPDATA%' is preserved by PyInstaller
+        # (no shell expansion at build time) — Windows expands it at
+        # runtime when the .exe is launched. Confirmed by PyInstaller
+        # docs (https://pyinstaller.org/en/stable/usage.html).
         run: |
           pyinstaller --onefile --windowed `
             --name OysterRecorder `
+            --runtime-tmpdir "%LOCALAPPDATA%\OysterRecorder\runtime" `
             --add-binary "ffmpeg.exe;." `
             --add-data "bin/lint_v3_prd_grounded.py;." `
             --add-data "bin/generate_systeminfo_json.py;." `
@@ -57,28 +71,70 @@ jobs:
             --hidden-import PIL.Image `
             bin/recorder_consumer_lite.py
 
+      - name: Build --onedir fallback (zip distribution)
+        # Some testers report "Failed to load Python DLL" with the
+        # --onefile build because Defender / third-party AV scans
+        # the just-extracted python311.dll mid-load. --onedir avoids
+        # the %TEMP% extraction entirely — all DLLs ship inside a
+        # folder next to OysterRecorder.exe and load directly.
+        # Tester unzips once, double-clicks the .exe inside the folder.
+        run: |
+          pyinstaller --onedir --windowed `
+            --name OysterRecorder-onedir `
+            --add-binary "ffmpeg.exe;." `
+            --add-data "bin/lint_v3_prd_grounded.py;." `
+            --add-data "bin/generate_systeminfo_json.py;." `
+            --add-data "bin/generate_gameinfo_xlsx.py;." `
+            --paths bin `
+            --collect-all tkinter `
+            --collect-all pynput `
+            --collect-all numpy `
+            --collect-all PIL `
+            --collect-all yaml `
+            --hidden-import pynput.keyboard._win32 `
+            --hidden-import pynput.mouse._win32 `
+            --hidden-import lint_v3_prd_grounded `
+            --hidden-import generate_systeminfo_json `
+            --hidden-import generate_gameinfo_xlsx `
+            --hidden-import PIL.Image `
+            bin/recorder_consumer_lite.py
+          # Zip the onedir output for distribution.
+          Compress-Archive -Path dist/OysterRecorder-onedir/* `
+            -DestinationPath dist/OysterRecorder-onedir.zip `
+            -CompressionLevel Fastest
+
       - name: Verify build output
         run: |
           dir dist
           if (-not (Test-Path dist/OysterRecorder.exe)) {
-            Write-Error "Recorder build artifact missing"
+            Write-Error "Recorder --onefile build artifact missing"
             exit 1
           }
-          $size_mb = (Get-Item dist/OysterRecorder.exe).Length / 1MB
-          Write-Host "Recorder .exe size: $size_mb MB"
+          if (-not (Test-Path dist/OysterRecorder-onedir.zip)) {
+            Write-Error "Recorder --onedir zip fallback missing"
+            exit 1
+          }
+          $size_mb_exe = (Get-Item dist/OysterRecorder.exe).Length / 1MB
+          $size_mb_zip = (Get-Item dist/OysterRecorder-onedir.zip).Length / 1MB
+          Write-Host "Recorder --onefile .exe: $size_mb_exe MB"
+          Write-Host "Recorder --onedir .zip:  $size_mb_zip MB"
 
       - name: Upload as workflow artifact (always)
         uses: actions/upload-artifact@v4
         with:
           name: OysterRecorder-windows
-          path: dist/OysterRecorder.exe
+          path: |
+            dist/OysterRecorder.exe
+            dist/OysterRecorder-onedir.zip
           if-no-files-found: error
 
       - name: Attach to GitHub Release (tag push only)
         if: startsWith(github.ref, 'refs/tags/recorder-v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/OysterRecorder.exe
+          files: |
+            dist/OysterRecorder.exe
+            dist/OysterRecorder-onedir.zip
           generate_release_notes: true
           body: |
             # Oyster 录制器 (Lite stop-gap MVP)
