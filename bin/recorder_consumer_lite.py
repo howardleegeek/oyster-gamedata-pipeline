@@ -81,11 +81,31 @@ _trace(f"sys.platform={sys.platform}")
 _trace(f"os.name={os.name}")
 
 # Bumped on every release — used by self-update logic.
-RECORDER_VERSION = "lite-v0.8.0"
+# CRITICAL: this MUST match the recorder-vX.Y.Z tag we're publishing
+# under. Out-of-sync versions cause v0.13 onedir installs to think
+# they're v0.8 and "update" themselves to v0.9 single-file, breaking
+# the bundled _internal/ layout. See v0.14.0 commit for postmortem.
+RECORDER_VERSION = "lite-v0.14.0"
 RELEASES_API = (
     "https://api.github.com/repos/howardleegeek/oyster-gamedata-pipeline"
     "/releases?per_page=20"
 )
+
+
+def _is_onedir_install() -> bool:
+    """Detect whether we're running as a PyInstaller --onedir bundle.
+
+    --onedir bundles have a ``_internal/`` directory next to the .exe
+    holding all DLLs. --onefile extracts to a temp dir and the .exe
+    sits alone. Self-update can ONLY safely overwrite same-format
+    bundles (onefile→onefile or onedir→onedir-zip), so this gate
+    prevents an onedir install from being clobbered by a single-file
+    .exe download.
+    """
+    if not getattr(sys, "frozen", False):
+        return False
+    exe = Path(sys.executable).resolve()
+    return (exe.parent / "_internal").is_dir()
 
 
 # ---- Self-update (engineer ships once, recorder updates itself) ---------
@@ -153,9 +173,17 @@ def _stage_self_update(new_exe_url: str) -> bool:
     Returns True if the update was staged (caller should exit so the
     .bat can take over). Returns False on any failure (no harm, recorder
     keeps running on the current version).
+
+    v0.14.0 GUARD: refuses to self-update an --onedir install with a
+    single-file .exe. The single-file .exe assumes %TEMP% extraction
+    and overwrites our bootstrap, leaving the _internal/ folder
+    orphaned and crashing the next launch with PYI_APPLICATION_HOME_DIR.
     """
     if os.name != "nt" or not getattr(sys, "frozen", False):
         # Only auto-update when running as a packaged .exe on Windows.
+        return False
+    if _is_onedir_install():
+        _trace("update: SKIP — running as --onedir, refusing single-.exe overwrite")
         return False
     try:
         import urllib.request
@@ -1307,12 +1335,28 @@ class RecorderApp(tk.Tk):
         else:
             _trace("ffmpeg: no audio device found, recording video only")
 
+        # v0.14.0: prefer window-title capture so we only record MC, not
+        # the entire desktop (which includes our own GUI, browser, etc).
+        # Falls back to full desktop if window not found at ffmpeg start
+        # time. The MC window title was already detected in
+        # _get_minecraft_window_rect for systeminfo.json, so use it here
+        # too if available — gives ffmpeg a stable handle that survives
+        # MC moving / resizing.
+        if self._mc_window_rect and self._mc_window_rect.get("title"):
+            mc_title = self._mc_window_rect["title"]
+            video_input = ["-f", "gdigrab", "-framerate", "30",
+                           "-draw_mouse", "0",
+                           "-i", f"title={mc_title}"]
+            _trace(f"ffmpeg: window-mode capture title='{mc_title}'")
+        else:
+            video_input = ["-f", "gdigrab", "-framerate", "30",
+                           "-draw_mouse", "0",
+                           "-i", "desktop"]
+            _trace("ffmpeg: full-desktop capture (no MC window detected)")
+
         cmd = [
             str(_FFMPEG),
-            "-f", "gdigrab",
-            "-framerate", "30",
-            "-draw_mouse", "0",
-            "-i", "desktop",
+            *video_input,
             *audio_inputs,
             "-vf", "scale=1920:1080:flags=lanczos",
             "-c:v", "libx265",
