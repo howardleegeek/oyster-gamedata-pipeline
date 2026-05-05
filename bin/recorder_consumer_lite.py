@@ -80,6 +80,139 @@ _trace(f"sys.frozen={getattr(sys, 'frozen', False)}")
 _trace(f"sys.platform={sys.platform}")
 _trace(f"os.name={os.name}")
 
+# Bumped on every release — used by self-update logic.
+RECORDER_VERSION = "lite-v0.8.0"
+RELEASES_API = (
+    "https://api.github.com/repos/howardleegeek/oyster-gamedata-pipeline"
+    "/releases?per_page=20"
+)
+
+
+# ---- Self-update (engineer ships once, recorder updates itself) ---------
+# Howard 2026-05-05: "能不能 自动给这个电脑上的更新"
+# On launch (and once an hour while running), check the GitHub Releases
+# API for the latest `recorder-v*` tag. If a newer version exists,
+# download the new .exe to %TEMP%, then write a tiny Windows .bat that
+# (a) waits 3s for us to fully exit, (b) copies the new .exe over our
+# path, (c) re-launches us. We spawn the .bat detached and quit.
+# Tester sees the recorder briefly close + reopen — every ~5 min when
+# we ship a new release, never has to touch the file manually again.
+
+def _current_version_tag() -> str:
+    """Return the recorder-vX.Y.Z tag derived from RECORDER_VERSION."""
+    # RECORDER_VERSION = "lite-v0.8.0" → tag = "recorder-v0.8.0"
+    semver = RECORDER_VERSION.split("-", 1)[-1]  # 'v0.8.0'
+    return f"recorder-{semver}"
+
+
+def _latest_release_tag_and_url() -> tuple[Optional[str], Optional[str]]:
+    """Query GitHub API for the latest recorder-v* release. Returns
+    (tag, exe_download_url) or (None, None) on any failure (network,
+    rate-limit, etc).
+    """
+    try:
+        import urllib.request
+        req = urllib.request.Request(
+            RELEASES_API,
+            headers={"User-Agent": "OysterRecorder/lite", "Accept": "application/vnd.github+json"},
+        )
+        with urllib.request.urlopen(req, timeout=10) as r:
+            releases = json.loads(r.read().decode("utf-8"))
+    except Exception as e:
+        _trace(f"update_check: api error {e}")
+        return None, None
+    for rel in releases:
+        tag = rel.get("tag_name", "")
+        if not tag.startswith("recorder-v"):
+            continue
+        if rel.get("draft") or rel.get("prerelease"):
+            continue
+        for asset in rel.get("assets", []):
+            if asset.get("name") == "OysterRecorder.exe":
+                return tag, asset.get("browser_download_url")
+    return None, None
+
+
+def _is_newer_tag(latest: str, current: str) -> bool:
+    """Compare recorder-vA.B.C semver-ish tags. Returns True if latest > current."""
+    def _key(t: str) -> tuple[int, ...]:
+        v = t.replace("recorder-v", "").split(".")
+        out = []
+        for piece in v:
+            try:
+                out.append(int(piece))
+            except ValueError:
+                out.append(0)
+        return tuple(out)
+    return _key(latest) > _key(current)
+
+
+def _stage_self_update(new_exe_url: str) -> bool:
+    """Download the new .exe and write a self-replacing .bat.
+
+    Returns True if the update was staged (caller should exit so the
+    .bat can take over). Returns False on any failure (no harm, recorder
+    keeps running on the current version).
+    """
+    if os.name != "nt" or not getattr(sys, "frozen", False):
+        # Only auto-update when running as a packaged .exe on Windows.
+        return False
+    try:
+        import urllib.request
+        new_path = Path(tempfile.gettempdir()) / "OysterRecorder-update.exe"
+        _trace(f"update: downloading {new_exe_url} -> {new_path}")
+        with urllib.request.urlopen(new_exe_url, timeout=120) as resp, \
+                new_path.open("wb") as fh:
+            shutil.copyfileobj(resp, fh)
+        _trace(f"update: downloaded {new_path.stat().st_size} bytes")
+    except Exception as e:
+        _trace(f"update: download failed {e}")
+        return False
+
+    current_exe = Path(sys.executable)
+    bat_path = Path(tempfile.gettempdir()) / "OysterRecorder-update.bat"
+    bat_body = (
+        "@echo off\r\n"
+        "rem Wait for the recorder to fully exit before swapping.\r\n"
+        "timeout /t 3 /nobreak > nul\r\n"
+        f'move /Y "{new_path}" "{current_exe}"\r\n'
+        f'start "" "{current_exe}"\r\n'
+        f'del "{bat_path}"\r\n'
+    )
+    try:
+        bat_path.write_text(bat_body, encoding="ascii")
+        # DETACHED_PROCESS (0x08) + CREATE_NEW_PROCESS_GROUP (0x200) so
+        # closing us doesn't kill the .bat.
+        subprocess.Popen(
+            ["cmd.exe", "/c", str(bat_path)],
+            creationflags=0x08 | 0x200,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        _trace(f"update: staged via {bat_path}")
+        return True
+    except Exception as e:
+        _trace(f"update: stage failed {e}")
+        return False
+
+
+def _check_for_update_in_background(on_done=None) -> None:
+    """Fire-and-forget update check. Calls on_done(tag, url, is_newer)."""
+    def _go():
+        latest_tag, exe_url = _latest_release_tag_and_url()
+        current_tag = _current_version_tag()
+        if not latest_tag:
+            _trace("update_check: no release returned by API")
+            if on_done:
+                on_done(None, None, False)
+            return
+        is_newer = _is_newer_tag(latest_tag, current_tag)
+        _trace(f"update_check: current={current_tag} latest={latest_tag} newer={is_newer}")
+        if on_done:
+            on_done(latest_tag, exe_url, is_newer)
+    threading.Thread(target=_go, daemon=True).start()
+
 
 # ---- Remote telemetry (so engineer can see logs without tester action) ---
 # Howard 2026-05-05: "你这边 能不能有log 到信息和日志"
@@ -490,6 +623,11 @@ class RecorderApp(tk.Tk):
         # Clean shutdown if window is closed mid-recording.
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
+        # v0.8.0: kick off self-update check immediately. If a newer
+        # release exists, stage the update and exit cleanly so the .bat
+        # can swap us out and re-launch. Tester sees a brief flicker.
+        _check_for_update_in_background(self._on_update_check)
+
     def _build_ui(self) -> None:
         # v0.4.0: explicit "Arm recording" button. Default state = NOT
         # recording. Tester can verify Minecraft works first, then arm
@@ -656,6 +794,30 @@ class RecorderApp(tk.Tk):
                 ))
 
         threading.Thread(target=_go, daemon=True).start()
+
+    def _on_update_check(self, latest_tag, exe_url, is_newer):
+        """Self-update callback. If newer release found, stage + restart."""
+        if not is_newer or not exe_url:
+            self.after(0, lambda: self._hint.config(
+                text=f"已经是最新版 ({_current_version_tag()})\n如果出问题，请把 {_STARTUP_LOG} 截图给工程师。",
+                fg=TEXT_GRAY,
+            ))
+            return
+        # Don't auto-replace mid-recording; wait until tester is idle.
+        if self._record_armed:
+            _trace(f"update: deferred — recording in progress, will retry on close")
+            return
+        _trace(f"update: staging {latest_tag}")
+        self.after(0, lambda: self._set("⏳ 自动更新中…", ORANGE,
+                                         f"正在下载 {latest_tag}，几秒后会自动重启。"))
+        if _stage_self_update(exe_url):
+            _trace("update: staged ok, exiting for relaunch")
+            self.after(2000, self._on_close)
+        else:
+            self.after(0, lambda: self._hint.config(
+                text=f"自动更新失败 — 见 {_STARTUP_LOG}",
+                fg=ORANGE,
+            ))
 
     def _restore_window(self) -> None:
         """Bring the recorder window back from minimized state.
