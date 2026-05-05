@@ -1456,10 +1456,11 @@ gaps:
   title: bin/multi_camera_capture.py
   purpose: 'Cluster C+: multi-camera concurrent capture (1st-person + 3rd-person +
     top-down) — Habitat-Sim parity for buyers training multi-view world models'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 280
   dispatched_at: '2026-05-04 22:19:16'
+  completed_at: '2026-05-04 22:21:03'
 - id: G167
   title: bin/optical_flow_provider.py
   purpose: 'Cluster E+: per-frame optical flow computation (RAFT model, 2D vectors)
@@ -1482,10 +1483,11 @@ gaps:
   title: bin/material_albedo_provider.py
   purpose: 'Cluster C+: per-pixel albedo + roughness + metallic G-buffer (Sora 2 /
     Cosmos training data parity)'
-  status: dispatched
+  status: completed
   priority: P2
   lines_estimate: 220
   dispatched_at: '2026-05-04 22:20:29'
+  completed_at: '2026-05-04 22:21:04'
 - id: G170
   title: bin/scene_lighting_metadata.py
   purpose: 'Cluster C+: per-frame sun direction + ambient intensity + weather state
@@ -1543,4 +1545,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-05T05:20:29Z'
+  last_heartbeat: '2026-05-05T05:21:04Z'
