@@ -56,8 +56,38 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-import tkinter as tk
-from tkinter import messagebox
+# ---- Startup tracing (runs BEFORE any heavyweight import) -----------------
+# Howard tester 2026-05-05: "反馈过来一点就闪退" — v0.1.0 silently crashed
+# on launch with --windowed (which swallows stderr). To diagnose, every
+# import + init step writes a single line to ~/OysterRecorder.log BEFORE
+# any GUI work. Tester can email/Slack that file even after the .exe is
+# gone. The log is also tail-printed in the messagebox if Tk is alive.
+_STARTUP_LOG = Path.home() / "OysterRecorder.log"
+
+
+def _trace(step: str) -> None:
+    try:
+        with _STARTUP_LOG.open("a", encoding="utf-8") as fh:
+            fh.write(f"{datetime.now().isoformat(timespec='seconds')} {step}\n")
+    except Exception:
+        # Even logging failed — nothing more we can do this early.
+        pass
+
+
+_trace("=== OysterRecorder boot ===")
+_trace(f"sys.executable={sys.executable}")
+_trace(f"sys.frozen={getattr(sys, 'frozen', False)}")
+_trace(f"sys.platform={sys.platform}")
+_trace(f"os.name={os.name}")
+
+try:
+    _trace("importing tkinter…")
+    import tkinter as tk
+    from tkinter import messagebox
+    _trace("tkinter ok")
+except Exception:
+    _trace(f"tkinter FAILED:\n{traceback.format_exc()}")
+    raise
 
 # pynput is lazily imported in InputCapture.start() so that startup of
 # the .exe doesn't fail if pynput's hooks misbehave on a tester's box.
@@ -87,6 +117,81 @@ def _output_dir() -> Path:
 
 # Process names treated as "Minecraft" — both Java and Bedrock variants.
 MC_PROCESS_NAMES = {"javaw.exe", "java.exe", "Minecraft.exe", "MinecraftLauncher.exe"}
+
+
+def _get_minecraft_window_rect() -> Optional[dict[str, int]]:
+    """Return Minecraft window geometry on Windows, or None if not found.
+
+    Uses Win32 EnumWindows + GetWindowText + GetWindowRect via ctypes
+    (no extra deps, built into Python). We scan all top-level windows
+    and pick the first whose title contains 'Minecraft'. PRD requires
+    gameProcessName / x / y / width / height / recordDpi (criterion 8),
+    so this powers the real systeminfo.json.
+
+    Returns None on non-Windows or if no MC window is visible yet.
+    """
+    if os.name != "nt":
+        return None
+
+    try:
+        import ctypes
+        import ctypes.wintypes as wt
+    except Exception:
+        return None
+
+    user32 = ctypes.windll.user32
+
+    EnumWindows = user32.EnumWindows
+    GetWindowText = user32.GetWindowTextW
+    GetWindowTextLength = user32.GetWindowTextLengthW
+    IsWindowVisible = user32.IsWindowVisible
+    GetWindowRect = user32.GetWindowRect
+    GetDpiForWindow = getattr(user32, "GetDpiForWindow", None)
+
+    EnumWindowsProc = ctypes.WINFUNCTYPE(ctypes.c_bool, wt.HWND, wt.LPARAM)
+
+    found_hwnd: list[int] = []
+    found_title: list[str] = []
+
+    def _callback(hwnd, _lparam):
+        if not IsWindowVisible(hwnd):
+            return True
+        ln = GetWindowTextLength(hwnd)
+        if ln == 0:
+            return True
+        buf = ctypes.create_unicode_buffer(ln + 1)
+        GetWindowText(hwnd, buf, ln + 1)
+        title = buf.value
+        if "minecraft" in title.lower():
+            found_hwnd.append(hwnd)
+            found_title.append(title)
+            return False  # stop iteration
+        return True
+
+    EnumWindows(EnumWindowsProc(_callback), 0)
+
+    if not found_hwnd:
+        return None
+
+    rect = wt.RECT()
+    if not GetWindowRect(found_hwnd[0], ctypes.byref(rect)):
+        return None
+
+    dpi = 96
+    if GetDpiForWindow is not None:
+        try:
+            dpi = int(GetDpiForWindow(found_hwnd[0])) or 96
+        except Exception:
+            dpi = 96
+
+    return {
+        "title": found_title[0],
+        "x": int(rect.left),
+        "y": int(rect.top),
+        "width": int(rect.right - rect.left),
+        "height": int(rect.bottom - rect.top),
+        "recordDpi": dpi,
+    }
 
 
 class InputCapture:
@@ -305,6 +410,12 @@ class RecorderApp(tk.Tk):
         self._stop_event = threading.Event()
         self._input_capture: Optional[InputCapture] = None
         self._captured_events: list[dict[str, Any]] = []
+        # v0.4.0: tester explicitly opts in to recording. Default is
+        # observe-only mode so our .exe can NEVER be blamed for MC
+        # crashing — a tester whose MC crashes can verify it crashes
+        # WITHOUT us recording first.
+        self._record_armed = False
+        self._mc_window_rect: Optional[dict[str, int]] = None
 
         self._build_ui()
         # Start background watcher immediately — testers do not click anything.
@@ -314,40 +425,88 @@ class RecorderApp(tk.Tk):
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
     def _build_ui(self) -> None:
-        # Status banner (fills most of the window)
+        # v0.4.0: explicit "Arm recording" button. Default state = NOT
+        # recording. Tester can verify Minecraft works first, then arm
+        # the recorder. This also distinguishes "MC crashes by itself"
+        # from "MC crashes because of our ffmpeg".
         self._verdict = tk.Label(
             self,
             text="…",
-            font=("Helvetica", 36, "bold"),
+            font=("Helvetica", 30, "bold"),
             bg="white",
             fg=TEXT_GRAY,
             height=2,
         )
-        self._verdict.pack(fill="x", padx=20, pady=(40, 8))
+        self._verdict.pack(fill="x", padx=20, pady=(20, 8))
 
         self._subtitle = tk.Label(
             self,
-            text="正在等待 Minecraft 启动…",
-            font=("Helvetica", 13),
+            text="先正常打开 Minecraft 玩一下，确认 MC 不崩。\n要开始录制再点下面按钮。",
+            font=("Helvetica", 12),
             bg="white",
             fg=TEXT_GRAY,
             wraplength=480,
+            justify="center",
         )
         self._subtitle.pack(pady=(0, 4))
+
+        # The arm-recording button (default: idle / unarmed)
+        self._arm_btn = tk.Button(
+            self,
+            text="▶ 开始录制",
+            font=("Helvetica", 14, "bold"),
+            bg="#1976d2",
+            fg="white",
+            activebackground="#1565c0",
+            activeforeground="white",
+            bd=0,
+            padx=22,
+            pady=12,
+            cursor="hand2",
+            command=self._toggle_arm,
+        )
+        self._arm_btn.pack(pady=(16, 0))
 
         # Spacer
         tk.Frame(self, bg="white").pack(expand=True, fill="both")
 
-        # Tiny output-dir hint at the bottom
+        # Tiny output-dir hint + log path at the bottom
         self._hint = tk.Label(
             self,
-            text=f"录制完成后会保存到: {_output_dir()}",
+            text=(
+                f"录制完成后会保存到: {_output_dir()}\n"
+                f"如果出问题，请把 {_STARTUP_LOG} 截图给工程师。"
+            ),
             font=("Helvetica", 9),
             bg="white",
             fg=TEXT_GRAY,
             wraplength=500,
+            justify="center",
         )
-        self._hint.pack(pady=(0, 12))
+        self._hint.pack(pady=(0, 10))
+
+    def _toggle_arm(self) -> None:
+        """Tester clicked the arm button. Toggle recording state."""
+        if not self._record_armed:
+            # Arm
+            self._record_armed = True
+            self._arm_btn.config(
+                text="■ 停止录制",
+                bg="#c62828",
+                activebackground="#b71c1c",
+            )
+            _trace("recording armed by user click")
+        else:
+            # Disarm — request the watcher to stop any in-flight ffmpeg.
+            self._record_armed = False
+            self._stop_event.set()
+            self._stop_ffmpeg()
+            self._arm_btn.config(
+                text="▶ 开始录制",
+                bg="#1976d2",
+                activebackground="#1565c0",
+            )
+            _trace("recording disarmed by user click")
 
     # ---- worker --------------------------------------------------------
     def _watch_loop(self) -> None:
@@ -357,14 +516,36 @@ class RecorderApp(tk.Tk):
                       "ffmpeg.exe 没有打包进来，请联系工程师。")
             return
 
-        # Phase 1: wait for MC to start
-        self._set("…", TEXT_GRAY, "等待 Minecraft 启动…")
+        # Phase 1: wait for tester to arm AND MC to start.
+        # v0.4.0 split: do NOT spawn ffmpeg until the tester explicitly
+        # clicks "开始录制". This protects testers whose MC otherwise
+        # works fine — our auto-ffmpeg won't blame us for MC issues.
+        _trace("watch_loop: waiting for arm + MC")
+        self._set("准备好", TEXT_GRAY,
+                  "先打开 Minecraft 玩一会儿确认它不崩。\n确认后再点上面 ▶ 开始录制。")
         while not self._stop_event.is_set():
-            if _minecraft_running():
+            if self._record_armed and _minecraft_running():
                 break
-            time.sleep(2.0)
+            time.sleep(1.0)
         if self._stop_event.is_set():
+            _trace("watch_loop: stopped before recording")
             return
+
+        # 5-second settle delay. Lets MC fully transition out of any
+        # loading screen / world generation before ffmpeg attaches to
+        # its window or grabs the desktop. Reported MC crashes were
+        # likely caused by GDI capture starting mid-loading.
+        _trace("watch_loop: 5s settle before ffmpeg")
+        self._set("● 即将开始", ORANGE, "5 秒后开始录制（让 Minecraft 稳定）…")
+        for _ in range(5):
+            if self._stop_event.is_set() or not self._record_armed:
+                _trace("watch_loop: aborted during settle")
+                return
+            time.sleep(1.0)
+
+        # Capture window geometry (if visible) for systeminfo.json.
+        self._mc_window_rect = _get_minecraft_window_rect()
+        _trace(f"watch_loop: mc_window={self._mc_window_rect}")
 
         # Phase 2: start recording into a temp dir; we'll package it as
         # a 5-file PRD-shaped tarball after MC exits.
@@ -457,16 +638,19 @@ class RecorderApp(tk.Tk):
         if self._video_path and self._video_path.exists():
             shutil.move(str(self._video_path), str(clip_dir / "video.mp4"))
 
-        # 2. systeminfo.json — best-effort window geometry from the OS.
+        # 2. systeminfo.json — REAL window geometry via Win32 EnumWindows
+        # if available (v0.4.0+); falls back to 1920x1080 placeholder.
+        rect = self._mc_window_rect or {}
         sys_info = {
-            "gameProcessName": "Minecraft",
-            "x": 0,
-            "y": 0,
-            "width": 1920,
-            "height": 1080,
-            "recordDpi": 96,
+            "gameProcessName": rect.get("title", "Minecraft"),
+            "x": rect.get("x", 0),
+            "y": rect.get("y", 0),
+            "width": rect.get("width", 1920),
+            "height": rect.get("height", 1080),
+            "recordDpi": rect.get("recordDpi", 96),
             "recordedAt": ts,
-            "recorderVersion": "lite-v0.2.0",
+            "recorderVersion": "lite-v0.4.0",
+            "_real_window_geometry": bool(self._mc_window_rect),
             "_note": "stop-gap recorder; full systeminfo from Rust app",
         }
         (clip_dir / "systeminfo.json").write_text(
