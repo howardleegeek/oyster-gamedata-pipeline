@@ -66,3 +66,13 @@ bin/.cache/
 harness.log
 watchdog.log
 nohup.out
+
+# QA workdir — local output of bin/oyster-qa-tool.pyz, never commit
+qa_workdir/
+
+# Stray nested clones — block the "repo cloned inside repo" footgun.
+# A nested copy here once caused harness_loop.py to read an old audit_gaps.yaml
+# with 183 entries instead of the real 258, and dispatcher reported pending=0
+# while disk had 58 pending P0/P1. Never again.
+oyster-gamedata-pipeline/
+oyster-agent-runner/

@@ -579,8 +579,12 @@ def harness_loop(once: bool = False, dry_run: bool = False) -> int:
         if not dry_run:
             try:
                 run(["git", "-C", str(REPO_ROOT), "add", "docs/audit_gaps.yaml"])
+                # [skip ci] suppresses GitHub Actions for heartbeat commits.
+                # paths-ignore in the workflows already handles audit_gaps.yaml-only
+                # diffs, but [skip ci] is belt-and-suspenders + works on platforms
+                # that don't support paths-ignore (e.g. some self-hosted runners).
                 run(["git", "-C", str(REPO_ROOT), "commit", "-m",
-                     f"chore(harness): heartbeat from {HOSTNAME} iter={iteration}",
+                     f"chore(harness): heartbeat from {HOSTNAME} iter={iteration} [skip ci]",
                      "--allow-empty"], check=False)
                 run(["git", "-C", str(REPO_ROOT), "push", "origin", "main"],
                     check=False, timeout=60)

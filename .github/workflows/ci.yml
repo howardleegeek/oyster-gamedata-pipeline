@@ -3,6 +3,13 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      # Heartbeat-only commits from harness_loop.py iterate every 30s. Skipping them
+      # here saves ~86% of CI runs (audited last 100 commits — 86 were heartbeat).
+      - 'docs/audit_gaps.yaml'
+      - '**.md'
+      - 'autoresearch_logs/**'
+      - 'qa_workdir/**'
   pull_request:
     branches: [main]
 

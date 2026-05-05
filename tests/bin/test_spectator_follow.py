@@ -120,16 +120,19 @@ def test_spectate_loop_respects_duration():
     mock_rcon = Mock()
     mock_rcon.send.return_value = "OK"
 
-    # Mock time to control loop duration
-    time_values = [
-        0.0,
-        1.0,
-        6.0,
-        11.0,
-        16.0,
-    ]  # Start, after first, after second, after third, after check
+    # Mock time: start + 2 elapsed checks (1.0, 6.0) that allow 2 sends,
+    # then 11.0 to break the duration check. Inner sleep-polling loop also
+    # calls time.time() many times, so we tail with itertools.repeat to
+    # avoid StopIteration.
+    import itertools as _it
+    time_iter = _it.chain(
+        [0.0],                # start_time = time.time()
+        [1.0, 1.05, 1.1],     # iter 1: elapsed=1.0 (send), then sleep-loop polls
+        [6.0, 6.05, 6.1],     # iter 2: elapsed=6.0 (send), then sleep-loop polls
+        _it.repeat(100.0),    # next elapsed call >> 10 → break
+    )
 
-    with patch("time.time", side_effect=time_values), patch("time.sleep"):
+    with patch("time.time", side_effect=time_iter), patch("time.sleep"):
         with patch("logging.info"):
             with patch("logging.debug"):
                 # Run for 10 seconds with 5 second interval

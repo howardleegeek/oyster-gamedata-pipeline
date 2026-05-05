@@ -5,6 +5,13 @@ on:
     branches: [main]
   push:
     branches: [main]
+    paths-ignore:
+      # See ci.yml for rationale — heartbeat-only audit_gaps.yaml updates
+      # from harness_loop.py iter every 30s. Don't burn CI minutes on them.
+      - 'docs/audit_gaps.yaml'
+      - '**.md'
+      - 'autoresearch_logs/**'
+      - 'qa_workdir/**'
 
 jobs:
   test:
