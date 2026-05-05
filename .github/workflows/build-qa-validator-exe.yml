@@ -1,0 +1,95 @@
+name: Build QA Validator EXE
+
+# Builds bin/qa_validator_gui.py into a single Windows .exe via PyInstaller.
+# Triggered on tags `qa-validator-v*` (auto-attaches to GitHub Release) or
+# manually via workflow_dispatch (artifact only). Non-programmer testers
+# download the .exe from the release page and double-click it — no Python,
+# no pip, no terminal.
+
+on:
+  push:
+    tags:
+      - 'qa-validator-v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed for softprops/action-gh-release to attach asset
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller pillow numpy pyyaml
+
+      - name: Build single-file .exe (PyInstaller)
+        # --onefile           : single .exe, no __pycache__ side files
+        # --windowed          : no console window flashes (it's a GUI)
+        # --name              : output filename
+        # --paths bin         : let PyInstaller resolve `import lint_v3_prd_grounded`
+        # --hidden-import     : G165 lint module + its lazy deps (numpy/PIL/yaml)
+        # --add-data          : also bundle the .py source so module is findable
+        run: |
+          pyinstaller --onefile --windowed `
+            --name OysterClipValidator `
+            --paths bin `
+            --hidden-import lint_v3_prd_grounded `
+            --hidden-import numpy `
+            --hidden-import PIL `
+            --hidden-import PIL.Image `
+            --hidden-import yaml `
+            --add-data "bin/lint_v3_prd_grounded.py;." `
+            bin/qa_validator_gui.py
+
+      - name: Verify build output
+        run: |
+          dir dist
+          if (-not (Test-Path dist/OysterClipValidator.exe)) {
+            Write-Error "Build artifact missing"
+            exit 1
+          }
+
+      - name: Upload as workflow artifact (always)
+        uses: actions/upload-artifact@v4
+        with:
+          name: OysterClipValidator-windows
+          path: dist/OysterClipValidator.exe
+          if-no-files-found: error
+
+      - name: Attach to GitHub Release (tag push only)
+        if: startsWith(github.ref, 'refs/tags/qa-validator-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/OysterClipValidator.exe
+          generate_release_notes: true
+          body: |
+            ## What this is
+            Single-file Windows .exe for **non-programmer testers** to validate
+            recorded gameplay clips against the Lark PDF buyer-spec
+            (24 PRD acceptance criteria, G165 lint v3).
+
+            ## How testers use it
+            1. Download `OysterClipValidator.exe` from the **Assets** below.
+            2. Double-click it. (No installer; no admin; no Python.)
+            3. Click **Choose Clip...** and pick a `clip-YYYYMMDD-HHMMSS.tar.gz`.
+            4. Read the green / red banner. If red, the per-criterion list
+               below the banner says exactly which checks failed.
+
+            ## Engineer triage
+            If a tester reports a red verdict, ask for a screenshot of the
+            detail panel and the clip filename. Engineers can run the same
+            lint locally with:
+            ```
+            python3 bin/lint_v3_prd_grounded.py <extracted-clip-dir>
+            ```
+            and reproduce the failure offline.
