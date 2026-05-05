@@ -872,12 +872,46 @@ class RecorderApp(tk.Tk):
 
     # ---- worker --------------------------------------------------------
     def _watch_loop(self) -> None:
-        """Poll for MC launch → record → poll for MC exit → finalize."""
+        """Poll for MC launch → record → poll for MC exit → finalize.
+
+        v0.9.0: this is now the SESSION wrapper. After a session
+        finishes (recording packaged + verdict shown), it loops back to
+        Phase 1 so re-arming via the GUI button works without restarting
+        the .exe. Only the close-the-window or app exit path tears the
+        loop down for good (via self._stop_event when _on_close fires).
+        """
         if not _FFMPEG.exists():
             self._set("⚠️ 缺少 ffmpeg", ORANGE,
                       "ffmpeg.exe 没有打包进来，请联系工程师。")
             return
 
+        while not self._stop_event.is_set():
+            self._run_one_session()
+            # After a session ends naturally, reset the arm state so the
+            # GUI button starts fresh and Phase 1 (wait for arm + MC)
+            # picks up cleanly on the next iteration. _stop_event is
+            # only set by _on_close, which means tester-quit-the-app.
+            if not self._stop_event.is_set():
+                self.after(0, self._reset_arm_button)
+
+    def _reset_arm_button(self) -> None:
+        """After a recording session, restore the button to '▶ 开始录制' so
+        the tester can immediately start another session without
+        restarting the .exe.
+        """
+        try:
+            self._record_armed = False
+            self._arm_btn.config(
+                text="▶ 开始录制",
+                bg="#1976d2",
+                activebackground="#1565c0",
+            )
+            _trace("button reset for next session")
+        except Exception:
+            pass
+
+    def _run_one_session(self) -> None:
+        """One arm→record→package→verdict cycle. Returns when finished."""
         # Phase 1: wait for tester to arm AND MC to start.
         # v0.4.0 split: do NOT spawn ffmpeg until the tester explicitly
         # clicks "开始录制". This protects testers whose MC otherwise
@@ -935,12 +969,20 @@ class RecorderApp(tk.Tk):
             self._set("● 正在录制（仅视频）", RED,
                       "键鼠采集未启动，仅录制视频。继续玩游戏即可。")
 
-        # Phase 3: wait for MC to exit OR for 6 minutes elapsed (PRD cap).
+        # Phase 3: wait for MC to exit OR for 6 minutes elapsed (PRD cap)
+        # OR for the user to disarm.
         # PRD spec requires 5-6 min duration; auto-stop at 6 min so the
         # downstream lint doesn't reject for over-length.
         MAX_RECORD_SECONDS = 6 * 60
-        while not self._stop_event.is_set():
+        while True:
+            if self._stop_event.is_set():
+                _trace("watch_loop: stop_event set — finalizing whatever we have")
+                break
+            if not self._record_armed:
+                _trace("watch_loop: user disarmed — finalizing whatever we have")
+                break
             if not _minecraft_running():
+                _trace("watch_loop: MC exited — finalizing")
                 break
             elapsed = time.time() - self._record_started_at
             if elapsed >= MAX_RECORD_SECONDS:
@@ -948,9 +990,12 @@ class RecorderApp(tk.Tk):
                           "PRD 规格要求 5-6 分钟，正在收尾…")
                 break
             time.sleep(2.0)
-        if self._stop_event.is_set():
-            self._stop_ffmpeg()
-            return
+
+        # v0.9.0 BUG FIX: previously, hitting `_stop_event` returned
+        # before `_package_tarball`, throwing away the recording. Now ANY
+        # stop reason (MC exit / user disarm / 6-min cap / stop_event)
+        # falls through to packaging so the tester always gets a tarball
+        # representing what was actually recorded up to that point.
 
         # Phase 4: finalize ffmpeg + input capture, then package.
         self._stop_ffmpeg()
