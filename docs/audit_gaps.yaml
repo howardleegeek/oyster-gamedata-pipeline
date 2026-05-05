@@ -1546,24 +1546,27 @@ gaps:
   title: src/oyster_agent_runner/environments/beamng_drive.py
   purpose: 'BeamNG.drive extractor: BeamNGpy connect + Vehicle.poll_sensors + Camera
     depth-mode + ego pose at 60Hz'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 350
+  dispatched_at: '2026-05-05 07:51:21'
 - id: G177
   title: src/oyster_agent_runner/environments/stardew_valley.py
   purpose: 'Stardew Valley extractor: SMAPI mod relay over HTTP/JSON socket; player
     position/facing + map name + action keys at 60Hz'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 280
   dispatched_at: '2026-05-05 07:33:59'
+  completed_at: '2026-05-05 07:49:35'
 - id: G178
   title: src/oyster_agent_runner/environments/cyberpunk_2077.py
   purpose: 'CP2077 extractor: CET (Cyber Engine Tweaks) Lua over websocket; 6-DoF
     camera + player pose + velocity + FOV + day-night'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 380
+  dispatched_at: '2026-05-05 07:52:52'
 - id: G179
   title: src/oyster_agent_runner/environments/cities_skylines.py
   purpose: 'Cities Skylines extractor: Mod API + Harmony patch shim; camera position
@@ -1582,16 +1585,18 @@ gaps:
   title: src/oyster_agent_runner/environments/registry.py
   purpose: 'Environment plugin registry: discovers environments/*.py modules + uniform
     AgentTask -> Environment factory'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 180
+  dispatched_at: '2026-05-05 08:01:45'
 - id: G182
   title: bin/cross_game_test_harness.py
   purpose: 'Cross-game integration test harness: enumerates registered environments
     + runs 30s mock trajectory + lints; gates new game integrations'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 250
+  dispatched_at: '2026-05-05 08:03:22'
 - id: G183
   title: docs/runbooks/STARDEW_RUNBOOK.md
   purpose: 'Operator runbook for Stardew capture: SMAPI install + our mod copy + 30-min
@@ -1602,4 +1607,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-05T14:49:01Z'
+  last_heartbeat: '2026-05-05T15:06:23Z'
