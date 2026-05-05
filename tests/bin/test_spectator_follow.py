@@ -61,12 +61,12 @@ def test_authenticate_success():
     def mock_recv(size):
         recv_calls.append(size)
         if len(recv_calls) == 1:  # First call gets length of auth response
-            return struct.pack("<i", 14)  # Length
+            return struct.pack("<i", 10)  # Length: id(4) + type(4) + 2 nulls = 10 (empty body)
         elif len(recv_calls) == 2:  # Second call gets auth response packet
             # Success response: id=1, type=0, body="\x00\x00"
             return struct.pack("<ii", 1, 0) + b"\x00\x00"
         elif len(recv_calls) == 3:  # Third call gets length of empty response
-            return struct.pack("<i", 14)  # Length
+            return struct.pack("<i", 10)  # Length: id(4) + type(4) + 2 nulls = 10 (empty body)
         else:  # Fourth call gets empty response packet
             # Empty response: id=1, type=0, body="\x00\x00"
             return struct.pack("<ii", 1, 0) + b"\x00\x00"
@@ -95,10 +95,10 @@ def test_authenticate_fails_on_bad_password():
     def mock_recv(size):
         recv_calls.append(size)
         if len(recv_calls) == 1:  # First call gets length
-            return struct.pack("<i", 14)  # Length of response packet
-        else:  # Second call gets packet data
+            return struct.pack("<i", 10)  # Length: id(4) + type(4) + 2 nulls = 10 (empty body) of response packet
+        else:  # Second call gets packet data (10 bytes total: 4+4+2)
             # Failure response: id=-1, type=0, body="\x00\x00"
-            return struct.pack("<ii", -1, 0) + b"\x00\x00"
+            return struct.pack("<ii", -1, 0) + b"\x00\x00"  # 10 bytes
         # No second packet for failed auth
 
     mock_sock.recv.side_effect = mock_recv
