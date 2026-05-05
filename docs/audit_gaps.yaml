@@ -1744,9 +1744,10 @@ gaps:
   title: bin/depth_shader_pack_minecraft.py
   purpose: Generator for Iris/Sodium shader pack that exports Z-buffer at 6fps to
     disk; ground-truth depth replaces DepthAnything inference for MC capture
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 350
+  dispatched_at: '2026-05-05 16:36:32'
 - id: G199
   title: bin/recorder_health_telemetry.py
   purpose: Vendor recorder posts heartbeat (uptime, FPS, encoder backpressure, last-clip-at)
@@ -1790,17 +1791,19 @@ gaps:
   title: docs/runbooks/VENDOR_INSTALL_VALIDATOR.md
   purpose: 'Validator runbook for vendor PCs: GPU model + driver + Java + Node + disk
     free + network speed checklist before recorder.exe runs'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 200
+  dispatched_at: '2026-05-05 16:42:19'
 - id: G205
   title: bin/backup_orchestrator.py
   purpose: 'Daily backup: pg_dump Postgres + S3 cross-region replication + Glacier
     90-day retention; reports last-success timestamp'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 280
   dispatched_at: '2026-05-05 16:25:15'
+  completed_at: '2026-05-05 16:31:51'
 - id: G206
   title: bin/cn_vendor_mirror.py
   purpose: 'CN-side mirror: Aliyun OSS bucket + presigned URL issuer for vendors behind
@@ -1819,10 +1822,11 @@ gaps:
   title: sdk/python/oyster_buyer_sdk/__init__.py
   purpose: 'Python SDK for buyers: list_clips() / download_clip() / stream_dataset()
     with progress bars + presigned URL refresh; pip-installable'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 320
   dispatched_at: '2026-05-05 16:28:15'
+  completed_at: '2026-05-05 16:31:53'
 - id: G209
   title: sdk/javascript/oyster-buyer/index.js
   purpose: 'JavaScript / TypeScript SDK for buyers: same API as Python SDK; for Node.js
@@ -1858,9 +1862,10 @@ gaps:
   title: docs/PRIVACY_POLICY.md
   purpose: 'Privacy policy: vendor PII (email, payout info) + clip data retention
     90 days + GDPR DSAR procedure + California CCPA opt-out + deletion endpoint'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 280
+  dispatched_at: '2026-05-05 16:46:45'
 - id: G214
   title: bin/installer_one_click_windows.py
   purpose: 'Windows .msi installer: bundles Java 21 + recorder.exe + auto-launch-on-boot
@@ -2342,4 +2347,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 89343
-  last_heartbeat: '2026-05-05T23:31:16Z'
+  last_heartbeat: '2026-05-05T23:49:46Z'
