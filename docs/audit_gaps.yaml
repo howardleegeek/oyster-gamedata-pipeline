@@ -1582,10 +1582,11 @@ gaps:
   title: src/oyster_agent_runner/environments/factorio_full.py
   purpose: 'Factorio extractor v2: full RCON + observer-mod loop; player pose + facing
     + tile state + biter wave events'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 320
   dispatched_at: '2026-05-05 08:40:03'
+  completed_at: '2026-05-05 08:40:53'
 - id: G181
   title: src/oyster_agent_runner/environments/registry.py
   purpose: 'Environment plugin registry: discovers environments/*.py modules + uniform
@@ -1616,4 +1617,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-05T15:40:03Z'
+  last_heartbeat: '2026-05-05T15:40:53Z'
