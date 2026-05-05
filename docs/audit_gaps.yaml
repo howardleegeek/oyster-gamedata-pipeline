@@ -1716,6 +1716,103 @@ gaps:
   status: pending
   priority: P0
   lines_estimate: 280
+- id: G214
+  title: bin/installer_one_click_windows.py
+  purpose: 'Windows .msi installer: bundles Java 21 + recorder.exe + auto-launch-on-boot reg key + uninstaller; one click
+    for consumer (no pip, no terminal)'
+  status: pending
+  priority: P0
+  lines_estimate: 320
+- id: G215
+  title: bin/installer_macos_pkg.py
+  purpose: 'macOS .pkg installer for Mac gamers: bundles Java 21 + recorder + LaunchAgent plist; signed with Developer ID
+    per Apple notarization'
+  status: pending
+  priority: P0
+  lines_estimate: 280
+- id: G216
+  title: bin/onboarding_consumer_splash.py
+  purpose: 'First-run splash screen: age gate (COPPA 13+) + region (GDPR/CCPA/other) + per-game opt-in + PayPal email collect'
+  status: pending
+  priority: P0
+  lines_estimate: 260
+- id: G217
+  title: bin/game_auto_detector.py
+  purpose: 'Windows / macOS process-list scanner: detects when supported games launch (Minecraft.exe, BeamNG.drive.exe, Stardew
+    Valley.exe, Cyberpunk2077.exe, etc.); fires hooks'
+  status: pending
+  priority: P0
+  lines_estimate: 280
+- id: G218
+  title: bin/auto_record_orchestrator.py
+  purpose: 'Auto-record state machine: game-launch event -> start recording, game-exit event -> stop + queue upload, network-online
+    event -> drain queue; consumer never touches anything'
+  status: pending
+  priority: P0
+  lines_estimate: 320
+- id: G219
+  title: bin/system_tray_consumer_ui.py
+  purpose: 'Native system tray UI (cross-platform via pystray + tkinter): icon shows status (idle / recording / uploading
+    / earned $X today), right-click menu (settings, history, exit)'
+  status: pending
+  priority: P0
+  lines_estimate: 360
+- id: G220
+  title: bin/consumer_privacy_dashboard.py
+  purpose: 'In-app privacy dashboard: per-game opt-in toggles + ''what we record'' explainer + ''delete my data'' button (calls
+    /v1/user/delete) + GDPR DSAR shortcut'
+  status: pending
+  priority: P0
+  lines_estimate: 280
+- id: G221
+  title: bin/consent_log_signed.py
+  purpose: 'Legally-binding signed consent log: HMAC-signed entry per recording session capturing user_id + game + timestamp
+    + opt-in version; serves GDPR/CCPA/COPPA'
+  status: pending
+  priority: P0
+  lines_estimate: 220
+- id: G222
+  title: bin/paypal_micropayout_handler.py
+  purpose: 'PayPal Payouts API for consumer micro-payments ($1-50): batches per day, threshold $5 minimum, idempotency token
+    per payout; replaces Stripe Connect KYC overhead'
+  status: pending
+  priority: P0
+  lines_estimate: 280
+- id: G223
+  title: bin/referral_system.py
+  purpose: 'Consumer referral: A invites B with code, B installs + uploads first clip -> A gets $1 bonus credit, viral coefficient
+    tracking; growth driver for B2C'
+  status: pending
+  priority: P1
+  lines_estimate: 250
+- id: G224
+  title: bin/in_app_earnings_counter.py
+  purpose: 'Real-time earnings counter inside tray UI: queries /v1/me/earnings, animated counter, this-week vs all-time view,
+    payout-eligible threshold display'
+  status: pending
+  priority: P0
+  lines_estimate: 200
+- id: G225
+  title: bin/auto_updater_winsparkle.py
+  purpose: 'Auto-update mechanism (WinSparkle / Squirrel.Mac): polls update server daily, downloads new installer, prompts
+    consumer ''restart to update'' or auto-update overnight'
+  status: pending
+  priority: P0
+  lines_estimate: 260
+- id: G226
+  title: bin/crash_reporter_sentry.py
+  purpose: 'Sentry-style crash reporter for consumer app: catches Python + Rust + JS exceptions, sends to Sentry with PII-stripping,
+    no consumer action needed'
+  status: pending
+  priority: P0
+  lines_estimate: 230
+- id: G227
+  title: docs/CONSUMER_LANDING_COPY.md
+  purpose: 'Marketing site copy rewritten consumer-first: hero (Play Games, Earn Money) + 3-step (download, play, paid) +
+    payout examples + privacy + referral CTA'
+  status: pending
+  priority: P0
+  lines_estimate: 240
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
