@@ -1619,40 +1619,45 @@ gaps:
   purpose: Pre-commit hook script that detects heartbeat-only audit_gaps.yaml diffs
     and appends [skip ci] to the commit message; eliminates 86 percent of CI workflow
     runs
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 90
+  dispatched_at: '2026-05-05 12:51:26'
 - id: G185
   title: bin/cluster_output_autoformat.py
   purpose: Pre-commit auto-formatter for cluster-shipped code; runs black + ruff --fix
     on the staged file before harness commit, catching the unformatted-output failure
     mode
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 130
+  dispatched_at: '2026-05-05 12:52:32'
 - id: G186
   title: tests/bin/conftest_rcon_helpers.py
   purpose: Shared pytest fixtures for RCON packet construction; replaces magic numbers
     like length=14 with helper rcon_pack_response(id, type, body) that computes correct
     length
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 110
+  dispatched_at: '2026-05-05 13:20:45'
 - id: G187
   title: bin/ci_health_dashboard.py
   purpose: CLI that polls gh run list, computes pass/fail rate over last N runs, surfaces
     top-3 failure patterns; observability for the harness operator
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 200
+  dispatched_at: '2026-05-05 13:22:33'
 - id: G188
   title: bin/auto_fix_ci_failures.py
   purpose: Reads gh run view --log-failed, applies known fixes (black --check failure
     -> run black; ruff failure -> ruff --fix; missing import -> add it); commits with
     auto-fix-ci tag
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 280
+  dispatched_at: '2026-05-05 13:25:22'
 - id: G189
   title: .github/workflows/heartbeat_skip_check.yml
   purpose: Workflow that runs on every push and short-circuits with skip-marker output
@@ -1673,9 +1678,10 @@ gaps:
   title: bin/s3_presigned_url_issuer.py
   purpose: Issue 24h presigned S3 PUT URLs to vendors (one URL per clip); rate-limit
     per vendor key; write upload-intent row in Postgres for audit
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 200
+  dispatched_at: '2026-05-05 13:31:04'
 - id: G192
   title: bin/vendor_portal_static_site.py
   purpose: Generator for static SPA (HTML + JS, no server) — vendor signs in via OAuth,
@@ -2217,5 +2223,5 @@ gaps:
   lines_estimate: 220
 harness_lock:
   host: Howards-MacBook-Air-4.local
-  pid: 45649
-  last_heartbeat: '2026-05-05T16:00:27Z'
+  pid: 57662
+  last_heartbeat: '2026-05-05T20:31:04Z'
