@@ -191,10 +191,53 @@ class ValidatorApp(tk.Tk):
         self.update_idletasks()
 
 
+def _emergency_error_box(exc: BaseException) -> None:
+    """Last-resort error reporter when --windowed swallows stderr.
+
+    Without this, a startup crash inside ValidatorApp.__init__ (Tkinter DLL
+    missing, lint module import failure, etc.) produces a silent 0.5s flash
+    with no log file. Show a Tk messagebox so non-programmer testers can
+    screenshot the traceback for engineer triage.
+    """
+    try:
+        from tkinter import messagebox
+        import tkinter as _tk
+
+        # A dialog needs a root; create + immediately withdraw so no main window.
+        root = _tk.Tk()
+        root.withdraw()
+        messagebox.showerror(
+            title="Oyster Clip Validator — Startup Error",
+            message=(
+                "The validator failed to start.\n\n"
+                "Please screenshot this entire dialog and send it to the\n"
+                "engineering team for triage.\n\n"
+                f"{type(exc).__name__}: {exc}\n\n"
+                f"--- Traceback ---\n{traceback.format_exc()}"
+            ),
+        )
+        root.destroy()
+    except Exception:  # noqa: BLE001 — even messagebox can fail; best-effort
+        # Fallback to a writable log file in the user's home directory so
+        # engineering can still recover the error after the fact.
+        log = Path.home() / "OysterClipValidator-error.log"
+        try:
+            with log.open("a", encoding="utf-8") as fh:
+                fh.write(f"\n=== startup error ===\n{traceback.format_exc()}\n")
+        except Exception:
+            pass
+
+
 def main() -> int:
-    app = ValidatorApp()
-    app.mainloop()
-    return 0
+    try:
+        app = ValidatorApp()
+        app.mainloop()
+        return 0
+    except SystemExit:
+        raise
+    except BaseException as exc:  # noqa: BLE001 — top-level catch-all
+        _emergency_error_box(exc)
+        return 2
 
 
 if __name__ == "__main__":
