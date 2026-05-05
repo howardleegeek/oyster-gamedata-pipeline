@@ -649,6 +649,14 @@ SPECS: list[dict] = [
     {"id": "G228", "title": "bin/end_to_end_consumer_smoke.py",
      "purpose": "Master smoke test for the consumer install->play->tarball flow: simulates installer run + game launch + 5-min mock-provider trajectory + auto-stop + PRD-compliant tarball at ~/Documents/OysterClips/; gates the v1 release. Asserts 24/24 G165 lint PASS at end",
      "lines": 280, "priority": "P0"},
+
+    # ─── W27 B2C-critical adds (2 specs) — Howard: 'To C 非常重要' ─────────
+    {"id": "G229", "title": "bin/fps_overhead_monitor.py",
+     "purpose": "Real-time FPS-overhead monitor: measures consumer game FPS with vs without recording; auto-scales encoder bitrate / disables depth track if overhead > 5 percent. Critical: consumers uninstall instantly if their game's framerate drops",
+     "lines": 240, "priority": "P0"},
+    {"id": "G230", "title": "bin/in_app_clip_status_widget.py",
+     "purpose": "System-tray menu widget showing last 5 clips with green PASS / red FAIL badges (from G165 lint result); consumer sees feedback without opening Finder or CLI. Replaces the missing earnings counter as the primary tray feedback signal",
+     "lines": 200, "priority": "P0"},
 ]
 
 

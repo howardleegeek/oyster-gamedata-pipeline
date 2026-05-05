@@ -1825,6 +1825,20 @@ gaps:
   status: pending
   priority: P0
   lines_estimate: 280
+- id: G229
+  title: bin/fps_overhead_monitor.py
+  purpose: 'Real-time FPS-overhead monitor: measures consumer game FPS with vs without recording; auto-scales encoder bitrate
+    / disables depth track if overhead > 5 percent. Critical: consumers uninstall instantly if their game''s framerate drops'
+  status: pending
+  priority: P0
+  lines_estimate: 240
+- id: G230
+  title: bin/in_app_clip_status_widget.py
+  purpose: System-tray menu widget showing last 5 clips with green PASS / red FAIL badges (from G165 lint result); consumer
+    sees feedback without opening Finder or CLI. Replaces the missing earnings counter as the primary tray feedback signal
+  status: pending
+  priority: P0
+  lines_estimate: 200
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
