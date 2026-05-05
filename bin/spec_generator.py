@@ -730,6 +730,28 @@ SPECS: list[dict] = [
     {"id": "G252", "title": "bin/i18n_zh_en_strings.py",
      "purpose": "Internationalization: zh-CN + zh-TW + en-US runtime string loader; covers tray menu, splash, privacy dashboard, error messages; .po format compatible with future locale adds",
      "lines": 240, "priority": "P1"},
+
+    # ─── W30 EPal integration (6 NEW-FILE specs) ───────────────────────────
+    # Howard 2026-05-05: 'EPal 通过我们的游戏陪玩社群来录这些数据'.
+    # See docs/EPAL_INTEGRATION_STRATEGY.md for the lifecycle diagram.
+    {"id": "G253", "title": "bin/epal_session_lifecycle_hook.py",
+     "purpose": "POST /v1/epal/session_start + /v1/epal/session_end webhooks: recorder starts only on paid EPal session start (with companion opt-in), stops + uploads on session end with rating + companion_id provenance",
+     "lines": 280, "priority": "P0"},
+    {"id": "G254", "title": "bin/epal_companion_quality_score.py",
+     "purpose": "Wire EPal companion professional rating (1-5 stars) into clip metadata; buyer pays premium for higher-rated companion captures; informs cluster training-time data weighting",
+     "lines": 200, "priority": "P0"},
+    {"id": "G255", "title": "bin/epal_payout_passthrough.py",
+     "purpose": "Bonus payout rides EPal payment rails (POST <epal-api>/v1/companion/bonus): no Stripe / PayPal / W-9 — companion sees EPal session pay + recording bonus on one statement",
+     "lines": 240, "priority": "P0"},
+    {"id": "G256", "title": "bin/epal_client_consent_handshake.py",
+     "purpose": "At EPal session start, prompts the paying client (the customer): consent to recording for AI training, opt-out switch, GDPR-compliant disclosure; persists signed consent log per G221",
+     "lines": 220, "priority": "P0"},
+    {"id": "G257", "title": "bin/epal_community_dashboard.py",
+     "purpose": "EPal-side companion dashboard widget: shows clips contributed this week, total bonus earned, leaderboard rank within community; embedded in EPal companion app via iframe / native view",
+     "lines": 280, "priority": "P1"},
+    {"id": "G258", "title": "docs/EPAL_COMPANION_ONBOARDING.md",
+     "purpose": "Companion-facing onboarding doc: how to enable recording in EPal companion app, what gets recorded vs not, FAQ on anti-cheat, bonus calc, opt-out anytime",
+     "lines": 220, "priority": "P0"},
 ]
 
 

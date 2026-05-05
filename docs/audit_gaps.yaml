@@ -1641,9 +1641,11 @@ gaps:
   title: bin/vendor_signup_flow.py
   purpose: 'Vendor signup: email + Google OAuth + KYC-light (full name + payout method) + recorder download URL emit; writes
     vendors row in Postgres'
-  status: pending
+  status: skipped
   priority: P0
   lines_estimate: 280
+  skip_reason: 'EPal companion model: EPal already provides signup, TOS, payment rails, community per docs/EPAL_INTEGRATION_STRATEGY.md
+    2026-05-05'
 - id: G203
   title: bin/buyer_signup_flow.py
   purpose: 'Buyer signup: company info + sales contact + JWT issuance + sample-clip download grant; writes buyers row + audit'
@@ -1707,9 +1709,11 @@ gaps:
   title: docs/TOS_VENDOR.md
   purpose: 'Vendor terms of service: data ownership transfer + payout schedule + anti-cheat compliance clause + termination
     + IP indemnity (no copyrighted-mod data)'
-  status: pending
+  status: skipped
   priority: P0
   lines_estimate: 250
+  skip_reason: 'EPal companion model: EPal already provides signup, TOS, payment rails, community per docs/EPAL_INTEGRATION_STRATEGY.md
+    2026-05-05'
 - id: G213
   title: docs/PRIVACY_POLICY.md
   purpose: 'Privacy policy: vendor PII (email, payout info) + clip data retention 90 days + GDPR DSAR procedure + California
@@ -1995,6 +1999,48 @@ gaps:
   status: pending
   priority: P1
   lines_estimate: 240
+- id: G253
+  title: bin/epal_session_lifecycle_hook.py
+  purpose: 'POST /v1/epal/session_start + /v1/epal/session_end webhooks: recorder starts only on paid EPal session start (with
+    companion opt-in), stops + uploads on session end with rating + companion_id provenance'
+  status: pending
+  priority: P0
+  lines_estimate: 280
+- id: G254
+  title: bin/epal_companion_quality_score.py
+  purpose: Wire EPal companion professional rating (1-5 stars) into clip metadata; buyer pays premium for higher-rated companion
+    captures; informs cluster training-time data weighting
+  status: pending
+  priority: P0
+  lines_estimate: 200
+- id: G255
+  title: bin/epal_payout_passthrough.py
+  purpose: 'Bonus payout rides EPal payment rails (POST <epal-api>/v1/companion/bonus): no Stripe / PayPal / W-9 — companion
+    sees EPal session pay + recording bonus on one statement'
+  status: pending
+  priority: P0
+  lines_estimate: 240
+- id: G256
+  title: bin/epal_client_consent_handshake.py
+  purpose: 'At EPal session start, prompts the paying client (the customer): consent to recording for AI training, opt-out
+    switch, GDPR-compliant disclosure; persists signed consent log per G221'
+  status: pending
+  priority: P0
+  lines_estimate: 220
+- id: G257
+  title: bin/epal_community_dashboard.py
+  purpose: 'EPal-side companion dashboard widget: shows clips contributed this week, total bonus earned, leaderboard rank
+    within community; embedded in EPal companion app via iframe / native view'
+  status: pending
+  priority: P1
+  lines_estimate: 280
+- id: G258
+  title: docs/EPAL_COMPANION_ONBOARDING.md
+  purpose: 'Companion-facing onboarding doc: how to enable recording in EPal companion app, what gets recorded vs not, FAQ
+    on anti-cheat, bonus calc, opt-out anytime'
+  status: pending
+  priority: P0
+  lines_estimate: 220
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
