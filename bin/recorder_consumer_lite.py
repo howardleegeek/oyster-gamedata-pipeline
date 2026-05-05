@@ -85,7 +85,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.15.0"
+RECORDER_VERSION = "lite-v0.16.0"
 RELEASES_API = (
     "https://api.github.com/repos/howardleegeek/oyster-gamedata-pipeline"
     "/releases?per_page=20"
@@ -995,13 +995,41 @@ class RecorderApp(tk.Tk):
         # v0.4.0 split: do NOT spawn ffmpeg until the tester explicitly
         # clicks "开始录制". This protects testers whose MC otherwise
         # works fine — our auto-ffmpeg won't blame us for MC issues.
+        # v0.16.0: live status update so tester always sees what we're
+        # waiting for. Previous bug: tester clicked ▶ → button changed
+        # to '■ 停止录制' → but if MC wasn't running, watch_loop sat in
+        # silent Phase 1 sleep forever and 'time stays 0' = '时间不动'.
         _trace("watch_loop: waiting for arm + MC")
         self._set("准备好", TEXT_GRAY,
                   "先打开 Minecraft 玩一会儿确认它不崩。\n确认后再点上面 ▶ 开始录制。")
+        arm_announced_at = None
+        last_status_update = 0.0
         while not self._stop_event.is_set():
-            if self._record_armed and _minecraft_running():
+            armed = self._record_armed
+            mc_alive = _minecraft_running()
+            if armed and mc_alive:
+                _trace("watch_loop: armed + MC alive → entering recording")
                 break
-            time.sleep(1.0)
+            now = time.time()
+            # First-time arm message
+            if armed and arm_announced_at is None:
+                arm_announced_at = now
+            # Update status every 2s while waiting so tester sees progress
+            if now - last_status_update >= 2.0:
+                last_status_update = now
+                if armed and not mc_alive:
+                    waited = int(now - (arm_announced_at or now))
+                    self._set("⏸ 已 arm — 请打开 Minecraft", ORANGE,
+                              f"录制器在等 Minecraft 启动…（已等 {waited} 秒）\n"
+                              f"打开 Minecraft 后 1-2 秒会自动开始录")
+                elif not armed and mc_alive:
+                    self._set("Minecraft 已开 — 等你点 ▶ 开始录制", TEXT_GRAY,
+                              "MC 检测到了，点上面蓝色按钮就开始录")
+                elif not armed and not mc_alive:
+                    self._set("准备好", TEXT_GRAY,
+                              "先打开 Minecraft 玩一会儿确认它不崩。\n"
+                              "确认后再点上面 ▶ 开始录制。")
+            time.sleep(0.5)
         if self._stop_event.is_set():
             _trace("watch_loop: stopped before recording")
             return
