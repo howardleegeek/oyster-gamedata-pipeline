@@ -6,6 +6,47 @@
 
 ---
 
+
+## A.0 Scope handoff (Howard 2026-05-05)
+
+> "Consumer facing 我们自己弄就是了" — Howard's team builds the consumer
+> UI manually. Cluster stops shipping installer / splash / tray / privacy
+> dashboard / clip-status widget / release builder.
+
+**Cluster now owns ONLY** (data + backend + integration):
+- Backend ingest API (G190)
+- S3 presigned URL issuer (G191)
+- Anomaly detection (G194)
+- Buyer download API (G195)
+- Audio QC extractor (G196)
+- Multi-clip stitcher (G197)
+- Real-depth shader pack (G198)
+- Recorder health telemetry (G199)
+- Backend / payment runbooks (G200, G201)
+- Buyer SDKs (G208, G209)
+- Buyer evaluation harness (G210)
+- W28 error reporting service (G231-G240)
+- Update server endpoint (G250)
+- Version compatibility check (G251)
+- W30 EPal integration hooks (G253-G258)
+- W21 multi-game extractors (G176-G182)
+- E2E smoke gate (G228)
+
+**Howard team owns** (consumer-facing UI):
+- G214 / G215 installers
+- G216 splash
+- G217 / G218 game-detect + auto-record
+- G219 system tray UI
+- G220 privacy dashboard
+- G230 clip-status widget
+- G241 / G243 signing + release builder
+
+Plus Howard manual ops: B2 (Apple ID, deferred) / B3 EPal API contract /
+B4 hosting / B5 domain / B6 beta recruits / B7 legal review / B8 buyer
+contract.
+
+---
+
 ## A. Cluster-shipping (10 critical-path specs PENDING)
 
 These are blocking `v0.2.0-consumer-beta`. Cluster autonomously dispatches them; ETA depends on velocity.
@@ -35,7 +76,7 @@ These can't be cluster-shipped:
 
 | # | Item | Cost / time | Why |
 |---|---|---|---|
-| B1 | **Authenticode code-signing certificate** | $200-400/year (EV cert from Sectigo/DigiCert/SSL.com) | Without this, .msi triggers SmartScreen warning → consumers click "Don't run" → ship is dead |
+| ~~B1~~ | ~~Authenticode code-signing certificate~~ — **DROPPED 2026-05-05 per Howard** | $0 | Skip signing for v0.2.0; SmartScreen shows warning but EPal companions following install instructions click 'More info → Run anyway'. Revisit post-MVP if friction is real. |
 | B2 | **Apple Developer ID account** | $99/year | Same for macOS; needed for G215 .pkg in v0.3.0 (post-v0.2.0) |
 | B3 | **EPal API contract** | EPal team time | We've designed the integration (G253-G258) but not coordinated yet. Need: EPal endpoint URLs, auth scheme, sandbox env. Estimate: 2 meetings + 1 doc exchange |
 | B4 | **Backend hosting setup** | $20-50/mo | Render/Railway + Postgres + S3 bucket for ingest (G190-G191). Can defer to post-beta if we hand-deliver clips on flash drive at first |
