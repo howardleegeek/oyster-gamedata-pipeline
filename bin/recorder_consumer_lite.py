@@ -85,7 +85,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.14.0"
+RECORDER_VERSION = "lite-v0.15.0"
 RELEASES_API = (
     "https://api.github.com/repos/howardleegeek/oyster-gamedata-pipeline"
     "/releases?per_page=20"
@@ -209,11 +209,16 @@ def _stage_self_update(new_exe_url: str) -> bool:
     )
     try:
         bat_path.write_text(bat_body, encoding="ascii")
-        # DETACHED_PROCESS (0x08) + CREATE_NEW_PROCESS_GROUP (0x200) so
-        # closing us doesn't kill the .bat.
+        # v0.15.0: add CREATE_NO_WINDOW (0x08000000) so the cmd.exe
+        # invocation doesn't FLASH a black console window on screen.
+        # DETACHED_PROCESS (0x08) alone only detaches from the parent's
+        # console — Windows still creates a fresh visible one for cmd.
+        # CREATE_NO_WINDOW + CREATE_NEW_PROCESS_GROUP (0x200) combined
+        # give us: no visible window, no parent console, survives parent
+        # exit.
         subprocess.Popen(
             ["cmd.exe", "/c", str(bat_path)],
-            creationflags=0x08 | 0x200,
+            creationflags=0x08 | 0x200 | 0x08000000,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -586,6 +591,12 @@ def _list_windows_processes() -> set[str]:
 
     Uses `tasklist` on Windows (no extra deps). On non-Windows dev boxes
     this returns an empty set — the recorder is Windows-only.
+
+    v0.15.0: pass CREATE_NO_WINDOW (0x08000000) so the CMD console
+    spawned for tasklist DOES NOT FLASH on screen. Without this flag,
+    tester sees a black popup every 2s during arm-wait — extremely
+    annoying. The flag attaches the child process to no console rather
+    than the visible default one.
     """
     if os.name != "nt":
         return set()
@@ -595,6 +606,7 @@ def _list_windows_processes() -> set[str]:
             stderr=subprocess.DEVNULL,
             text=True,
             timeout=5,
+            creationflags=0x08000000,  # CREATE_NO_WINDOW
         )
     except Exception:  # noqa: BLE001
         return set()
