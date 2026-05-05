@@ -1463,9 +1463,10 @@ gaps:
   title: bin/optical_flow_provider.py
   purpose: 'Cluster E+: per-frame optical flow computation (RAFT model, 2D vectors)
     — GAIA-2 / Sora-class buyers want flow-conditioned generation'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 320
+  dispatched_at: '2026-05-04 21:30:48'
 - id: G168
   title: bin/per_frame_object_bbox.py
   purpose: 'Cluster E+: per-frame 2D + 3D bounding boxes for visible NPCs/items (CARLA
@@ -1491,40 +1492,45 @@ gaps:
   title: bin/temporal_consistency_lint.py
   purpose: 'Lint v4: detect temporal artifacts (frame-to-frame discontinuity > 30
     percent in flow) — buyers reject jitter'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 200
   dispatched_at: '2026-05-04 21:07:34'
+  completed_at: '2026-05-04 21:21:31'
 - id: G172
   title: bin/automatic_diversity_metric.py
   purpose: 'Cluster E+: per-scene diversity score (biome / time / weather entropy)
     so buyer can sort cohorts'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 230
+  dispatched_at: '2026-05-04 21:39:13'
 - id: G173
   title: bin/audio_event_track.py
   purpose: 'PRD p8 audio req: per-frame audio peak + event-classifier (footstep /
     ambient / etc.) — addresses earlier PRD audio gap'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 270
+  dispatched_at: '2026-05-04 21:27:21'
 - id: G174
   title: bin/replay_determinism_tester.py
   purpose: 'Production hardening: re-run same seed twice, diff frame-by-frame, assert
     byte-identical — proves data is deterministic'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 250
   dispatched_at: '2026-05-04 21:11:56'
+  completed_at: '2026-05-04 21:21:33'
 - id: G175
   title: bin/buyer_dashboard_html.py
   purpose: 'Customer polish: static HTML report (no server) summarizing 1 clip — preview
     frames + lint result + diversity stats — buyer eye-pop'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 350
+  dispatched_at: '2026-05-04 21:29:19'
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-05T04:20:57Z'
+  last_heartbeat: '2026-05-05T04:39:13Z'
