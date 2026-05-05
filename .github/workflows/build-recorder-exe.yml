@@ -41,6 +41,8 @@ jobs:
             --name OysterRecorder `
             --add-binary "ffmpeg.exe;." `
             --add-data "bin/lint_v3_prd_grounded.py;." `
+            --add-data "bin/generate_systeminfo_json.py;." `
+            --add-data "bin/generate_gameinfo_xlsx.py;." `
             --paths bin `
             --collect-all tkinter `
             --collect-all pynput `
@@ -50,6 +52,8 @@ jobs:
             --hidden-import pynput.keyboard._win32 `
             --hidden-import pynput.mouse._win32 `
             --hidden-import lint_v3_prd_grounded `
+            --hidden-import generate_systeminfo_json `
+            --hidden-import generate_gameinfo_xlsx `
             --hidden-import PIL.Image `
             bin/recorder_consumer_lite.py
 

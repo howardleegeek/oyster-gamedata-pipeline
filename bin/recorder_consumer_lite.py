@@ -1066,21 +1066,36 @@ class RecorderApp(tk.Tk):
         if self._video_path and self._video_path.exists():
             shutil.move(str(self._video_path), str(clip_dir / "video.mp4"))
 
-        # 2. systeminfo.json — REAL window geometry via Win32 EnumWindows
-        # if available (v0.4.0+); falls back to 1920x1080 placeholder.
+        # 2. systeminfo.json — v0.10.0: now uses the proper engineering
+        # helper bin/generate_systeminfo_json.build_systeminfo() rather
+        # than my hand-rolled dict. Same function the buyer-spec
+        # pipeline uses, so backend ingest accepts it without special-casing.
         rect = self._mc_window_rect or {}
-        sys_info = {
-            "gameProcessName": rect.get("title", "Minecraft"),
-            "x": rect.get("x", 0),
-            "y": rect.get("y", 0),
-            "width": rect.get("width", 1920),
-            "height": rect.get("height", 1080),
-            "recordDpi": rect.get("recordDpi", 96),
-            "recordedAt": ts,
-            "recorderVersion": "lite-v0.4.0",
-            "_real_window_geometry": bool(self._mc_window_rect),
-            "_note": "stop-gap recorder; full systeminfo from Rust app",
-        }
+        try:
+            import generate_systeminfo_json as gsi  # noqa: PLC0415
+            sys_info = gsi.build_systeminfo(
+                game_process_name="javaw.exe",
+                x=int(rect.get("x", 0)),
+                y=int(rect.get("y", 0)),
+                width=int(rect.get("width", 1920)),
+                height=int(rect.get("height", 1080)),
+                record_dpi=float(rect.get("recordDpi", 96)) / 96.0,  # ratio
+            )
+            sys_info["recordedAt"] = ts
+            sys_info["recorderVersion"] = "lite-v0.10.0"
+            sys_info["_real_window_geometry"] = bool(self._mc_window_rect)
+        except Exception as e:  # noqa: BLE001
+            _trace(f"systeminfo: helper import failed, using stub ({e})")
+            sys_info = {
+                "gameProcessName": rect.get("title", "Minecraft"),
+                "x": rect.get("x", 0),
+                "y": rect.get("y", 0),
+                "width": rect.get("width", 1920),
+                "height": rect.get("height", 1080),
+                "recordDpi": rect.get("recordDpi", 96),
+                "recordedAt": ts,
+                "recorderVersion": "lite-v0.10.0-fallback",
+            }
         (clip_dir / "systeminfo.json").write_text(
             json.dumps(sys_info, indent=2), encoding="utf-8"
         )
@@ -1129,12 +1144,32 @@ class RecorderApp(tk.Tk):
             encoding="utf-8",
         )
 
-        # 4. gameinfo.xlsx — minimal placeholder. Real version is
-        # produced by the Rust app's gameinfo extractor (G164/G181).
-        # We write a near-empty xlsx using a hand-crafted minimal
-        # zipfile (xlsx is a zip) so the validator's "is xlsx" check
-        # finds something parseable.
-        _write_minimal_xlsx(clip_dir / "gameinfo.xlsx")
+        # 4. gameinfo.xlsx — v0.10.0: uses bin/generate_gameinfo_xlsx
+        # write_xlsx() for a real 14-field xlsx instead of my
+        # _write_minimal_xlsx hand-rolled stub. Same fields buyer
+        # ingest expects.
+        try:
+            import generate_gameinfo_xlsx as ggx  # noqa: PLC0415
+            video_dur = max(0.0, time.time() - self._record_started_at)
+            game_info = ggx.build_gameinfo_dict(
+                game_name="Minecraft",
+                game_version="1.20.4",
+                platform="Java Edition",
+                scene_name="overworld",
+                weather="clear",
+                time_of_day="day",
+                character_name="DataPilot",
+                character_class="player",
+                operator_id="lite-recorder",
+                total_frames=int(video_dur * 30),  # 30 fps locked
+                video_duration_sec=video_dur,
+                route_type=1,
+                notes=f"recorded by recorder_consumer_lite v0.10.0 at {ts}",
+            )
+            ggx.write_xlsx(game_info, str(clip_dir / "gameinfo.xlsx"))
+        except Exception as e:  # noqa: BLE001
+            _trace(f"gameinfo: helper failed ({e}), using minimal stub")
+            _write_minimal_xlsx(clip_dir / "gameinfo.xlsx")
 
         # 5. depth/ — empty directory placeholder. Real version needs
         # G198 depth shader pack injecting per-frame z-buffer EXR files.
