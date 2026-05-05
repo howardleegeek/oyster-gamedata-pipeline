@@ -1552,6 +1552,90 @@ gaps:
   status: pending
   priority: P1
   lines_estimate: 60
+- id: G190
+  title: bin/backend_ingest_handler.py
+  purpose: FastAPI endpoint /v1/ingest accepts vendor tarball uploads, validates via G165 lint, stores to S3, writes Postgres
+    clip row with vendor_id + duration + sha256
+  status: pending
+  priority: P0
+  lines_estimate: 320
+- id: G191
+  title: bin/s3_presigned_url_issuer.py
+  purpose: Issue 24h presigned S3 PUT URLs to vendors (one URL per clip); rate-limit per vendor key; write upload-intent row
+    in Postgres for audit
+  status: pending
+  priority: P0
+  lines_estimate: 200
+- id: G192
+  title: bin/vendor_portal_static_site.py
+  purpose: Generator for static SPA (HTML + JS, no server) — vendor signs in via OAuth, sees earnings + clips uploaded + recorder
+    download link
+  status: pending
+  priority: P0
+  lines_estimate: 380
+- id: G193
+  title: bin/payout_calculator.py
+  purpose: 'Compute vendor payout: clip_duration_min * rate_per_min * quality_multiplier (from G165 lint score) - rejection_penalties;
+    outputs CSV for ACH'
+  status: pending
+  priority: P0
+  lines_estimate: 220
+- id: G194
+  title: bin/anomaly_detector_clip_quality.py
+  purpose: 'Flag low-effort vendor submissions: action entropy < threshold OR camera variance < threshold OR identical-trajectory
+    pattern across N clips (catches farming)'
+  status: pending
+  priority: P0
+  lines_estimate: 280
+- id: G195
+  title: bin/buyer_download_api_handler.py
+  purpose: 'FastAPI /v1/buyer/clips endpoint: paginated clip list + presigned download URL per clip; auth via buyer JWT; rate-limit
+    + audit log'
+  status: pending
+  priority: P0
+  lines_estimate: 250
+- id: G196
+  title: bin/audio_track_extractor.py
+  purpose: Extract audio from video.mp4 via ffmpeg, validate continuity (no gaps over 50ms per PRD p8), check volume/distortion;
+    emit audio.flac + audio_qc.json
+  status: pending
+  priority: P0
+  lines_estimate: 230
+- id: G197
+  title: bin/multi_clip_stitcher.py
+  purpose: Combine N short same-scene clips into longer episode; preserve timestamp continuity + frame_id offset; for buyers
+    wanting longer trajectories
+  status: pending
+  priority: P1
+  lines_estimate: 260
+- id: G198
+  title: bin/depth_shader_pack_minecraft.py
+  purpose: Generator for Iris/Sodium shader pack that exports Z-buffer at 6fps to disk; ground-truth depth replaces DepthAnything
+    inference for MC capture
+  status: pending
+  priority: P0
+  lines_estimate: 350
+- id: G199
+  title: bin/recorder_health_telemetry.py
+  purpose: Vendor recorder posts heartbeat (uptime, FPS, encoder backpressure, last-clip-at) to /v1/health endpoint every
+    60s; backend dashboard surfaces stragglers
+  status: pending
+  priority: P1
+  lines_estimate: 200
+- id: G200
+  title: docs/runbooks/BACKEND_DEPLOY.md
+  purpose: 'Deploy FastAPI backend to Render or Railway: env vars + Postgres URL + S3 creds + alembic migrate + healthcheck
+    verification'
+  status: pending
+  priority: P0
+  lines_estimate: 220
+- id: G201
+  title: docs/runbooks/PAYMENT_SETUP.md
+  purpose: 'Vendor payout setup: Stripe Connect for US + manual ACH/wire spreadsheet for non-US; tax form (W-9 / W-8BEN) collection
+    runbook'
+  status: pending
+  priority: P1
+  lines_estimate: 200
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
