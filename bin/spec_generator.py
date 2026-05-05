@@ -467,6 +467,32 @@ SPECS: list[dict] = [
     {"id": "G175", "title": "bin/buyer_dashboard_html.py",
      "purpose": "Customer polish: static HTML report (no server) summarizing 1 clip — preview frames + lint result + diversity stats — buyer eye-pop",
      "lines": 350, "priority": "P0"},
+
+    # ─── W21 Multi-game horizontal expansion (8 specs) ─────────────────────
+    {"id": "G176", "title": "src/oyster_agent_runner/environments/beamng_drive.py",
+     "purpose": "BeamNG.drive extractor: BeamNGpy connect + Vehicle.poll_sensors + Camera depth-mode + ego pose at 60Hz",
+     "lines": 350, "priority": "P0"},
+    {"id": "G177", "title": "src/oyster_agent_runner/environments/stardew_valley.py",
+     "purpose": "Stardew Valley extractor: SMAPI mod relay over HTTP/JSON socket; player position/facing + map name + action keys at 60Hz",
+     "lines": 280, "priority": "P0"},
+    {"id": "G178", "title": "src/oyster_agent_runner/environments/cyberpunk_2077.py",
+     "purpose": "CP2077 extractor: CET (Cyber Engine Tweaks) Lua over websocket; 6-DoF camera + player pose + velocity + FOV + day-night",
+     "lines": 380, "priority": "P0"},
+    {"id": "G179", "title": "src/oyster_agent_runner/environments/cities_skylines.py",
+     "purpose": "Cities Skylines extractor: Mod API + Harmony patch shim; camera position 3D + zoom + simulation tick over named pipe",
+     "lines": 300, "priority": "P0"},
+    {"id": "G180", "title": "src/oyster_agent_runner/environments/factorio_full.py",
+     "purpose": "Factorio extractor v2: full RCON + observer-mod loop; player pose + facing + tile state + biter wave events",
+     "lines": 320, "priority": "P0"},
+    {"id": "G181", "title": "src/oyster_agent_runner/environments/registry.py",
+     "purpose": "Environment plugin registry: discovers environments/*.py modules + uniform AgentTask -> Environment factory",
+     "lines": 180, "priority": "P0"},
+    {"id": "G182", "title": "bin/cross_game_test_harness.py",
+     "purpose": "Cross-game integration test harness: enumerates registered environments + runs 30s mock trajectory + lints; gates new game integrations",
+     "lines": 250, "priority": "P0"},
+    {"id": "G183", "title": "docs/runbooks/STARDEW_RUNBOOK.md",
+     "purpose": "Operator runbook for Stardew capture: SMAPI install + our mod copy + 30-min smoke; mirrors BEAMNG_RUNBOOK",
+     "lines": 180, "priority": "P1"},
 ]
 
 

@@ -175,8 +175,8 @@ gaps:
   skip_reason: file already in repo
 - id: G023
   title: bin/redteam_attacks_v2.py
-  purpose: 5 new adversarial scenarios (quat drift / timestamp regression / partial
-    stuck-key / EXR wrong channel / tarball extras)
+  purpose: 5 new adversarial scenarios (quat drift / timestamp regression / partial stuck-key / EXR wrong channel / tarball
+    extras)
   status: skipped
   priority: P1
   lines_estimate: 200
@@ -250,8 +250,8 @@ gaps:
   completed_at: '2026-05-04 00:29:42'
 - id: G031
   title: bin/obs_websocket_smoke.py
-  purpose: Standalone smoke test that boots OBS Studio (subprocess) and verifies WebSocket
-    v5 connect + auth + StartRecord/StopRecord opcodes
+  purpose: Standalone smoke test that boots OBS Studio (subprocess) and verifies WebSocket v5 connect + auth + StartRecord/StopRecord
+    opcodes
   status: skipped
   priority: P0
   lines_estimate: 200
@@ -261,8 +261,7 @@ gaps:
   skip_reason: file already in repo
 - id: G032
   title: bin/depth_anything_smoke.py
-  purpose: Load DepthAnything V2 Small model + run inference on 1 RGB sample + write
-    valid OpenEXR float32 Z + read-back validate
+  purpose: Load DepthAnything V2 Small model + run inference on 1 RGB sample + write valid OpenEXR float32 Z + read-back validate
   status: skipped
   priority: P0
   lines_estimate: 180
@@ -272,8 +271,7 @@ gaps:
   skip_reason: file already in repo
 - id: G033
   title: bin/mc_client_smoke.py
-  purpose: Launch real Minecraft Java 1.20.4 client in offline mode + screenshot at
-    t=10s + verify pixels-not-black
+  purpose: Launch real Minecraft Java 1.20.4 client in offline mode + screenshot at t=10s + verify pixels-not-black
   status: completed
   priority: P0
   lines_estimate: 200
@@ -281,16 +279,16 @@ gaps:
   completed_at: '2026-05-03 23:16:27'
 - id: G034
   title: bin/scene_diversity_scorer.py
-  purpose: Compute Habitat-style scene diversity metric (pixel histogram clustering
-    across video frames) — flags vendor monotone-scene clips
+  purpose: Compute Habitat-style scene diversity metric (pixel histogram clustering across video frames) — flags vendor monotone-scene
+    clips
   status: dispatched
   priority: P1
   lines_estimate: 180
   dispatched_at: '2026-05-03 23:27:59'
 - id: G035
   title: bin/clip_validator_strict.py
-  purpose: Stricter clip-level validator — cross-checks audio mute/silent / black-frame
-    rate / repeated-frame rate / motion entropy
+  purpose: Stricter clip-level validator — cross-checks audio mute/silent / black-frame rate / repeated-frame rate / motion
+    entropy
   status: completed
   priority: P1
   lines_estimate: 250
@@ -306,16 +304,16 @@ gaps:
   completed_at: '2026-05-04 00:31:16'
 - id: G037
   title: bin/network_throttle_test.py
-  purpose: Simulate weak vendor network (200 Kbps upload) using tc/dummynet wrapper
-    — validates upload_s3.sh truly handles slow links
+  purpose: Simulate weak vendor network (200 Kbps upload) using tc/dummynet wrapper — validates upload_s3.sh truly handles
+    slow links
   status: skipped
   priority: P2
   lines_estimate: 130
   skip_reason: file already in repo
 - id: G038
   title: bin/buyer_spec_validator_v2.py
-  purpose: Strict independent v2 validator (cross-file consistency checks beyond lint_buyer_spec
-    — manifest sha vs files / xlsx semantic / EXR temporal alignment)
+  purpose: Strict independent v2 validator (cross-file consistency checks beyond lint_buyer_spec — manifest sha vs files /
+    xlsx semantic / EXR temporal alignment)
   status: completed
   priority: P1
   lines_estimate: 280
@@ -323,8 +321,7 @@ gaps:
   completed_at: '2026-05-03 23:34:27'
 - id: G039
   title: bin/edge_test_zero_records.py
-  purpose: 'Boundary test: action_camera.json with empty records list — adapter must
-    fail-closed not crash'
+  purpose: 'Boundary test: action_camera.json with empty records list — adapter must fail-closed not crash'
   status: completed
   priority: P1
   lines_estimate: 80
@@ -332,8 +329,7 @@ gaps:
   completed_at: '2026-05-04 04:06:13'
 - id: G040
   title: bin/edge_test_negative_timestamps.py
-  purpose: 'Boundary test: timestamp 1970-01-01 negative epoch — schema must reject
-    pre-2020 explicitly'
+  purpose: 'Boundary test: timestamp 1970-01-01 negative epoch — schema must reject pre-2020 explicitly'
   status: completed
   priority: P1
   lines_estimate: 90
@@ -341,8 +337,7 @@ gaps:
   completed_at: '2026-05-04 04:19:08'
 - id: G041
   title: bin/edge_test_gigantic_record_count.py
-  purpose: 'Boundary test: 1,000,000 records in single action_camera.json — confirm
-    adapter streams not loads-all'
+  purpose: 'Boundary test: 1,000,000 records in single action_camera.json — confirm adapter streams not loads-all'
   status: completed
   priority: P1
   lines_estimate: 110
@@ -350,8 +345,7 @@ gaps:
   completed_at: '2026-05-04 04:19:10'
 - id: G042
   title: bin/edge_test_unicode_filenames.py
-  purpose: 'Boundary test: Chinese / emoji / RTL filenames in tarball entries — verify
-    utf-8 manifest support'
+  purpose: 'Boundary test: Chinese / emoji / RTL filenames in tarball entries — verify utf-8 manifest support'
   status: completed
   priority: P2
   lines_estimate: 100
@@ -359,8 +353,7 @@ gaps:
   completed_at: '2026-05-04 07:15:45'
 - id: G043
   title: bin/edge_test_missing_optional_fields.py
-  purpose: 'Boundary test: skip optional Vector4 quat field — adapter must default-fill
-    not crash'
+  purpose: 'Boundary test: skip optional Vector4 quat field — adapter must default-fill not crash'
   status: completed
   priority: P1
   lines_estimate: 95
@@ -368,8 +361,7 @@ gaps:
   completed_at: '2026-05-04 04:19:11'
 - id: G044
   title: bin/edge_test_extra_unknown_fields.py
-  purpose: 'Boundary test: vendor adds extra keys to action_camera record — lint warns
-    but accepts'
+  purpose: 'Boundary test: vendor adds extra keys to action_camera record — lint warns but accepts'
   status: completed
   priority: P2
   lines_estimate: 90
@@ -377,8 +369,7 @@ gaps:
   completed_at: '2026-05-04 07:15:47'
 - id: G045
   title: bin/edge_test_nan_inf_floats.py
-  purpose: 'Boundary test: NaN / +Inf in Vector3 — lint must reject as buyer spec
-    requires finite floats'
+  purpose: 'Boundary test: NaN / +Inf in Vector3 — lint must reject as buyer spec requires finite floats'
   status: completed
   priority: P0
   lines_estimate: 105
@@ -394,8 +385,7 @@ gaps:
   completed_at: '2026-05-04 04:06:15'
 - id: G047
   title: bin/edge_test_max_int_values.py
-  purpose: 'Boundary test: int64 max for frame_id — confirm no overflow in adapter
-    math'
+  purpose: 'Boundary test: int64 max for frame_id — confirm no overflow in adapter math'
   status: completed
   priority: P2
   lines_estimate: 85
@@ -411,8 +401,7 @@ gaps:
   completed_at: '2026-05-04 07:31:29'
 - id: G049
   title: bin/edge_test_dst_clock_change.py
-  purpose: 'Boundary test: capture spans DST transition — UTC timestamps must remain
-    monotonic'
+  purpose: 'Boundary test: capture spans DST transition — UTC timestamps must remain monotonic'
   status: completed
   priority: P1
   lines_estimate: 100
@@ -420,8 +409,7 @@ gaps:
   completed_at: '2026-05-04 04:19:13'
 - id: G055
   title: bin/stress_test_huge_tarball_5gb.py
-  purpose: 'Stress test: build 5 GB tarball (long capture + 6fps depth) — verify upload_s3.sh
-    chunked path holds'
+  purpose: 'Stress test: build 5 GB tarball (long capture + 6fps depth) — verify upload_s3.sh chunked path holds'
   status: completed
   priority: P1
   lines_estimate: 140
@@ -429,8 +417,7 @@ gaps:
   completed_at: '2026-05-04 05:19:13'
 - id: G056
   title: bin/stress_test_long_capture_2h.py
-  purpose: 'Stress test: simulate 2-hour scene with 30-min cap — confirm scene_id
-    rotation and clip cap enforced'
+  purpose: 'Stress test: simulate 2-hour scene with 30-min cap — confirm scene_id rotation and clip cap enforced'
   status: completed
   priority: P1
   lines_estimate: 150
@@ -438,8 +425,7 @@ gaps:
   completed_at: '2026-05-04 05:19:15'
 - id: G057
   title: bin/stress_test_burst_50_clips.py
-  purpose: 'Stress test: 50 clips per minute burst — lint queue must drain without
-    deadlock'
+  purpose: 'Stress test: 50 clips per minute burst — lint queue must drain without deadlock'
   status: completed
   priority: P2
   lines_estimate: 120
@@ -447,8 +433,7 @@ gaps:
   completed_at: '2026-05-04 07:51:42'
 - id: G058
   title: bin/stress_test_memory_leak_check.py
-  purpose: 'Stress test: 1000-iteration adapter run with tracemalloc — assert RSS
-    growth less than 50MB'
+  purpose: 'Stress test: 1000-iteration adapter run with tracemalloc — assert RSS growth less than 50MB'
   status: completed
   priority: P1
   lines_estimate: 130
@@ -456,8 +441,7 @@ gaps:
   completed_at: '2026-05-04 04:54:45'
 - id: G059
   title: bin/vendor_scenario_first_clip.py
-  purpose: 'Walkthrough: vendor follows README from zero, uploads first clip — measure
-    time-to-first-clip metric'
+  purpose: 'Walkthrough: vendor follows README from zero, uploads first clip — measure time-to-first-clip metric'
   status: completed
   priority: P0
   lines_estimate: 140
@@ -465,8 +449,7 @@ gaps:
   completed_at: '2026-05-04 01:57:22'
 - id: G060
   title: bin/vendor_scenario_china_mirror.py
-  purpose: 'Walkthrough: vendor in CN behind GFW — pip mirror + S3 region selection
-    works without VPN'
+  purpose: 'Walkthrough: vendor in CN behind GFW — pip mirror + S3 region selection works without VPN'
   status: completed
   priority: P1
   lines_estimate: 130
@@ -474,8 +457,7 @@ gaps:
   completed_at: '2026-05-04 04:36:24'
 - id: G061
   title: bin/vendor_scenario_resume_after_crash.py
-  purpose: 'Walkthrough: kill capture mid-clip, restart — confirm no partial tarball
-    poisons s3 + manifest detects gap'
+  purpose: 'Walkthrough: kill capture mid-clip, restart — confirm no partial tarball poisons s3 + manifest detects gap'
   status: completed
   priority: P0
   lines_estimate: 150
@@ -491,8 +473,7 @@ gaps:
   completed_at: '2026-05-04 04:54:46'
 - id: G063
   title: bin/vendor_scenario_low_disk.py
-  purpose: 'Walkthrough: 1 GB free disk — capture pre-flight check warns and aborts
-    safely'
+  purpose: 'Walkthrough: 1 GB free disk — capture pre-flight check warns and aborts safely'
   status: completed
   priority: P1
   lines_estimate: 110
@@ -500,8 +481,7 @@ gaps:
   completed_at: '2026-05-04 04:36:28'
 - id: G064
   title: bin/vendor_scenario_mac_only.py
-  purpose: 'Walkthrough: vendor on M1 Mac no GPU — depth provider falls back to CPU
-    model'
+  purpose: 'Walkthrough: vendor on M1 Mac no GPU — depth provider falls back to CPU model'
   status: completed
   priority: P2
   lines_estimate: 120
@@ -509,8 +489,7 @@ gaps:
   completed_at: '2026-05-04 07:31:32'
 - id: G065
   title: bin/vendor_scenario_old_python_310.py
-  purpose: 'Walkthrough: vendor on Ubuntu 22.04 default Python 3.10 — adapter runs
-    without datetime.UTC'
+  purpose: 'Walkthrough: vendor on Ubuntu 22.04 default Python 3.10 — adapter runs without datetime.UTC'
   status: completed
   priority: P0
   lines_estimate: 100
@@ -518,8 +497,7 @@ gaps:
   completed_at: '2026-05-04 01:57:24'
 - id: G066
   title: bin/vendor_scenario_no_gpu.py
-  purpose: 'Walkthrough: no CUDA / Metal — DepthAnything inference falls back to onnx-cpu
-    within SLA'
+  purpose: 'Walkthrough: no CUDA / Metal — DepthAnything inference falls back to onnx-cpu within SLA'
   status: completed
   priority: P1
   lines_estimate: 130
@@ -527,8 +505,7 @@ gaps:
   completed_at: '2026-05-04 05:49:38'
 - id: G067
   title: bin/vendor_scenario_alpha_week.py
-  purpose: 'Walkthrough: alpha-week first 50 vendors — concurrent ingest + per-vendor
-    quota holds'
+  purpose: 'Walkthrough: alpha-week first 50 vendors — concurrent ingest + per-vendor quota holds'
   status: completed
   priority: P1
   lines_estimate: 140
@@ -536,8 +513,7 @@ gaps:
   completed_at: '2026-05-04 04:54:48'
 - id: G068
   title: bin/vendor_scenario_rejection_loop.py
-  purpose: 'Walkthrough: vendor uploads malformed clip — rejection email + retry guide
-    reaches them'
+  purpose: 'Walkthrough: vendor uploads malformed clip — rejection email + retry guide reaches them'
   status: completed
   priority: P1
   lines_estimate: 130
@@ -545,8 +521,7 @@ gaps:
   completed_at: '2026-05-04 04:54:50'
 - id: G069
   title: bin/prd_test_video_no_ui.py
-  purpose: 'PRD p4 #3: video must contain no overlay UI / chat / dialogs — OCR scan
-    asserts clean frames'
+  purpose: 'PRD p4 #3: video must contain no overlay UI / chat / dialogs — OCR scan asserts clean frames'
   status: completed
   priority: P0
   lines_estimate: 140
@@ -554,8 +529,7 @@ gaps:
   completed_at: '2026-05-04 01:57:26'
 - id: G070
   title: bin/prd_test_route_type_distribution.py
-  purpose: 'PRD p5 #2: route_type field across 240 clips must hit at least 5 distinct
-    types — distribution check'
+  purpose: 'PRD p5 #2: route_type field across 240 clips must hit at least 5 distinct types — distribution check'
   status: completed
   priority: P1
   lines_estimate: 110
@@ -563,8 +537,7 @@ gaps:
   completed_at: '2026-05-04 05:19:17'
 - id: G071
   title: bin/prd_test_wasd_balance.py
-  purpose: 'PRD p6 #4: WASD action balance — no single key over 60 percent in long
-    captures'
+  purpose: 'PRD p6 #4: WASD action balance — no single key over 60 percent in long captures'
   status: completed
   priority: P1
   lines_estimate: 100
@@ -580,8 +553,7 @@ gaps:
   completed_at: '2026-05-04 01:57:27'
 - id: G073
   title: bin/prd_test_action_per_second.py
-  purpose: 'PRD p6 #6: median actions-per-second 0.5 to 5.0 — out-of-band capture
-    flagged as low-quality'
+  purpose: 'PRD p6 #6: median actions-per-second 0.5 to 5.0 — out-of-band capture flagged as low-quality'
   status: completed
   priority: P1
   lines_estimate: 100
@@ -589,8 +561,7 @@ gaps:
   completed_at: '2026-05-04 05:19:19'
 - id: G074
   title: bin/prd_test_camera_intrinsics_pinhole.py
-  purpose: 'PRD p3 #2: camera projection must be pinhole — fov + aspect populated,
-    no fisheye distortion params'
+  purpose: 'PRD p3 #2: camera projection must be pinhole — fov + aspect populated, no fisheye distortion params'
   status: completed
   priority: P0
   lines_estimate: 120
@@ -598,8 +569,7 @@ gaps:
   completed_at: '2026-05-04 02:12:56'
 - id: G075
   title: bin/prd_test_left_hand_coordinates.py
-  purpose: 'PRD p3 #4: left-hand coordinate system — assert handedness via cross-product
-    sign on Vector3 axes'
+  purpose: 'PRD p3 #4: left-hand coordinate system — assert handedness via cross-product sign on Vector3 axes'
   status: completed
   priority: P0
   lines_estimate: 100
@@ -607,8 +577,7 @@ gaps:
   completed_at: '2026-05-04 02:12:57'
 - id: G076
   title: bin/prd_test_metric_units_meters.py
-  purpose: 'PRD p3 #5: positions in meters — sanity-bound camera_position within world
-    cube radius'
+  purpose: 'PRD p3 #5: positions in meters — sanity-bound camera_position within world cube radius'
   status: completed
   priority: P1
   lines_estimate: 95
@@ -640,8 +609,7 @@ gaps:
   completed_at: '2026-05-04 02:24:43'
 - id: G080
   title: bin/prd_test_systeminfo_required.py
-  purpose: 'PRD p7 file 1: required keys (gpu, cpu, ram_gb, os, build) all present
-    — fail-closed if missing'
+  purpose: 'PRD p7 file 1: required keys (gpu, cpu, ram_gb, os, build) all present — fail-closed if missing'
   status: completed
   priority: P0
   lines_estimate: 100
@@ -649,8 +617,7 @@ gaps:
   completed_at: '2026-05-04 02:13:00'
 - id: G081
   title: bin/prd_test_depth_invalid_marker.py
-  purpose: 'PRD p4 #6: depth invalid pixel sentinel value (zero or NaN) preserved
-    through OpenEXR roundtrip'
+  purpose: 'PRD p4 #6: depth invalid pixel sentinel value (zero or NaN) preserved through OpenEXR roundtrip'
   status: completed
   priority: P0
   lines_estimate: 110
@@ -658,8 +625,7 @@ gaps:
   completed_at: '2026-05-04 02:24:45'
 - id: G082
   title: bin/prd_test_depth_6fps_alignment.py
-  purpose: 'PRD p4 #5: depth EXR 6fps alignment with 30fps video — frame index ratio
-    5:1 exact'
+  purpose: 'PRD p4 #5: depth EXR 6fps alignment with 30fps video — frame index ratio 5:1 exact'
   status: completed
   priority: P0
   lines_estimate: 105
@@ -667,8 +633,7 @@ gaps:
   completed_at: '2026-05-04 02:24:47'
 - id: G083
   title: bin/prd_test_audio_continuity.py
-  purpose: 'PRD p4 #2: video audio track continuous (no gaps over 50ms) — ffprobe
-    + numpy diff check'
+  purpose: 'PRD p4 #2: video audio track continuous (no gaps over 50ms) — ffprobe + numpy diff check'
   status: completed
   priority: P1
   lines_estimate: 120
@@ -676,8 +641,7 @@ gaps:
   completed_at: '2026-05-04 05:33:38'
 - id: G084
   title: bin/red_team_oversized_json.py
-  purpose: 'Red team: 100 MB action_camera.json — confirm adapter rejects or streams
-    without OOM'
+  purpose: 'Red team: 100 MB action_camera.json — confirm adapter rejects or streams without OOM'
   status: completed
   priority: P0
   lines_estimate: 110
@@ -685,8 +649,7 @@ gaps:
   completed_at: '2026-05-04 02:24:48'
 - id: G085
   title: bin/red_team_nan_coordinates.py
-  purpose: 'Red team: inject NaN into camera_position — lint must reject not silently
-    propagate'
+  purpose: 'Red team: inject NaN into camera_position — lint must reject not silently propagate'
   status: completed
   priority: P0
   lines_estimate: 90
@@ -702,8 +665,7 @@ gaps:
   completed_at: '2026-05-04 05:33:40'
 - id: G087
   title: bin/red_team_path_traversal.py
-  purpose: 'Red team: tarball entry name contains ../../etc — extractor must refuse
-    traversal'
+  purpose: 'Red team: tarball entry name contains ../../etc — extractor must refuse traversal'
   status: completed
   priority: P0
   lines_estimate: 100
@@ -719,8 +681,7 @@ gaps:
   completed_at: '2026-05-04 05:49:41'
 - id: G089
   title: bin/red_team_concurrent_writers.py
-  purpose: 'Red team: two adapter procs write same tarball simultaneously — file lock
-    prevents corruption'
+  purpose: 'Red team: two adapter procs write same tarball simultaneously — file lock prevents corruption'
   status: completed
   priority: P0
   lines_estimate: 130
@@ -728,8 +689,7 @@ gaps:
   completed_at: '2026-05-04 03:32:37'
 - id: G090
   title: bin/red_team_sigkill_mid_write.py
-  purpose: 'Red team: SIGKILL adapter mid action_camera write — atomic temp+rename
-    leaves no half-file'
+  purpose: 'Red team: SIGKILL adapter mid action_camera write — atomic temp+rename leaves no half-file'
   status: completed
   priority: P0
   lines_estimate: 120
@@ -737,8 +697,7 @@ gaps:
   completed_at: '2026-05-04 02:42:00'
 - id: G091
   title: bin/red_team_disk_full.py
-  purpose: 'Red team: simulate ENOSPC during write — adapter aborts cleanly with clear
-    error'
+  purpose: 'Red team: simulate ENOSPC during write — adapter aborts cleanly with clear error'
   status: completed
   priority: P0
   lines_estimate: 110
@@ -746,8 +705,7 @@ gaps:
   completed_at: '2026-05-04 02:58:46'
 - id: G092
   title: bin/red_team_out_of_order_frames.py
-  purpose: 'Red team: shuffle frame ordering in JSON — lint rejects non-monotonic
-    frame_id sequence'
+  purpose: 'Red team: shuffle frame ordering in JSON — lint rejects non-monotonic frame_id sequence'
   status: completed
   priority: P1
   lines_estimate: 90
@@ -755,8 +713,7 @@ gaps:
   completed_at: '2026-05-04 06:24:38'
 - id: G093
   title: bin/red_team_wrong_obs_key.py
-  purpose: 'Red team: WebSocket auth with wrong password — session refuses + audit
-    log records attempt'
+  purpose: 'Red team: WebSocket auth with wrong password — session refuses + audit log records attempt'
   status: completed
   priority: P1
   lines_estimate: 100
@@ -764,8 +721,7 @@ gaps:
   completed_at: '2026-05-04 06:39:10'
 - id: G094
   title: bin/red_team_corrupt_exr.py
-  purpose: 'Red team: zero-fill 1 KB inside EXR — validator detects corruption via
-    numpy isnan/isinf scan'
+  purpose: 'Red team: zero-fill 1 KB inside EXR — validator detects corruption via numpy isnan/isinf scan'
   status: completed
   priority: P0
   lines_estimate: 110
@@ -789,8 +745,7 @@ gaps:
   completed_at: '2026-05-04 02:42:05'
 - id: G097
   title: bin/red_team_mixed_vector_format.py
-  purpose: 'Red team: same file mixes dict and list Vector3 forms — lint rejects format
-    inconsistency'
+  purpose: 'Red team: same file mixes dict and list Vector3 forms — lint rejects format inconsistency'
   status: completed
   priority: P1
   lines_estimate: 100
@@ -798,8 +753,7 @@ gaps:
   completed_at: '2026-05-04 05:49:43'
 - id: G098
   title: bin/red_team_clock_skew.py
-  purpose: 'Red team: capture machine clock jumps backward 1 hour — adapter switches
-    to monotonic clock'
+  purpose: 'Red team: capture machine clock jumps backward 1 hour — adapter switches to monotonic clock'
   status: completed
   priority: P0
   lines_estimate: 110
@@ -807,8 +761,7 @@ gaps:
   completed_at: '2026-05-04 02:42:06'
 - id: G099
   title: src/oyster_agent_runner/defense_size_limit.py
-  purpose: 'Blue team for G084: per-file size cap defender (10 MB action_camera, 500
-    MB video)'
+  purpose: 'Blue team for G084: per-file size cap defender (10 MB action_camera, 500 MB video)'
   status: completed
   priority: P0
   lines_estimate: 110
@@ -816,8 +769,7 @@ gaps:
   completed_at: '2026-05-04 02:58:47'
 - id: G100
   title: src/oyster_agent_runner/defense_finite_check.py
-  purpose: 'Blue team for G085: assert_finite helper running on every Vector3 value
-    before write'
+  purpose: 'Blue team for G085: assert_finite helper running on every Vector3 value before write'
   status: completed
   priority: P0
   lines_estimate: 90
@@ -825,8 +777,7 @@ gaps:
   completed_at: '2026-05-04 02:58:49'
 - id: G101
   title: src/oyster_agent_runner/defense_timestamp_range.py
-  purpose: 'Blue team for G086: enforce timestamps within 2024-01-01 to 2030-01-01
-    range'
+  purpose: 'Blue team for G086: enforce timestamps within 2024-01-01 to 2030-01-01 range'
   status: completed
   priority: P1
   lines_estimate: 80
@@ -834,8 +785,7 @@ gaps:
   completed_at: '2026-05-04 05:49:45'
 - id: G102
   title: src/oyster_agent_runner/defense_path_sanitize.py
-  purpose: 'Blue team for G087: tarball path sanitizer rejecting absolute / traversal
-    members'
+  purpose: 'Blue team for G087: tarball path sanitizer rejecting absolute / traversal members'
   status: completed
   priority: P0
   lines_estimate: 100
@@ -843,8 +793,7 @@ gaps:
   completed_at: '2026-05-04 03:32:39'
 - id: G103
   title: src/oyster_agent_runner/defense_dedup_frames.py
-  purpose: 'Blue team for G088: in-memory set tracker rejecting duplicate frame_id
-    within scene'
+  purpose: 'Blue team for G088: in-memory set tracker rejecting duplicate frame_id within scene'
   status: completed
   priority: P1
   lines_estimate: 90
@@ -852,8 +801,7 @@ gaps:
   completed_at: '2026-05-04 06:09:49'
 - id: G104
   title: src/oyster_agent_runner/defense_file_lock.py
-  purpose: 'Blue team for G089: fcntl flock wrapper around tarball open — prevents
-    concurrent corruption'
+  purpose: 'Blue team for G089: fcntl flock wrapper around tarball open — prevents concurrent corruption'
   status: completed
   priority: P0
   lines_estimate: 110
@@ -869,8 +817,7 @@ gaps:
   completed_at: '2026-05-04 03:13:40'
 - id: G106
   title: src/oyster_agent_runner/defense_disk_check.py
-  purpose: 'Blue team for G091: pre-flight shutil.disk_usage check requiring 5 GB
-    free before capture'
+  purpose: 'Blue team for G091: pre-flight shutil.disk_usage check requiring 5 GB free before capture'
   status: completed
   priority: P0
   lines_estimate: 90
@@ -878,8 +825,7 @@ gaps:
   completed_at: '2026-05-04 03:13:42'
 - id: G107
   title: src/oyster_agent_runner/defense_frame_order.py
-  purpose: 'Blue team for G092: streaming validator asserting frame_id strictly increases
-    by 1'
+  purpose: 'Blue team for G092: streaming validator asserting frame_id strictly increases by 1'
   status: completed
   priority: P1
   lines_estimate: 100
@@ -887,8 +833,7 @@ gaps:
   completed_at: '2026-05-04 06:24:39'
 - id: G108
   title: src/oyster_agent_runner/defense_obs_auth.py
-  purpose: 'Blue team for G093: SHA256+base64 OBS auth helper with rate-limit on failed
-    attempts'
+  purpose: 'Blue team for G093: SHA256+base64 OBS auth helper with rate-limit on failed attempts'
   status: completed
   priority: P1
   lines_estimate: 110
@@ -896,8 +841,7 @@ gaps:
   completed_at: '2026-05-04 06:24:42'
 - id: G109
   title: src/oyster_agent_runner/defense_exr_validate.py
-  purpose: 'Blue team for G094: post-write EXR validator scanning for NaN clusters
-    and shape mismatch'
+  purpose: 'Blue team for G094: post-write EXR validator scanning for NaN clusters and shape mismatch'
   status: completed
   priority: P0
   lines_estimate: 120
@@ -905,8 +849,7 @@ gaps:
   completed_at: '2026-05-04 03:48:30'
 - id: G110
   title: src/oyster_agent_runner/defense_systeminfo_required.py
-  purpose: 'Blue team for G095: systeminfo schema with REQUIRED_KEYS list and pydantic-lite
-    validator'
+  purpose: 'Blue team for G095: systeminfo schema with REQUIRED_KEYS list and pydantic-lite validator'
   status: completed
   priority: P0
   lines_estimate: 100
@@ -922,8 +865,7 @@ gaps:
   completed_at: '2026-05-04 03:13:45'
 - id: G112
   title: src/oyster_agent_runner/defense_vector_uniform.py
-  purpose: 'Blue team for G097: scan first record format and enforce uniform Vector3
-    shape across file'
+  purpose: 'Blue team for G097: scan first record format and enforce uniform Vector3 shape across file'
   status: completed
   priority: P1
   lines_estimate: 100
@@ -931,8 +873,7 @@ gaps:
   completed_at: '2026-05-04 06:09:51'
 - id: G113
   title: src/oyster_agent_runner/defense_monotonic_clock.py
-  purpose: 'Blue team for G098: prefer time.monotonic_ns inside capture loop, wall
-    clock only for stamp'
+  purpose: 'Blue team for G098: prefer time.monotonic_ns inside capture loop, wall clock only for stamp'
   status: completed
   priority: P0
   lines_estimate: 100
@@ -940,8 +881,7 @@ gaps:
   completed_at: '2026-05-04 03:48:32'
 - id: G114
   title: bin/autoresearch_lint_perf.py
-  purpose: 'Autoresearch: benchmark lint_buyer_spec on 100-tarball corpus — surface
-    p50 / p95 / p99'
+  purpose: 'Autoresearch: benchmark lint_buyer_spec on 100-tarball corpus — surface p50 / p95 / p99'
   status: completed
   priority: P1
   lines_estimate: 130
@@ -949,8 +889,7 @@ gaps:
   completed_at: '2026-05-04 06:09:53'
 - id: G115
   title: bin/autoresearch_adapter_quality.py
-  purpose: 'Autoresearch: golden-corpus diff vs hand-labeled mineflayer scenes — coverage
-    and recall metrics'
+  purpose: 'Autoresearch: golden-corpus diff vs hand-labeled mineflayer scenes — coverage and recall metrics'
   status: completed
   priority: P1
   lines_estimate: 150
@@ -958,8 +897,7 @@ gaps:
   completed_at: '2026-05-04 06:24:44'
 - id: G116
   title: bin/autoresearch_compression_ratio.py
-  purpose: 'Autoresearch: compare H.264 vs H.265 vs AV1 sizes on same scene — recommend
-    codec'
+  purpose: 'Autoresearch: compare H.264 vs H.265 vs AV1 sizes on same scene — recommend codec'
   status: completed
   priority: P2
   lines_estimate: 130
@@ -967,8 +905,7 @@ gaps:
   completed_at: '2026-05-04 07:51:44'
 - id: G117
   title: bin/autoresearch_depth_quality.py
-  purpose: 'Autoresearch: DepthAnything V2 vs Marigold MAE on 50 ground-truth Minecraft
-    Z-buffer frames'
+  purpose: 'Autoresearch: DepthAnything V2 vs Marigold MAE on 50 ground-truth Minecraft Z-buffer frames'
   status: completed
   priority: P1
   lines_estimate: 160
@@ -976,8 +913,7 @@ gaps:
   completed_at: '2026-05-04 06:24:45'
 - id: G118
   title: bin/autoresearch_failure_modes.py
-  purpose: 'Autoresearch: enumerate top 10 lint failure modes from 1000 vendor tarballs
-    — drives spec backlog'
+  purpose: 'Autoresearch: enumerate top 10 lint failure modes from 1000 vendor tarballs — drives spec backlog'
   status: completed
   priority: P1
   lines_estimate: 140
@@ -985,8 +921,7 @@ gaps:
   completed_at: '2026-05-04 06:24:48'
 - id: G119
   title: bin/autoresearch_recovery_time.py
-  purpose: 'Autoresearch: kill-9 then restart adapter — measure mean time to first
-    new clip after crash'
+  purpose: 'Autoresearch: kill-9 then restart adapter — measure mean time to first new clip after crash'
   status: completed
   priority: P1
   lines_estimate: 110
@@ -994,8 +929,7 @@ gaps:
   completed_at: '2026-05-04 06:39:11'
 - id: G120
   title: bin/autoresearch_throughput.py
-  purpose: 'Autoresearch: clips-per-vendor-per-day at 50 / 200 / 1000 vendors — capacity
-    planning'
+  purpose: 'Autoresearch: clips-per-vendor-per-day at 50 / 200 / 1000 vendors — capacity planning'
   status: completed
   priority: P1
   lines_estimate: 130
@@ -1003,8 +937,7 @@ gaps:
   completed_at: '2026-05-04 06:39:13'
 - id: G121
   title: bin/autoresearch_clip_density.py
-  purpose: 'Autoresearch: action density across scene types (combat / build / explore)
-    — diversity metric'
+  purpose: 'Autoresearch: action density across scene types (combat / build / explore) — diversity metric'
   status: completed
   priority: P2
   lines_estimate: 120
@@ -1012,8 +945,7 @@ gaps:
   completed_at: '2026-05-04 07:47:01'
 - id: G122
   title: bin/autoresearch_data_diversity.py
-  purpose: 'Autoresearch: biome / time-of-day / weather distribution per 1000 clips
-    — flag undersampled'
+  purpose: 'Autoresearch: biome / time-of-day / weather distribution per 1000 clips — flag undersampled'
   status: completed
   priority: P2
   lines_estimate: 130
@@ -1021,8 +953,7 @@ gaps:
   completed_at: '2026-05-04 07:47:03'
 - id: G123
   title: bin/autoresearch_action_entropy.py
-  purpose: 'Autoresearch: Shannon entropy of action stream — low entropy suggests
-    AFK / scripted vendor'
+  purpose: 'Autoresearch: Shannon entropy of action stream — low entropy suggests AFK / scripted vendor'
   status: completed
   priority: P1
   lines_estimate: 110
@@ -1030,8 +961,7 @@ gaps:
   completed_at: '2026-05-04 07:15:48'
 - id: G124
   title: bin/observability_metrics_emitter.py
-  purpose: 'Production: prometheus-style counters / histograms emitted to stdout for
-    adapter / lint / upload'
+  purpose: 'Production: prometheus-style counters / histograms emitted to stdout for adapter / lint / upload'
   status: completed
   priority: P1
   lines_estimate: 140
@@ -1039,8 +969,7 @@ gaps:
   completed_at: '2026-05-04 06:39:15'
 - id: G125
   title: bin/health_check_endpoint.py
-  purpose: 'Production: thin HTTP server reporting last_clip_at / disk_free / queue_depth
-    — for ops'
+  purpose: 'Production: thin HTTP server reporting last_clip_at / disk_free / queue_depth — for ops'
   status: completed
   priority: P1
   lines_estimate: 120
@@ -1048,8 +977,7 @@ gaps:
   completed_at: '2026-05-04 06:39:18'
 - id: G126
   title: bin/audit_log_writer.py
-  purpose: 'Production: append-only newline-delimited JSON audit log of every capture
-    / lint / upload'
+  purpose: 'Production: append-only newline-delimited JSON audit log of every capture / lint / upload'
   status: completed
   priority: P0
   lines_estimate: 110
@@ -1073,8 +1001,7 @@ gaps:
   completed_at: '2026-05-04 06:59:10'
 - id: G129
   title: bin/rate_limiter.py
-  purpose: 'Production: token-bucket per vendor key — enforce per-day clip budget
-    on adapter side'
+  purpose: 'Production: token-bucket per vendor key — enforce per-day clip budget on adapter side'
   status: completed
   priority: P1
   lines_estimate: 110
@@ -1082,8 +1009,7 @@ gaps:
   completed_at: '2026-05-04 07:31:36'
 - id: G130
   title: bin/graceful_shutdown.py
-  purpose: 'Production: SIGTERM handler flushes in-flight writes + closes tarball
-    before exit'
+  purpose: 'Production: SIGTERM handler flushes in-flight writes + closes tarball before exit'
   status: completed
   priority: P0
   lines_estimate: 100
@@ -1091,8 +1017,7 @@ gaps:
   completed_at: '2026-05-04 03:48:33'
 - id: G131
   title: bin/recovery_orchestrator.py
-  purpose: 'Production: on startup, scan staging dir for half-baked tarballs and either
-    resume or quarantine'
+  purpose: 'Production: on startup, scan staging dir for half-baked tarballs and either resume or quarantine'
   status: completed
   priority: P0
   lines_estimate: 140
@@ -1108,8 +1033,7 @@ gaps:
   completed_at: '2026-05-04 07:47:05'
 - id: G133
   title: bin/dependency_pinning_check.py
-  purpose: 'Production: assert all pip deps pinned to exact version — fail CI if any
-    range'
+  purpose: 'Production: assert all pip deps pinned to exact version — fail CI if any range'
   status: completed
   priority: P1
   lines_estimate: 90
@@ -1117,8 +1041,7 @@ gaps:
   completed_at: '2026-05-04 07:15:50'
 - id: G134
   title: bin/installer_one_click.py
-  purpose: 'Customer: single bash script that detects OS / installs deps / sets up
-    PATH for vendors'
+  purpose: 'Customer: single bash script that detects OS / installs deps / sets up PATH for vendors'
   status: completed
   priority: P0
   lines_estimate: 150
@@ -1126,8 +1049,7 @@ gaps:
   completed_at: '2026-05-04 04:19:16'
 - id: G135
   title: bin/error_message_translator.py
-  purpose: 'Customer: convert internal exception traces into vendor-friendly remediation
-    message'
+  purpose: 'Customer: convert internal exception traces into vendor-friendly remediation message'
   status: completed
   priority: P1
   lines_estimate: 120
@@ -1135,8 +1057,7 @@ gaps:
   completed_at: '2026-05-04 06:59:14'
 - id: G136
   title: bin/onboarding_smoke_test.py
-  purpose: 'Customer: post-install verify — captures 10s clip and lints, reports go
-    / no-go'
+  purpose: 'Customer: post-install verify — captures 10s clip and lints, reports go / no-go'
   status: completed
   priority: P0
   lines_estimate: 130
@@ -1144,8 +1065,7 @@ gaps:
   completed_at: '2026-05-04 03:48:37'
 - id: G137
   title: bin/uninstall_clean.py
-  purpose: 'Customer: remove all installed files and config — leaves zero trace including
-    launchd plists'
+  purpose: 'Customer: remove all installed files and config — leaves zero trace including launchd plists'
   status: completed
   priority: P2
   lines_estimate: 110
@@ -1153,8 +1073,7 @@ gaps:
   completed_at: '2026-05-04 07:47:07'
 - id: G138
   title: bin/diag_bundle_collector.py
-  purpose: 'Customer: gather logs / systeminfo / last 3 manifests into a tarball for
-    support tickets'
+  purpose: 'Customer: gather logs / systeminfo / last 3 manifests into a tarball for support tickets'
   status: completed
   priority: P1
   lines_estimate: 130
@@ -1162,8 +1081,8 @@ gaps:
   completed_at: '2026-05-04 06:59:16'
 - id: G139
   title: src/oyster_agent_runner/buyer_spec_v2_camera_intrinsics.py
-  purpose: 'Cluster A: per-frame K matrix + distortion + T_world_cam SE3 pose (Ego-Exo4D
-    / nuScenes / DROID standard) — without K depth EXR is uninterpretable in 3D'
+  purpose: 'Cluster A: per-frame K matrix + distortion + T_world_cam SE3 pose (Ego-Exo4D / nuScenes / DROID standard) — without
+    K depth EXR is uninterpretable in 3D'
   status: completed
   priority: P0
   lines_estimate: 200
@@ -1171,8 +1090,8 @@ gaps:
   completed_at: '2026-05-04 09:38:38'
 - id: G140
   title: src/oyster_agent_runner/buyer_spec_v2_rlds_flags.py
-  purpose: 'Cluster A: is_first / is_last / is_terminal episode-boundary flags per
-    record (Open X-Embodiment / RT-X mandatory) — unlocks OXE pooling'
+  purpose: 'Cluster A: is_first / is_last / is_terminal episode-boundary flags per record (Open X-Embodiment / RT-X mandatory)
+    — unlocks OXE pooling'
   status: completed
   priority: P0
   lines_estimate: 130
@@ -1180,8 +1099,8 @@ gaps:
   completed_at: '2026-05-04 09:38:40'
 - id: G141
   title: src/oyster_agent_runner/buyer_spec_v2_language_instruction.py
-  purpose: 'Cluster A: per-episode instruction string + optional dense narration (RT-2
-    / OpenVLA / Octo / Pi-0 require it) — unlocks VLA fine-tune ecosystem'
+  purpose: 'Cluster A: per-episode instruction string + optional dense narration (RT-2 / OpenVLA / Octo / Pi-0 require it)
+    — unlocks VLA fine-tune ecosystem'
   status: completed
   priority: P0
   lines_estimate: 150
@@ -1189,8 +1108,8 @@ gaps:
   completed_at: '2026-05-04 09:38:41'
 - id: G142
   title: src/oyster_agent_runner/buyer_spec_v2_vpt_mouse.py
-  purpose: 'Cluster A: extend mouse with scaledX/Y + dwheel + buttons bitmask + newButtons
-    edge-triggered (OpenAI VPT / MineWorld schema) — drop-in VPT compat'
+  purpose: 'Cluster A: extend mouse with scaledX/Y + dwheel + buttons bitmask + newButtons edge-triggered (OpenAI VPT / MineWorld
+    schema) — drop-in VPT compat'
   status: completed
   priority: P1
   lines_estimate: 170
@@ -1198,8 +1117,8 @@ gaps:
   completed_at: '2026-05-04 09:21:38'
 - id: G143
   title: src/oyster_agent_runner/buyer_spec_v2_action_tokens.py
-  purpose: 'Cluster A: 256-bin per-dim discretization of action vector (RT-1 / RT-2
-    actions-as-language) — table-stakes for VLA training'
+  purpose: 'Cluster A: 256-bin per-dim discretization of action vector (RT-1 / RT-2 actions-as-language) — table-stakes for
+    VLA training'
   status: completed
   priority: P1
   lines_estimate: 180
@@ -1207,8 +1126,8 @@ gaps:
   completed_at: '2026-05-04 10:13:42'
 - id: G144
   title: src/oyster_agent_runner/buyer_spec_v2_action_chunks.py
-  purpose: 'Cluster A: action_chunk_next_4 + action_chunk_next_10 packing for diffusion-decoded
-    policies (Octo / OpenVLA / Pi-0)'
+  purpose: 'Cluster A: action_chunk_next_4 + action_chunk_next_10 packing for diffusion-decoded policies (Octo / OpenVLA /
+    Pi-0)'
   status: completed
   priority: P2
   lines_estimate: 150
@@ -1216,8 +1135,8 @@ gaps:
   completed_at: '2026-05-04 09:57:23'
 - id: G145
   title: bin/c2pa_signer.py
-  purpose: 'Cluster B: C2PA v2.1 signed manifest with AI/ML assertion + is_synthetic
-    flag — mandatory under EU AI Act Aug 2026 + CA AB 2013 Jan 2026'
+  purpose: 'Cluster B: C2PA v2.1 signed manifest with AI/ML assertion + is_synthetic flag — mandatory under EU AI Act Aug
+    2026 + CA AB 2013 Jan 2026'
   status: completed
   priority: P0
   lines_estimate: 220
@@ -1225,8 +1144,8 @@ gaps:
   completed_at: '2026-05-04 09:38:44'
 - id: G146
   title: src/oyster_agent_runner/hmac_machine_id.py
-  purpose: 'Cluster B: HMAC-rotated machine fingerprint replacing raw MAC/disk-serial
-    hash — GDPR personal-data avoidance per EDPB 2024 guidance'
+  purpose: 'Cluster B: HMAC-rotated machine fingerprint replacing raw MAC/disk-serial hash — GDPR personal-data avoidance
+    per EDPB 2024 guidance'
   status: completed
   priority: P0
   lines_estimate: 100
@@ -1234,8 +1153,8 @@ gaps:
   completed_at: '2026-05-04 09:21:39'
 - id: G147
   title: src/oyster_agent_runner/privacy_kanon_inputs.py
-  purpose: 'Cluster B: k-anonymity bucketing on mouse/key inter-event intervals to
-    defeat keystroke-dynamics re-identification (~99% re-id literature)'
+  purpose: 'Cluster B: k-anonymity bucketing on mouse/key inter-event intervals to defeat keystroke-dynamics re-identification
+    (~99% re-id literature)'
   status: completed
   priority: P1
   lines_estimate: 110
@@ -1243,8 +1162,8 @@ gaps:
   completed_at: '2026-05-04 09:38:45'
 - id: G148
   title: bin/synthetic_disclosure_metadata.py
-  purpose: 'Cluster B: ensure is_synthetic + engine + engine_version + capture_date
-    in every JSON / manifest / video sidecar (synthetic-content disclosure mandate)'
+  purpose: 'Cluster B: ensure is_synthetic + engine + engine_version + capture_date in every JSON / manifest / video sidecar
+    (synthetic-content disclosure mandate)'
   status: completed
   priority: P0
   lines_estimate: 80
@@ -1252,8 +1171,8 @@ gaps:
   completed_at: '2026-05-04 09:21:41'
 - id: G149
   title: bin/imu_provider.py
-  purpose: 'Cluster C: synthetic IMU 6-axis (3-accel + 3-gyro) at 240Hz physics-tick
-    rate from Mineflayer state (Ego-Exo4D / VIO papers — derived velocity is lossy)'
+  purpose: 'Cluster C: synthetic IMU 6-axis (3-accel + 3-gyro) at 240Hz physics-tick rate from Mineflayer state (Ego-Exo4D
+    / VIO papers — derived velocity is lossy)'
   status: completed
   priority: P1
   lines_estimate: 250
@@ -1261,8 +1180,8 @@ gaps:
   completed_at: '2026-05-04 09:38:47'
 - id: G150
   title: bin/seg_track_provider.py
-  purpose: 'Cluster C: per-pixel semantic + instance segmentation at 6fps (R=class_id
-    from Minecraft block IDs, G+B=instance_id, CARLA / Habitat convention)'
+  purpose: 'Cluster C: per-pixel semantic + instance segmentation at 6fps (R=class_id from Minecraft block IDs, G+B=instance_id,
+    CARLA / Habitat convention)'
   status: completed
   priority: P1
   lines_estimate: 280
@@ -1270,8 +1189,7 @@ gaps:
   completed_at: '2026-05-04 10:13:44'
 - id: G151
   title: src/oyster_agent_runner/depth_uint16_alt_writer.py
-  purpose: 'Cluster C: alternative uint16 PNG mm depth output alongside float32 EXR
-    (ScanNet++ / Habitat convention, 4x smaller)'
+  purpose: 'Cluster C: alternative uint16 PNG mm depth output alongside float32 EXR (ScanNet++ / Habitat convention, 4x smaller)'
   status: completed
   priority: P2
   lines_estimate: 130
@@ -1279,8 +1197,8 @@ gaps:
   completed_at: '2026-05-04 09:57:24'
 - id: G152
   title: bin/reward_signal_provider.py
-  purpose: 'Cluster C: per-step sparse reward float + per-episode task_success bool
-    (DreamerV3-family world-model / RL training requirement)'
+  purpose: 'Cluster C: per-step sparse reward float + per-episode task_success bool (DreamerV3-family world-model / RL training
+    requirement)'
   status: completed
   priority: P2
   lines_estimate: 160
@@ -1288,8 +1206,8 @@ gaps:
   completed_at: '2026-05-04 09:57:26'
 - id: G153
   title: bin/embodiment_metadata.py
-  purpose: 'Cluster C: per-scene embodiment.json with embodiment_id + agent_geometry
-    + locomotion_mode (arxiv 2505.05753 scaling-laws axis)'
+  purpose: 'Cluster C: per-scene embodiment.json with embodiment_id + agent_geometry + locomotion_mode (arxiv 2505.05753 scaling-laws
+    axis)'
   status: completed
   priority: P2
   lines_estimate: 100
@@ -1297,8 +1215,7 @@ gaps:
   completed_at: '2026-05-04 10:13:46'
 - id: G154
   title: bin/inventory_voxel_capture.py
-  purpose: 'Cluster C: per-frame inventory + 3x3x3 voxel-window block-IDs around player
-    (MineDojo / MineWorld multimodal observation)'
+  purpose: 'Cluster C: per-frame inventory + 3x3x3 voxel-window block-IDs around player (MineDojo / MineWorld multimodal observation)'
   status: completed
   priority: P2
   lines_estimate: 230
@@ -1306,8 +1223,8 @@ gaps:
   completed_at: '2026-05-04 10:47:06'
 - id: G155
   title: bin/parquet_manifest_writer.py
-  purpose: 'Cluster D: gameinfo.parquet + action_camera.parquet shards keyed by (clip_id,
-    frame_idx) replacing xlsx (AV2 / OXE / DROID convention)'
+  purpose: 'Cluster D: gameinfo.parquet + action_camera.parquet shards keyed by (clip_id, frame_idx) replacing xlsx (AV2 /
+    OXE / DROID convention)'
   status: completed
   priority: P1
   lines_estimate: 180
@@ -1315,8 +1232,7 @@ gaps:
   completed_at: '2026-05-04 09:57:28'
 - id: G156
   title: bin/rlds_export.py
-  purpose: 'Cluster D: convert one tarball into TFDS RLDS-format shard (tf.data.Dataset
-    compatible) — unlocks OXE pooling'
+  purpose: 'Cluster D: convert one tarball into TFDS RLDS-format shard (tf.data.Dataset compatible) — unlocks OXE pooling'
   status: completed
   priority: P1
   lines_estimate: 280
@@ -1324,8 +1240,7 @@ gaps:
   completed_at: '2026-05-04 10:13:47'
 - id: G157
   title: bin/lerobot_export.py
-  purpose: 'Cluster D: convert tarball to LeRobot HuggingFace format — HF-hub distribution
-    path for robotics buyers'
+  purpose: 'Cluster D: convert tarball to LeRobot HuggingFace format — HF-hub distribution path for robotics buyers'
   status: completed
   priority: P2
   lines_estimate: 110
@@ -1333,8 +1248,7 @@ gaps:
   completed_at: '2026-05-04 10:47:08'
 - id: G158
   title: bin/hdf5_episode_pack.py
-  purpose: 'Cluster D: optional episode.h5 packing all action / depth / seg / imu
-    in one file (BEHAVIOR-1K / OmniGibson pattern)'
+  purpose: 'Cluster D: optional episode.h5 packing all action / depth / seg / imu in one file (BEHAVIOR-1K / OmniGibson pattern)'
   status: completed
   priority: P3
   lines_estimate: 180
@@ -1342,8 +1256,8 @@ gaps:
   completed_at: '2026-05-04 10:42:15'
 - id: G159
   title: bin/aesthetic_scorer.py
-  purpose: 'Cluster E: per-clip aesthetic / motion / OCR-overlay / camera-jitter scores
-    (Open-Sora 2.0 filter stack) — buyer reweighting / curation'
+  purpose: 'Cluster E: per-clip aesthetic / motion / OCR-overlay / camera-jitter scores (Open-Sora 2.0 filter stack) — buyer
+    reweighting / curation'
   status: completed
   priority: P2
   lines_estimate: 320
@@ -1351,8 +1265,8 @@ gaps:
   completed_at: '2026-05-04 10:42:20'
 - id: G160
   title: bin/data_diversity_dashboard.py
-  purpose: 'Cluster E: per-cohort diversity dashboard (route_type / biome / time-of-day
-    / action-entropy histograms) for buyer pre-purchase verification'
+  purpose: 'Cluster E: per-cohort diversity dashboard (route_type / biome / time-of-day / action-entropy histograms) for buyer
+    pre-purchase verification'
   status: completed
   priority: P2
   lines_estimate: 220
@@ -1360,8 +1274,7 @@ gaps:
   completed_at: '2026-05-04 10:47:10'
 - id: G050
   title: bin/edge_test_leap_second.py
-  purpose: 'Boundary test: leap-second insertion at 23:59:60 — adapter handles or
-    rejects cleanly'
+  purpose: 'Boundary test: leap-second insertion at 23:59:60 — adapter handles or rejects cleanly'
   status: completed
   priority: P3
   lines_estimate: 95
@@ -1369,8 +1282,7 @@ gaps:
   completed_at: '2026-05-04 07:47:00'
 - id: G051
   title: bin/edge_test_high_precision_floats.py
-  purpose: 'Boundary test: 1e-300 tiny floats in camera position — verify json round-trip
-    preserves precision'
+  purpose: 'Boundary test: 1e-300 tiny floats in camera position — verify json round-trip preserves precision'
   status: completed
   priority: P2
   lines_estimate: 90
@@ -1378,8 +1290,7 @@ gaps:
   completed_at: '2026-05-04 07:31:30'
 - id: G052
   title: bin/edge_test_quaternion_norm_drift.py
-  purpose: 'Boundary test: quaternion magnitude 1.0001 from float drift — lint tolerates
-    within epsilon'
+  purpose: 'Boundary test: quaternion magnitude 1.0001 from float drift — lint tolerates within epsilon'
   status: completed
   priority: P1
   lines_estimate: 110
@@ -1387,8 +1298,7 @@ gaps:
   completed_at: '2026-05-04 04:19:15'
 - id: G053
   title: bin/edge_test_camera_pitch_singularity.py
-  purpose: 'Boundary test: pitch exactly 90.0 / -90.0 gimbal-lock case — adapter clamps
-    not wraps'
+  purpose: 'Boundary test: pitch exactly 90.0 / -90.0 gimbal-lock case — adapter clamps not wraps'
   status: completed
   priority: P0
   lines_estimate: 100
@@ -1396,8 +1306,7 @@ gaps:
   completed_at: '2026-05-04 02:24:42'
 - id: G054
   title: bin/stress_test_50_concurrent_lints.py
-  purpose: 'Stress test: spawn 50 lint processes against same tarball — verify no
-    shared-state corruption'
+  purpose: 'Stress test: spawn 50 lint processes against same tarball — verify no shared-state corruption'
   status: completed
   priority: P1
   lines_estimate: 130
@@ -1405,9 +1314,8 @@ gaps:
   completed_at: '2026-05-04 04:36:22'
 - id: G161
   title: bin/synthesize_real_depth.py
-  purpose: 'Cluster A: 1920x1080 float32 single-channel EXR depth synthesis with realistic
-    Z-buffer (distance-to-plane) — replaces 16x16 all-zeros placeholder; cap invalid-pixel
-    ratio at 0.1 percent'
+  purpose: 'Cluster A: 1920x1080 float32 single-channel EXR depth synthesis with realistic Z-buffer (distance-to-plane) —
+    replaces 16x16 all-zeros placeholder; cap invalid-pixel ratio at 0.1 percent'
   status: completed
   priority: P0
   lines_estimate: 200
@@ -1415,9 +1323,8 @@ gaps:
   completed_at: '2026-05-04 11:51:34'
 - id: G162
   title: bin/synthesize_route_diversity.py
-  purpose: 'Cluster A: route_type distribution 50 percent normal + 50 percent special/loop;
-    WASD distribution W=40 percent / A=S=D=20 percent each — replaces 100 percent
-    route_type=1 mono-distribution'
+  purpose: 'Cluster A: route_type distribution 50 percent normal + 50 percent special/loop; WASD distribution W=40 percent
+    / A=S=D=20 percent each — replaces 100 percent route_type=1 mono-distribution'
   status: completed
   priority: P0
   lines_estimate: 150
@@ -1425,8 +1332,8 @@ gaps:
   completed_at: '2026-05-04 11:47:24'
 - id: G163
   title: src/oyster_agent_runner/keycode_int_normalizer.py
-  purpose: 'Cluster A: convert list-form keyCode arrays to single int per record per
-    PRD page 11 spec (W=87 ASCII), or expand list into multiple frame records'
+  purpose: 'Cluster A: convert list-form keyCode arrays to single int per record per PRD page 11 spec (W=87 ASCII), or expand
+    list into multiple frame records'
   status: completed
   priority: P0
   lines_estimate: 80
@@ -1434,8 +1341,8 @@ gaps:
   completed_at: '2026-05-04 11:47:26'
 - id: G164
   title: src/oyster_agent_runner/intrinsics_capital_keys.py
-  purpose: 'Cluster A: rename camera_intrinsics dict keys from lowercase fx/fy/cx/cy
-    to PRD-specified fx/fy/Cx/Cy (capital Cx Cy) per p5'
+  purpose: 'Cluster A: rename camera_intrinsics dict keys from lowercase fx/fy/cx/cy to PRD-specified fx/fy/Cx/Cy (capital
+    Cx Cy) per p5'
   status: completed
   priority: P0
   lines_estimate: 60
@@ -1443,9 +1350,8 @@ gaps:
   completed_at: '2026-05-04 11:51:36'
 - id: G165
   title: bin/lint_v3_prd_grounded.py
-  purpose: 'Cluster A: full PRD page-by-page lint — checks all 24 acceptance criteria
-    including audio quality / route distribution / camera_intrinsics fx==fy / quaternion
-    xyzw order / depth invalid-pixel ratio / keyCode int format / 5-6 min duration
+  purpose: 'Cluster A: full PRD page-by-page lint — checks all 24 acceptance criteria including audio quality / route distribution
+    / camera_intrinsics fx==fy / quaternion xyzw order / depth invalid-pixel ratio / keyCode int format / 5-6 min duration
     / 1920x1080 strict / no UI overlay / no logo / no popup'
   status: completed
   priority: P0
@@ -1454,8 +1360,8 @@ gaps:
   completed_at: '2026-05-04 11:51:37'
 - id: G166
   title: bin/multi_camera_capture.py
-  purpose: 'Cluster C+: multi-camera concurrent capture (1st-person + 3rd-person +
-    top-down) — Habitat-Sim parity for buyers training multi-view world models'
+  purpose: 'Cluster C+: multi-camera concurrent capture (1st-person + 3rd-person + top-down) — Habitat-Sim parity for buyers
+    training multi-view world models'
   status: completed
   priority: P0
   lines_estimate: 280
@@ -1463,8 +1369,8 @@ gaps:
   completed_at: '2026-05-04 22:21:03'
 - id: G167
   title: bin/optical_flow_provider.py
-  purpose: 'Cluster E+: per-frame optical flow computation (RAFT model, 2D vectors)
-    — GAIA-2 / Sora-class buyers want flow-conditioned generation'
+  purpose: 'Cluster E+: per-frame optical flow computation (RAFT model, 2D vectors) — GAIA-2 / Sora-class buyers want flow-conditioned
+    generation'
   status: completed
   priority: P1
   lines_estimate: 320
@@ -1472,8 +1378,7 @@ gaps:
   completed_at: '2026-05-04 21:39:47'
 - id: G168
   title: bin/per_frame_object_bbox.py
-  purpose: 'Cluster E+: per-frame 2D + 3D bounding boxes for visible NPCs/items (CARLA
-    / nuScenes parity)'
+  purpose: 'Cluster E+: per-frame 2D + 3D bounding boxes for visible NPCs/items (CARLA / nuScenes parity)'
   status: completed
   priority: P1
   lines_estimate: 250
@@ -1481,8 +1386,7 @@ gaps:
   completed_at: '2026-05-04 22:04:15'
 - id: G169
   title: bin/material_albedo_provider.py
-  purpose: 'Cluster C+: per-pixel albedo + roughness + metallic G-buffer (Sora 2 /
-    Cosmos training data parity)'
+  purpose: 'Cluster C+: per-pixel albedo + roughness + metallic G-buffer (Sora 2 / Cosmos training data parity)'
   status: completed
   priority: P2
   lines_estimate: 220
@@ -1490,8 +1394,7 @@ gaps:
   completed_at: '2026-05-04 22:21:04'
 - id: G170
   title: bin/scene_lighting_metadata.py
-  purpose: 'Cluster C+: per-frame sun direction + ambient intensity + weather state
-    (allows relighting experiments)'
+  purpose: 'Cluster C+: per-frame sun direction + ambient intensity + weather state (allows relighting experiments)'
   status: completed
   priority: P1
   lines_estimate: 180
@@ -1499,8 +1402,7 @@ gaps:
   completed_at: '2026-05-04 22:04:17'
 - id: G171
   title: bin/temporal_consistency_lint.py
-  purpose: 'Lint v4: detect temporal artifacts (frame-to-frame discontinuity > 30
-    percent in flow) — buyers reject jitter'
+  purpose: 'Lint v4: detect temporal artifacts (frame-to-frame discontinuity > 30 percent in flow) — buyers reject jitter'
   status: completed
   priority: P0
   lines_estimate: 200
@@ -1508,8 +1410,7 @@ gaps:
   completed_at: '2026-05-04 21:21:31'
 - id: G172
   title: bin/automatic_diversity_metric.py
-  purpose: 'Cluster E+: per-scene diversity score (biome / time / weather entropy)
-    so buyer can sort cohorts'
+  purpose: 'Cluster E+: per-scene diversity score (biome / time / weather entropy) so buyer can sort cohorts'
   status: completed
   priority: P1
   lines_estimate: 230
@@ -1517,8 +1418,8 @@ gaps:
   completed_at: '2026-05-04 21:39:49'
 - id: G173
   title: bin/audio_event_track.py
-  purpose: 'PRD p8 audio req: per-frame audio peak + event-classifier (footstep /
-    ambient / etc.) — addresses earlier PRD audio gap'
+  purpose: 'PRD p8 audio req: per-frame audio peak + event-classifier (footstep / ambient / etc.) — addresses earlier PRD
+    audio gap'
   status: completed
   priority: P0
   lines_estimate: 270
@@ -1526,8 +1427,7 @@ gaps:
   completed_at: '2026-05-04 21:39:51'
 - id: G174
   title: bin/replay_determinism_tester.py
-  purpose: 'Production hardening: re-run same seed twice, diff frame-by-frame, assert
-    byte-identical — proves data is deterministic'
+  purpose: 'Production hardening: re-run same seed twice, diff frame-by-frame, assert byte-identical — proves data is deterministic'
   status: completed
   priority: P0
   lines_estimate: 250
@@ -1535,13 +1435,65 @@ gaps:
   completed_at: '2026-05-04 21:21:33'
 - id: G175
   title: bin/buyer_dashboard_html.py
-  purpose: 'Customer polish: static HTML report (no server) summarizing 1 clip — preview
-    frames + lint result + diversity stats — buyer eye-pop'
+  purpose: 'Customer polish: static HTML report (no server) summarizing 1 clip — preview frames + lint result + diversity
+    stats — buyer eye-pop'
   status: completed
   priority: P0
   lines_estimate: 350
   dispatched_at: '2026-05-04 21:29:19'
   completed_at: '2026-05-04 21:39:54'
+- id: G176
+  title: src/oyster_agent_runner/environments/beamng_drive.py
+  purpose: 'BeamNG.drive extractor: BeamNGpy connect + Vehicle.poll_sensors + Camera depth-mode + ego pose at 60Hz'
+  status: pending
+  priority: P0
+  lines_estimate: 350
+- id: G177
+  title: src/oyster_agent_runner/environments/stardew_valley.py
+  purpose: 'Stardew Valley extractor: SMAPI mod relay over HTTP/JSON socket; player position/facing + map name + action keys
+    at 60Hz'
+  status: pending
+  priority: P0
+  lines_estimate: 280
+- id: G178
+  title: src/oyster_agent_runner/environments/cyberpunk_2077.py
+  purpose: 'CP2077 extractor: CET (Cyber Engine Tweaks) Lua over websocket; 6-DoF camera + player pose + velocity + FOV +
+    day-night'
+  status: pending
+  priority: P0
+  lines_estimate: 380
+- id: G179
+  title: src/oyster_agent_runner/environments/cities_skylines.py
+  purpose: 'Cities Skylines extractor: Mod API + Harmony patch shim; camera position 3D + zoom + simulation tick over named
+    pipe'
+  status: pending
+  priority: P0
+  lines_estimate: 300
+- id: G180
+  title: src/oyster_agent_runner/environments/factorio_full.py
+  purpose: 'Factorio extractor v2: full RCON + observer-mod loop; player pose + facing + tile state + biter wave events'
+  status: pending
+  priority: P0
+  lines_estimate: 320
+- id: G181
+  title: src/oyster_agent_runner/environments/registry.py
+  purpose: 'Environment plugin registry: discovers environments/*.py modules + uniform AgentTask -> Environment factory'
+  status: pending
+  priority: P0
+  lines_estimate: 180
+- id: G182
+  title: bin/cross_game_test_harness.py
+  purpose: 'Cross-game integration test harness: enumerates registered environments + runs 30s mock trajectory + lints; gates
+    new game integrations'
+  status: pending
+  priority: P0
+  lines_estimate: 250
+- id: G183
+  title: docs/runbooks/STARDEW_RUNBOOK.md
+  purpose: 'Operator runbook for Stardew capture: SMAPI install + our mod copy + 30-min smoke; mirrors BEAMNG_RUNBOOK'
+  status: pending
+  priority: P1
+  lines_estimate: 180
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
