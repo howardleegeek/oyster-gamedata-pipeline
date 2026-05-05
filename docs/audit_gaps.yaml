@@ -1676,9 +1676,10 @@ gaps:
   purpose: FastAPI endpoint /v1/ingest accepts vendor tarball uploads, validates via
     G165 lint, stores to S3, writes Postgres clip row with vendor_id + duration +
     sha256
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 320
+  dispatched_at: '2026-05-05 15:55:30'
 - id: G191
   title: bin/s3_presigned_url_issuer.py
   purpose: Issue 24h presigned S3 PUT URLs to vendors (one URL per clip); rate-limit
@@ -1692,10 +1693,11 @@ gaps:
   title: bin/vendor_portal_static_site.py
   purpose: Generator for static SPA (HTML + JS, no server) — vendor signs in via OAuth,
     sees earnings + clips uploaded + recorder download link
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 380
   dispatched_at: '2026-05-05 15:38:07'
+  completed_at: '2026-05-05 15:53:46'
 - id: G193
   title: bin/payout_calculator.py
   purpose: 'Compute vendor payout: clip_duration_min * rate_per_min * quality_multiplier
@@ -1709,9 +1711,10 @@ gaps:
   title: bin/anomaly_detector_clip_quality.py
   purpose: 'Flag low-effort vendor submissions: action entropy < threshold OR camera
     variance < threshold OR identical-trajectory pattern across N clips (catches farming)'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 280
+  dispatched_at: '2026-05-05 15:56:21'
 - id: G195
   title: bin/buyer_download_api_handler.py
   purpose: 'FastAPI /v1/buyer/clips endpoint: paginated clip list + presigned download
@@ -1723,9 +1726,10 @@ gaps:
   title: bin/audio_track_extractor.py
   purpose: Extract audio from video.mp4 via ffmpeg, validate continuity (no gaps over
     50ms per PRD p8), check volume/distortion; emit audio.flac + audio_qc.json
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 230
+  dispatched_at: '2026-05-05 16:01:58'
 - id: G197
   title: bin/multi_clip_stitcher.py
   purpose: Combine N short same-scene clips into longer episode; preserve timestamp
@@ -1751,9 +1755,10 @@ gaps:
   title: docs/runbooks/BACKEND_DEPLOY.md
   purpose: 'Deploy FastAPI backend to Render or Railway: env vars + Postgres URL +
     S3 creds + alembic migrate + healthcheck verification'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 220
+  dispatched_at: '2026-05-05 16:06:52'
 - id: G201
   title: docs/runbooks/PAYMENT_SETUP.md
   purpose: 'Vendor payout setup: Stripe Connect for US + manual ACH/wire spreadsheet
@@ -2296,4 +2301,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 89343
-  last_heartbeat: '2026-05-05T22:53:11Z'
+  last_heartbeat: '2026-05-05T23:09:52Z'
