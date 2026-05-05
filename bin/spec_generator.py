@@ -608,7 +608,7 @@ SPECS: list[dict] = [
      "purpose": "macOS .pkg installer for Mac gamers: bundles Java 21 + recorder + LaunchAgent plist; signed with Developer ID per Apple notarization",
      "lines": 280, "priority": "P0"},
     {"id": "G216", "title": "bin/onboarding_consumer_splash.py",
-     "purpose": "First-run splash screen: age gate (COPPA 13+) + region (GDPR/CCPA/other) + per-game opt-in + PayPal email collect",
+     "purpose": "First-run splash screen v1: age gate (COPPA 13+) + region (GDPR/CCPA) + per-game opt-in checkboxes + Continue button. NO email or payout collection in v1 (local-capture-only MVP)",
      "lines": 260, "priority": "P0"},
     {"id": "G217", "title": "bin/game_auto_detector.py",
      "purpose": "Windows / macOS process-list scanner: detects when supported games launch (Minecraft.exe, BeamNG.drive.exe, Stardew Valley.exe, Cyberpunk2077.exe, etc.); fires hooks",
@@ -643,6 +643,12 @@ SPECS: list[dict] = [
     {"id": "G227", "title": "docs/CONSUMER_LANDING_COPY.md",
      "purpose": "Marketing site copy rewritten consumer-first: hero (Play Games, Earn Money) + 3-step (download, play, paid) + payout examples + privacy + referral CTA",
      "lines": 240, "priority": "P0"},
+
+    # ─── W26 Clueless-user MVP gate (1 spec) ───────────────────────────────
+    # Howard 2026-05-05: 'let a complete novice install + record + done'
+    {"id": "G228", "title": "bin/end_to_end_consumer_smoke.py",
+     "purpose": "Master smoke test for the consumer install->play->tarball flow: simulates installer run + game launch + 5-min mock-provider trajectory + auto-stop + PRD-compliant tarball at ~/Documents/OysterClips/; gates the v1 release. Asserts 24/24 G165 lint PASS at end",
+     "lines": 280, "priority": "P0"},
 ]
 
 

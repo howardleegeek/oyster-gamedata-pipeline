@@ -1577,9 +1577,10 @@ gaps:
   title: bin/payout_calculator.py
   purpose: 'Compute vendor payout: clip_duration_min * rate_per_min * quality_multiplier (from G165 lint score) - rejection_penalties;
     outputs CSV for ACH'
-  status: pending
+  status: skipped
   priority: P0
   lines_estimate: 220
+  skip_reason: no payments v1 per Howard 2026-05-05 — clueless-user MVP only does install + record + tarball
 - id: G194
   title: bin/anomaly_detector_clip_quality.py
   purpose: 'Flag low-effort vendor submissions: action entropy < threshold OR camera variance < threshold OR identical-trajectory
@@ -1775,23 +1776,26 @@ gaps:
   title: bin/paypal_micropayout_handler.py
   purpose: 'PayPal Payouts API for consumer micro-payments ($1-50): batches per day, threshold $5 minimum, idempotency token
     per payout; replaces Stripe Connect KYC overhead'
-  status: pending
+  status: skipped
   priority: P0
   lines_estimate: 280
+  skip_reason: no payments v1 per Howard 2026-05-05 — clueless-user MVP only does install + record + tarball
 - id: G223
   title: bin/referral_system.py
   purpose: 'Consumer referral: A invites B with code, B installs + uploads first clip -> A gets $1 bonus credit, viral coefficient
     tracking; growth driver for B2C'
-  status: pending
+  status: skipped
   priority: P1
   lines_estimate: 250
+  skip_reason: no payments v1 per Howard 2026-05-05 — clueless-user MVP only does install + record + tarball
 - id: G224
   title: bin/in_app_earnings_counter.py
   purpose: 'Real-time earnings counter inside tray UI: queries /v1/me/earnings, animated counter, this-week vs all-time view,
     payout-eligible threshold display'
-  status: pending
+  status: skipped
   priority: P0
   lines_estimate: 200
+  skip_reason: no payments v1 per Howard 2026-05-05 — clueless-user MVP only does install + record + tarball
 - id: G225
   title: bin/auto_updater_winsparkle.py
   purpose: 'Auto-update mechanism (WinSparkle / Squirrel.Mac): polls update server daily, downloads new installer, prompts
@@ -1813,6 +1817,14 @@ gaps:
   status: pending
   priority: P0
   lines_estimate: 240
+- id: G228
+  title: bin/end_to_end_consumer_smoke.py
+  purpose: 'Master smoke test for the consumer install->play->tarball flow: simulates installer run + game launch + 5-min
+    mock-provider trajectory + auto-stop + PRD-compliant tarball at ~/Documents/OysterClips/; gates the v1 release. Asserts
+    24/24 G165 lint PASS at end'
+  status: pending
+  priority: P0
+  lines_estimate: 280
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649

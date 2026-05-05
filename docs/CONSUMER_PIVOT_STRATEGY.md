@@ -93,3 +93,36 @@ Already covered in `docs/ANTI_CHEAT_COMPATIBILITY.md` — consumer running our r
 2. Threshold for first payout — $1 (low friction) vs $5 (less spam)?
 3. App-store distribution (Microsoft Store / Mac App Store) or direct download only?
 4. iOS / Android companion app for "monitor your earnings" — needed v1 or post-MVP?
+
+---
+
+## v1 SCOPE NARROWING (Howard 2026-05-05)
+
+> "PayPal 微支付这些不需要 — 先跑通让一个什么都不懂的人直接可以录游戏 — 这个流程 — @PRD-Lark.pdf 用这个标准"
+
+**v1 MVP = install + play + tarball**. Nothing else.
+
+### v1 IN
+- One-click installer (G214/G215)
+- Splash with opt-in (G216 — trimmed: no email, no payout collect)
+- Auto-detect + auto-record (G217 + G218)
+- System tray UI (G219)
+- PRD-compliant tarball output to `~/Documents/OysterClips/`
+- G165 lint v3 PASS gate (24/24 PRD criteria)
+- Privacy dashboard + signed consent (G220 + G221)
+- Auto-update + crash reporter (G225 + G226)
+- E2E smoke (G228)
+
+### v1 OUT (skipped, revisit post-MVP)
+- ❌ G193 payout_calculator — no payments v1
+- ❌ G222 paypal_micropayout_handler — no payments v1
+- ❌ G223 referral_system — no growth flywheel v1
+- ❌ G224 in_app_earnings_counter — nothing to count v1
+
+### v1 success definition
+
+> A clueless user double-clicks the installer, plays Minecraft 1.20.4 for 5+ min, exits the game, and finds a PRD-compliant tarball in `~/Documents/OysterClips/clip-YYYYMMDD-HHMMSS.tar.gz` that PASSES `oyster-qa-tool.pyz lint`.
+
+That's it. Backend ingest, vendor portal, payouts — all post-MVP.
+
+The buyer story still works: we ship clips on flash drive / direct S3 transfer for v1. Scaled-up backend for v2.
