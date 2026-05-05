@@ -657,6 +657,40 @@ SPECS: list[dict] = [
     {"id": "G230", "title": "bin/in_app_clip_status_widget.py",
      "purpose": "System-tray menu widget showing last 5 clips with green PASS / red FAIL badges (from G165 lint result); consumer sees feedback without opening Finder or CLI. Replaces the missing earnings counter as the primary tray feedback signal",
      "lines": 200, "priority": "P0"},
+
+    # ─── W28 Centralized Error Reporting Service (10 specs) ────────────────
+    # Howard: '每次跑都有 log 报错, 做成一个服务, 自动报错'.
+    # Self-hosted (not Sentry SaaS) because consumer-fleet scale would cost.
+    {"id": "G231", "title": "bin/error_reporting_service.py",
+     "purpose": "FastAPI service exposing POST /v1/errors {severity, source, user_id, error_class, traceback, context_json}; rate-limit per IP + per user; dedup by sha256(traceback); writes to Postgres",
+     "lines": 320, "priority": "P0"},
+    {"id": "G232", "title": "bin/error_storage_postgres.py",
+     "purpose": "Alembic migration + SQLAlchemy models for errors table: timestamp, severity, source (recorder/cli/test/cluster), user_id, error_class, traceback_text, context_jsonb, sha256_dedup_key indexed; retention 90 days",
+     "lines": 220, "priority": "P0"},
+    {"id": "G233", "title": "bin/error_dashboard_web.py",
+     "purpose": "Single-page admin dashboard at /admin/errors served by service: filter by severity / source / time / user; group by sha256_dedup_key showing top-10 most-frequent recent errors with sample traceback",
+     "lines": 350, "priority": "P0"},
+    {"id": "G234", "title": "src/oyster_agent_runner/error_client_python.py",
+     "purpose": "Auto-installed Python global error capture: sys.excepthook + threading.excepthook + asyncio default handler + atexit; non-blocking POST to G231 with retry; PII-strip helper for tracebacks",
+     "lines": 280, "priority": "P0"},
+    {"id": "G235", "title": "bin/error_client_rust_recorder.rs",
+     "purpose": "Rust panic handler + std::panic::set_hook compiled into recorder.exe; serializes panic_info + backtrace + machine-id (HMAC-rotated, GDPR-safe) and POSTs to G231 endpoint",
+     "lines": 240, "priority": "P0"},
+    {"id": "G236", "title": "bin/error_client_pytest_plugin.py",
+     "purpose": "pytest plugin (entry-point pytest11) auto-reporting test failures + tracebacks to G231 with source=test, ci_run_id, commit_sha; opt-out via OYSTER_NO_ERROR_REPORT env var",
+     "lines": 200, "priority": "P0"},
+    {"id": "G237", "title": "bin/auto_install_error_handler.py",
+     "purpose": "One-line bootstrap: import this at any process startup -> installs G234 global Python hooks; works via PYTHONSTARTUP / sitecustomize.py / explicit import; zero-config for any runtime",
+     "lines": 150, "priority": "P0"},
+    {"id": "G238", "title": "docs/runbooks/ERROR_SERVICE_DEPLOY.md",
+     "purpose": "Deploy runbook for the error reporting service: Render or Railway + Postgres + env vars + alembic migrate + healthcheck + first end-to-end test (POST a fake error, see it in dashboard)",
+     "lines": 250, "priority": "P0"},
+    {"id": "G239", "title": "bin/error_severity_classifier.py",
+     "purpose": "Auto-classifier: maps incoming error_class + module + traceback signature to severity (critical = data loss / payment / auth; high = crash; medium = degraded; low = warning); rules table with override path",
+     "lines": 220, "priority": "P0"},
+    {"id": "G240", "title": "bin/error_alert_router.py",
+     "purpose": "For critical-severity errors: rate-limited Slack / Discord webhook (configurable); dedup window 5 min per sha256_key; daily-summary digest for medium / low; replaces Sentry pager-style alerts",
+     "lines": 200, "priority": "P0"},
 ]
 
 

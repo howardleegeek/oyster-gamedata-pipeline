@@ -126,3 +126,41 @@ Already covered in `docs/ANTI_CHEAT_COMPATIBILITY.md` — consumer running our r
 That's it. Backend ingest, vendor portal, payouts — all post-MVP.
 
 The buyer story still works: we ship clips on flash drive / direct S3 transfer for v1. Scaled-up backend for v2.
+
+---
+
+## W28 — Centralized Error Reporting Service (Howard 2026-05-05)
+
+> "我们要有很好的报错系统 这样我们可以locate 到每一次的错误 — 可否做成一个服务 — 自动报错 — 每次测试和跑的时候"
+
+Self-hosted error service (cheaper than Sentry at consumer-fleet scale). Three-layer:
+
+1. **Service** — FastAPI POST /v1/errors → Postgres with sha256-dedup, 90-day retention
+2. **Auto-installed clients** in every runtime:
+   - Python (sys.excepthook + threading + asyncio + atexit) → `error_client_python.py`
+   - Rust panic handler in recorder.exe → `error_client_rust_recorder.rs`
+   - pytest plugin (auto-reports test failures with ci_run_id + commit_sha)
+   - Cluster agents (minimax_agent_simple.py) — already log, just need POST shim
+3. **Dashboard + alerting**:
+   - `/admin/errors` web UI grouped by dedup key
+   - Severity classifier (critical / high / medium / low) by error_class + traceback signature
+   - Slack/Discord webhook for critical; daily digest for medium/low
+
+### Coverage matrix
+
+| Source | Capture mechanism | Spec |
+|---|---|---|
+| recorder.exe runtime crash | std::panic::set_hook → POST | G235 |
+| Python harness daemon errors | sys.excepthook → POST | G234 + G237 |
+| qa-tool.pyz lint errors | Python excepthook | G234 + G237 |
+| pytest CI failures | pytest plugin | G236 |
+| Cluster minimax_agent runs | wrap subprocess + POST on non-zero exit | G234 |
+| Backend ingest errors | FastAPI middleware | G231 itself |
+
+### Consumer-fleet implication
+
+Once we have millions of consumer installs (post-MVP), Sentry SaaS would cost $$$ per million events. Self-hosted Postgres absorbs millions of dedup-collapsed rows for free. Architecture decision locked.
+
+### G226 sentry replacement
+
+G226 `crash_reporter_sentry.py` (queued in W25) is now SKIPPED — superseded by self-hosted W28.
