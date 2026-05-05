@@ -85,7 +85,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.16.0"
+RECORDER_VERSION = "lite-v0.17.0"
 RELEASES_API = (
     "https://api.github.com/repos/howardleegeek/oyster-gamedata-pipeline"
     "/releases?per_page=20"
@@ -931,12 +931,13 @@ class RecorderApp(tk.Tk):
                 activebackground="#b71c1c",
             )
             _trace("recording armed by user click")
-            # Get out of MC's way.
-            try:
-                self.iconify()
-                _trace("window iconified to taskbar")
-            except Exception as e:
-                _trace(f"iconify failed: {e}")
+            # v0.17.0 BUG FIX: do NOT iconify here. Earlier versions
+            # iconified the window the moment ▶ was clicked, hiding the
+            # GUI before the watch_loop's Phase-1 status messages
+            # ('⏸ 已 arm — 请打开 Minecraft') could be seen. Tester saw
+            # window vanish and assumed crash. v0.17.0 defers iconify to
+            # the moment ffmpeg actually starts (in _run_one_session, see
+            # 'iconify after ffmpeg starts' marker).
         else:
             # Disarm — request the watcher to stop any in-flight ffmpeg.
             self._record_armed = False
@@ -1080,6 +1081,15 @@ class RecorderApp(tk.Tk):
         # actually working. Updates every second with elapsed seconds +
         # current video file size. Self-stops when ffmpeg ends.
         self.after(0, self._tick_recording_status)
+
+        # v0.17.0: iconify after ffmpeg starts marker — moved here from
+        # _toggle_arm. Now Phase 1 status messages stay visible until
+        # recording actually begins.
+        try:
+            self.after(0, self.iconify)
+            _trace("window iconified to taskbar (after ffmpeg start)")
+        except Exception as e:
+            _trace(f"iconify failed: {e}")
 
         # Phase 3: wait for MC to exit OR for 6 minutes elapsed (PRD cap)
         # OR for the user to disarm.
@@ -1382,8 +1392,26 @@ class RecorderApp(tk.Tk):
         # _get_minecraft_window_rect for systeminfo.json, so use it here
         # too if available — gives ffmpeg a stable handle that survives
         # MC moving / resizing.
-        if self._mc_window_rect and self._mc_window_rect.get("title"):
-            mc_title = self._mc_window_rect["title"]
+        # v0.17.0: only use window-title mode if title is purely ASCII
+        # AND doesn't contain '-' or '?' or other characters ffmpeg's
+        # gdigrab title parser chokes on. Otherwise fall back to full
+        # desktop capture, which always works. Symptom seen in earlier
+        # logs: 'Minecraft 26.2 Snapshot 6 - �?����,,�^?' — title had
+        # mojibake chars + a hyphen, which make ffmpeg silently fail to
+        # find the window and the recording produces 0 bytes.
+        mc_title = (self._mc_window_rect or {}).get("title", "") or ""
+        title_safe = (
+            bool(mc_title)
+            and mc_title.isascii()
+            and "-" not in mc_title
+            and "?" not in mc_title
+            and "<" not in mc_title
+            and ">" not in mc_title
+            and "|" not in mc_title
+            and "/" not in mc_title
+            and "\\" not in mc_title
+        )
+        if title_safe:
             video_input = ["-f", "gdigrab", "-framerate", "30",
                            "-draw_mouse", "0",
                            "-i", f"title={mc_title}"]
@@ -1392,7 +1420,7 @@ class RecorderApp(tk.Tk):
             video_input = ["-f", "gdigrab", "-framerate", "30",
                            "-draw_mouse", "0",
                            "-i", "desktop"]
-            _trace("ffmpeg: full-desktop capture (no MC window detected)")
+            _trace(f"ffmpeg: full-desktop capture (title unsafe={mc_title!r})")
 
         cmd = [
             str(_FFMPEG),
