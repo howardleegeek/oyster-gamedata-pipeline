@@ -80,6 +80,72 @@ _trace(f"sys.frozen={getattr(sys, 'frozen', False)}")
 _trace(f"sys.platform={sys.platform}")
 _trace(f"os.name={os.name}")
 
+
+# ---- Remote telemetry (so engineer can see logs without tester action) ---
+# Howard 2026-05-05: "你这边 能不能有log 到信息和日志"
+# We POST the full local log to ix.io (anonymous, free pastebin) on close
+# / crash / record-complete. The returned URL is appended to the local log
+# AND shown in the GUI subtitle so tester can read it off if asked. We do
+# NOT block startup or recording on this network call — it runs on a
+# daemon thread and any failure is silently logged.
+TELEMETRY_ENDPOINT = "http://ix.io"
+
+
+def _upload_log_remote() -> Optional[str]:
+    """POST ~/OysterRecorder.log to ix.io. Returns short URL or None.
+
+    Synchronous — caller is expected to run this on a daemon thread.
+    Network failures and ix.io downtime degrade gracefully (return None;
+    tester just doesn't see a remote URL, the local log file is still
+    intact).
+    """
+    if not _STARTUP_LOG.exists():
+        _trace("upload_log: no local log file yet")
+        return None
+    try:
+        body = _STARTUP_LOG.read_text(encoding="utf-8", errors="replace")
+    except Exception as exc:
+        _trace(f"upload_log: read failed: {exc}")
+        return None
+    if len(body) > 500_000:  # ix.io limit ~256KB; truncate the head.
+        body = body[-450_000:]
+    try:
+        # urllib + form-encoded body — built-in to Python, no requests dep.
+        import urllib.parse
+        import urllib.request
+        data = urllib.parse.urlencode({"f:1": body}).encode("ascii")
+        req = urllib.request.Request(
+            TELEMETRY_ENDPOINT,
+            data=data,
+            headers={"User-Agent": "OysterRecorder/lite"},
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            url = resp.read().decode("utf-8", errors="replace").strip()
+        if url.startswith("http"):
+            _trace(f"upload_log: success {url}")
+            # Append URL to the local log so subsequent runs see it.
+            try:
+                with _STARTUP_LOG.open("a", encoding="utf-8") as fh:
+                    fh.write(f"{datetime.now().isoformat()} REMOTE_LOG_URL={url}\n")
+            except Exception:
+                pass
+            return url
+    except Exception as exc:
+        _trace(f"upload_log: POST failed: {exc}")
+    return None
+
+
+def _upload_log_in_background(callback=None) -> None:
+    """Fire-and-forget upload; optional callback receives the URL or None."""
+    def _go():
+        url = _upload_log_remote()
+        if callback is not None:
+            try:
+                callback(url)
+            except Exception:
+                pass
+    threading.Thread(target=_go, daemon=True).start()
+
 try:
     _trace("importing tkinter…")
     import tkinter as tk
@@ -465,7 +531,22 @@ class RecorderApp(tk.Tk):
             cursor="hand2",
             command=self._toggle_arm,
         )
-        self._arm_btn.pack(pady=(16, 0))
+        self._arm_btn.pack(pady=(16, 4))
+
+        # "Send log" — manual telemetry push so tester can give engineering
+        # a remote-readable log URL even if the recorder hasn't crashed.
+        # Useful when MC crashes but our recorder is still alive.
+        self._upload_btn = tk.Button(
+            self,
+            text="↗ 发送日志给工程师",
+            font=("Helvetica", 10, "underline"),
+            bg="white",
+            fg="#1976d2",
+            bd=0,
+            cursor="hand2",
+            command=self._upload_log_now,
+        )
+        self._upload_btn.pack(pady=(0, 6))
 
         # Spacer
         tk.Frame(self, bg="white").pack(expand=True, fill="both")
@@ -484,6 +565,31 @@ class RecorderApp(tk.Tk):
             justify="center",
         )
         self._hint.pack(pady=(0, 10))
+
+    def _upload_log_now(self) -> None:
+        """Tester clicked '发送日志给工程师'. Upload then show URL."""
+        _trace("user clicked send-log button")
+        self._upload_btn.config(text="↗ 上传中…", state="disabled")
+
+        def on_done(url: Optional[str]) -> None:
+            def apply():
+                if url:
+                    self._upload_btn.config(
+                        text=f"✓ 日志已上传 — {url}",
+                        state="normal",
+                    )
+                    self._hint.config(
+                        text=f"工程师查日志: {url}",
+                        fg="#1976d2",
+                    )
+                else:
+                    self._upload_btn.config(
+                        text="✗ 上传失败 — 重试",
+                        state="normal",
+                    )
+            self.after(0, apply)
+
+        _upload_log_in_background(on_done)
 
     def _toggle_arm(self) -> None:
         """Tester clicked the arm button. Toggle recording state."""
@@ -612,6 +718,16 @@ class RecorderApp(tk.Tk):
                 text=f"已保存: {output_tar}",
                 fg=GREEN,
             )
+            # Engineer-side telemetry: push the full session log to a
+            # remote pastebin so engineering can curl <url> and see what
+            # happened on tester's machine without asking for files.
+            def _on_url(url: Optional[str]) -> None:
+                if url:
+                    self.after(0, lambda: self._hint.config(
+                        text=f"已保存: {output_tar}\n远程日志: {url}",
+                        fg=GREEN,
+                    ))
+            _upload_log_in_background(_on_url)
         else:
             self._set("⚠️ 录制结束但文件未生成", ORANGE,
                       "请联系工程师并截图本窗口。")
@@ -790,8 +906,15 @@ class RecorderApp(tk.Tk):
         self._ffmpeg_proc = None
 
     def _on_close(self) -> None:
+        _trace("on_close: user closed window")
         self._stop_event.set()
         self._stop_ffmpeg()
+        # Final telemetry push so engineer sees the full session log.
+        # Synchronous-ish but capped to 15s by urlopen timeout.
+        try:
+            _upload_log_remote()
+        except Exception:
+            pass
         self.destroy()
 
     # ---- UI updates (thread-safe via after) -----------------------------
@@ -807,17 +930,37 @@ class RecorderApp(tk.Tk):
 
 
 def _emergency_error_box(exc: BaseException) -> None:
+    # Best-effort: push the local log to remote pastebin BEFORE showing
+    # the dialog, so even if the tester ignores the dialog and force-
+    # quits, engineering already has the log.
+    _trace(f"=== EMERGENCY: {type(exc).__name__}: {exc} ===")
+    _trace(traceback.format_exc())
+    remote_url = None
+    try:
+        remote_url = _upload_log_remote()
+    except Exception:
+        pass
+
     try:
         root = tk.Tk()
         root.withdraw()
+        msg = (
+            "录制器启动失败。\n\n"
+            f"{type(exc).__name__}: {exc}\n\n"
+        )
+        if remote_url:
+            msg += (
+                f"日志已自动上传，工程师可访问：\n{remote_url}\n\n"
+                "你不用做任何事，工程师会从这个链接看到出错原因。"
+            )
+        else:
+            msg += (
+                f"日志在本机：{_STARTUP_LOG}\n"
+                "如果方便，把这个文件发给工程师。"
+            )
         messagebox.showerror(
             title="Oyster 录制器 — 启动错误",
-            message=(
-                "录制器启动失败。\n\n"
-                "请截图整个窗口，发给工程师。\n\n"
-                f"{type(exc).__name__}: {exc}\n\n"
-                f"--- 详细 ---\n{traceback.format_exc()}"
-            ),
+            message=msg,
         )
         root.destroy()
     except Exception:
