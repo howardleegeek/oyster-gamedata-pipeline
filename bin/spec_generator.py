@@ -493,6 +493,29 @@ SPECS: list[dict] = [
     {"id": "G183", "title": "docs/runbooks/STARDEW_RUNBOOK.md",
      "purpose": "Operator runbook for Stardew capture: SMAPI install + our mod copy + 30-min smoke; mirrors BEAMNG_RUNBOOK",
      "lines": 180, "priority": "P1"},
+
+    # ─── W22 GitHub Actions repair (6 NEW-FILE specs) ──────────────────────
+    # Howard: '我看见 GitHub action 一直失败 集群 修复一下'
+    # CI failing because: heartbeat spam triggering 86/100 runs, cluster
+    # output unformatted, test mock data bugs, no CI health visibility.
+    {"id": "G184", "title": "bin/git_hook_heartbeat_skip_ci.sh",
+     "purpose": "Pre-commit hook script that detects heartbeat-only audit_gaps.yaml diffs and appends [skip ci] to the commit message; eliminates 86 percent of CI workflow runs",
+     "lines": 90, "priority": "P0"},
+    {"id": "G185", "title": "bin/cluster_output_autoformat.py",
+     "purpose": "Pre-commit auto-formatter for cluster-shipped code; runs black + ruff --fix on the staged file before harness commit, catching the unformatted-output failure mode",
+     "lines": 130, "priority": "P0"},
+    {"id": "G186", "title": "tests/bin/conftest_rcon_helpers.py",
+     "purpose": "Shared pytest fixtures for RCON packet construction; replaces magic numbers like length=14 with helper rcon_pack_response(id, type, body) that computes correct length",
+     "lines": 110, "priority": "P0"},
+    {"id": "G187", "title": "bin/ci_health_dashboard.py",
+     "purpose": "CLI that polls gh run list, computes pass/fail rate over last N runs, surfaces top-3 failure patterns; observability for the harness operator",
+     "lines": 200, "priority": "P0"},
+    {"id": "G188", "title": "bin/auto_fix_ci_failures.py",
+     "purpose": "Reads gh run view --log-failed, applies known fixes (black --check failure -> run black; ruff failure -> ruff --fix; missing import -> add it); commits with auto-fix-ci tag",
+     "lines": 280, "priority": "P0"},
+    {"id": "G189", "title": ".github/workflows/heartbeat_skip_check.yml",
+     "purpose": "Workflow that runs on every push and short-circuits with skip-marker output if commit message contains [skip ci] or paths-ignore patterns; redundancy layer for paths-ignore",
+     "lines": 60, "priority": "P1"},
 ]
 
 
