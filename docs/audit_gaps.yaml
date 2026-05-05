@@ -1605,10 +1605,11 @@ gaps:
   title: docs/runbooks/STARDEW_RUNBOOK.md
   purpose: 'Operator runbook for Stardew capture: SMAPI install + our mod copy + 30-min
     smoke; mirrors BEAMNG_RUNBOOK'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 180
+  dispatched_at: '2026-05-05 08:25:26'
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 45649
-  last_heartbeat: '2026-05-05T15:16:13Z'
+  last_heartbeat: '2026-05-05T15:25:26Z'
