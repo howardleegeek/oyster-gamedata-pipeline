@@ -134,16 +134,32 @@ def _b04_time_fps_proportional_dilate(rec: dict, neighbor: dict) -> AttackResult
 def _b05_dataset_replay_splice(rec: dict, neighbor: dict) -> AttackResult:
     """Splice clip A's action_camera with clip B's video. Each individual
     frame internally valid; only multimodal cross-check (R15 fps, R16
-    depth count, V₄ frame-OCR) catches."""
+    depth count, V₄ frame-OCR) catches — *unless* the recorder stamps a
+    session_id, in which case R18 trips immediately on the bound
+    manifest.
+
+    The action_camera stream from session B is concatenated under a
+    manifest claiming session A. Mutate ``session_id`` to a *different*
+    UUID to model the splice: every spliced frame now carries the foreign
+    session token while ``session_manifest.json`` still says
+    ``AAA-canonical-uuid-1``.
+    """
+    new = copy.deepcopy(rec)
+    new["session_id"] = "BBB-different-uuid-2"
     return AttackResult(
         fi_id="B-05",
         bucket="B",
         label="full-dataset replay splice (action_camera A + video B)",
         severity="critical",
-        mutated_rec=copy.deepcopy(rec),  # frame itself unchanged
+        mutated_rec=new,
         mutated_neighbor=neighbor,
-        expected_residuals=("R15", "R16"),  # multimodal duration/count mismatch
-        notes="single-modal residuals all PASS; R15+R16 catch via video metadata mismatch",
+        # R18 binds frame ↔ manifest; R15/R16 stay listed for the
+        # legacy multimodal path even though R18 alone now suffices.
+        expected_residuals=("R18", "R15", "R16"),
+        notes=(
+            "session_id swapped to foreign UUID; R18 catches immediately. "
+            "R15+R16 retained as legacy multimodal backup."
+        ),
     )
 
 
@@ -291,7 +307,16 @@ def _d03_inputs_jsonl_truncated(rec: dict, neighbor: dict) -> AttackResult:
 
 
 def _d04_depth_files_shuffled(rec: dict, neighbor: dict) -> AttackResult:
+    """Depth/*.exr count correct but content shuffled across sessions.
+
+    Models the same Frankenstein-splice family as B-05: the depth
+    directory is borrowed from a different recording session, which the
+    recorder would have stamped with its own session_id. Mutating
+    ``session_id`` here lets us prove R18 is *cross-applicable* and
+    closes one more critical-severity gap on the way.
+    """
     new = copy.deepcopy(rec)
+    new["session_id"] = "CCC-different-uuid-3"
     return AttackResult(
         fi_id="D-04",
         bucket="D",
@@ -299,8 +324,11 @@ def _d04_depth_files_shuffled(rec: dict, neighbor: dict) -> AttackResult:
         severity="critical",
         mutated_rec=new,
         mutated_neighbor=neighbor,
-        expected_residuals=(),  # R16 only counts files
-        notes="ARCHITECTURAL GAP — R16 counts only; need hash-content per-frame check",
+        expected_residuals=("R18",),  # session_id mismatch with manifest
+        notes=(
+            "Cross-session shuffled depth ⇒ session_id differs from "
+            "manifest. R18 catches; per-frame hash check still future work."
+        ),
     )
 
 
@@ -332,7 +360,7 @@ bucket_b_attacks: tuple[AttackCase, ...] = (
     AttackCase("B-04", "B", "time+fps proportional dilate", "high",
                ("R12", "R15"), _b04_time_fps_proportional_dilate),
     AttackCase("B-05", "B", "dataset replay splice (AC[A] + video[B])", "critical",
-               ("R15", "R16"), _b05_dataset_replay_splice),
+               ("R18", "R15", "R16"), _b05_dataset_replay_splice),
 )
 
 bucket_c_attacks: tuple[AttackCase, ...] = (
@@ -356,7 +384,7 @@ bucket_d_attacks: tuple[AttackCase, ...] = (
     AttackCase("D-03", "D", "inputs.jsonl truncated", "medium",
                (), _d03_inputs_jsonl_truncated),
     AttackCase("D-04", "D", "depth content shuffled", "critical",
-               (), _d04_depth_files_shuffled),
+               ("R18",), _d04_depth_files_shuffled),
     AttackCase("D-05", "D", "video codec mismatch", "medium",
                (), _d05_video_codec_mismatch),
 )

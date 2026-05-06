@@ -11,11 +11,20 @@ Usage:
 """
 from __future__ import annotations
 
+import json
 import math
 import sys
+import tempfile
 from dataclasses import dataclass
+from pathlib import Path
 
 from bin.red_team.attackers import ATTACK_CATALOG, AttackResult
+
+# Canonical session UUID stamped onto every baseline frame + manifest.
+# B-05 / D-04 attackers mutate the frame's session_id to a *different*
+# UUID, simulating a Frankenstein splice (action_camera from session B
+# riding under a manifest that claims session A).
+_CANONICAL_SESSION_ID = "AAA-canonical-uuid-1"
 
 
 @dataclass
@@ -30,11 +39,17 @@ class BlueScore:
 
 
 def _baseline_frame() -> tuple[dict, dict]:
-    """Reference frame pair for attackers to mutate."""
+    """Reference frame pair for attackers to mutate.
+
+    Both frames carry ``session_id`` so R18 has something to bind against
+    once a manifest fixture is supplied. Honest attacks (everything except
+    B-05 / D-04) leave this field intact ⇒ R18 PASSES.
+    """
     half = math.radians(90.0) * 0.5
     qy = math.sin(half); qw = math.cos(half)
     n = {
         "frame": 0, "time": "2026-05-05 19:30:00.000", "fps": 30.0, "route_type": 1,
+        "session_id": _CANONICAL_SESSION_ID,
         "mouse_x": [0.5], "mouse_y": [0.5], "mouse_dx": [0.0], "mouse_dy": [0.0],
         "keyCode": [87],
         "camera_position": [0.0, 64.0, 0.0],
@@ -56,6 +71,26 @@ def _baseline_frame() -> tuple[dict, dict]:
     n1["camera_position"] = [0.5 / 30, 64.0, 0.0]
     n1["player_position"] = [0.5 / 30, 64.0, 0.0]
     return n, n1
+
+
+def _make_b05_manifest_fixture() -> Path:
+    """Write a temp ``session_manifest.json`` keyed to the canonical UUID.
+
+    R18 reads this file when scoring. Manifest claims session
+    ``AAA-canonical-uuid-1``; any frame whose ``session_id`` differs is
+    treated as a Frankenstein splice and tripped to FAIL.
+
+    Returned path lives in the OS temp dir; not unlinked here so the
+    score harness can keep referencing it across the run. Lifetime is
+    process-bounded, so the OS reaps it eventually.
+    """
+    tmpdir = Path(tempfile.mkdtemp(prefix="bft_r18_manifest_"))
+    manifest_path = tmpdir / "session_manifest.json"
+    manifest_path.write_text(
+        json.dumps({"session_id": _CANONICAL_SESSION_ID}),
+        encoding="utf-8",
+    )
+    return manifest_path
 
 
 def _vote_v1(fn, *args) -> bool:
@@ -84,8 +119,14 @@ def _vote_v3(fn, *args) -> bool:
         return True
 
 
-def _detect_count(attack: AttackResult) -> dict[str, int]:
-    """Count FAILing verifiers per residual ID."""
+def _detect_count(attack: AttackResult, manifest_path: Path | None = None) -> dict[str, int]:
+    """Count FAILing verifiers per residual ID.
+
+    ``manifest_path`` (when provided) lets R18 — the
+    session-manifest binding residual — fire on B-05 / D-04
+    Frankenstein splices. Without it R18 ABSTAINs (NaN residual)
+    and contributes zero to the BFT count.
+    """
     from bin.v1_claude_residuals.residuals import (
         r01_quat_norm as v1_r01, r02_euler_quat_consistency as v1_r02,
         r03_kinematics as v1_r03, r04_mouse_dx_diff as v1_r04,
@@ -159,6 +200,21 @@ def _detect_count(attack: AttackResult) -> dict[str, int]:
             ) else 0)
         except Exception:
             add("R21", 1)
+
+    # R18 session-manifest binding — closes B-05 (Frankenstein replay
+    # splice) and the D-04 cross-applicability variant. Only fires when
+    # the harness supplies a manifest fixture; otherwise the residual
+    # ABSTAINs by design (IL10) and we keep the count at zero rather
+    # than letting NaN→FAIL noise flip honest attacks.
+    if manifest_path is not None:
+        from bin.v1_claude_residuals.r18_session_manifest import r18_session_manifest
+        try:
+            r18 = r18_session_manifest(rec, nbr, manifest_path)
+            is_abstain = isinstance(r18.residual, float) and math.isnan(r18.residual)
+            add("R18", 1 if (not r18.passed and not is_abstain) else 0)
+        except Exception:
+            # Treat raw exceptions as detection (matches R21 contract).
+            add("R18", 1)
     return counts
 
 
@@ -168,10 +224,11 @@ def main() -> int:
     print("=" * 78)
 
     n, n1 = _baseline_frame()
+    manifest_path = _make_b05_manifest_fixture()
     scores: list[BlueScore] = []
     for case in ATTACK_CATALOG:
         attack = case.mutator(n, n1)
-        counts = _detect_count(attack)
+        counts = _detect_count(attack, manifest_path=manifest_path)
         # BFT caught — three flavors of acceptance:
         # (a) ≥ 2 verifiers fire on the same residual (multi-verifier BFT)
         # (b) V₁-only residuals (R13, R18, R21) only have 1 implementation

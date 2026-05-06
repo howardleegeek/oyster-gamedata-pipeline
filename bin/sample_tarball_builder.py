@@ -508,7 +508,25 @@ def build_sample_tarball(
             depth_dir.mkdir()
             # Create minimal placeholder
             (depth_dir / "depth_000000.exr").write_bytes(b'\x00' * 512)
-        
+
+        # R22 (D-04 defense): hash every depth/*.exr at *generation time*
+        # and emit depth_manifest.json beside the depth/ dir. Verifier
+        # rebuilds the hash and compares — file rename/shuffle no longer
+        # passes silently the way R16's count-only check did.
+        import json as _json
+        depth_manifest = {}
+        for exr_path in sorted(depth_dir.glob("*.exr")):
+            sha = hashlib.sha256()
+            with exr_path.open("rb") as fh:
+                for chunk in iter(lambda fh=fh: fh.read(1 << 20), b""):
+                    sha.update(chunk)
+            depth_manifest[exr_path.name] = sha.hexdigest()
+        depth_manifest_path = tmpdir / "depth_manifest.json"
+        depth_manifest_path.write_text(
+            _json.dumps(depth_manifest, indent=2),
+            encoding="utf-8",
+        )
+
         # Create tarball
         print("Creating tarball...")
         with tarfile.open(output_path, 'w:gz') as tar:
@@ -516,6 +534,7 @@ def build_sample_tarball(
             tar.add(systeminfo_path, arcname="systeminfo.json")
             tar.add(action_camera_path, arcname="action_camera.json")
             tar.add(manifest_path, arcname="session_manifest.json")
+            tar.add(depth_manifest_path, arcname="depth_manifest.json")
             tar.add(gameinfo_path, arcname="gameinfo.xlsx")
             tar.add(depth_dir, arcname="depth")
         

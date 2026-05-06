@@ -109,6 +109,34 @@ class TestR13KeyCodeReplay(unittest.TestCase):
         r = r13_keycode_replay(rec, inputs_path=str(path))
         self.assertTrue(r.passed)
 
+    def test_d03_truncation_abstains(self) -> None:
+        """D-03 attack: inputs.jsonl events stop at t=1000ms but
+        action_camera.json claims frame 300 (t_end ≈ 10033ms). Without the
+        truncation gate, frame 300 with keyCode=[] would silently PASS
+        because both sides are empty (IL10 violation). Must ABSTAIN."""
+        path = _write_inputs_jsonl([
+            {"event_type": "key_down", "key_code": 87, "timestamp_ms": 0},
+            {"event_type": "key_up",   "key_code": 87, "timestamp_ms": 1000},
+        ])
+        rec = {"frame": 300, "keyCode": []}  # would silently pass without gate
+        r = r13_keycode_replay(rec, inputs_path=str(path))
+        self.assertFalse(r.passed)
+        self.assertTrue(math.isnan(r.residual))
+        self.assertIn("inputs_truncated", r.note)
+
+    def test_truncation_gate_within_5s_window_still_passes(self) -> None:
+        """Edge case: last event at t=9000ms, frame 300 ends at t≈10033ms.
+        Gap is ~1s, well under the 5s ABSTAIN threshold — must still PASS,
+        no false ABSTAIN."""
+        path = _write_inputs_jsonl([
+            {"event_type": "key_down", "key_code": 87, "timestamp_ms": 0},
+            {"event_type": "key_up",   "key_code": 87, "timestamp_ms": 9000},
+        ])
+        rec = {"frame": 300, "keyCode": []}  # W released by 9000ms, frame=300 → empty
+        r = r13_keycode_replay(rec, inputs_path=str(path))
+        self.assertTrue(r.passed, msg=f"expected pass, got {r}")
+        self.assertEqual(r.residual, 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

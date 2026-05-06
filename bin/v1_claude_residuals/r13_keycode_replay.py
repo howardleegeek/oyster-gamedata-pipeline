@@ -110,6 +110,20 @@ def r13_keycode_replay(
 
     # Frame N spans [N · 1000/fps, (N+1) · 1000/fps] ms. Snapshot at end.
     t_end_ms = (frame_idx + 1) * (1000.0 / fps)
+
+    # D-03 truncation defense: if last event predates this frame's boundary
+    # by >5s, inputs.jsonl was truncated relative to action_camera.json.
+    # Without this gate, frames past the truncation point silently PASS
+    # whenever rec.keyCode == [] (both sides empty) — IL10 violation.
+    if events:
+        last_ts = float(events[-1].get("timestamp_ms", 0))
+        if last_ts < t_end_ms - 5000:
+            return ResidualResult(
+                "R13", False, math.nan, threshold,
+                f"ABSTAIN:inputs_truncated (last event @ {last_ts}ms, "
+                f"frame needs {t_end_ms}ms)",
+            )
+
     snapshot = _held_keys_at(events, t_end_ms)
     actual = set(rec.get("keyCode") or [])
     if not isinstance(actual, set):

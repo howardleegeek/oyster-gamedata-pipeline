@@ -80,6 +80,29 @@ jobs:
           fi
         continue-on-error: true
 
+  lint-il10-artifact-honesty:
+    # IL10 (Producer-Artifact Honesty): every residual that takes a producer-side
+    # artifact path must declare ABSTAIN when the artifact is absent — never
+    # silent-PASS. See docs/SPEC_R13_MULTIMODAL.md § 1.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run IL10 audit lint
+        run: |
+          python3 bin/audit_artifact_honesty.py
+
+      - name: Run IL10 audit tests
+        run: |
+          pip install pytest
+          pytest tests/bin/test_audit_artifact_honesty.py -v
+
   e2e-smoke:
     runs-on: ubuntu-latest
     steps:

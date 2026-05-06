@@ -1737,6 +1737,31 @@ class RecorderApp(tk.Tk):
             encoding="utf-8",
         )
 
+        # R22 (D-04 defense): hash every *.exr in depth/ and write
+        # depth_manifest.json next to the directory. Stop-gap path
+        # has zero EXR files so the manifest is the empty object {},
+        # which still lets the consumer-side R22 vote PASS instead of
+        # ABSTAIN once the full recorder ships EXR frames.
+        try:
+            import hashlib as _hashlib  # noqa: PLC0415
+            depth_dir_path = clip_dir / "depth"
+            depth_manifest: dict[str, str] = {}
+            for exr_path in sorted(depth_dir_path.glob("*.exr")):
+                sha = _hashlib.sha256()
+                with exr_path.open("rb") as fh:
+                    for chunk in iter(lambda fh=fh: fh.read(1 << 20), b""):
+                        sha.update(chunk)
+                depth_manifest[exr_path.name] = sha.hexdigest()
+            (clip_dir / "depth_manifest.json").write_text(
+                json.dumps(depth_manifest, indent=2),
+                encoding="utf-8",
+            )
+            _trace(f"package: wrote depth_manifest.json ({len(depth_manifest)} entries)")
+        except Exception as e:  # noqa: BLE001
+            _trace(f"package: depth_manifest.json write failed: {e}")
+            # Non-fatal — R22 will ABSTAIN on missing manifest, same as
+            # behaviour before this hook landed.
+
         # 6. v0.18.0: intrinsics.yaml — buyer expects fx/fy/Cx/Cy.
         # Standard MC at 1920x1080 with default 70° vertical FOV:
         #   fy = (height/2) / tan(FOV_v/2) = 540 / tan(35°) ≈ 771.4
