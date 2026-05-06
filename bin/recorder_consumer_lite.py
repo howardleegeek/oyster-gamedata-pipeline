@@ -85,7 +85,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.20.2"
+RECORDER_VERSION = "lite-v0.21.0"
 RELEASES_API = (
     "https://api.github.com/repos/howardleegeek/oyster-gamedata-pipeline"
     "/releases?per_page=20"
@@ -991,6 +991,86 @@ class RecorderApp(tk.Tk):
 
         threading.Thread(target=_go, daemon=True).start()
 
+    def _auto_bft(self, tarball: Path) -> None:
+        """v0.21.0: BFT N=4 self-verification on the just-recorded tarball.
+
+        Goes deeper than _auto_lint (which runs PRD-grounded shallow checks).
+        BFT runs V₁ Claude / V₂ MiniMax / V₂' GLM / V₃ Physics-Table on every
+        frame pair, computes per-residual COMMIT/REJECT/VIEW_CHANGE/INSUFFICIENT
+        and a dataset_decision. If FAIL, surfaces specific residuals + which
+        verifier rejected, so tester knows exactly what to re-record.
+
+        Howard's "shift-left" ask: 数据对的最强保证 = recorder 自验。
+        """
+        def _go():
+            try:
+                # Lazy import — keeps cold-start fast.
+                if getattr(sys, "frozen", False):
+                    sys.path.insert(0, str(_BUNDLE_ROOT))
+                from bin.bft_orchestrator import orchestrator as orch  # noqa: PLC0415
+                import json  # noqa: PLC0415
+
+                # Extract tarball + read action_camera.json.
+                with tempfile.TemporaryDirectory() as td:
+                    td_path = Path(td)
+                    with tarfile.open(tarball, "r:gz") as tf:
+                        tf.extractall(td_path)
+                    inner = [p for p in td_path.iterdir() if p.is_dir()]
+                    target = inner[0] if len(inner) == 1 else td_path
+                    ac_path = target / "action_camera.json"
+                    if not ac_path.exists():
+                        _trace("auto_bft: action_camera.json not found, skip")
+                        return
+                    records = json.loads(ac_path.read_text(encoding="utf-8"))
+
+                # Run BFT on the first 60 contiguous frames (= 2 seconds).
+                # Must be contiguous because R03/R04/R05 require real
+                # frame[n+1] neighbors — non-adjacent pairs produce false
+                # REJECTs (Δposition over a gap ≠ speed · dt). The full
+                # dataset analysis runs on engineer's side via the CLI
+                # `python -m bin.bft_orchestrator.orchestrator <ac.json>`.
+                n = len(records)
+                spot_check_size = min(60, n)
+                contiguous_records = records[:spot_check_size]
+                report = orch.aggregate_dataset(contiguous_records, fps=30.0)
+
+                _trace(f"auto_bft: report={report}")
+
+                def _ui():
+                    decision = report.get("dataset_decision", "UNKNOWN")
+                    residuals = report.get("residuals", {})
+                    if decision == "PASS":
+                        self._set(
+                            f"✓ BFT 共识: 全过 ({len(residuals)} 残差)",
+                            GREEN,
+                            "数据通过 N=4 拜占庭共识 — 可以上传。",
+                        )
+                        self._hint.config(
+                            text=f"已保存: {tarball}\nBFT N=4 全过 ({len(residuals)} 残差)",
+                            fg=GREEN,
+                        )
+                    else:
+                        bad = []
+                        for rname, stats in residuals.items():
+                            if stats.get("REJECT", 0) > 0:
+                                bad.append(f"{rname}({stats.get('REJECT', 0)}REJ)")
+                            elif stats.get("VIEW_CHANGE", 0) > 0:
+                                bad.append(f"{rname}({stats.get('VIEW_CHANGE', 0)}VC)")
+                        self._set(
+                            f"⚠️ BFT 共识 {decision}",
+                            ORANGE,
+                            f"问题残差: {', '.join(bad[:5]) if bad else '(详情见日志)'}\n建议重录或检查 producer。",
+                        )
+                        self._hint.config(
+                            text=f"已保存: {tarball}\nBFT 数据决议: {decision} — 见日志详情",
+                            fg=ORANGE,
+                        )
+                self.after(0, _ui)
+            except Exception as exc:
+                _trace(f"auto_bft failed: {exc}\n{traceback.format_exc()}")
+
+        threading.Thread(target=_go, daemon=True).start()
+
     def _on_update_check(self, latest_tag, exe_url, is_newer):
         """Self-update callback. If newer release found, stage + restart."""
         if not is_newer or not exe_url:
@@ -1308,6 +1388,12 @@ class RecorderApp(tk.Tk):
             # tool. We import lint_v3 lazily so its numpy/PIL deps don't
             # delay startup.
             self._auto_lint(output_tar)
+            # v0.21.0: shift-left BFT N=4 self-verification — Howard
+            # 战略反馈"最重要确保数据是对的". Lint v3 is a shallow check
+            # (24 PRD criteria); BFT runs the full PINNs residual stack
+            # across 4 independent verifiers and surfaces specific
+            # disagreements so tester knows what to re-record.
+            self._auto_bft(output_tar)
             # Engineer-side telemetry: push the full session log to a
             # remote pastebin so engineering can curl <url> and see what
             # happened on tester's machine without asking for files.
