@@ -271,6 +271,105 @@ def _r16_dataset_vote(depth_dir: str | Path | None,
     return _to_vote_v1("R16", "V1", r)
 
 
+# R20a..R20e are dataset-level drift residuals returning ``DriftResult``.
+# Their ABSTAIN signal lives on ``.detail`` (not ``.note``) but uses the same
+# ``ABSTAIN:`` prefix per IL11. We adapt to a Vote uniformly.
+_R20_REGISTRY = (
+    ("R20a", "r20a_quat_norm_distribution"),
+    ("R20b", "r20b_mouse_dx_cumulative"),
+    ("R20c", "r20c_fps_jitter"),
+    ("R20d", "r20d_speed_profile"),
+    ("R20e", "r20e_yaw_turn_rate"),
+)
+
+
+def _r20_dataset_votes(records: list[dict]) -> list[Vote]:
+    """Invoke all five R20 sub-residuals once per dataset.
+
+    Returns at most 5 votes — ABSTAINs (DriftResult.detail starts with
+    ``ABSTAIN:``) are filtered so they don't poison the tally.
+    """
+    out: list[Vote] = []
+    if not records:
+        return out
+    mod = _load("bin.v1_claude_residuals.r20_drift")
+    if mod is None:
+        return out
+    for residual_name, fn_name in _R20_REGISTRY:
+        fn = getattr(mod, fn_name, None)
+        if fn is None:
+            continue
+        try:
+            r = fn(records)
+        except Exception as exc:
+            out.append(Vote("V1", residual_name, "FAIL", math.nan, 0.0,
+                            f"{type(exc).__name__}: {exc}"))
+            continue
+        detail = getattr(r, "detail", "") or ""
+        if isinstance(detail, str) and detail.startswith("ABSTAIN:"):
+            continue
+        verdict = "PASS" if getattr(r, "passed", False) else "FAIL"
+        sample_stat = getattr(r, "sample_stat", 0.0)
+        threshold = getattr(r, "threshold", 0.0)
+        try:
+            sval = float(sample_stat)
+        except (TypeError, ValueError):
+            sval = math.nan
+        out.append(Vote("V1", residual_name, verdict, sval,
+                        float(threshold), str(detail)))
+    return out
+
+
+def _r22_dataset_vote(depth_dir: str | Path | None,
+                      depth_manifest_path: str | Path | None,
+                      sample_rec: dict) -> Vote | None:
+    """Invoke V₁ R22 depth-content SHA-256 verifier once per dataset.
+
+    R22 needs both ``depth_dir`` and a manifest path — either being None
+    yields ABSTAIN inside the residual itself; we filter that out so a
+    caller running without aux args sees no R22 entry at all.
+    """
+    if depth_dir is None or depth_manifest_path is None:
+        return None
+    mod = _load("bin.v1_claude_residuals.r22_depth_hash")
+    if mod is None:
+        return None
+    fn = getattr(mod, "r22_depth_hash", None)
+    if fn is None:
+        return None
+    try:
+        r = fn(sample_rec, None, str(depth_dir), str(depth_manifest_path))
+    except Exception as exc:
+        return Vote("V1", "R22", "FAIL", math.nan, 0.0,
+                    f"{type(exc).__name__}: {exc}")
+    note = getattr(r, "note", "") or ""
+    if _abstain_vote("V1", "R22", note):
+        return None
+    return _to_vote_v1("R22", "V1", r)
+
+
+def _r23_dataset_vote(video_path: str | Path | None,
+                      sample_rec: dict) -> Vote | None:
+    """Invoke V₁ R23 video-codec verifier once per dataset."""
+    if video_path is None:
+        return None
+    mod = _load("bin.v1_claude_residuals.r23_video_codec")
+    if mod is None:
+        return None
+    fn = getattr(mod, "r23_video_codec", None)
+    if fn is None:
+        return None
+    try:
+        r = fn(sample_rec, None, str(video_path))
+    except Exception as exc:
+        return Vote("V1", "R23", "FAIL", math.nan, 0.0,
+                    f"{type(exc).__name__}: {exc}")
+    note = getattr(r, "note", "") or ""
+    if _abstain_vote("V1", "R23", note):
+        return None
+    return _to_vote_v1("R23", "V1", r)
+
+
 def tally(votes: list[Vote]) -> dict[str, dict[str, Any]]:
     """Aggregate votes by residual name and apply the BFT majority rule.
 
@@ -324,19 +423,25 @@ def aggregate_dataset(records: list[dict], fps: float = 30.0,
                       inputs_path: str | Path | None = None,
                       video_path: str | Path | None = None,
                       depth_dir: str | Path | None = None,
-                      video_duration_sec: float | None = None) -> dict[str, Any]:
+                      video_duration_sec: float | None = None,
+                      depth_manifest_path: str | Path | None = None) -> dict[str, Any]:
     """Run collect_votes + tally on each frame pair (n, n+1).
 
     Multimodal extras (all backward-compatible — None = unchanged behavior):
 
     * ``inputs_path``: when set, V₁ + V₂' R13 keycode-replay is invoked per
       frame and aggregated into the residuals dict.
-    * ``video_path``: when set, V₁ R15 fps-consistency is invoked ONCE for
-      the whole dataset (ffprobe is dataset-level).
+    * ``video_path``: when set, V₁ R15 fps-consistency AND V₁ R23
+      video-codec residuals are invoked ONCE for the whole dataset
+      (ffprobe is dataset-level).
     * ``depth_dir`` + ``video_duration_sec``: when both set, V₁ R16
       depth-count is invoked ONCE for the whole dataset. If
       ``video_duration_sec`` is None, it is derived from frame count
       (``len(records) / fps``) so callers don't have to re-probe.
+    * ``depth_manifest_path``: when set together with ``depth_dir``, V₁
+      R22 SHA-256 manifest binding is invoked ONCE per dataset.
+    * R20a..R20e (statistical drift) are always attempted on the full
+      records list — they self-ABSTAIN when the sample is too small.
     """
     n_pairs = max(len(records) - 1, 0)
     by_res: dict[str, dict[str, int]] = {}
@@ -347,7 +452,7 @@ def aggregate_dataset(records: list[dict], fps: float = 30.0,
             bucket = by_res.setdefault(r_name, {"COMMIT": 0, "REJECT": 0, "VIEW_CHANGE": 0, "INSUFFICIENT": 0})
             bucket[info["decision"]] += 1
 
-    # Dataset-level multimodal residuals (R15, R16) — fire once per dataset.
+    # Dataset-level residuals (R15, R16, R20a..e, R22, R23) — fire once each.
     sample_rec = records[0] if records else {}
     dataset_votes: list[Vote] = []
     if video_path is not None:
@@ -361,6 +466,16 @@ def aggregate_dataset(records: list[dict], fps: float = 30.0,
         v = _r16_dataset_vote(depth_dir, duration, sample_rec)
         if v is not None:
             dataset_votes.append(v)
+    # R20a..R20e drift — always attempted; ABSTAIN-filtered inside helper.
+    dataset_votes.extend(_r20_dataset_votes(records))
+    # R22 manifest hash — needs both depth_dir and manifest path.
+    v = _r22_dataset_vote(depth_dir, depth_manifest_path, sample_rec)
+    if v is not None:
+        dataset_votes.append(v)
+    # R23 video codec — needs video_path.
+    v = _r23_dataset_vote(video_path, sample_rec)
+    if v is not None:
+        dataset_votes.append(v)
     if dataset_votes:
         for r_name, info in tally(dataset_votes).items():
             bucket = by_res.setdefault(r_name, {"COMMIT": 0, "REJECT": 0, "VIEW_CHANGE": 0, "INSUFFICIENT": 0})

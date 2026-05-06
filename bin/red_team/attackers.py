@@ -181,8 +181,8 @@ def _c01_quat_norm_just_under_threshold(rec: dict, neighbor: dict) -> AttackResu
         severity="low",
         mutated_rec=new,
         mutated_neighbor=neighbor,
-        expected_residuals=(),  # by construction below threshold
-        notes="single-frame undetectable; needs statistical drift detector",
+        expected_residuals=("R20a",),  # R20 distribution-level drift
+        notes="single-frame undetectable; R20a catches via dataset-level drift",
     )
 
 
@@ -199,8 +199,8 @@ def _c02_mouse_dx_subepsilon(rec: dict, neighbor: dict) -> AttackResult:
         severity="low",
         mutated_rec=new,
         mutated_neighbor=new_neighbor,
-        expected_residuals=(),
-        notes="cumulative drift over 9000 frames = 4.5e-3 — visible only in aggregate",
+        expected_residuals=("R20b",),
+        notes="cumulative drift over 9000 frames = 4.5e-3 — R20b catches in aggregate",
     )
 
 
@@ -214,8 +214,8 @@ def _c03_fps_at_lower_bound(rec: dict, neighbor: dict) -> AttackResult:
         severity="low",
         mutated_rec=new,
         mutated_neighbor=neighbor,
-        expected_residuals=(),
-        notes="boundary case — strict-vs-inclusive threshold semantics matter",
+        expected_residuals=("R20c",),
+        notes="boundary case — R20c fps-jitter drift catches declared-vs-actual mismatch",
     )
 
 
@@ -246,8 +246,8 @@ def _c05_speed_just_under_v_max(rec: dict, neighbor: dict) -> AttackResult:
         severity="medium",
         mutated_rec=new,
         mutated_neighbor=neighbor,
-        expected_residuals=("R03",),  # kinematics inconsistent with pos
-        notes="R10 lets it through; only R03 catches via Δpos mismatch",
+        expected_residuals=("R03", "R20d"),  # kinematics + drift profile
+        notes="R10 lets it through; R03 catches via Δpos mismatch, R20d via dataset μ_speed",
     )
 
 
@@ -324,10 +324,10 @@ def _d04_depth_files_shuffled(rec: dict, neighbor: dict) -> AttackResult:
         severity="critical",
         mutated_rec=new,
         mutated_neighbor=neighbor,
-        expected_residuals=("R18",),  # session_id mismatch with manifest
+        expected_residuals=("R18", "R22"),  # session_id mismatch + per-file hash
         notes=(
             "Cross-session shuffled depth ⇒ session_id differs from "
-            "manifest. R18 catches; per-frame hash check still future work."
+            "manifest (R18) AND per-file SHA-256 hashes mismatch (R22)."
         ),
     )
 
@@ -341,8 +341,8 @@ def _d05_video_codec_mismatch(rec: dict, neighbor: dict) -> AttackResult:
         severity="medium",
         mutated_rec=new,
         mutated_neighbor=neighbor,
-        expected_residuals=(),  # R15 only checks fps
-        notes="ARCHITECTURAL GAP — extend R15 to validate codec via ffprobe",
+        expected_residuals=("R23",),  # codec/format binding
+        notes="R23 ffprobe codec check catches H.264 (PRD requires HEVC)",
     )
 
 
@@ -365,15 +365,15 @@ bucket_b_attacks: tuple[AttackCase, ...] = (
 
 bucket_c_attacks: tuple[AttackCase, ...] = (
     AttackCase("C-01", "C", "quat norm 1 + 5e-7 (sub-R01-threshold)", "low",
-               (), _c01_quat_norm_just_under_threshold),
+               ("R20a",), _c01_quat_norm_just_under_threshold),
     AttackCase("C-02", "C", "mouse_dx +5e-7 (sub-R04-threshold)", "low",
-               (), _c02_mouse_dx_subepsilon),
+               ("R20b",), _c02_mouse_dx_subepsilon),
     AttackCase("C-03", "C", "fps=29.51 (R12 lower-bound)", "low",
-               (), _c03_fps_at_lower_bound),
+               ("R20c",), _c03_fps_at_lower_bound),
     AttackCase("C-04", "C", "pitch=180.001 (R06 over)", "medium",
                ("R06", "R02"), _c04_pitch_180p001_overshoot),
     AttackCase("C-05", "C", "speed=49.99 (R10 just under)", "medium",
-               ("R03",), _c05_speed_just_under_v_max),
+               ("R03", "R20d"), _c05_speed_just_under_v_max),
 )
 
 bucket_d_attacks: tuple[AttackCase, ...] = (
@@ -384,9 +384,9 @@ bucket_d_attacks: tuple[AttackCase, ...] = (
     AttackCase("D-03", "D", "inputs.jsonl truncated", "medium",
                (), _d03_inputs_jsonl_truncated),
     AttackCase("D-04", "D", "depth content shuffled", "critical",
-               ("R18",), _d04_depth_files_shuffled),
+               ("R18", "R22"), _d04_depth_files_shuffled),
     AttackCase("D-05", "D", "video codec mismatch", "medium",
-               (), _d05_video_codec_mismatch),
+               ("R23",), _d05_video_codec_mismatch),
 )
 
 ATTACK_CATALOG: tuple[AttackCase, ...] = (

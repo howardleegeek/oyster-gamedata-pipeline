@@ -1,11 +1,13 @@
 """Tests for the BFT consensus orchestrator tally + collect_votes paths."""
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
@@ -212,16 +214,163 @@ class MultimodalAggregateTests(unittest.TestCase):
         self.assertEqual(result["residuals"]["R16"]["COMMIT"], 1)
 
     def test_aggregate_without_aux_args_unchanged_behavior(self) -> None:
-        """No multimodal args → no R13/R15/R16 keys (backward compatibility)."""
+        """No multimodal args → no R13/R15/R16 keys (backward compatibility).
+
+        R20a..R20e are also absent here because the 3-frame sample is below
+        their ``min_frames=10`` ABSTAIN gate, and ABSTAIN votes are filtered
+        out of the tally per IL10/IL11."""
         records = [_make_min_frame(i) for i in range(3)]
         result = aggregate_dataset(records, fps=30.0)
         self.assertNotIn("R13", result["residuals"])
         self.assertNotIn("R15", result["residuals"])
         self.assertNotIn("R16", result["residuals"])
+        for r in ("R20a", "R20b", "R20c", "R20d", "R20e", "R22", "R23"):
+            self.assertNotIn(r, result["residuals"],
+                             msg=f"unexpected {r} in tally")
         # Frames-pair count + dataset_decision should still be populated.
         self.assertEqual(result["frames"], 2)
         self.assertIn(result["dataset_decision"],
                       {"PASS", "FAIL", "NEEDS_HUMAN"})
+
+
+def _drift_baseline(n: int = 30, fps: float = 30.0) -> list[dict]:
+    """Honest drift-grade dataset (≥ R20 min_frames=10)."""
+    t0 = datetime(2026, 5, 6, 12, 0, 0)
+    dt = 1.0 / fps
+    out: list[dict] = []
+    for i in range(n):
+        t = t0 + timedelta(seconds=i * dt)
+        rec = _make_min_frame(i)
+        rec["time"] = t.strftime("%Y-%m-%d %H:%M:%S.") + f"{t.microsecond // 1000:03d}"
+        rec["camera_speed"] = [0.5, 0.0, 0.0]
+        rec["camera_rotation_oula"] = [0.0, i * 0.1, 0.0]
+        rec["mouse_x"] = [0.5 + i * 1e-6]
+        rec["mouse_dx"] = [1e-6]
+        out.append(rec)
+    return out
+
+
+def _write_depth_dir(tmp: Path, count: int) -> dict[str, str]:
+    """Write deterministic ``depth_<n>.exr`` files; return manifest mapping."""
+    manifest: dict[str, str] = {}
+    for i in range(count):
+        name = f"depth_{i:05d}.exr"
+        body = f"frame-{i}-payload-{'x' * (i % 7)}".encode("utf-8")
+        (tmp / name).write_bytes(body)
+        manifest[name] = hashlib.sha256(body).hexdigest()
+    return manifest
+
+
+class DatasetLevelResidualTests(unittest.TestCase):
+    """R20 (drift) + R22 (depth manifest) + R23 (video codec) wiring."""
+
+    def test_aggregate_with_full_aux_args_emits_r20_r22_r23(self) -> None:
+        """All aux args present → R20a..e + R22 + R23 votes appear."""
+        records = _drift_baseline(n=30)
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            manifest = _write_depth_dir(tmp_path, 30)
+            mpath = tmp_path / "_manifest.json"
+            mpath.write_text(json.dumps(manifest), encoding="utf-8")
+            with tempfile.NamedTemporaryFile(
+                suffix=".mp4", delete=False,
+            ) as vf:
+                vf.write(b"\x00")
+                video_path = vf.name
+            ffprobe_payload = json.dumps({"streams": [{
+                "codec_type": "video",
+                "avg_frame_rate": "30/1",
+                "codec_name": "hevc",
+                "width": 1920,
+                "height": 1080,
+            }]})
+
+            class _FakeProc:
+                stdout = ffprobe_payload
+                stderr = ""
+                returncode = 0
+
+            try:
+                with mock.patch(
+                    "bin.v1_claude_residuals.r15_fps_consistency.shutil.which",
+                    return_value="/usr/bin/ffprobe",
+                ), mock.patch(
+                    "bin.v1_claude_residuals.r15_fps_consistency.subprocess.run",
+                    return_value=_FakeProc(),
+                ), mock.patch(
+                    "bin.v1_claude_residuals.r23_video_codec.shutil.which",
+                    return_value="/usr/bin/ffprobe",
+                ), mock.patch(
+                    "bin.v1_claude_residuals.r23_video_codec.subprocess.run",
+                    return_value=_FakeProc(),
+                ):
+                    result = aggregate_dataset(
+                        records, fps=30.0,
+                        video_path=video_path,
+                        depth_dir=str(tmp_path),
+                        depth_manifest_path=str(mpath),
+                        video_duration_sec=float(len(records)) / 30.0,
+                    )
+            finally:
+                Path(video_path).unlink(missing_ok=True)
+
+        for r in ("R20a", "R20b", "R20c", "R20d", "R20e", "R22", "R23"):
+            self.assertIn(r, result["residuals"],
+                          msg=f"{r} missing; got {sorted(result['residuals'])}")
+            self.assertEqual(result["residuals"][r]["COMMIT"], 1,
+                             msg=f"{r} should COMMIT on honest baseline")
+
+    def test_aggregate_records_only_r20_fires_no_r22_r23(self) -> None:
+        """Just records (≥ min_frames) → R20a..e fire, R22/R23 absent."""
+        records = _drift_baseline(n=30)
+        result = aggregate_dataset(records, fps=30.0)
+        for r in ("R20a", "R20b", "R20c", "R20d", "R20e"):
+            self.assertIn(r, result["residuals"],
+                          msg=f"{r} missing on drift-grade sample")
+            self.assertEqual(result["residuals"][r]["COMMIT"], 1)
+        # R22 + R23 require aux args — must be absent.
+        self.assertNotIn("R22", result["residuals"])
+        self.assertNotIn("R23", result["residuals"])
+
+    def test_drift_attack_quat_norm_offset_r20a_fails(self) -> None:
+        """50 frames with persistent quat-norm offset → R20a REJECTs.
+
+        Per the spec C-01 fixture: rescale ‖q‖ to 1+5e-5, well above the
+        1e-5 max_offset default → R20a sample_stat exceeds threshold.
+        """
+        records = _drift_baseline(n=50)
+        scale = 1.0 + 5e-5
+        for r in records:
+            r["camera_rotation_quaternion"] = [0.0, 0.0, 0.0, scale]
+        result = aggregate_dataset(records, fps=30.0)
+        self.assertIn("R20a", result["residuals"])
+        # Single dataset-level vote that FAILed → REJECT bucket = 1.
+        self.assertEqual(result["residuals"]["R20a"]["REJECT"], 1,
+                         msg=f"R20a should REJECT under quat drift, "
+                             f"got {result['residuals']['R20a']}")
+        self.assertEqual(result["residuals"]["R20a"]["COMMIT"], 0)
+
+    def test_depth_manifest_mismatch_r22_fails(self) -> None:
+        """Manifest references files that don't match content → R22 REJECTs."""
+        records = _drift_baseline(n=15)
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            manifest = _write_depth_dir(tmp_path, 5)
+            mpath = tmp_path / "_manifest.json"
+            mpath.write_text(json.dumps(manifest), encoding="utf-8")
+            # Adversary action: rewrite one file's bytes after manifest is
+            # written, simulating a shuffle/swap attack (D-04).
+            (tmp_path / "depth_00002.exr").write_bytes(b"TAMPERED-BYTES")
+            result = aggregate_dataset(
+                records, fps=30.0,
+                depth_dir=str(tmp_path),
+                depth_manifest_path=str(mpath),
+            )
+        self.assertIn("R22", result["residuals"])
+        self.assertEqual(result["residuals"]["R22"]["REJECT"], 1,
+                         msg=f"R22 should REJECT on hash mismatch, "
+                             f"got {result['residuals']['R22']}")
+        self.assertEqual(result["residuals"]["R22"]["COMMIT"], 0)
 
 
 if __name__ == "__main__":

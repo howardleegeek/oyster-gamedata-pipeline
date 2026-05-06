@@ -213,5 +213,179 @@ def r12_fps_range(rec: Dict[str, Any]) -> Dict[str, Any]:
     return {"name": "r12_fps_range", "passed": True, "residual": 0.0, "threshold": 0.0}
 
 
+# V₂ MiniMax independent implementations of R13/R18/R21.
+# Pure stdlib. Dict return shape. Mirrors V₁ semantics for BFT N=4 redundancy.
+
+import json
+from pathlib import Path
+
+
+def _v2_parse_inputs_jsonl(path: "Path") -> "tuple":
+    """Parse inputs.jsonl. Return (fps_or_None, sorted_event_list)."""
+    if not path.exists():
+        return None, []
+    fps = None
+    events: List[Dict[str, Any]] = []
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if obj.get("event_type") == "session_start":
+                    fps_val = obj.get("fps", 0)
+                    fps = float(fps_val) or None
+                    continue
+                if "timestamp_ms" in obj and "event_type" in obj:
+                    events.append(obj)
+    except OSError:
+        return None, []
+    events.sort(key=lambda e: float(e.get("timestamp_ms", 0)))
+    return fps, events
+
+
+def _v2_held_keys_at(events, t_ms: float):
+    """Replay events up to t_ms; return held-key set."""
+    held = set()
+    for ev in events:
+        if float(ev.get("timestamp_ms", 0)) > t_ms:
+            break
+        et = ev.get("event_type")
+        kc = ev.get("key_code")
+        if not isinstance(kc, int):
+            continue
+        if et == "key_down":
+            held.add(kc)
+        elif et == "key_up":
+            held.discard(kc)
+    return held
+
+
+def r13_keycode_replay(
+    rec: Dict[str, Any],
+    neighbor: Dict[str, Any] = None,
+    inputs_path=None,
+) -> Dict[str, Any]:
+    """V₂ R13: rec.keyCode equals replay snapshot from inputs.jsonl."""
+    threshold = 0.0
+    base = {"name": "r13_keycode_replay", "threshold": threshold}
+
+    if inputs_path is None:
+        return {**base, "passed": False, "residual": math.nan,
+                "note": "ABSTAIN:no_inputs_path"}
+    p = Path(inputs_path)
+    if not p.exists():
+        return {**base, "passed": False, "residual": math.nan,
+                "note": "ABSTAIN:inputs_jsonl_absent"}
+
+    fps, events = _v2_parse_inputs_jsonl(p)
+    if fps is None:
+        return {**base, "passed": False, "residual": math.nan,
+                "note": "ABSTAIN:no_session_start_sentinel"}
+    if not (29.5 <= fps <= 30.5):
+        return {**base, "passed": False, "residual": math.nan,
+                "note": f"ABSTAIN:fps_out_of_band ({fps})"}
+
+    frame_idx = rec.get("frame")
+    if not isinstance(frame_idx, int):
+        return {**base, "passed": False, "residual": math.nan,
+                "note": "ABSTAIN:frame_index_missing"}
+
+    t_end_ms = (frame_idx + 1) * (1000.0 / fps)
+
+    if events:
+        last_ts = float(events[-1].get("timestamp_ms", 0))
+        if last_ts < t_end_ms - 5000:
+            return {**base, "passed": False, "residual": math.nan,
+                    "note": (f"ABSTAIN:inputs_truncated (last event @ "
+                             f"{last_ts}ms, frame needs {t_end_ms}ms)")}
+
+    snapshot = _v2_held_keys_at(events, t_end_ms)
+    actual = set(rec.get("keyCode") or [])
+    sym_diff = snapshot ^ actual
+    residual = float(len(sym_diff))
+    if residual == 0.0:
+        return {**base, "passed": True, "residual": 0.0,
+                "note": f"replay matched ({len(snapshot)} keys)"}
+    return {**base, "passed": False, "residual": residual,
+            "note": (f"keyCode mismatch: replay={sorted(snapshot)} "
+                     f"vs frame={sorted(actual)}")}
+
+
+def r18_session_manifest(
+    rec: Dict[str, Any],
+    neighbor: Dict[str, Any] = None,
+    manifest_path=None,
+) -> Dict[str, Any]:
+    """V₂ R18: rec.session_id equals manifest['session_id']."""
+    threshold = 0.0
+    base = {"name": "r18_session_manifest", "threshold": threshold}
+
+    if manifest_path is None:
+        return {**base, "passed": False, "residual": math.nan,
+                "note": "ABSTAIN:no_manifest_path"}
+    p = Path(manifest_path)
+    if not p.exists():
+        return {**base, "passed": False, "residual": math.nan,
+                "note": "ABSTAIN:manifest_absent"}
+
+    try:
+        with p.open("r", encoding="utf-8") as fh:
+            manifest = json.load(fh)
+    except (OSError, json.JSONDecodeError):
+        return {**base, "passed": False, "residual": math.nan,
+                "note": "ABSTAIN:manifest_unreadable"}
+
+    if "session_id" not in manifest:
+        return {**base, "passed": False, "residual": math.nan,
+                "note": "ABSTAIN:manifest_no_session_id"}
+
+    manifest_sid = manifest["session_id"]
+    if not manifest_sid:
+        return {**base, "passed": False, "residual": math.nan,
+                "note": "ABSTAIN:manifest_session_id_empty"}
+
+    if "session_id" not in rec:
+        return {**base, "passed": False, "residual": math.nan,
+                "note": "ABSTAIN:frame_no_session_id"}
+
+    rec_sid = rec["session_id"]
+    if rec_sid == manifest_sid:
+        return {**base, "passed": True, "residual": 0.0,
+                "note": "session_id matched"}
+    return {**base, "passed": False, "residual": 1.0,
+            "note": f"session_id mismatch: rec={rec_sid} vs manifest={manifest_sid}"}
+
+
+def r21_monotonic_frame(
+    rec: Dict[str, Any],
+    neighbor: Dict[str, Any] = None,
+) -> Dict[str, Any]:
+    """V₂ R21: adjacent frame indices strictly increase by ≥1."""
+    threshold = 0.0
+    base = {"name": "r21_monotonic_frame", "threshold": threshold}
+
+    if neighbor is None:
+        return {**base, "passed": True, "residual": 0.0,
+                "note": "no neighbor (last frame)"}
+
+    cur = rec.get("frame")
+    nxt = neighbor.get("frame")
+    if not isinstance(cur, int) or not isinstance(nxt, int):
+        return {**base, "passed": False, "residual": math.nan,
+                "note": "ABSTAIN:frame_index_missing"}
+
+    residual = float(max(0, cur - nxt + 1))
+    if residual == 0.0:
+        return {**base, "passed": True, "residual": 0.0,
+                "note": f"strict increase ({cur} → {nxt})"}
+    return {**base, "passed": False, "residual": residual,
+            "note": f"non-monotonic: {cur} → {nxt}"}
+
+
 if __name__ == "__main__":
     unittest.main()

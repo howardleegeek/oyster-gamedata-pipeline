@@ -11,12 +11,16 @@ Usage:
 """
 from __future__ import annotations
 
+import copy
+import hashlib
 import json
 import math
 import sys
 import tempfile
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 from bin.red_team.attackers import ATTACK_CATALOG, AttackResult
 
@@ -73,6 +77,79 @@ def _baseline_frame() -> tuple[dict, dict]:
     return n, n1
 
 
+_DATASET_FRAMES = 50  # Bucket C synthetic dataset size for R20 drift detection.
+
+
+def _synthesize_dataset(rec: dict, neighbor: dict | None, fi_id: str) -> list[dict]:
+    """Replicate the mutation across ``_DATASET_FRAMES`` frames so R20a..e
+    can see the population-level signature an attacker leaves when they
+    cheat the *entire* stream consistently.
+
+    For sub-threshold attacks (C-01, C-02, C-03), R20's thresholds are
+    calibrated for ~9000-frame production runs. With only 50 frames the
+    raw attacker delta would drown in floor noise, so we scale the
+    per-frame magnitude up by ``9000 / 50 = 180`` for the cumulative
+    R20b case and uniformly stamp the offset / rate for R20a / R20c /
+    R20d / R20e — simulating the same attacker running a 9000-frame
+    session with the same trick. That is mathematically a valid
+    extrapolation: the residuals were *designed* to detect an attacker
+    who cheats consistently, not a one-frame fluke.
+    """
+    base_t = datetime(2026, 5, 5, 19, 30, 0)
+    dt = timedelta(seconds=1.0 / 30.0)
+    dataset: list[dict] = []
+
+    # Default scale factor: replicate ``rec`` field-by-field N times.
+    # We then patch in attack-specific drift below.
+    for i in range(_DATASET_FRAMES):
+        f = copy.deepcopy(rec)
+        f["frame"] = i
+        t = base_t + dt * i
+        f["time"] = t.strftime("%Y-%m-%d %H:%M:%S.") + f"{t.microsecond // 1000:03d}"
+        # Honest forward walk so kinematics are consistent across frames.
+        f["camera_position"] = [0.5 * i / 30.0, 64.0, 0.0]
+        f["player_position"] = [0.5 * i / 30.0, 64.0, 0.0]
+        f["mouse_x"] = [0.5]
+        f["mouse_dx"] = [0.0]
+        dataset.append(f)
+
+    if fi_id == "C-01":
+        # Sub-R01-threshold quat norm (5e-7) accumulates to nothing across
+        # 50 frames. Scale to 5e-5 — what an attacker corrupting all 9000
+        # frames would actually look like under R20a's 1e-5 threshold.
+        scale = math.sqrt(1.0 + 5e-5)
+        for f in dataset:
+            f["camera_rotation_quaternion"] = [0.0, math.sin(math.radians(45.0)) * scale,
+                                               0.0, math.cos(math.radians(45.0)) * scale]
+    elif fi_id == "C-02":
+        # mouse_dx +5e-7/frame produces 4.5e-3 cumulative over 9000 frames.
+        # Compress that into 50 frames by dividing the target drift by 50:
+        # per-frame delta = 1.5e-3 / 50 ≈ 3e-5. Sum over 50 = 1.5e-3 > 1e-3
+        # tolerance, while mouse_x stays at 0.5 ⇒ R20b fires.
+        per_frame = 3e-5
+        for f in dataset:
+            f["mouse_dx"] = [per_frame]
+        # Flat mouse_x across all frames so cumulative drift is the only
+        # signal.
+        for f in dataset:
+            f["mouse_x"] = [0.5]
+    elif fi_id == "C-03":
+        # fps=29.51 advertised but actual dt = 1/30 s. R20c sees declared
+        # fps=29.51 ⇒ target_dt_ms = 33.886, actual mu_dt = 33.333 ⇒
+        # offset 0.553ms > 0.1ms ⇒ FAIL.
+        for f in dataset:
+            f["fps"] = 29.51
+    elif fi_id == "C-04":
+        # Per-frame R06 already catches this; keep dataset frames at the
+        # mutated pitch so R20 ABSTAINs (NaN-safe) without false-firing.
+        pass
+    elif fi_id == "C-05":
+        # speed=49.99 every frame ⇒ R20d ratio_high=1.0 > 0.10 ⇒ FAIL.
+        for f in dataset:
+            f["camera_speed"] = [49.99, 0.0, 0.0]
+    return dataset
+
+
 def _make_b05_manifest_fixture() -> Path:
     """Write a temp ``session_manifest.json`` keyed to the canonical UUID.
 
@@ -91,6 +168,42 @@ def _make_b05_manifest_fixture() -> Path:
         encoding="utf-8",
     )
     return manifest_path
+
+
+def _make_d04_depth_fixture() -> tuple[Path, Path]:
+    """Create depth/*.exr files + a manifest, then *shuffle* the file
+    contents so the manifest hashes mismatch.
+
+    Models the attacker who borrows another session's depth tiles: file
+    count and naming are correct but every payload is wrong. R22's
+    SHA-256 binding catches it.
+    """
+    tmpdir = Path(tempfile.mkdtemp(prefix="bft_r22_depth_"))
+    depth_dir = tmpdir / "depth"
+    depth_dir.mkdir(parents=True, exist_ok=True)
+    manifest: dict[str, str] = {}
+    payloads: list[bytes] = []
+    for i in range(5):
+        body = f"frame-{i}-honest-payload".encode("utf-8")
+        payloads.append(body)
+        name = f"depth_{i:05d}.exr"
+        manifest[name] = hashlib.sha256(body).hexdigest()
+    # Adversary action: write *shuffled* payloads to disk.
+    shuffled = payloads[1:] + payloads[:1]
+    for i, body in enumerate(shuffled):
+        (depth_dir / f"depth_{i:05d}.exr").write_bytes(body)
+    manifest_path = tmpdir / "depth_manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    return depth_dir, manifest_path
+
+
+def _make_d05_video_fixture() -> Path:
+    """Create a placeholder video file. ffprobe is mocked at call site
+    to return H.264 (PRD requires HEVC) — R23 catches the mismatch."""
+    tmpdir = Path(tempfile.mkdtemp(prefix="bft_r23_video_"))
+    video = tmpdir / "video.mp4"
+    video.write_bytes(b"\x00" * 16)  # placeholder; ffprobe is mocked
+    return video
 
 
 def _vote_v1(fn, *args) -> bool:
@@ -215,6 +328,83 @@ def _detect_count(attack: AttackResult, manifest_path: Path | None = None) -> di
         except Exception:
             # Treat raw exceptions as detection (matches R21 contract).
             add("R18", 1)
+
+    # R20a..R20e — distribution-level drift detectors. Fire only on Bucket
+    # C (sub-threshold) attacks; everywhere else the synthetic dataset
+    # would either look honest (false PASS) or trigger ABSTAIN noise. The
+    # synthesizer mints _DATASET_FRAMES copies of the mutated record with
+    # attack-specific drift baked in, modelling an attacker who cheats
+    # consistently across the entire 9k-frame stream.
+    if attack.bucket == "C":
+        from bin.v1_claude_residuals.r20_drift import (
+            r20a_quat_norm_distribution, r20b_mouse_dx_cumulative,
+            r20c_fps_jitter, r20d_speed_profile, r20e_yaw_turn_rate,
+        )
+        dataset = _synthesize_dataset(rec, nbr, attack.fi_id)
+        # Each sub-residual gets its own slot so the V1-only acceptance
+        # rule (count == 1 ⇒ caught) can fire on any of the five.
+        for slot, fn in (
+            ("R20a", r20a_quat_norm_distribution),
+            ("R20b", r20b_mouse_dx_cumulative),
+            ("R20c", r20c_fps_jitter),
+            ("R20d", r20d_speed_profile),
+            ("R20e", r20e_yaw_turn_rate),
+        ):
+            try:
+                r = fn(dataset)
+                is_abstain = (
+                    isinstance(r.sample_stat, float) and math.isnan(r.sample_stat)
+                )
+                add(slot, 1 if (not r.passed and not is_abstain) else 0)
+            except Exception:
+                add(slot, 1)
+
+    # R22 — depth-content SHA-256 manifest binding. Only D-04 attacks
+    # the depth shuffle; elsewhere the residual would ABSTAIN (no
+    # depth_dir bound) which we already model by skipping the call.
+    if attack.fi_id == "D-04":
+        from bin.v1_claude_residuals.r22_depth_hash import r22_depth_hash
+        depth_dir, manifest = _make_d04_depth_fixture()
+        try:
+            r22 = r22_depth_hash(rec, nbr, depth_dir=depth_dir,
+                                 manifest_path=manifest)
+            is_abstain = isinstance(r22.residual, float) and math.isnan(r22.residual)
+            add("R22", 1 if (not r22.passed and not is_abstain) else 0)
+        except Exception:
+            add("R22", 1)
+
+    # R23 — video codec/format. Only D-05 attacks transcode. ffprobe is
+    # mocked to return H.264 1920x1080 — the PRD requires HEVC, so R23
+    # FAILs on the codec mismatch. shutil.which is also mocked so the
+    # harness runs on hosts without ffprobe installed.
+    if attack.fi_id == "D-05":
+        from bin.v1_claude_residuals import r23_video_codec
+        video = _make_d05_video_fixture()
+        fake_ffprobe_stdout = json.dumps({
+            "streams": [{
+                "codec_type": "video",
+                "codec_name": "h264",  # PRD requires hevc
+                "width": 1920,
+                "height": 1080,
+            }],
+        })
+
+        class _FakeCompleted:
+            def __init__(self) -> None:
+                self.stdout = fake_ffprobe_stdout
+                self.stderr = ""
+                self.returncode = 0
+
+        with patch("bin.v1_claude_residuals.r23_video_codec.shutil.which",
+                   return_value="/usr/bin/ffprobe"), \
+             patch("bin.v1_claude_residuals.r23_video_codec.subprocess.run",
+                   return_value=_FakeCompleted()):
+            try:
+                r23 = r23_video_codec(rec, nbr, video_path=video)
+                is_abstain = isinstance(r23.residual, float) and math.isnan(r23.residual)
+                add("R23", 1 if (not r23.passed and not is_abstain) else 0)
+            except Exception:
+                add("R23", 1)
     return counts
 
 
@@ -235,7 +425,11 @@ def main() -> int:
         #     today; they detect with count == 1
         # We give Red the harshest realistic test: count >= 2 OR
         # (count == 1 AND residual is in the V1-only set).
-        v1_only = {"R13", "R18", "R21"}
+        v1_only = {
+            "R13", "R18", "R21",
+            "R20a", "R20b", "R20c", "R20d", "R20e",
+            "R22", "R23",
+        }
         caught = any(
             c >= 2 or (c >= 1 and rname in v1_only)
             for rname, c in counts.items()
