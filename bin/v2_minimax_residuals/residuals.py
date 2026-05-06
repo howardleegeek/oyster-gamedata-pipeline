@@ -45,7 +45,7 @@ def r02_euler_quat_consistency(rec: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def r03_kinematics(rec_n: Dict[str, Any], rec_n1: Dict[str, Any], fps: float) -> Dict[str, Any]:
-    """Verify position delta matches speed * dt"""
+    """Verify computed speed from position delta matches recorded speed"""
     dt = 1.0 / fps
     pos_n = rec_n.get("camera_position")
     pos_n1 = rec_n1.get("camera_position")
@@ -54,33 +54,29 @@ def r03_kinematics(rec_n: Dict[str, Any], rec_n1: Dict[str, Any], fps: float) ->
     if pos_n is None or pos_n1 is None or speed_n is None:
         return {"name": "r03_kinematics", "passed": False, "residual": 0.0, "threshold": 0.0}
 
-    dx = pos_n[0] - pos_n1[0]
-    dy = pos_n[1] - pos_n1[1]
-    dz = pos_n[2] - pos_n1[2]
+    residual = 0.0
+    for i in range(3):
+        computed_speed = (pos_n1[i] - pos_n[i]) / dt
+        residual = max(residual, abs(computed_speed - speed_n[i]))
 
-    expected_dx = speed_n[0] * dt
-    expected_dy = speed_n[1] * dt
-    expected_dz = speed_n[2] * dt
-
-    residual = math.sqrt((dx - expected_dx)**2 + (dy - expected_dy)**2 + (dz - expected_dz)**2)
-    return {"name": "r03_kinematics", "passed": residual < 0.1, "residual": residual, "threshold": 0.1}
+    return {"name": "r03_kinematics", "passed": residual < 0.05, "residual": residual, "threshold": 0.05}
 
 
 def r04_mouse_dx_diff(rec_n: Dict[str, Any], rec_n1: Dict[str, Any]) -> Dict[str, Any]:
     """Verify mouse_dx is difference of mouse_x"""
     mx_n = rec_n.get("mouse_x", [0.0])[0]
     mx_n1 = rec_n1.get("mouse_x", [0.0])[0]
-    mdx_n = rec_n.get("mouse_dx", [0.0])[0]
+    mdx_n1 = rec_n1.get("mouse_dx", [0.0])[0]
 
-    expected_mdx = mx_n - mx_n1
-    residual = abs(mdx_n - expected_mdx)
-    return {"name": "r04_mouse_dx_diff", "passed": residual < 1e-3, "residual": residual, "threshold": 1e-3}
+    expected_delta = mx_n1 - mx_n
+    residual = abs(mdx_n1 - expected_delta)
+    return {"name": "r04_mouse_dx_diff", "passed": residual < 1e-6, "residual": residual, "threshold": 1e-6}
 
 
 def r05_dt(rec_n: Dict[str, Any], rec_n1: Dict[str, Any]) -> Dict[str, Any]:
-    """Verify frame dt matches fps"""
-    fps_n = rec_n.get("fps", 30.0)
-    dt = 1.0 / fps_n
+    """Verify frame dt in ms matches expected 1000/fps with fps=30"""
+    fps = 30
+    expected_ms = 1000.0 / fps
 
     time_n = rec_n.get("time", "")
     time_n1 = rec_n1.get("time", "")
@@ -91,10 +87,10 @@ def r05_dt(rec_n: Dict[str, Any], rec_n1: Dict[str, Any]) -> Dict[str, Any]:
     from datetime import datetime
     t_n = datetime.strptime(time_n, "%Y-%m-%d %H:%M:%S.%f")
     t_n1 = datetime.strptime(time_n1, "%Y-%m-%d %H:%M:%S.%f")
-    actual_dt = (t_n - t_n1).total_seconds()
+    actual_dt_ms = (t_n - t_n1).total_seconds() * 1000.0
 
-    residual = abs(actual_dt - dt)
-    return {"name": "r05_dt", "passed": residual < 0.05, "residual": residual, "threshold": 0.05}
+    residual = abs(actual_dt_ms - expected_ms)
+    return {"name": "r05_dt", "passed": residual < 5.0, "residual": residual, "threshold": 5.0}
 
 
 def r06_angle_range(rec: Dict[str, Any]) -> Dict[str, Any]:
