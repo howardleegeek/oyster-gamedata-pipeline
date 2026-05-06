@@ -1820,10 +1820,11 @@ gaps:
   title: bin/cn_vendor_mirror.py
   purpose: 'CN-side mirror: Aliyun OSS bucket + presigned URL issuer for vendors behind
     GFW; bypasses S3 latency without VPN'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 220
   dispatched_at: '2026-05-05 19:35:51'
+  completed_at: '2026-05-05 19:49:05'
 - id: G207
   title: bin/dr_failover_runbook_check.py
   purpose: 'Disaster recovery validation: simulate primary-region outage, verify failover
@@ -1844,10 +1845,11 @@ gaps:
   title: sdk/javascript/oyster-buyer/index.js
   purpose: 'JavaScript / TypeScript SDK for buyers: same API as Python SDK; for Node.js
     training-pipeline integration'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 280
   dispatched_at: '2026-05-05 19:40:37'
+  completed_at: '2026-05-05 19:49:07'
 - id: G210
   title: bin/buyer_evaluation_harness.py
   purpose: 'Reference benchmark: train tiny world model on N clips of our data, evaluate
@@ -1862,10 +1864,11 @@ gaps:
   title: docs/MARKETING_SITE_COPY.md
   purpose: 'Landing page copy: hero (play games get paid) + 3-step how-it-works +
     buyer pitch + 5-FAQ + CTA'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 200
   dispatched_at: '2026-05-05 19:42:29'
+  completed_at: '2026-05-05 19:49:09'
 - id: G212
   title: docs/TOS_VENDOR.md
   purpose: 'Vendor terms of service: data ownership transfer + payout schedule + anti-cheat
@@ -2231,9 +2234,10 @@ gaps:
   purpose: On laptops, detect battery vs AC via psutil + IOPSCopyPowerSourcesInfo;
     pause recording on battery (default) to preserve laptop; configurable override
     per-game
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 180
+  dispatched_at: '2026-05-05 19:57:49'
 - id: G250
   title: bin/update_server_endpoint.py
   purpose: FastAPI /api/updates/check?platform=windows&current=1.0.0 endpoint serving
@@ -2258,9 +2262,10 @@ gaps:
   purpose: 'Internationalization: zh-CN + zh-TW + en-US runtime string loader; covers
     tray menu, splash, privacy dashboard, error messages; .po format compatible with
     future locale adds'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 240
+  dispatched_at: '2026-05-05 19:59:30'
 - id: G253
   title: bin/epal_session_lifecycle_hook.py
   purpose: 'POST /v1/epal/session_start + /v1/epal/session_end webhooks: recorder
@@ -2338,9 +2343,10 @@ gaps:
   priority: PP0
   estimated_lines: 180
   wave: W31
-  status: pending
+  status: skipped
   completed_at: '2026-05-06T00:48:04.928369+00:00'
   created_at: '2026-05-05T22:31:16+00:00'
+  skip_reason: file already in repo
 - id: G262
   title: bin/recorder_manifest.py
   purpose: 'Generate per-clip MANIFEST.json with sha256 of each of the 5 files (video.mp4,
@@ -2350,9 +2356,10 @@ gaps:
   priority: PP1
   estimated_lines: 100
   wave: W31
-  status: pending
+  status: skipped
   completed_at: '2026-05-06T00:49:12.854091+00:00'
   created_at: '2026-05-05T22:31:16+00:00'
+  skip_reason: file already in repo
 - id: G263
   title: bin/recorder_window_capture_helper.py
   purpose: 'Cross-platform helper: given Windows window title, return ffmpeg gdigrab
@@ -2362,9 +2369,10 @@ gaps:
   priority: PP1
   estimated_lines: 120
   wave: W31
-  status: pending
+  status: skipped
   completed_at: '2026-05-06T00:50:18.262636+00:00'
   created_at: '2026-05-05T22:31:16+00:00'
+  skip_reason: file already in repo
 - id: G264
   title: bin/recorder_replay_mod_installer.py
   purpose: On-demand installer that downloads Replay Mod jar matching detected MC
@@ -2374,9 +2382,10 @@ gaps:
   priority: PP1
   estimated_lines: 200
   wave: W31
-  status: pending
+  status: skipped
   completed_at: '2026-05-06T00:52:00.422362+00:00'
   created_at: '2026-05-05T22:31:16+00:00'
+  skip_reason: file already in repo
 - id: G265
   title: bin/recorder_motw_unblock.py
   purpose: 'Standalone Windows utility: removes Zone.Identifier ADS (Mark-of-the-Web)
@@ -2401,9 +2410,10 @@ gaps:
   priority: PP0
   estimated_lines: 220
   wave: W31
-  status: pending
+  status: skipped
   created_at: '2026-05-05T23:29:57+00:00'
   completed_at: '2026-05-06T00:46:17+00:00'
+  skip_reason: file already in repo
 - id: G267
   title: bin/recorder_quality_score.py
   purpose: 'Wrap anomaly_detector_clip_quality.analyze_clip to score a finished tarball:
@@ -2412,9 +2422,10 @@ gaps:
   priority: PP1
   estimated_lines: 150
   wave: W31
-  status: pending
+  status: skipped
   created_at: '2026-05-05T23:29:57+00:00'
   completed_at: '2026-05-06T00:48:41+00:00'
+  skip_reason: file already in repo
 - id: G268
   title: bin/recorder_clip_uploader.py
   purpose: 'Optional opt-in clip uploader: POST tarball to a configurable backend
@@ -2424,9 +2435,10 @@ gaps:
   priority: PP1
   estimated_lines: 180
   wave: W31
-  status: pending
+  status: skipped
   created_at: '2026-05-05T23:29:57+00:00'
   completed_at: '2026-05-06T00:50:48+00:00'
+  skip_reason: file already in repo
 - id: G269
   title: bin/recorder_metadata_emitter.py
   purpose: 'Generate metadata.json with timestamp (UTC ISO), location=''anonymous'',
@@ -2435,9 +2447,10 @@ gaps:
   priority: PP1
   estimated_lines: 90
   wave: W31
-  status: pending
+  status: skipped
   created_at: '2026-05-06T00:14:49+00:00'
   completed_at: '2026-05-06T00:51:53+00:00'
+  skip_reason: file already in repo
 - id: G270
   title: bin/recorder_mc_config_reader.py
   purpose: Parse %APPDATA%/.minecraft/options.txt for FOV, screen_resolution, gamma.
@@ -2447,9 +2460,10 @@ gaps:
   priority: PP1
   estimated_lines: 130
   wave: W31
-  status: pending
+  status: skipped
   created_at: '2026-05-06T00:14:49+00:00'
   completed_at: '2026-05-06T00:47:27+00:00'
+  skip_reason: file already in repo
 - id: G271
   title: bin/recorder_record_resampler.py
   purpose: 'Resample input event stream to 30 Hz frame-aligned action_camera records.
@@ -2458,9 +2472,10 @@ gaps:
   priority: PP1
   estimated_lines: 180
   wave: W31
-  status: pending
+  status: skipped
   created_at: '2026-05-06T00:14:49+00:00'
   completed_at: '2026-05-06T00:47:31+00:00'
+  skip_reason: file already in repo
 - id: G272
   title: bin/recorder_disk_guard.py
   purpose: 'Pre-flight free-space check: shutil.disk_usage on Documents folder, refuse
@@ -2469,9 +2484,10 @@ gaps:
   priority: PP2
   estimated_lines: 70
   wave: W31
-  status: pending
+  status: skipped
   created_at: '2026-05-06T00:14:49+00:00'
   completed_at: '2026-05-06T00:47:36+00:00'
+  skip_reason: file already in repo
 - id: G273
   title: bin/recorder_fullscreen_detector.py
   purpose: Detect MC running in exclusive fullscreen via Win32 (window rect == screen
@@ -2480,9 +2496,10 @@ gaps:
   priority: PP2
   estimated_lines: 90
   wave: W31
-  status: pending
+  status: skipped
   created_at: '2026-05-06T00:14:49+00:00'
   completed_at: '2026-05-06T00:47:40+00:00'
+  skip_reason: file already in repo
 - id: G274
   title: bin/recorder_replay_mod_postprocess.py
   purpose: Read .mcpr file produced by Replay Mod, extract camera 6DoF + quaternion
@@ -2491,9 +2508,10 @@ gaps:
   priority: PP0
   estimated_lines: 240
   wave: W31
-  status: pending
+  status: skipped
   created_at: '2026-05-06T00:14:49+00:00'
   completed_at: '2026-05-06T00:47:46+00:00'
+  skip_reason: file already in repo
 - id: G275
   title: bin/recorder_dav2_runner.py
   purpose: 'Wrap depth_anything_smoke / real_depth_filler: take video.mp4, sample
@@ -2503,9 +2521,10 @@ gaps:
   priority: PP0
   estimated_lines: 280
   wave: W31
-  status: pending
+  status: skipped
   created_at: '2026-05-06T00:14:49+00:00'
   completed_at: '2026-05-06T00:46:20.163429+00:00'
+  skip_reason: file already in repo
 - id: G276
   title: bin/recorder_eula_first_run.py
   purpose: Show first-run consent dialog (Tk) asking tester to agree to data collection
@@ -2514,9 +2533,10 @@ gaps:
   priority: PP1
   estimated_lines: 150
   wave: W31
-  status: pending
+  status: skipped
   created_at: '2026-05-06T00:14:49+00:00'
   completed_at: '2026-05-06T00:46:20.163429+00:00'
+  skip_reason: file already in repo
 - id: G277
   title: bin/recorder_log_rotator.py
   purpose: Rotate ~/OysterRecorder.log when >10 MB, keep last 5 rotations as .1, .2,
@@ -2524,9 +2544,10 @@ gaps:
   priority: PP2
   estimated_lines: 80
   wave: W31
-  status: pending
+  status: skipped
   created_at: '2026-05-06T00:14:49+00:00'
   completed_at: '2026-05-06T00:46:20.163429+00:00'
+  skip_reason: file already in repo
 - id: G278
   title: bin/recorder_close_confirm.py
   purpose: 'Tk dialog when tester closes window mid-record: ''正在录制中，确认丢弃？'' Yes/No.
@@ -2534,9 +2555,10 @@ gaps:
   priority: PP2
   estimated_lines: 60
   wave: W31
-  status: pending
+  status: skipped
   created_at: '2026-05-06T00:14:49+00:00'
   completed_at: '2026-05-06T00:46:20.163429+00:00'
+  skip_reason: file already in repo
 - id: G279
   title: bin/recorder_audio_loopback.py
   purpose: Switch ffmpeg dshow input from default microphone to WASAPI loopback (system
@@ -2544,9 +2566,10 @@ gaps:
   priority: PP1
   estimated_lines: 110
   wave: W31
-  status: pending
+  status: dispatched
   created_at: '2026-05-06T00:14:49+00:00'
   completed_at: '2026-05-06T00:47:20+00:00'
+  dispatched_at: '2026-05-05 20:04:11'
 - id: G280
   title: bin/recorder_clip_uuid.py
   purpose: Generate per-clip UUID4 + insert into systeminfo + metadata + filename
@@ -2580,4 +2603,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 89343
-  last_heartbeat: '2026-05-06T02:48:30Z'
+  last_heartbeat: '2026-05-06T03:07:11Z'
