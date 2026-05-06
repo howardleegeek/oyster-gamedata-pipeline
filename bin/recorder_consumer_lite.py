@@ -85,7 +85,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.20.1"
+RECORDER_VERSION = "lite-v0.20.2"
 RELEASES_API = (
     "https://api.github.com/repos/howardleegeek/oyster-gamedata-pipeline"
     "/releases?per_page=20"
@@ -1478,6 +1478,28 @@ class RecorderApp(tk.Tk):
             json.dumps(action_records, separators=(",", ":"), ensure_ascii=False),
             encoding="utf-8",
         )
+
+        # v0.20.2: write inputs.jsonl — raw pynput events (key_down, key_up,
+        # mouse_move, mouse_click) with millisecond timestamps. Producer-side
+        # artifact for R13 multimodal residual (keyCode-vs-input-replay)
+        # which closes the FI-02 blind spot in BFT N=4 single-modal mesh.
+        # See docs/SPEC_R13_MULTIMODAL.md § R13. Per IL10, this file is OK
+        # to be missing on legacy/headless runs — R13 will ABSTAIN, not FAIL.
+        try:
+            with (clip_dir / "inputs.jsonl").open("w", encoding="utf-8") as fh:
+                # First line: session_start sentinel (frame-time alignment).
+                fh.write(json.dumps({
+                    "event_type": "session_start",
+                    "timestamp_ms": 0,
+                    "fps": FPS,
+                    "frame_count": target_frame_count,
+                }) + "\n")
+                for ev in self._captured_events:
+                    fh.write(json.dumps(ev, ensure_ascii=False) + "\n")
+            _trace(f"package: wrote inputs.jsonl ({len(self._captured_events)} events)")
+        except Exception as e:
+            _trace(f"package: inputs.jsonl write failed: {e}")
+            # Non-fatal: action_camera.json still ships; R13 will ABSTAIN.
 
         # 4. gameinfo.xlsx — v0.10.0: uses bin/generate_gameinfo_xlsx
         # write_xlsx() for a real 14-field xlsx instead of my
