@@ -34,10 +34,10 @@ def r02_euler_quat_consistency(rec: Dict[str, Any]) -> Dict[str, Any]:
     cr = math.cos(roll * 0.5)
     sr = math.sin(roll * 0.5)
 
-    qx = sr * cp * cy - cr * sp * sy
-    qy = cr * sp * cy + sr * cp * sy
-    qz = cr * cp * sy - sr * sp * cy
-    qw = cr * cp * cy + sr * sp * sy
+    qw = cp * cy * cr + sp * sy * sr
+    qx = sp * cy * cr - cp * sy * sr
+    qy = cp * sy * cr + sp * cy * sr
+    qz = cp * cy * sr - sp * sy * cr
 
     residual = (abs(qx - quat[0]) + abs(qy - quat[1]) +
                 abs(qz - quat[2]) + abs(qw - quat[3]))
