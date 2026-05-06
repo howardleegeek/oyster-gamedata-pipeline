@@ -2120,9 +2120,10 @@ gaps:
   purpose: 'Auto-classifier: maps incoming error_class + module + traceback signature
     to severity (critical = data loss / payment / auth; high = crash; medium = degraded;
     low = warning); rules table with override path'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 220
+  dispatched_at: '2026-05-05 18:42:24'
 - id: G240
   title: bin/error_alert_router.py
   purpose: 'For critical-severity errors: rate-limited Slack / Discord webhook (configurable);
@@ -2221,19 +2222,21 @@ gaps:
   title: bin/update_server_endpoint.py
   purpose: FastAPI /api/updates/check?platform=windows&current=1.0.0 endpoint serving
     latest version + download URL + SHA256 + release notes; backs G225 auto-updater
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 250
   dispatched_at: '2026-05-05 18:32:34'
+  completed_at: '2026-05-05 18:37:53'
 - id: G251
   title: bin/version_compatibility_check.py
   purpose: 'Detect game version at launch (Minecraft 1.20.4 vs 1.21.x): if unsupported,
     system tray notifies user ''this version unsupported, recording paused''; recommends
     supported version range'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 220
   dispatched_at: '2026-05-05 18:34:17'
+  completed_at: '2026-05-05 18:37:55'
 - id: G252
   title: bin/i18n_zh_en_strings.py
   purpose: 'Internationalization: zh-CN + zh-TW + en-US runtime string loader; covers
@@ -2247,9 +2250,10 @@ gaps:
   purpose: 'POST /v1/epal/session_start + /v1/epal/session_end webhooks: recorder
     starts only on paid EPal session start (with companion opt-in), stops + uploads
     on session end with rating + companion_id provenance'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 280
+  dispatched_at: '2026-05-05 18:50:33'
 - id: G254
   title: bin/epal_companion_quality_score.py
   purpose: Wire EPal companion professional rating (1-5 stars) into clip metadata;
@@ -2551,4 +2555,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 89343
-  last_heartbeat: '2026-05-06T01:37:18Z'
+  last_heartbeat: '2026-05-06T01:56:34Z'
