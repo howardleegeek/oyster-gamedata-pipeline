@@ -2277,7 +2277,8 @@ gaps:
   priority: PP1
   estimated_lines: 140
   wave: W31
-  status: pending
+  status: completed
+  completed_at: '2026-05-06T00:44:53.486949+00:00'
   created_at: '2026-05-05T22:31:16+00:00'
 - id: G261
   title: bin/recorder_depth_filler.py
@@ -2331,8 +2332,9 @@ gaps:
   priority: PP2
   estimated_lines: 80
   wave: W31
-  status: pending
+  status: completed
   created_at: '2026-05-05T22:31:16+00:00'
+  completed_at: '2026-05-06T00:44:47+00:00'
 - id: G266
   title: bin/recorder_post_pipeline.py
   purpose: 'After recorder finishes a clip tarball, run the full PRD-completion pipeline:
