@@ -2079,8 +2079,9 @@ gaps:
   priority: PP1
   estimated_lines: 90
   wave: W31
-  status: pending
+  status: completed
   created_at: '2026-05-06T00:14:49+00:00'
+  completed_at: '2026-05-06T00:51:53+00:00'
 - id: G270
   title: bin/recorder_mc_config_reader.py
   purpose: Parse %APPDATA%/.minecraft/options.txt for FOV, screen_resolution, gamma. Parse launcher_profiles.json for current MC username. Returns dict consumed by recorder gameinfo + intrinsics generation. Replaces hardcoded character_name='DataPilot' / fov=70.
