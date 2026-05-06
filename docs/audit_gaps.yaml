@@ -2356,8 +2356,9 @@ gaps:
   priority: PP1
   estimated_lines: 180
   wave: W31
-  status: pending
+  status: completed
   created_at: '2026-05-06T00:14:49+00:00'
+  completed_at: '2026-05-06T00:47:31+00:00'
 - id: G272
   title: bin/recorder_disk_guard.py
   purpose: 'Pre-flight free-space check: shutil.disk_usage on Documents folder, refuse to
