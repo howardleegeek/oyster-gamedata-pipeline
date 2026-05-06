@@ -2315,10 +2315,11 @@ gaps:
   purpose: 'EPal-side companion dashboard widget: shows clips contributed this week,
     total bonus earned, leaderboard rank within community; embedded in EPal companion
     app via iframe / native view'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 280
   dispatched_at: '2026-05-05 20:35:59'
+  completed_at: '2026-05-05 20:36:34'
 - id: G258
   title: docs/EPAL_COMPANION_ONBOARDING.md
   purpose: 'Companion-facing onboarding doc: how to enable recording in EPal companion
@@ -2611,4 +2612,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 89343
-  last_heartbeat: '2026-05-06T03:35:59Z'
+  last_heartbeat: '2026-05-06T03:39:34Z'
