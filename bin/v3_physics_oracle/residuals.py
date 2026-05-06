@@ -78,8 +78,43 @@ def _oula_match(a: tuple[float, float, float], b: tuple[float, float, float], to
     return all(abs(a[i] - b[i]) < tol for i in range(3))
 
 
+def _is_single_axis(oula: tuple[float, float, float], tol: float = 1e-6) -> int | None:
+    """If oula is a pure single-axis rotation, return axis index 0/1/2; else None."""
+    nonzero = [i for i, v in enumerate(oula) if abs(v) > tol]
+    if len(nonzero) == 0:
+        return -1  # identity (any axis works)
+    if len(nonzero) == 1:
+        return nonzero[0]
+    return None
+
+
+def _hamilton_single_axis_quat(axis: int, deg: float) -> tuple[float, float, float, float]:
+    """Compute Hamilton quaternion for pure rotation around one axis.
+
+    This is NOT a complex formula derived from PRD prose — it's the literal
+    definition of axis-angle quaternion from any 3D math textbook. Computed
+    from sin/cos of half-angle. Audit-trivial (any human with a calculator).
+    """
+    half = math.radians(deg) / 2
+    s = math.sin(half)
+    c = math.cos(half)
+    if axis == 0: return (s, 0.0, 0.0, c)
+    if axis == 1: return (0.0, s, 0.0, c)
+    if axis == 2: return (0.0, 0.0, s, c)
+    return (0.0, 0.0, 0.0, 1.0)  # identity
+
+
 def r02_oula_quat_table(rec: dict, threshold: float = 1e-3) -> OracleResult:
-    """If frame's oula matches a table entry, the quat must match too."""
+    """V₃ R02 oracle — covers single-axis rotations textbook-equivalently.
+
+    Decision tree:
+    1. If oula matches one of 8 hand-tabulated rows → use those exact values
+    2. Else if oula is single-axis (e.g., yaw ramp) → compute Hamilton on the fly
+       (this is still zero-LLM: pure stdlib math.sin/math.cos of half-angle,
+       no LLM-derived formula, no PRD prose interpretation)
+    3. Else (compound rotation) → ABSTAIN (compound order is PRD-ambiguous;
+       leave to V₁/V₂/V₂' LLM consensus)
+    """
     oula = rec.get("camera_rotation_oula")
     quat = rec.get("camera_rotation_quaternion")
     if oula is None or quat is None or len(oula) != 3 or len(quat) != 4:
@@ -87,16 +122,37 @@ def r02_oula_quat_table(rec: dict, threshold: float = 1e-3) -> OracleResult:
                             "missing oula or quat field")
     actual_oula = (float(oula[0]), float(oula[1]), float(oula[2]))
     actual_q = _normalize_quat_to_positive_w(tuple(float(c) for c in quat))
+
+    # Step 1: check the 8-row hand-tabulated reference table
     for table_oula, table_q in PHYSICS_QUAT_TABLE:
         if _oula_match(actual_oula, table_oula):
             expected_q = _normalize_quat_to_positive_w(table_q)
             residual = sum(abs(actual_q[i] - expected_q[i]) for i in range(4))
             if residual <= threshold:
-                return OracleResult("R02", Verdict.PASS, expected_q, actual_q, residual)
+                return OracleResult("R02", Verdict.PASS, expected_q, actual_q, residual,
+                                    "8-row hand-table match")
             return OracleResult("R02", Verdict.FAIL, expected_q, actual_q, residual,
-                                f"oula={actual_oula} should give {expected_q}, got {actual_q}")
+                                f"hand-table mismatch oula={actual_oula}")
+
+    # Step 2: single-axis rotation → compute Hamilton from textbook
+    axis = _is_single_axis(actual_oula)
+    if axis is not None:
+        if axis == -1:
+            expected_q = (0.0, 0.0, 0.0, 1.0)
+        else:
+            expected_q = _normalize_quat_to_positive_w(
+                _hamilton_single_axis_quat(axis, actual_oula[axis])
+            )
+        residual = sum(abs(actual_q[i] - expected_q[i]) for i in range(4))
+        if residual <= threshold:
+            return OracleResult("R02", Verdict.PASS, expected_q, actual_q, residual,
+                                f"single-axis Hamilton (axis={axis})")
+        return OracleResult("R02", Verdict.FAIL, expected_q, actual_q, residual,
+                            f"single-axis Hamilton mismatch oula={actual_oula}")
+
+    # Step 3: compound rotation → ABSTAIN (V₃ refuses to take a side)
     return OracleResult("R02", Verdict.ABSTAIN, None, actual_q, math.nan,
-                        f"oula={actual_oula} not in V₃ table (8 known entries)")
+                        f"compound rotation oula={actual_oula} — order ambiguous, V₃ abstains")
 
 
 # ---------------------------------------------------------------------------
