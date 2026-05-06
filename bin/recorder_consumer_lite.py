@@ -85,7 +85,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.18.0"
+RECORDER_VERSION = "lite-v0.19.0"
 RELEASES_API = (
     "https://api.github.com/repos/howardleegeek/oyster-gamedata-pipeline"
     "/releases?per_page=20"
@@ -1222,54 +1222,92 @@ class RecorderApp(tk.Tk):
             json.dumps(sys_info, indent=2), encoding="utf-8"
         )
 
-        # 3. action_camera.json — REAL keyboard + mouse data from
-        # InputCapture, plus placeholder camera/quaternion fields. The
-        # Rust app's shader pack (G198) provides per-frame camera data;
-        # in this stop-gap we expose only what we can collect from
-        # user-space (key/mouse).
-        # v0.18.0: ALSO emit `quaternion` array [x, y, z, w] (PRD format)
-        # alongside the legacy cameraQX/QY/QZ/QW scalar fields so lint
-        # v3 actually picks up our quaternion records (criterion 13/14).
+        # 3. action_camera.json — v0.19.0 BIG REWRITE: PRD-aligned schema
+        # was event-based with mouseX/cameraX scalars; PRD wants 9000
+        # frame-aligned records at 30Hz. Sample/sample_tarball_builder.py
+        # is the canonical schema reference.
+        from datetime import datetime as _dt, timedelta as _td  # noqa: PLC0415
+
+        FPS = 30.0
+        target_frame_count = int(elapsed_sec * FPS) if elapsed_sec > 0 else 9000
+        SCREEN_W, SCREEN_H = 1920, 1080
+        # Build per-frame state by replaying captured pynput events into
+        # frame buckets. Each frame inherits the last-known mouse/key
+        # state (latching).
+        events = sorted(
+            self._captured_events,
+            key=lambda e: e.get("timestamp_ms", 0),
+        )
+        cur_keys: list[int] = []
+        cur_mx, cur_my = SCREEN_W // 2, SCREEN_H // 2
+        prev_mx, prev_my = cur_mx, cur_my
+        ev_idx = 0
+        base_time = _dt.fromtimestamp(self._record_started_at)
+        # Use intrinsics computed from window geometry (recorder.intrinsics.yaml
+        # FOV 70° → fy = 540 / tan(35°) ≈ 771.4).
+        fy = 540.0 / 0.7002075382097097  # tan(35°) = 0.7002...
+        intrinsics = {"fx": round(fy, 3), "fy": round(fy, 3),
+                      "cx": 960.0, "cy": 540.0}
         action_records = []
-        for ev in self._captured_events:
-            qx, qy, qz, qw = 0.0, 0.0, 0.0, 1.0  # identity placeholder
-            rec: dict[str, Any] = {
-                "timestamp_ms": ev.get("timestamp_ms", 0),
-                "event_type": ev.get("event_type", "unknown"),
-                # Required PRD field: keyCode is int. -1 for non-key events.
-                "keyCode": int(ev.get("keyCode", -1)),
-                # Mouse position (real for mouse events, 0 otherwise).
-                "mouseX": int(ev.get("mouseX", 0)),
-                "mouseY": int(ev.get("mouseY", 0)),
-                # Camera position placeholder until depth shader lands.
-                "cameraX": 0.0, "cameraY": 0.0, "cameraZ": 0.0,
-                # Quaternion in xyzw order per PRD criterion 14.
-                # NEW v0.18.0: array form for lint v3 detection.
-                "quaternion": [qx, qy, qz, qw],
-                # Legacy scalar fields (kept for any old downstream consumers).
-                "cameraQX": qx, "cameraQY": qy,
-                "cameraQZ": qz, "cameraQW": qw,
+        for f in range(target_frame_count):
+            # Frame-relative timestamp in ms
+            f_ms = int(f * 1000.0 / FPS)
+            t = base_time + _td(milliseconds=f_ms)
+            t_str = t.strftime("%Y-%m-%d %H:%M:%S.") + f"{t.microsecond // 1000:03d}"
+            # Apply all events whose timestamp is ≤ this frame's window
+            while ev_idx < len(events) and events[ev_idx].get("timestamp_ms", 0) <= f_ms:
+                ev = events[ev_idx]
+                et = ev.get("event_type", "")
+                if et == "key_down":
+                    kc = int(ev.get("keyCode", -1))
+                    if kc >= 0 and kc not in cur_keys:
+                        cur_keys.append(kc)
+                elif et == "key_up":
+                    kc = int(ev.get("keyCode", -1))
+                    if kc in cur_keys:
+                        cur_keys.remove(kc)
+                elif et in ("mouse_move", "mouse_click"):
+                    cur_mx = int(ev.get("mouseX", cur_mx))
+                    cur_my = int(ev.get("mouseY", cur_my))
+                ev_idx += 1
+            # Normalized mouse coords (0..1) per PRD; deltas
+            mx_n = cur_mx / SCREEN_W
+            my_n = cur_my / SCREEN_H
+            mdx = (cur_mx - prev_mx) / SCREEN_W
+            mdy = (cur_my - prev_my) / SCREEN_H
+            prev_mx, prev_my = cur_mx, cur_my
+            rec = {
+                "frame": f,
+                "time": t_str,
+                "fps": FPS,
+                "route_type": 1,
+                "mouse_x": mx_n,
+                "mouse_y": my_n,
+                "mouse_dx": mdx,
+                "mouse_dy": mdy,
+                # PRD: keyCode is list[int] of currently-held keys.
+                "keyCode": list(cur_keys) if cur_keys else [],
+                # camera_* fields placeholder — Replay Mod postprocess
+                # (G274) overwrites these when .mcpr present. For vanilla
+                # tester these stay [0,64,0] / identity.
+                "camera_position": [0.0, 64.0, 0.0],
+                "camera_rotation_euler": [0.0, 0.0, 0.0],
+                "camera_rotation_quaternion": [0.0, 0.0, 0.0, 1.0],
+                "camera_follow_offset": [0.0, 1.6, 0.0],
+                "camera_intrinsics": intrinsics,
+                "camera_speed": [0.0, 0.0, 0.0],
+                "player_position": [0.0, 64.0, 0.0],
+                "player_rotation_euler": [0.0, 0.0, 0.0],
+                "player_rotation_quaternion": [0.0, 0.0, 0.0, 1.0],
+                "player_speed": [0.0, 0.0, 0.0],
+                "metric_scale": 1.0,
             }
-            # Carry button info on mouse_click for downstream ML.
-            if "button" in ev:
-                rec["mouseButton"] = str(ev["button"])
-                rec["pressed"] = bool(ev.get("pressed", False))
             action_records.append(rec)
 
         (clip_dir / "action_camera.json").write_text(
-            json.dumps(
-                {
-                    "_placeholder_camera": True,
-                    "_note": (
-                        "key + mouse fields are real; camera/quaternion "
-                        "fields are placeholder until Rust app's depth "
-                        "shader (G198) lands"
-                    ),
-                    "recordCount": len(action_records),
-                    "records": action_records,
-                },
-                separators=(",", ":"),  # compact for large arrays
-            ),
+            # PRD format: top-level array of records, no wrapper dict.
+            # sample_tarball_builder.py writes this format too.
+            json.dumps(action_records, separators=(",", ":"), ensure_ascii=False),
             encoding="utf-8",
         )
 
