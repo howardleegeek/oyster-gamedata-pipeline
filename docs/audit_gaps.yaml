@@ -1668,9 +1668,10 @@ gaps:
   purpose: Workflow that runs on every push and short-circuits with skip-marker output
     if commit message contains [skip ci] or paths-ignore patterns; redundancy layer
     for paths-ignore
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 60
+  dispatched_at: '2026-05-05 19:19:11'
 - id: G190
   title: bin/backend_ingest_handler.py
   purpose: FastAPI endpoint /v1/ingest accepts vendor tarball uploads, validates via
@@ -1739,9 +1740,10 @@ gaps:
   title: bin/multi_clip_stitcher.py
   purpose: Combine N short same-scene clips into longer episode; preserve timestamp
     continuity + frame_id offset; for buyers wanting longer trajectories
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 260
+  dispatched_at: '2026-05-05 19:22:11'
 - id: G198
   title: bin/depth_shader_pack_minecraft.py
   purpose: Generator for Iris/Sodium shader pack that exports Z-buffer at 6fps to
@@ -1755,9 +1757,10 @@ gaps:
   title: bin/recorder_health_telemetry.py
   purpose: Vendor recorder posts heartbeat (uptime, FPS, encoder backpressure, last-clip-at)
     to /v1/health endpoint every 60s; backend dashboard surfaces stragglers
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 200
+  dispatched_at: '2026-05-05 19:23:38'
 - id: G200
   title: docs/runbooks/BACKEND_DEPLOY.md
   purpose: 'Deploy FastAPI backend to Render or Railway: env vars + Postgres URL +
@@ -2082,10 +2085,11 @@ gaps:
   purpose: Rust panic handler + std::panic::set_hook compiled into recorder.exe; serializes
     panic_info + backtrace + machine-id (HMAC-rotated, GDPR-safe) and POSTs to G231
     endpoint
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 240
   dispatched_at: '2026-05-05 18:58:36'
+  completed_at: '2026-05-05 19:14:49'
 - id: G236
   title: bin/error_client_pytest_plugin.py
   purpose: pytest plugin (entry-point pytest11) auto-reporting test failures + tracebacks
@@ -2181,10 +2185,11 @@ gaps:
   purpose: 'Anonymous mode: consumer can install + record + accumulate clips locally
     without ANY signup or email; opt-in to account later via in-app prompt; clips
     queued locally, uploaded only after opt-in'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 260
   dispatched_at: '2026-05-05 19:00:31'
+  completed_at: '2026-05-05 19:14:51'
 - id: G246
   title: bin/disk_space_manager.py
   purpose: 'Auto-cleanup old local clips: configurable cap (default 5 GB), LRU deletion
@@ -2210,10 +2215,11 @@ gaps:
   purpose: Hook OS shutdown signals (Win SetConsoleCtrlHandler / macOS SIGTERM via
     launchd); flush in-flight clip writes, close tarballs atomically, persist queue
     state; restart-resume-able
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 220
   dispatched_at: '2026-05-05 19:03:28'
+  completed_at: '2026-05-05 19:14:53'
 - id: G249
   title: bin/battery_aware_pause.py
   purpose: On laptops, detect battery vs AC via psutil + IOPSCopyPowerSourcesInfo;
@@ -2264,26 +2270,29 @@ gaps:
   purpose: Wire EPal companion professional rating (1-5 stars) into clip metadata;
     buyer pays premium for higher-rated companion captures; informs cluster training-time
     data weighting
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 200
+  dispatched_at: '2026-05-05 19:16:06'
 - id: G255
   title: bin/epal_payout_passthrough.py
   purpose: 'Bonus payout rides EPal payment rails (POST <epal-api>/v1/companion/bonus):
     no Stripe / PayPal / W-9 — companion sees EPal session pay + recording bonus on
     one statement'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 240
+  dispatched_at: '2026-05-05 19:17:52'
 - id: G256
   title: bin/epal_client_consent_handshake.py
   purpose: 'At EPal session start, prompts the paying client (the customer): consent
     to recording for AI training, opt-out switch, GDPR-compliant disclosure; persists
     signed consent log per G221'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 220
   dispatched_at: '2026-05-05 19:12:06'
+  completed_at: '2026-05-05 19:14:55'
 - id: G257
   title: bin/epal_community_dashboard.py
   purpose: 'EPal-side companion dashboard widget: shows clips contributed this week,
@@ -2296,10 +2305,11 @@ gaps:
   title: docs/EPAL_COMPANION_ONBOARDING.md
   purpose: 'Companion-facing onboarding doc: how to enable recording in EPal companion
     app, what gets recorded vs not, FAQ on anti-cheat, bonus calc, opt-out anytime'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 220
   dispatched_at: '2026-05-05 19:14:15'
+  completed_at: '2026-05-05 19:14:57'
 - id: G260
   title: bin/recorder_audio_postprocess.py
   purpose: 'Wrap bin/audio_event_track to post-process recorder-captured WAV/MP4 audio:
@@ -2562,4 +2572,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 89343
-  last_heartbeat: '2026-05-06T02:14:15Z'
+  last_heartbeat: '2026-05-06T02:29:39Z'
