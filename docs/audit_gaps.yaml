@@ -1721,9 +1721,10 @@ gaps:
   title: bin/buyer_download_api_handler.py
   purpose: 'FastAPI /v1/buyer/clips endpoint: paginated clip list + presigned download
     URL per clip; auth via buyer JWT; rate-limit + audit log'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 250
+  dispatched_at: '2026-05-05 16:53:12'
 - id: G196
   title: bin/audio_track_extractor.py
   purpose: Extract audio from video.mp4 via ffmpeg, validate continuity (no gaps over
@@ -1744,10 +1745,11 @@ gaps:
   title: bin/depth_shader_pack_minecraft.py
   purpose: Generator for Iris/Sodium shader pack that exports Z-buffer at 6fps to
     disk; ground-truth depth replaces DepthAnything inference for MC capture
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 350
   dispatched_at: '2026-05-05 16:36:32'
+  completed_at: '2026-05-05 16:50:20'
 - id: G199
   title: bin/recorder_health_telemetry.py
   purpose: Vendor recorder posts heartbeat (uptime, FPS, encoder backpressure, last-clip-at)
@@ -1791,10 +1793,11 @@ gaps:
   title: docs/runbooks/VENDOR_INSTALL_VALIDATOR.md
   purpose: 'Validator runbook for vendor PCs: GPU model + driver + Java + Node + disk
     free + network speed checklist before recorder.exe runs'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 200
   dispatched_at: '2026-05-05 16:42:19'
+  completed_at: '2026-05-05 16:50:23'
 - id: G205
   title: bin/backup_orchestrator.py
   purpose: 'Daily backup: pg_dump Postgres + S3 cross-region replication + Glacier
@@ -1839,9 +1842,10 @@ gaps:
   purpose: 'Reference benchmark: train tiny world model on N clips of our data, evaluate
     on held-out test set; emits MSE / SSIM / FID for buyer to verify data quality
     before bulk purchase'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 350
+  dispatched_at: '2026-05-05 16:58:31'
 - id: G211
   title: docs/MARKETING_SITE_COPY.md
   purpose: 'Landing page copy: hero (play games get paid) + 3-step how-it-works +
@@ -1862,10 +1866,11 @@ gaps:
   title: docs/PRIVACY_POLICY.md
   purpose: 'Privacy policy: vendor PII (email, payout info) + clip data retention
     90 days + GDPR DSAR procedure + California CCPA opt-out + deletion endpoint'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 280
   dispatched_at: '2026-05-05 16:46:45'
+  completed_at: '2026-05-05 16:50:24'
 - id: G214
   title: bin/installer_one_click_windows.py
   purpose: 'Windows .msi installer: bundles Java 21 + recorder.exe + auto-launch-on-boot
@@ -1936,9 +1941,10 @@ gaps:
   title: bin/consent_log_signed.py
   purpose: 'Legally-binding signed consent log: HMAC-signed entry per recording session
     capturing user_id + game + timestamp + opt-in version; serves GDPR/CCPA/COPPA'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 220
+  dispatched_at: '2026-05-05 17:01:19'
 - id: G222
   title: bin/paypal_micropayout_handler.py
   purpose: 'PayPal Payouts API for consumer micro-payments ($1-50): batches per day,
@@ -1988,9 +1994,10 @@ gaps:
   title: docs/CONSUMER_LANDING_COPY.md
   purpose: 'Marketing site copy rewritten consumer-first: hero (Play Games, Earn Money)
     + 3-step (download, play, paid) + payout examples + privacy + referral CTA'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 240
+  dispatched_at: '2026-05-05 17:05:43'
 - id: G228
   title: bin/end_to_end_consumer_smoke.py
   purpose: 'Master smoke test for the consumer install->play->tarball flow: simulates
@@ -2347,4 +2354,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 89343
-  last_heartbeat: '2026-05-05T23:49:46Z'
+  last_heartbeat: '2026-05-06T00:08:43Z'
