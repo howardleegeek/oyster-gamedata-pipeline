@@ -2247,7 +2247,8 @@ gaps:
   priority: PP0
   estimated_lines: 180
   wave: W31
-  status: pending
+  status: completed
+  completed_at: '2026-05-06T00:48:04.928369+00:00'
   created_at: '2026-05-05T22:31:16+00:00'
 - id: G262
   title: bin/recorder_manifest.py
