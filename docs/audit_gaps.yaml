@@ -1983,10 +1983,11 @@ gaps:
   purpose: 'Auto-update mechanism (WinSparkle / Squirrel.Mac): polls update server
     daily, downloads new installer, prompts consumer ''restart to update'' or auto-update
     overnight'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 260
   dispatched_at: '2026-05-05 17:46:21'
+  completed_at: '2026-05-05 18:00:37'
 - id: G226
   title: bin/crash_reporter_sentry.py
   purpose: 'Sentry-style crash reporter for consumer app: catches Python + Rust +
@@ -2061,10 +2062,11 @@ gaps:
   purpose: 'Single-page admin dashboard at /admin/errors served by service: filter
     by severity / source / time / user; group by sha256_dedup_key showing top-10 most-frequent
     recent errors with sample traceback'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 350
   dispatched_at: '2026-05-05 17:47:28'
+  completed_at: '2026-05-05 18:00:39'
 - id: G234
   title: src/oyster_agent_runner/error_client_python.py
   purpose: 'Auto-installed Python global error capture: sys.excepthook + threading.excepthook
@@ -2108,10 +2110,11 @@ gaps:
   purpose: 'Deploy runbook for the error reporting service: Render or Railway + Postgres
     + env vars + alembic migrate + healthcheck + first end-to-end test (POST a fake
     error, see it in dashboard)'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 250
   dispatched_at: '2026-05-05 17:51:31'
+  completed_at: '2026-05-05 18:00:41'
 - id: G239
   title: bin/error_severity_classifier.py
   purpose: 'Auto-classifier: maps incoming error_class + module + traceback signature
@@ -2125,9 +2128,10 @@ gaps:
   purpose: 'For critical-severity errors: rate-limited Slack / Discord webhook (configurable);
     dedup window 5 min per sha256_key; daily-summary digest for medium / low; replaces
     Sentry pager-style alerts'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 200
+  dispatched_at: '2026-05-05 18:09:41'
 - id: G241
   title: bin/code_signing_windows_authenticode.py
   purpose: Automate Windows Authenticode signing of .msi installer + recorder.exe
@@ -2143,10 +2147,11 @@ gaps:
   purpose: 'Automate Apple Developer ID notarization workflow for .pkg installer +
     .app: codesign + altool / notarytool submit + staple; without it Gatekeeper blocks
     consumer install'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 240
   dispatched_at: '2026-05-05 18:00:02'
+  completed_at: '2026-05-05 18:00:43'
 - id: G243
   title: bin/release_builder_consumer.py
   purpose: 'End-to-end consumer release builder: takes a tag, builds signed Windows
@@ -2162,9 +2167,10 @@ gaps:
   purpose: 'Public-facing ''what is this software'' trust page accessible from system
     tray menu: what we record, what we do not, anti-cheat statement, privacy summary,
     GitHub link, contact'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 250
+  dispatched_at: '2026-05-05 18:11:19'
 - id: G245
   title: bin/anonymous_first_run.py
   purpose: 'Anonymous mode: consumer can install + record + accumulate clips locally
@@ -2178,17 +2184,19 @@ gaps:
   purpose: 'Auto-cleanup old local clips: configurable cap (default 5 GB), LRU deletion
     of uploaded clips first, never deletes pending-upload; warns user at 80 percent
     fill'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 230
+  dispatched_at: '2026-05-05 18:16:25'
 - id: G247
   title: bin/network_throttle_aware.py
   purpose: Detect metered / cellular / paid networks via Windows NetworkInformation
     API + macOS NWPath; pause uploads on metered connections by default; configurable
     in tray menu
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 200
+  dispatched_at: '2026-05-05 18:18:08'
 - id: G248
   title: bin/graceful_shutdown_handler.py
   purpose: Hook OS shutdown signals (Win SetConsoleCtrlHandler / macOS SIGTERM via
@@ -2537,4 +2545,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 89343
-  last_heartbeat: '2026-05-06T01:00:02Z'
+  last_heartbeat: '2026-05-06T01:18:08Z'
