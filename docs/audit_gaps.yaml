@@ -1829,9 +1829,10 @@ gaps:
   title: bin/dr_failover_runbook_check.py
   purpose: 'Disaster recovery validation: simulate primary-region outage, verify failover
     region serves /v1/ingest within 60s, restores last-good Postgres backup'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 250
+  dispatched_at: '2026-05-05 20:12:01'
 - id: G208
   title: sdk/python/oyster_buyer_sdk/__init__.py
   purpose: 'Python SDK for buyers: list_clips() / download_clip() / stream_dataset()
@@ -2234,10 +2235,11 @@ gaps:
   purpose: On laptops, detect battery vs AC via psutil + IOPSCopyPowerSourcesInfo;
     pause recording on battery (default) to preserve laptop; configurable override
     per-game
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 180
   dispatched_at: '2026-05-05 19:57:49'
+  completed_at: '2026-05-05 20:07:46'
 - id: G250
   title: bin/update_server_endpoint.py
   purpose: FastAPI /api/updates/check?platform=windows&current=1.0.0 endpoint serving
@@ -2262,10 +2264,11 @@ gaps:
   purpose: 'Internationalization: zh-CN + zh-TW + en-US runtime string loader; covers
     tray menu, splash, privacy dashboard, error messages; .po format compatible with
     future locale adds'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 240
   dispatched_at: '2026-05-05 19:59:30'
+  completed_at: '2026-05-05 20:07:48'
 - id: G253
   title: bin/epal_session_lifecycle_hook.py
   purpose: 'POST /v1/epal/session_start + /v1/epal/session_end webhooks: recorder
@@ -2566,9 +2569,9 @@ gaps:
   priority: PP1
   estimated_lines: 110
   wave: W31
-  status: dispatched
+  status: completed
   created_at: '2026-05-06T00:14:49+00:00'
-  completed_at: '2026-05-06T00:47:20+00:00'
+  completed_at: '2026-05-05 20:07:50'
   dispatched_at: '2026-05-05 20:04:11'
 - id: G280
   title: bin/recorder_clip_uuid.py
@@ -2577,9 +2580,10 @@ gaps:
   priority: PP2
   estimated_lines: 50
   wave: W31
-  status: pending
+  status: dispatched
   created_at: '2026-05-06T00:14:49+00:00'
   completed_at: '2026-05-06T00:47:20+00:00'
+  dispatched_at: '2026-05-05 20:15:59'
 - id: G281
   title: bin/recorder_utc_timestamps.py
   purpose: Audit recorder code for datetime.now() calls without tz, replace with datetime.now(timezone.utc).
@@ -2603,4 +2607,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 89343
-  last_heartbeat: '2026-05-06T03:07:11Z'
+  last_heartbeat: '2026-05-06T03:22:00Z'
