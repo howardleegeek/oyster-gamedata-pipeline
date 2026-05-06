@@ -1787,10 +1787,11 @@ gaps:
   title: bin/buyer_signup_flow.py
   purpose: 'Buyer signup: company info + sales contact + JWT issuance + sample-clip
     download grant; writes buyers row + audit'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 240
   dispatched_at: '2026-05-05 17:10:39'
+  completed_at: '2026-05-05 17:26:03'
 - id: G204
   title: docs/runbooks/VENDOR_INSTALL_VALIDATOR.md
   purpose: 'Validator runbook for vendor PCs: GPU model + driver + Java + Node + disk
@@ -2009,19 +2010,21 @@ gaps:
     installer run + game launch + 5-min mock-provider trajectory + auto-stop + PRD-compliant
     tarball at ~/Documents/OysterClips/; gates the v1 release. Asserts 24/24 G165
     lint PASS at end'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 280
   dispatched_at: '2026-05-05 17:15:26'
+  completed_at: '2026-05-05 17:26:04'
 - id: G229
   title: bin/fps_overhead_monitor.py
   purpose: 'Real-time FPS-overhead monitor: measures consumer game FPS with vs without
     recording; auto-scales encoder bitrate / disables depth track if overhead > 5
     percent. Critical: consumers uninstall instantly if their game''s framerate drops'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 240
   dispatched_at: '2026-05-05 17:18:02'
+  completed_at: '2026-05-05 17:26:07'
 - id: G230
   title: bin/in_app_clip_status_widget.py
   purpose: System-tray menu widget showing last 5 clips with green PASS / red FAIL
@@ -2037,19 +2040,21 @@ gaps:
   purpose: FastAPI service exposing POST /v1/errors {severity, source, user_id, error_class,
     traceback, context_json}; rate-limit per IP + per user; dedup by sha256(traceback);
     writes to Postgres
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 320
   dispatched_at: '2026-05-05 17:19:37'
+  completed_at: '2026-05-05 17:26:08'
 - id: G232
   title: bin/error_storage_postgres.py
   purpose: 'Alembic migration + SQLAlchemy models for errors table: timestamp, severity,
     source (recorder/cli/test/cluster), user_id, error_class, traceback_text, context_jsonb,
     sha256_dedup_key indexed; retention 90 days'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 220
   dispatched_at: '2026-05-05 17:22:27'
+  completed_at: '2026-05-05 17:26:10'
 - id: G233
   title: bin/error_dashboard_web.py
   purpose: 'Single-page admin dashboard at /admin/errors served by service: filter
@@ -2063,9 +2068,10 @@ gaps:
   purpose: 'Auto-installed Python global error capture: sys.excepthook + threading.excepthook
     + asyncio default handler + atexit; non-blocking POST to G231 with retry; PII-strip
     helper for tracebacks'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 280
+  dispatched_at: '2026-05-05 17:35:11'
 - id: G235
   title: bin/error_client_rust_recorder.rs
   purpose: Rust panic handler + std::panic::set_hook compiled into recorder.exe; serializes
@@ -2079,17 +2085,19 @@ gaps:
   purpose: pytest plugin (entry-point pytest11) auto-reporting test failures + tracebacks
     to G231 with source=test, ci_run_id, commit_sha; opt-out via OYSTER_NO_ERROR_REPORT
     env var
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 200
+  dispatched_at: '2026-05-05 17:39:59'
 - id: G237
   title: bin/auto_install_error_handler.py
   purpose: 'One-line bootstrap: import this at any process startup -> installs G234
     global Python hooks; works via PYTHONSTARTUP / sitecustomize.py / explicit import;
     zero-config for any runtime'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 150
+  dispatched_at: '2026-05-05 17:41:30'
 - id: G238
   title: docs/runbooks/ERROR_SERVICE_DEPLOY.md
   purpose: 'Deploy runbook for the error reporting service: Render or Railway + Postgres
@@ -2499,4 +2507,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 89343
-  last_heartbeat: '2026-05-06T00:25:28Z'
+  last_heartbeat: '2026-05-06T00:44:30Z'
