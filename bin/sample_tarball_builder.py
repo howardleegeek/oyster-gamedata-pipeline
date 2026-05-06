@@ -79,7 +79,11 @@ def synthesize_video(out_path: str, duration_sec: float = 300, fps: int = 30) ->
     return str(out_path)
 
 
-def synthesize_action_camera(out_path: str, frame_count: int = 9000) -> str:
+def synthesize_action_camera(
+    out_path: str,
+    frame_count: int = 9000,
+    session_id: str | None = None,
+) -> str:
     """
     Generate valid action_camera records as buyer-spec-compliant JSON
     (PDF p7 file 2 = action_camera.json, NOT binary).
@@ -95,6 +99,9 @@ def synthesize_action_camera(out_path: str, frame_count: int = 9000) -> str:
     Args:
         out_path: Output JSON file path
         frame_count: Number of records (default 9000 = 5 min × 30 fps)
+        session_id: R18 session-binding UUID. None → frames omit the
+            field (legacy behavior); supplied → every frame carries it
+            so R18 can verify against session_manifest.json.
 
     Returns:
         Path to the created JSON file
@@ -199,6 +206,11 @@ def synthesize_action_camera(out_path: str, frame_count: int = 9000) -> str:
             "player_speed": list(cam_speed),
             "metric_scale": 1.0,
         })
+        if session_id is not None:
+            # R18 binding: each frame declares the session it belongs to.
+            # Frankenstein splice (B-05) breaks here — attacker would need
+            # to forge the same UUID across all 9000 frames.
+            records[-1]["session_id"] = session_id
         prev_yaw = yaw
 
     with open(out_path, "w", encoding="utf-8") as f:
@@ -422,13 +434,20 @@ def build_sample_tarball(
     """
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    
+
+    # R18: generate one session UUID up-front, embed in every artifact so the
+    # session_manifest.json + per-frame session_id agree. Without this binding,
+    # red-team B-05 (Frankenstein splice) is undetectable.
+    import uuid as _uuid
+    session_id = str(_uuid.uuid4())
+
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)
-        
+
         # Generate components
         print(f"Building sample tarball: {output_path}")
         print(f"Clip ID: {clip_id}")
+        print(f"Session ID: {session_id}")
         
         # 1. Video
         video_path = tmpdir / "video.mp4"
@@ -449,7 +468,23 @@ def build_sample_tarball(
         # 3. Action camera data (JSON per PDF, not binary)
         print("Generating action_camera.json...")
         action_camera_path = tmpdir / "action_camera.json"
-        synthesize_action_camera(str(action_camera_path), frame_count=9000)
+        synthesize_action_camera(
+            str(action_camera_path), frame_count=9000, session_id=session_id
+        )
+
+        # R18: write session_manifest.json alongside other artifacts so the
+        # residual can verify each frame's session_id matches.
+        import json as _json
+        manifest_path = tmpdir / "session_manifest.json"
+        manifest_path.write_text(
+            _json.dumps({
+                "session_id": session_id,
+                "recorder_version": "sample-tarball-builder",
+                "frame_count": 9000,
+                "clip_id": clip_id,
+            }, indent=2),
+            encoding="utf-8",
+        )
         
         # 3. Game info
         print("Generating gameinfo.xlsx...")
@@ -480,6 +515,7 @@ def build_sample_tarball(
             tar.add(video_path, arcname="video.mp4")
             tar.add(systeminfo_path, arcname="systeminfo.json")
             tar.add(action_camera_path, arcname="action_camera.json")
+            tar.add(manifest_path, arcname="session_manifest.json")
             tar.add(gameinfo_path, arcname="gameinfo.xlsx")
             tar.add(depth_dir, arcname="depth")
         

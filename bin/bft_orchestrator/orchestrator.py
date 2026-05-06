@@ -140,13 +140,69 @@ def _run(module: Any, vid: str, registry: list, normalize: Callable[[str, str, A
     return out
 
 
+def _abstain_vote(verifier: str, residual_name: str, note: str) -> bool:
+    """Return True if a residual result represents an ABSTAIN.
+
+    Both V₁'s ResidualResult and V₂'/V₂prime's dict use a ``ABSTAIN:`` note
+    prefix to encode "I don't know" per IL10. The orchestrator drops these
+    so they don't poison the tally as FAIL votes.
+    """
+    return isinstance(note, str) and note.startswith("ABSTAIN:")
+
+
+def _r13_vote_v1(frame: dict, neighbor: dict | None,
+                 inputs_path: str | Path | None) -> Vote | None:
+    """Invoke V₁ R13 keycode-replay if module is loadable. Returns None on
+    ABSTAIN so we don't pollute the tally."""
+    mod = _load("bin.v1_claude_residuals.r13_keycode_replay")
+    if mod is None or inputs_path is None:
+        return None
+    fn = getattr(mod, "r13_keycode_replay", None)
+    if fn is None:
+        return None
+    try:
+        r = fn(frame, neighbor, inputs_path)
+    except Exception as exc:
+        return Vote("V1", "R13", "FAIL", math.nan, 0.0,
+                    f"{type(exc).__name__}: {exc}")
+    note = getattr(r, "note", "") or ""
+    if _abstain_vote("V1", "R13", note):
+        return None
+    return _to_vote_v1("R13", "V1", r)
+
+
+def _r13_vote_v2prime(frame: dict, neighbor: dict | None,
+                      inputs_path: str | Path | None) -> Vote | None:
+    """Invoke V₂' GLM R13 keycode-replay (dict return shape)."""
+    mod = _load("bin.v2prime_glm_residuals.residuals")
+    if mod is None or inputs_path is None:
+        return None
+    fn = getattr(mod, "r13_keycode_replay", None)
+    if fn is None:
+        return None
+    try:
+        r = fn(frame, neighbor, str(inputs_path))
+    except Exception as exc:
+        return Vote("V2prime", "R13", "FAIL", math.nan, 0.0,
+                    f"{type(exc).__name__}: {exc}")
+    note = str(r.get("note", "")) if isinstance(r, dict) else ""
+    if _abstain_vote("V2prime", "R13", note):
+        return None
+    return _to_vote_v2("R13", "V2prime", r)
+
+
 def collect_votes(frame: dict, neighbor: dict | None = None,
-                  fps: float = 30.0) -> list[Vote]:
+                  fps: float = 30.0,
+                  inputs_path: str | Path | None = None) -> list[Vote]:
     """Run all V1/V2/V3 (and V2' if present) residuals on the frame pair.
 
     Residuals needing neighbor (R03, R04, R05) are skipped if neighbor is
     None. Any verifier exception becomes a FAIL vote with evidence=str(exc):
     a TypeError raised by V2 R07 on scalar mouse_x is still detection.
+
+    Multimodal residual R13 is invoked per-frame when ``inputs_path`` is
+    provided (V₁ + V₂' both implement R13 with matching contracts).
+    R15/R16 are dataset-level and are invoked from ``aggregate_dataset``.
     """
     votes: list[Vote] = []
     votes += _run(_load("bin.v1_claude_residuals.residuals"), "V1", _V1_RES,
@@ -157,7 +213,62 @@ def collect_votes(frame: dict, neighbor: dict | None = None,
                   _V2P_RES, _to_vote_v2, frame, neighbor, fps)
     votes += _run(_load("bin.v3_physics_oracle.residuals"), "V3", _V3_RES,
                   _to_vote_v3, frame, neighbor, fps)
+
+    # R13 is per-frame multimodal: needs inputs.jsonl, applied here.
+    if inputs_path is not None:
+        v1_r13 = _r13_vote_v1(frame, neighbor, inputs_path)
+        if v1_r13 is not None:
+            votes.append(v1_r13)
+        v2p_r13 = _r13_vote_v2prime(frame, neighbor, inputs_path)
+        if v2p_r13 is not None:
+            votes.append(v2p_r13)
     return votes
+
+
+def _r15_dataset_vote(video_path: str | Path | None,
+                      sample_rec: dict) -> Vote | None:
+    """Invoke V₁ R15 fps-consistency once per dataset. Returns None on
+    ABSTAIN. The residual reads ``rec['fps']`` so we pass any record."""
+    if video_path is None:
+        return None
+    mod = _load("bin.v1_claude_residuals.r15_fps_consistency")
+    if mod is None:
+        return None
+    fn = getattr(mod, "r15_fps_consistency", None)
+    if fn is None:
+        return None
+    try:
+        r = fn(sample_rec, str(video_path))
+    except Exception as exc:
+        return Vote("V1", "R15", "FAIL", math.nan, 0.0,
+                    f"{type(exc).__name__}: {exc}")
+    note = getattr(r, "note", "") or ""
+    if _abstain_vote("V1", "R15", note):
+        return None
+    return _to_vote_v1("R15", "V1", r)
+
+
+def _r16_dataset_vote(depth_dir: str | Path | None,
+                      video_duration_sec: float | None,
+                      sample_rec: dict) -> Vote | None:
+    """Invoke V₁ R16 depth-count once per dataset."""
+    if depth_dir is None:
+        return None
+    mod = _load("bin.v1_claude_residuals.r16_depth_count")
+    if mod is None:
+        return None
+    fn = getattr(mod, "r16_depth_count", None)
+    if fn is None:
+        return None
+    try:
+        r = fn(sample_rec, str(depth_dir), video_duration_sec)
+    except Exception as exc:
+        return Vote("V1", "R16", "FAIL", math.nan, 0.0,
+                    f"{type(exc).__name__}: {exc}")
+    note = getattr(r, "note", "") or ""
+    if _abstain_vote("V1", "R16", note):
+        return None
+    return _to_vote_v1("R16", "V1", r)
 
 
 def tally(votes: list[Vote]) -> dict[str, dict[str, Any]]:
@@ -209,12 +320,49 @@ def tally(votes: list[Vote]) -> dict[str, dict[str, Any]]:
     return out
 
 
-def aggregate_dataset(records: list[dict], fps: float = 30.0) -> dict[str, Any]:
-    """Run collect_votes + tally on each frame pair (n, n+1)."""
+def aggregate_dataset(records: list[dict], fps: float = 30.0,
+                      inputs_path: str | Path | None = None,
+                      video_path: str | Path | None = None,
+                      depth_dir: str | Path | None = None,
+                      video_duration_sec: float | None = None) -> dict[str, Any]:
+    """Run collect_votes + tally on each frame pair (n, n+1).
+
+    Multimodal extras (all backward-compatible — None = unchanged behavior):
+
+    * ``inputs_path``: when set, V₁ + V₂' R13 keycode-replay is invoked per
+      frame and aggregated into the residuals dict.
+    * ``video_path``: when set, V₁ R15 fps-consistency is invoked ONCE for
+      the whole dataset (ffprobe is dataset-level).
+    * ``depth_dir`` + ``video_duration_sec``: when both set, V₁ R16
+      depth-count is invoked ONCE for the whole dataset. If
+      ``video_duration_sec`` is None, it is derived from frame count
+      (``len(records) / fps``) so callers don't have to re-probe.
+    """
     n_pairs = max(len(records) - 1, 0)
     by_res: dict[str, dict[str, int]] = {}
     for i in range(n_pairs):
-        for r_name, info in tally(collect_votes(records[i], records[i + 1], fps=fps)).items():
+        votes = collect_votes(records[i], records[i + 1], fps=fps,
+                              inputs_path=inputs_path)
+        for r_name, info in tally(votes).items():
+            bucket = by_res.setdefault(r_name, {"COMMIT": 0, "REJECT": 0, "VIEW_CHANGE": 0, "INSUFFICIENT": 0})
+            bucket[info["decision"]] += 1
+
+    # Dataset-level multimodal residuals (R15, R16) — fire once per dataset.
+    sample_rec = records[0] if records else {}
+    dataset_votes: list[Vote] = []
+    if video_path is not None:
+        v = _r15_dataset_vote(video_path, sample_rec)
+        if v is not None:
+            dataset_votes.append(v)
+    if depth_dir is not None:
+        duration = video_duration_sec
+        if duration is None and records and fps > 0:
+            duration = float(len(records)) / float(fps)
+        v = _r16_dataset_vote(depth_dir, duration, sample_rec)
+        if v is not None:
+            dataset_votes.append(v)
+    if dataset_votes:
+        for r_name, info in tally(dataset_votes).items():
             bucket = by_res.setdefault(r_name, {"COMMIT": 0, "REJECT": 0, "VIEW_CHANGE": 0, "INSUFFICIENT": 0})
             bucket[info["decision"]] += 1
 

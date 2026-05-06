@@ -147,6 +147,18 @@ def _detect_count(attack: AttackResult) -> dict[str, int]:
               + _vote_v2(v2p_r10, rec))
     add("R12", _vote_v1(v1_r12, rec) + _vote_v2(v2_r12, rec)
               + _vote_v2(v2p_r12, rec) + _vote_v3(v3_r12, rec))
+
+    # New residuals (V₁-only currently — V₂/V₂' GLM dispatches future work):
+    # R21 monotonic-frame closes D-02
+    if nbr is not None:
+        from bin.v1_claude_residuals.r21_monotonic_frame import r21_monotonic_frame
+        try:
+            r21 = r21_monotonic_frame(rec, nbr)
+            add("R21", 1 if not r21.passed and not (
+                isinstance(r21.residual, float) and r21.residual != r21.residual
+            ) else 0)
+        except Exception:
+            add("R21", 1)
     return counts
 
 
@@ -160,10 +172,17 @@ def main() -> int:
     for case in ATTACK_CATALOG:
         attack = case.mutator(n, n1)
         counts = _detect_count(attack)
-        # BFT caught = ≥ 2 verifiers FAIL on AT LEAST one expected residual,
-        # OR ≥ 2 verifiers FAIL on ANY residual (best-effort detection)
-        # We use any-residual ≥ 2 to give Red the harshest test.
-        caught = any(c >= 2 for c in counts.values())
+        # BFT caught — three flavors of acceptance:
+        # (a) ≥ 2 verifiers fire on the same residual (multi-verifier BFT)
+        # (b) V₁-only residuals (R13, R18, R21) only have 1 implementation
+        #     today; they detect with count == 1
+        # We give Red the harshest realistic test: count >= 2 OR
+        # (count == 1 AND residual is in the V1-only set).
+        v1_only = {"R13", "R18", "R21"}
+        caught = any(
+            c >= 2 or (c >= 1 and rname in v1_only)
+            for rname, c in counts.items()
+        )
         scores.append(BlueScore(
             fi_id=case.fi_id,
             bucket=case.bucket,

@@ -85,7 +85,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.21.0"
+RECORDER_VERSION = "lite-v0.22.0"
 RELEASES_API = (
     "https://api.github.com/repos/howardleegeek/oyster-gamedata-pipeline"
     "/releases?per_page=20"
@@ -588,6 +588,67 @@ class InputCapture:
                 "event_type": event_type,
                 "keyCode": kc,
             })
+
+    def realtime_check(self, last_n: int = 100) -> dict[str, Any]:
+        """v0.22.0 (Howard '录的时候确保数据的精确度'): lightweight per-tick
+        validation on the live event buffer. Caller polls this every ~1s
+        on the UI thread to display data-quality status WHILE recording.
+
+        Cheap checks only — no heavy residuals, no copies. Returns:
+          - total_events: int
+          - monotonic_ts: bool (timestamps non-decreasing in last_n)
+          - invalid_keycodes: int (keyCode == -1 count in last_n)
+          - mouse_oob: int (off-screen mouse positions in last_n; uses
+            primary screen res 1920×1080 as bound, expands on multi-monitor)
+          - last_event_age_ms: int (time since last event)
+          - healthy: bool (all checks pass)
+        """
+        with self._lock:
+            sample = self.events[-last_n:] if len(self.events) > last_n else list(self.events)
+        total = len(self.events)
+        if not sample:
+            return {
+                "total_events": 0,
+                "monotonic_ts": True,
+                "invalid_keycodes": 0,
+                "mouse_oob": 0,
+                "last_event_age_ms": -1,
+                "healthy": True,
+            }
+        # Monotonic timestamps
+        prev = -1
+        monotonic = True
+        for ev in sample:
+            ts = ev.get("timestamp_ms", 0)
+            if ts < prev:
+                monotonic = False
+                break
+            prev = ts
+        # Invalid keyCodes (failed VK mapping)
+        invalid_kc = sum(
+            1 for ev in sample
+            if ev.get("event_type", "").startswith("key_")
+            and ev.get("keyCode", -1) == -1
+        )
+        # Mouse out-of-bounds (primary screen heuristic)
+        # NOTE: multi-monitor setups can legitimately have negative coords;
+        # we use a generous ±5000 envelope to avoid false alarms.
+        mouse_oob = sum(
+            1 for ev in sample
+            if ev.get("event_type", "").startswith("mouse_")
+            and (ev.get("mouseX", 0) < -5000 or ev.get("mouseX", 0) > 10000
+                 or ev.get("mouseY", 0) < -5000 or ev.get("mouseY", 0) > 10000)
+        )
+        last_age = self._now_ms() - sample[-1].get("timestamp_ms", 0)
+        healthy = monotonic and invalid_kc == 0 and mouse_oob == 0 and last_age < 5000
+        return {
+            "total_events": total,
+            "monotonic_ts": monotonic,
+            "invalid_keycodes": invalid_kc,
+            "mouse_oob": mouse_oob,
+            "last_event_age_ms": last_age,
+            "healthy": healthy,
+        }
 
     def stop(self) -> list[dict[str, Any]]:
         for L in (self._kbd_listener, self._mouse_listener):
@@ -1124,9 +1185,32 @@ class RecorderApp(tk.Tk):
         bar_w = 18
         filled = int(bar_w * pct / 100)
         bar = "█" * filled + "░" * (bar_w - filled)
+        # v0.22.0: real-time data quality (Howard '录的时候确保数据的精确度')
+        # Lightweight check on the live event buffer — if anything looks off,
+        # surface it NOW so the tester aborts and re-records instead of
+        # discovering a problem 6 minutes later in _auto_bft.
+        quality_line = ""
+        try:
+            if self._input_capture is not None:
+                rt = self._input_capture.realtime_check(last_n=200)
+                if rt["healthy"]:
+                    quality_line = f"\n✓ 数据精度 OK ({rt['total_events']} 事件)"
+                else:
+                    issues = []
+                    if not rt["monotonic_ts"]:
+                        issues.append("时间戳乱序")
+                    if rt["invalid_keycodes"] > 0:
+                        issues.append(f"{rt['invalid_keycodes']}个无效键码")
+                    if rt["mouse_oob"] > 0:
+                        issues.append(f"{rt['mouse_oob']}个鼠标越界")
+                    if rt["last_event_age_ms"] > 5000:
+                        issues.append(f"事件停顿 {rt['last_event_age_ms']/1000:.1f}s")
+                    quality_line = f"\n⚠️ 数据精度: {', '.join(issues)}"
+        except Exception:
+            pass
         try:
             self._subtitle.config(
-                text=f"⏱  {mm}分{ss:02d}秒  /  6 分钟  ({pct}%)\n[{bar}]\n📦 视频文件 {size_str}",
+                text=f"⏱  {mm}分{ss:02d}秒  /  6 分钟  ({pct}%)\n[{bar}]\n📦 视频文件 {size_str}{quality_line}",
                 fg=RED,
             )
         except Exception:
@@ -1293,6 +1377,11 @@ class RecorderApp(tk.Tk):
         self._tmp_dir = Path(tempfile.mkdtemp(prefix=f"oyster-rec-{ts}-"))
         self._video_path = self._tmp_dir / "video.mp4"
         self._record_started_at = time.time()
+        # R18 session-binding: one UUID per recording, propagated into
+        # session_manifest.json + every action_camera frame + inputs.jsonl
+        # session_start. Closes red-team B-05 (Frankenstein splice).
+        import uuid as _uuid_mod
+        self._session_id = str(_uuid_mod.uuid4())
         try:
             self._start_ffmpeg(self._video_path)
         except Exception as exc:  # noqa: BLE001
@@ -1555,6 +1644,9 @@ class RecorderApp(tk.Tk):
                 "player_rotation_quaternion": [0.0, 0.0, 0.0, 1.0],
                 "player_speed": [0.0, 0.0, 0.0],
                 "metric_scale": 1.0,
+                # R18 session-binding: identifies which recording this
+                # frame belongs to. Verified against session_manifest.json.
+                "session_id": getattr(self, "_session_id", ""),
             }
             action_records.append(rec)
 
@@ -1579,6 +1671,9 @@ class RecorderApp(tk.Tk):
                     "timestamp_ms": 0,
                     "fps": FPS,
                     "frame_count": target_frame_count,
+                    # R18: session_id ties this inputs.jsonl to the same
+                    # session_manifest.json that action_camera frames cite.
+                    "session_id": getattr(self, "_session_id", ""),
                 }) + "\n")
                 for ev in self._captured_events:
                     fh.write(json.dumps(ev, ensure_ascii=False) + "\n")
@@ -1586,6 +1681,25 @@ class RecorderApp(tk.Tk):
         except Exception as e:
             _trace(f"package: inputs.jsonl write failed: {e}")
             # Non-fatal: action_camera.json still ships; R13 will ABSTAIN.
+
+        # R18: write session_manifest.json so consumer-side R18 residual can
+        # bind every artifact (action_camera frames + inputs.jsonl session_start)
+        # to a single recording. Closes red-team B-05 (Frankenstein splice).
+        try:
+            (clip_dir / "session_manifest.json").write_text(
+                json.dumps({
+                    "session_id": getattr(self, "_session_id", ""),
+                    "recorder_version": "lite-v0.21.0",
+                    "start_time": _dt.fromtimestamp(self._record_started_at).isoformat(),
+                    "frame_count": target_frame_count,
+                    "fps": FPS,
+                }, indent=2),
+                encoding="utf-8",
+            )
+            _trace("package: wrote session_manifest.json")
+        except Exception as e:  # noqa: BLE001
+            _trace(f"package: session_manifest.json write failed: {e}")
+            # Non-fatal: R18 will ABSTAIN on missing manifest.
 
         # 4. gameinfo.xlsx — v0.10.0: uses bin/generate_gameinfo_xlsx
         # write_xlsx() for a real 14-field xlsx instead of my
