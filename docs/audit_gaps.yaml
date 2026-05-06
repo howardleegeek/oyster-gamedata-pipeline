@@ -2312,7 +2312,8 @@ gaps:
   priority: PP1
   estimated_lines: 120
   wave: W31
-  status: pending
+  status: completed
+  completed_at: '2026-05-06T00:50:18.262636+00:00'
   created_at: '2026-05-05T22:31:16+00:00'
 - id: G264
   title: bin/recorder_replay_mod_installer.py
