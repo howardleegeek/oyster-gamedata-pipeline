@@ -97,16 +97,22 @@ class PipelineReport:
 def _try_import(module_name: str) -> Optional[Any]:
     """Import ``module_name`` lazily, returning None if unavailable.
 
-    ``None`` is the universal "phase skipped" signal in this orchestrator;
-    callers must not treat ImportError as fatal — the W31 contract is to
-    keep coordinating whatever phases ARE available.
+    Tries the bare name first (recorder runtime, with ``bin/`` on sys.path)
+    then ``bin.<name>`` (test harness with repo root on sys.path).  ``None``
+    is the universal "phase skipped" signal in this orchestrator; callers
+    must not treat ImportError as fatal — the W31 contract is to keep
+    coordinating whatever phases ARE available.
     """
-    try:
-        return importlib.import_module(module_name)
-    except (ImportError, ModuleNotFoundError) as exc:
-        logger.info("Sibling %s not available: %s — skipping phase",
-                    module_name, exc)
-        return None
+    last_exc: Optional[Exception] = None
+    for candidate in (module_name, f"bin.{module_name}"):
+        try:
+            return importlib.import_module(candidate)
+        except (ImportError, ModuleNotFoundError) as exc:
+            last_exc = exc
+            continue
+    logger.info("Sibling %s not available: %s — skipping phase",
+                module_name, last_exc)
+    return None
 
 
 def _run_phase(name: str, fn: Callable[[], str]) -> PhaseResult:
