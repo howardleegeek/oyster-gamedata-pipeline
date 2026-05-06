@@ -85,7 +85,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.20.0"
+RECORDER_VERSION = "lite-v0.20.1"
 RELEASES_API = (
     "https://api.github.com/repos/howardleegeek/oyster-gamedata-pipeline"
     "/releases?per_page=20"
@@ -179,11 +179,15 @@ def _stage_self_update(new_exe_url: str) -> bool:
     and overwrites our bootstrap, leaving the _internal/ folder
     orphaned and crashing the next launch with PYI_APPLICATION_HOME_DIR.
     """
-    if os.name != "nt" or not getattr(sys, "frozen", False):
-        # Only auto-update when running as a packaged .exe on Windows.
+    # v0.20.1: fail-loud diagnostic trace at every gate (was silently False)
+    if os.name != "nt":
+        _trace(f"update: SKIP — non-Windows OS ({os.name})")
+        return False
+    if not getattr(sys, "frozen", False):
+        _trace("update: SKIP — not running as packaged .exe (dev mode)")
         return False
     if _is_onedir_install():
-        _trace("update: SKIP — running as --onedir, refusing single-.exe overwrite")
+        _trace("update: SKIP — onedir bundle, refuses single-.exe overwrite (would orphan _internal/)")
         return False
     try:
         import urllib.request
@@ -192,9 +196,14 @@ def _stage_self_update(new_exe_url: str) -> bool:
         with urllib.request.urlopen(new_exe_url, timeout=120) as resp, \
                 new_path.open("wb") as fh:
             shutil.copyfileobj(resp, fh)
-        _trace(f"update: downloaded {new_path.stat().st_size} bytes")
+        size = new_path.stat().st_size
+        _trace(f"update: downloaded {size} bytes")
+        if size < 1_000_000:  # under 1 MB is suspicious — likely a 4xx error page
+            _trace(f"update: ABORT — downloaded file too small ({size} bytes), likely error page not exe")
+            return False
     except Exception as e:
-        _trace(f"update: download failed {e}")
+        # v0.20.1: explicit exception type for diagnostic clarity
+        _trace(f"update: download failed [{type(e).__name__}]: {e}")
         return False
 
     current_exe = Path(sys.executable)
@@ -249,55 +258,113 @@ def _check_for_update_in_background(on_done=None) -> None:
 
 # ---- Remote telemetry (so engineer can see logs without tester action) ---
 # Howard 2026-05-05: "你这边 能不能有log 到信息和日志"
-# We POST the full local log to ix.io (anonymous, free pastebin) on close
-# / crash / record-complete. The returned URL is appended to the local log
-# AND shown in the GUI subtitle so tester can read it off if asked. We do
-# NOT block startup or recording on this network call — it runs on a
-# daemon thread and any failure is silently logged.
-TELEMETRY_ENDPOINT = "http://ix.io"
+# v0.20.1 hotfix: ix.io is DEAD (offline since 2024). Switch to 0x0.st,
+# which is alive, free, no-auth, accepts multipart file uploads.
+# Always write a local diagnostic zip to Desktop as fallback so the tester
+# can manually send via WeChat/email even if both endpoints fail.
+TELEMETRY_ENDPOINT = "https://0x0.st"  # multipart POST with field name "file"
+DIAGNOSTIC_ZIP_NAME = "OysterRecorder_diagnostic.zip"
+
+
+def _desktop_path() -> Path:
+    """Return path to user's Desktop, falling back to home if not present."""
+    desktop = Path.home() / "Desktop"
+    if desktop.exists():
+        return desktop
+    # 中文 Windows 桌面 may localize — try OneDrive Desktop too
+    onedrive = Path.home() / "OneDrive" / "Desktop"
+    if onedrive.exists():
+        return onedrive
+    return Path.home()
+
+
+def _build_diagnostic_zip() -> Optional[Path]:
+    """Build a diagnostic zip on the Desktop containing log + system info.
+
+    Tester can send this zip via WeChat / email to engineer when remote
+    upload fails. Returns the zip path on success, None on failure.
+    """
+    try:
+        import zipfile, platform
+        zip_path = _desktop_path() / DIAGNOSTIC_ZIP_NAME
+        sys_info_lines = [
+            f"recorder_version: {RECORDER_VERSION}",
+            f"timestamp: {datetime.now().isoformat()}",
+            f"platform: {platform.platform()}",
+            f"python: {sys.version}",
+            f"frozen: {getattr(sys, 'frozen', False)}",
+            f"is_onedir: {_is_onedir_install() if getattr(sys, 'frozen', False) else 'N/A'}",
+            f"sys.executable: {sys.executable}",
+            f"home: {Path.home()}",
+            f"log_file: {_STARTUP_LOG}",
+            f"log_exists: {_STARTUP_LOG.exists()}",
+            f"log_size_bytes: {_STARTUP_LOG.stat().st_size if _STARTUP_LOG.exists() else 0}",
+        ]
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("sysinfo.txt", "\n".join(sys_info_lines))
+            if _STARTUP_LOG.exists():
+                zf.write(_STARTUP_LOG, "OysterRecorder.log")
+        _trace(f"diagnostic_zip: built {zip_path}")
+        return zip_path
+    except Exception as exc:
+        _trace(f"diagnostic_zip: build failed: {exc}")
+        return None
 
 
 def _upload_log_remote() -> Optional[str]:
-    """POST ~/OysterRecorder.log to ix.io. Returns short URL or None.
+    """POST ~/OysterRecorder.log to 0x0.st. Returns short URL or None.
 
-    Synchronous — caller is expected to run this on a daemon thread.
-    Network failures and ix.io downtime degrade gracefully (return None;
-    tester just doesn't see a remote URL, the local log file is still
-    intact).
+    v0.20.1 hotfix: previously POSTed to ix.io which has been offline since
+    2024. Now uses 0x0.st (multipart upload, anonymous, free, alive).
+    Whether or not the remote upload succeeds, _build_diagnostic_zip() is
+    also called so the tester always has a local fallback.
     """
     if not _STARTUP_LOG.exists():
         _trace("upload_log: no local log file yet")
         return None
     try:
-        body = _STARTUP_LOG.read_text(encoding="utf-8", errors="replace")
+        body = _STARTUP_LOG.read_text(encoding="utf-8", errors="replace").encode("utf-8")
     except Exception as exc:
         _trace(f"upload_log: read failed: {exc}")
         return None
-    if len(body) > 500_000:  # ix.io limit ~256KB; truncate the head.
-        body = body[-450_000:]
+    if len(body) > 5_000_000:  # 0x0.st limit ~512MB but trim aggressively
+        body = body[-1_000_000:]
     try:
-        # urllib + form-encoded body — built-in to Python, no requests dep.
-        import urllib.parse
+        # 0x0.st expects multipart/form-data with field name "file".
+        # Build a minimal multipart body with stdlib (no `requests` dep).
         import urllib.request
-        data = urllib.parse.urlencode({"f:1": body}).encode("ascii")
+        import uuid
+        boundary = f"----OysterBoundary{uuid.uuid4().hex}"
+        crlf = "\r\n"
+        head = (
+            f"--{boundary}{crlf}"
+            f'Content-Disposition: form-data; name="file"; filename="OysterRecorder.log"{crlf}'
+            f"Content-Type: text/plain{crlf}{crlf}"
+        ).encode("utf-8")
+        tail = f"{crlf}--{boundary}--{crlf}".encode("utf-8")
+        data = head + body + tail
         req = urllib.request.Request(
             TELEMETRY_ENDPOINT,
             data=data,
-            headers={"User-Agent": "OysterRecorder/lite"},
+            headers={
+                "User-Agent": "OysterRecorder/lite (engineer-contact)",
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+            },
         )
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=20) as resp:
             url = resp.read().decode("utf-8", errors="replace").strip()
         if url.startswith("http"):
             _trace(f"upload_log: success {url}")
-            # Append URL to the local log so subsequent runs see it.
             try:
                 with _STARTUP_LOG.open("a", encoding="utf-8") as fh:
                     fh.write(f"{datetime.now().isoformat()} REMOTE_LOG_URL={url}\n")
             except Exception:
                 pass
             return url
+        _trace(f"upload_log: server returned non-URL response: {url[:200]}")
     except Exception as exc:
-        _trace(f"upload_log: POST failed: {exc}")
+        # v0.20.1: explicit exception type + message for diagnostic clarity
+        _trace(f"upload_log: POST failed [{type(exc).__name__}]: {exc}")
     return None
 
 
@@ -734,7 +801,7 @@ class RecorderApp(tk.Tk):
             self,
             text=(
                 f"录制完成后会保存到: {_output_dir()}\n"
-                f"如果出问题，请把 {_STARTUP_LOG} 截图给工程师。"
+                f"如果出问题，点上面按钮自动打包诊断包到桌面。"
             ),
             font=("Helvetica", 9),
             bg="white",
@@ -742,32 +809,121 @@ class RecorderApp(tk.Tk):
             wraplength=500,
             justify="center",
         )
-        self._hint.pack(pady=(0, 10))
+        self._hint.pack(pady=(0, 4))
+
+        # v0.20.1: extra row of small action buttons for tester self-help
+        helpbar = tk.Frame(self, bg="white")
+        helpbar.pack(pady=(0, 8))
+        tk.Button(
+            helpbar, text="打开日志文件夹",
+            font=("Helvetica", 8), bg="white", fg="#666",
+            bd=0, cursor="hand2",
+            command=lambda: self._open_path(_STARTUP_LOG.parent),
+        ).pack(side="left", padx=4)
+        tk.Button(
+            helpbar, text="复制日志路径",
+            font=("Helvetica", 8), bg="white", fg="#666",
+            bd=0, cursor="hand2",
+            command=lambda: self._copy_to_clipboard(str(_STARTUP_LOG)),
+        ).pack(side="left", padx=4)
+        tk.Button(
+            helpbar, text="导出诊断包到桌面",
+            font=("Helvetica", 8), bg="white", fg="#666",
+            bd=0, cursor="hand2",
+            command=self._export_diagnostic_only,
+        ).pack(side="left", padx=4)
+
+    def _export_diagnostic_only(self) -> None:
+        """Build diagnostic zip and open the Desktop folder. No network."""
+        _trace("user clicked export-diagnostic button")
+        def _go():
+            zp = _build_diagnostic_zip()
+            def apply():
+                if zp:
+                    self._hint.config(
+                        text=f"诊断包已导出: {zp}\n请发给工程师",
+                        fg="#1976d2",
+                    )
+                    self._open_path(zp.parent)
+                else:
+                    self._hint.config(
+                        text="导出失败，请截屏后联系工程师",
+                        fg="#dc2626",
+                    )
+            self.after(0, apply)
+        threading.Thread(target=_go, daemon=True).start()
 
     def _upload_log_now(self) -> None:
-        """Tester clicked '发送日志给工程师'. Upload then show URL."""
+        """Tester clicked '发送日志给工程师'. v0.20.1: always build a local
+        diagnostic zip on Desktop as fallback, also try remote upload.
+        Tester always has a path they can manually send via WeChat/email.
+        """
         _trace("user clicked send-log button")
         self._upload_btn.config(text="↗ 上传中…", state="disabled")
 
-        def on_done(url: Optional[str]) -> None:
+        def _go():
+            # Always build diagnostic zip first (works offline, no network).
+            zip_path = _build_diagnostic_zip()
+            # Then attempt remote upload (best-effort).
+            url = _upload_log_remote()
+
             def apply():
                 if url:
                     self._upload_btn.config(
-                        text=f"✓ 日志已上传 — {url}",
+                        text="✓ 上传成功 — 复制链接",
                         state="normal",
+                        command=lambda u=url: self._copy_to_clipboard(u),
                     )
                     self._hint.config(
-                        text=f"工程师查日志: {url}",
+                        text=f"工程师可访问: {url}\n本地诊断包也在: {zip_path or _desktop_path()}",
                         fg="#1976d2",
+                    )
+                elif zip_path:
+                    self._upload_btn.config(
+                        text="✓ 诊断包已生成 — 打开桌面",
+                        state="normal",
+                        command=lambda p=zip_path: self._open_path(p.parent),
+                    )
+                    self._hint.config(
+                        text=f"远程上传失败，但已生成桌面诊断包:\n{zip_path}\n请通过微信/邮件发给工程师",
+                        fg="#d97706",  # amber
                     )
                 else:
                     self._upload_btn.config(
-                        text="✗ 上传失败 — 重试",
+                        text="✗ 全部失败 — 复制日志路径",
                         state="normal",
+                        command=lambda: self._copy_to_clipboard(str(_STARTUP_LOG)),
+                    )
+                    self._hint.config(
+                        text=f"上传 + 打包都失败。请手动发送:\n{_STARTUP_LOG}",
+                        fg="#dc2626",  # red
                     )
             self.after(0, apply)
 
-        _upload_log_in_background(on_done)
+        threading.Thread(target=_go, daemon=True).start()
+
+    def _copy_to_clipboard(self, text: str) -> None:
+        """Copy text to system clipboard via Tk."""
+        try:
+            self.clipboard_clear()
+            self.clipboard_append(text)
+            self.update()
+            _trace(f"clipboard: copied {text!r}")
+        except Exception as e:
+            _trace(f"clipboard: copy failed {e}")
+
+    def _open_path(self, path: Path) -> None:
+        """Open a file or folder in the OS file explorer."""
+        try:
+            if os.name == "nt":
+                os.startfile(str(path))  # type: ignore[attr-defined]
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", str(path)])
+            else:
+                subprocess.Popen(["xdg-open", str(path)])
+            _trace(f"open_path: opened {path}")
+        except Exception as e:
+            _trace(f"open_path: failed {e}")
 
     def _auto_lint(self, tarball: Path) -> None:
         """v0.7.0: run G165 lint v3 on the just-recorded tarball + show
