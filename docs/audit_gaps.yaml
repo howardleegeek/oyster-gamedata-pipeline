@@ -1668,10 +1668,11 @@ gaps:
   purpose: Workflow that runs on every push and short-circuits with skip-marker output
     if commit message contains [skip ci] or paths-ignore patterns; redundancy layer
     for paths-ignore
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 60
   dispatched_at: '2026-05-05 19:19:11'
+  completed_at: '2026-05-05 19:30:14'
 - id: G190
   title: bin/backend_ingest_handler.py
   purpose: FastAPI endpoint /v1/ingest accepts vendor tarball uploads, validates via
@@ -1740,10 +1741,11 @@ gaps:
   title: bin/multi_clip_stitcher.py
   purpose: Combine N short same-scene clips into longer episode; preserve timestamp
     continuity + frame_id offset; for buyers wanting longer trajectories
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 260
   dispatched_at: '2026-05-05 19:22:11'
+  completed_at: '2026-05-05 19:30:16'
 - id: G198
   title: bin/depth_shader_pack_minecraft.py
   purpose: Generator for Iris/Sodium shader pack that exports Z-buffer at 6fps to
@@ -1757,10 +1759,11 @@ gaps:
   title: bin/recorder_health_telemetry.py
   purpose: Vendor recorder posts heartbeat (uptime, FPS, encoder backpressure, last-clip-at)
     to /v1/health endpoint every 60s; backend dashboard surfaces stragglers
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 200
   dispatched_at: '2026-05-05 19:23:38'
+  completed_at: '2026-05-05 19:30:18'
 - id: G200
   title: docs/runbooks/BACKEND_DEPLOY.md
   purpose: 'Deploy FastAPI backend to Render or Railway: env vars + Postgres URL +
@@ -1817,9 +1820,10 @@ gaps:
   title: bin/cn_vendor_mirror.py
   purpose: 'CN-side mirror: Aliyun OSS bucket + presigned URL issuer for vendors behind
     GFW; bypasses S3 latency without VPN'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 220
+  dispatched_at: '2026-05-05 19:35:51'
 - id: G207
   title: bin/dr_failover_runbook_check.py
   purpose: 'Disaster recovery validation: simulate primary-region outage, verify failover
@@ -1840,9 +1844,10 @@ gaps:
   title: sdk/javascript/oyster-buyer/index.js
   purpose: 'JavaScript / TypeScript SDK for buyers: same API as Python SDK; for Node.js
     training-pipeline integration'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 280
+  dispatched_at: '2026-05-05 19:40:37'
 - id: G210
   title: bin/buyer_evaluation_harness.py
   purpose: 'Reference benchmark: train tiny world model on N clips of our data, evaluate
@@ -1857,9 +1862,10 @@ gaps:
   title: docs/MARKETING_SITE_COPY.md
   purpose: 'Landing page copy: hero (play games get paid) + 3-step how-it-works +
     buyer pitch + 5-FAQ + CTA'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 200
+  dispatched_at: '2026-05-05 19:42:29'
 - id: G212
   title: docs/TOS_VENDOR.md
   purpose: 'Vendor terms of service: data ownership transfer + payout schedule + anti-cheat
@@ -2270,19 +2276,21 @@ gaps:
   purpose: Wire EPal companion professional rating (1-5 stars) into clip metadata;
     buyer pays premium for higher-rated companion captures; informs cluster training-time
     data weighting
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 200
   dispatched_at: '2026-05-05 19:16:06'
+  completed_at: '2026-05-05 19:30:20'
 - id: G255
   title: bin/epal_payout_passthrough.py
   purpose: 'Bonus payout rides EPal payment rails (POST <epal-api>/v1/companion/bonus):
     no Stripe / PayPal / W-9 — companion sees EPal session pay + recording bonus on
     one statement'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 240
   dispatched_at: '2026-05-05 19:17:52'
+  completed_at: '2026-05-05 19:30:22'
 - id: G256
   title: bin/epal_client_consent_handshake.py
   purpose: 'At EPal session start, prompts the paying client (the customer): consent
@@ -2572,4 +2580,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 89343
-  last_heartbeat: '2026-05-06T02:29:39Z'
+  last_heartbeat: '2026-05-06T02:48:30Z'
