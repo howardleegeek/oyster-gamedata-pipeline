@@ -238,10 +238,14 @@ def synthesize_depth_dir(out_dir: str, count: int = 1800) -> int:
         return count
     
     # Fix #2 + #3: real 1920x1080 depth (was 16x16 stub, ~310 bytes per file).
-    # PRD requires full-resolution depth at video resolution.
+    # Fix #11: ZIP_COMPRESSION reduces uncompressed 8MB/frame → ~500KB-1MB
+    # depending on depth complexity. With 1800 frames at default,
+    # uncompressed sample tarball was 7.3 GB (unusable). Compressed ZIP
+    # brings it to ~1-2 GB (still big but tractable).
     W, H = 1920, 1080
     header = OpenEXR.Header(W, H)
     header['channels'] = {'Z': Imath.Channel(Imath.PixelType(Imath.PixelType.FLOAT))}
+    header['compression'] = Imath.Compression(Imath.Compression.ZIP_COMPRESSION)
 
     # Pre-compute a synthetic depth field once (ramp + circular feature) so
     # each frame writes 8 MB of REAL float32 Z values, not constant fill.
@@ -431,7 +435,13 @@ def build_sample_tarball(
         depth_dir = tmpdir / "depth"
         if not skip_depth:
             print("Generating depth files...")
-            count = synthesize_depth_dir(str(depth_dir), count=1800)
+            # Fix #11: sample-mode default 60 frames at full 1920x1080 res.
+            # 1800 × ~1MB compressed = ~1.8 GB; for sample/demo a 60-frame
+            # subset @ 6 fps × 10s = ~60 MB tarball is reasonable. Real
+            # buyer-spec wants 1800 (5-min × 6 fps); recorder will produce
+            # full count. Override via SAMPLE_FRAME_COUNT env var.
+            sample_count = int(os.environ.get("SAMPLE_FRAME_COUNT", "60"))
+            count = synthesize_depth_dir(str(depth_dir), count=sample_count)
             print(f"Created {count} depth files")
         else:
             print("Skipping depth generation")
