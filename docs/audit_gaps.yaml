@@ -2300,7 +2300,8 @@ gaps:
   priority: PP1
   estimated_lines: 100
   wave: W31
-  status: pending
+  status: completed
+  completed_at: '2026-05-06T00:49:12.854091+00:00'
   created_at: '2026-05-05T22:31:16+00:00'
 - id: G263
   title: bin/recorder_window_capture_helper.py
