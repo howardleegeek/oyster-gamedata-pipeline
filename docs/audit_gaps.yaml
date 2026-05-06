@@ -2441,8 +2441,9 @@ gaps:
   priority: PP0
   estimated_lines: 280
   wave: W31
-  status: pending
+  status: completed
   created_at: '2026-05-06T00:14:49+00:00'
+  completed_at: '2026-05-06T00:46:20.163429+00:00'
 - id: G276
   title: bin/recorder_eula_first_run.py
   purpose: Show first-run consent dialog (Tk) asking tester to agree to data collection
@@ -2451,8 +2452,9 @@ gaps:
   priority: PP1
   estimated_lines: 150
   wave: W31
-  status: pending
+  status: completed
   created_at: '2026-05-06T00:14:49+00:00'
+  completed_at: '2026-05-06T00:46:20.163429+00:00'
 - id: G277
   title: bin/recorder_log_rotator.py
   purpose: Rotate ~/OysterRecorder.log when >10 MB, keep last 5 rotations as .1, .2,
@@ -2460,8 +2462,9 @@ gaps:
   priority: PP2
   estimated_lines: 80
   wave: W31
-  status: pending
+  status: completed
   created_at: '2026-05-06T00:14:49+00:00'
+  completed_at: '2026-05-06T00:46:20.163429+00:00'
 - id: G278
   title: bin/recorder_close_confirm.py
   purpose: 'Tk dialog when tester closes window mid-record: ''正在录制中，确认丢弃？'' Yes/No.
@@ -2469,8 +2472,9 @@ gaps:
   priority: PP2
   estimated_lines: 60
   wave: W31
-  status: pending
+  status: completed
   created_at: '2026-05-06T00:14:49+00:00'
+  completed_at: '2026-05-06T00:46:20.163429+00:00'
 - id: G279
   title: bin/recorder_audio_loopback.py
   purpose: Switch ffmpeg dshow input from default microphone to WASAPI loopback (system
