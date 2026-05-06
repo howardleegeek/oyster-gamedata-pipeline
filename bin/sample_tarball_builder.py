@@ -143,6 +143,21 @@ def synthesize_action_camera(out_path: str, frame_count: int = 9000) -> str:
         cam_x = 50.0 * _math.sin(i / 200.0)
         cam_y = 64.0 + 3.0 * _math.cos(i / 150.0)
         cam_z = 50.0 * _math.cos(i / 200.0)
+        # Fix #12 (BFT N=3 finding): speed must equal Δposition · fps (R03 PINNs
+        # residual). Previously hardcoded [1.5, 0, 0] and BFT R03 rejected
+        # 99/99 frames — V₁ Claude / V₂ MiniMax / V₂' GLM unanimous detected
+        # producer-side speed/position inconsistency on 2026-05-05.
+        if i + 1 < frame_count:
+            next_x = 50.0 * _math.sin((i + 1) / 200.0)
+            next_y = 64.0 + 3.0 * _math.cos((i + 1) / 150.0)
+            next_z = 50.0 * _math.cos((i + 1) / 200.0)
+            cam_speed = [(next_x - cam_x) * 30.0, (next_y - cam_y) * 30.0, (next_z - cam_z) * 30.0]
+        else:
+            # Last frame — backwards-difference fallback (no n+1 to look at).
+            prev_x = 50.0 * _math.sin((i - 1) / 200.0)
+            prev_y = 64.0 + 3.0 * _math.cos((i - 1) / 150.0)
+            prev_z = 50.0 * _math.cos((i - 1) / 200.0)
+            cam_speed = [(cam_x - prev_x) * 30.0, (cam_y - prev_y) * 30.0, (cam_z - prev_z) * 30.0]
         records.append({
             "frame": i,
             "time": time_str,
@@ -166,12 +181,13 @@ def synthesize_action_camera(out_path: str, frame_count: int = 9000) -> str:
             # Fix #10: intrinsics matched to recorder's 70° FOV.
             # fy = (height/2) / tan(FOV_v/2) = 540 / tan(35°) ≈ 771.4
             "camera_intrinsics": {"fx": 771.4, "fy": 771.4, "cx": 960.0, "cy": 540.0},
-            "camera_speed": [1.5, 0.0, 0.0],
+            "camera_speed": cam_speed,
             "player_position": [cam_x, cam_y, cam_z],
             # PRD page 5 字面 'player_rotation_oula' (拼音). DO NOT rename to euler.
             "player_rotation_oula": [pitch, yaw, 0.0],
             "player_rotation_quaternion": [qx, qy, qz, qw],
-            "player_speed": [1.5, 0.0, 0.0],
+            # player tracks camera, so player_speed == camera_speed for sample.
+            "player_speed": list(cam_speed),
             "metric_scale": 1.0,
         })
         prev_yaw = yaw
