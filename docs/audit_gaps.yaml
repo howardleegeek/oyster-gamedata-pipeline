@@ -1829,10 +1829,11 @@ gaps:
   title: bin/dr_failover_runbook_check.py
   purpose: 'Disaster recovery validation: simulate primary-region outage, verify failover
     region serves /v1/ingest within 60s, restores last-good Postgres backup'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 250
   dispatched_at: '2026-05-05 20:12:01'
+  completed_at: '2026-05-05 20:22:36'
 - id: G208
   title: sdk/python/oyster_buyer_sdk/__init__.py
   purpose: 'Python SDK for buyers: list_clips() / download_clip() / stream_dataset()
@@ -2580,9 +2581,9 @@ gaps:
   priority: PP2
   estimated_lines: 50
   wave: W31
-  status: dispatched
+  status: completed
   created_at: '2026-05-06T00:14:49+00:00'
-  completed_at: '2026-05-06T00:47:20+00:00'
+  completed_at: '2026-05-05 20:22:38'
   dispatched_at: '2026-05-05 20:15:59'
 - id: G281
   title: bin/recorder_utc_timestamps.py
@@ -2591,9 +2592,10 @@ gaps:
   priority: PP2
   estimated_lines: 90
   wave: W31
-  status: pending
+  status: dispatched
   created_at: '2026-05-06T00:14:49+00:00'
   completed_at: '2026-05-06T00:47:20+00:00'
+  dispatched_at: '2026-05-05 20:29:53'
 - id: G282
   title: bin/recorder_mp4_faststart.py
   purpose: Add ffmpeg -movflags=+faststart to recording cmd; ensures mp4 moov atom
@@ -2601,10 +2603,11 @@ gaps:
   priority: PP1
   estimated_lines: 30
   wave: W31
-  status: pending
+  status: dispatched
   created_at: '2026-05-06T00:14:49+00:00'
   completed_at: '2026-05-06T00:47:20+00:00'
+  dispatched_at: '2026-05-05 20:31:12'
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 89343
-  last_heartbeat: '2026-05-06T03:22:00Z'
+  last_heartbeat: '2026-05-06T03:31:12Z'
