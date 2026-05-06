@@ -85,7 +85,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.19.0"
+RECORDER_VERSION = "lite-v0.20.0"
 RELEASES_API = (
     "https://api.github.com/repos/howardleegeek/oyster-gamedata-pipeline"
     "/releases?per_page=20"
@@ -1184,6 +1184,12 @@ class RecorderApp(tk.Tk):
         clip_dir = self._tmp_dir / f"clip-{ts}"
         clip_dir.mkdir(parents=True, exist_ok=True)
 
+        # Compute recording duration once, up front: the frame-count math
+        # below (action_camera.json) and the partial-duration check at the
+        # end both need it. Reading time.time() now vs. later differs by
+        # microseconds — irrelevant for 30 fps frame bucketing.
+        elapsed_sec = max(0.0, time.time() - self._record_started_at)
+
         # 1. Move the real video into place.
         if self._video_path and self._video_path.exists():
             shutil.move(str(self._video_path), str(clip_dir / "video.mp4"))
@@ -1281,23 +1287,29 @@ class RecorderApp(tk.Tk):
                 "time": t_str,
                 "fps": FPS,
                 "route_type": 1,
-                "mouse_x": mx_n,
-                "mouse_y": my_n,
-                "mouse_dx": mdx,
-                "mouse_dy": mdy,
-                # PRD: keyCode is list[int] of currently-held keys.
+                # PRD 文件2 字面：mouse_* 都是 list[float]，例 `{"mouse_x": [0.5]}`.
+                # mouse_x/y ∈ [0, 1]，mouse_dx/dy ∈ [-1, 1] (带方向).
+                "mouse_x": [mx_n],
+                "mouse_y": [my_n],
+                "mouse_dx": [mdx],
+                "mouse_dy": [mdy],
+                # PRD: keyCode is list[int] of currently-held keys (VK code, NOT ASCII).
                 "keyCode": list(cur_keys) if cur_keys else [],
                 # camera_* fields placeholder — Replay Mod postprocess
                 # (G274) overwrites these when .mcpr present. For vanilla
                 # tester these stay [0,64,0] / identity.
                 "camera_position": [0.0, 64.0, 0.0],
-                "camera_rotation_euler": [0.0, 0.0, 0.0],
+                # PRD page 4 字面 'camera_rotation_oula' (拼音). DO NOT rename to euler.
+                "camera_rotation_oula": [0.0, 0.0, 0.0],
                 "camera_rotation_quaternion": [0.0, 0.0, 0.0, 1.0],
-                "camera_follow_offset": [0.0, 1.6, 0.0],
+                # PRD page 4 字面 'camera_Follow Offset' (带空格 + 大写 F).
+                # DO NOT rename to snake_case. Quirky but PRD-mandated.
+                "camera_Follow Offset": [0.0, 1.6, 0.0],
                 "camera_intrinsics": intrinsics,
                 "camera_speed": [0.0, 0.0, 0.0],
                 "player_position": [0.0, 64.0, 0.0],
-                "player_rotation_euler": [0.0, 0.0, 0.0],
+                # PRD page 5 字面 'player_rotation_oula' (拼音). DO NOT rename.
+                "player_rotation_oula": [0.0, 0.0, 0.0],
                 "player_rotation_quaternion": [0.0, 0.0, 0.0, 1.0],
                 "player_speed": [0.0, 0.0, 0.0],
                 "metric_scale": 1.0,
@@ -1360,8 +1372,10 @@ class RecorderApp(tk.Tk):
         intrinsics = {
             "fx": round(focal, 3),
             "fy": round(focal, 3),
-            "Cx": 960.0,
-            "Cy": 540.0,
+            # PRD 文件2 例：cx/cy 小写（JSON wire 格式权威）。
+            # 表格描述写大写 Cx/Cy 是 PRD 内部不一致，wire 例为准.
+            "cx": 960.0,
+            "cy": 540.0,
             "width": 1920,
             "height": 1080,
             "fov_vertical_deg": fov_v_deg,
@@ -1384,9 +1398,7 @@ class RecorderApp(tk.Tk):
         # buyer-spec rejects (criterion 2 wants 5-6 min). We can't
         # extend a too-short recording, but we mark it 'partial' in
         # systeminfo so backend ingest can quarantine + ask tester to
-        # redo. Read duration from ffprobe if available, else
-        # estimate from elapsed time at packaging.
-        elapsed_sec = max(0.0, time.time() - self._record_started_at)
+        # redo. (elapsed_sec computed at top of method.)
         sys_info["actual_duration_sec"] = round(elapsed_sec, 1)
         sys_info["partial"] = elapsed_sec < 300.0  # <5 min
         # Re-write systeminfo.json with the new fields.

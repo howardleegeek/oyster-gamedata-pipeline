@@ -77,11 +77,11 @@ DEFAULT_INTRINSICS: dict[str, float] = {
     "cy": 540.0,
 }
 
-# 20 fields each frame must carry (mirrors recorder_consumer_lite v0.19.0
-# AND sample_tarball_builder.synthesize_action_camera). Names diverge
-# slightly from BUYER_SPEC_V1.md (``oula`` → ``euler``,
-# ``camera_Follow Offset`` → ``camera_follow_offset``); the recorder is
-# canonical, the buyer-spec doc is the older naming.
+# 20 fields each frame must carry (mirrors recorder_consumer_lite v0.20.0
+# AND sample_tarball_builder.synthesize_action_camera).
+# v0.20.0 reverted the v0.19.0 regression: PDF page 4-5 字面用拼音 "oula"
+# (NOT "euler") and 'camera_Follow Offset' (literal space + capital F).
+# See docs/PRD_DIGEST.md and docs/PRD_FORMULAS.md for the audit.
 ACTION_CAMERA_FIELDS: tuple[str, ...] = (
     "frame",
     "time",
@@ -93,13 +93,13 @@ ACTION_CAMERA_FIELDS: tuple[str, ...] = (
     "mouse_dy",
     "keyCode",
     "camera_position",
-    "camera_rotation_euler",
+    "camera_rotation_oula",          # PDF p4 字面拼音
     "camera_rotation_quaternion",
-    "camera_follow_offset",
+    "camera_Follow Offset",           # PDF p4 字面带空格 + 大写 F
     "camera_intrinsics",
     "camera_speed",
     "player_position",
-    "player_rotation_euler",
+    "player_rotation_oula",          # PDF p5 字面拼音
     "player_rotation_quaternion",
     "player_speed",
     "metric_scale",
@@ -237,19 +237,20 @@ def synthesize_action_camera_records(
             "time": t_str,
             "fps": fps,
             "route_type": 1,
-            "mouse_x": mx_n,
-            "mouse_y": my_n,
-            "mouse_dx": mdx,
-            "mouse_dy": mdy,
+            # PRD 文件2: mouse_* are list[float]; mouse_x/y ∈ [0,1], dx/dy ∈ [-1,1]
+            "mouse_x": [mx_n],
+            "mouse_y": [my_n],
+            "mouse_dx": [mdx],
+            "mouse_dy": [mdy],
             "keyCode": list(cur_keys) if cur_keys else [],
             "camera_position": [0.0, 64.0, 0.0],
-            "camera_rotation_euler": [0.0, 0.0, 0.0],
+            "camera_rotation_oula": [0.0, 0.0, 0.0],          # PDF p4 字面
             "camera_rotation_quaternion": [0.0, 0.0, 0.0, 1.0],
-            "camera_follow_offset": [0.0, 1.6, 0.0],
+            "camera_Follow Offset": [0.0, 1.6, 0.0],          # PDF p4 字面
             "camera_intrinsics": dict(intrinsics),
             "camera_speed": [0.0, 0.0, 0.0],
             "player_position": [0.0, 64.0, 0.0],
-            "player_rotation_euler": [0.0, 0.0, 0.0],
+            "player_rotation_oula": [0.0, 0.0, 0.0],          # PDF p5 字面
             "player_rotation_quaternion": [0.0, 0.0, 0.0, 1.0],
             "player_speed": [0.0, 0.0, 0.0],
             "metric_scale": 1.0,
@@ -454,8 +455,9 @@ def package_tarball(
     intrinsics = {
         "fx": _FY,
         "fy": _FY,
-        "Cx": 960.0,
-        "Cy": 540.0,
+        # PRD 文件2 wire 例：cx/cy 小写.
+        "cx": 960.0,
+        "cy": 540.0,
         "width": SCREEN_W,
         "height": SCREEN_H,
         "fov_vertical_deg": 70.0,

@@ -148,23 +148,28 @@ def synthesize_action_camera(out_path: str, frame_count: int = 9000) -> str:
             "time": time_str,
             "fps": 30.0,
             "route_type": 1,
-            "mouse_x": 0.5,
-            "mouse_y": 0.5,
-            "mouse_dx": mouse_dx,
-            "mouse_dy": 0.0,
+            # PRD 文件2 字面：mouse_* 都是 list[float]，例 `{"mouse_x": [0.5]}`.
+            # mouse_x/y ∈ [0, 1]，mouse_dx/dy ∈ [-1, 1] (带方向，page 5).
+            "mouse_x": [0.5],
+            "mouse_y": [0.5],
+            "mouse_dx": [mouse_dx],
+            "mouse_dy": [0.0],
             "keyCode": [wasd_pattern[i % 100]],
             "camera_position": [cam_x, cam_y, cam_z],
             # Fix #8: 'oula' (拼音 "欧拉") → 'euler' (English).
-            "camera_rotation_euler": [pitch, yaw, 0.0],
+            # PRD page 4 字面用 'camera_rotation_oula' (拼音). DO NOT rename.
+            "camera_rotation_oula": [pitch, yaw, 0.0],
             "camera_rotation_quaternion": [qx, qy, qz, qw],
-            # Fix #9: 'camera_Follow Offset' (space) → 'camera_follow_offset' (snake_case).
-            "camera_follow_offset": [0.0, 1.6, 0.0],
+            # PRD page 4 字面 'camera_Follow Offset' (带空格 + 大写 F).
+            # DO NOT rename to snake_case. Quirky but PRD-mandated.
+            "camera_Follow Offset": [0.0, 1.6, 0.0],
             # Fix #10: intrinsics matched to recorder's 70° FOV.
             # fy = (height/2) / tan(FOV_v/2) = 540 / tan(35°) ≈ 771.4
             "camera_intrinsics": {"fx": 771.4, "fy": 771.4, "cx": 960.0, "cy": 540.0},
             "camera_speed": [1.5, 0.0, 0.0],
             "player_position": [cam_x, cam_y, cam_z],
-            "player_rotation_euler": [pitch, yaw, 0.0],
+            # PRD page 5 字面 'player_rotation_oula' (拼音). DO NOT rename to euler.
+            "player_rotation_oula": [pitch, yaw, 0.0],
             "player_rotation_quaternion": [qx, qy, qz, qw],
             "player_speed": [1.5, 0.0, 0.0],
             "metric_scale": 1.0,
@@ -182,6 +187,8 @@ def synthesize_systeminfo(out_path: str) -> str:
     import json as _json
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    # PRD page 3-4 specifies systeminfo.json has EXACTLY 5 fields.
+    # DO NOT add map_scale or map_bounds — they are NOT in the PDF spec.
     data = {
         "gameProcessName": "minecraft.exe",
         "x": 0,
@@ -189,13 +196,6 @@ def synthesize_systeminfo(out_path: str) -> str:
         "width": 1920,
         "height": 1080,
         "recordDpi": 1.0,
-        "map_scale": 1.0,
-        "map_bounds": {
-            "min_x": -10000,
-            "min_z": -10000,
-            "max_x": 10000,
-            "max_z": 10000,
-        },
     }
     with open(out_path, "w", encoding="utf-8") as f:
         _json.dump(data, f, indent=2)

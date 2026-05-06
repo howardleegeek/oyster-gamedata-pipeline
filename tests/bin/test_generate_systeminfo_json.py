@@ -207,7 +207,11 @@ class TestBuildSysteminfo(unittest.TestCase):
     """Test build_systeminfo function."""
 
     def test_build_systeminfo_default_values(self):
-        """Test building systeminfo with default values."""
+        """Test building systeminfo with PRD-canonical 5-field defaults.
+
+        PRD page 3-4 schema = 5 fields. map_scale/map_bounds are legacy
+        opt-in extras — see test_build_systeminfo_with_legacy_extras.
+        """
         result = build_systeminfo()
 
         self.assertEqual(result["gameProcessName"], "minecraft.exe")
@@ -216,6 +220,13 @@ class TestBuildSysteminfo(unittest.TestCase):
         self.assertEqual(result["width"], 1920)
         self.assertEqual(result["height"], 1080)
         self.assertEqual(result["recordDpi"], 1.0)
+        # PRD compliance: legacy fields must NOT appear by default.
+        self.assertNotIn("map_scale", result)
+        self.assertNotIn("map_bounds", result)
+
+    def test_build_systeminfo_with_legacy_extras(self):
+        """Legacy extras path — only emitted when explicitly opted in."""
+        result = build_systeminfo(include_legacy_extras=True)
         self.assertEqual(result["map_scale"], 1.0)
         self.assertEqual(
             result["map_bounds"],
@@ -245,6 +256,7 @@ class TestBuildSysteminfo(unittest.TestCase):
             record_dpi=2.0,
             map_scale=0.5,
             map_bounds=custom_map_bounds,
+            include_legacy_extras=True,
         )
 
         self.assertEqual(result["gameProcessName"], "custom_game.exe")
@@ -257,8 +269,8 @@ class TestBuildSysteminfo(unittest.TestCase):
         self.assertEqual(result["map_bounds"], custom_map_bounds)
 
     def test_build_systeminfo_map_bounds_default_minecraft(self):
-        """Test that map_bounds defaults to Minecraft values when None."""
-        result = build_systeminfo(map_bounds=None)
+        """map_bounds default Minecraft values when legacy extras enabled."""
+        result = build_systeminfo(map_bounds=None, include_legacy_extras=True)
 
         self.assertEqual(
             result["map_bounds"],
@@ -332,8 +344,8 @@ class TestWriteSysteminfoJson(unittest.TestCase):
             os.unlink(temp_path)
 
     def test_write_systeminfo_json_creates_valid_json(self):
-        """Test that written JSON is valid."""
-        test_data = build_systeminfo()
+        """Test that written JSON is valid (legacy-extras path)."""
+        test_data = build_systeminfo(include_legacy_extras=True)
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             temp_path = f.name
@@ -347,7 +359,7 @@ class TestWriteSysteminfoJson(unittest.TestCase):
                 content = f.read()
                 parsed = json.loads(content)
 
-            # Check structure
+            # Check structure (legacy-extras schema)
             self.assertIn("gameProcessName", parsed)
             self.assertIn("x", parsed)
             self.assertIn("y", parsed)
@@ -369,7 +381,7 @@ class TestMainFunction(unittest.TestCase):
             temp_path = f.name
 
         try:
-            # Run main with arguments
+            # Run main with arguments (legacy extras path)
             test_args = [
                 "--output",
                 temp_path,
@@ -395,6 +407,7 @@ class TestMainFunction(unittest.TestCase):
                 "5000",
                 "--map-bounds-max-z",
                 "5000",
+                "--include-legacy-extras",
             ]
 
             with patch("sys.argv", ["generate_systeminfo_json.py"] + test_args):

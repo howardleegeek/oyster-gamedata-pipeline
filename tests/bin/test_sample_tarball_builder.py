@@ -50,7 +50,9 @@ class TestSynthesizeVideo:
                 call_args = mock_run.call_args[0][0]
                 assert "ffmpeg" in call_args[0]
                 assert "-c:v" in call_args
-                assert "libx264" in call_args
+                # Sample fix #1: H.265 (libx265), not libx264 — buyer accepts both
+                # but H.265 halves bitrate at same quality.
+                assert "libx265" in call_args
 
                 # Verify output path
                 assert result == video_path

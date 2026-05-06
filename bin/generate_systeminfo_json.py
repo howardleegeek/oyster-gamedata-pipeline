@@ -126,24 +126,36 @@ def build_systeminfo(
     record_dpi: float = 1.0,
     map_scale: float = 1.0,
     map_bounds: Optional[dict] = None,
+    include_legacy_extras: bool = False,
 ) -> dict:
     """
     Build systeminfo.json data structure.
-    
+
+    PRD page 3-4 specifies systeminfo.json has EXACTLY 5 fields:
+    gameProcessName, x, y, width, height, recordDpi (6 effectively — `recordDpi`
+    is page 4). map_scale and map_bounds are NOT in the PDF and were added by
+    an earlier sample-builder mistake. They are now opt-in via
+    ``include_legacy_extras=True`` for backward compatibility.
+
     Args:
         game_process_name: Game process name
         x, y: Window top-left corner screen coordinates
         width, height: Game screen resolution
         record_dpi: Screen scaling ratio (1.0 / 1.5 / 2.0)
-        map_scale: Map scale factor
-        map_bounds: Map bounds dictionary with min_x, min_z, max_x, max_z
-        
+        map_scale: (legacy) Map scale factor — emitted only if
+            ``include_legacy_extras=True``
+        map_bounds: (legacy) Map bounds dict — emitted only if
+            ``include_legacy_extras=True``
+        include_legacy_extras: If True, emits the legacy ``map_scale`` and
+            ``map_bounds`` fields. Default False so the production wire
+            matches the PDF spec.
+
     Returns:
-        Dictionary with systeminfo structure
+        Dictionary with systeminfo structure (PRD-canonical by default).
     """
     if record_dpi <= 0:
         raise ValueError("record_dpi must be greater than 0")
-    
+
     if map_bounds is None:
         map_bounds = {
             "min_x": -10000,
@@ -151,17 +163,19 @@ def build_systeminfo(
             "max_x": 10000,
             "max_z": 10000,
         }
-    
-    return {
+
+    info = {
         "gameProcessName": game_process_name,
         "x": x,
         "y": y,
         "width": width,
         "height": height,
         "recordDpi": record_dpi,
-        "map_scale": map_scale,
-        "map_bounds": map_bounds,
     }
+    if include_legacy_extras:
+        info["map_scale"] = map_scale
+        info["map_bounds"] = map_bounds
+    return info
 
 
 def write_systeminfo_json(data: dict, out_path: str) -> None:
@@ -274,6 +288,15 @@ def main(argv=None) -> int:
         action="store_true",
         help="Auto-detect Minecraft window geometry",
     )
+
+    # PRD compliance flag: legacy extras (map_scale/map_bounds) are NOT in PDF.
+    # Default off so the production wire matches the spec; explicit opt-in for
+    # legacy/internal callers and back-compat tests.
+    parser.add_argument(
+        "--include-legacy-extras",
+        action="store_true",
+        help="(legacy) Emit map_scale + map_bounds (NOT in PDF spec — opt-in)",
+    )
     
     args = parser.parse_args(argv)
     
@@ -307,6 +330,7 @@ def main(argv=None) -> int:
             record_dpi=record_dpi,
             map_scale=args.map_scale,
             map_bounds=map_bounds,
+            include_legacy_extras=args.include_legacy_extras,
         )
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)

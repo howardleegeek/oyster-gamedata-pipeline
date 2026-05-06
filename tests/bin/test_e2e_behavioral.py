@@ -285,7 +285,9 @@ def test_mouse_dx_matches_synthetic_pixel_delta(
     total_dx = 0.0
     nonzero_count = 0
     for rec in action_camera_records:
-        dx = rec["mouse_dx"]
+        # PRD 文件2: mouse_dx is list[float], take element 0.
+        dx_raw = rec["mouse_dx"]
+        dx = dx_raw[0] if isinstance(dx_raw, list) else dx_raw
         # Either 0 or +5px/SCREEN_W (within float tolerance) — never any
         # other value, because events are 100 ms aligned and 5 px each.
         if abs(dx) > ATOL:
@@ -312,11 +314,15 @@ def test_mouse_x_normalized_and_consistent_with_cumulative_dx(
     mouse_dx plus the starting position (0.5, screen center)."""
     running_x = 0.5  # initial mouse_x at screen center
     for idx, rec in enumerate(action_camera_records):
-        mx = rec["mouse_x"]
+        # PRD 文件2: mouse_x and mouse_dx are list[float], take element 0.
+        mx_raw = rec["mouse_x"]
+        mx = mx_raw[0] if isinstance(mx_raw, list) else mx_raw
         assert 0.0 <= mx <= 1.0, (
             f"frame {idx}: mouse_x={mx} not in [0,1]"
         )
-        running_x = running_x + rec["mouse_dx"]
+        dx_raw = rec["mouse_dx"]
+        dx = dx_raw[0] if isinstance(dx_raw, list) else dx_raw
+        running_x = running_x + dx
         # Recorder accumulates absolute pixel and divides at end of
         # frame, so cumulative model gives running_x within ATOL of the
         # frame's mouse_x.
@@ -394,13 +400,15 @@ def test_time_field_iso_aligned_to_fps(
 @pytest.mark.integration
 def test_vector_fields_are_3_or_4_element_lists(action_camera_records) -> None:
     """Vector3/Vector4 fields are list[float] of correct length."""
+    # PDF page 4-5 字面字段名 (拼音 oula + 'Follow Offset' 带空格大写F).
+    # See docs/PRD_DIGEST.md and docs/PRD_FORMULAS.md.
     vec3_fields = (
         "camera_position",
-        "camera_rotation_euler",
-        "camera_follow_offset",
+        "camera_rotation_oula",
+        "camera_Follow Offset",
         "camera_speed",
         "player_position",
-        "player_rotation_euler",
+        "player_rotation_oula",
         "player_speed",
     )
     vec4_fields = ("camera_rotation_quaternion", "player_rotation_quaternion")
