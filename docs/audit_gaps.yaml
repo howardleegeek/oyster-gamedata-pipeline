@@ -2128,10 +2128,11 @@ gaps:
   purpose: 'For critical-severity errors: rate-limited Slack / Discord webhook (configurable);
     dedup window 5 min per sha256_key; daily-summary digest for medium / low; replaces
     Sentry pager-style alerts'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 200
   dispatched_at: '2026-05-05 18:09:41'
+  completed_at: '2026-05-05 18:18:43'
 - id: G241
   title: bin/code_signing_windows_authenticode.py
   purpose: Automate Windows Authenticode signing of .msi installer + recorder.exe
@@ -2167,10 +2168,11 @@ gaps:
   purpose: 'Public-facing ''what is this software'' trust page accessible from system
     tray menu: what we record, what we do not, anti-cheat statement, privacy summary,
     GitHub link, contact'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 250
   dispatched_at: '2026-05-05 18:11:19'
+  completed_at: '2026-05-05 18:18:45'
 - id: G245
   title: bin/anonymous_first_run.py
   purpose: 'Anonymous mode: consumer can install + record + accumulate clips locally
@@ -2184,19 +2186,21 @@ gaps:
   purpose: 'Auto-cleanup old local clips: configurable cap (default 5 GB), LRU deletion
     of uploaded clips first, never deletes pending-upload; warns user at 80 percent
     fill'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 230
   dispatched_at: '2026-05-05 18:16:25'
+  completed_at: '2026-05-05 18:18:47'
 - id: G247
   title: bin/network_throttle_aware.py
   purpose: Detect metered / cellular / paid networks via Windows NetworkInformation
     API + macOS NWPath; pause uploads on metered connections by default; configurable
     in tray menu
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 200
   dispatched_at: '2026-05-05 18:18:08'
+  completed_at: '2026-05-05 18:18:48'
 - id: G248
   title: bin/graceful_shutdown_handler.py
   purpose: Hook OS shutdown signals (Win SetConsoleCtrlHandler / macOS SIGTERM via
@@ -2217,17 +2221,19 @@ gaps:
   title: bin/update_server_endpoint.py
   purpose: FastAPI /api/updates/check?platform=windows&current=1.0.0 endpoint serving
     latest version + download URL + SHA256 + release notes; backs G225 auto-updater
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 250
+  dispatched_at: '2026-05-05 18:32:34'
 - id: G251
   title: bin/version_compatibility_check.py
   purpose: 'Detect game version at launch (Minecraft 1.20.4 vs 1.21.x): if unsupported,
     system tray notifies user ''this version unsupported, recording paused''; recommends
     supported version range'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 220
+  dispatched_at: '2026-05-05 18:34:17'
 - id: G252
   title: bin/i18n_zh_en_strings.py
   purpose: 'Internationalization: zh-CN + zh-TW + en-US runtime string loader; covers
@@ -2545,4 +2551,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 89343
-  last_heartbeat: '2026-05-06T01:18:08Z'
+  last_heartbeat: '2026-05-06T01:37:18Z'
