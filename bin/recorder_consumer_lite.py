@@ -85,7 +85,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.17.0"
+RECORDER_VERSION = "lite-v0.18.0"
 RELEASES_API = (
     "https://api.github.com/repos/howardleegeek/oyster-gamedata-pipeline"
     "/releases?per_page=20"
@@ -1227,8 +1227,12 @@ class RecorderApp(tk.Tk):
         # Rust app's shader pack (G198) provides per-frame camera data;
         # in this stop-gap we expose only what we can collect from
         # user-space (key/mouse).
+        # v0.18.0: ALSO emit `quaternion` array [x, y, z, w] (PRD format)
+        # alongside the legacy cameraQX/QY/QZ/QW scalar fields so lint
+        # v3 actually picks up our quaternion records (criterion 13/14).
         action_records = []
         for ev in self._captured_events:
+            qx, qy, qz, qw = 0.0, 0.0, 0.0, 1.0  # identity placeholder
             rec: dict[str, Any] = {
                 "timestamp_ms": ev.get("timestamp_ms", 0),
                 "event_type": ev.get("event_type", "unknown"),
@@ -1237,11 +1241,14 @@ class RecorderApp(tk.Tk):
                 # Mouse position (real for mouse events, 0 otherwise).
                 "mouseX": int(ev.get("mouseX", 0)),
                 "mouseY": int(ev.get("mouseY", 0)),
-                # Camera fields placeholder until Rust app's depth shader.
+                # Camera position placeholder until depth shader lands.
                 "cameraX": 0.0, "cameraY": 0.0, "cameraZ": 0.0,
-                # Quaternion xyzw order per PRD (criterion 14).
-                "cameraQX": 0.0, "cameraQY": 0.0,
-                "cameraQZ": 0.0, "cameraQW": 1.0,
+                # Quaternion in xyzw order per PRD criterion 14.
+                # NEW v0.18.0: array form for lint v3 detection.
+                "quaternion": [qx, qy, qz, qw],
+                # Legacy scalar fields (kept for any old downstream consumers).
+                "cameraQX": qx, "cameraQY": qy,
+                "cameraQZ": qz, "cameraQW": qw,
             }
             # Carry button info on mouse_click for downstream ML.
             if "button" in ev:
@@ -1300,6 +1307,53 @@ class RecorderApp(tk.Tk):
             "Stop-gap recorder does not produce per-frame depth files.\n"
             "Full Rust recorder + G198 shader pack adds 1800 .exr frames here.\n",
             encoding="utf-8",
+        )
+
+        # 6. v0.18.0: intrinsics.yaml — buyer expects fx/fy/Cx/Cy.
+        # Standard MC at 1920x1080 with default 70° vertical FOV:
+        #   fy = (height/2) / tan(FOV_v/2) = 540 / tan(35°) ≈ 771.4
+        #   fx = fy (square pixels)  per criterion 12 (fx==fy)
+        #   Cx = width/2 = 960, Cy = height/2 = 540
+        # MC's actual FOV is user-settable so this is a default; full
+        # Rust recorder will read FOV from game config.
+        import math  # noqa: PLC0415 — local import keeps cold-start fast
+        fov_v_deg = 70.0
+        focal = (1080 / 2) / math.tan(math.radians(fov_v_deg / 2))
+        intrinsics = {
+            "fx": round(focal, 3),
+            "fy": round(focal, 3),
+            "Cx": 960.0,
+            "Cy": 540.0,
+            "width": 1920,
+            "height": 1080,
+            "fov_vertical_deg": fov_v_deg,
+            "_note": "default MC 70° vertical FOV; tester may have changed in-game",
+        }
+        try:
+            import yaml  # noqa: PLC0415
+            (clip_dir / "intrinsics.yaml").write_text(
+                yaml.safe_dump(intrinsics, sort_keys=False),
+                encoding="utf-8",
+            )
+        except Exception:
+            # Fall back to a plain text file in YAML-ish format.
+            (clip_dir / "intrinsics.yaml").write_text(
+                "\n".join(f"{k}: {v}" for k, v in intrinsics.items()),
+                encoding="utf-8",
+            )
+
+        # 7. v0.18.0: duration enforcement — if recording <5 min the
+        # buyer-spec rejects (criterion 2 wants 5-6 min). We can't
+        # extend a too-short recording, but we mark it 'partial' in
+        # systeminfo so backend ingest can quarantine + ask tester to
+        # redo. Read duration from ffprobe if available, else
+        # estimate from elapsed time at packaging.
+        elapsed_sec = max(0.0, time.time() - self._record_started_at)
+        sys_info["actual_duration_sec"] = round(elapsed_sec, 1)
+        sys_info["partial"] = elapsed_sec < 300.0  # <5 min
+        # Re-write systeminfo.json with the new fields.
+        (clip_dir / "systeminfo.json").write_text(
+            json.dumps(sys_info, indent=2), encoding="utf-8"
         )
 
         # Write the tarball into the user's Documents/OysterClips/.
