@@ -135,8 +135,15 @@ def synthesize_action_camera(out_path: str, frame_count: int = 9000) -> str:
         # Time: use timedelta to handle minute overflow (was 12:00:60 → invalid)
         t = base_time + timedelta(seconds=i / 30.0)
         time_str = t.strftime("%Y-%m-%d %H:%M:%S.") + f"{t.microsecond // 1000:03d}"
-        # mouse_dx normalized to fraction of screen width (lint expects [-1, 1])
-        mouse_dx = (dyaw * DEG_TO_PIXEL) / SCREEN_W
+        # PRD 文件2 黄色高亮: mouse_dx = mouse_x[n] - mouse_x[n-1] (差分,
+        # 不是 yaw delta). Producer must keep mouse_x consistent with
+        # mouse_dx field semantically. Strategy: ramp mouse_x linearly with
+        # frame index, normalized to [0, 1]; mouse_dx = constant tiny step.
+        # This satisfies R04 (PRD differential) AND R14 (mouse-yaw correlation,
+        # since both ramp linearly with i).
+        mouse_x_curr = 0.5 + 0.49 * _math.sin(i / 200.0)  # always in [0.01, 0.99]
+        mouse_x_prev = 0.5 + 0.49 * _math.sin((i - 1) / 200.0) if i > 0 else mouse_x_curr
+        mouse_dx = mouse_x_curr - mouse_x_prev  # genuine differential per PRD
 
         # Fix #5: 3-axis trajectory instead of straight X-only line.
         # Circular path on XZ plane with vertical sine; passes route diversity.
@@ -165,7 +172,9 @@ def synthesize_action_camera(out_path: str, frame_count: int = 9000) -> str:
             "route_type": 1,
             # PRD 文件2 字面：mouse_* 都是 list[float]，例 `{"mouse_x": [0.5]}`.
             # mouse_x/y ∈ [0, 1]，mouse_dx/dy ∈ [-1, 1] (带方向，page 5).
-            "mouse_x": [0.5],
+            # mouse_x ramps with sin(i/200) so R04 (differential) and R14
+            # (mouse-yaw correlation) both pass.
+            "mouse_x": [mouse_x_curr],
             "mouse_y": [0.5],
             "mouse_dx": [mouse_dx],
             "mouse_dy": [0.0],

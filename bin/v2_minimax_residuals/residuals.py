@@ -85,9 +85,21 @@ def r05_dt(rec_n: Dict[str, Any], rec_n1: Dict[str, Any]) -> Dict[str, Any]:
         return {"name": "r05_dt", "passed": False, "residual": 0.0, "threshold": 0.0}
 
     from datetime import datetime
-    t_n = datetime.strptime(time_n, "%Y-%m-%d %H:%M:%S.%f")
-    t_n1 = datetime.strptime(time_n1, "%Y-%m-%d %H:%M:%S.%f")
-    actual_dt_ms = (t_n - t_n1).total_seconds() * 1000.0
+
+    def pad_ms_to_us(time_str):
+        if '.' in time_str:
+            base, ms = time_str.rsplit('.', 1)
+            if len(ms) == 3:
+                ms = ms + '000'
+            return base + '.' + ms
+        return time_str
+
+    time_n_padded = pad_ms_to_us(time_n)
+    time_n1_padded = pad_ms_to_us(time_n1)
+
+    t_n = datetime.strptime(time_n_padded, "%Y-%m-%d %H:%M:%S.%f")
+    t_n1 = datetime.strptime(time_n1_padded, "%Y-%m-%d %H:%M:%S.%f")
+    actual_dt_ms = (t_n1 - t_n).total_seconds() * 1000.0
 
     residual = abs(actual_dt_ms - expected_ms)
     return {"name": "r05_dt", "passed": residual < 5.0, "residual": residual, "threshold": 5.0}
