@@ -49,16 +49,26 @@ def synthesize_video(out_path: str, duration_sec: float = 300, fps: int = 30) ->
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     
-    # Use ultrafast preset with CRF 0 (lossless) for fast encoding and large file
+    # Fix #1: H.265 (libx265) per PRD criterion 4. Was libx264 — buyer rejects.
+    # Fix #6: include audio track. PRD criteria 7-10 (audio quality / format /
+    # channels / sample rate) require a real audio stream — synthesize with
+    # `sine` lavfi at 48kHz stereo to satisfy structural checks.
     cmd = [
         "ffmpeg",
         "-y",  # Overwrite output
         "-f", "lavfi",
         "-i", f"testsrc=duration={duration_sec}:size=1920x1080:rate={fps}",
-        "-c:v", "libx264",
+        "-f", "lavfi",
+        "-i", f"sine=frequency=440:sample_rate=48000:duration={duration_sec}",
+        "-c:v", "libx265",
         "-preset", "ultrafast",
-        "-crf", "0",  # Lossless = largest file
+        "-x265-params", "log-level=error",
+        "-c:a", "aac",
+        "-b:a", "128k",
+        "-ac", "2",
         "-pix_fmt", "yuv420p",
+        "-shortest",
+        "-movflags", "+faststart",  # PRD compatibility
         str(out_path)
     ]
     
@@ -128,6 +138,11 @@ def synthesize_action_camera(out_path: str, frame_count: int = 9000) -> str:
         # mouse_dx normalized to fraction of screen width (lint expects [-1, 1])
         mouse_dx = (dyaw * DEG_TO_PIXEL) / SCREEN_W
 
+        # Fix #5: 3-axis trajectory instead of straight X-only line.
+        # Circular path on XZ plane with vertical sine; passes route diversity.
+        cam_x = 50.0 * _math.sin(i / 200.0)
+        cam_y = 64.0 + 3.0 * _math.cos(i / 150.0)
+        cam_z = 50.0 * _math.cos(i / 200.0)
         records.append({
             "frame": i,
             "time": time_str,
@@ -138,14 +153,18 @@ def synthesize_action_camera(out_path: str, frame_count: int = 9000) -> str:
             "mouse_dx": mouse_dx,
             "mouse_dy": 0.0,
             "keyCode": [wasd_pattern[i % 100]],
-            "camera_position": [float(i) * 0.05, 64.0, 0.0],
-            "camera_rotation_oula": [pitch, yaw, 0.0],
+            "camera_position": [cam_x, cam_y, cam_z],
+            # Fix #8: 'oula' (拼音 "欧拉") → 'euler' (English).
+            "camera_rotation_euler": [pitch, yaw, 0.0],
             "camera_rotation_quaternion": [qx, qy, qz, qw],
-            "camera_Follow Offset": [0.0, 1.6, 0.0],
-            "camera_intrinsics": {"fx": 960.0, "fy": 960.0, "cx": 960.0, "cy": 540.0},
+            # Fix #9: 'camera_Follow Offset' (space) → 'camera_follow_offset' (snake_case).
+            "camera_follow_offset": [0.0, 1.6, 0.0],
+            # Fix #10: intrinsics matched to recorder's 70° FOV.
+            # fy = (height/2) / tan(FOV_v/2) = 540 / tan(35°) ≈ 771.4
+            "camera_intrinsics": {"fx": 771.4, "fy": 771.4, "cx": 960.0, "cy": 540.0},
             "camera_speed": [1.5, 0.0, 0.0],
-            "player_position": [float(i) * 0.05, 64.0, 0.0],
-            "player_rotation_oula": [pitch, yaw, 0.0],
+            "player_position": [cam_x, cam_y, cam_z],
+            "player_rotation_euler": [pitch, yaw, 0.0],
             "player_rotation_quaternion": [qx, qy, qz, qw],
             "player_speed": [1.5, 0.0, 0.0],
             "metric_scale": 1.0,
@@ -218,21 +237,32 @@ def synthesize_depth_dir(out_dir: str, count: int = 1800) -> int:
                 f.write(b'\x00' * 512)  # Minimal padding
         return count
     
-    # Real OpenEXR implementation
-    header = OpenEXR.Header(16, 16)
+    # Fix #2 + #3: real 1920x1080 depth (was 16x16 stub, ~310 bytes per file).
+    # PRD requires full-resolution depth at video resolution.
+    W, H = 1920, 1080
+    header = OpenEXR.Header(W, H)
     header['channels'] = {'Z': Imath.Channel(Imath.PixelType(Imath.PixelType.FLOAT))}
-    
+
+    # Pre-compute a synthetic depth field once (ramp + circular feature) so
+    # each frame writes 8 MB of REAL float32 Z values, not constant fill.
+    yy, xx = np.meshgrid(np.arange(H), np.arange(W), indexing='ij')
+    base_depth = 10.0 + 0.005 * (xx + yy)  # plausible Z range 10-25 meters
+
     for i in range(count):
         exr_path = out_dir / f"depth_{i:06d}.exr"
-        
-        # Create depth data (16x16 float32 values)
-        depth_data = np.full((16, 16), i / count, dtype=np.float32)
+        # Per-frame variation: shift focal point so depth changes frame-to-frame
+        cx = (i / count) * W
+        cy = H / 2 + 100 * np.sin(i / 30.0)
+        radial = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2)
+        depth_data = (base_depth - 0.001 * radial).astype(np.float32)
+        # Mark a few pixels as invalid (Z=0) to test PRD criterion 15
+        # invalid-pixel ratio (< 5% allowed).
+        depth_data[radial < 50] = 0.0
         z_channel = depth_data.tobytes()
-        
         exr_file = OpenEXR.OutputFile(str(exr_path), header)
         exr_file.writePixels({'Z': z_channel})
         exr_file.close()
-    
+
     return count
 
 
@@ -260,20 +290,31 @@ def create_gameinfo_xlsx(out_path: str, clip_id: str = "sample-clip-001") -> str
     wb = Workbook()
     ws = wb.active
     ws.title = "GameInfo"
-    
-    # Add headers
-    headers = ["clip_id", "duration_sec", "fps", "resolution", "created_at", "status"]
-    for col, header in enumerate(headers, 1):
-        ws.cell(row=1, column=col, value=header)
-    
-    # Add data row
-    ws.cell(row=2, column=1, value=clip_id)
-    ws.cell(row=2, column=2, value=300)
-    ws.cell(row=2, column=3, value=30)
-    ws.cell(row=2, column=4, value="1920x1080")
-    ws.cell(row=2, column=5, value="2024-01-01T00:00:00Z")
-    ws.cell(row=2, column=6, value="sample")
-    
+
+    # Fix #4: 14 PRD fields, not 6. Matches bin/generate_gameinfo_xlsx.build_gameinfo_dict
+    # output keys per PRD spec.
+    rows = [
+        ("game_name", "Minecraft"),
+        ("game_version", "1.20.4"),
+        ("platform", "Java Edition"),
+        ("scene_name", "overworld-flat"),
+        ("weather", "clear"),
+        ("time_of_day", "day"),
+        ("character_name", "DataPilot"),
+        ("character_class", "spectator"),
+        ("operator_id", "vendor-001-op-A"),
+        ("recording_date", "2026-05-02"),
+        ("total_frames", 9000),
+        ("video_duration_sec", 300.0),
+        ("route_type", 1),
+        ("notes", f"sample clip {clip_id}"),
+    ]
+    ws.cell(row=1, column=1, value="field")
+    ws.cell(row=1, column=2, value="value")
+    for r, (k, v) in enumerate(rows, start=2):
+        ws.cell(row=r, column=1, value=k)
+        ws.cell(row=r, column=2, value=v)
+
     wb.save(out_path)
     return str(out_path)
 

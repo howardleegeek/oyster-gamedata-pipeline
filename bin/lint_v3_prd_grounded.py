@@ -152,25 +152,70 @@ def _check_quaternion(d: Path, rpt: LintReport) -> None:
     rpt.add(LintResult(14, "Quaternion Normalization", not issues, "Quaternion normalization check passed"))
 
 def _check_depth_ratio(d: Path, rpt: LintReport) -> None:
-    """Criteria 15-16: Depth invalid-pixel ratio (<5%)."""
+    """Criteria 15-16: Depth invalid-pixel ratio (<5%).
+
+    BUG FIX: previously globbed for .png and .npy ONLY, so PRD-spec .exr
+    depth files (the actual buyer format) silently passed as 'No depth
+    files'. Now reads OpenEXR via the OpenEXR module (lazy import) and
+    falls back to .png/.npy for backwards compat.
+    """
     np = _get_np()
     Image = _get_pil()
-    depth_files = list(d.glob("**/*depth*.png")) + list(d.glob("**/*depth*.npy"))
+    exr_files = list(d.glob("**/*depth*.exr")) + list(d.glob("**/depth/*.exr"))
+    other_files = list(d.glob("**/*depth*.png")) + list(d.glob("**/*depth*.npy"))
+    depth_files = exr_files + other_files
     if not depth_files:
-        rpt.add(LintResult(15, "Depth Invalid-Pixel Ratio", True, "No depth files"))
-        rpt.add(LintResult(16, "Depth Data Quality", True, "No depth files"))
+        rpt.add(LintResult(15, "Depth Invalid-Pixel Ratio", False,
+                           "No depth files (PRD requires 1800 .exr float32 single-channel Z)"))
+        rpt.add(LintResult(16, "Depth Data Quality", False,
+                           "No depth files — fail by absence per PRD criterion 15-16"))
         return
+
     issues = []
+    sample_size_w, sample_size_h = None, None
     for df in depth_files[:15]:
         try:
-            if df.suffix == ".npy": data = np.load(str(df))
+            if df.suffix == ".exr":
+                # Lazy import OpenEXR — falls back to size-only check if absent.
+                try:
+                    import OpenEXR
+                    f = OpenEXR.InputFile(str(df))
+                    h = f.header()
+                    dw = h["dataWindow"]
+                    w_px = dw.max.x - dw.min.x + 1
+                    h_px = dw.max.y - dw.min.y + 1
+                    sample_size_w, sample_size_h = w_px, h_px
+                    if w_px < 1920 or h_px < 1080:
+                        issues.append((df.name, f"resolution {w_px}x{h_px} < 1920x1080"))
+                        continue
+                    raw = f.channel("Z")
+                    arr = np.frombuffer(raw, dtype=np.float32)
+                    invalid = float(np.sum((arr == 0) | ~np.isfinite(arr))) / max(arr.size, 1)
+                    if invalid > 0.05:
+                        issues.append((df.name, f"{invalid:.1%} invalid"))
+                except ImportError:
+                    # Without OpenEXR, the best we can do is reject empty stubs.
+                    if df.stat().st_size < 50_000:  # real 1080p Z buffer is ~8MB raw
+                        issues.append((df.name, f"file too small ({df.stat().st_size}B)"))
+            elif df.suffix == ".npy":
+                data = np.load(str(df))
+                invalid = float(np.sum((data == 0) | (data == 65535))) / data.size
+                if invalid > 0.05:
+                    issues.append((df.name, f"{invalid:.1%}"))
             else:
-                with Image.open(df) as im: data = np.array(im)
-            invalid = np.sum((data == 0) | (data == 65535)) / data.size
-            if invalid > 0.05: issues.append((df.name, f"{invalid:.1%}"))
-        except Exception: pass
+                with Image.open(df) as im:
+                    data = np.array(im)
+                invalid = float(np.sum((data == 0) | (data == 65535))) / data.size
+                if invalid > 0.05:
+                    issues.append((df.name, f"{invalid:.1%}"))
+        except Exception as e:
+            issues.append((df.name, f"read-err: {type(e).__name__}"))
+    msg_pass = (
+        f"All within 5% (sampled {min(15, len(depth_files))}/{len(depth_files)} files"
+        + (f", {sample_size_w}x{sample_size_h})" if sample_size_w else ")")
+    )
     rpt.add(LintResult(15, "Depth Invalid-Pixel Ratio", not issues,
-                       "All within 5%" if not issues else f"{len(issues)} exceed", {"issues": issues[:5]}))
+                       msg_pass if not issues else f"{len(issues)} exceed", {"issues": issues[:5]}))
     rpt.add(LintResult(16, "Depth Data Quality", not issues, "Depth quality check passed"))
 
 def _check_keycode(d: Path, rpt: LintReport) -> None:
