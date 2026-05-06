@@ -324,10 +324,9 @@ splits cleanly. See open question #1.
 | `ABSTAIN:no_mouse_dx_field` | `curr.mouse_dx` missing |
 | `ABSTAIN:nan_in_input` | NaN in either |
 
-R14 deliberately does **not** ABSTAIN on warmup/static windows — those
-are PASS, because absence of evidence at single-window granularity is
-not evidence of decoupling, and dataset quorum re-tests on later
-non-static windows.
+R14 does **not** ABSTAIN on warmup/static — those are PASS. Absence of
+evidence at single-window granularity is not evidence of decoupling;
+dataset quorum re-tests on later non-static windows.
 
 ### 4.5 Verdict
 
@@ -382,16 +381,14 @@ def r15_fps_video_consistency(
     """
 ```
 
-**One-time per dataset.** fps is a dataset-level property; entrypoint
-calls R15 on `curr.frame == 0` only and caches via lru_cache.
-Subsequent frames carry the cached verdict. Documented because it
-deviates from R13/R14 per-frame model.
+**One-time per dataset.** Entrypoint calls R15 on `curr.frame == 0`
+only and caches via lru_cache; subsequent frames carry cached verdict.
+Deviates from R13/R14 per-frame model.
 
 ### 5.2 ffprobe pattern
 
 `ffprobe` is already a recorder dependency
-(`recorder_consumer_lite.py`, `recorder_metadata_emitter.py`). Verifier
-reuses:
+(`recorder_consumer_lite.py`, `recorder_metadata_emitter.py`):
 
 ```
 $ ffprobe -v error -select_streams v:0 \
@@ -399,17 +396,10 @@ $ ffprobe -v error -select_streams v:0 \
     -show_entries format=duration -of json video.mp4
 ```
 
-`avg_frame_rate` is rational `"30000/1001"`; verifier evaluates:
-
-```python
-def _eval_rational(s: str) -> float:
-    num, den = s.split("/")
-    return 0.0 if float(den) == 0 else float(num)/float(den)
-```
-
-R15 uses `avg_frame_rate` (actual stream avg) not `r_frame_rate` (raw
-container) — `avg_frame_rate` catches a producer that lied about fps
-but actually encoded fewer frames per second.
+`avg_frame_rate` is rational `"30000/1001"`; verifier evaluates as
+`num/den` (0 if den == 0). R15 uses `avg_frame_rate` (actual stream
+avg) not `r_frame_rate` (raw container) — catches a producer that lied
+about fps but actually encoded fewer frames per second.
 
 ### 5.3 Verdict
 
@@ -503,15 +493,15 @@ diff     = abs(expected − actual)
 PASS  iff  diff ≤ depth_count_tolerance
 ```
 
-**Why ±2.** Depth thread samples at 6 Hz wall-clock independently of
-the encoder. A recording ending at `t_end = 4.95 s` has
-`ceil(4.95×6) = 30` expected frames; depth thread may write 29 (last
-sample didn't fire) or 31 (one extra after stop). ±2 absorbs
-end-of-stream race; ±3 would absorb a real bug (full 0.5-second gap).
+**Why ±2.** Depth samples at 6 Hz wall-clock independently of encoder.
+Recording ending at `t_end = 4.95 s`: `ceil(4.95×6) = 30` expected;
+depth thread may write 29 (last sample didn't fire) or 31 (one extra
+after stop). ±2 absorbs end-of-stream race; ±3 would absorb a real
+bug (full 0.5 s gap).
 
 ### 6.4 Uniform-spacing (Pattern B only)
 
-When `config["check_uniform_spacing"] == True` and timestamped names:
+When `check_uniform_spacing == True` AND timestamped filenames:
 
 ```
 ts_i = parsed timestamp of i-th file (sorted by index)
@@ -520,9 +510,9 @@ PASS iff max_i |ts_i − expected_ts_i| < (1 / depth_fps) / 2
                                          ⌊── ½ depth-frame slack
 ```
 
-Catches "producer wrote 30 files, all from the first half of the
-recording" (stuck-thread bug). With Pattern A, silently skipped (does
-not ABSTAIN; just doesn't contribute evidence).
+Catches "30 files, all from the first half of the recording"
+(stuck-thread bug). Pattern A: silently skipped (no ABSTAIN; just no
+evidence).
 
 ### 6.5 Verdict
 
@@ -599,34 +589,29 @@ question #5.
 ## 8. What This Does NOT Solve
 
 R13–R16 cover *cross-modal alignment* — quantifiable, deterministic
-predicates. The following classes of buyer concern are **out of scope**
-for the V₁/V₂/V₃ residual catalog and require V₄ buyer-signed sample
-diff per `ARCH_BFT_CONSENSUS.md` § 2.4:
+predicates. The following are **out of scope** for V₁/V₂/V₃ residuals
+and require V₄ buyer-signed sample diff per BFT § 2.4:
 
-- **Camera-motion smoothness.** Perceptual; depends on buyer's downstream
-  model architecture; can be technically correct yet unusable.
-  Resolution: V₄ on a buyer-pre-signed "motion smoothness exemplar"
-  frame. **Do not** invent an R-residual for smoothness.
-- **Scene diversity.** Distribution over many recordings, not a single
-  recording. Belongs in `bin/aggregate_sprint_report.py`, not residuals.
-- **Cultural/content appropriateness.** Visible in-game ads, NSFW-adjacent
-  visuals, UI text. Not a math problem; separate moderation pipeline.
-- **Audio quality.** `audio_event_track.py` is the locus; this spec
-  stays out of audio entirely.
+- **Camera-motion smoothness.** Perceptual; depends on buyer's
+  downstream model architecture. Resolution: V₄ on buyer-pre-signed
+  "smoothness exemplar" frame. Do not invent an R-residual for it.
+- **Scene diversity.** Distribution property over many recordings.
+  Belongs in `bin/aggregate_sprint_report.py`, not residuals.
+- **Cultural/content appropriateness.** In-game ads, NSFW visuals, UI
+  text. Not a math problem; separate moderation pipeline.
+- **Audio quality.** `audio_event_track.py` is the locus.
 
 **General rule:**
 
 > A V₁/V₂/V₃ residual must, given a fully-specified `FrameWindow` +
 > `MultiModalExtras` + buyer config, produce a deterministic verdict
 > with the same numerical value on any compliant Python runtime.
-> Anything requiring *human judgment* — even highly-trained,
-> well-calibrated, agreeable judgment — is by construction a V₄
-> matter, not a residual.
+> Anything requiring human judgment is by construction a V₄ matter,
+> not a residual.
 
-R13–R16 satisfy this. Smoothness, diversity, appropriateness do not.
-Treat anyone proposing "an R-residual for camera smoothness" as having
-missed the architectural distinction; the right move is V₄, not a
-residual.
+R13–R16 satisfy this. Smoothness/diversity/appropriateness do not.
+Anyone proposing "an R-residual for smoothness" has missed the
+architectural distinction; the right move is V₄.
 
 ---
 
@@ -679,27 +664,21 @@ PR rejected by CI if any of 1–8 missing.
 
 ### 9.3 Roll-out order
 
-Easiest first:
+Easiest first: **R15** (single subprocess, single dataset verdict) →
+**R16** (file listing + arithmetic) → **R13** (FI-02 catch — highest
+value, requires inputs.jsonl + time alignment) → **R14** (sliding
+window + `aux_state` ABI extension).
 
-1. **R15** — single subprocess, single verdict per dataset, forgiving
-   tolerance. Highest signal, lowest risk.
-2. **R16** — file listing + arithmetic. Similar simplicity.
-3. **R13** — FI-02 catch (highest value), but requires `inputs.jsonl`
-   parsing and time-alignment care.
-4. **R14** — correlation residual; needs `aux_state` ABI extension and
-   sliding-window state.
-
-BFT Phase A (dual-run shadow per BFT § 9.2) covers all four; advance to
-Phase B (active gating) only after 100 consecutive consensus rounds
+BFT Phase A (dual-run shadow per BFT § 9.2) covers all four. Advance
+to Phase B (active gating) only after 100 consecutive consensus rounds
 without spurious failure on known-good recordings, per residual.
 
 ### 9.4 Rollback
 
 Each residual independently disable-able by removing its
-`enabled_residuals` entry. No schema migration. If R-N produces a
-sustained false-FAIL spike, response is to lower threshold in
-buyer_spec, not hot-fix code, until calibration window completes and
-proper threshold lands via signed change.
+`enabled_residuals` entry. No schema migration. Sustained false-FAIL
+spike: lower threshold in buyer_spec; do not hot-fix code until
+calibration window closes and the signed-threshold change lands.
 
 ---
 
@@ -768,65 +747,56 @@ Each criterion binary (YES/NO ≤ 1 second).
 
 ## 11. Open Questions for Howard
 
-1. **R14 default threshold = 0.5.** |corr| ≥ 0.5 was chosen as middle
-   ground (sensitivity vs specificity). Test recordings show |corr| ≥
-   0.85 on legitimate runs — we could tighten to 0.7 and still cover all
-   known FI cases. **Should default be 0.5, 0.6, or 0.7?**
+1. **R14 default threshold.** 0.5 was chosen as middle ground; test
+   recordings show |corr| ≥ 0.85 on legitimate runs — tightening to
+   0.7 still covers all known FI cases. Default 0.5, 0.6, or 0.7?
 
-2. **R15 V₃ opt-in for buyer-signed-sample workflow.** § 5.6 leaves V₃
-   on R15 as a knob. Spec the `physics_oracle_table.json` schema
-   extension for `expected_fps` per dataset_id, or stay V₃-ABSTAIN-by-default
-   and defer to a later spec? **My rec: defer.** Per-dataset oracle
-   rows materially complicate V₃'s "no-LLM, hand-tabulated, < 200 LOC"
+2. **R15 V₃ opt-in.** § 5.6 leaves V₃ on R15 as a knob. Spec
+   `physics_oracle_table.json` extension for `expected_fps` per
+   dataset_id, or stay ABSTAIN-by-default and defer? **My rec: defer.**
+   Per-dataset oracle rows complicate V₃'s "no-LLM, < 200 LOC"
    guarantee per BFT § 2.3.
 
-3. **R16 depth_fps default 6.0.** PRD says "每秒 6 张均匀抽帧". Is this
-   exactly 6.0, or do we permit 5.99 / 6.01 from container clock drift?
-   If exact, ±2 tolerance suffices; if drift permitted, R16 needs a
-   `depth_fps_tolerance` knob (target, not constant).
+3. **R16 `depth_fps` default 6.0.** PRD says "每秒 6 张均匀抽帧".
+   Exactly 6.0, or permit 5.99 / 6.01 from container clock drift? If
+   exact, ±2 tolerance suffices; if drift permitted, R16 needs a
+   `depth_fps_tolerance` knob.
 
 4. **`inputs.jsonl` t₀ sentinel.** R13 § 3.2 requires first row
-   `kind: "session_start"`. **Is the recorder already emitting this?**
+   `kind: "session_start"`. Is the recorder already emitting this?
    Resolves with `head -n 1
    samples/canonical_recording_03/inputs.jsonl`. If not: (a) producer
-   change (deeper, blocks R13 ship) or (b) verifier infers t₀ from
-   `min(events.ts_ns)` (weaker, no producer change). I lean (a).
+   change (deeper, blocks R13) or (b) verifier infers t₀ from
+   `min(events.ts_ns)` (weaker). I lean (a).
 
-5. **Per-residual ABSTAIN ratio thresholds (§ 7).** Placeholder 0.10 /
-   0.50. Real data needed. Run R13–R16 in shadow 2 weeks, plot ABSTAIN
-   ratio per residual, lock thresholds. **Spec the calibration job
-   now, or "calibrate later" acceptable for v1 ship?**
+5. **§ 7 ABSTAIN ratio thresholds.** Placeholder 0.10 / 0.50. Run
+   R13–R16 in shadow 2 weeks, plot ABSTAIN ratio per residual, lock
+   thresholds. Spec calibration job now, or "calibrate later"
+   acceptable for v1?
 
-6. **R15 `tolerate_fractional` default = True.** Permits NTSC 29.97 →
-   30 PASS — buyer-convenience-correct, but technically allows 0.03 fps
-   lie. **Default-True, or default-False with NTSC buyers explicitly
-   opting in?** My position: default-True. False default's failure mode
-   (flood of spurious FAILs eroding trust in R15) is worse than
-   under-detecting 0.03 fps.
+6. **R15 `tolerate_fractional` default = True.** Permits NTSC
+   29.97 → 30 PASS — buyer-convenient but technically allows 0.03 fps
+   lie. Default-True or default-False with NTSC opt-in? My position:
+   default-True; flood of spurious FAILs from default-False would
+   erode trust in R15 worse than under-detecting 0.03 fps.
 
 ---
 
 ## 12. Document Provenance
 
-- Authored by: Vera Sterling (Algorithm Agent), 2026-05-05, Stream D.
-- Source-of-truth files cited:
-  - `docs/PRD_FORMULAS.md` — § B13 VK codes, criterion #3 mouse, #5 keyCode.
-  - `docs/PRD_DIGEST.md` — iron-laws scaffold (this spec proposes IL10).
-  - `docs/ARCH_BFT_CONSENSUS.md` — V₁/V₂/V₃ roles, PBFT decree, audit
-    (§ 4.1), ABSTAIN semantics (§ 5, § 8.1).
-  - `docs/ARCH_PINNS_BUYER_SPEC.md` — `FrameDict`, `FrameWindow`,
-    `ResidualResult`, buyer-spec YAML, sentinels, quorum.
-- Producer files cited (read-only):
-  - `bin/recorder_consumer_lite.py` — emits `inputs.jsonl`.
-  - `bin/recorder_metadata_emitter.py` — emits `video.mp4` metadata.
-  - `bin/recorder_depth_filler.py` — emits `depth/*.exr`.
-- Sibling specs **NOT modified**: `ARCH_BFT_CONSENSUS.md`,
-  `ARCH_PINNS_BUYER_SPEC.md`, plus parallel-stream A/C/E specs.
-- Scope: R13–R16 residual design, IL10, ISC for these four only.
-  **Out of scope:** any R-residual ≥ R17, V₂ dispatch implementation
-  choice (MiniMax vs GLM vs Codex), orchestrator tally code, V₄
-  buyer-reference workflow.
-
----
+- Authored by Vera Sterling (Algorithm Agent), 2026-05-05, Stream D.
+- Source-of-truth: `docs/PRD_FORMULAS.md` (§ B13, criteria #3, #5),
+  `docs/PRD_DIGEST.md` (iron-laws scaffold; this spec proposes IL10),
+  `docs/ARCH_BFT_CONSENSUS.md` (V₁/V₂/V₃ roles, PBFT, ABSTAIN per
+  § 5/§ 8.1), `docs/ARCH_PINNS_BUYER_SPEC.md` (`FrameDict`,
+  `FrameWindow`, `ResidualResult`, buyer-spec YAML, quorum).
+- Producer files cited (read-only): `bin/recorder_consumer_lite.py`
+  (`inputs.jsonl`), `bin/recorder_metadata_emitter.py` (`video.mp4`
+  metadata), `bin/recorder_depth_filler.py` (`depth/*.exr`).
+- Sibling specs NOT modified: `ARCH_BFT_CONSENSUS.md`,
+  `ARCH_PINNS_BUYER_SPEC.md`, parallel-stream A/C/E specs.
+- Scope: R13–R16 residual design, IL10, ISC. **Out of scope:** any
+  R-residual ≥ R17, V₂ dispatch implementation (MiniMax vs GLM vs
+  Codex), orchestrator tally code, V₄ buyer-reference workflow.
 
 *End of SPEC_R13_MULTIMODAL.md.*
