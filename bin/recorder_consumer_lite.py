@@ -85,7 +85,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.22.0"
+RECORDER_VERSION = "lite-v0.23.0"
 RELEASES_API = (
     "https://api.github.com/repos/howardleegeek/oyster-gamedata-pipeline"
     "/releases?per_page=20"
@@ -1076,30 +1076,84 @@ class RecorderApp(tk.Tk):
                     td_path = Path(td)
                     with tarfile.open(tarball, "r:gz") as tf:
                         tf.extractall(td_path)
-                    inner = [p for p in td_path.iterdir() if p.is_dir()]
-                    target = inner[0] if len(inner) == 1 else td_path
+                    # v0.23.0: target = whichever directory level holds
+                    # action_camera.json. Some tarballs wrap everything in a
+                    # single dir (recorder default), others extract files at
+                    # root (sample_tarball_builder). Pick whichever works.
+                    if (td_path / "action_camera.json").exists():
+                        target = td_path
+                    else:
+                        inner = [p for p in td_path.iterdir() if p.is_dir()]
+                        candidates = [
+                            p for p in inner
+                            if (p / "action_camera.json").exists()
+                        ]
+                        target = candidates[0] if candidates else (
+                            inner[0] if len(inner) == 1 else td_path
+                        )
                     ac_path = target / "action_camera.json"
                     if not ac_path.exists():
                         _trace("auto_bft: action_camera.json not found, skip")
                         return
                     records = json.loads(ac_path.read_text(encoding="utf-8"))
 
-                # Run BFT on the first 60 contiguous frames (= 2 seconds).
-                # Must be contiguous because R03/R04/R05 require real
-                # frame[n+1] neighbors — non-adjacent pairs produce false
-                # REJECTs (Δposition over a gap ≠ speed · dt). The full
-                # dataset analysis runs on engineer's side via the CLI
-                # `python -m bin.bft_orchestrator.orchestrator <ac.json>`.
-                n = len(records)
-                spot_check_size = min(60, n)
-                contiguous_records = records[:spot_check_size]
-                report = orch.aggregate_dataset(contiguous_records, fps=30.0)
+                    # v0.23.0: gather multimodal artifact paths so the
+                    # orchestrator-level residuals (R13/R15/R16/R20/R22/R23)
+                    # actually fire instead of ABSTAINing. Each path is
+                    # backward-compatible — orchestrator self-handles None.
+                    inputs_path = target / "inputs.jsonl"
+                    depth_dir = target / "depth"
+                    depth_manifest_path = target / "depth_manifest.json"
+                    video_path = target / "video.mp4"
+                    inputs_arg = inputs_path if inputs_path.exists() else None
+                    depth_dir_arg = depth_dir if depth_dir.exists() else None
+                    depth_manifest_arg = (
+                        depth_manifest_path if depth_manifest_path.exists() else None
+                    )
+                    video_arg = video_path if video_path.exists() else None
+
+                    # Run BFT on the first 60 contiguous frames (= 2 seconds).
+                    # Must be contiguous because R03/R04/R05 require real
+                    # frame[n+1] neighbors — non-adjacent pairs produce false
+                    # REJECTs (Δposition over a gap ≠ speed · dt). The full
+                    # dataset analysis runs on engineer's side via the CLI
+                    # `python -m bin.bft_orchestrator.orchestrator <ac.json>`.
+                    n = len(records)
+                    spot_check_size = min(60, n)
+                    contiguous_records = records[:spot_check_size]
+                    report = orch.aggregate_dataset(
+                        contiguous_records,
+                        fps=30.0,
+                        inputs_path=inputs_arg,
+                        depth_dir=depth_dir_arg,
+                        depth_manifest_path=depth_manifest_arg,
+                        video_path=video_arg,
+                    )
 
                 _trace(f"auto_bft: report={report}")
 
                 def _ui():
                     decision = report.get("dataset_decision", "UNKNOWN")
                     residuals = report.get("residuals", {})
+                    # v0.23.0: separate single-modal (R01..R12) from
+                    # multimodal/dataset (R13/R15/R16/R20*/R22/R23) so the
+                    # tester sees which class failed.
+                    multimodal_prefixes = ("R13", "R15", "R16", "R20", "R22", "R23")
+                    multimodal_bad = []
+                    single_bad = []
+                    for rname, stats in residuals.items():
+                        rej = stats.get("REJECT", 0)
+                        vc = stats.get("VIEW_CHANGE", 0)
+                        if rej == 0 and vc == 0:
+                            continue
+                        tag = (
+                            f"{rname}({rej}REJ)" if rej > 0
+                            else f"{rname}({vc}VC)"
+                        )
+                        if rname.startswith(multimodal_prefixes):
+                            multimodal_bad.append(tag)
+                        else:
+                            single_bad.append(tag)
                     if decision == "PASS":
                         self._set(
                             f"✓ BFT 共识: 全过 ({len(residuals)} 残差)",
@@ -1111,19 +1165,30 @@ class RecorderApp(tk.Tk):
                             fg=GREEN,
                         )
                     else:
-                        bad = []
-                        for rname, stats in residuals.items():
-                            if stats.get("REJECT", 0) > 0:
-                                bad.append(f"{rname}({stats.get('REJECT', 0)}REJ)")
-                            elif stats.get("VIEW_CHANGE", 0) > 0:
-                                bad.append(f"{rname}({stats.get('VIEW_CHANGE', 0)}VC)")
+                        bad_combined = multimodal_bad + single_bad
+                        detail_lines = []
+                        if multimodal_bad:
+                            detail_lines.append(
+                                f"多模态失败: {', '.join(multimodal_bad[:5])}"
+                            )
+                        if single_bad:
+                            detail_lines.append(
+                                f"单模态失败: {', '.join(single_bad[:5])}"
+                            )
+                        if not detail_lines:
+                            detail_lines.append("(详情见日志)")
                         self._set(
-                            f"⚠️ BFT 共识 {decision}",
+                            f"⚠️ BFT 共识 FAIL ({decision})",
                             ORANGE,
-                            f"问题残差: {', '.join(bad[:5]) if bad else '(详情见日志)'}\n建议重录或检查 producer。",
+                            "\n".join(detail_lines)
+                            + "\n建议重录或检查 producer。",
                         )
                         self._hint.config(
-                            text=f"已保存: {tarball}\nBFT 数据决议: {decision} — 见日志详情",
+                            text=(
+                                f"已保存: {tarball}\n"
+                                f"BFT 数据决议: {decision} — "
+                                f"问题: {', '.join(bad_combined[:5]) if bad_combined else '见日志'}"
+                            ),
                             fg=ORANGE,
                         )
                 self.after(0, _ui)

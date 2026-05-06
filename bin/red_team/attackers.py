@@ -352,15 +352,15 @@ def _d05_video_codec_mismatch(rec: dict, neighbor: dict) -> AttackResult:
 
 bucket_b_attacks: tuple[AttackCase, ...] = (
     AttackCase("B-01", "B", "oula+quat self-consistent swap", "high",
-               ("R13",), _b01_oula_quat_consistent_swap),
+               ("R13", "R24"), _b01_oula_quat_consistent_swap),
     AttackCase("B-02", "B", "pos+speed ×2 coordinated", "medium",
                ("R10",), _b02_pos_speed_consistent_scale),
     AttackCase("B-03", "B", "keyCode + inputs.jsonl W→B coordinated", "critical",
-               (), _b03_keycode_W_to_B_full_swap),
+               ("R24",), _b03_keycode_W_to_B_full_swap),
     AttackCase("B-04", "B", "time+fps proportional dilate", "high",
                ("R12", "R15"), _b04_time_fps_proportional_dilate),
     AttackCase("B-05", "B", "dataset replay splice (AC[A] + video[B])", "critical",
-               ("R18", "R15", "R16"), _b05_dataset_replay_splice),
+               ("R18", "R15", "R16", "R24"), _b05_dataset_replay_splice),
 )
 
 bucket_c_attacks: tuple[AttackCase, ...] = (

@@ -387,5 +387,302 @@ def r21_monotonic_frame(
             "note": f"non-monotonic: {cur} → {nxt}"}
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# V₂ MiniMax R20a-e (drift), R22 (depth hash), R23 (video codec)
+# Mirrors V₁ semantics; dict return shape for BFT N=4 redundancy.
+# Pure stdlib + hashlib. ABSTAIN: passed=False, residual=NaN, note="ABSTAIN:…"
+# ──────────────────────────────────────────────────────────────────────────
+
+import hashlib
+import os
+import shutil
+import statistics
+import subprocess
+from datetime import datetime as _dt
+
+
+def _v2_drift_abstain(name, reason, threshold=0.0):
+    return {"name": name, "passed": False, "residual": math.nan,
+            "threshold": threshold, "note": f"ABSTAIN:{reason}"}
+
+
+def _v2_parse_time(s):
+    return _dt.strptime(s, "%Y-%m-%d %H:%M:%S.%f")
+
+
+def r20a_quat_norm_distribution(records, max_offset=1e-5, max_std=1e-4,
+                                min_frames=10):
+    """V₂ R20a: |μ_‖q‖−1.0|≤max_offset AND σ_‖q‖≤max_std."""
+    if not records:
+        return _v2_drift_abstain("R20a", "empty_records", max_offset)
+    if len(records) < min_frames:
+        return _v2_drift_abstain(
+            "R20a", f"insufficient_sample({len(records)}<{min_frames})",
+            max_offset)
+    norms = []
+    for r in records:
+        q = r.get("camera_rotation_quaternion")
+        if not q or len(q) != 4:
+            return _v2_drift_abstain(
+                "R20a", "missing_field(camera_rotation_quaternion)", max_offset)
+        n = math.sqrt(sum(float(c) * float(c) for c in q))
+        if math.isnan(n):
+            return _v2_drift_abstain("R20a", "nan_in_stat", max_offset)
+        norms.append(n)
+    mu = statistics.fmean(norms)
+    sigma = statistics.stdev(norms) if len(norms) > 1 else 0.0
+    offset = abs(mu - 1.0)
+    passed = offset <= max_offset and sigma <= max_std
+    return {"name": "R20a", "passed": passed, "residual": offset,
+            "threshold": max_offset,
+            "note": f"mu={mu:.3e} sigma={sigma:.3e}"}
+
+
+def r20b_mouse_dx_cumulative(records, tolerance=1e-3, min_frames=10):
+    """V₂ R20b: |Σ mouse_dx − (mouse_x[N-1]−mouse_x[0])| ≤ tolerance."""
+    if not records:
+        return _v2_drift_abstain("R20b", "empty_records", tolerance)
+    if len(records) < min_frames:
+        return _v2_drift_abstain(
+            "R20b", f"insufficient_sample({len(records)}<{min_frames})",
+            tolerance)
+    s = 0.0
+    for r in records:
+        dx = r.get("mouse_dx")
+        if not isinstance(dx, list) or not dx:
+            return _v2_drift_abstain(
+                "R20b", "malformed_field(mouse_dx)", tolerance)
+        s += float(dx[0])
+    x0 = records[0].get("mouse_x")
+    xN = records[-1].get("mouse_x")
+    if (not isinstance(x0, list) or not x0
+            or not isinstance(xN, list) or not xN):
+        return _v2_drift_abstain(
+            "R20b", "malformed_field(mouse_x)", tolerance)
+    delta_x = float(xN[0]) - float(x0[0])
+    drift = abs(s - delta_x)
+    if math.isnan(drift):
+        return _v2_drift_abstain("R20b", "nan_in_stat", tolerance)
+    return {"name": "R20b", "passed": drift <= tolerance, "residual": drift,
+            "threshold": tolerance,
+            "note": f"sum={s:.3e} delta_x={delta_x:.3e}"}
+
+
+def r20c_fps_jitter(records, max_offset_ms=0.1, max_std_ms=5.0,
+                    min_frames=10):
+    """V₂ R20c: |μ_dt − 1/fps| ≤ max_offset_ms AND σ_dt ≤ max_std_ms."""
+    if not records:
+        return _v2_drift_abstain("R20c", "empty_records", max_offset_ms)
+    if len(records) < min_frames:
+        return _v2_drift_abstain(
+            "R20c", f"insufficient_sample({len(records)}<{min_frames})",
+            max_offset_ms)
+    declared_fps = float(records[0].get("fps", 30.0))
+    target_dt_ms = 1000.0 / declared_fps if declared_fps > 0 else 1000.0 / 30.0
+    dts_ms = []
+    try:
+        for i in range(len(records) - 1):
+            dt = (_v2_parse_time(records[i + 1]["time"])
+                  - _v2_parse_time(records[i]["time"])).total_seconds() * 1000.0
+            if dt < 0:
+                return _v2_drift_abstain(
+                    "R20c", "non_monotone_time", max_offset_ms)
+            dts_ms.append(dt)
+    except (KeyError, ValueError, TypeError):
+        return _v2_drift_abstain(
+            "R20c", "malformed_field(time)", max_offset_ms)
+    mu = statistics.fmean(dts_ms)
+    sigma = statistics.stdev(dts_ms) if len(dts_ms) > 1 else 0.0
+    offset = abs(mu - target_dt_ms)
+    passed = offset <= max_offset_ms and sigma <= max_std_ms
+    return {"name": "R20c", "passed": passed, "residual": offset,
+            "threshold": max_offset_ms,
+            "note": (f"mu_dt={mu:.3f}ms target={target_dt_ms:.3f}ms "
+                     f"sigma={sigma:.3f}ms")}
+
+
+def r20d_speed_profile(records, max_outlier_pct=0.10, max_mean_speed=15.0,
+                       high_speed_threshold=30.0, min_frames=10):
+    """V₂ R20d: ratio(‖speed‖>30)≤10% AND μ_‖speed‖≤15 m/s."""
+    if not records:
+        return _v2_drift_abstain("R20d", "empty_records", max_outlier_pct)
+    if len(records) < min_frames:
+        return _v2_drift_abstain(
+            "R20d", f"insufficient_sample({len(records)}<{min_frames})",
+            max_outlier_pct)
+    mags = []
+    for r in records:
+        s = r.get("camera_speed")
+        if not isinstance(s, list) or len(s) != 3:
+            return _v2_drift_abstain(
+                "R20d", "malformed_field(camera_speed)", max_outlier_pct)
+        mag = math.sqrt(sum(float(c) * float(c) for c in s))
+        if math.isnan(mag):
+            return _v2_drift_abstain("R20d", "nan_in_stat", max_outlier_pct)
+        mags.append(mag)
+    n_high = sum(1 for m in mags if m > high_speed_threshold)
+    ratio = n_high / len(mags)
+    mu = statistics.fmean(mags)
+    passed = ratio <= max_outlier_pct and mu <= max_mean_speed
+    return {"name": "R20d", "passed": passed, "residual": ratio,
+            "threshold": max_outlier_pct,
+            "note": f"mu_speed={mu:.3f}m/s ratio_high={ratio:.3f}"}
+
+
+def r20e_yaw_turn_rate(records, max_rate_deg_per_sec=720.0,
+                       max_outlier_pct=0.05, min_frames=10):
+    """V₂ R20e: ratio(|Δyaw|/dt > 720°/s) ≤ 5% over adjacent pairs."""
+    if not records:
+        return _v2_drift_abstain("R20e", "empty_records", max_outlier_pct)
+    if len(records) < min_frames:
+        return _v2_drift_abstain(
+            "R20e", f"insufficient_sample({len(records)}<{min_frames})",
+            max_outlier_pct)
+    rates = []
+    try:
+        for i in range(len(records) - 1):
+            on = records[i].get("camera_rotation_oula")
+            on1 = records[i + 1].get("camera_rotation_oula")
+            if not on or not on1 or len(on) < 2 or len(on1) < 2:
+                return _v2_drift_abstain(
+                    "R20e", "malformed_field(camera_rotation_oula)",
+                    max_outlier_pct)
+            d_yaw = float(on1[1]) - float(on[1])
+            d_yaw = (d_yaw + 180.0) % 360.0 - 180.0
+            dt = (_v2_parse_time(records[i + 1]["time"])
+                  - _v2_parse_time(records[i]["time"])).total_seconds()
+            if dt <= 0:
+                return _v2_drift_abstain(
+                    "R20e", "non_monotone_time", max_outlier_pct)
+            rates.append(abs(d_yaw) / dt)
+    except (KeyError, ValueError, TypeError):
+        return _v2_drift_abstain(
+            "R20e", "malformed_field(time)", max_outlier_pct)
+    n_extreme = sum(1 for r in rates if r > max_rate_deg_per_sec)
+    ratio = n_extreme / len(rates) if rates else 0.0
+    return {"name": "R20e", "passed": ratio <= max_outlier_pct,
+            "residual": ratio, "threshold": max_outlier_pct,
+            "note": (f"ratio_extreme={ratio:.3f} "
+                     f"max_rate={max(rates) if rates else 0.0:.1f}deg/s")}
+
+
+_V2_CHUNK = 1 << 20  # 1 MiB chunked SHA-256 reads
+
+
+def _v2_sha256_file(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(_V2_CHUNK), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def r22_depth_hash(rec, neighbor=None, depth_dir=None, manifest_path=None):
+    """V₂ R22: every file in depth_manifest.json hashes to recorded SHA-256."""
+    threshold = 0.0
+    base = {"name": "r22_depth_hash", "threshold": threshold}
+
+    if depth_dir is None:
+        return {**base, "passed": False, "residual": math.nan,
+                "note": "ABSTAIN:no_depth_dir"}
+    if not os.path.isdir(str(depth_dir)):
+        return {**base, "passed": False, "residual": math.nan,
+                "note": "ABSTAIN:no_depth_dir"}
+    if manifest_path is None:
+        return {**base, "passed": False, "residual": math.nan,
+                "note": "ABSTAIN:no_manifest_path"}
+    if not os.path.isfile(str(manifest_path)):
+        return {**base, "passed": False, "residual": math.nan,
+                "note": "ABSTAIN:manifest_not_found"}
+    try:
+        with open(str(manifest_path), "r", encoding="utf-8") as fh:
+            manifest = json.load(fh)
+    except (OSError, json.JSONDecodeError) as e:
+        return {**base, "passed": False, "residual": math.nan,
+                "note": f"ABSTAIN:manifest_unreadable:{e}"}
+    if not isinstance(manifest, dict) or not all(
+            isinstance(k, str) and isinstance(v, str)
+            for k, v in manifest.items()):
+        return {**base, "passed": False, "residual": math.nan,
+                "note": "ABSTAIN:manifest_bad_shape"}
+
+    mismatched = 0
+    missing = 0
+    for filename, expected_sha in manifest.items():
+        fpath = os.path.join(str(depth_dir), filename)
+        if not os.path.isfile(fpath):
+            missing += 1
+            continue
+        if _v2_sha256_file(fpath).lower() != expected_sha.lower():
+            mismatched += 1
+    residual = float(mismatched + missing)
+    if residual == 0.0:
+        return {**base, "passed": True, "residual": 0.0,
+                "note": f"all {len(manifest)} hashes matched"}
+    return {**base, "passed": False, "residual": residual,
+            "note": (f"mismatched={mismatched} missing={missing} "
+                     f"of {len(manifest)} listed")}
+
+
+_V2_FFPROBE = ("ffprobe", "-v", "error", "-show_streams", "-of", "json")
+_V2_EXPECT_CODEC = "hevc"
+_V2_EXPECT_W = 1920
+_V2_EXPECT_H = 1080
+
+
+def _v2_codec_abstain(reason):
+    return {"name": "r23_video_codec", "passed": False,
+            "residual": math.nan, "threshold": 0.0,
+            "note": f"ABSTAIN:{reason}"}
+
+
+def r23_video_codec(rec, neighbor=None, video_path=None):
+    """V₂ R23: video.mp4 is H.265 / 1920x1080 per PRD."""
+    if video_path is None:
+        return _v2_codec_abstain("no_video_file")
+    p = str(video_path)
+    if not os.path.isfile(p):
+        return _v2_codec_abstain("no_video_file")
+    if shutil.which("ffprobe") is None:
+        return _v2_codec_abstain("ffprobe_unavailable")
+
+    try:
+        proc = subprocess.run([*_V2_FFPROBE, p], capture_output=True,
+                              text=True, timeout=10, check=False)
+    except (subprocess.TimeoutExpired, OSError) as e:
+        return _v2_codec_abstain(f"ffprobe_failed:{type(e).__name__}")
+    if proc.returncode != 0:
+        return _v2_codec_abstain("ffprobe_failed")
+
+    try:
+        data = json.loads(proc.stdout)
+        streams = data.get("streams", [])
+        vs = next((s for s in streams if s.get("codec_type") == "video"),
+                  None)
+        if vs is None and streams:
+            vs = streams[0]
+    except (json.JSONDecodeError, TypeError):
+        return _v2_codec_abstain("ffprobe_failed")
+    if not vs:
+        return _v2_codec_abstain("no_video_stream")
+
+    mismatches = []
+    codec = vs.get("codec_name")
+    width = vs.get("width")
+    height = vs.get("height")
+    if codec != _V2_EXPECT_CODEC:
+        mismatches.append(f"codec={codec!r}!={_V2_EXPECT_CODEC!r}")
+    if width != _V2_EXPECT_W:
+        mismatches.append(f"width={width}!={_V2_EXPECT_W}")
+    if height != _V2_EXPECT_H:
+        mismatches.append(f"height={height}!={_V2_EXPECT_H}")
+    residual = float(len(mismatches))
+    if residual == 0.0:
+        return {"name": "r23_video_codec", "passed": True, "residual": 0.0,
+                "threshold": 0.0, "note": "hevc 1920x1080"}
+    return {"name": "r23_video_codec", "passed": False, "residual": residual,
+            "threshold": 0.0, "note": "; ".join(mismatches)}
+
+
 if __name__ == "__main__":
     unittest.main()

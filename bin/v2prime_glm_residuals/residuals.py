@@ -5,8 +5,11 @@ Written by V2 (GLM via Z.AI proxy). References PRD_INPUT.md ONLY.
 
 import json
 import math
+import statistics
 import sys
-from typing import Any, Dict, List, Optional
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
 # --- Valid Windows VK codes from PRD ---
 VK_TO_KEY = {
@@ -418,6 +421,252 @@ def r12_fps_range(frame: Dict[str, Any]) -> Dict[str, Any]:
 
     return {"name": "r12_fps_range", "passed": overshoot <= threshold,
             "residual": overshoot, "threshold": threshold}
+
+
+# ── r18: session_id manifest binding (Frankenstein-splice defense) ───
+def r18_session_manifest(
+    rec: Dict[str, Any],
+    neighbor: Optional[Dict[str, Any]] = None,
+    manifest_path: Union[str, Path, None] = None,
+) -> Dict[str, Any]:
+    """V₂' R18: ``rec['session_id']`` must equal ``manifest['session_id']``.
+
+    ABSTAIN encoding: ``passed=False, residual=NaN, note='ABSTAIN:...'``.
+    Mirrors V₁ logic — strict equality, four ABSTAIN gates per IL10.
+    """
+    name = "R18"
+    threshold = 0.0
+
+    def _abstain(reason: str) -> Dict[str, Any]:
+        return {"name": name, "passed": False, "residual": float("nan"),
+                "threshold": threshold, "note": f"ABSTAIN:{reason}"}
+
+    if manifest_path is None:
+        return _abstain("no_manifest_path")
+    mpath = Path(manifest_path)
+    if not mpath.is_file():
+        return _abstain("manifest_not_found")
+
+    try:
+        manifest: Dict[str, Any] = json.loads(mpath.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        return _abstain(f"manifest_unreadable:{e}")
+
+    if "session_id" not in manifest:
+        return _abstain("manifest_no_session_id")
+    manifest_sid = manifest["session_id"]
+    if not isinstance(manifest_sid, str) or manifest_sid == "":
+        return _abstain("manifest_session_id_empty")
+    if "session_id" not in rec:
+        return _abstain("frame_no_session_id")
+
+    frame_sid = rec["session_id"]
+    if frame_sid != manifest_sid:
+        return {"name": name, "passed": False, "residual": 1.0,
+                "threshold": threshold,
+                "note": f"session_id mismatch: frame={frame_sid!r} manifest={manifest_sid!r}"}
+    return {"name": name, "passed": True, "residual": 0.0,
+            "threshold": threshold, "note": "OK"}
+
+
+# ── r20: dataset-level distribution drift detectors ──────────────────
+def _drift_abstain(name: str, reason: str, threshold: float = 0.0) -> Dict[str, Any]:
+    return {"name": name, "passed": False, "residual": float("nan"),
+            "threshold": threshold, "note": f"ABSTAIN:{reason}"}
+
+
+def _parse_time(s: str) -> datetime:
+    return datetime.strptime(s, "%Y-%m-%d %H:%M:%S.%f")
+
+
+def r20a_quat_norm_distribution(
+    records: List[Dict[str, Any]],
+    max_offset: float = 1e-5,
+    max_std: float = 1e-4,
+    min_frames: int = 10,
+) -> Dict[str, Any]:
+    """``|μ_‖q‖ − 1.0| ≤ max_offset`` AND ``σ_‖q‖ ≤ max_std``."""
+    name = "R20a"
+    if not records:
+        return _drift_abstain(name, "empty_records", max_offset)
+    if len(records) < min_frames:
+        return _drift_abstain(name, f"insufficient_sample({len(records)}<{min_frames})", max_offset)
+    norms: List[float] = []
+    for r in records:
+        q = r.get("camera_rotation_quaternion")
+        if not q or len(q) != 4:
+            return _drift_abstain(name, "missing_field(camera_rotation_quaternion)", max_offset)
+        n = math.sqrt(sum(float(c) * float(c) for c in q))
+        if math.isnan(n):
+            return _drift_abstain(name, "nan_in_stat", max_offset)
+        norms.append(n)
+    mu = statistics.fmean(norms)
+    sigma = statistics.stdev(norms) if len(norms) > 1 else 0.0
+    offset = abs(mu - 1.0)
+    passed = offset <= max_offset and sigma <= max_std
+    return {"name": name, "passed": passed, "residual": offset,
+            "threshold": max_offset,
+            "note": f"mu={mu:.3e} sigma={sigma:.3e} sample={len(norms)}"}
+
+
+def r20b_mouse_dx_cumulative(
+    records: List[Dict[str, Any]],
+    tolerance: float = 1e-3,
+    min_frames: int = 10,
+) -> Dict[str, Any]:
+    """``|Σ mouse_dx − (mouse_x[N-1] − mouse_x[0])| ≤ tolerance``."""
+    name = "R20b"
+    if not records:
+        return _drift_abstain(name, "empty_records", tolerance)
+    if len(records) < min_frames:
+        return _drift_abstain(name, f"insufficient_sample({len(records)}<{min_frames})", tolerance)
+    s = 0.0
+    for r in records:
+        dx = r.get("mouse_dx")
+        if not isinstance(dx, list) or not dx:
+            return _drift_abstain(name, "malformed_field(mouse_dx)", tolerance)
+        s += float(dx[0])
+    x0 = records[0].get("mouse_x")
+    xN = records[-1].get("mouse_x")
+    if not isinstance(x0, list) or not x0 or not isinstance(xN, list) or not xN:
+        return _drift_abstain(name, "malformed_field(mouse_x)", tolerance)
+    delta_x = float(xN[0]) - float(x0[0])
+    drift = abs(s - delta_x)
+    if math.isnan(drift):
+        return _drift_abstain(name, "nan_in_stat", tolerance)
+    return {"name": name, "passed": drift <= tolerance, "residual": drift,
+            "threshold": tolerance,
+            "note": f"sum={s:.3e} delta_x={delta_x:.3e} sample={len(records)}"}
+
+
+def r20c_fps_jitter(
+    records: List[Dict[str, Any]],
+    max_offset_ms: float = 0.1,
+    max_std_ms: float = 5.0,
+    min_frames: int = 10,
+) -> Dict[str, Any]:
+    """``|μ_dt − 1/fps| ≤ max_offset_ms`` AND ``σ_dt ≤ max_std_ms``."""
+    name = "R20c"
+    if not records:
+        return _drift_abstain(name, "empty_records", max_offset_ms)
+    if len(records) < min_frames:
+        return _drift_abstain(name, f"insufficient_sample({len(records)}<{min_frames})", max_offset_ms)
+    declared_fps = float(records[0].get("fps", 30.0))
+    target_dt_ms = 1000.0 / declared_fps if declared_fps > 0 else 1000.0 / 30.0
+    dts_ms: List[float] = []
+    try:
+        for i in range(len(records) - 1):
+            dt = (_parse_time(records[i + 1]["time"]) - _parse_time(records[i]["time"])).total_seconds() * 1000.0
+            if dt < 0:
+                return _drift_abstain(name, "non_monotone_time", max_offset_ms)
+            dts_ms.append(dt)
+    except (KeyError, ValueError, TypeError):
+        return _drift_abstain(name, "malformed_field(time)", max_offset_ms)
+    mu = statistics.fmean(dts_ms)
+    sigma = statistics.stdev(dts_ms) if len(dts_ms) > 1 else 0.0
+    offset = abs(mu - target_dt_ms)
+    passed = offset <= max_offset_ms and sigma <= max_std_ms
+    return {"name": name, "passed": passed, "residual": offset,
+            "threshold": max_offset_ms,
+            "note": f"mu_dt={mu:.3f}ms target={target_dt_ms:.3f}ms sigma={sigma:.3f}ms sample={len(dts_ms)}"}
+
+
+def r20d_speed_profile(
+    records: List[Dict[str, Any]],
+    max_outlier_pct: float = 0.10,
+    max_mean_speed: float = 15.0,
+    high_speed_threshold: float = 30.0,
+    min_frames: int = 10,
+) -> Dict[str, Any]:
+    """``ratio(‖speed‖ > 30) ≤ 10%`` AND ``μ_‖speed‖ ≤ 15 m/s``."""
+    name = "R20d"
+    if not records:
+        return _drift_abstain(name, "empty_records", max_outlier_pct)
+    if len(records) < min_frames:
+        return _drift_abstain(name, f"insufficient_sample({len(records)}<{min_frames})", max_outlier_pct)
+    mags: List[float] = []
+    for r in records:
+        s = r.get("camera_speed")
+        if not isinstance(s, list) or len(s) != 3:
+            return _drift_abstain(name, "malformed_field(camera_speed)", max_outlier_pct)
+        mag = math.sqrt(sum(float(c) * float(c) for c in s))
+        if math.isnan(mag):
+            return _drift_abstain(name, "nan_in_stat", max_outlier_pct)
+        mags.append(mag)
+    n_high = sum(1 for m in mags if m > high_speed_threshold)
+    ratio = n_high / len(mags)
+    mu = statistics.fmean(mags)
+    passed = ratio <= max_outlier_pct and mu <= max_mean_speed
+    return {"name": name, "passed": passed, "residual": ratio,
+            "threshold": max_outlier_pct,
+            "note": f"mu_speed={mu:.3f}m/s ratio_high={ratio:.3f} sample={len(mags)}"}
+
+
+def r20e_yaw_turn_rate(
+    records: List[Dict[str, Any]],
+    max_rate_deg_per_sec: float = 720.0,
+    max_outlier_pct: float = 0.05,
+    min_frames: int = 10,
+) -> Dict[str, Any]:
+    """``ratio(|Δyaw|/dt > 720°/s) ≤ 5%`` over all adjacent pairs."""
+    name = "R20e"
+    if not records:
+        return _drift_abstain(name, "empty_records", max_outlier_pct)
+    if len(records) < min_frames:
+        return _drift_abstain(name, f"insufficient_sample({len(records)}<{min_frames})", max_outlier_pct)
+    rates: List[float] = []
+    try:
+        for i in range(len(records) - 1):
+            oula_n = records[i].get("camera_rotation_oula")
+            oula_n1 = records[i + 1].get("camera_rotation_oula")
+            if not oula_n or not oula_n1 or len(oula_n) < 2 or len(oula_n1) < 2:
+                return _drift_abstain(name, "malformed_field(camera_rotation_oula)", max_outlier_pct)
+            d_yaw = float(oula_n1[1]) - float(oula_n[1])
+            d_yaw = (d_yaw + 180.0) % 360.0 - 180.0
+            dt = (_parse_time(records[i + 1]["time"]) - _parse_time(records[i]["time"])).total_seconds()
+            if dt <= 0:
+                return _drift_abstain(name, "non_monotone_time", max_outlier_pct)
+            rates.append(abs(d_yaw) / dt)
+    except (KeyError, ValueError, TypeError):
+        return _drift_abstain(name, "malformed_field(time)", max_outlier_pct)
+    n_extreme = sum(1 for r in rates if r > max_rate_deg_per_sec)
+    ratio = n_extreme / len(rates) if rates else 0.0
+    passed = ratio <= max_outlier_pct
+    max_rate = max(rates) if rates else 0.0
+    return {"name": name, "passed": passed, "residual": ratio,
+            "threshold": max_outlier_pct,
+            "note": f"ratio_extreme={ratio:.3f} max_rate={max_rate:.1f}deg/s sample={len(rates)}"}
+
+
+# ── r21: monotonic frame index (D-02 reorder defense) ────────────────
+def r21_monotonic_frame(
+    rec: Dict[str, Any],
+    neighbor: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """V₂' R21: rec.frame < neighbor.frame (strict monotonic increase).
+
+    ABSTAIN encoding: ``passed=False, residual=NaN,
+    note='ABSTAIN:frame_index_missing'``.
+    """
+    name = "R21"
+    threshold = 0.0
+    if neighbor is None:
+        return {"name": name, "passed": True, "residual": 0.0,
+                "threshold": threshold, "note": "last_frame_no_neighbor"}
+
+    rec_f = rec.get("frame")
+    nbr_f = neighbor.get("frame")
+    if not isinstance(rec_f, int) or not isinstance(nbr_f, int):
+        return {"name": name, "passed": False, "residual": float("nan"),
+                "threshold": threshold, "note": "ABSTAIN:frame_index_missing"}
+
+    residual = float(max(0, rec_f - nbr_f + 1))
+    if residual == 0.0:
+        return {"name": name, "passed": True, "residual": 0.0,
+                "threshold": threshold, "note": f"{rec_f} < {nbr_f}"}
+    return {"name": name, "passed": False, "residual": residual,
+            "threshold": threshold,
+            "note": f"out_of_order: rec.frame={rec_f} >= neighbor.frame={nbr_f}"}
 
 
 # ── Runner ───────────────────────────────────────────────────────────

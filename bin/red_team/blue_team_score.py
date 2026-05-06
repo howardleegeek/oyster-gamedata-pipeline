@@ -2,7 +2,7 @@
 
 For each attack:
   1. Mutate baseline frame via attacker
-  2. Run V₁ + V₂ + V₂' + V₃ residuals
+  2. Run V₁ + V₂ + V₂' + V₃ + V₄ residuals
   3. For each ``expected_residuals``, check if at least 2 verifiers FAIL it
   4. Tally: caught / missed / abstained-only
 
@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import hmac
 import json
 import math
 import sys
@@ -29,6 +30,11 @@ from bin.red_team.attackers import ATTACK_CATALOG, AttackResult
 # UUID, simulating a Frankenstein splice (action_camera from session B
 # riding under a manifest that claims session A).
 _CANONICAL_SESSION_ID = "AAA-canonical-uuid-1"
+
+# Hardcoded test secret used to HMAC-SHA256 sign the V₄ buyer-reference
+# fixture. Production buyers receive their own per-session secret out of
+# band; this constant exists only to drive the in-process Blue/Red harness.
+_V4_BUYER_TEST_SECRET = b"blue-team-v4-test-secret-do-not-ship"
 
 
 @dataclass
@@ -206,6 +212,46 @@ def _make_d05_video_fixture() -> Path:
     return video
 
 
+def _make_v4_buyer_reference_fixture() -> Path:
+    """Write a temp ``buyer_reference.json`` snapshot for V₄'s diff check.
+
+    The buyer pre-records 5 reference frames from the canonical baseline
+    (indices 0, 1, 100, 4500, 8999 — start, neighbor, early, mid,
+    end-of-stream) and signs the bundle with HMAC-SHA256 using the
+    out-of-band ``_V4_BUYER_TEST_SECRET``. The signature is what makes
+    the snapshot tamper-evident: if a Bucket B attacker mutates fields
+    on the recorder side that drift from this signed reference, V₄'s
+    ``v4_buyer_reference_diff`` raises a residual and FAILs.
+
+    Returned path is the JSON manifest itself; lifetime is process-bounded
+    (mkdtemp dirs survive until the OS reaps them, matching the R18 / R22
+    fixture pattern).
+    """
+    n, n1 = _baseline_frame()
+    # Re-stamp frame indices for the 5 snapshots without disturbing the
+    # other fields; the harness's V₄ verifier matches by ``frame``.
+    indices = (0, 1, 100, 4500, 8999)
+    frames: list[dict] = []
+    for idx in indices:
+        ref = copy.deepcopy(n)
+        ref["frame"] = idx
+        frames.append(ref)
+
+    payload = {"frames": frames}
+    payload_bytes = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    sig = hmac.new(_V4_BUYER_TEST_SECRET, payload_bytes, hashlib.sha256).hexdigest()
+
+    bundle = {
+        "frames": frames,
+        "signature": sig,
+        "algorithm": "HMAC-SHA256",
+    }
+    tmpdir = Path(tempfile.mkdtemp(prefix="bft_v4_buyer_"))
+    ref_path = tmpdir / "buyer_reference.json"
+    ref_path.write_text(json.dumps(bundle), encoding="utf-8")
+    return ref_path
+
+
 def _vote_v1(fn, *args) -> bool:
     """V₁ FAILs ⇒ True (detected)."""
     try:
@@ -232,13 +278,24 @@ def _vote_v3(fn, *args) -> bool:
         return True
 
 
-def _detect_count(attack: AttackResult, manifest_path: Path | None = None) -> dict[str, int]:
+def _detect_count(
+    attack: AttackResult,
+    manifest_path: Path | None = None,
+    buyer_reference_path: Path | None = None,
+) -> dict[str, int]:
     """Count FAILing verifiers per residual ID.
 
     ``manifest_path`` (when provided) lets R18 — the
     session-manifest binding residual — fire on B-05 / D-04
     Frankenstein splices. Without it R18 ABSTAINs (NaN residual)
     and contributes zero to the BFT count.
+
+    ``buyer_reference_path`` (when provided) lets V₄ — the buyer-signed
+    reference-diff verifier — fire on coordinated multi-field Bucket B
+    attacks (B-01, B-03, B-05) where every V₁..V₃ residual self-passes
+    because the lies are internally consistent. V₄ binds the recorder's
+    output to a buyer-pre-shared, HMAC-signed snapshot, so any field
+    mutation diffs against the ground truth and FAILs.
     """
     from bin.v1_claude_residuals.residuals import (
         r01_quat_norm as v1_r01, r02_euler_quat_consistency as v1_r02,
@@ -313,6 +370,43 @@ def _detect_count(attack: AttackResult, manifest_path: Path | None = None) -> di
             ) else 0)
         except Exception:
             add("R21", 1)
+
+    # R24 — V₄ buyer-signed reference diff. Only fires on the Bucket B
+    # coordinated-mutation attacks where the lies are internally consistent
+    # (B-01 oula+quat swap, B-03 keyCode + inputs.jsonl swap,
+    # B-05 Frankenstein splice). V₄ holds an HMAC-signed snapshot of
+    # buyer-pre-recorded reference frames; any drift in mutated rec
+    # versus the signed ground truth is unforgeable proof of tampering.
+    #
+    # Skipped silently when (a) the harness has no buyer reference fixture
+    # bound, or (b) W4-1's verifier module isn't on disk yet — the
+    # blue_team harness must keep working in worktrees that lag behind
+    # stream W4-1 without falsely crediting V₄ detections.
+    _v4_targets = {"B-01", "B-03", "B-05"}
+    if (
+        buyer_reference_path is not None
+        and attack.fi_id in _v4_targets
+        and attack.severity in ("critical", "high")
+        and attack.bucket == "B"
+    ):
+        try:
+            from bin.v4_buyer_signed.verifier import v4_buyer_reference_diff
+        except ImportError:
+            v4_buyer_reference_diff = None  # W4-1 not landed yet
+        if v4_buyer_reference_diff is not None:
+            # Fake video path — V₄'s frame-OCR fallback path needs the
+            # arg present even though the in-memory rec diff alone
+            # produces a definitive verdict for the Bucket B mutations.
+            fake_video = buyer_reference_path.parent / "video.mp4"
+            try:
+                r24 = v4_buyer_reference_diff(rec, nbr, buyer_reference_path, fake_video)
+                is_abstain = (
+                    isinstance(r24.residual, float) and math.isnan(r24.residual)
+                )
+                add("R24", 1 if (not r24.passed and not is_abstain) else 0)
+            except Exception:
+                # Treat exceptions as detection (matches R18/R21/R22 contract).
+                add("R24", 1)
 
     # R18 session-manifest binding — closes B-05 (Frankenstein replay
     # splice) and the D-04 cross-applicability variant. Only fires when
@@ -415,18 +509,23 @@ def main() -> int:
 
     n, n1 = _baseline_frame()
     manifest_path = _make_b05_manifest_fixture()
+    buyer_reference_path = _make_v4_buyer_reference_fixture()
     scores: list[BlueScore] = []
     for case in ATTACK_CATALOG:
         attack = case.mutator(n, n1)
-        counts = _detect_count(attack, manifest_path=manifest_path)
+        counts = _detect_count(
+            attack,
+            manifest_path=manifest_path,
+            buyer_reference_path=buyer_reference_path,
+        )
         # BFT caught — three flavors of acceptance:
         # (a) ≥ 2 verifiers fire on the same residual (multi-verifier BFT)
-        # (b) V₁-only residuals (R13, R18, R21) only have 1 implementation
-        #     today; they detect with count == 1
+        # (b) V₁-only residuals (R13, R18, R21, R24) only have 1
+        #     implementation today; they detect with count == 1.
         # We give Red the harshest realistic test: count >= 2 OR
         # (count == 1 AND residual is in the V1-only set).
         v1_only = {
-            "R13", "R18", "R21",
+            "R13", "R18", "R21", "R24",
             "R20a", "R20b", "R20c", "R20d", "R20e",
             "R22", "R23",
         }
