@@ -2315,9 +2315,10 @@ gaps:
   purpose: 'EPal-side companion dashboard widget: shows clips contributed this week,
     total bonus earned, leaderboard rank within community; embedded in EPal companion
     app via iframe / native view'
-  status: pending
+  status: dispatched
   priority: P1
   lines_estimate: 280
+  dispatched_at: '2026-05-05 20:35:59'
 - id: G258
   title: docs/EPAL_COMPANION_ONBOARDING.md
   purpose: 'Companion-facing onboarding doc: how to enable recording in EPal companion
@@ -2592,9 +2593,9 @@ gaps:
   priority: PP2
   estimated_lines: 90
   wave: W31
-  status: dispatched
+  status: completed
   created_at: '2026-05-06T00:14:49+00:00'
-  completed_at: '2026-05-06T00:47:20+00:00'
+  completed_at: '2026-05-05 20:31:47'
   dispatched_at: '2026-05-05 20:29:53'
 - id: G282
   title: bin/recorder_mp4_faststart.py
@@ -2603,11 +2604,11 @@ gaps:
   priority: PP1
   estimated_lines: 30
   wave: W31
-  status: dispatched
+  status: completed
   created_at: '2026-05-06T00:14:49+00:00'
-  completed_at: '2026-05-06T00:47:20+00:00'
+  completed_at: '2026-05-05 20:31:48'
   dispatched_at: '2026-05-05 20:31:12'
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 89343
-  last_heartbeat: '2026-05-06T03:31:12Z'
+  last_heartbeat: '2026-05-06T03:35:59Z'
