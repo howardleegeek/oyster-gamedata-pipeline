@@ -1777,10 +1777,11 @@ gaps:
   title: docs/runbooks/PAYMENT_SETUP.md
   purpose: 'Vendor payout setup: Stripe Connect for US + manual ACH/wire spreadsheet
     for non-US; tax form (W-9 / W-8BEN) collection runbook'
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 200
   dispatched_at: '2026-05-05 21:03:49'
+  completed_at: '2026-05-05 21:08:03'
 - id: G202
   title: bin/vendor_signup_flow.py
   purpose: 'Vendor signup: email + Google OAuth + KYC-light (full name + payout method)
@@ -2613,4 +2614,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 89343
-  last_heartbeat: '2026-05-06T04:03:49Z'
+  last_heartbeat: '2026-05-06T04:08:03Z'
