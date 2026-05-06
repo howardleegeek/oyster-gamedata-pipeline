@@ -2082,9 +2082,10 @@ gaps:
   purpose: Rust panic handler + std::panic::set_hook compiled into recorder.exe; serializes
     panic_info + backtrace + machine-id (HMAC-rotated, GDPR-safe) and POSTs to G231
     endpoint
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 240
+  dispatched_at: '2026-05-05 18:58:36'
 - id: G236
   title: bin/error_client_pytest_plugin.py
   purpose: pytest plugin (entry-point pytest11) auto-reporting test failures + tracebacks
@@ -2120,10 +2121,11 @@ gaps:
   purpose: 'Auto-classifier: maps incoming error_class + module + traceback signature
     to severity (critical = data loss / payment / auth; high = crash; medium = degraded;
     low = warning); rules table with override path'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 220
   dispatched_at: '2026-05-05 18:42:24'
+  completed_at: '2026-05-05 18:57:08'
 - id: G240
   title: bin/error_alert_router.py
   purpose: 'For critical-severity errors: rate-limited Slack / Discord webhook (configurable);
@@ -2179,9 +2181,10 @@ gaps:
   purpose: 'Anonymous mode: consumer can install + record + accumulate clips locally
     without ANY signup or email; opt-in to account later via in-app prompt; clips
     queued locally, uploaded only after opt-in'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 260
+  dispatched_at: '2026-05-05 19:00:31'
 - id: G246
   title: bin/disk_space_manager.py
   purpose: 'Auto-cleanup old local clips: configurable cap (default 5 GB), LRU deletion
@@ -2207,9 +2210,10 @@ gaps:
   purpose: Hook OS shutdown signals (Win SetConsoleCtrlHandler / macOS SIGTERM via
     launchd); flush in-flight clip writes, close tarballs atomically, persist queue
     state; restart-resume-able
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 220
+  dispatched_at: '2026-05-05 19:03:28'
 - id: G249
   title: bin/battery_aware_pause.py
   purpose: On laptops, detect battery vs AC via psutil + IOPSCopyPowerSourcesInfo;
@@ -2250,10 +2254,11 @@ gaps:
   purpose: 'POST /v1/epal/session_start + /v1/epal/session_end webhooks: recorder
     starts only on paid EPal session start (with companion opt-in), stops + uploads
     on session end with rating + companion_id provenance'
-  status: dispatched
+  status: completed
   priority: P0
   lines_estimate: 280
   dispatched_at: '2026-05-05 18:50:33'
+  completed_at: '2026-05-05 18:57:10'
 - id: G254
   title: bin/epal_companion_quality_score.py
   purpose: Wire EPal companion professional rating (1-5 stars) into clip metadata;
@@ -2275,9 +2280,10 @@ gaps:
   purpose: 'At EPal session start, prompts the paying client (the customer): consent
     to recording for AI training, opt-out switch, GDPR-compliant disclosure; persists
     signed consent log per G221'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 220
+  dispatched_at: '2026-05-05 19:12:06'
 - id: G257
   title: bin/epal_community_dashboard.py
   purpose: 'EPal-side companion dashboard widget: shows clips contributed this week,
@@ -2290,9 +2296,10 @@ gaps:
   title: docs/EPAL_COMPANION_ONBOARDING.md
   purpose: 'Companion-facing onboarding doc: how to enable recording in EPal companion
     app, what gets recorded vs not, FAQ on anti-cheat, bonus calc, opt-out anytime'
-  status: pending
+  status: dispatched
   priority: P0
   lines_estimate: 220
+  dispatched_at: '2026-05-05 19:14:15'
 - id: G260
   title: bin/recorder_audio_postprocess.py
   purpose: 'Wrap bin/audio_event_track to post-process recorder-captured WAV/MP4 audio:
@@ -2555,4 +2562,4 @@ gaps:
 harness_lock:
   host: Howards-MacBook-Air-4.local
   pid: 89343
-  last_heartbeat: '2026-05-06T01:56:34Z'
+  last_heartbeat: '2026-05-06T02:14:15Z'
