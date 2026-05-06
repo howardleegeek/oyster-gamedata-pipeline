@@ -1,0 +1,73 @@
+# G189 · heartbeat_skip_check.yml
+# Runs on every push; short-circuits with skip-marker output when commit
+# message contains [skip ci] or all changed files match paths-ignore patterns.
+# Acts as a redundancy layer for GitHub's native paths-ignore.
+
+name: "G189 · Heartbeat Skip Check"
+
+on:
+  push:
+    branches: ["**"]
+
+permissions:
+  contents: read
+
+jobs:
+  skip-check:
+    name: "Check whether CI should be skipped"
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.detect.outputs.skip }}
+      reason: ${{ steps.detect.outputs.reason }}
+    steps:
+      - name: Detect skip marker in commit message
+        id: detect
+        run: |
+          set -euo pipefail
+
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
+          SKIP="false"
+          REASON=""
+
+          # Check for skip-ci markers (case-insensitive)
+          if echo "${COMMIT_MSG}" | grep -qiE '\[(skip ci|ci skip)\]'; then
+            SKIP="true"
+            REASON="Commit message contains [skip ci] / [ci skip]"
+          fi
+
+          # Check paths-ignore redundancy
+          if [ "${SKIP}" = "false" ]; then
+            CHANGED_FILES=$(git diff --name-only \
+              "${{ github.event.before }}" "${{ github.sha }}" 2>/dev/null || true)
+
+            if [ -n "${CHANGED_FILES}" ]; then
+              SKIP_PATTERNS=(
+                "*.md" "*.txt" "docs/**" ".github/ISSUE_TEMPLATE/**"
+                "*.png" "*.jpg" "*.gif" "*.svg"
+              )
+
+              ALL_MATCH=true
+              while IFS= read -r file; do
+                FILE_MATCH=false
+                for pattern in "${SKIP_PATTERNS[@]}"; do
+                  # shellcheck disable=SC2254
+                  case "${file}" in
+                    ${pattern}) FILE_MATCH=true; break ;;
+                  esac
+                done
+                if [ "${FILE_MATCH}" = "false" ]; then
+                  ALL_MATCH=false
+                  break
+                fi
+              done <<< "${CHANGED_FILES}"
+
+              if [ "${ALL_MATCH}" = "true" ]; then
+                SKIP="true"
+                REASON="All changed files match paths-ignore patterns"
+              fi
+            fi
+          fi
+
+          echo "skip=${SKIP}" >> "${GITHUB_OUTPUT}"
+          echo "reason=${REASON}" >> "${GITHUB_OUTPUT}"
+          echo "::notice::Skip check result — skip=${SKIP}, reason=${REASON:-none}"
