@@ -38,6 +38,90 @@ def _get(frame: Dict[str, Any], key: str, default=None):
     return frame.get(key, default)
 
 
+# ── r13: keyCode replay from inputs.jsonl ───────────────────────────
+def r13_keycode_replay(
+    rec: Dict[str, Any],
+    neighbor: Optional[Dict[str, Any]] = None,
+    inputs_path: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Replay key_down / key_up events from inputs.jsonl up to the frame
+    timestamp and compare the resulting held-keys set with rec["keyCode"].
+    """
+    import os
+
+    name = "r13_keycode_replay"
+    threshold = 0.0
+
+    def _abstain(reason: str) -> Dict[str, Any]:
+        return {"name": name, "passed": False, "residual": float("nan"),
+                "threshold": threshold, "note": f"ABSTAIN:{reason}"}
+
+    # ── ABSTAIN gates ───────────────────────────────────────────────
+    if inputs_path is None:
+        return _abstain("no_inputs_path")
+
+    if not os.path.isfile(inputs_path):
+        return _abstain("inputs_jsonl_absent")
+
+    # Parse inputs.jsonl
+    events: List[Dict[str, Any]] = []
+    session_start = None
+    with open(inputs_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            obj = json.loads(line)
+            if obj.get("event_type") == "session_start":
+                session_start = obj
+            events.append(obj)
+
+    if session_start is None:
+        return _abstain("no_session_start_sentinel")
+
+    fps = session_start.get("fps")
+    if fps is None or not (29.5 <= fps <= 30.5):
+        return _abstain("fps_out_of_band")
+
+    frame_idx = rec.get("frame")
+    if not isinstance(frame_idx, int):
+        return _abstain("frame_index_missing")
+
+    # ── Replay ──────────────────────────────────────────────────────
+    # Sort events by timestamp
+    events.sort(key=lambda e: e.get("timestamp_ms", 0))
+
+    cutoff_ms = (frame_idx + 1) * 1000.0 / fps
+    held_keys: set = set()
+
+    for ev in events:
+        ts = ev.get("timestamp_ms", 0)
+        if ts > cutoff_ms:
+            break
+        et = ev.get("event_type")
+        kc = ev.get("key_code")
+        if et == "key_down" and kc is not None:
+            held_keys.add(kc)
+        elif et == "key_up" and kc is not None:
+            held_keys.discard(kc)
+
+    # ── Compare ─────────────────────────────────────────────────────
+    actual = set(rec.get("keyCode", []))
+    sym_diff = held_keys.symmetric_difference(actual)
+    residual = float(len(sym_diff))
+    passed = residual == 0.0
+
+    if passed:
+        note = "OK"
+    else:
+        note = (f"keyCode mismatch: replay={sorted(held_keys)} "
+                f"vs frame={sorted(actual)}")
+
+    return {"name": name, "passed": passed, "residual": residual,
+            "threshold": threshold, "note": note}
+
+
 # ── r01: quaternion norm ──────────────────────────────────────────────
 def r01_quat_norm(frame: Dict[str, Any]) -> Dict[str, Any]:
     """Quaternion [X,Y,Z,W] must have unit norm. Residual = |norm - 1|."""
