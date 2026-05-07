@@ -661,59 +661,6 @@ class InputCapture:
             return list(self.events)
 
 
-def _write_minimal_xlsx(path: Path) -> None:
-    """Write a minimum-viable single-sheet xlsx without an xlsx library.
-
-    .xlsx is a zip of XML parts. The validator only needs the file to be
-    a parseable zip with the OOXML sheet structure; placeholder content is
-    fine. Hand-rolled to avoid depending on openpyxl/xlsxwriter inside
-    PyInstaller (smaller .exe). The minimum parts the OOXML spec requires
-    are: [Content_Types].xml, _rels/.rels, xl/workbook.xml,
-    xl/_rels/workbook.xml.rels, and one xl/worksheets/sheetN.xml.
-    """
-    import zipfile
-
-    content_types = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-  <Default Extension="xml" ContentType="application/xml"/>
-  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
-  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
-</Types>"""
-
-    rels = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
-</Relationships>"""
-
-    workbook = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
-          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-  <sheets>
-    <sheet name="GameInfo" sheetId="1" r:id="rId1"/>
-  </sheets>
-</workbook>"""
-
-    workbook_rels = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
-</Relationships>"""
-
-    sheet1 = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-  <sheetData>
-    <row r="1"><c r="A1" t="inlineStr"><is><t>placeholder - stop-gap recorder</t></is></c></row>
-  </sheetData>
-</worksheet>"""
-
-    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("[Content_Types].xml", content_types)
-        zf.writestr("_rels/.rels", rels)
-        zf.writestr("xl/workbook.xml", workbook)
-        zf.writestr("xl/_rels/workbook.xml.rels", workbook_rels)
-        zf.writestr("xl/worksheets/sheet1.xml", sheet1)
-
-
 def _list_windows_processes() -> set[str]:
     """Return a set of running process executable names (case-preserved).
 
@@ -1766,40 +1713,37 @@ class RecorderApp(tk.Tk):
             _trace(f"package: session_manifest.json write failed: {e}")
             # Non-fatal: R18 will ABSTAIN on missing manifest.
 
-        # 4. gameinfo.xlsx — v0.10.0: uses bin/generate_gameinfo_xlsx
-        # write_xlsx() for a real 14-field xlsx instead of my
-        # _write_minimal_xlsx hand-rolled stub. Same fields buyer
-        # ingest expects.
-        try:
-            import generate_gameinfo_xlsx as ggx  # noqa: PLC0415
-            video_dur = max(0.0, time.time() - self._record_started_at)
-            game_info = ggx.build_gameinfo_dict(
-                game_name="Minecraft",
-                game_version="1.20.4",
-                platform="Java Edition",
-                scene_name="overworld",
-                weather="clear",
-                time_of_day="day",
-                character_name="DataPilot",
-                character_class="player",
-                operator_id="lite-recorder",
-                total_frames=int(video_dur * 30),  # 30 fps locked
-                video_duration_sec=video_dur,
-                route_type=1,
-                notes=f"recorded by recorder_consumer_lite v0.10.0 at {ts}",
-            )
-            ggx.write_xlsx(game_info, str(clip_dir / "gameinfo.xlsx"))
-        except Exception as e:  # noqa: BLE001
-            _trace(f"gameinfo: helper failed ({e}), using minimal stub")
-            _write_minimal_xlsx(clip_dir / "gameinfo.xlsx")
+        # 4. gameinfo.xlsx — uses bin/generate_gameinfo_xlsx.write_xlsx() for
+        # a real 14-field xlsx. Howard 2026-05-06 Iron Law: NO PLACEHOLDER
+        # FALLBACK. If the helper fails, the clip is unusable; fail loud
+        # so the tester can re-run rather than ship a stub.
+        import generate_gameinfo_xlsx as ggx  # noqa: PLC0415
+        video_dur = max(0.0, time.time() - self._record_started_at)
+        game_info = ggx.build_gameinfo_dict(
+            game_name="Minecraft",
+            game_version="1.20.4",
+            platform="Java Edition",
+            scene_name="overworld",
+            weather="clear",
+            time_of_day="day",
+            character_name="DataPilot",
+            character_class="player",
+            operator_id="lite-recorder",
+            total_frames=int(video_dur * 30),  # 30 fps locked
+            video_duration_sec=video_dur,
+            route_type=1,
+            notes=f"recorded by {RECORDER_VERSION} at {ts}",
+        )
+        ggx.write_xlsx(game_info, str(clip_dir / "gameinfo.xlsx"))
 
-        # 5. depth/ — empty directory placeholder. Real version needs
-        # G198 depth shader pack injecting per-frame z-buffer EXR files.
-        (clip_dir / "depth").mkdir(exist_ok=True)
-        (clip_dir / "depth" / "_README.txt").write_text(
-            "Stop-gap recorder does not produce per-frame depth files.\n"
-            "Full Rust recorder + G198 shader pack adds 1800 .exr frames here.\n",
-            encoding="utf-8",
+        # 5. depth/ — Howard 2026-05-06 Iron Law: NO PLACEHOLDER. Until the
+        # DepthAnything V2 pipeline lands (Track C / spec real_depth_pipeline.md),
+        # we refuse to produce a tarball at all. Fail loud rather than ship
+        # an empty directory and pretend the buyer can use it.
+        raise RuntimeError(
+            "Depth pipeline not yet integrated. This recorder build cannot "
+            "produce a buyer-spec-compliant tarball. Wait for v0.27.0+ which "
+            "wires DepthAnything V2 inference. See specs/real_depth_pipeline.md."
         )
 
         # R22 (D-04 defense): hash every *.exr in depth/ and write
