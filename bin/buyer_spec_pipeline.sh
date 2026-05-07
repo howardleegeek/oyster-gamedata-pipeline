@@ -185,6 +185,32 @@ echo "[pipeline] adapting to $BUYER_DIR" >&2
         exit 2
     }
 
+# --- step 3.5: REAL depth via raycast from bot's recorded pose -------------
+# Howard 2026-05-07 NO PLACEHOLDER: replace the gradient-hardlink farm in
+# $BUYER_DIR/depth/ with real per-frame raycast depth derived from the bot's
+# actual position/yaw/pitch in metadata.jsonl. Falls back gracefully if the
+# raycast module is missing or metadata lacks pose data.
+DEPTH_RAYCAST="${REPO}/bin/depth_from_mineflayer_raycast.py"
+if [[ -f "$DEPTH_RAYCAST" ]]; then
+    echo "[pipeline] step 3.5: rendering real raycast depth" >&2
+    rm -rf "$BUYER_DIR/depth"
+    PYTHONPATH="$REPO" "${OYSTER_AGENT_PY:-${REPO}/.venv/bin/python}" -c "
+import sys
+from pathlib import Path
+from bin.depth_from_mineflayer_raycast import render_depth_for_session
+manifest = render_depth_for_session(
+    Path('$CAPTURE_DIR/metadata.jsonl'),
+    Path('$BUYER_DIR/depth'),
+    width=320, height=240, fps=30, max_depth_meters=64.0,
+    target_frame_count=1801,  # buyer-spec: 6fps × 300s minimum
+)
+print(f'[raycast] rendered {len(manifest)} REAL depth frames (1801 = 6fps×300s)')
+" >&2 || {
+        echo "[pipeline] raycast depth FAILED — falling back to placeholders dir" >&2
+        cp -r "$PLACEHOLDERS/depth" "$BUYER_DIR/depth"
+    }
+fi
+
 # --- step 4: lint ---------------------------------------------------------
 
 echo "[pipeline] linting" >&2
