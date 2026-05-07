@@ -56,11 +56,19 @@ jobs:
           black --check src/ tests/
 
       - name: Run tests
+        # Howard 2026-05-07: Cap each pytest invocation at 12 minutes wall
+        # clock — round-3 had a test hang for 42m+ before manual cancel,
+        # burning runner minutes. -x stops on first failure; --timeout=120
+        # stops on first 2-min hang. timeout-minutes is the GHA-level
+        # safety net.
+        timeout-minutes: 12
         run: |
           source .venv/bin/activate
-          pytest tests/ -q --no-header -x
+          pip install pytest-timeout
+          pytest tests/ -q --no-header -x --timeout=120
 
       - name: Run tests with coverage
+        timeout-minutes: 12
         run: |
           source .venv/bin/activate
-          pytest tests/ -q --no-header -x --cov=oyster_agent_runner --cov-report=term
+          pytest tests/ -q --no-header -x --timeout=120 --cov=oyster_agent_runner --cov-report=term
