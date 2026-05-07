@@ -21,7 +21,7 @@ set -euo pipefail
 TASK_ID="${1:?task_id required}"
 SPEC_PATH="${2:?spec.md path required}"
 MINIPC_HOST="${MINIPC_HOST:-minipc-bwdxs}"
-QWEN_MODEL="${QWEN_MODEL:-qwen3.6-plus}"  # Aliyun token-plan: qwen3.6-plus | deepseek-v3.2 | MiniMax-M2.5 | glm-5
+QWEN_MODEL="${QWEN_MODEL:-deepseek-v3.2}"  # Aliyun token-plan: deepseek-v3.2 (fast codegen, default) | qwen3.6-plus (reasoning, slower) | MiniMax-M2.5 | glm-5
 KEY_FILE="${HOME}/.oyster-keys/aliyun-token-plan.env"
 
 [ -f "$KEY_FILE" ] || { echo "ERROR: $KEY_FILE missing"; exit 1; }
@@ -79,7 +79,7 @@ print(json.dumps({
 curl -sS -X POST "$ALIYUN_TOKEN_PLAN_BASE_URL/chat/completions" \
     -H "Authorization: Bearer $ALIYUN_TOKEN_PLAN_API_KEY" \
     -H "Content-Type: application/json" \
-    --max-time 120 --retry 3 --retry-delay 4 --retry-all-errors \
+    --max-time 300 --retry 2 --retry-delay 5 --retry-all-errors \
     -d "$REQUEST" >"$WORK_DIR/response.json"
 
 CONTENT=$(WORK_DIR="$WORK_DIR" python3 -c "
