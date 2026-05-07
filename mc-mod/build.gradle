@@ -1,0 +1,59 @@
+// =============================================================================
+// Oyster Recorder Fabric Mod — build.gradle
+//
+// Howard 2026-05-07: minimal Fabric mod — no client/server split, no Mixins,
+// no rendering hooks. Single ClientModInitializer that registers a tick
+// listener. JSONL output via plain java.nio. No external runtime deps.
+//
+// Build: ./gradlew build  →  build/libs/oyster-recorder-mod-X.Y.Z.jar
+// =============================================================================
+
+plugins {
+    id 'fabric-loom' version '1.8-SNAPSHOT'
+    id 'maven-publish'
+    id 'java'
+}
+
+version = project.mod_version
+group = project.maven_group
+base.archivesName = project.archives_base_name
+
+repositories {
+    maven { url = 'https://maven.fabricmc.net/' }
+    mavenCentral()
+}
+
+java {
+    // Fabric loom auto-targets the right MC Java version. 1.21.x = Java 21.
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+    withSourcesJar()
+}
+
+dependencies {
+    // Minecraft + Fabric Loader + Yarn mappings (versions in gradle.properties)
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+    // Fabric API — needed for ClientTickEvents
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+}
+
+processResources {
+    inputs.property "version", project.version
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+}
+
+jar {
+    from("LICENSE") {
+        rename { "${it}_${project.archivesBaseName}" }
+    }
+}

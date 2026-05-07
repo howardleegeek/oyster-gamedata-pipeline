@@ -47,6 +47,36 @@ jobs:
           Copy-Item $ffmpegBin.FullName -Destination ffmpeg.exe
           Get-Item ffmpeg.exe | Format-List Length, FullName
 
+      - name: Download Fabric installer jar (D17)
+        # Howard 2026-05-07 (D17): bundle the Fabric loader installer so the
+        # recorder can auto-install Fabric + drop the Oyster mod into the
+        # user's MC on first launch. No runtime download — fully offline.
+        run: |
+          $url = "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.0.1/fabric-installer-1.0.1.jar"
+          Invoke-WebRequest -Uri $url -OutFile fabric-installer.jar
+          Get-Item fabric-installer.jar | Format-List Length, FullName
+
+      - name: Build Oyster MC mod (D15+D16)
+        # Howard 2026-05-07: build the Fabric mod that captures REAL game
+        # state and bundle it with the .exe. install_fabric_loader.py drops
+        # this jar into MC's mods/ on first launch.
+        working-directory: mc-mod
+        run: |
+          if (-not (Test-Path gradlew.bat)) {
+            choco install gradle -y --no-progress
+            gradle wrapper --gradle-version 8.10
+          }
+          .\gradlew.bat build --no-daemon
+          $jar = Get-ChildItem -Path build/libs/oyster-recorder-mod-*.jar `
+                 | Where-Object { $_.Name -notmatch 'sources' } `
+                 | Select-Object -First 1
+          if (-not $jar) {
+            Write-Error "mc-mod build failed — no jar produced"
+            exit 1
+          }
+          Copy-Item $jar.FullName -Destination ../oyster-recorder-mod.jar
+          Get-Item ../oyster-recorder-mod.jar | Format-List Length, FullName
+
       - name: Build single-file recorder .exe (PyInstaller)
         # --runtime-tmpdir : redirect PyInstaller's --onefile runtime
         #     extraction from %TEMP%\_MEI<rand>\ to a stable per-user
@@ -70,6 +100,10 @@ jobs:
             --add-data "bin/generate_systeminfo_json.py;." `
             --add-data "bin/generate_gameinfo_xlsx.py;." `
             --add-data "bin/depth_anything_v2_inference.py;." `
+            --add-data "bin/install_fabric_loader.py;." `
+            --add-data "bin/game_state_overlay.py;." `
+            --add-data "fabric-installer.jar;." `
+            --add-data "oyster-recorder-mod.jar;." `
             --add-data "hf_cache;hf_cache" `
             --paths bin `
             --collect-all tkinter `
@@ -89,6 +123,8 @@ jobs:
             --hidden-import generate_systeminfo_json `
             --hidden-import generate_gameinfo_xlsx `
             --hidden-import depth_anything_v2_inference `
+            --hidden-import install_fabric_loader `
+            --hidden-import game_state_overlay `
             --hidden-import PIL.Image `
             bin/recorder_consumer_lite.py
 
@@ -107,6 +143,10 @@ jobs:
             --add-data "bin/generate_systeminfo_json.py;." `
             --add-data "bin/generate_gameinfo_xlsx.py;." `
             --add-data "bin/depth_anything_v2_inference.py;." `
+            --add-data "bin/install_fabric_loader.py;." `
+            --add-data "bin/game_state_overlay.py;." `
+            --add-data "fabric-installer.jar;." `
+            --add-data "oyster-recorder-mod.jar;." `
             --add-data "hf_cache;hf_cache" `
             --paths bin `
             --collect-all tkinter `
@@ -126,6 +166,8 @@ jobs:
             --hidden-import generate_systeminfo_json `
             --hidden-import generate_gameinfo_xlsx `
             --hidden-import depth_anything_v2_inference `
+            --hidden-import install_fabric_loader `
+            --hidden-import game_state_overlay `
             --hidden-import PIL.Image `
             bin/recorder_consumer_lite.py
           # Zip the onedir output for distribution.

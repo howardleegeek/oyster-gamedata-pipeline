@@ -752,6 +752,7 @@ def adapt_phase1_to_buyer_spec(
     placeholders_dir: Path | None = None,
     pad_to_min_records: int | None = None,
     route_type: int = 1,
+    game_state_jsonl: Path | None = None,
 ) -> Path:
     """Adapt a Phase 1 Minecraft bundle into the buyer-spec 4-deliverable layout.
 
@@ -813,6 +814,38 @@ def adapt_phase1_to_buyer_spec(
         pad_to_min_records=pad_to_min_records,
         route_type=route_type,
     )
+
+    # Howard 2026-05-07 (D16): if the server-side Fabric mod produced a
+    # JSONL stream for this bot, overlay REAL game-state on top of the
+    # metadata-derived records. Closes Pipeline 2's last placeholder gap.
+    if game_state_jsonl is not None and game_state_jsonl.exists():
+        try:
+            import sys as _sys  # noqa: PLC0415
+            _bin_dir = str((Path(__file__).resolve().parent.parent.parent / "bin").resolve())
+            if _bin_dir not in _sys.path:
+                _sys.path.insert(0, _bin_dir)
+            from game_state_overlay import (  # type: ignore  # noqa: PLC0415
+                load as _gs_load,
+                lookup_at_ms as _gs_lookup,
+                apply_to_record as _gs_apply,
+            )
+            samples = _gs_load(game_state_jsonl)
+            if samples:
+                # records have "frame" and our fps; compute frame_ms per record
+                for rec in records:
+                    f = rec.get("frame", 0)
+                    f_ms = int(f * 1000.0 / fps)
+                    sample = _gs_lookup(samples, f_ms)
+                    if sample is not None:
+                        _gs_apply(rec, sample)
+        except Exception as _e:
+            # fail-soft per iron-law-1: never break the pipeline because
+            # the overlay had a hiccup. Log + fall through.
+            import logging as _logging  # noqa: PLC0415
+            _logging.getLogger(__name__).warning(
+                "game_state_overlay failed (non-fatal): %s", _e
+            )
+
     (output_dir / ACTION_CAMERA_FILENAME).write_text(
         json.dumps(records, indent=2) + "\n", encoding="utf-8"
     )

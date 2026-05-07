@@ -71,15 +71,37 @@ def load_model(variant: str = "vits", device: str = "cpu"):
 
 
 def _write_exr(depth: np.ndarray, target: Path) -> None:
-    """Write a single-channel float32 EXR with channel name 'Z'."""
+    """Write a single-channel float32 EXR with channel name 'Z'.
+
+    Howard 2026-05-07: downsample 2× before write + use PIZ compression.
+    Reason: DepthAnything V2 returns at video resolution (1280×720), which
+    serializes to ~2.7 MB/frame even with default ZIP compression, pushing
+    a 1801-frame tarball over GitHub's 2 GiB asset limit. Most ML depth
+    networks downsample on ingest anyway, so 640×360 preserves all useful
+    spatial info while bringing per-frame EXR to ~700 KB.
+
+    Block-mean 2× downsampling is preferred over PIL bilinear here because
+    we're outputting depth (a physical quantity), not a colour image — mean
+    pooling preserves average distance correctly across each block.
+    """
     import OpenEXR  # noqa: PLC0415
     import Imath  # noqa: PLC0415
 
+    # 2× block-mean downsample. Trim to multiples-of-2 to keep .reshape exact.
+    H, W = depth.shape
+    new_H, new_W = H // 2, W // 2
+    depth = depth[: new_H * 2, : new_W * 2].astype(np.float32)
+    depth = depth.reshape(new_H, 2, new_W, 2).mean(axis=(1, 3)).astype(np.float32)
+
     h, w = depth.shape
     header = OpenEXR.Header(w, h)
+    # PIZ_COMPRESSION uses Wavelet — better than ZIP for smooth float depth
+    # surfaces. Combined with the 2× downsample, EXR drops from 2.7 MB to
+    # ~400 KB per frame.
+    header["compression"] = Imath.Compression(Imath.Compression.PIZ_COMPRESSION)
     header["channels"] = {"Z": Imath.Channel(Imath.PixelType(Imath.PixelType.FLOAT))}
     out = OpenEXR.OutputFile(str(target), header)
-    out.writePixels({"Z": depth.astype(np.float32).tobytes()})
+    out.writePixels({"Z": depth.tobytes()})
     out.close()
 
 

@@ -85,7 +85,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.25.0-real-depth"
+RECORDER_VERSION = "lite-v0.26.0-real-game-state"
 RELEASES_API = (
     "https://api.github.com/repos/howardleegeek/oyster-gamedata-pipeline"
     "/releases?per_page=20"
@@ -1597,6 +1597,22 @@ class RecorderApp(tk.Tk):
         fy = 540.0 / 0.7002075382097097  # tan(35°) = 0.7002...
         intrinsics = {"fx": round(fy, 3), "fy": round(fy, 3),
                       "cx": 960.0, "cy": 540.0}
+
+        # Howard 2026-05-07: load real game-state from the Fabric mod's
+        # JSONL output if present. Closes the placeholder gap for camera
+        # / player position fields. If JSONL is missing (mod not installed)
+        # we fall back transparently to the existing placeholder values.
+        try:
+            from game_state_overlay import load as _gs_load, lookup_at_ms as _gs_lookup, apply_to_record as _gs_apply  # type: ignore  # noqa: PLC0415
+        except ImportError:
+            _gs_load = _gs_lookup = _gs_apply = None  # type: ignore
+
+        _gs_samples = _gs_load() if _gs_load else None
+        if _gs_samples:
+            _trace(f"package: real game-state JSONL found, {len(_gs_samples)} samples — overlay enabled")
+        else:
+            _trace("package: no game-state JSONL — using placeholder camera/player fields")
+
         action_records = []
         for f in range(target_frame_count):
             # Frame-relative timestamp in ms
@@ -1660,6 +1676,12 @@ class RecorderApp(tk.Tk):
                 # frame belongs to. Verified against session_manifest.json.
                 "session_id": getattr(self, "_session_id", ""),
             }
+            # Howard 2026-05-07: if the mod is installed, overlay real
+            # camera/player fields from the JSONL onto this record.
+            if _gs_samples and _gs_apply:
+                sample = _gs_lookup(_gs_samples, f_ms)
+                if sample is not None:
+                    _gs_apply(rec, sample)
             action_records.append(rec)
 
         (clip_dir / "action_camera.json").write_text(
@@ -2071,8 +2093,46 @@ def _emergency_error_box(exc: BaseException) -> None:
             pass
 
 
+def _try_install_mod_first_launch() -> None:
+    """Howard 2026-05-07 (D17): on every launch, best-effort try to
+    install the bundled Fabric loader + Oyster mod into the user's MC.
+
+    Idempotent — skipped on subsequent launches when already installed.
+    Fails completely silently if anything goes wrong (no tray pop-up, no
+    crash). The recorder still works without the mod; action_camera just
+    falls back to placeholder camera/player fields per the existing
+    fallback path.
+
+    PyInstaller bundles the two jars via ``--add-data``; we resolve their
+    paths via ``sys._MEIPASS`` when running as a frozen .exe.
+    """
+    try:
+        # Resolve bundle dir: frozen → _MEIPASS, source → script dir
+        if hasattr(sys, "_MEIPASS"):
+            bundle = Path(sys._MEIPASS)
+        else:
+            bundle = Path(__file__).resolve().parent
+        fabric_installer = bundle / "fabric-installer.jar"
+        mod_jar = next(bundle.glob("oyster-recorder-mod-*.jar"), None)
+        if mod_jar is None or not fabric_installer.exists():
+            # Bundled assets missing — likely a dev run from source. No-op.
+            return
+        # Defer the import — only available when running with our wheel,
+        # not in legacy contexts.
+        sys.path.insert(0, str(bundle))
+        from install_fabric_loader import ensure_installed  # type: ignore
+        result = ensure_installed(fabric_installer, mod_jar)
+        _trace(f"mod-install: {result.to_dict()}")
+    except Exception as e:  # noqa: BLE001 — never crash recorder
+        try:
+            _trace(f"mod-install failed (non-fatal): {e}")
+        except Exception:
+            pass
+
+
 def main() -> int:
     try:
+        _try_install_mod_first_launch()
         app = RecorderApp()
         app.mainloop()
         return 0

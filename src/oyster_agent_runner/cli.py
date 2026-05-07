@@ -781,6 +781,18 @@ def adapt_buyer_spec_cmd(
             ),
         ),
     ] = None,
+    game_state_jsonl: Annotated[
+        Path | None,
+        typer.Option(
+            "--game-state-jsonl",
+            help=(
+                "Optional path to a server-side Fabric mod JSONL stream "
+                "(D16). When supplied, real per-tick game state from the "
+                "Paper server overlays the metadata-derived camera/player "
+                "fields, closing Pipeline 2's last placeholder gap."
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Adapt a Phase 1 Minecraft bundle into the buyer-spec v1 layout.
 
@@ -813,6 +825,7 @@ def adapt_buyer_spec_cmd(
             placeholders_dir=placeholders,
             pad_to_min_records=pad_to_min_records,
             route_type=route_type,
+            game_state_jsonl=game_state_jsonl,
         )
     except FileNotFoundError as exc:
         console.print(f"[red]cannot adapt bundle:[/red] {exc}")

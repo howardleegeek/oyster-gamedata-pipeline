@@ -154,9 +154,16 @@ def record_screen_region(
 
     actual_fps = frames_captured / actual_duration if actual_duration > 0 else 0
 
-    if actual_fps < (fps * 0.5):
+    # Howard 2026-05-07: relaxed from 50% → 25% threshold. The 50% cutoff was
+    # crashing D4 cycles when CPU got busy (multiple mineflayer bots + back-
+    # to-back DepthAnything inference loads) — capture rate dipped to 13.6 fps
+    # at one point, killing a real REAL=6 cycle for purely cosmetic reasons.
+    # Buyer-spec doesn't mandate 30 fps real-time fidelity; the data is REAL
+    # at any rate ≥ ~5 fps. Below 25% (7.5 fps) is genuine breakage (mss
+    # frozen, screen permission lost, etc.) and still raises.
+    if actual_fps < (fps * 0.25):
         raise RuntimeError(
-            f"Frame capture rate {actual_fps:.1f} fps is below 50% of target {fps} fps"
+            f"Frame capture rate {actual_fps:.1f} fps is below 25% of target {fps} fps"
         )
 
     # Howard 2026-05-07: stamp `comment=oyster-real-screen-capture` so the

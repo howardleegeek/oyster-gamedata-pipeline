@@ -176,11 +176,29 @@ fi
 BUYER_DIR=$(mktemp -d -t oyster_pipeline_buyer.XXXXXX 2>/dev/null || mktemp -d "/tmp/oyster_pipeline_buyer.XXXXXX")
 echo "[pipeline] adapting to $BUYER_DIR" >&2
 
+# Howard 2026-05-07 (D16): if the server-side Fabric mod is loaded on
+# the Paper server, it emits per-bot JSONL into <server_dir>/oyster_state/
+# <bot_username>.jsonl. Find that file (best-effort) and pass it through;
+# adapter overlays REAL game-state on top of metadata-derived fields.
+GAME_STATE_FLAG=""
+SERVER_HOST="${SERVER%:*}"
+SERVER_PORT="${SERVER#*:}"
+# Cluster Paper instances live under /tmp/oyster_paper_* (per swarm controller).
+for CAND_DIR in /tmp/oyster_paper_d3 /tmp/oyster_paper_mac1 /tmp/oyster_paper_mac1_p2 /tmp/oyster_paper_mac1_p3; do
+    CAND_JSONL="${CAND_DIR}/oyster_state/${BOT_USERNAME}.jsonl"
+    if [[ -f "$CAND_JSONL" && -s "$CAND_JSONL" ]]; then
+        GAME_STATE_FLAG="--game-state-jsonl $CAND_JSONL"
+        echo "[pipeline] found server-side game-state JSONL: $CAND_JSONL" >&2
+        break
+    fi
+done
+
 "$OYSTER_AGENT" adapt-buyer-spec \
     --bundle "$CAPTURE_DIR" \
     --output "$BUYER_DIR" \
     --placeholders "$PLACEHOLDERS" \
-    --pad-to-min-records 9000 >&2 || {
+    --pad-to-min-records 9000 \
+    $GAME_STATE_FLAG >&2 || {
         echo "[pipeline] adapt failed" >&2
         exit 2
     }

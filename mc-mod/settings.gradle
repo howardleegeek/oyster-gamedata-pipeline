@@ -1,0 +1,17 @@
+// Oyster Recorder Fabric Mod — settings.gradle
+//
+// Howard 2026-05-07: pulls Fabric Loom from official Maven so the build
+// works in CI without local plugin installs.
+
+pluginManagement {
+    repositories {
+        maven {
+            name = 'Fabric'
+            url = 'https://maven.fabricmc.net/'
+        }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+rootProject.name = 'oyster-recorder-mod'

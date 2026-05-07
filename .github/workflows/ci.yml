@@ -40,6 +40,12 @@ jobs:
         run: |
           pip install -e .[test,exr,xlsx]
 
+      - name: Spec lint (D21 — REAL ONLY iron law)
+        # Howard 2026-05-07: rejects specs with placeholder/mock/TODO outside
+        # 不要做 sections unless explicitly waived. Stdlib-only, fast (<1 s).
+        run: |
+          python bin/spec_lint.py specs/
+
       - name: Run pytest
         run: |
           pytest tests/ -v --tb=short

@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "oyster-recorder",
+  "version": "${version}",
+  "name": "Oyster Recorder",
+  "description": "Streams real player game state (position, rotation, velocity, dimension) to a JSONL file consumed by OysterRecorder.exe. Closes the placeholder gap in the buyer-spec action_camera output. Howard 2026-05-07.",
+  "authors": ["Howard Li / Oyster Labs"],
+  "contact": {
+    "homepage": "https://github.com/howardleegeek/oyster-gamedata-pipeline",
+    "sources": "https://github.com/howardleegeek/oyster-gamedata-pipeline/tree/main/mc-mod"
+  },
+  "license": "MIT",
+  "icon": "assets/oyster-recorder/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "client": [
+      "world.oyster.recorder.OysterRecorderMod"
+    ],
+    "server": [
+      "world.oyster.recorder.server.OysterServerMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "~1.21.4",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}

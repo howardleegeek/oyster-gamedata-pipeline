@@ -124,14 +124,23 @@ def _classify_depth_dir(d: Path) -> tuple[str, str]:
 
 
 def _classify_action_camera(p: Path) -> tuple[str, str]:
-    """Multi-signal: prefer is_padded flag, fall back to fingerprint variance.
+    """Three-tier classification: mod-driven > metadata-derived > placeholder.
 
-    Howard 2026-05-07: stationary bot rotating its head produces real data
-    even though `camera_position` is constant. The full record fingerprint
-    (position + rotation + speed + ...) varies across time. Counting only
-    distinct positions falsely labels a "looking around" session as
-    placeholder. Use the explicit `is_padded` flag if present (added by
-    buyer_spec_adapter), then fall back to multi-field fingerprint.
+    Howard 2026-05-07 (D18): added tier 0 — explicit ``_real_game_state``
+    flag set by ``game_state_overlay.apply_to_record`` when the Fabric mod's
+    JSONL was consumed. This unambiguously certifies real game-state and
+    short-circuits the variance-based heuristics below (which can false-
+    positive on stationary bots producing identical-but-real frames).
+
+    Tier order:
+        0. ``_real_game_state: True`` flag present → REAL (mod-driven)
+        1. ``is_padded`` flag present → REAL (real bot data + transparent padding)
+        2. Multi-field fingerprint variance → REAL (frame variation observed)
+        3. Otherwise → PLACEHOLDER
+
+    Type-check is strict on tier 0: only boolean ``True`` accepted, not
+    truthy strings. This stops type-confusion attacks where a ``"true"``
+    string masquerades as authenticated real data.
     """
     if not p.exists():
         return UNKNOWN, "missing"
@@ -143,6 +152,19 @@ def _classify_action_camera(p: Path) -> tuple[str, str]:
         return UNKNOWN, f"unexpected shape: {type(d).__name__}"
 
     n = len(d)
+
+    # Tier 0: explicit _real_game_state flag from mod-driven overlay
+    # (D18). MUST be boolean True, not "true" / 1 / "yes" — those are
+    # potential placeholder-shipping-as-real attacks.
+    real_flagged = sum(1 for r in d if r.get("_real_game_state") is True)
+    if real_flagged > 0:
+        ratio = real_flagged / n
+        return (
+            REAL,
+            f"{real_flagged}/{n} records carry _real_game_state=true "
+            f"({ratio:.1%}) — mod-driven real game state present",
+        )
+
     # Tier 1: explicit is_padded flag from buyer_spec_adapter
     if any("is_padded" in r for r in d):
         real_count = sum(1 for r in d if not r.get("is_padded"))
