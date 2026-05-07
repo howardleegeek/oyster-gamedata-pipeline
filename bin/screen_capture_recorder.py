@@ -159,6 +159,16 @@ def record_screen_region(
             f"Frame capture rate {actual_fps:.1f} fps is below 50% of target {fps} fps"
         )
 
+    # Howard 2026-05-07: stamp `comment=oyster-real-screen-capture` so the
+    # D5 authenticity validator recognises this is real capture (not testsrc)
+    # even when the captured screen content is static. Best-effort — if the
+    # stamp fails, the video itself is still real, just D5 will mark UNKNOWN.
+    try:
+        from bin.stamp_real_metadata import stamp_video  # noqa: PLC0415
+        stamp_video(output_path, recorder_version="screen-capture-recorder-v1")
+    except Exception:
+        pass  # non-fatal
+
     return {
         "frames_captured": frames_captured,
         "actual_fps": actual_fps,

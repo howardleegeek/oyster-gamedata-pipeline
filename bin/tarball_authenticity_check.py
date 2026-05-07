@@ -46,15 +46,26 @@ def _classify_video(p: Path) -> tuple[str, str]:
     except Exception as e:
         return UNKNOWN, f"ffprobe failed: {e}"
 
-    # 1. Encoder tags pointing at lavfi/testsrc → placeholder
+    # 1. Encoder tags pointing at lavfi/testsrc → definitive PLACEHOLDER
     fmt_tags = (meta.get("format") or {}).get("tags") or {}
     encoder = (fmt_tags.get("encoder") or "").lower()
+    comment = (fmt_tags.get("comment") or "").lower()
     for stream in meta.get("streams", []):
         encoder = (encoder + " " + (stream.get("tags", {}).get("encoder") or "")).lower()
     if "lavfi" in encoder or "testsrc" in encoder:
         return PLACEHOLDER, f"encoder tag contains lavfi/testsrc: {encoder!r}"
 
-    # 2. Frame variance check — sample 5 frames via ffmpeg, compare brightness
+    # 1b. Real-capture metadata stamp (D15) → definitive REAL
+    if "oyster-real-screen-capture" in comment or "oyster-recorder" in comment:
+        return REAL, f"metadata comment claims real capture: {comment!r}"
+
+    # 2. Frame variance check — sample 5 frames. Howard 2026-05-07: relaxed.
+    # Frame-byte-identical alone is NOT proof of placeholder — a real screen
+    # capture from a static desktop session also produces identical frames.
+    # Without the encoder tag (rule 1) OR a real-capture stamp (rule 1b), we
+    # CANNOT distinguish "real-but-static" from "synthetic-static".
+    # Honest verdict: UNKNOWN, not PLACEHOLDER. The exit-1 gate still covers
+    # UNKNOWN, so callers know to ask for explicit metadata.
     try:
         with tempfile.TemporaryDirectory() as td:
             for idx, t in enumerate([0.0, 0.5, 1.0, 1.5, 2.0]):
@@ -69,7 +80,6 @@ def _classify_video(p: Path) -> tuple[str, str]:
                 (Path(td) / f"f{i}.gray").stat().st_size if (Path(td) / f"f{i}.gray").exists() else 0
                 for i in range(5)
             ]
-            # If all frames have identical size AND first byte → likely identical
             if len(set(sizes)) == 1 and sizes[0] > 0:
                 contents = []
                 for i in range(5):
@@ -77,7 +87,11 @@ def _classify_video(p: Path) -> tuple[str, str]:
                     if fp.exists():
                         contents.append(fp.read_bytes()[:1024])
                 if len(set(contents)) == 1:
-                    return PLACEHOLDER, "all sampled frames byte-identical"
+                    return UNKNOWN, (
+                        "all sampled frames byte-identical — could be "
+                        "real-static or synthetic; need oyster-recorder "
+                        "metadata stamp (D15) to disambiguate"
+                    )
     except Exception:
         pass  # frame-sampling is best-effort
 

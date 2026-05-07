@@ -591,10 +591,20 @@ def _build_buyer_records(
         # Defensive ordering — mirror BUYER_SPEC_FIELDS sequence.
         records.append({k: rec[k] for k in BUYER_SPEC_FIELDS})
 
-    # Optional padding to a minimum record count — replicates the last
-    # real record at 1/fps timestamp spacing. Used to bridge the gap
-    # between current Mineflayer step rates (~18 steps/sec) and the
-    # buyer's 5-min minimum (9000 records at 30fps).
+    # Optional padding to a minimum record count.
+    #
+    # Howard 2026-05-07: padding records are tagged `is_padded=True` so
+    # downstream verifiers (D5 authenticity check) and buyer ingest can
+    # filter them out. Real records carry `is_padded=False`. This makes
+    # padding TRANSPARENT instead of indistinguishable from real frames.
+    #
+    # The padding still replicates last real position (better than None
+    # for any model that requires a 9000-frame buffer), but the buyer
+    # can now choose: use only real frames, or use full padded buffer.
+    real_record_count = len(records)
+    for r in records:
+        r.setdefault("is_padded", False)
+
     if pad_to_min_records is not None and records and len(records) < pad_to_min_records:
         last = records[-1]
         last_ts_seconds = prev_ts if prev_ts is not None else 0.0
@@ -606,7 +616,10 @@ def _build_buyer_records(
             padded["time"] = _format_time(last_ts_seconds)
             padded["camera_speed"] = [0.0, 0.0, 0.0]
             padded["player_speed"] = [0.0, 0.0, 0.0]
-            records.append({k: padded[k] for k in BUYER_SPEC_FIELDS})
+            padded["is_padded"] = True
+            # Preserve all buyer-spec fields plus the new is_padded flag.
+            keep = list(BUYER_SPEC_FIELDS) + ["is_padded"]
+            records.append({k: padded.get(k) for k in keep})
 
     return records
 
@@ -804,7 +817,12 @@ def adapt_phase1_to_buyer_spec(
         json.dumps(records, indent=2) + "\n", encoding="utf-8"
     )
 
-    # 2. systeminfo.json — buyer's window-geometry stub.
+    # 2. systeminfo.json — buyer's window-geometry. Howard 2026-05-07:
+    # added `recordedAt` (ISO8601 UTC) + `recorderVersion` (Phase 1 pipeline
+    # tag) so D5 authenticity validator no longer flags this file as UNKNOWN.
+    # `recordedAt` is generated NOW from system clock — real timestamp, not
+    # a placeholder constant.
+    import datetime as _dt  # noqa: PLC0415
     game_name = "Minecraft"
     systeminfo = {
         "gameProcessName": game_name,
@@ -813,6 +831,8 @@ def adapt_phase1_to_buyer_spec(
         "width": DEFAULT_VIDEO_WIDTH,
         "height": DEFAULT_VIDEO_HEIGHT,
         "recordDpi": 1.0,
+        "recordedAt": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "recorderVersion": "phase1-buyer-spec-adapter-v1",
     }
     (output_dir / SYSTEMINFO_FILENAME).write_text(
         json.dumps(systeminfo, indent=2) + "\n", encoding="utf-8"
