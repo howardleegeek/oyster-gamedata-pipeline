@@ -122,10 +122,21 @@ ensure_placeholders "$PLACEHOLDERS"
 
 # --- step 2: capture -------------------------------------------------------
 
-CAPTURE_DIR=$(mktemp -d -t oyster_pipeline_capture)
+CAPTURE_DIR=$(mktemp -d -t oyster_pipeline_capture.XXXXXX 2>/dev/null || mktemp -d "/tmp/oyster_pipeline_capture.XXXXXX")
 echo "[pipeline] capturing into $CAPTURE_DIR (max_steps=$MAX_STEPS)" >&2
 
-"$REPO/.venv/bin/oyster-agent" run-mc \
+# OYSTER_AGENT_BIN env override allows running on machines where the binary
+# isn't at $REPO/.venv/bin/ (e.g. fresh minipc with global pip install -e .)
+OYSTER_AGENT="${OYSTER_AGENT_BIN:-$REPO/.venv/bin/oyster-agent}"
+if [[ ! -x "$OYSTER_AGENT" ]]; then
+    OYSTER_AGENT=$(command -v oyster-agent || echo "")
+    if [[ -z "$OYSTER_AGENT" ]]; then
+        echo "[pipeline] oyster-agent not found — pip install -e . in repo, or set OYSTER_AGENT_BIN" >&2
+        exit 1
+    fi
+fi
+
+"$OYSTER_AGENT" run-mc \
     --task-file "$TASK" \
     --output-dir "$CAPTURE_DIR" \
     --provider "$PROVIDER" \
@@ -140,10 +151,10 @@ fi
 
 # --- step 3: adapt ---------------------------------------------------------
 
-BUYER_DIR=$(mktemp -d -t oyster_pipeline_buyer)
+BUYER_DIR=$(mktemp -d -t oyster_pipeline_buyer.XXXXXX 2>/dev/null || mktemp -d "/tmp/oyster_pipeline_buyer.XXXXXX")
 echo "[pipeline] adapting to $BUYER_DIR" >&2
 
-"$REPO/.venv/bin/oyster-agent" adapt-buyer-spec \
+"$OYSTER_AGENT" adapt-buyer-spec \
     --bundle "$CAPTURE_DIR" \
     --output "$BUYER_DIR" \
     --placeholders "$PLACEHOLDERS" \
