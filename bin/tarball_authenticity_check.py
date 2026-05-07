@@ -124,7 +124,15 @@ def _classify_depth_dir(d: Path) -> tuple[str, str]:
 
 
 def _classify_action_camera(p: Path) -> tuple[str, str]:
-    """Count distinct camera_position tuples; if <5% → mostly padded."""
+    """Multi-signal: prefer is_padded flag, fall back to fingerprint variance.
+
+    Howard 2026-05-07: stationary bot rotating its head produces real data
+    even though `camera_position` is constant. The full record fingerprint
+    (position + rotation + speed + ...) varies across time. Counting only
+    distinct positions falsely labels a "looking around" session as
+    placeholder. Use the explicit `is_padded` flag if present (added by
+    buyer_spec_adapter), then fall back to multi-field fingerprint.
+    """
     if not p.exists():
         return UNKNOWN, "missing"
     try:
@@ -133,17 +141,33 @@ def _classify_action_camera(p: Path) -> tuple[str, str]:
         return UNKNOWN, f"json parse failed: {e}"
     if not isinstance(d, list) or not d:
         return UNKNOWN, f"unexpected shape: {type(d).__name__}"
-    positions = set()
-    for r in d:
-        cp = r.get("camera_position")
-        if cp is not None:
-            positions.add(tuple(cp))
+
     n = len(d)
-    unique = len(positions)
+    # Tier 1: explicit is_padded flag from buyer_spec_adapter
+    if any("is_padded" in r for r in d):
+        real_count = sum(1 for r in d if not r.get("is_padded"))
+        ratio = real_count / n if n else 0
+        if ratio < 0.02:  # less than 2% real records → effectively all padded
+            return PLACEHOLDER, f"{real_count}/{n} records non-padded ({ratio:.1%}) — almost entirely synthetic"
+        return REAL, f"{real_count}/{n} records non-padded ({ratio:.1%}, is_padded flag present) — real bot data + transparent padding"
+
+    # Tier 2: multi-field fingerprint (position, rotation, speed, intrinsics)
+    fingerprint_keys = (
+        "camera_position", "camera_rotation_oula", "camera_quat",
+        "camera_speed", "player_position", "yaw", "pitch",
+    )
+    fingerprints = set()
+    for r in d:
+        fp = tuple(
+            tuple(r[k]) if isinstance(r.get(k), list) else r.get(k)
+            for k in fingerprint_keys
+        )
+        fingerprints.add(fp)
+    unique = len(fingerprints)
     ratio = unique / n if n else 0
     if ratio < 0.05:
-        return PLACEHOLDER, f"{unique} distinct camera_positions / {n} records ({ratio:.1%}) — mostly padded"
-    return REAL, f"{unique} distinct camera_positions / {n} records ({ratio:.1%}) — real motion"
+        return PLACEHOLDER, f"{unique} distinct multi-field fingerprints / {n} records ({ratio:.1%}) — mostly identical"
+    return REAL, f"{unique} distinct multi-field fingerprints / {n} records ({ratio:.1%}) — real frame variation"
 
 
 def _classify_gameinfo_xlsx(p: Path) -> tuple[str, str]:
@@ -189,14 +213,27 @@ def _classify_systeminfo(p: Path) -> tuple[str, str]:
 
 
 def _classify_readme(p: Path) -> tuple[str, str]:
+    """Howard 2026-05-07: relaxed — 'placeholder if absent' is a conditional
+    caution about absent files, NOT an active placeholder claim. Only flag
+    PLACEHOLDER on unambiguous active language like 'this is a placeholder'
+    or 'do not use'.
+    """
     if not p.exists():
         return UNKNOWN, "missing"
     body = p.read_text().lower()
-    needles = ("placeholder if absent", "stop-gap", "stopgap")
-    found = [n for n in needles if n in body]
+    # Active placeholder claims (definitive)
+    active = (
+        "this is a placeholder",
+        "this bundle is a placeholder",
+        "do not use",
+        "do not train",
+        "stop-gap mvp",
+        "stopgap mvp",
+    )
+    found = [n for n in active if n in body]
     if found:
-        return PLACEHOLDER, f"contains placeholder-disclosure phrasing: {found}"
-    return REAL, "no placeholder phrasing"
+        return PLACEHOLDER, f"contains active placeholder claim: {found}"
+    return REAL, "no active placeholder claim"
 
 
 def audit_tarball(tar_path: Path) -> dict[str, Any]:
