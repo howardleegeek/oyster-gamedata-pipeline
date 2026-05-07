@@ -205,8 +205,9 @@ class TestAliasDivergence:
     def test_alias_row_paired_in_frame_diff(self):
         rec_a = {"camera_rotation_oula": [10.0, 20.0, 30.0]}
         rec_b = {"camera_rotation_euler": [10.0, 20.0, 30.0]}
-        rows = vvd.diff_frame(rec_a, rec_b,
-                              aliases=[("camera_rotation_oula", "camera_rotation_euler")])
+        rows = vvd.diff_frame(
+            rec_a, rec_b, aliases=[("camera_rotation_oula", "camera_rotation_euler")]
+        )
         assert len(rows) == 1
         assert "alias" in rows[0].note
         # Even with values equal, they should match because we coerce list→dict

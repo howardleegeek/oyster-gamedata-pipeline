@@ -10,6 +10,7 @@ Full RCON + observer-mod loop for extracting:
 Usage:
     python factorio_full.py --host 127.0.0.1 --port 27015 --password secret
 """
+
 from __future__ import annotations
 
 import argparse
@@ -35,8 +36,14 @@ POLL_INTERVAL: float = 0.1
 MAX_OBSERVATIONS: int = 10_000
 
 _FACING_8_TABLE: list[str] = [
-    "north", "northeast", "east", "southeast",
-    "south", "southwest", "west", "northwest",
+    "north",
+    "northeast",
+    "east",
+    "southeast",
+    "south",
+    "southwest",
+    "west",
+    "northwest",
 ]
 
 
@@ -49,6 +56,7 @@ def orientation_to_facing(orientation: float) -> str:
 @dataclass
 class PlayerState:
     """Player pose and status in the Factorio world."""
+
     position: tuple[float, float] = (0.0, 0.0)
     orientation: float = 0.0
     facing: str = "north"
@@ -72,6 +80,7 @@ class PlayerState:
 @dataclass
 class TileState:
     """State of a tile in the Factorio world."""
+
     position: tuple[int, int] = (0, 0)
     name: str = "dirt"
     hidden: bool = False
@@ -87,6 +96,7 @@ class TileState:
 @dataclass
 class BiterWaveEvent:
     """Biter wave attack event data."""
+
     tick: int = 0
     position: tuple[float, float] = (0.0, 0.0)
     size: int = 0
@@ -106,6 +116,7 @@ class BiterWaveEvent:
 @dataclass
 class GameObservation:
     """Complete game observation snapshot."""
+
     tick: int = 0
     player: PlayerState = field(default_factory=PlayerState)
     tiles: list[TileState] = field(default_factory=list)
@@ -247,9 +258,7 @@ class FactorioObserver:
             selected_entity=data.get("sel"),
         )
 
-    def get_tile_state(
-        self, center: tuple[float, float], radius: int = 10
-    ) -> list[TileState]:
+    def get_tile_state(self, center: tuple[float, float], radius: int = 10) -> list[TileState]:
         """Query tile states around a center position."""
         cmd = f"/c local t=game.surfaces[1].find_tiles_filtered({{position={{{center[0]},{center[1]}}},radius={radius}}})local r={{}}for i,v in ipairs(t)do r[i]={{x=v.position.x,y=v.position.y,n=v.name}}end rcon.print(game.table_to_json(r))"
         try:
@@ -260,7 +269,9 @@ class FactorioObserver:
             return []
 
         return [
-            TileState(position=(int(t.get("x", 0)), int(t.get("y", 0))), name=str(t.get("n", "dirt")))
+            TileState(
+                position=(int(t.get("x", 0)), int(t.get("y", 0))), name=str(t.get("n", "dirt"))
+            )
             for t in (data if isinstance(data, list) else [])
         ]
 
@@ -277,13 +288,15 @@ class FactorioObserver:
         waves = []
         for w in (data if isinstance(data, list) else []):
             pos = w.get("position", {})
-            waves.append(BiterWaveEvent(
-                tick=int(w.get("tick", 0)),
-                position=(float(pos.get("x", 0)), float(pos.get("y", 0))),
-                size=int(w.get("size", 0)),
-                evolution=float(w.get("evolution", 0)),
-                target=w.get("target"),
-            ))
+            waves.append(
+                BiterWaveEvent(
+                    tick=int(w.get("tick", 0)),
+                    position=(float(pos.get("x", 0)), float(pos.get("y", 0))),
+                    size=int(w.get("size", 0)),
+                    evolution=float(w.get("evolution", 0)),
+                    target=w.get("target"),
+                )
+            )
         return waves
 
     def observe(self, player_name: Optional[str] = None) -> GameObservation:
@@ -331,10 +344,14 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
     parser.add_argument("--host", default="127.0.0.1", help="Factorio server RCON host")
     parser.add_argument("--port", type=int, default=DEFAULT_RCON_PORT, help="RCON port")
-    parser.add_argument("--password", default="", help="RCON password (or set FACTORIO_RCON_PASSWORD)")
+    parser.add_argument(
+        "--password", default="", help="RCON password (or set FACTORIO_RCON_PASSWORD)"
+    )
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT, help="Connection timeout")
     parser.add_argument("--poll-interval", type=float, default=POLL_INTERVAL, help="Poll interval")
-    parser.add_argument("--max-observations", type=int, default=MAX_OBSERVATIONS, help="Max observations")
+    parser.add_argument(
+        "--max-observations", type=int, default=MAX_OBSERVATIONS, help="Max observations"
+    )
     parser.add_argument("--output", "-o", type=Path, help="Output file (JSONL format)")
     parser.add_argument("--player", default=None, help="Specific player to observe")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose logging")

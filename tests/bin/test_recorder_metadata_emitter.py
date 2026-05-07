@@ -5,13 +5,8 @@ from __future__ import annotations
 import json
 import re
 import uuid
-from pathlib import Path
-from unittest import mock
-
-import pytest
 
 from bin import recorder_metadata_emitter as md
-
 
 ISO_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$")
 
@@ -64,9 +59,10 @@ class TestBuildMetadata:
 
 class TestWriteMetadata:
     def test_writes_metadata_json(self, tmp_path):
-        out = md.write_metadata(tmp_path,
-                                metadata={"timestamp": "x", "location": "y",
-                                          "device_id": "z", "session_id": "s"})
+        out = md.write_metadata(
+            tmp_path,
+            metadata={"timestamp": "x", "location": "y", "device_id": "z", "session_id": "s"},
+        )
         assert out == tmp_path / "metadata.json"
         loaded = json.loads(out.read_text())
         assert loaded["device_id"] == "z"

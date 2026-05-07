@@ -6,11 +6,11 @@ clobber-only-Oyster semantics, and fail-soft return values.
 Howard 2026-05-07: testing without a real Minecraft install. Uses
 MINECRAFT_DIR_OVERRIDE env var so tests work on any CI runner.
 """
+
 from __future__ import annotations
 
 import importlib.util
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -23,9 +23,9 @@ sys.modules["install_fabric_loader"] = ifl
 _spec.loader.exec_module(ifl)
 
 
-def _make_fake_mc_dir(tmp_path: Path,
-                      fabric_installed: bool = False,
-                      existing_mod_versions: list[str] | None = None) -> Path:
+def _make_fake_mc_dir(
+    tmp_path: Path, fabric_installed: bool = False, existing_mod_versions: list[str] | None = None
+) -> Path:
     """Create a fake .minecraft directory tree for testing."""
     mc = tmp_path / "minecraft"
     mc.mkdir()
@@ -37,7 +37,7 @@ def _make_fake_mc_dir(tmp_path: Path,
         prof = mc / "versions" / f"fabric-loader-{loader}-{ver}"
         prof.mkdir()
         (prof / f"fabric-loader-{loader}-{ver}.json").write_text("{}")
-    for v in (existing_mod_versions or []):
+    for v in existing_mod_versions or []:
         (mc / "mods" / f"oyster-recorder-mod-{v}.jar").write_text("fake jar v" + v)
     return mc
 
@@ -97,8 +97,7 @@ def test_drop_mod_jar_idempotent_same_size(tmp_path):
 def test_drop_mod_jar_clobbers_only_old_oyster_jars(tmp_path):
     """Critical: must remove old oyster-recorder-mod-*.jar but preserve
     other mods (like Sodium, Iris, etc.) the user has installed."""
-    mc = _make_fake_mc_dir(tmp_path,
-                            existing_mod_versions=["0.0.1-old", "0.0.2-older"])
+    mc = _make_fake_mc_dir(tmp_path, existing_mod_versions=["0.0.1-old", "0.0.2-older"])
     other_mod = mc / "mods" / "sodium-0.6.0.jar"
     other_mod.write_text("sodium")
     iris_mod = mc / "mods" / "iris-mc1.21.4-1.7.6.jar"
@@ -168,7 +167,8 @@ def test_install_result_to_dict_serialisable(tmp_path):
 def test_main_cli_returns_zero_on_install_success(tmp_path, monkeypatch, capsys):
     mc = _make_fake_mc_dir(tmp_path, fabric_installed=True)
     monkeypatch.setenv("MINECRAFT_DIR_OVERRIDE", str(mc))
-    fab = tmp_path / "fab.jar"; fab.write_text("x")
+    fab = tmp_path / "fab.jar"
+    fab.write_text("x")
     src = _make_fake_source_jar(tmp_path, "0.1.0")
     rc = ifl.main([str(fab), str(src)])
     out = capsys.readouterr().out

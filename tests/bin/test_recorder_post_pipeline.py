@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import json
-import sys
 import types
-from pathlib import Path
 from unittest import mock
 
 import pytest
@@ -39,8 +37,7 @@ class TestRunPipelineSkipping:
 
     def test_explicit_skip_flags(self, clip_dir):
         with mock.patch.object(pipeline, "_try_import", return_value=None):
-            report = pipeline.run_pipeline(clip_dir,
-                                           skip=["audio", "depth"])
+            report = pipeline.run_pipeline(clip_dir, skip=["audio", "depth"])
         details = {p.name: p.detail for p in report.phases}
         assert "--skip-audio" in details["audio"]
         assert "--skip-depth" in details["depth"]
@@ -51,45 +48,41 @@ class TestRunPipelinePhases:
 
     def test_audio_phase_uses_primary(self, clip_dir):
         primary = types.SimpleNamespace(
-            process_clip=mock.Mock(return_value=clip_dir / "audio.flac"))
+            process_clip=mock.Mock(return_value=clip_dir / "audio.flac")
+        )
 
         def fake_import(name):
             if name == "recorder_audio_postprocess":
                 return primary
             return None
 
-        with mock.patch.object(pipeline, "_try_import",
-                                side_effect=fake_import):
+        with mock.patch.object(pipeline, "_try_import", side_effect=fake_import):
             result = pipeline.run_audio_phase(clip_dir)
         assert result.status == "ok"
         primary.process_clip.assert_called_once_with(clip_dir)
 
     def test_audio_phase_uses_fallback(self, clip_dir):
-        fallback = types.SimpleNamespace(
-            extract_and_validate=mock.Mock(return_value="ok"))
+        fallback = types.SimpleNamespace(extract_and_validate=mock.Mock(return_value="ok"))
 
         def fake_import(name):
             if name == "audio_track_extractor":
                 return fallback
             return None
 
-        with mock.patch.object(pipeline, "_try_import",
-                                side_effect=fake_import):
+        with mock.patch.object(pipeline, "_try_import", side_effect=fake_import):
             result = pipeline.run_audio_phase(clip_dir)
         assert result.status == "ok"
         fallback.extract_and_validate.assert_called_once()
 
     def test_phase_failure_recorded(self, clip_dir):
-        boom = types.SimpleNamespace(
-            process_clip=mock.Mock(side_effect=RuntimeError("kaboom")))
+        boom = types.SimpleNamespace(process_clip=mock.Mock(side_effect=RuntimeError("kaboom")))
 
         def fake_import(name):
             if name == "recorder_audio_postprocess":
                 return boom
             return None
 
-        with mock.patch.object(pipeline, "_try_import",
-                                side_effect=fake_import):
+        with mock.patch.object(pipeline, "_try_import", side_effect=fake_import):
             result = pipeline.run_audio_phase(clip_dir)
         assert result.status == "failed"
         assert "kaboom" in result.detail
@@ -122,7 +115,6 @@ class TestMain:
     def test_report_json_written(self, clip_dir, tmp_path):
         out = tmp_path / "report.json"
         with mock.patch.object(pipeline, "_try_import", return_value=None):
-            pipeline.main(["--clip-dir", str(clip_dir),
-                           "--report-json", str(out)])
+            pipeline.main(["--clip-dir", str(clip_dir), "--report-json", str(out)])
         loaded = json.loads(out.read_text())
         assert "phases" in loaded and len(loaded["phases"]) == 3

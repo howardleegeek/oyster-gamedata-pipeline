@@ -22,16 +22,17 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 DEFAULT_PIPE_NAME = "cities_skylines_state"
 DEFAULT_TIMEOUT = 5.0
-MAGIC_HEADER = b'CSST'
+MAGIC_HEADER = b"CSST"
 
 
 class GameState(Enum):
     """Enumeration of possible game states."""
+
     LOADING = "loading"
     MAIN_MENU = "main_menu"
     PLAYING = "playing"
@@ -43,6 +44,7 @@ class GameState(Enum):
 @dataclass
 class CameraState:
     """Represents the 3D camera state in Cities Skylines."""
+
     position_x: float = 0.0
     position_y: float = 0.0
     position_z: float = 0.0
@@ -60,7 +62,8 @@ class CameraState:
         return {
             "position": [self.position_x, self.position_y, self.position_z],
             "rotation": [self.rotation_x, self.rotation_y, self.rotation_z],
-            "zoom": self.zoom_level, "field_of_view": self.field_of_view,
+            "zoom": self.zoom_level,
+            "field_of_view": self.field_of_view,
             "target": [self.target_x, self.target_y, self.target_z],
         }
 
@@ -88,6 +91,7 @@ class CameraState:
 @dataclass
 class SimulationState:
     """Represents the simulation state including tick and time."""
+
     tick: int = 0
     time_of_day: float = 12.0
     day: int = 1
@@ -99,9 +103,11 @@ class SimulationState:
     def to_dict(self) -> Dict[str, Any]:
         """Convert simulation state to dictionary representation."""
         return {
-            "tick": self.tick, "time_of_day": self.time_of_day,
+            "tick": self.tick,
+            "time_of_day": self.time_of_day,
             "date": {"day": self.day, "month": self.month, "year": self.year},
-            "speed": self.speed, "is_paused": self.is_paused,
+            "speed": self.speed,
+            "is_paused": self.is_paused,
         }
 
     @classmethod
@@ -111,8 +117,10 @@ class SimulationState:
         return cls(
             tick=int(data.get("tick", 0)),
             time_of_day=float(data.get("time_of_day", 12.0)),
-            day=int(date.get("day", 1)), month=int(date.get("month", 1)),
-            year=int(date.get("year", 2020)), speed=float(data.get("speed", 1.0)),
+            day=int(date.get("day", 1)),
+            month=int(date.get("month", 1)),
+            year=int(date.get("year", 2020)),
+            speed=float(data.get("speed", 1.0)),
             is_paused=bool(data.get("is_paused", False)),
         )
 
@@ -120,6 +128,7 @@ class SimulationState:
 @dataclass
 class GameStateSnapshot:
     """Complete game state snapshot combining all state data."""
+
     timestamp: float = field(default_factory=time.time)
     game_state: GameState = GameState.UNKNOWN
     camera: CameraState = field(default_factory=CameraState)
@@ -130,9 +139,12 @@ class GameStateSnapshot:
     def to_dict(self) -> Dict[str, Any]:
         """Convert complete game state to dictionary."""
         return {
-            "timestamp": self.timestamp, "game_state": self.game_state.value,
-            "camera": self.camera.to_dict(), "simulation": self.simulation.to_dict(),
-            "city_name": self.city_name, "money": self.money,
+            "timestamp": self.timestamp,
+            "game_state": self.game_state.value,
+            "camera": self.camera.to_dict(),
+            "simulation": self.simulation.to_dict(),
+            "city_name": self.city_name,
+            "money": self.money,
         }
 
     def to_json(self) -> str:
@@ -305,8 +317,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Cities Skylines game state extractor")
     parser.add_argument("--pipe-name", default=DEFAULT_PIPE_NAME, help="Named pipe name")
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT, help="Timeout in seconds")
-    parser.add_argument("--command", choices=["get-state", "get-camera", "get-tick", "move-camera", "set-speed"],
-                       default="get-state", help="Command to execute")
+    parser.add_argument(
+        "--command",
+        choices=["get-state", "get-camera", "get-tick", "move-camera", "set-speed"],
+        default="get-state",
+        help="Command to execute",
+    )
     parser.add_argument("--x", type=float, default=0.0, help="X coordinate for move-camera")
     parser.add_argument("--y", type=float, default=0.0, help="Y coordinate for move-camera")
     parser.add_argument("--z", type=float, default=0.0, help="Z coordinate for move-camera")

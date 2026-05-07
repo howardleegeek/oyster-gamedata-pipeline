@@ -1,4 +1,5 @@
 """V₂ MiniMax R13/R18/R21 unit tests (BFT N=4 redundancy)."""
+
 from __future__ import annotations
 
 import json
@@ -15,11 +16,9 @@ from bin.v2_minimax_residuals.residuals import (
 
 
 def _write_inputs(events, fps=30.0, with_session_start=True):
-    f = tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl",
-                                    delete=False, encoding="utf-8")
+    f = tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False, encoding="utf-8")
     if with_session_start:
-        f.write(json.dumps({"event_type": "session_start",
-                            "timestamp_ms": 0, "fps": fps}) + "\n")
+        f.write(json.dumps({"event_type": "session_start", "timestamp_ms": 0, "fps": fps}) + "\n")
     for ev in events:
         f.write(json.dumps(ev) + "\n")
     f.close()
@@ -28,19 +27,23 @@ def _write_inputs(events, fps=30.0, with_session_start=True):
 
 class TestV2R13(unittest.TestCase):
     def test_pass_w_held(self):
-        path = _write_inputs([
-            {"event_type": "key_down", "key_code": 87, "timestamp_ms": 0},
-            {"event_type": "key_up", "key_code": 87, "timestamp_ms": 2000},
-        ])
+        path = _write_inputs(
+            [
+                {"event_type": "key_down", "key_code": 87, "timestamp_ms": 0},
+                {"event_type": "key_up", "key_code": 87, "timestamp_ms": 2000},
+            ]
+        )
         r = r13_keycode_replay({"frame": 30, "keyCode": [87]}, inputs_path=path)
         self.assertTrue(r["passed"])
         self.assertEqual(r["residual"], 0.0)
 
     def test_fi02_mutation_caught(self):
-        path = _write_inputs([
-            {"event_type": "key_down", "key_code": 87, "timestamp_ms": 0},
-            {"event_type": "key_up", "key_code": 87, "timestamp_ms": 2000},
-        ])
+        path = _write_inputs(
+            [
+                {"event_type": "key_down", "key_code": 87, "timestamp_ms": 0},
+                {"event_type": "key_up", "key_code": 87, "timestamp_ms": 2000},
+            ]
+        )
         r = r13_keycode_replay({"frame": 30, "keyCode": [88]}, inputs_path=path)
         self.assertFalse(r["passed"])
         self.assertEqual(r["residual"], 2.0)

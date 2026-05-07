@@ -6,6 +6,7 @@ Four cases:
   3. Fake residual: returns ``residual=NaN`` (no string literal) → 0 violations.
   4. Empty residual file (no functions) → 0 violations.
 """
+
 from __future__ import annotations
 
 from pathlib import Path

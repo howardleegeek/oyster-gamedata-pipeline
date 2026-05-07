@@ -5,7 +5,6 @@ from __future__ import annotations
 import io
 import json
 import urllib.error
-from pathlib import Path
 from unittest import mock
 
 import pytest
@@ -25,11 +24,15 @@ def tarball(tmp_path):
 def config_file(tmp_path):
     """Create a config.json with an ingest endpoint."""
     cfg_path = tmp_path / "config.json"
-    cfg_path.write_text(json.dumps({
-        "ingest_endpoint": "https://api.test/v1/ingest",
-        "vendor_id": "vendor-test",
-        "auth_token": "Bearer abc",
-    }))
+    cfg_path.write_text(
+        json.dumps(
+            {
+                "ingest_endpoint": "https://api.test/v1/ingest",
+                "vendor_id": "vendor-test",
+                "auth_token": "Bearer abc",
+            }
+        )
+    )
     return cfg_path
 
 
@@ -78,10 +81,8 @@ class TestUploadClip:
     def test_uploaded_path(self, tarball):
         cfg = up.UploadConfig("https://api.test/v1/ingest", "v1", None)
 
-        def fake_post(endpoint, body, content_type, auth_token=None,
-                       timeout=60.0):
-            return {"status_code": 200, "elapsed_s": 0.1,
-                    "response": {"clip_id": "abc"}}
+        def fake_post(endpoint, body, content_type, auth_token=None, timeout=60.0):
+            return {"status_code": 200, "elapsed_s": 0.1, "response": {"clip_id": "abc"}}
 
         with mock.patch.object(up, "post_tarball", side_effect=fake_post):
             result = up.upload_clip(tarball, config=cfg)
@@ -91,8 +92,8 @@ class TestUploadClip:
     def test_http_error_path(self, tarball):
         cfg = up.UploadConfig("https://api.test/v1/ingest", "v1", None)
         err = urllib.error.HTTPError(
-            "https://api.test/v1/ingest", 503, "Service Unavailable",
-            hdrs=None, fp=io.BytesIO(b""))
+            "https://api.test/v1/ingest", 503, "Service Unavailable", hdrs=None, fp=io.BytesIO(b"")
+        )
         with mock.patch.object(up, "post_tarball", side_effect=err):
             result = up.upload_clip(tarball, config=cfg)
         assert result["status"] == "failed"
@@ -121,9 +122,13 @@ class TestMain:
         assert rc == 0
 
     def test_exit_0_on_dry_run(self, tarball, config_file):
-        rc = up.main([
-            "--tarball", str(tarball),
-            "--config", str(config_file),
-            "--dry-run",
-        ])
+        rc = up.main(
+            [
+                "--tarball",
+                str(tarball),
+                "--config",
+                str(config_file),
+                "--dry-run",
+            ]
+        )
         assert rc == 0

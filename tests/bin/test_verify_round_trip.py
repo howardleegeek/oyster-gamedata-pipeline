@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Tests for bin/verify_round_trip.py — round-trip data integrity checks."""
+
 from __future__ import annotations
 
 import json
@@ -12,9 +13,7 @@ import pytest
 
 sys.path.insert(
     0,
-    os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    ),
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
 )
 
 from bin.verify_action_camera import euler_zyx_to_quat  # noqa: E402,I001
@@ -30,8 +29,8 @@ from bin.verify_round_trip import (  # noqa: E402,I001
     run_all_checks,
 )
 
-
 # ---- Helpers ---------------------------------------------------------------
+
 
 def _build_clean_records(n: int = 30, fps: float = 30.0) -> list[dict[str, Any]]:
     """Synthesize a perfectly self-consistent action_camera record list.
@@ -41,19 +40,21 @@ def _build_clean_records(n: int = 30, fps: float = 30.0) -> list[dict[str, Any]]
     """
     records: list[dict[str, Any]] = []
     for i in range(n):
-        records.append({
-            "frame": i,
-            "frame_index": i,
-            "timestamp": round(i / fps, 6),
-            "fps": fps,
-            "mouse_x": 0.5,
-            "mouse_y": 0.5,
-            "mouse_dx": 0.0,
-            "mouse_dy": 0.0,
-            "keyCode": [],
-            "camera_rotation_quaternion": [0.0, 0.0, 0.0, 1.0],
-            "camera_rotation_euler": [0.0, 0.0, 0.0],
-        })
+        records.append(
+            {
+                "frame": i,
+                "frame_index": i,
+                "timestamp": round(i / fps, 6),
+                "fps": fps,
+                "mouse_x": 0.5,
+                "mouse_y": 0.5,
+                "mouse_dx": 0.0,
+                "mouse_dy": 0.0,
+                "keyCode": [],
+                "camera_rotation_quaternion": [0.0, 0.0, 0.0, 1.0],
+                "camera_rotation_euler": [0.0, 0.0, 0.0],
+            }
+        )
     return records
 
 
@@ -65,6 +66,7 @@ def _write_clip(tmp_path: Path, records: list[dict[str, Any]]) -> Path:
 
 
 # ---- Check 1: Keyboard event reconstruction --------------------------------
+
 
 class TestKeyboardReconstruction:
     def test_no_keys_held_passes(self) -> None:
@@ -108,6 +110,7 @@ class TestKeyboardReconstruction:
 
 # ---- Check 2: Mouse position reconstruction --------------------------------
 
+
 class TestMouseReconstruction:
     def test_zero_motion_passes(self) -> None:
         records = _build_clean_records(20)
@@ -139,6 +142,7 @@ class TestMouseReconstruction:
 
 
 # ---- Check 3: Quaternion ↔ Euler round-trip --------------------------------
+
 
 class TestQuaternionEulerRoundTrip:
     def test_identity_passes(self) -> None:
@@ -181,6 +185,7 @@ class TestQuaternionEulerRoundTrip:
 
 # ---- Check 4: Frame-time consistency ----------------------------------------
 
+
 class TestFrameTimeConsistency:
     def test_clean_records_pass(self) -> None:
         records = _build_clean_records(60)
@@ -199,19 +204,22 @@ class TestFrameTimeConsistency:
         records = []
         for i in range(20):
             ms = i * 33
-            records.append({
-                "frame": i,
-                "time": f"2026-05-05 12:00:00.{ms:03d}",
-                "fps": 30.0,
-                "keyCode": [],
-                "camera_rotation_quaternion": [0.0, 0.0, 0.0, 1.0],
-            })
+            records.append(
+                {
+                    "frame": i,
+                    "time": f"2026-05-05 12:00:00.{ms:03d}",
+                    "fps": 30.0,
+                    "keyCode": [],
+                    "camera_rotation_quaternion": [0.0, 0.0, 0.0, 1.0],
+                }
+            )
         result = check4_frame_time(records)
         # Within the ±1 frame tolerance because 33ms ≈ 30fps.
         assert result["passed"] is True
 
 
 # ---- CLI / loader tests ----------------------------------------------------
+
 
 class TestLoaderAndCLI:
     def test_load_top_level_array(self, tmp_path: Path) -> None:
@@ -265,6 +273,7 @@ class TestLoaderAndCLI:
 
 
 # ---- Run-all-checks aggregation -------------------------------------------
+
 
 class TestRunAllChecks:
     def test_returns_four_checks(self) -> None:

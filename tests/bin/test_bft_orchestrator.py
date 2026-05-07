@@ -1,9 +1,9 @@
 """Tests for the BFT consensus orchestrator tally + collect_votes paths."""
+
 from __future__ import annotations
 
 import hashlib
 import json
-import math
 import sys
 import tempfile
 import unittest
@@ -49,12 +49,22 @@ def _make_min_frame(idx: int) -> dict:
 def _write_inputs_jsonl(events: list[dict], fps: float = 30.0) -> Path:
     """Write a temp inputs.jsonl with session_start sentinel + events."""
     f = tempfile.NamedTemporaryFile(
-        mode="w", suffix=".jsonl", delete=False, encoding="utf-8",
+        mode="w",
+        suffix=".jsonl",
+        delete=False,
+        encoding="utf-8",
     )
-    f.write(json.dumps({
-        "event_type": "session_start", "timestamp_ms": 0,
-        "fps": fps, "frame_count": 9000,
-    }) + "\n")
+    f.write(
+        json.dumps(
+            {
+                "event_type": "session_start",
+                "timestamp_ms": 0,
+                "fps": fps,
+                "frame_count": 9000,
+            }
+        )
+        + "\n"
+    )
     for ev in events:
         f.write(json.dumps(ev) + "\n")
     f.close()
@@ -62,7 +72,9 @@ def _write_inputs_jsonl(events: list[dict], fps: float = 30.0) -> Path:
 
 
 def _vote(verifier: str, residual: str, verdict: str) -> Vote:
-    return Vote(verifier_id=verifier, residual=residual, verdict=verdict, residual_value=0.0, threshold=0.0)
+    return Vote(
+        verifier_id=verifier, residual=residual, verdict=verdict, residual_value=0.0, threshold=0.0
+    )
 
 
 class TallyTests(unittest.TestCase):
@@ -151,10 +163,12 @@ class MultimodalAggregateTests(unittest.TestCase):
 
     def test_aggregate_with_inputs_path_produces_r13_votes(self) -> None:
         """inputs.jsonl present + matching keyCode → R13 appears in residuals."""
-        inputs_path = _write_inputs_jsonl([
-            {"event_type": "key_down", "key_code": 87, "timestamp_ms": 0},
-            {"event_type": "key_up",   "key_code": 87, "timestamp_ms": 5000},
-        ])
+        inputs_path = _write_inputs_jsonl(
+            [
+                {"event_type": "key_down", "key_code": 87, "timestamp_ms": 0},
+                {"event_type": "key_up", "key_code": 87, "timestamp_ms": 5000},
+            ]
+        )
         # Frame 30 → t_end ~1033ms, W still held → keyCode=[87] matches replay.
         records = []
         for i in range(30, 33):
@@ -162,12 +176,12 @@ class MultimodalAggregateTests(unittest.TestCase):
             r["keyCode"] = [87]
             records.append(r)
         try:
-            result = aggregate_dataset(records, fps=30.0,
-                                       inputs_path=str(inputs_path))
+            result = aggregate_dataset(records, fps=30.0, inputs_path=str(inputs_path))
         finally:
             inputs_path.unlink(missing_ok=True)
-        self.assertIn("R13", result["residuals"],
-                      msg=f"R13 missing; got {sorted(result['residuals'])}")
+        self.assertIn(
+            "R13", result["residuals"], msg=f"R13 missing; got {sorted(result['residuals'])}"
+        )
         # Both V₁ and V₂' should COMMIT (matching replay).
         self.assertGreaterEqual(result["residuals"]["R13"]["COMMIT"], 1)
 
@@ -186,15 +200,17 @@ class MultimodalAggregateTests(unittest.TestCase):
             returncode = 0
 
         try:
-            with mock.patch(
-                "bin.v1_claude_residuals.r15_fps_consistency.shutil.which",
-                return_value="/usr/bin/ffprobe",
-            ), mock.patch(
-                "bin.v1_claude_residuals.r15_fps_consistency.subprocess.run",
-                return_value=_FakeProc(),
+            with (
+                mock.patch(
+                    "bin.v1_claude_residuals.r15_fps_consistency.shutil.which",
+                    return_value="/usr/bin/ffprobe",
+                ),
+                mock.patch(
+                    "bin.v1_claude_residuals.r15_fps_consistency.subprocess.run",
+                    return_value=_FakeProc(),
+                ),
             ):
-                result = aggregate_dataset(records, fps=30.0,
-                                           video_path=video_path)
+                result = aggregate_dataset(records, fps=30.0, video_path=video_path)
         finally:
             Path(video_path).unlink(missing_ok=True)
         self.assertIn("R15", result["residuals"])
@@ -207,8 +223,7 @@ class MultimodalAggregateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             for i in range(60):
                 (Path(tmp) / f"depth_{i:05d}.exr").touch()
-            result = aggregate_dataset(records, fps=30.0, depth_dir=tmp,
-                                       video_duration_sec=10.0)
+            result = aggregate_dataset(records, fps=30.0, depth_dir=tmp, video_duration_sec=10.0)
         self.assertIn("R16", result["residuals"])
         # 60 files at 10s × 6fps → diff 0 → COMMIT.
         self.assertEqual(result["residuals"]["R16"]["COMMIT"], 1)
@@ -225,12 +240,10 @@ class MultimodalAggregateTests(unittest.TestCase):
         self.assertNotIn("R15", result["residuals"])
         self.assertNotIn("R16", result["residuals"])
         for r in ("R20a", "R20b", "R20c", "R20d", "R20e", "R22", "R23"):
-            self.assertNotIn(r, result["residuals"],
-                             msg=f"unexpected {r} in tally")
+            self.assertNotIn(r, result["residuals"], msg=f"unexpected {r} in tally")
         # Frames-pair count + dataset_decision should still be populated.
         self.assertEqual(result["frames"], 2)
-        self.assertIn(result["dataset_decision"],
-                      {"PASS", "FAIL", "NEEDS_HUMAN"})
+        self.assertIn(result["dataset_decision"], {"PASS", "FAIL", "NEEDS_HUMAN"})
 
 
 def _drift_baseline(n: int = 30, fps: float = 30.0) -> list[dict]:
@@ -273,17 +286,24 @@ class DatasetLevelResidualTests(unittest.TestCase):
             mpath = tmp_path / "_manifest.json"
             mpath.write_text(json.dumps(manifest), encoding="utf-8")
             with tempfile.NamedTemporaryFile(
-                suffix=".mp4", delete=False,
+                suffix=".mp4",
+                delete=False,
             ) as vf:
                 vf.write(b"\x00")
                 video_path = vf.name
-            ffprobe_payload = json.dumps({"streams": [{
-                "codec_type": "video",
-                "avg_frame_rate": "30/1",
-                "codec_name": "hevc",
-                "width": 1920,
-                "height": 1080,
-            }]})
+            ffprobe_payload = json.dumps(
+                {
+                    "streams": [
+                        {
+                            "codec_type": "video",
+                            "avg_frame_rate": "30/1",
+                            "codec_name": "hevc",
+                            "width": 1920,
+                            "height": 1080,
+                        }
+                    ]
+                }
+            )
 
             class _FakeProc:
                 stdout = ffprobe_payload
@@ -291,21 +311,27 @@ class DatasetLevelResidualTests(unittest.TestCase):
                 returncode = 0
 
             try:
-                with mock.patch(
-                    "bin.v1_claude_residuals.r15_fps_consistency.shutil.which",
-                    return_value="/usr/bin/ffprobe",
-                ), mock.patch(
-                    "bin.v1_claude_residuals.r15_fps_consistency.subprocess.run",
-                    return_value=_FakeProc(),
-                ), mock.patch(
-                    "bin.v1_claude_residuals.r23_video_codec.shutil.which",
-                    return_value="/usr/bin/ffprobe",
-                ), mock.patch(
-                    "bin.v1_claude_residuals.r23_video_codec.subprocess.run",
-                    return_value=_FakeProc(),
+                with (
+                    mock.patch(
+                        "bin.v1_claude_residuals.r15_fps_consistency.shutil.which",
+                        return_value="/usr/bin/ffprobe",
+                    ),
+                    mock.patch(
+                        "bin.v1_claude_residuals.r15_fps_consistency.subprocess.run",
+                        return_value=_FakeProc(),
+                    ),
+                    mock.patch(
+                        "bin.v1_claude_residuals.r23_video_codec.shutil.which",
+                        return_value="/usr/bin/ffprobe",
+                    ),
+                    mock.patch(
+                        "bin.v1_claude_residuals.r23_video_codec.subprocess.run",
+                        return_value=_FakeProc(),
+                    ),
                 ):
                     result = aggregate_dataset(
-                        records, fps=30.0,
+                        records,
+                        fps=30.0,
                         video_path=video_path,
                         depth_dir=str(tmp_path),
                         depth_manifest_path=str(mpath),
@@ -315,18 +341,19 @@ class DatasetLevelResidualTests(unittest.TestCase):
                 Path(video_path).unlink(missing_ok=True)
 
         for r in ("R20a", "R20b", "R20c", "R20d", "R20e", "R22", "R23"):
-            self.assertIn(r, result["residuals"],
-                          msg=f"{r} missing; got {sorted(result['residuals'])}")
-            self.assertEqual(result["residuals"][r]["COMMIT"], 1,
-                             msg=f"{r} should COMMIT on honest baseline")
+            self.assertIn(
+                r, result["residuals"], msg=f"{r} missing; got {sorted(result['residuals'])}"
+            )
+            self.assertEqual(
+                result["residuals"][r]["COMMIT"], 1, msg=f"{r} should COMMIT on honest baseline"
+            )
 
     def test_aggregate_records_only_r20_fires_no_r22_r23(self) -> None:
         """Just records (≥ min_frames) → R20a..e fire, R22/R23 absent."""
         records = _drift_baseline(n=30)
         result = aggregate_dataset(records, fps=30.0)
         for r in ("R20a", "R20b", "R20c", "R20d", "R20e"):
-            self.assertIn(r, result["residuals"],
-                          msg=f"{r} missing on drift-grade sample")
+            self.assertIn(r, result["residuals"], msg=f"{r} missing on drift-grade sample")
             self.assertEqual(result["residuals"][r]["COMMIT"], 1)
         # R22 + R23 require aux args — must be absent.
         self.assertNotIn("R22", result["residuals"])
@@ -345,9 +372,11 @@ class DatasetLevelResidualTests(unittest.TestCase):
         result = aggregate_dataset(records, fps=30.0)
         self.assertIn("R20a", result["residuals"])
         # Single dataset-level vote that FAILed → REJECT bucket = 1.
-        self.assertEqual(result["residuals"]["R20a"]["REJECT"], 1,
-                         msg=f"R20a should REJECT under quat drift, "
-                             f"got {result['residuals']['R20a']}")
+        self.assertEqual(
+            result["residuals"]["R20a"]["REJECT"],
+            1,
+            msg=f"R20a should REJECT under quat drift, " f"got {result['residuals']['R20a']}",
+        )
         self.assertEqual(result["residuals"]["R20a"]["COMMIT"], 0)
 
     def test_depth_manifest_mismatch_r22_fails(self) -> None:
@@ -362,14 +391,17 @@ class DatasetLevelResidualTests(unittest.TestCase):
             # written, simulating a shuffle/swap attack (D-04).
             (tmp_path / "depth_00002.exr").write_bytes(b"TAMPERED-BYTES")
             result = aggregate_dataset(
-                records, fps=30.0,
+                records,
+                fps=30.0,
                 depth_dir=str(tmp_path),
                 depth_manifest_path=str(mpath),
             )
         self.assertIn("R22", result["residuals"])
-        self.assertEqual(result["residuals"]["R22"]["REJECT"], 1,
-                         msg=f"R22 should REJECT on hash mismatch, "
-                             f"got {result['residuals']['R22']}")
+        self.assertEqual(
+            result["residuals"]["R22"]["REJECT"],
+            1,
+            msg=f"R22 should REJECT on hash mismatch, " f"got {result['residuals']['R22']}",
+        )
         self.assertEqual(result["residuals"]["R22"]["COMMIT"], 0)
 
 

@@ -821,14 +821,20 @@ def adapt_phase1_to_buyer_spec(
     if game_state_jsonl is not None and game_state_jsonl.exists():
         try:
             import sys as _sys  # noqa: PLC0415
+
             _bin_dir = str((Path(__file__).resolve().parent.parent.parent / "bin").resolve())
             if _bin_dir not in _sys.path:
                 _sys.path.insert(0, _bin_dir)
-            from game_state_overlay import (  # type: ignore  # noqa: PLC0415
-                load as _gs_load,
-                lookup_at_ms as _gs_lookup,
+            from game_state_overlay import (
                 apply_to_record as _gs_apply,
             )
+            from game_state_overlay import (  # type: ignore  # noqa: PLC0415
+                load as _gs_load,
+            )
+            from game_state_overlay import (
+                lookup_at_ms as _gs_lookup,
+            )
+
             samples = _gs_load(game_state_jsonl)
             if samples:
                 # records have "frame" and our fps; compute frame_ms per record
@@ -842,9 +848,8 @@ def adapt_phase1_to_buyer_spec(
             # fail-soft per iron-law-1: never break the pipeline because
             # the overlay had a hiccup. Log + fall through.
             import logging as _logging  # noqa: PLC0415
-            _logging.getLogger(__name__).warning(
-                "game_state_overlay failed (non-fatal): %s", _e
-            )
+
+            _logging.getLogger(__name__).warning("game_state_overlay failed (non-fatal): %s", _e)
 
     (output_dir / ACTION_CAMERA_FILENAME).write_text(
         json.dumps(records, indent=2) + "\n", encoding="utf-8"
@@ -856,6 +861,7 @@ def adapt_phase1_to_buyer_spec(
     # `recordedAt` is generated NOW from system clock — real timestamp, not
     # a placeholder constant.
     import datetime as _dt  # noqa: PLC0415
+
     game_name = "Minecraft"
     systeminfo = {
         "gameProcessName": game_name,
@@ -864,7 +870,9 @@ def adapt_phase1_to_buyer_spec(
         "width": DEFAULT_VIDEO_WIDTH,
         "height": DEFAULT_VIDEO_HEIGHT,
         "recordDpi": 1.0,
-        "recordedAt": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "recordedAt": _dt.datetime.now(_dt.timezone.utc)
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z"),
         "recorderVersion": "phase1-buyer-spec-adapter-v1",
     }
     (output_dir / SYSTEMINFO_FILENAME).write_text(

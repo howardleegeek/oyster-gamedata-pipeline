@@ -12,6 +12,7 @@ Six fixtures cover:
 5. ABSTAIN — frame has no session_id field (legacy data).
 6. ABSTAIN — manifest session_id is the empty string.
 """
+
 from __future__ import annotations
 
 import json

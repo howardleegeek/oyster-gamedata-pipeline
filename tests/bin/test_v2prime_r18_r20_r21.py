@@ -3,6 +3,7 @@
 Mirrors V₁ test cases. V₂' returns dict shape (not ResidualResult);
 ABSTAIN encoded as passed=False, residual=NaN, note prefix 'ABSTAIN:'.
 """
+
 from __future__ import annotations
 
 import json
@@ -10,12 +11,13 @@ import math
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from bin.v2prime_glm_residuals import (
     r18_session_manifest,
-    r20a_quat_norm_distribution, r20b_mouse_dx_cumulative,
-    r20c_fps_jitter, r20d_speed_profile, r20e_yaw_turn_rate,
+    r20a_quat_norm_distribution,
+    r20b_mouse_dx_cumulative,
+    r20c_fps_jitter,
+    r20d_speed_profile,
+    r20e_yaw_turn_rate,
     r21_monotonic_frame,
 )
 
@@ -30,17 +32,22 @@ def _ts(i: int, fps: float = 30.0) -> str:
 
 def _honest_records(n: int = 100) -> list[dict]:
     """N frames: unit quaternion, near-zero mouse, 30fps, low speed, low yaw rate."""
-    return [{
-        "frame": i,
-        "time": _ts(i),
-        "fps": 30.0,
-        "camera_rotation_quaternion": [0.0, 0.0, 0.0, 1.0],
-        "camera_rotation_oula": [0.0, i * 0.1, 0.0],
-        "camera_position": [i * 0.01, 0.0, 0.0],
-        "camera_speed": [1.0, 0.0, 0.0],
-        "mouse_x": [0.5 + i * 0.0001], "mouse_y": [0.5],
-        "mouse_dx": [0.0001], "mouse_dy": [0.0],
-    } for i in range(n)]
+    return [
+        {
+            "frame": i,
+            "time": _ts(i),
+            "fps": 30.0,
+            "camera_rotation_quaternion": [0.0, 0.0, 0.0, 1.0],
+            "camera_rotation_oula": [0.0, i * 0.1, 0.0],
+            "camera_position": [i * 0.01, 0.0, 0.0],
+            "camera_speed": [1.0, 0.0, 0.0],
+            "mouse_x": [0.5 + i * 0.0001],
+            "mouse_y": [0.5],
+            "mouse_dx": [0.0001],
+            "mouse_dy": [0.0],
+        }
+        for i in range(n)
+    ]
 
 
 # ── R18 ────────────────────────────────────────────────────────────

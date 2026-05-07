@@ -4,6 +4,7 @@ Closes critical-gap coverage on B-01 (self-consistent Hamilton oula+quat
 swap) and B-03 (coordinated keyCode + inputs.jsonl W→B swap) per
 ``docs/SPEC_V4_BUYER_SIGNED_PROTOCOL.md`` § 5.
 """
+
 from __future__ import annotations
 
 import json
@@ -55,8 +56,11 @@ class TestV4BuyerSigned(unittest.TestCase):
         self.env = mock.patch.dict(os.environ, {"BUYER_SHARED_SECRET": SECRET})
         self.env.start()
         self.snapshots = [
-            _frame(0), _frame(142), _frame(2700, key=87, oula=(0.0, 1.5, 0.0)),
-            _frame(4500), _frame(8999),
+            _frame(0),
+            _frame(142),
+            _frame(2700, key=87, oula=(0.0, 1.5, 0.0)),
+            _frame(4500),
+            _frame(8999),
         ]
         self.ref_path = _make_reference(self.snapshots)
 
@@ -103,7 +107,8 @@ class TestV4BuyerSigned(unittest.TestCase):
         broken.pop("signature")
         # File missing required signature key → schema_mismatch ABSTAIN
         bad = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
-        bad.write(json.dumps(broken)); bad.close()
+        bad.write(json.dumps(broken))
+        bad.close()
         try:
             r = v4_buyer_reference_diff(self.snapshots[1], buyer_reference_path=bad.name)
             self.assertFalse(r.passed)
@@ -115,7 +120,8 @@ class TestV4BuyerSigned(unittest.TestCase):
         tampered = json.loads(self.ref_path.read_text())
         tampered["signature"] = "deadbeef" * 8
         bad = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
-        bad.write(json.dumps(tampered)); bad.close()
+        bad.write(json.dumps(tampered))
+        bad.close()
         try:
             r = v4_buyer_reference_diff(self.snapshots[1], buyer_reference_path=bad.name)
             self.assertFalse(r.passed)

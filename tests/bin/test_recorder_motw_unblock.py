@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
 from unittest import mock
-
-import pytest
 
 from bin import recorder_motw_unblock as motw
 
@@ -72,6 +68,8 @@ class TestMain:
     def test_exit_0_when_no_motw(self, tmp_path):
         target = tmp_path / "clean.exe"
         target.write_bytes(b"MZ")
-        with mock.patch.object(motw, "is_windows", return_value=True), \
-                mock.patch.object(motw, "has_motw", return_value=False):
+        with (
+            mock.patch.object(motw, "is_windows", return_value=True),
+            mock.patch.object(motw, "has_motw", return_value=False),
+        ):
             assert motw.main([str(target)]) == 0

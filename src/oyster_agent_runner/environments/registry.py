@@ -190,6 +190,7 @@ def reset_registry() -> None:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main(argv: Optional[List[str]] = None) -> int:
     """CLI entry-point for the environment registry."""
     import argparse

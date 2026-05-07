@@ -10,6 +10,7 @@ ships. Either side can be the source of truth as long as they agree.
 Reads the Java file as text (no JVM needed) and the Python module via import,
 then asserts the canonical field set is identical.
 """
+
 from __future__ import annotations
 
 import re
@@ -26,10 +27,17 @@ import game_state_overlay  # noqa: E402
 EXPECTED_FIELDS = {
     "tick",
     "timestamp_ms",
-    "x", "y", "z",
-    "yaw_deg", "pitch_deg",
-    "look_x", "look_y", "look_z",
-    "velocity_x", "velocity_y", "velocity_z",
+    "x",
+    "y",
+    "z",
+    "yaw_deg",
+    "pitch_deg",
+    "look_x",
+    "look_y",
+    "look_z",
+    "velocity_x",
+    "velocity_y",
+    "velocity_z",
     "on_ground",
     "sneaking",
     "sprinting",
@@ -40,8 +48,17 @@ EXPECTED_FIELDS = {
 
 def _java_field_set() -> set[str]:
     """Parse the JSON keys actually emitted by GameStateSample.toJsonLine."""
-    java = (REPO_ROOT / "mc-mod" / "src" / "main" / "java" / "world" / "oyster"
-            / "recorder" / "GameStateSample.java").read_text()
+    java = (
+        REPO_ROOT
+        / "mc-mod"
+        / "src"
+        / "main"
+        / "java"
+        / "world"
+        / "oyster"
+        / "recorder"
+        / "GameStateSample.java"
+    ).read_text()
     # Match every appendKv*(sb, "key", ...) call inside toJsonLine.
     keys = re.findall(r'appendKv\w*\(sb,\s*"([^"]+)",', java)
     return set(keys)
@@ -49,9 +66,11 @@ def _java_field_set() -> set[str]:
 
 def _python_field_set() -> set[str]:
     """The field set apply_to_record + lookup_at_ms read from a sample."""
-    fn_src = "\n".join([
-        Path(game_state_overlay.__file__).read_text(),
-    ])
+    fn_src = "\n".join(
+        [
+            Path(game_state_overlay.__file__).read_text(),
+        ]
+    )
     # Heuristic: every sample["FIELD"] or sample.get("FIELD", ...) in the module.
     direct = set(re.findall(r'sample\["([^"]+)"\]', fn_src))
     indirect = set(re.findall(r'sample\.get\("([^"]+)"', fn_src))
@@ -105,9 +124,14 @@ def test_lookup_at_ms_returns_expected_fields():
 
     # All overridden fields MUST be present after apply.
     for k in [
-        "camera_position", "camera_rotation_oula", "camera_rotation_quaternion",
-        "camera_Follow Offset", "camera_speed",
-        "player_position", "player_rotation_oula", "player_rotation_quaternion",
+        "camera_position",
+        "camera_rotation_oula",
+        "camera_rotation_quaternion",
+        "camera_Follow Offset",
+        "camera_speed",
+        "player_position",
+        "player_rotation_oula",
+        "player_rotation_quaternion",
         "player_speed",
         "_real_game_state",
     ]:

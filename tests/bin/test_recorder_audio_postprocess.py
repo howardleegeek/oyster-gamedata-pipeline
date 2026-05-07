@@ -6,7 +6,6 @@ from __future__ import annotations
 import json
 import os
 import sys
-import tempfile
 from pathlib import Path
 from unittest import mock
 
@@ -14,9 +13,7 @@ import pytest
 
 sys.path.insert(
     0,
-    os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    ),
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
 )
 
 from bin.recorder_audio_postprocess import (  # noqa: E402
@@ -66,12 +63,15 @@ def test_postprocess_clip_pipeline(tmp_path: Path) -> None:
         Path(out_wav).write_bytes(b"RIFF\x00\x00\x00\x00WAVEfmt ")
         return Path(out_wav)
 
-    with mock.patch(
-        "bin.recorder_audio_postprocess.extract_audio_track",
-        side_effect=_fake_ffmpeg,
-    ), mock.patch(
-        "bin.recorder_audio_postprocess.run_event_classifier",
-        return_value=fake_events,
+    with (
+        mock.patch(
+            "bin.recorder_audio_postprocess.extract_audio_track",
+            side_effect=_fake_ffmpeg,
+        ),
+        mock.patch(
+            "bin.recorder_audio_postprocess.run_event_classifier",
+            return_value=fake_events,
+        ),
     ):
         out = postprocess_clip(tmp_path, frame_ms=50)
 
@@ -93,9 +93,7 @@ def test_run_event_classifier_calls_process_audio(tmp_path: Path) -> None:
     wav = tmp_path / "audio.wav"
     wav.write_bytes(b"x")
     sentinel = {"frames": []}
-    with mock.patch(
-        "bin.audio_event_track.process_audio", return_value=sentinel
-    ) as patched:
+    with mock.patch("bin.audio_event_track.process_audio", return_value=sentinel) as patched:
         out = run_event_classifier(wav, frame_ms=25)
     assert out is sentinel
     patched.assert_called_once()

@@ -5,6 +5,7 @@ duplicated. R09 / R13 only inspect single-record semantics, so a swap of
 frames 4 ↔ 5 in the stream silently passes them. R21 enforces the global
 ordering invariant on adjacent pairs.
 """
+
 from __future__ import annotations
 
 import math

@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import json
 import math
-import struct
 from pathlib import Path
 
 import pytest
@@ -31,10 +30,8 @@ Imath = pytest.importorskip("Imath")
 
 from bin.depth_from_mineflayer_raycast import (
     DEFAULT_MAX_DEPTH_M,
-    GROUND_Y,
     render_depth_for_session,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -157,9 +154,9 @@ class TestHappyPathLookingDown:
         # Sky should be impossible (camera looks down) — every pixel should
         # have hit the ground within ``max_depth``. The diagonal corners go
         # at an angle, so they hit slightly farther — but never max_depth.
-        assert (depth < DEFAULT_MAX_DEPTH_M).all(), (
-            "every pixel should hit the ground when looking straight down"
-        )
+        assert (
+            depth < DEFAULT_MAX_DEPTH_M
+        ).all(), "every pixel should hit the ground when looking straight down"
 
 
 class TestBotLookingHorizontally:
@@ -318,6 +315,6 @@ class TestStationaryBotEmitsIdenticalFrames:
 
         # All three frames captured identical pose → identical depth →
         # identical EXR bytes → identical sha256.
-        assert len(set(hashes.values())) == 1, (
-            "stationary bot should yield byte-identical depth EXRs"
-        )
+        assert (
+            len(set(hashes.values())) == 1
+        ), "stationary bot should yield byte-identical depth EXRs"

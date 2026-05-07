@@ -13,9 +13,7 @@ import pytest
 
 sys.path.insert(
     0,
-    os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    ),
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
 )
 
 from bin.recorder_replay_mod_installer import (  # noqa: E402
@@ -113,8 +111,8 @@ def test_install_full_with_mocks(tmp_path: Path) -> None:
     """Mocked end-to-end: index fetch + jar download + doc emit."""
     fake_index = [{"mc_version": "1.20.1", "mod_version": "2.6.20", "url": "u"}]
 
-    fake_jar = tmp_path / "mods" / JAR_NAME_TEMPLATE.format(
-        mc_version="1.20.1", mod_version="2.6.20"
+    fake_jar = (
+        tmp_path / "mods" / JAR_NAME_TEMPLATE.format(mc_version="1.20.1", mod_version="2.6.20")
     )
 
     def _fake_download(release, mods_dir, **kw):
@@ -122,10 +120,11 @@ def test_install_full_with_mocks(tmp_path: Path) -> None:
         fake_jar.write_bytes(b"jar")
         return fake_jar
 
-    with mock.patch(
-        "bin.recorder_replay_mod_installer.fetch_release_index", return_value=fake_index
-    ), mock.patch(
-        "bin.recorder_replay_mod_installer.download_jar", side_effect=_fake_download
+    with (
+        mock.patch(
+            "bin.recorder_replay_mod_installer.fetch_release_index", return_value=fake_index
+        ),
+        mock.patch("bin.recorder_replay_mod_installer.download_jar", side_effect=_fake_download),
     ):
         summary = install(
             repo_root=tmp_path,
@@ -142,9 +141,12 @@ def test_install_full_with_mocks(tmp_path: Path) -> None:
 def test_main_dry_run_returns_zero(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     rc = main(
         [
-            "--mc-version", "1.20.1",
-            "--repo-root", str(tmp_path),
-            "--mods-dir", str(tmp_path / "mods"),
+            "--mc-version",
+            "1.20.1",
+            "--repo-root",
+            str(tmp_path),
+            "--mods-dir",
+            str(tmp_path / "mods"),
             "--dry-run",
         ]
     )

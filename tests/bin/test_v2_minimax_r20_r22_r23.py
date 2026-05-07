@@ -2,6 +2,7 @@
 
 Mirrors V₁ scenarios. Dict return shape; ABSTAIN: passed=False, residual=NaN.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -31,16 +32,18 @@ def _baseline(n=N, fps=30.0, yaw_step=0.1):
     out = []
     for i in range(n):
         t = T0 + timedelta(seconds=i * dt)
-        out.append({
-            "frame": i, "fps": fps,
-            "time": t.strftime("%Y-%m-%d %H:%M:%S.")
-                    + f"{t.microsecond // 1000:03d}000",
-            "camera_rotation_quaternion": [0.0, 0.0, 0.0, 1.0],
-            "camera_rotation_oula": [0.0, i * yaw_step, 0.0],
-            "camera_speed": [0.5, 0.0, 0.0],
-            "mouse_x": [0.5 + i * 1e-6],
-            "mouse_dx": [1e-6],
-        })
+        out.append(
+            {
+                "frame": i,
+                "fps": fps,
+                "time": t.strftime("%Y-%m-%d %H:%M:%S.") + f"{t.microsecond // 1000:03d}000",
+                "camera_rotation_quaternion": [0.0, 0.0, 0.0, 1.0],
+                "camera_rotation_oula": [0.0, i * yaw_step, 0.0],
+                "camera_speed": [0.5, 0.0, 0.0],
+                "mouse_x": [0.5 + i * 1e-6],
+                "mouse_dx": [1e-6],
+            }
+        )
     return out
 
 
@@ -88,8 +91,13 @@ class TestV2R20Adversarial(unittest.TestCase):
 
 class TestV2R20Abstain(unittest.TestCase):
     def test_empty_records(self):
-        for fn in (r20a_quat_norm_distribution, r20b_mouse_dx_cumulative,
-                   r20c_fps_jitter, r20d_speed_profile, r20e_yaw_turn_rate):
+        for fn in (
+            r20a_quat_norm_distribution,
+            r20b_mouse_dx_cumulative,
+            r20c_fps_jitter,
+            r20d_speed_profile,
+            r20e_yaw_turn_rate,
+        ):
             r = fn([])
             self.assertFalse(r["passed"])
             self.assertTrue(math.isnan(r["residual"]))

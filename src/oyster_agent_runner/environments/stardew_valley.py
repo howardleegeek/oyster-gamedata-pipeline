@@ -34,7 +34,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -173,9 +173,7 @@ class SMAPIRelayClient:
             raise ConnectionError(f"GET {url} failed: {exc}") from exc
         return json.loads(body)
 
-    def _post_json(
-        self, url: str, payload: bytes
-    ) -> Dict[str, Any]:
+    def _post_json(self, url: str, payload: bytes) -> Dict[str, Any]:
         """Perform a POST request with a JSON body and return parsed JSON."""
         req = urllib.request.Request(url, data=payload, method="POST")
         req.add_header("Content-Type", "application/json")
@@ -225,10 +223,12 @@ class StardewValleyEnv:
         self._frame_count = 0
         self._running = True
         self._last_state = self._client.get_state()
-        logger.info("StardewValleyEnv reset – map=%s pos=(%.1f, %.1f)",
-                     self._last_state.map_name,
-                     self._last_state.x,
-                     self._last_state.y)
+        logger.info(
+            "StardewValleyEnv reset – map=%s pos=(%.1f, %.1f)",
+            self._last_state.map_name,
+            self._last_state.x,
+            self._last_state.y,
+        )
         return self._last_state
 
     def step(self) -> PlayerState:

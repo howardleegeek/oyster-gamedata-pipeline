@@ -12,9 +12,7 @@ import pytest
 
 sys.path.insert(
     0,
-    os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    ),
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
 )
 
 from bin.recorder_window_capture_helper import (  # noqa: E402
@@ -50,9 +48,7 @@ def test_find_window_case_insensitive() -> None:
         WindowRect("Minecraft 1.20.1", 100, 0, 0, 1920, 1080),
         WindowRect("Discord", 200, 0, 0, 800, 600),
     ]
-    with mock.patch(
-        "bin.recorder_window_capture_helper.enumerate_windows", return_value=fake
-    ):
+    with mock.patch("bin.recorder_window_capture_helper.enumerate_windows", return_value=fake):
         assert find_window("MINECRAFT").hwnd == 100
         assert find_window("discord").hwnd == 200
         assert find_window("notepad") is None
@@ -67,10 +63,9 @@ def test_build_window_args_non_windows_raises() -> None:
 
 def test_build_window_args_with_match() -> None:
     fake = WindowRect("Minecraft", 1, 100, 200, 1300, 920)
-    with mock.patch(
-        "bin.recorder_window_capture_helper.is_windows", return_value=True
-    ), mock.patch(
-        "bin.recorder_window_capture_helper.find_window", return_value=fake
+    with (
+        mock.patch("bin.recorder_window_capture_helper.is_windows", return_value=True),
+        mock.patch("bin.recorder_window_capture_helper.find_window", return_value=fake),
     ):
         args, rect = build_window_args("Minecraft", framerate=60)
     assert rect == fake
@@ -83,10 +78,9 @@ def test_build_window_args_with_match() -> None:
 
 
 def test_build_window_args_no_match_raises() -> None:
-    with mock.patch(
-        "bin.recorder_window_capture_helper.is_windows", return_value=True
-    ), mock.patch(
-        "bin.recorder_window_capture_helper.find_window", return_value=None
+    with (
+        mock.patch("bin.recorder_window_capture_helper.is_windows", return_value=True),
+        mock.patch("bin.recorder_window_capture_helper.find_window", return_value=None),
     ):
         with pytest.raises(LookupError):
             build_window_args("nope")
@@ -94,10 +88,9 @@ def test_build_window_args_no_match_raises() -> None:
 
 def test_build_window_args_zero_area_raises() -> None:
     bad = WindowRect("Minimised", 1, 0, 0, 0, 0)
-    with mock.patch(
-        "bin.recorder_window_capture_helper.is_windows", return_value=True
-    ), mock.patch(
-        "bin.recorder_window_capture_helper.find_window", return_value=bad
+    with (
+        mock.patch("bin.recorder_window_capture_helper.is_windows", return_value=True),
+        mock.patch("bin.recorder_window_capture_helper.find_window", return_value=bad),
     ):
         with pytest.raises(ValueError):
             build_window_args("Minimised")

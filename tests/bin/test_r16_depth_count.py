@@ -3,6 +3,7 @@
 Spec: docs/SPEC_R13_MULTIMODAL.md § R16. Covers PASS, ±2 boundary, FAIL,
 and the two IL10 ABSTAIN gates (missing depth_dir, missing duration).
 """
+
 from __future__ import annotations
 
 import math

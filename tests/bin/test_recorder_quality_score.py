@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from unittest import mock
 
 import pytest
 
@@ -18,8 +16,7 @@ def clip_dir(tmp_path):
     d.mkdir()
     payload = {
         "actions": [{"value": i} for i in range(20)],
-        "camera": [{"x": i * 0.1, "y": i * 0.1, "z": i * 0.05}
-                    for i in range(20)],
+        "camera": [{"x": i * 0.1, "y": i * 0.1, "z": i * 0.05} for i in range(20)],
     }
     (d / "action_camera.json").write_text(json.dumps(payload))
     return d
@@ -51,26 +48,35 @@ class TestComputeScore:
 
     def test_low_entropy_only(self):
         score, farming = qs.compute_score(
-            {"anomalies": ["low_action_entropy:1.0<2.0"], "metrics": {}})
+            {"anomalies": ["low_action_entropy:1.0<2.0"], "metrics": {}}
+        )
         assert score == 6.0
         assert farming is False
 
     def test_low_entropy_and_variance_means_farming(self):
-        score, farming = qs.compute_score({
-            "anomalies": ["low_action_entropy:0.5<2.0",
-                          "low_camera_variance:0.1<0.5"],
-            "metrics": {},
-        })
+        score, farming = qs.compute_score(
+            {
+                "anomalies": ["low_action_entropy:0.5<2.0", "low_camera_variance:0.1<0.5"],
+                "metrics": {},
+            }
+        )
         assert score == 3.0
         assert farming is True
 
     def test_score_clamped_to_zero(self):
-        score, _ = qs.compute_score({
-            "anomalies": ["low_action_entropy:0.5",
-                          "low_camera_variance:0.1",
-                          "other1", "other2", "other3", "other4"],
-            "metrics": {},
-        })
+        score, _ = qs.compute_score(
+            {
+                "anomalies": [
+                    "low_action_entropy:0.5",
+                    "low_camera_variance:0.1",
+                    "other1",
+                    "other2",
+                    "other3",
+                    "other4",
+                ],
+                "metrics": {},
+            }
+        )
         assert score == 0.0
 
 
@@ -85,8 +91,7 @@ class TestBuildClipData:
 class TestScoreClip:
     def test_writes_payload_with_required_fields(self, clip_dir):
         payload = qs.score_clip(clip_dir)
-        for key in ("clip_id", "score", "farming_detected",
-                    "anomalies", "metrics", "scored_at"):
+        for key in ("clip_id", "score", "farming_detected", "anomalies", "metrics", "scored_at"):
             assert key in payload, f"missing key {key}"
         assert 0.0 <= payload["score"] <= 10.0
 

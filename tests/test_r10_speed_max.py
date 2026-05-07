@@ -3,6 +3,7 @@
 Generated 2026-05-06 via dispatch_qwen_to_minipc.sh.
 Verified 10/10 PASS on minipc-bwdxs WSL pytest.
 """
+
 import math
 
 import pytest

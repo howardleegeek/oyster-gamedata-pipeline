@@ -3,6 +3,7 @@
 Mocks ``subprocess.run`` and ``shutil.which`` so the tests run on any
 host without ffprobe installed and without touching real video files.
 """
+
 from __future__ import annotations
 
 import json
@@ -40,10 +41,16 @@ class TestR15FpsConsistency(unittest.TestCase):
 
     def test_pass_when_30_over_1_matches_declared_30(self) -> None:
         rec = {"fps": 30}
-        with patch("bin.v1_claude_residuals.r15_fps_consistency.shutil.which",
-                   return_value="/usr/bin/ffprobe"), \
-             patch("bin.v1_claude_residuals.r15_fps_consistency.subprocess.run",
-                   return_value=_FakeCompleted(_ffprobe_stdout("30/1"))):
+        with (
+            patch(
+                "bin.v1_claude_residuals.r15_fps_consistency.shutil.which",
+                return_value="/usr/bin/ffprobe",
+            ),
+            patch(
+                "bin.v1_claude_residuals.r15_fps_consistency.subprocess.run",
+                return_value=_FakeCompleted(_ffprobe_stdout("30/1")),
+            ),
+        ):
             res = r15_fps_consistency(rec, self.video_path)
         self.assertTrue(res.passed, msg=res.note)
         self.assertAlmostEqual(res.residual, 0.0, places=6)
@@ -51,10 +58,16 @@ class TestR15FpsConsistency(unittest.TestCase):
 
     def test_pass_ntsc_2997_tolerance_against_declared_30(self) -> None:
         rec = {"fps": 30}
-        with patch("bin.v1_claude_residuals.r15_fps_consistency.shutil.which",
-                   return_value="/usr/bin/ffprobe"), \
-             patch("bin.v1_claude_residuals.r15_fps_consistency.subprocess.run",
-                   return_value=_FakeCompleted(_ffprobe_stdout("30000/1001"))):
+        with (
+            patch(
+                "bin.v1_claude_residuals.r15_fps_consistency.shutil.which",
+                return_value="/usr/bin/ffprobe",
+            ),
+            patch(
+                "bin.v1_claude_residuals.r15_fps_consistency.subprocess.run",
+                return_value=_FakeCompleted(_ffprobe_stdout("30000/1001")),
+            ),
+        ):
             res = r15_fps_consistency(rec, self.video_path)
         self.assertTrue(res.passed, msg=res.note)
         # 30 - 29.970029... ≈ 0.030
@@ -62,10 +75,16 @@ class TestR15FpsConsistency(unittest.TestCase):
 
     def test_fail_when_25_against_declared_30(self) -> None:
         rec = {"fps": 30}
-        with patch("bin.v1_claude_residuals.r15_fps_consistency.shutil.which",
-                   return_value="/usr/bin/ffprobe"), \
-             patch("bin.v1_claude_residuals.r15_fps_consistency.subprocess.run",
-                   return_value=_FakeCompleted(_ffprobe_stdout("25/1"))):
+        with (
+            patch(
+                "bin.v1_claude_residuals.r15_fps_consistency.shutil.which",
+                return_value="/usr/bin/ffprobe",
+            ),
+            patch(
+                "bin.v1_claude_residuals.r15_fps_consistency.subprocess.run",
+                return_value=_FakeCompleted(_ffprobe_stdout("25/1")),
+            ),
+        ):
             res = r15_fps_consistency(rec, self.video_path)
         self.assertFalse(res.passed)
         self.assertAlmostEqual(res.residual, 5.0, places=6)

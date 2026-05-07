@@ -25,10 +25,9 @@ import math
 import os
 import struct
 import sys
-import tempfile
 import time
-from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import asdict, dataclass, field
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +35,11 @@ logger = logging.getLogger(__name__)
 # Data models
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Vector3:
     """Simple 3-D vector."""
+
     x: float = 0.0
     y: float = 0.0
     z: float = 0.0
@@ -47,12 +48,13 @@ class Vector3:
         return [self.x, self.y, self.z]
 
     def length(self) -> float:
-        return math.sqrt(self.x ** 2 + self.y ** 2 + self.z ** 2)
+        return math.sqrt(self.x**2 + self.y**2 + self.z**2)
 
 
 @dataclass
 class Quaternion:
     """Unit quaternion (w, x, y, z)."""
+
     w: float = 1.0
     x: float = 0.0
     y: float = 0.0
@@ -64,14 +66,14 @@ class Quaternion:
     def to_euler(self) -> Vector3:
         """Convert quaternion to Euler angles (roll, pitch, yaw) in degrees."""
         sinr_cosp = 2.0 * (self.w * self.x + self.y * self.z)
-        cosr_cosp = 1.0 - 2.0 * (self.x ** 2 + self.y ** 2)
+        cosr_cosp = 1.0 - 2.0 * (self.x**2 + self.y**2)
         roll = math.atan2(sinr_cosp, cosr_cosp)
 
         sinp = 2.0 * (self.w * self.y - self.z * self.x)
         pitch = math.asin(max(-1.0, min(1.0, sinp)))
 
         siny_cosp = 2.0 * (self.w * self.z + self.x * self.y)
-        cosy_cosp = 1.0 - 2.0 * (self.y ** 2 + self.z ** 2)
+        cosy_cosp = 1.0 - 2.0 * (self.y**2 + self.z**2)
         yaw = math.atan2(siny_cosp, cosy_cosp)
 
         return Vector3(
@@ -84,6 +86,7 @@ class Quaternion:
 @dataclass
 class CameraState:
     """6-DoF camera snapshot."""
+
     position: Vector3 = field(default_factory=Vector3)
     rotation: Quaternion = field(default_factory=Quaternion)
     fov_horizontal: float = 0.0
@@ -98,6 +101,7 @@ class CameraState:
 @dataclass
 class PlayerState:
     """Player pose and kinematics."""
+
     position: Vector3 = field(default_factory=Vector3)
     rotation: Quaternion = field(default_factory=Quaternion)
     velocity: Vector3 = field(default_factory=Vector3)
@@ -120,6 +124,7 @@ class PlayerState:
 @dataclass
 class DayNightState:
     """In-game day / night cycle parameters."""
+
     game_hour: float = 0.0
     game_minute: float = 0.0
     day_progress: float = 0.0  # 0.0 = midnight, 0.5 = noon
@@ -140,6 +145,7 @@ class DayNightState:
 @dataclass
 class GameSnapshot:
     """Full game-state snapshot."""
+
     timestamp: float = 0.0
     frame_id: int = 0
     camera: CameraState = field(default_factory=CameraState)
@@ -244,8 +250,8 @@ class CETWebSocketClient:
             ) from exc
 
         # Websocket handshake
-        import hashlib
         import base64
+
         key = base64.b64encode(os.urandom(16)).decode()
         handshake = (
             f"GET / HTTP/1.1\r\n"
@@ -259,9 +265,7 @@ class CETWebSocketClient:
         self._writer.write(handshake.encode())
         await self._writer.drain()
 
-        response = await asyncio.wait_for(
-            self._reader.readuntil(b"\r\n\r\n"), timeout=timeout
-        )
+        response = await asyncio.wait_for(self._reader.readuntil(b"\r\n\r\n"), timeout=timeout)
         if b"101" not in response:
             self.close()
             raise ConnectionError(f"Websocket handshake failed: {response.decode()}")
@@ -357,6 +361,7 @@ class CETWebSocketClient:
 # Snapshot builder
 # ---------------------------------------------------------------------------
 
+
 def _parse_vector3(data: Optional[Dict[str, float]]) -> Vector3:
     if data is None:
         return Vector3()
@@ -422,13 +427,10 @@ async def capture_snapshot(
             snapshot.day_night.game_minute = float(dn_data.get("minute", 0))
             snapshot.day_night.day_progress = float(dn_data.get("progress", 0))
             snapshot.day_night.is_night = (
-                snapshot.day_night.game_hour >= 20
-                or snapshot.day_night.game_hour < 6
+                snapshot.day_night.game_hour >= 20 or snapshot.day_night.game_hour < 6
             )
             snapshot.day_night.weather_id = str(dn_data.get("weather_id", ""))
-            snapshot.day_night.weather_intensity = float(
-                dn_data.get("weather_intensity", 0)
-            )
+            snapshot.day_night.weather_intensity = float(dn_data.get("weather_intensity", 0))
             snapshot.raw_lua["day_night"] = dn_data
     except Exception as exc:
         logger.error("Day-night capture failed: %s", exc)
@@ -439,6 +441,7 @@ async def capture_snapshot(
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the argument parser for the CP2077 extractor CLI."""
@@ -476,7 +479,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Seconds between snapshots (default: 0)",
     )
     parser.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Enable debug logging",
     )

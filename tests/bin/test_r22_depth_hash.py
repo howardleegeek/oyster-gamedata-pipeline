@@ -5,6 +5,7 @@ attack residuals (content-modified, file-missing), the manifest-as-
 authoritative semantics (extra unlisted file ⇒ PASS), and the two
 IL10 ABSTAIN gates (missing depth_dir, missing manifest_path).
 """
+
 from __future__ import annotations
 
 import hashlib

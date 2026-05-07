@@ -43,10 +43,8 @@ from __future__ import annotations
 
 import json
 import math
-import os
 import sys
 import tarfile
-import time
 from pathlib import Path
 from typing import Any
 
@@ -60,7 +58,6 @@ if str(_REPO_ROOT) not in sys.path:
 from bin.recorder_test_harness import (  # noqa: E402
     ACTION_CAMERA_FIELDS,
     DEFAULT_INTRINSICS,
-    FPS_DEFAULT,
     SCREEN_H,
     SCREEN_W,
     build_replay_camera_samples,
@@ -71,7 +68,6 @@ from bin.recorder_test_harness import (  # noqa: E402
     package_tarball,
     synthesize_action_camera_records,
 )
-
 
 # ---------------------------------------------------------------------------
 # Constants — tied to PRD acceptance gates.
@@ -96,12 +92,14 @@ QUAT_NORM_TOL = 1e-3
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def fixed_started_at() -> float:
     """A deterministic start timestamp so frame ``time`` strings are reproducible."""
     # 2026-05-05 12:00:00 local — concrete and far enough in the past
     # that it will not collide with other test fixtures.
     import datetime as _dt
+
     return _dt.datetime(2026, 5, 5, 12, 0, 0).timestamp()
 
 
@@ -135,9 +133,7 @@ def synthetic_events() -> list[dict[str, Any]]:
     # Mouse start at center, +5px every 100ms.
     cx, cy = SCREEN_W // 2, SCREEN_H // 2
     for i in range(1, 50):  # 100ms .. 4900ms
-        events.append(
-            make_mouse_move(timestamp_ms=i * 100, mouse_x=cx + 5 * i, mouse_y=cy)
-        )
+        events.append(make_mouse_move(timestamp_ms=i * 100, mouse_x=cx + 5 * i, mouse_y=cy))
 
     events.append(make_key_event(timestamp_ms=2000, key_code=VK_W, is_down=False))
     return events
@@ -177,6 +173,7 @@ def action_camera_records(packaged_clip) -> list[dict[str, Any]]:
 # Tests — frame count, schema, and per-field correctness
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.integration
 def test_packaging_produces_expected_artefacts(packaged_clip) -> None:
     """All five PRD-shaped artefacts exist after packaging."""
@@ -208,9 +205,7 @@ def test_every_frame_has_all_20_prd_fields(action_camera_records) -> None:
     assert len(ACTION_CAMERA_FIELDS) == 20
     for idx, frame in enumerate(action_camera_records):
         missing = set(ACTION_CAMERA_FIELDS) - set(frame.keys())
-        assert not missing, (
-            f"frame {idx} missing PRD fields: {sorted(missing)}"
-        )
+        assert not missing, f"frame {idx} missing PRD fields: {sorted(missing)}"
 
 
 @pytest.mark.integration
@@ -226,13 +221,11 @@ def test_keycode_is_list_of_int(action_camera_records) -> None:
     pragmatic shape; sample_tarball_builder writes the same)."""
     for idx, rec in enumerate(action_camera_records):
         kc = rec["keyCode"]
-        assert isinstance(kc, list), (
-            f"frame {idx}: keyCode should be list, got {type(kc).__name__}"
-        )
+        assert isinstance(kc, list), f"frame {idx}: keyCode should be list, got {type(kc).__name__}"
         for v in kc:
-            assert isinstance(v, int) and not isinstance(v, bool), (
-                f"frame {idx}: keyCode entries must be int, got {type(v).__name__}"
-            )
+            assert isinstance(v, int) and not isinstance(
+                v, bool
+            ), f"frame {idx}: keyCode entries must be int, got {type(v).__name__}"
 
 
 @pytest.mark.integration
@@ -246,9 +239,7 @@ def test_w_key_present_during_armed_window(action_camera_records) -> None:
     # is materialised the key is gone. Frames 0..59 must contain VK_W.
     for f in range(60):
         kc = action_camera_records[f]["keyCode"]
-        assert VK_W in kc, (
-            f"expected VK_W=87 in frame {f}.keyCode (W held [0,2000ms]), got {kc}"
-        )
+        assert VK_W in kc, f"expected VK_W=87 in frame {f}.keyCode (W held [0,2000ms]), got {kc}"
     # Conversely, W must be released by frame 60 onward.
     for f in range(60, len(action_camera_records)):
         assert VK_W not in action_camera_records[f]["keyCode"], (
@@ -291,16 +282,15 @@ def test_mouse_dx_matches_synthetic_pixel_delta(
         # Either 0 or +5px/SCREEN_W (within float tolerance) — never any
         # other value, because events are 100 ms aligned and 5 px each.
         if abs(dx) > ATOL:
-            assert math.isclose(dx, expected_unit, abs_tol=ATOL), (
-                f"unexpected mouse_dx {dx}; should be 0 or {expected_unit}"
-            )
+            assert math.isclose(
+                dx, expected_unit, abs_tol=ATOL
+            ), f"unexpected mouse_dx {dx}; should be 0 or {expected_unit}"
             nonzero_count += 1
         total_dx += dx
     # 49 events × 5 px / SCREEN_W
     expected_total = 49 * 5.0 / SCREEN_W
     assert math.isclose(total_dx, expected_total, abs_tol=ATOL), (
-        f"sum of mouse_dx={total_dx}, expected {expected_total} "
-        f"(49 moves × 5 px / {SCREEN_W})"
+        f"sum of mouse_dx={total_dx}, expected {expected_total} " f"(49 moves × 5 px / {SCREEN_W})"
     )
     # Sanity: at least one move-frame got recorded.
     assert nonzero_count >= 1
@@ -317,9 +307,7 @@ def test_mouse_x_normalized_and_consistent_with_cumulative_dx(
         # PRD 文件2: mouse_x and mouse_dx are list[float], take element 0.
         mx_raw = rec["mouse_x"]
         mx = mx_raw[0] if isinstance(mx_raw, list) else mx_raw
-        assert 0.0 <= mx <= 1.0, (
-            f"frame {idx}: mouse_x={mx} not in [0,1]"
-        )
+        assert 0.0 <= mx <= 1.0, f"frame {idx}: mouse_x={mx} not in [0,1]"
         dx_raw = rec["mouse_dx"]
         dx = dx_raw[0] if isinstance(dx_raw, list) else dx_raw
         running_x = running_x + dx
@@ -327,8 +315,7 @@ def test_mouse_x_normalized_and_consistent_with_cumulative_dx(
         # frame, so cumulative model gives running_x within ATOL of the
         # frame's mouse_x.
         assert math.isclose(mx, running_x, abs_tol=ATOL), (
-            f"frame {idx}: mouse_x={mx} drifted from cumulative dx model "
-            f"({running_x})"
+            f"frame {idx}: mouse_x={mx} drifted from cumulative dx model " f"({running_x})"
         )
 
 
@@ -338,13 +325,13 @@ def test_quaternion_unit_norm(action_camera_records) -> None:
     for idx, rec in enumerate(action_camera_records):
         for key in ("camera_rotation_quaternion", "player_rotation_quaternion"):
             q = rec[key]
-            assert isinstance(q, list) and len(q) == 4, (
-                f"frame {idx}.{key}: must be a 4-element list"
-            )
+            assert (
+                isinstance(q, list) and len(q) == 4
+            ), f"frame {idx}.{key}: must be a 4-element list"
             norm = math.sqrt(sum(c * c for c in q))
-            assert abs(norm - 1.0) < QUAT_NORM_TOL, (
-                f"frame {idx}.{key}: ‖q‖={norm}, expected 1.0 ± {QUAT_NORM_TOL}"
-            )
+            assert (
+                abs(norm - 1.0) < QUAT_NORM_TOL
+            ), f"frame {idx}.{key}: ‖q‖={norm}, expected 1.0 ± {QUAT_NORM_TOL}"
 
 
 @pytest.mark.integration
@@ -353,9 +340,9 @@ def test_camera_intrinsics_pinhole(action_camera_records) -> None:
     for idx, rec in enumerate(action_camera_records):
         intr = rec["camera_intrinsics"]
         assert isinstance(intr, dict)
-        assert {"fx", "fy", "cx", "cy"}.issubset(intr.keys()), (
-            f"frame {idx}: intrinsics missing fx/fy/cx/cy"
-        )
+        assert {"fx", "fy", "cx", "cy"}.issubset(
+            intr.keys()
+        ), f"frame {idx}: intrinsics missing fx/fy/cx/cy"
         assert math.isclose(intr["fx"], intr["fy"], abs_tol=1e-3), (
             f"frame {idx}: fx={intr['fx']} != fy={intr['fy']} "
             f"(buyer-spec requires pinhole model)"
@@ -374,27 +361,26 @@ def test_route_type_is_int(action_camera_records) -> None:
     """``route_type`` is an int (1/2/3 per BUYER_SPEC L77)."""
     for idx, rec in enumerate(action_camera_records):
         rt = rec["route_type"]
-        assert isinstance(rt, int) and not isinstance(rt, bool), (
-            f"frame {idx}: route_type={rt!r} not int"
-        )
+        assert isinstance(rt, int) and not isinstance(
+            rt, bool
+        ), f"frame {idx}: route_type={rt!r} not int"
         assert rt in (1, 2, 3), f"frame {idx}: route_type={rt} not in 1/2/3"
 
 
 @pytest.mark.integration
-def test_time_field_iso_aligned_to_fps(
-    action_camera_records, fixed_started_at: float
-) -> None:
+def test_time_field_iso_aligned_to_fps(action_camera_records, fixed_started_at: float) -> None:
     """Each frame's ``time`` string parses and is offset by frame/30 s."""
     import datetime as _dt
+
     base = _dt.datetime.fromtimestamp(fixed_started_at)
     for idx, rec in enumerate(action_camera_records):
         t = _dt.datetime.strptime(rec["time"], "%Y-%m-%d %H:%M:%S.%f")
         delta = (t - base).total_seconds()
         expected = idx / FPS
         # Recorder rounds millisecond field, so allow 1 ms slack.
-        assert abs(delta - expected) < 0.002, (
-            f"frame {idx}: time={rec['time']} ⇒ Δ={delta}s, expected {expected}s"
-        )
+        assert (
+            abs(delta - expected) < 0.002
+        ), f"frame {idx}: time={rec['time']} ⇒ Δ={delta}s, expected {expected}s"
 
 
 @pytest.mark.integration
@@ -415,15 +401,15 @@ def test_vector_fields_are_3_or_4_element_lists(action_camera_records) -> None:
     for idx, rec in enumerate(action_camera_records):
         for k in vec3_fields:
             v = rec[k]
-            assert isinstance(v, list) and len(v) == 3, (
-                f"frame {idx}.{k}: expected 3-element list, got {v!r}"
-            )
+            assert (
+                isinstance(v, list) and len(v) == 3
+            ), f"frame {idx}.{k}: expected 3-element list, got {v!r}"
             assert all(isinstance(c, (int, float)) for c in v)
         for k in vec4_fields:
             v = rec[k]
-            assert isinstance(v, list) and len(v) == 4, (
-                f"frame {idx}.{k}: expected 4-element list, got {v!r}"
-            )
+            assert (
+                isinstance(v, list) and len(v) == 4
+            ), f"frame {idx}.{k}: expected 4-element list, got {v!r}"
             assert all(isinstance(c, (int, float)) for c in v)
 
 
@@ -432,14 +418,15 @@ def test_metric_scale_is_positive_float(action_camera_records) -> None:
     """``metric_scale`` is the world:meter ratio — must be a positive float."""
     for idx, rec in enumerate(action_camera_records):
         ms = rec["metric_scale"]
-        assert isinstance(ms, (int, float)) and ms > 0, (
-            f"frame {idx}: metric_scale={ms!r} should be positive number"
-        )
+        assert (
+            isinstance(ms, (int, float)) and ms > 0
+        ), f"frame {idx}: metric_scale={ms!r} should be positive number"
 
 
 # ---------------------------------------------------------------------------
 # Replay Mod path — synthesize a .mcpr fixture, package, assert merged.
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def synthetic_mcpr(tmp_path: Path) -> Path:
@@ -482,8 +469,7 @@ def test_replay_mod_path_fills_camera_pose(
     )
     # Step 2 — confirm the stub ran and reported its synthetic mc version.
     assert result.replay_status in ("stub", "ok"), (
-        f"replay status was {result.replay_status} — pipeline failed to "
-        f"invoke postprocess"
+        f"replay status was {result.replay_status} — pipeline failed to " f"invoke postprocess"
     )
     assert result.replay_metadata.get("mc_version") == "1.20.4"
 
@@ -511,9 +497,7 @@ def test_replay_mod_path_fills_camera_pose(
             nonzero_quat_xyz += 1
         # Quaternion still unit-norm.
         norm = math.sqrt(sum(c * c for c in cq))
-        assert abs(norm - 1.0) < QUAT_NORM_TOL, (
-            f"frame {idx}: post-merge ‖q‖={norm}"
-        )
+        assert abs(norm - 1.0) < QUAT_NORM_TOL, f"frame {idx}: post-merge ‖q‖={norm}"
 
     # Strong assertion: more than half of frames carry real data.
     assert nonzero_pos >= EXPECTED_FRAME_COUNT // 2, (
@@ -543,21 +527,24 @@ def test_replay_mod_no_mcpr_keeps_placeholder_zeros(
         mcpr_path=None,
         clip_ts="20260505-120000-vanilla",
     )
-    assert result.replay_status is None, (
-        "replay postprocess should be skipped entirely without a .mcpr"
-    )
+    assert (
+        result.replay_status is None
+    ), "replay postprocess should be skipped entirely without a .mcpr"
     records = json.loads(result.action_camera_path.read_text(encoding="utf-8"))
     # All camera_position entries are the recorder's [0, 64, 0] placeholder.
     for idx, rec in enumerate(records):
-        assert rec["camera_position"] == [0.0, 64.0, 0.0], (
-            f"frame {idx}: expected vanilla placeholder, got {rec['camera_position']}"
-        )
+        assert rec["camera_position"] == [
+            0.0,
+            64.0,
+            0.0,
+        ], f"frame {idx}: expected vanilla placeholder, got {rec['camera_position']}"
 
 
 # ---------------------------------------------------------------------------
 # Direct unit-style coverage of synthesize_action_camera_records — keeps
 # the harness honest without going through the full tarball path.
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.unit
 def test_synthesize_falls_back_to_9000_when_elapsed_zero(
@@ -577,7 +564,7 @@ def test_synthesize_handles_unsorted_events(fixed_started_at: float) -> None:
     recorder behaviour)."""
     events = [
         make_key_event(2000, VK_W, is_down=False),  # later first
-        make_key_event(0, VK_W, is_down=True),       # earlier second
+        make_key_event(0, VK_W, is_down=True),  # earlier second
     ]
     records = synthesize_action_camera_records(
         events=events, started_at=fixed_started_at, elapsed_sec=ELAPSED_SEC
@@ -589,8 +576,6 @@ def test_synthesize_handles_unsorted_events(fixed_started_at: float) -> None:
 @pytest.mark.unit
 def test_synthesize_default_intrinsics_pinhole() -> None:
     """The hard-coded default intrinsics ALWAYS satisfy fx == fy."""
-    assert math.isclose(
-        DEFAULT_INTRINSICS["fx"], DEFAULT_INTRINSICS["fy"], abs_tol=1e-3
-    )
+    assert math.isclose(DEFAULT_INTRINSICS["fx"], DEFAULT_INTRINSICS["fy"], abs_tol=1e-3)
     assert DEFAULT_INTRINSICS["cx"] == 960.0
     assert DEFAULT_INTRINSICS["cy"] == 540.0

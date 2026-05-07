@@ -95,7 +95,9 @@ def test_authenticate_fails_on_bad_password():
     def mock_recv(size):
         recv_calls.append(size)
         if len(recv_calls) == 1:  # First call gets length
-            return struct.pack("<i", 10)  # Length: id(4) + type(4) + 2 nulls = 10 (empty body) of response packet
+            return struct.pack(
+                "<i", 10
+            )  # Length: id(4) + type(4) + 2 nulls = 10 (empty body) of response packet
         else:  # Second call gets packet data (10 bytes total: 4+4+2)
             # Failure response: id=-1, type=0, body="\x00\x00"
             return struct.pack("<ii", -1, 0) + b"\x00\x00"  # 10 bytes
@@ -125,11 +127,12 @@ def test_spectate_loop_respects_duration():
     # calls time.time() many times, so we tail with itertools.repeat to
     # avoid StopIteration.
     import itertools as _it
+
     time_iter = _it.chain(
-        [0.0],                # start_time = time.time()
-        [1.0, 1.05, 1.1],     # iter 1: elapsed=1.0 (send), then sleep-loop polls
-        [6.0, 6.05, 6.1],     # iter 2: elapsed=6.0 (send), then sleep-loop polls
-        _it.repeat(100.0),    # next elapsed call >> 10 → break
+        [0.0],  # start_time = time.time()
+        [1.0, 1.05, 1.1],  # iter 1: elapsed=1.0 (send), then sleep-loop polls
+        [6.0, 6.05, 6.1],  # iter 2: elapsed=6.0 (send), then sleep-loop polls
+        _it.repeat(100.0),  # next elapsed call >> 10 → break
     )
 
     with patch("time.time", side_effect=time_iter), patch("time.sleep"):

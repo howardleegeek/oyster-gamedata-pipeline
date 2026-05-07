@@ -12,9 +12,7 @@ import pytest
 
 sys.path.insert(
     0,
-    os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    ),
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
 )
 
 from bin.recorder_depth_filler import (  # noqa: E402
@@ -80,10 +78,9 @@ def test_fill_clip_depth_pipeline(tmp_path: Path) -> None:
         Path(depth_dir).mkdir(parents=True, exist_ok=True)
         return 3
 
-    with mock.patch(
-        "bin.recorder_depth_filler.extract_frames", side_effect=_fake_extract
-    ), mock.patch(
-        "bin.recorder_depth_filler.run_depth_inference", side_effect=_fake_inference
+    with (
+        mock.patch("bin.recorder_depth_filler.extract_frames", side_effect=_fake_extract),
+        mock.patch("bin.recorder_depth_filler.run_depth_inference", side_effect=_fake_inference),
     ):
         out = fill_clip_depth(tmp_path, expected_frames=3)
 
