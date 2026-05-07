@@ -59,9 +59,12 @@ packages = ["src/oyster_agent_runner"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-# Add repo-root to sys.path so `from bin.X import Y` works in tests
-# (bin/ is a top-level scripts dir, marked as a package via __init__.py)
-pythonpath = ["."]
+# Add repo-root + src/ to sys.path so both `from bin.X import Y` (top-level
+# scripts dir, marked as package via __init__.py) and `from oyster_agent_runner
+# import ...` (proper Python package under src/) work without an editable
+# install. Without `src`, 20+ tests error with ModuleNotFoundError at
+# collection time even when the package directory is right there.
+pythonpath = [".", "src"]
 addopts = "-ra --strict-markers"
 markers = [
     "unit: fast isolated tests",
