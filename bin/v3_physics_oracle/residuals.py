@@ -272,3 +272,13 @@ def r07_mouse_range_strict(rec: dict) -> OracleResult:
                                 max(abs(dx), abs(dx - 1.0), abs(dx + 1.0)),
                                 f"mouse_d{axis}={dx} outside [-1,1]")
     return OracleResult("R07", Verdict.PASS, "all in spec range", "ok", 0.0)
+
+
+# ---------------------------------------------------------------------------
+# R10 — speed magnitude hard ceiling. Lives in r10_speed_max.py for spec
+# isolation (its own constants table). Re-exported here so the BFT
+# orchestrator's _load("...residuals") + getattr(..., "r10_speed_max") finds
+# it. The late-import is intentional: r10_speed_max.py imports OracleResult
+# and Verdict from this module, which by this line are already defined.
+# ---------------------------------------------------------------------------
+from bin.v3_physics_oracle.r10_speed_max import r10_speed_max  # noqa: E402,F401

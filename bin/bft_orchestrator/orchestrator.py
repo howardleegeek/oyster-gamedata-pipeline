@@ -64,6 +64,9 @@ _V3_RES = [
     ("R07", "r07_mouse_range_strict", False, False),
     ("R08", "r08_intrinsics_symmetric", False, False),
     ("R09", "r09_keycode_vk_known", False, False),
+    # R10: zero-LLM speed magnitude oracle (Aliyun→minipc dispatched 2026-05-06,
+    # 10/10 pytest, lives in r10_speed_max.py, re-exported via residuals.py).
+    ("R10", "r10_speed_max", False, False),
     ("R12", "r12_fps_fixed_30", False, False),
 ]
 

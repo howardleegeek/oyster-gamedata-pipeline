@@ -85,7 +85,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.23.0"
+RECORDER_VERSION = "lite-v0.24.0"
 RELEASES_API = (
     "https://api.github.com/repos/howardleegeek/oyster-gamedata-pipeline"
     "/releases?per_page=20"
