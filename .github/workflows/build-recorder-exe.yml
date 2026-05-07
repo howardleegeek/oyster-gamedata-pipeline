@@ -56,17 +56,34 @@ jobs:
           Invoke-WebRequest -Uri $url -OutFile fabric-installer.jar
           Get-Item fabric-installer.jar | Format-List Length, FullName
 
+      - name: Setup Java 21 for mc-mod build (D15+D16)
+        # Howard 2026-05-07: Minecraft 1.21.4 + Fabric Loom strictly require
+        # Java 21 — the runner's default Java 17 trips a clear error from
+        # Fabric Loom at gradle configure time. setup-java pins to Temurin
+        # 21 same as the standalone build-mc-mod.yml workflow does.
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
       - name: Build Oyster MC mod (D15+D16)
-        # Howard 2026-05-07: build the Fabric mod that captures REAL game
-        # state and bundle it with the .exe. install_fabric_loader.py drops
-        # this jar into MC's mods/ on first launch.
+        # Bootstrap gradle wrapper directly via the gradle binary that
+        # setup-gradle/setup-java install — no chocolatey dance, no version
+        # pinning surprises. Choosing 8.10 explicitly because Fabric Loom
+        # 1.8.x is tested against gradle 8.x; 9.x is too new and still
+        # surfacing edge cases.
         working-directory: mc-mod
         run: |
+          # Bootstrap a gradlew wrapper using the gradle that setup-java
+          # places on PATH (Adoptium ships gradle ~8 with the JDK).
           if (-not (Test-Path gradlew.bat)) {
-            choco install gradle -y --no-progress
+            $gradleZip = "https://services.gradle.org/distributions/gradle-8.10-bin.zip"
+            Invoke-WebRequest -Uri $gradleZip -OutFile gradle.zip
+            Expand-Archive -Path gradle.zip -DestinationPath gradle-tmp -Force
+            $env:PATH = "$pwd\gradle-tmp\gradle-8.10\bin;$env:PATH"
             gradle wrapper --gradle-version 8.10
           }
-          .\gradlew.bat build --no-daemon
+          .\gradlew.bat build --no-daemon --info
           $jar = Get-ChildItem -Path build/libs/oyster-recorder-mod-*.jar `
                  | Where-Object { $_.Name -notmatch 'sources' } `
                  | Select-Object -First 1
