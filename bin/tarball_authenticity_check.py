@@ -99,9 +99,15 @@ def _classify_video(p: Path) -> tuple[str, str]:
 
 
 def _classify_depth_dir(d: Path) -> tuple[str, str]:
-    """Hash all EXR files; if <5% unique → placeholder farm."""
+    """Multi-signal: NOTICE file > content-hash variance > UNKNOWN."""
     if not d.exists() or not d.is_dir():
         return UNKNOWN, "missing"
+    # Howard 2026-05-07: the pipeline's _ensure_placeholders now drops
+    # _PLACEHOLDER_NOTICE.txt when emitting the gradient farm. That file
+    # is the strongest signal — definitive PLACEHOLDER.
+    notice = d / "_PLACEHOLDER_NOTICE.txt"
+    if notice.exists():
+        return PLACEHOLDER, "depth/_PLACEHOLDER_NOTICE.txt present (gradient hardlink farm)"
     exrs = sorted(d.glob("*.exr"))
     if not exrs:
         return PLACEHOLDER, "no EXR files"
