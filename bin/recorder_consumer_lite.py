@@ -85,7 +85,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.24.0"
+RECORDER_VERSION = "lite-v0.25.0-real-depth"
 RELEASES_API = (
     "https://api.github.com/repos/howardleegeek/oyster-gamedata-pipeline"
     "/releases?per_page=20"
@@ -1736,15 +1736,36 @@ class RecorderApp(tk.Tk):
         )
         ggx.write_xlsx(game_info, str(clip_dir / "gameinfo.xlsx"))
 
-        # 5. depth/ — Howard 2026-05-06 Iron Law: NO PLACEHOLDER. Until the
-        # DepthAnything V2 pipeline lands (Track C / spec real_depth_pipeline.md),
-        # we refuse to produce a tarball at all. Fail loud rather than ship
-        # an empty directory and pretend the buyer can use it.
-        raise RuntimeError(
-            "Depth pipeline not yet integrated. This recorder build cannot "
-            "produce a buyer-spec-compliant tarball. Wait for v0.27.0+ which "
-            "wires DepthAnything V2 inference. See specs/real_depth_pipeline.md."
-        )
+        # 5. depth/ — Howard 2026-05-07: REAL DepthAnything V2 inference on
+        # the recorded video.mp4. Iron Law: NO PLACEHOLDER. The .exe is
+        # built with torch + transformers + DepthAnything model bundled via
+        # PyInstaller (build-recorder-exe.yml --add-data). Inference runs
+        # CPU-side on the local machine; ~1-3 sec/frame at 256×256.
+        #
+        # If the bundled model fails to load (corrupted weights, missing
+        # torch), the recording ABORTS the tarball — we refuse to ship
+        # without real depth.
+        try:
+            from depth_anything_v2_inference import infer_depth_for_video  # noqa: PLC0415
+            video_path = clip_dir / "video.mp4"
+            depth_dir = clip_dir / "depth"
+            _trace(f"depth: running DepthAnything V2 inference on {video_path}")
+            manifest = infer_depth_for_video(
+                video_path,
+                depth_dir,
+                model_variant="vits",
+                device="cpu",
+            )
+            _trace(f"depth: rendered {len(manifest)} REAL EXR frames")
+        except Exception as e:
+            _trace(f"depth: DepthAnything inference FAILED: {e!r}")
+            # No fake fallback — abort the entire packaging. The tester
+            # sees a clear error in the log; we never ship placeholder.
+            raise RuntimeError(
+                f"Depth inference failed: {e}. The recorder refuses to "
+                f"ship a tarball with placeholder depth. See "
+                f"~/OysterRecorder.log for details."
+            )
 
         # R22 (D-04 defense): hash every *.exr in depth/ and write
         # depth_manifest.json next to the directory. Stop-gap path

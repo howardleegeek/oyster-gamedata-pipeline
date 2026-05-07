@@ -24,7 +24,19 @@ jobs:
       - name: Install build dependencies
         run: |
           python -m pip install --upgrade pip
+          # Howard 2026-05-07: bundle DepthAnything V2 inference into .exe
+          # so testers' recordings include REAL depth (no placeholder).
+          # CPU-only torch keeps the .exe smaller (~1 GB vs ~3 GB CUDA).
           pip install pyinstaller pynput pillow numpy pyyaml
+          pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
+          pip install transformers imageio[ffmpeg] OpenEXR Imath huggingface_hub
+
+      - name: Pre-download DepthAnything V2 weights
+        # Bundle the model offline so testers don't need internet on first
+        # run. ViT-S is ~100 MB on disk after download.
+        run: |
+          python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='depth-anything/Depth-Anything-V2-Small-hf', local_dir='hf_cache/depth-anything-v2-small-hf')"
+          dir hf_cache
 
       - name: Download ffmpeg release build (Windows x64, GPL static)
         run: |
@@ -57,17 +69,26 @@ jobs:
             --add-data "bin/lint_v3_prd_grounded.py;." `
             --add-data "bin/generate_systeminfo_json.py;." `
             --add-data "bin/generate_gameinfo_xlsx.py;." `
+            --add-data "bin/depth_anything_v2_inference.py;." `
+            --add-data "hf_cache;hf_cache" `
             --paths bin `
             --collect-all tkinter `
             --collect-all pynput `
             --collect-all numpy `
             --collect-all PIL `
             --collect-all yaml `
+            --collect-all torch `
+            --collect-all transformers `
+            --collect-all OpenEXR `
+            --collect-all Imath `
+            --collect-all imageio `
+            --collect-all imageio_ffmpeg `
             --hidden-import pynput.keyboard._win32 `
             --hidden-import pynput.mouse._win32 `
             --hidden-import lint_v3_prd_grounded `
             --hidden-import generate_systeminfo_json `
             --hidden-import generate_gameinfo_xlsx `
+            --hidden-import depth_anything_v2_inference `
             --hidden-import PIL.Image `
             bin/recorder_consumer_lite.py
 
@@ -85,17 +106,26 @@ jobs:
             --add-data "bin/lint_v3_prd_grounded.py;." `
             --add-data "bin/generate_systeminfo_json.py;." `
             --add-data "bin/generate_gameinfo_xlsx.py;." `
+            --add-data "bin/depth_anything_v2_inference.py;." `
+            --add-data "hf_cache;hf_cache" `
             --paths bin `
             --collect-all tkinter `
             --collect-all pynput `
             --collect-all numpy `
             --collect-all PIL `
             --collect-all yaml `
+            --collect-all torch `
+            --collect-all transformers `
+            --collect-all OpenEXR `
+            --collect-all Imath `
+            --collect-all imageio `
+            --collect-all imageio_ffmpeg `
             --hidden-import pynput.keyboard._win32 `
             --hidden-import pynput.mouse._win32 `
             --hidden-import lint_v3_prd_grounded `
             --hidden-import generate_systeminfo_json `
             --hidden-import generate_gameinfo_xlsx `
+            --hidden-import depth_anything_v2_inference `
             --hidden-import PIL.Image `
             bin/recorder_consumer_lite.py
           # Zip the onedir output for distribution.
