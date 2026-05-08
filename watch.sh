@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
-# demo-watch.sh — Howard's tomorrow-morning monitor.
+# watch.sh — Production health monitor for the GameData pipeline.
 #
-# Single-pane real-time view of the demo surfaces:
-#   - tester portal (homepage + /docs)
-#   - buyer  portal (homepage + /api/catalog)
-#   - GitHub Release .exe download URL
-#   - local disk pressure
+# Single-pane real-time view of the production surfaces:
+#   - tester portal (homepage + /docs + /download)
+#   - buyer  portal (homepage + /browse + /api/catalog row count)
+#   - GitHub Release .exe download URL (the recorder testers download)
+#   - local disk pressure (the box running this script)
 #
 # Howard 2026-05-08 IRON-LAW: only honest signals — HTTP codes from the
-# real deployments + the real catalog row count. No fabricated metrics.
+# real production deployments + the real catalog row count. No fabricated
+# metrics. Designed to run 24/7, not just during a launch window.
 #
 # Usage:
 #   TESTER_URL=https://tester.example.com \
 #   BUYER_URL=https://buyer.example.com \
-#   ./demo-watch.sh
+#   ./watch.sh
 #
 # Defaults to localhost:3000 / 3001 (matches `next dev` for both portals).
 # Press Ctrl-C to exit.
@@ -81,7 +82,7 @@ PY
 clear_screen() { printf '\033[H\033[2J'; }
 
 clear_screen
-echo "🛟  demo-watch.sh — Ctrl-C to exit | refresh every ${INTERVAL}s"
+echo "🛟  watch.sh — production health monitor | refresh every ${INTERVAL}s | Ctrl-C to exit"
 echo "    tester: $TESTER_URL"
 echo "    buyer:  $BUYER_URL"
 echo "    exe:    $EXE_URL"

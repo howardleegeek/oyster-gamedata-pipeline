@@ -4,7 +4,7 @@
 tester / buyer experiences themselves. Iron-law: every screen they
 see has either real data or `<NotConfigured>` — never a fabrication.**
 
-> **Howard 2026-05-08 — Stripe deferred for this demo.** Scope is:
+> **Howard 2026-05-08 — Stripe deferred for this launch.** Scope is:
 >
 > **Tester:** signup → download .exe → record gameplay → upload tarball → see real entry on /dashboard.
 > Skip flow A4 (Stripe Connect onboarding); /payouts will render `<NotConfigured>` (that's the iron-law-honest "coming soon" state).
@@ -76,10 +76,10 @@ in `pending` verdict (D5 will grade it later).
 **Fail mode:** Tarball appears but never moves out of `pending` → D5
 classifier offline (separate cluster issue).
 
-### A4. View earnings — DEFERRED (Stripe not in this demo)
+### A4. View earnings — DEFERRED (Stripe not in this launch)
 
 **Skip this flow tomorrow.** Don't click "Payouts" in nav during the
-live demo — it will render `<NotConfigured>` (which is iron-law-honest
+live launch — it will render `<NotConfigured>` (which is iron-law-honest
 but distracting in front of a fresh tester).
 
 If a tester asks "when do I get paid?" the answer is:
@@ -122,9 +122,9 @@ the ingest pipeline hasn't materialized
 `<bucket>/<tarball_id>/action_camera_preview.jsonl`. Run
 `bin/regenerate_action_camera_preview.py` (TODO if it doesn't exist).
 
-### B3. Add to cart + checkout — DEFERRED (Stripe not in this demo)
+### B3. Add to cart + checkout — DEFERRED (Stripe not in this launch)
 
-**Stop the buyer demo at /tarball/[id] tomorrow.** Don't click "Add to
+**Stop the buyer launch at /tarball/[id] tomorrow.** Don't click "Add to
 cart" or navigate to /cart or /checkout — they all render
 `<NotConfigured>` until Stripe is wired.
 
@@ -144,15 +144,15 @@ redeploy. /cart and /checkout then go live.
 
 Same deferral. /downloads requires a real purchase row in the DB,
 which can't exist without Stripe Checkout having created one. Skip
-in tomorrow's demo.
+in tomorrow's production launch.
 
 (Alternatively: pre-seed a buyer + purchase row manually in Supabase
-if you want to demo the download UX without Stripe — but this is more
+if you want to launch the download UX without Stripe — but this is more
 trouble than it's worth for tomorrow.)
 
 ---
 
-## Iron-law sanity checks during the demo
+## Iron-law sanity checks during production
 
 If you ever see ANY of these in front of a real user, STOP and fix
 before continuing:
@@ -173,7 +173,7 @@ If any appear: the deploy is running an old commit. Force-redeploy.
 
 ---
 
-## Demo script for first impressions (60 sec elevator)
+## Launch script for first impressions (60 sec elevator)
 
 > "This is Oyster GameData. Real Minecraft players record their gameplay,
 > we pay them six dollars an hour, and we sell the data to AI labs at

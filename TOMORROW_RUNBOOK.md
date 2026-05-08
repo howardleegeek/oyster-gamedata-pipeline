@@ -1,10 +1,10 @@
-# Tomorrow Morning Runbook — Real-User Test Day
+# Production Launch Runbook
 
 **Generated overnight by Claude (Opus 4) — Howard 2026-05-08**
 
 You said: 积极性推进 我睡觉了 自动推进 一定要production级别. 项目due了.
 This is what's ready for you, what needs your touch first thing, and the
-exact play-by-play for the live demo.
+exact play-by-play for production traffic.
 
 ---
 
@@ -75,15 +75,15 @@ c784c70  fix(ci): black format + default RECORDER_EXE_URL to v0.26.0 GitHub Rele
 On origin/main now. Watch CI at:
 https://github.com/howardleegeek/oyster-gamedata-pipeline/actions
 
-### 2. Provision real Supabase keys — needs you (REQUIRED for demo)
+### 2. Provision real Supabase keys — needs you (REQUIRED for launch)
 
 > **Stripe deferred — Howard 2026-05-08:** Stripe is NOT required for
-> tomorrow's real-user test. The demo scope is recording → upload →
+> tomorrow's production launch. The launch scope is recording → upload →
 > dashboard (tester) and browse → inspect (buyer). Stripe-gated pages
 > (`/payouts`, `/cart`, `/checkout`) will render `<NotConfigured>` —
-> just don't click into them during the live demo.
+> just don't click into them during production traffic.
 
-**web-tester (REQUIRED for demo):**
+**web-tester (REQUIRED for launch):**
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
@@ -92,21 +92,21 @@ https://github.com/howardleegeek/oyster-gamedata-pipeline/actions
   `lib/env.ts`, no Vercel override needed unless you want a different
   build per environment
 
-**web-tester (POST-DEMO, can skip tomorrow):**
+**web-tester (POST-LAUNCH, fine to add later):**
 - `STRIPE_SECRET_KEY` (`/payouts` will show NotConfigured until set —
-  fine for demo, just don't click that nav link)
+  fine for launch, just don't click that nav link)
 - `STRIPE_WEBHOOK_SECRET`, `STRIPE_CONNECT_CLIENT_ID`
 
-**web-buyer (REQUIRED for demo):**
+**web-buyer (REQUIRED for launch):**
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `NEXT_PUBLIC_SITE_URL`
 
-**web-buyer (POST-DEMO, can skip tomorrow):**
+**web-buyer (POST-LAUNCH, fine to add later):**
 - `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`
   (`/cart` and `/checkout` will show NotConfigured until set — buyer
-  demo stops at /tarball/[id] tomorrow, that's the "early access" pitch)
+  launch ends at /tarball/[id]; checkout is the post-launch milestone)
 
 ### 3. .exe Windows verification — needs real hardware
 Mac can't run the Windows .exe. Either:
@@ -131,26 +131,26 @@ Files (already on main):
 
 ---
 
-## If something breaks during the demo
+## If something breaks during production
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Tester sees amber "Supabase not configured" panel on /dashboard | Vercel Supabase env var not set | Add the var in Vercel → redeploy |
 | Tester sees 404 on `Download .exe` button | `RECORDER_EXE_URL` overridden to a bad value | Unset the override; default is the v0.26.0 Release URL |
 | Upload returns 503 | `SUPABASE_SERVICE_ROLE_KEY` missing on the deployed env | Add it in Vercel → redeploy |
-| Tester sees "Stripe Connect not configured" on /payouts | Expected (Stripe deferred for tomorrow's demo) | **Don't click /payouts** during demo, or set `STRIPE_SECRET_KEY` |
-| Buyer sees "Stripe Checkout not configured" on /cart or /checkout | Expected (Stripe deferred for tomorrow's demo) | **Stop buyer demo at /tarball/[id]** — that's the "early access" pitch |
+| Tester sees "Stripe Connect not configured" on /payouts | Expected (Stripe deferred for tomorrow's production launch) | **Don't click /payouts** during launch, or set `STRIPE_SECRET_KEY` |
+| Buyer sees "Stripe Checkout not configured" on /cart or /checkout | Expected (Stripe deferred for tomorrow's production launch) | **Buyer flow ends at /tarball/[id]** — that's the "early access" pitch |
 | Cart says "Sign in required before checkout" | Buyer not signed in (this is correct, not a bug) | Sign in via GitHub or magic link |
 
 ---
 
-## Live monitoring during the demo — `./demo-watch.sh`
+## Live monitoring in production — `./watch.sh`
 
 While real users are clicking through, run this in a side terminal:
 
 ```bash
 cd ~/Downloads/oyster-agent-runner
-TESTER_URL=https://<tester-deploy>  BUYER_URL=https://<buyer-deploy>  ./demo-watch.sh
+TESTER_URL=https://<tester-deploy>  BUYER_URL=https://<buyer-deploy>  ./watch.sh
 ```
 
 Refreshes every 10 s, color-coded:
@@ -160,7 +160,7 @@ Refreshes every 10 s, color-coded:
 - `exe=200` — proves the GitHub Release `OysterRecorder.exe` is still serving
 - Local disk free / used %
 
-If a column flips red mid-demo, you'll see it within 10 s. `INTERVAL=5`
+If a column flips red in production, you'll see it within 10 s. `INTERVAL=5`
 tightens cadence; `INTERVAL=30` reduces noise. Defaults to `localhost:3000` /
 `localhost:3001` — works against `next dev` when rehearsing locally.
 
@@ -168,7 +168,7 @@ tightens cadence; `INTERVAL=30` reduces noise. Defaults to `localhost:3000` /
 
 ## Iron-law guard rails — do not regress
 
-If you (or a parallel agent) get tempted to "make demo easier" by
+If you (or a parallel agent) get tempted to "cut a corner" by
 re-adding sample-data:
 
 1. `pytest tests/test_iron_law_no_fake_data.py` — 16 tests will fail

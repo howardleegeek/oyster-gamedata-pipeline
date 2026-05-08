@@ -18,11 +18,11 @@ gh run watch  # or open https://github.com/howardleegeek/oyster-gamedata-pipelin
 
 Open https://vercel.com/dashboard, find both projects, **Settings → Environment Variables → Production**:
 
-> **Howard 2026-05-08 — Stripe deferred for tomorrow's demo.** Two
-> blocks per project: REQUIRED-FOR-DEMO (paste these) and
-> LATER-POST-DEMO (paste these AFTER tomorrow's session).
+> **Howard 2026-05-08 — Stripe deferred for tomorrow's production launch.** Two
+> blocks per project: REQUIRED-FOR-LAUNCH (paste these) and
+> POST-LAUNCH (paste these once Stripe is wired).
 
-### web-tester project — REQUIRED FOR DEMO
+### web-tester project — REQUIRED FOR LAUNCH
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR-TESTER-PROJECT.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...   # from Supabase dashboard → Project Settings → API
@@ -35,7 +35,7 @@ RECORDER_VERSION=0.26.0
 # RECORDER_EXE_URL — already defaulted in lib/env.ts to v0.26.0 release; leave unset
 ```
 
-### web-tester project — LATER (after demo)
+### web-tester project — LATER (after launch)
 ```
 # Wire Stripe to unlock /payouts. Until then it shows <NotConfigured>.
 STRIPE_SECRET_KEY=sk_test_...                  # https://dashboard.stripe.com/test/apikeys
@@ -43,7 +43,7 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 STRIPE_CONNECT_CLIENT_ID=ca_...                # https://dashboard.stripe.com/test/connect/applications
 ```
 
-### web-buyer project — REQUIRED FOR DEMO
+### web-buyer project — REQUIRED FOR LAUNCH
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR-BUYER-PROJECT.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
@@ -55,10 +55,10 @@ GAMEDATA_RESEARCH_DISCOUNT_PCT=40
 DOWNLOAD_LINK_TTL_SECONDS=86400
 ```
 
-### web-buyer project — LATER (after demo)
+### web-buyer project — LATER (after launch)
 ```
 # Wire Stripe Checkout to unlock /cart, /checkout, /downloads.
-# Until then those pages show <NotConfigured>; buyer demo stops at
+# Until then those pages show <NotConfigured>; buyer launch stops at
 # /tarball/[id] which is the "early access catalog" pitch.
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_PUBLISHABLE_KEY=pk_test_...
@@ -87,13 +87,13 @@ Asset URL (407 MB): https://github.com/howardleegeek/oyster-gamedata-pipeline/re
 
 Open https://app.supabase.com → your project → SQL Editor → New query.
 
-### Tester portal project (REQUIRED for demo):
+### Tester portal project (REQUIRED for launch):
 1. `web-tester/supabase/migrations/20260507000000_init.sql`
 
 ### Tester portal project (RUN ANYWAY — adds the Stripe Connect columns; harmless without Stripe configured, ready for next week):
 2. `web-tester/supabase/migrations/20260507100000_stripe_connect.sql`
 
-### Buyer portal project (REQUIRED for demo):
+### Buyer portal project (REQUIRED for launch):
 3. `web-buyer/supabase/migrations/20260507000000_buyer_init.sql`
 
 OR use the CLI if you have it linked:
@@ -117,7 +117,7 @@ Mac can't run it. Two options:
 **Option B: First tester is the proof**
 - Brief the tester that they're the first run — be in the room
 - Have a side-by-side Discord/Zoom share so you can see SmartScreen if it appears
-- If anything weird happens, fall back to a screen-share demo of `/dashboard` reading existing real tarball uploads from the cluster
+- If anything weird happens, fall back to a screen-share launch of `/dashboard` reading existing real tarball uploads from the cluster
 
 **Iron-law sanity:** if you see `# OysterRecorder placeholder for tester` in any downloaded file's contents, the deploy is running an OLD commit pre-`5ae84a3`. Force redeploy.
 

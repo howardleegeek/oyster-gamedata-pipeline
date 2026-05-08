@@ -114,7 +114,7 @@ export default async function LandingPage() {
         </section>
       ) : (
         // Howard 2026-05-08 IRON-LAW: when Supabase is configured but the catalog
-        // is empty (e.g. fresh demo DB before the first tester upload), show an
+        // is empty (fresh production DB before the first tester upload), show an
         // honest "live seeding" panel instead of silently dropping the section.
         // This is a real status, not fabricated content.
         <section className="max-w-6xl mx-auto px-4 py-12 md:py-16 border-t border-oyster-800/40">
