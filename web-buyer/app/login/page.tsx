@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { getSupabaseBrowserClient } from '../../lib/supabase-browser';
 import { isSupabaseConfigured, env } from '../../lib/env';
+import { NotConfigured } from '../../components/NotConfigured';
 
 function LoginInner() {
   const params = useSearchParams();
@@ -16,6 +17,20 @@ function LoginInner() {
 
   const supabase = getSupabaseBrowserClient();
 
+  // Howard 2026-05-07 IRON-LAW: hard-gate. Previous code surfaced a "DEV
+  // MODE: Auth is disabled — visit /browse to see the sample catalog"
+  // hint that pointed users at fabricated data. Now: render NotConfigured
+  // and stop.
+  if (!isSupabaseConfigured()) {
+    return (
+      <NotConfigured
+        service="Supabase"
+        envVars={['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY']}
+        docsUrl="/docs#supabase-setup"
+      />
+    );
+  }
+
   async function handleMagicLink(e: FormEvent) {
     e.preventDefault();
     setStatus('sending');
@@ -23,9 +38,7 @@ function LoginInner() {
 
     if (!supabase) {
       setStatus('error');
-      setError(
-        'Supabase is not configured. In DEV MODE you can browse the app without signing in — just visit /browse.',
-      );
+      setError('Supabase browser client unavailable — check your config.');
       return;
     }
     const { error } = await supabase.auth.signInWithOtp({
@@ -42,7 +55,7 @@ function LoginInner() {
 
   async function handleGitHub() {
     if (!supabase) {
-      setError('Supabase is not configured — DEV MODE only.');
+      setError('Supabase browser client unavailable — check your config.');
       return;
     }
     await supabase.auth.signInWithOAuth({
@@ -65,7 +78,6 @@ function LoginInner() {
       <button
         onClick={handleGitHub}
         className="btn-secondary w-full mb-6"
-        disabled={!isSupabaseConfigured()}
       >
         <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor" aria-hidden>
           <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.55v-2.13c-3.2.7-3.87-1.36-3.87-1.36-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.69.08-.69 1.15.08 1.76 1.18 1.76 1.18 1.02 1.76 2.69 1.25 3.34.96.1-.74.4-1.25.72-1.54-2.55-.29-5.24-1.27-5.24-5.66 0-1.25.45-2.27 1.18-3.07-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.15 1.17.91-.25 1.89-.38 2.86-.38.97 0 1.95.13 2.86.38 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.18 1.82 1.18 3.07 0 4.4-2.69 5.36-5.25 5.65.41.36.78 1.07.78 2.16v3.21c0 .31.2.66.79.55C20.71 21.39 24 17.08 24 12 24 5.65 18.85.5 12.5.5h-.5z" />
@@ -108,16 +120,6 @@ function LoginInner() {
       {status === 'error' && error && (
         <p className="mt-4 text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg p-3">
           {error}
-        </p>
-      )}
-
-      {!isSupabaseConfigured() && (
-        <p className="mt-6 text-xs text-oyster-400 text-center">
-          [DEV MODE] Auth is disabled. Visit{' '}
-          <Link href="/browse" className="text-amber-accent hover:underline">
-            /browse
-          </Link>{' '}
-          to see the sample catalog.
         </p>
       )}
     </div>

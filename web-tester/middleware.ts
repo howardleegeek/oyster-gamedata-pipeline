@@ -6,8 +6,11 @@ import { env, isSupabaseConfigured } from './lib/env';
  * Refresh the Supabase session on every request and gate the
  * authenticated routes (`/dashboard`, `/payouts`, `/download`) behind it.
  *
- * If Supabase is not configured (DEV MODE), we let everything through —
- * the pages themselves render sample data with the [DEV MODE] banner.
+ * Howard 2026-05-07 IRON-LAW: when Supabase isn't configured, the
+ * middleware short-circuits to the next handler and the page-level
+ * <NotConfigured> hard-gate takes over. The previous comment said
+ * "pages themselves render sample data with the [DEV MODE] banner" —
+ * that pattern fabricated tester stats and is gone.
  */
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next({ request: { headers: request.headers } });

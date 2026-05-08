@@ -12,6 +12,18 @@ eggs/
 .eggs/
 lib/
 lib64/
+
+# Iron-law (Howard 2026-05-07): web portal source lives in <portal>/lib/
+# and <portal>/app/api/downloads/. The Python build-dir ignores above
+# accidentally swallowed those directories — un-ignore them here so the
+# audit-fix changes show up in `git status` like every other source file.
+!web-buyer/lib/
+!web-buyer/lib/**
+!web-tester/lib/
+!web-tester/lib/**
+!web-buyer/app/api/downloads/
+!web-buyer/app/api/downloads/**
+!web-tester/public/downloads/
 parts/
 sdist/
 var/

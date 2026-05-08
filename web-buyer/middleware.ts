@@ -10,8 +10,11 @@ import { env, isSupabaseConfigured } from './lib/env';
  * can fill a cart anonymously and we'll persist it once they sign in (the
  * cart cookie merges into cart_items on first login).
  *
- * If Supabase is not configured (DEV MODE), we let everything through —
- * the pages themselves render sample data with the [DEV MODE] banner.
+ * Howard 2026-05-07 IRON-LAW: when Supabase isn't configured, the
+ * middleware short-circuits to the next handler and the page-level
+ * <NotConfigured> hard-gate takes over. The previous comment said
+ * "pages themselves render sample data with the [DEV MODE] banner" —
+ * that pattern shipped fabricated catalog data and is gone.
  */
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next({ request: { headers: request.headers } });

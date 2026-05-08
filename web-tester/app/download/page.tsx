@@ -1,26 +1,35 @@
 import Link from 'next/link';
 import { getSupabaseServerClient } from '../../lib/supabase-server';
 import { isSupabaseConfigured, env } from '../../lib/env';
+import { NotConfigured } from '../../components/NotConfigured';
 
 export const dynamic = 'force-dynamic';
 
-async function loadTesterId(): Promise<{ id: string; email: string; live: boolean }> {
-  if (!isSupabaseConfigured()) {
-    return {
-      id: '00000000-0000-0000-0000-000000000001',
-      email: 'sample-tester@example.com',
-      live: false,
-    };
-  }
+async function loadTesterId(): Promise<{ id: string; email: string }> {
   const supabase = getSupabaseServerClient();
   if (!supabase) throw new Error('Supabase server client unavailable.');
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Unauthenticated (middleware should redirect).');
-  return { id: user.id, email: user.email ?? '', live: true };
+  return { id: user.id, email: user.email ?? '' };
 }
 
 export default async function DownloadPage() {
-  const { id, email, live } = await loadTesterId();
+  // Howard 2026-05-07 IRON-LAW: hard-gate. The previous implementation
+  // returned a fabricated tester id (`00000000-…-001`) and email
+  // (`sample-tester@example.com`) when Supabase wasn't configured, then
+  // baked them into the .exe download URL — meaning anyone could grab
+  // a build attributed to the fake tester.
+  if (!isSupabaseConfigured()) {
+    return (
+      <NotConfigured
+        service="Supabase"
+        envVars={['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY']}
+        docsUrl="/docs#supabase-setup"
+      />
+    );
+  }
+
+  const { id, email } = await loadTesterId();
   // Tester ID is embedded in the filename so uploads can be attributed.
   // Format: OysterRecorder-<short>-<full>.exe — short is for humans, full is the source of truth.
   const shortId = id.slice(0, 8);
@@ -32,7 +41,6 @@ export default async function DownloadPage() {
       <h1 className="text-3xl font-bold mb-2">Download OysterRecorder</h1>
       <p className="text-oyster-300 mb-6">
         Windows recorder · v{env.recorderVersion}
-        {!live && ' · [DEV MODE]'}
       </p>
 
       <div className="card p-6 mb-6">

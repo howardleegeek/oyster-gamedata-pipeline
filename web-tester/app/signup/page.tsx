@@ -4,6 +4,7 @@ import { useState, FormEvent } from 'react';
 import Link from 'next/link';
 import { getSupabaseBrowserClient } from '../../lib/supabase-browser';
 import { isSupabaseConfigured, env } from '../../lib/env';
+import { NotConfigured } from '../../components/NotConfigured';
 
 export default function SignupPage() {
   const supabase = getSupabaseBrowserClient();
@@ -11,13 +12,24 @@ export default function SignupPage() {
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [error, setError] = useState('');
 
+  // Howard 2026-05-07 IRON-LAW: hard-gate.
+  if (!isSupabaseConfigured()) {
+    return (
+      <NotConfigured
+        service="Supabase"
+        envVars={['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY']}
+        docsUrl="/docs#supabase-setup"
+      />
+    );
+  }
+
   async function handleEmail(e: FormEvent) {
     e.preventDefault();
     setStatus('sending');
     setError('');
     if (!supabase) {
       setStatus('error');
-      setError('Supabase is not configured (DEV MODE).');
+      setError('Supabase browser client unavailable — check your config.');
       return;
     }
     const { error } = await supabase.auth.signInWithOtp({
@@ -60,7 +72,6 @@ export default function SignupPage() {
           <button
             onClick={handleGitHub}
             className="btn-secondary w-full mb-5"
-            disabled={!isSupabaseConfigured()}
           >
             Sign up with GitHub
           </button>

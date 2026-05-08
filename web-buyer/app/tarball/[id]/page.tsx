@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { fetchCatalogById } from '../../../lib/catalog';
+import { fetchCatalogById, CatalogNotConfiguredError } from '../../../lib/catalog';
 import { readCartCookie } from '../../../lib/cart-cookie';
-import { sampleActionCameraRecords } from '../../../lib/sample-data';
+import { isSupabaseConfigured } from '../../../lib/env';
+import { NotConfigured } from '../../../components/NotConfigured';
 import {
   formatBytes,
   formatCents,
@@ -18,17 +19,41 @@ interface PageProps {
 }
 
 export default async function TarballDetailPage({ params }: PageProps) {
-  const { row, liveMode } = await fetchCatalogById(params.id);
+  // Howard 2026-05-07 IRON-LAW: hard-gate. The previous implementation
+  // synthesised `sampleActionCameraRecords()` (deterministic but
+  // fabricated mouse/camera traces) for both DEV and "live" mode and
+  // displayed them next to the tarball price — visitors saw fake
+  // gameplay metadata next to a real-looking buy button.
+  if (!isSupabaseConfigured()) {
+    return (
+      <NotConfigured
+        service="Supabase"
+        envVars={['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY']}
+        docsUrl="/docs#supabase-setup"
+      />
+    );
+  }
+
+  let row: Awaited<ReturnType<typeof fetchCatalogById>>['row'];
+  try {
+    const result = await fetchCatalogById(params.id);
+    row = result.row;
+  } catch (err) {
+    if (err instanceof CatalogNotConfiguredError) {
+      return (
+        <NotConfigured
+          service="Supabase"
+          envVars={err.envVars}
+          docsUrl="/docs#supabase-setup"
+        />
+      );
+    }
+    throw err;
+  }
   if (!row) notFound();
 
   const cartIds = new Set(readCartCookie());
   const inCart = cartIds.has(row.id);
-
-  // First 100 records of action_camera.json — synthesized in DEV, derived
-  // from the sample fixture in LIVE (the real preview endpoint reads the
-  // tarball, but for the page we use the deterministic sample so the UI
-  // doesn't have to wait on a 200 MB tarball download just to render).
-  const actionRecords = sampleActionCameraRecords(row.id, 8);
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-10">
@@ -76,20 +101,15 @@ export default async function TarballDetailPage({ params }: PageProps) {
             </div>
           </div>
 
-          {/* JSON sample */}
-          <h3 className="text-lg font-semibold mb-2">action_camera.json (first 8 records)</h3>
-          <pre className="code-block max-h-96">
-{JSON.stringify(actionRecords, null, 2)}
-          </pre>
-          <p className="mt-2 text-xs text-oyster-400">
-            Full sample (100 records) available via{' '}
-            <a
-              href={`/api/tarball/${row.id}/preview`}
-              className="text-amber-accent hover:underline"
-            >
-              /api/tarball/{row.id.slice(0, 8)}…/preview
-            </a>
-            . Purchasing unlocks the complete tarball — usually ~30 records / second.
+          {/* JSON sample header — actual records are fetched from /api/tarball/[id]/preview
+              by the buyer when they click the link above. We do NOT inline the
+              records here so we can't accidentally fabricate them. */}
+          <h3 className="text-lg font-semibold mb-2">action_camera.json sample</h3>
+          <p className="text-sm text-oyster-300">
+            Click <span className="font-mono text-xs">Download sample JSON</span> above to see
+            the first 100 records of <span className="font-mono">action_camera.jsonl</span>{' '}
+            (camera angles, player position, mouse deltas, key states — all real, captured at
+            ~20&nbsp;Hz). Purchasing unlocks the complete tarball.
           </p>
         </div>
 
@@ -156,12 +176,6 @@ export default async function TarballDetailPage({ params }: PageProps) {
             </div>
 
             <AddToCartButton tarballId={row.id} initiallyInCart={inCart} />
-
-            {!liveMode && (
-              <p className="text-xs text-amber-accent">
-                [DEV MODE] add-to-cart writes to a cookie; checkout is faked.
-              </p>
-            )}
           </div>
         </aside>
       </div>

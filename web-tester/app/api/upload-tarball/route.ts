@@ -10,15 +10,17 @@
  * Behaviour:
  *   1. Verify SHA-256 server-side.
  *   2. Stash the tarball in Supabase Storage (bucket: `tarballs`) keyed
- *      by `<tester_id>/<sha256>.tar.gz`. In DEV MODE we write to /tmp-uploads
- *      so contributors can run end-to-end without any cloud setup.
+ *      by `<tester_id>/<sha256>.tar.gz`.
  *   3. Insert a row into `tarballs` (tester_id, sha256, size_bytes, ...).
  *   4. Return { id, sha256, accepted } so the recorder can mark the file shipped.
+ *
+ * Howard 2026-05-07 IRON-LAW: returns 503 when Supabase isn't configured.
+ * The previous DEV MODE branch wrote tarballs to a local fallback dir and
+ * returned a synthetic UUID + dev-mode success response — that fooled
+ * the recorder into thinking the upload had landed. No more.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
 import crypto from 'node:crypto';
 import { z } from 'zod';
 import { getSupabaseServiceClient } from '../../../lib/supabase-server';
@@ -37,6 +39,20 @@ const FormFields = z.object({
 const MAX_BYTES = 1024 * 1024 * 1024; // 1 GiB hard ceiling
 
 export async function POST(req: NextRequest) {
+  // Howard 2026-05-07 IRON-LAW: hard-gate before any storage work.
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json(
+      {
+        error: 'Supabase not configured',
+        envVars: ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY'],
+        details:
+          'Tarball ingestion writes to Supabase Storage + the tarballs table. ' +
+          'No local fallback — configure Supabase before pointing the recorder at this endpoint.',
+      },
+      { status: 503 },
+    );
+  }
+
   let form: FormData;
   try {
     form = await req.formData();
@@ -86,25 +102,7 @@ export async function POST(req: NextRequest) {
 
   const storagePath = `${tester_id}/${sha}.tar.gz`;
 
-  // ---- DEV MODE fallback: write to /tmp-uploads, no DB row -------------
-  if (!isSupabaseConfigured()) {
-    const tmpDir = path.resolve(process.cwd(), 'tmp-uploads', tester_id);
-    await fs.mkdir(tmpDir, { recursive: true });
-    const tmpPath = path.join(tmpDir, `${sha}.tar.gz`);
-    await fs.writeFile(tmpPath, buf);
-    return NextResponse.json({
-      id: crypto.randomUUID(),
-      sha256: sha,
-      size_bytes: file.size,
-      duration_seconds,
-      stored_at: tmpPath,
-      mode: 'dev_local',
-      message:
-        '[DEV MODE] Saved to local /tmp-uploads — no database row created. Configure Supabase to enable real ingestion.',
-    });
-  }
-
-  // ---- LIVE MODE: Supabase storage + DB row ----------------------------
+  // ---- LIVE: Supabase storage + DB row ---------------------------------
   const supabase = getSupabaseServiceClient();
   if (!supabase) {
     return NextResponse.json({ error: 'Service client unavailable' }, { status: 500 });

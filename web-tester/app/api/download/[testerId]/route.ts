@@ -10,8 +10,13 @@
  *     into the redirect URL via a query param the CDN ignores.
  *   - If RECORDER_EXE_URL is a local /public path, we stream it back with
  *     a Content-Disposition header.
- *   - In DEV with no .exe present, we return a small placeholder text file
- *     so the click-through still works during smoke tests.
+ *   - If the .exe is genuinely missing, we return 404 with a remediation
+ *     message — never a fabricated text file pretending to be the binary.
+ *
+ * Howard 2026-05-07 IRON-LAW: the previous implementation returned a
+ * plaintext fallback labelled with the tester id and served it with an
+ * .exe.txt Content-Disposition + a synthetic header flag. That was a
+ * fabricated download shipping in production source. Now: 404.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -58,29 +63,19 @@ export async function GET(
       },
     });
   } catch {
-    // File is missing — return a plaintext "stub" so the link still resolves.
-    // This is intentional for DEV environments where the .exe isn't built yet.
-    const stub = [
-      `# OysterRecorder placeholder for tester ${testerId}`,
-      ``,
-      `This is a stub file — the real OysterRecorder.exe is not yet present`,
-      `at ${env.recorderExeUrl}.`,
-      ``,
-      `Drop the built binary into web-tester/public/downloads/OysterRecorder.exe`,
-      `or set RECORDER_EXE_URL to a hosted URL (e.g. GitHub Releases asset).`,
-      ``,
-      `Tester ID: ${testerId}`,
-      `Build: ${env.recorderVersion}`,
-      `Generated: ${new Date().toISOString()}`,
-    ].join('\n');
-    return new NextResponse(stub, {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'Content-Disposition': `attachment; filename="${filename}.txt"`,
-        'Cache-Control': 'no-store',
-        'X-Recorder-Stub': 'true',
+    // Howard 2026-05-07 IRON-LAW: no stub-text fallback. Return 404 with
+    // a remediation message so the operator knows what to fix.
+    return NextResponse.json(
+      {
+        error: 'OysterRecorder.exe is not available',
+        details:
+          `The build is missing at ${env.recorderExeUrl}. ` +
+          'Set RECORDER_EXE_URL to a hosted URL (e.g. GitHub Releases asset) ' +
+          'or drop the binary into web-tester/public/downloads/OysterRecorder.exe.',
+        tester_id: testerId,
+        build: env.recorderVersion,
       },
-    });
+      { status: 404 },
+    );
   }
 }

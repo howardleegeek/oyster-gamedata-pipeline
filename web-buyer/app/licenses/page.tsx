@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { env, isSupabaseConfigured } from '../../lib/env';
 import { getSupabaseServerClient, getSupabaseServiceClient } from '../../lib/supabase-server';
-import { sampleBuyer, sampleLicenses, samplePurchases } from '../../lib/sample-data';
 import { formatRelativeTime } from '../../lib/format';
+import { NotConfigured } from '../../components/NotConfigured';
 import type { LicenseRow, PurchaseRow } from '../../types/database';
 
 export const dynamic = 'force-dynamic';
@@ -10,17 +10,7 @@ export const dynamic = 'force-dynamic';
 async function loadLicenses(): Promise<{
   licenses: LicenseRow[];
   purchaseById: Map<string, PurchaseRow>;
-  liveMode: boolean;
 }> {
-  if (!isSupabaseConfigured()) {
-    const buyer = sampleBuyer();
-    const purchases = samplePurchases(buyer.id);
-    return {
-      licenses: sampleLicenses(buyer.id),
-      purchaseById: new Map(purchases.map((p) => [p.id, p])),
-      liveMode: false,
-    };
-  }
   const supabase = getSupabaseServerClient();
   if (!supabase) throw new Error('Supabase server client unavailable.');
   const { data: { user } } = await supabase.auth.getUser();
@@ -28,7 +18,7 @@ async function loadLicenses(): Promise<{
   // Anonymous visitors still get the full terms below — only the
   // "Your license certificates" panel is empty for them.
   if (!user) {
-    return { licenses: [], purchaseById: new Map(), liveMode: true };
+    return { licenses: [], purchaseById: new Map() };
   }
 
   const service = getSupabaseServiceClient();
@@ -49,12 +39,21 @@ async function loadLicenses(): Promise<{
   return {
     licenses: (licenseRows ?? []) as LicenseRow[],
     purchaseById: new Map(((purchases ?? []) as PurchaseRow[]).map((p) => [p.id, p])),
-    liveMode: true,
   };
 }
 
 export default async function LicensesPage() {
-  const { licenses, purchaseById, liveMode } = await loadLicenses();
+  // Howard 2026-05-07 IRON-LAW: license terms below are real product copy
+  // and render without Supabase, but the per-buyer certificate list MUST
+  // be hard-gated. The previous implementation rendered fabricated
+  // sampleBuyer / samplePurchases / sampleLicenses certificates with fake
+  // purchase ids and "research"/"commercial" labels.
+  const supabaseConfigured = isSupabaseConfigured();
+
+  let certsState: Awaited<ReturnType<typeof loadLicenses>> | null = null;
+  if (supabaseConfigured) {
+    certsState = await loadLicenses();
+  }
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-10">
@@ -139,13 +138,13 @@ export default async function LicensesPage() {
       <section id="certs" className="space-y-3 scroll-mt-24">
         <h2 className="text-2xl font-bold mt-10">5. Your license certificates</h2>
 
-        {!liveMode && (
-          <p className="text-amber-accent text-sm">
-            [DEV MODE] showing sample certificates.
-          </p>
-        )}
-
-        {licenses.length === 0 ? (
+        {!supabaseConfigured ? (
+          <NotConfigured
+            service="Supabase"
+            envVars={['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY']}
+            docsUrl="/docs#supabase-setup"
+          />
+        ) : certsState && certsState.licenses.length === 0 ? (
           <p className="text-oyster-400 text-sm">
             You have no purchases yet —{' '}
             <Link href="/browse" className="text-amber-accent hover:underline">
@@ -153,10 +152,10 @@ export default async function LicensesPage() {
             </Link>{' '}
             to buy your first tarball.
           </p>
-        ) : (
+        ) : certsState ? (
           <div className="space-y-3">
-            {licenses.map((l) => {
-              const purchase = purchaseById.get(l.purchase_id);
+            {certsState.licenses.map((l) => {
+              const purchase = certsState!.purchaseById.get(l.purchase_id);
               return (
                 <div key={l.id} className="card p-4 flex items-center justify-between gap-4">
                   <div>
@@ -185,7 +184,7 @@ export default async function LicensesPage() {
               );
             })}
           </div>
-        )}
+        ) : null}
       </section>
     </div>
   );

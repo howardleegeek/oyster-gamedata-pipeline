@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import { TarballCard } from '../../components/TarballCard';
 import { CatalogFiltersPanel } from '../../components/CatalogFilters';
-import { fetchCatalog, FilterSchema } from '../../lib/catalog';
+import { NotConfigured } from '../../components/NotConfigured';
+import { fetchCatalog, FilterSchema, CatalogNotConfiguredError } from '../../lib/catalog';
+import { isSupabaseConfigured } from '../../lib/env';
 import { readCartCookie } from '../../lib/cart-cookie';
 
 export const dynamic = 'force-dynamic';
@@ -11,6 +13,19 @@ interface PageProps {
 }
 
 export default async function BrowsePage({ searchParams }: PageProps) {
+  // Howard 2026-05-07 IRON-LAW: hard-gate. The previous DEV MODE branch
+  // imported `sampleCatalog()` and rendered 5 fabricated tarballs; that
+  // is fake data shipping in production source.
+  if (!isSupabaseConfigured()) {
+    return (
+      <NotConfigured
+        service="Supabase"
+        envVars={['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY']}
+        docsUrl="/docs#supabase-setup"
+      />
+    );
+  }
+
   // Coerce searchParams to single strings (we never use arrays here).
   const flat = Object.fromEntries(
     Object.entries(searchParams).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v]),
@@ -18,7 +33,23 @@ export default async function BrowsePage({ searchParams }: PageProps) {
   const parsed = FilterSchema.safeParse(flat);
   const filters = parsed.success ? parsed.data : {};
 
-  const { rows, liveMode } = await fetchCatalog(filters);
+  let rows: Awaited<ReturnType<typeof fetchCatalog>>['rows'];
+  try {
+    const result = await fetchCatalog(filters);
+    rows = result.rows;
+  } catch (err) {
+    if (err instanceof CatalogNotConfiguredError) {
+      return (
+        <NotConfigured
+          service="Supabase"
+          envVars={err.envVars}
+          docsUrl="/docs#supabase-setup"
+        />
+      );
+    }
+    throw err;
+  }
+
   const cartIds = new Set(readCartCookie());
 
   return (
@@ -28,9 +59,6 @@ export default async function BrowsePage({ searchParams }: PageProps) {
           <h1 className="text-3xl font-bold">Catalog</h1>
           <p className="text-sm text-oyster-300 mt-1">
             {rows.length} tarball{rows.length === 1 ? '' : 's'} available
-            {!liveMode && (
-              <span className="ml-2 text-amber-accent">[DEV MODE: showing sample data]</span>
-            )}
           </p>
         </div>
         <Link href="/cart" className="btn-ghost">

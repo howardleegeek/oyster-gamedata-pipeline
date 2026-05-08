@@ -13,17 +13,19 @@ interface Item {
 interface CartCheckoutButtonProps {
   items: Item[];
   signedIn: boolean;
-  devMode: boolean;
 }
 
 /**
- * Sends the cart to /api/checkout, which returns either a Stripe Checkout
- * URL (LIVE) or a fake one ("dev_session_*") that 302s through to /downloads.
+ * Sends the cart to /api/checkout, which returns a real Stripe Checkout
+ * URL or 503 with envVars when not configured.
  *
- * The license type is collected here (research vs. commercial) before
- * creating the Checkout session.
+ * Howard 2026-05-07 IRON-LAW: removed the `devMode` prop and the fake-
+ * checkout banner. The previous code displayed "[DEV MODE] Checkout is
+ * faked — clicking will mint a sample purchase" — that was fabricated-
+ * data theatre. If Stripe isn't configured the API now returns 503 with
+ * remediation envVars and we surface the error message directly.
  */
-export function CartCheckoutButton({ items, signedIn, devMode }: CartCheckoutButtonProps) {
+export function CartCheckoutButton({ items, signedIn }: CartCheckoutButtonProps) {
   const [licenseType, setLicenseType] = useState<'research' | 'commercial'>('commercial');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -33,7 +35,7 @@ export function CartCheckoutButton({ items, signedIn, devMode }: CartCheckoutBut
     setError(null);
     if (items.length === 0) return;
 
-    if (!signedIn && !devMode) {
+    if (!signedIn) {
       // Bounce through /login first; the cart cookie survives the redirect.
       router.push(`/login?next=${encodeURIComponent('/cart')}`);
       return;
@@ -51,9 +53,14 @@ export function CartCheckoutButton({ items, signedIn, devMode }: CartCheckoutBut
         });
         const body = await res.json();
         if (!res.ok || !body?.url) {
+          if (res.status === 503 && body?.envVars) {
+            throw new Error(
+              `${body.error}. Set: ${(body.envVars as string[]).join(', ')}`,
+            );
+          }
           throw new Error(body?.error ?? `HTTP ${res.status}`);
         }
-        // Either Stripe URL (live) or /downloads?session_id=dev_… (dev mode)
+        // Real Stripe Checkout URL.
         window.location.assign(body.url as string);
       } catch (err: any) {
         setError(err.message ?? 'Checkout failed');
@@ -104,12 +111,6 @@ export function CartCheckoutButton({ items, signedIn, devMode }: CartCheckoutBut
       {error && (
         <p className="text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg p-3">
           {error}
-        </p>
-      )}
-
-      {devMode && (
-        <p className="text-xs text-amber-accent">
-          [DEV MODE] Checkout is faked — clicking will mint a sample purchase and bounce to /downloads.
         </p>
       )}
     </div>

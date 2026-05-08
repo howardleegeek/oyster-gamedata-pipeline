@@ -11,12 +11,16 @@
  *   - limit          : 1..200 (default 100)
  *
  * Responses:
- *   200 { mode: 'live'|'dev_sample', count, rows }
+ *   200 { mode: 'live', count, rows }
  *   400 { error: '...', details? }
+ *   503 { error, envVars[] } — Supabase not configured
+ *
+ * Howard 2026-05-07 IRON-LAW: no `dev_sample` mode any more. The catalog
+ * is real or it is unavailable.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchCatalog, FilterSchema } from '../../../lib/catalog';
+import { fetchCatalog, FilterSchema, CatalogNotConfiguredError } from '../../../lib/catalog';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,11 +35,23 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const { rows, liveMode } = await fetchCatalog(parsed.data);
-
-  return NextResponse.json({
-    mode: liveMode ? 'live' : 'dev_sample',
-    count: rows.length,
-    rows,
-  });
+  try {
+    const { rows } = await fetchCatalog(parsed.data);
+    return NextResponse.json({
+      mode: 'live',
+      count: rows.length,
+      rows,
+    });
+  } catch (err) {
+    if (err instanceof CatalogNotConfiguredError) {
+      return NextResponse.json(
+        { error: err.message, envVars: err.envVars },
+        { status: 503 },
+      );
+    }
+    return NextResponse.json(
+      { error: 'Catalog read failed', details: err instanceof Error ? err.message : String(err) },
+      { status: 502 },
+    );
+  }
 }

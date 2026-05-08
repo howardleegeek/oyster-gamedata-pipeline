@@ -1,9 +1,10 @@
 import Link from 'next/link';
-import { fetchCatalog } from '../../lib/catalog';
+import { fetchCatalog, CatalogNotConfiguredError } from '../../lib/catalog';
 import { readCartCookie } from '../../lib/cart-cookie';
 import { getSupabaseServerClient, getSupabaseServiceClient } from '../../lib/supabase-server';
 import { isSupabaseConfigured, env, isStripeConfigured } from '../../lib/env';
 import { formatBytes, formatCents, totalCents } from '../../lib/format';
+import { NotConfigured } from '../../components/NotConfigured';
 import type { CatalogTarball } from '../../types/database';
 import { CartCheckoutButton } from '../cart/CheckoutButton';
 
@@ -11,42 +12,72 @@ export const dynamic = 'force-dynamic';
 
 async function loadCheckout(): Promise<{
   items: CatalogTarball[];
-  liveMode: boolean;
-  stripeConfigured: boolean;
   signedIn: boolean;
 }> {
-  const { rows, liveMode } = await fetchCatalog({ limit: 200 });
+  const { rows } = await fetchCatalog({ limit: 200 });
   const byId = new Map(rows.map((r) => [r.id, r]));
 
   let cartIds: string[] = [];
   let signedIn = false;
 
-  if (isSupabaseConfigured()) {
-    const supabase = getSupabaseServerClient();
-    const { data } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
-    if (data?.user) {
-      signedIn = true;
-      const service = getSupabaseServiceClient();
-      if (service) {
-        const { data: rows } = await service
-          .from('cart_items')
-          .select('tarball_id')
-          .eq('buyer_id', data.user.id);
-        cartIds = (rows ?? []).map((r: any) => r.tarball_id);
-      }
-    } else {
-      cartIds = readCartCookie();
+  const supabase = getSupabaseServerClient();
+  const { data } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
+  if (data?.user) {
+    signedIn = true;
+    const service = getSupabaseServiceClient();
+    if (service) {
+      const { data: cartRows } = await service
+        .from('cart_items')
+        .select('tarball_id')
+        .eq('buyer_id', data.user.id);
+      cartIds = (cartRows ?? []).map((r: any) => r.tarball_id);
     }
   } else {
     cartIds = readCartCookie();
   }
 
   const items = cartIds.map((id) => byId.get(id)).filter(Boolean) as CatalogTarball[];
-  return { items, liveMode, stripeConfigured: isStripeConfigured(), signedIn };
+  return { items, signedIn };
 }
 
 export default async function CheckoutPage() {
-  const { items, liveMode, stripeConfigured, signedIn } = await loadCheckout();
+  // Howard 2026-05-07 IRON-LAW: hard-gate. Both Supabase (cart, buyer)
+  // and Stripe (checkout session) are required to render this page.
+  if (!isSupabaseConfigured()) {
+    return (
+      <NotConfigured
+        service="Supabase"
+        envVars={['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY']}
+        docsUrl="/docs#supabase-setup"
+      />
+    );
+  }
+  if (!isStripeConfigured()) {
+    return (
+      <NotConfigured
+        service="Stripe Checkout"
+        envVars={['STRIPE_SECRET_KEY', 'STRIPE_PUBLISHABLE_KEY']}
+        docsUrl="/docs#stripe-setup"
+      />
+    );
+  }
+
+  let checkoutState: Awaited<ReturnType<typeof loadCheckout>>;
+  try {
+    checkoutState = await loadCheckout();
+  } catch (err) {
+    if (err instanceof CatalogNotConfiguredError) {
+      return (
+        <NotConfigured
+          service="Supabase"
+          envVars={err.envVars}
+          docsUrl="/docs#supabase-setup"
+        />
+      );
+    }
+    throw err;
+  }
+  const { items, signedIn } = checkoutState;
 
   const subtotal = totalCents(items.map((i) => i.size_bytes), env.pricePerGbCents, 0);
   const research = totalCents(items.map((i) => i.size_bytes), env.pricePerGbCents, env.researchDiscountPct);
@@ -58,11 +89,6 @@ export default async function CheckoutPage() {
           <h1 className="text-3xl font-bold">Checkout</h1>
           <p className="text-sm text-oyster-300 mt-1">
             Review your order, pick a license, pay through Stripe.
-            {!stripeConfigured && (
-              <span className="ml-2 text-amber-accent">
-                [DEV MODE: Stripe not configured — checkout is faked]
-              </span>
-            )}
           </p>
         </div>
         <Link href="/cart" className="btn-ghost">← Back to cart</Link>
@@ -126,7 +152,6 @@ export default async function CheckoutPage() {
                 price_cents: i.price_cents,
               }))}
               signedIn={signedIn}
-              devMode={!liveMode || !stripeConfigured}
             />
           </div>
 

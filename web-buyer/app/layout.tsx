@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { SiteHeader } from '../components/SiteHeader';
-import { DevModeBanner } from '../components/DevModeBanner';
 
 export const metadata: Metadata = {
   title: 'Oyster GameData — License real Minecraft gameplay for AI training',
@@ -20,7 +19,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="min-h-screen flex flex-col">
-        <DevModeBanner />
         <SiteHeader />
         <main className="flex-1">{children}</main>
         <footer className="border-t border-oyster-800/60 py-6 text-center text-sm text-oyster-400">

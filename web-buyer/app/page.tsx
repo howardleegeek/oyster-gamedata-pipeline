@@ -1,14 +1,37 @@
 import Link from 'next/link';
-import { env } from '../lib/env';
-import { fetchCatalog } from '../lib/catalog';
+import { env, isSupabaseConfigured } from '../lib/env';
+import { fetchCatalog, CatalogNotConfiguredError } from '../lib/catalog';
 import { TarballCard } from '../components/TarballCard';
+import { NotConfigured } from '../components/NotConfigured';
 import { formatCents } from '../lib/format';
 
 export const dynamic = 'force-dynamic';
 
 export default async function LandingPage() {
   const pricePerGb = formatCents(env.pricePerGbCents);
-  const { rows } = await fetchCatalog({ limit: 3 });
+
+  // Howard 2026-05-07 IRON-LAW: marketing copy is real product copy, but
+  // the "Featured tarballs" grid is real catalog data — so we skip the
+  // grid when Supabase isn't configured, instead of fabricating tarballs.
+  let rows: Awaited<ReturnType<typeof fetchCatalog>>['rows'] = [];
+  let catalogError: { envVars: string[] } | null = null;
+  try {
+    if (isSupabaseConfigured()) {
+      const result = await fetchCatalog({ limit: 3 });
+      rows = result.rows;
+    } else {
+      catalogError = {
+        envVars: ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY'],
+      };
+    }
+  } catch (err) {
+    if (err instanceof CatalogNotConfiguredError) {
+      catalogError = { envVars: err.envVars };
+    } else {
+      // Real DB error — surface it instead of masking with sample data.
+      catalogError = { envVars: [] };
+    }
+  }
 
   return (
     <div className="hero-bg">
@@ -66,20 +89,30 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* Featured tarballs */}
-      <section className="max-w-6xl mx-auto px-4 py-12 md:py-16 border-t border-oyster-800/40">
-        <div className="flex items-end justify-between mb-6">
-          <h2 className="text-3xl font-bold">Featured tarballs</h2>
-          <Link href="/browse" className="btn-ghost">
-            See all →
-          </Link>
-        </div>
-        <div className="grid md:grid-cols-3 gap-5">
-          {rows.map((t) => (
-            <TarballCard key={t.id} t={t} />
-          ))}
-        </div>
-      </section>
+      {/* Featured tarballs — skipped when catalog isn't reachable. */}
+      {catalogError ? (
+        <section className="max-w-6xl mx-auto px-4 py-12 md:py-16 border-t border-oyster-800/40">
+          <h2 className="text-3xl font-bold mb-6">Featured tarballs</h2>
+          <NotConfigured
+            service="Supabase"
+            envVars={catalogError.envVars.length > 0 ? catalogError.envVars : ['SUPABASE_*']}
+          />
+        </section>
+      ) : rows.length > 0 ? (
+        <section className="max-w-6xl mx-auto px-4 py-12 md:py-16 border-t border-oyster-800/40">
+          <div className="flex items-end justify-between mb-6">
+            <h2 className="text-3xl font-bold">Featured tarballs</h2>
+            <Link href="/browse" className="btn-ghost">
+              See all →
+            </Link>
+          </div>
+          <div className="grid md:grid-cols-3 gap-5">
+            {rows.map((t) => (
+              <TarballCard key={t.id} t={t} />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {/* Why */}
       <section className="max-w-6xl mx-auto px-4 py-12 md:py-20 border-t border-oyster-800/40">

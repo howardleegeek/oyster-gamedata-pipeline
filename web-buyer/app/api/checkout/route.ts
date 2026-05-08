@@ -7,17 +7,14 @@
  * /api/checkout/webhook is the authoritative source of truth for fulfilment
  * — DO NOT mark anything purchased here.
  *
- * Two failure modes both return a usable response:
- *   1. Stripe NOT configured (DEV / no secret key) -> we mint a deterministic
- *      `dev_session_<uuid>` id, write the purchases + licenses ourselves, and
- *      return /downloads?session_id=... so the UI flow finishes end-to-end.
- *   2. Stripe configured but Supabase is not -> we still create the live
- *      Stripe session, but add a `dev_supabase=1` query param so /downloads
- *      knows to render sample purchases for the redirected buyer.
+ * Howard 2026-05-07 IRON-LAW: when Stripe or Supabase isn't configured, we
+ * return 503 with the required envVars. The previous behaviour minted
+ * fabricated dev-prefixed Stripe session ids and wrote a dev-marked
+ * purchase mode flag to the DB — that was fake financial data shipping
+ * in production source. No more.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'node:crypto';
 import { z } from 'zod';
 import {
   isStripeConfigured,
@@ -27,9 +24,8 @@ import {
 import { getStripe } from '../../../lib/stripe';
 import {
   getSupabaseServerClient,
-  getSupabaseServiceClient,
 } from '../../../lib/supabase-server';
-import { fetchCatalog } from '../../../lib/catalog';
+import { fetchCatalog, CatalogNotConfiguredError } from '../../../lib/catalog';
 import { totalCents } from '../../../lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -39,15 +35,27 @@ const Body = z.object({
   license_type: z.enum(['research', 'commercial']),
 });
 
-function buildSuccessUrl(sessionId: string): string {
-  // Replace Stripe's placeholder {CHECKOUT_SESSION_ID} when we know the id
-  // ahead of time (DEV path). LIVE Stripe Checkout will fill the template
-  // itself when it redirects.
-  const path = env.stripeSuccessPath.replace('{CHECKOUT_SESSION_ID}', sessionId);
-  return new URL(path, env.siteUrl).toString();
-}
-
 export async function POST(req: NextRequest) {
+  // Howard 2026-05-07 IRON-LAW: hard-gate. No fake-session fallback.
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json(
+      {
+        error: 'Supabase not configured',
+        envVars: ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY'],
+      },
+      { status: 503 },
+    );
+  }
+  if (!isStripeConfigured()) {
+    return NextResponse.json(
+      {
+        error: 'Stripe Checkout not configured',
+        envVars: ['STRIPE_SECRET_KEY', 'STRIPE_PUBLISHABLE_KEY'],
+      },
+      { status: 503 },
+    );
+  }
+
   let payload: unknown;
   try {
     payload = await req.json();
@@ -63,8 +71,23 @@ export async function POST(req: NextRequest) {
   }
   const { tarball_ids, license_type } = parsed.data;
 
-  // Resolve the cart items against the catalog so we know titles + prices.
-  const { rows: catalog } = await fetchCatalog({ limit: 200 });
+  // Resolve the cart items against the catalog.
+  let catalog: Awaited<ReturnType<typeof fetchCatalog>>['rows'];
+  try {
+    const result = await fetchCatalog({ limit: 200 });
+    catalog = result.rows;
+  } catch (err) {
+    if (err instanceof CatalogNotConfiguredError) {
+      return NextResponse.json(
+        { error: err.message, envVars: err.envVars },
+        { status: 503 },
+      );
+    }
+    return NextResponse.json(
+      { error: 'Catalog read failed', details: err instanceof Error ? err.message : String(err) },
+      { status: 502 },
+    );
+  }
   const byId = new Map(catalog.map((r) => [r.id, r]));
   const items = tarball_ids.map((id) => byId.get(id)).filter(Boolean) as typeof catalog;
   if (items.length === 0) {
@@ -82,90 +105,25 @@ export async function POST(req: NextRequest) {
     discountPct,
   );
 
-  // Recover or create a buyer id. In LIVE mode we require the user to be
-  // signed in BEFORE creating a Stripe session — middleware already gates
-  // /checkout but the cart redirector lands here directly so we double-check.
-  let buyerId: string | null = null;
-  let buyerEmail: string | undefined;
-  if (isSupabaseConfigured()) {
-    const supabase = getSupabaseServerClient();
-    const { data } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
-    if (data?.user) {
-      buyerId = data.user.id;
-      buyerEmail = data.user.email ?? undefined;
-    } else if (isStripeConfigured()) {
-      // Refuse to create a real Stripe session without an authenticated buyer.
-      return NextResponse.json(
-        { error: 'Sign in required before checkout' },
-        { status: 401 },
-      );
-    }
+  // Require an authenticated buyer.
+  const supabase = getSupabaseServerClient();
+  if (!supabase) {
+    return NextResponse.json({ error: 'Supabase server client unavailable' }, { status: 500 });
   }
-
-  // ------------------------------------------------------------------
-  // DEV PATH — Stripe not configured. Synthesize a session id + write
-  // purchase rows directly (only if the schema is applied). Either way,
-  // return a /downloads URL so the UI flow completes.
-  // ------------------------------------------------------------------
-  if (!isStripeConfigured()) {
-    const fakeSession = `dev_session_${crypto.randomUUID()}`;
-
-    if (buyerId && isSupabaseConfigured()) {
-      const service = getSupabaseServiceClient();
-      if (service) {
-        // Compute per-item price after the flat discount so the
-        // licensed amounts on /downloads sum to the cart total.
-        const perItem = items.map((t) => {
-          const base = t.price_cents;
-          const discounted = Math.max(
-            base - Math.floor((base * discountPct) / 100),
-            0,
-          );
-          return { tarball_id: t.id, amount_cents: discounted };
-        });
-
-        const { data: purchaseRows } = await service
-          .from('purchases')
-          .insert(
-            perItem.map((p) => ({
-              buyer_id: buyerId,
-              tarball_id: p.tarball_id,
-              amount_cents: p.amount_cents,
-              stripe_session_id: fakeSession,
-            })),
-          )
-          .select('id');
-
-        if (purchaseRows) {
-          await service.from('licenses').insert(
-            (purchaseRows as { id: string }[]).map((p) => ({
-              purchase_id: p.id,
-              type: license_type,
-              terms_url: `/licenses#${license_type}`,
-            })),
-          );
-          // Update licenses' purchase_id back-reference and clear cart.
-          // (Step done below — schema has trigger)
-          await service.from('cart_items').delete().eq('buyer_id', buyerId);
-        }
-      }
-    }
-
-    return NextResponse.json({
-      url: buildSuccessUrl(fakeSession),
-      session_id: fakeSession,
-      mode: 'dev_fake',
-      total_cents: discountedTotalCents,
-    });
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData?.user) {
+    return NextResponse.json(
+      { error: 'Sign in required before checkout' },
+      { status: 401 },
+    );
   }
+  const buyerId = userData.user.id;
+  const buyerEmail = userData.user.email ?? undefined;
 
   // ------------------------------------------------------------------
   // LIVE PATH — real Stripe Checkout session.
   // ------------------------------------------------------------------
   const stripe = getStripe();
-  if (!stripe) {
-    return NextResponse.json({ error: 'Stripe SDK unavailable' }, { status: 500 });
-  }
 
   const successUrl = new URL(
     env.stripeSuccessPath.replace('{CHECKOUT_SESSION_ID}', '{CHECKOUT_SESSION_ID}'),
@@ -196,13 +154,13 @@ export async function POST(req: NextRequest) {
         };
       }),
       metadata: {
-        buyer_id: buyerId ?? '',
+        buyer_id: buyerId,
         license_type,
         tarball_ids: tarball_ids.join(','),
       },
       payment_intent_data: {
         metadata: {
-          buyer_id: buyerId ?? '',
+          buyer_id: buyerId,
           license_type,
         },
       },
