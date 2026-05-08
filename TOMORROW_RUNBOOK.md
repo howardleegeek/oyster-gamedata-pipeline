@@ -66,43 +66,47 @@ Discovered while running `gh run list`:
 
 ## What you have to do (can't be automated overnight)
 
-### 1. Push the commits — needs you
-The push-to-main guard refused my generic auto-mode pre-auth. You'll
-push after coffee:
-
-```bash
-git log --oneline origin/main..HEAD
-# expect to see at minimum:
-#   5ae84a3 fix(IRON-LAW): full audit ...
-#   <pending> fix(ci): green up failing lanes + portal lockfiles
-git push origin main
+### 1. Push the commits — DONE
+Pushed during the morning session under explicit auth:
 ```
+a4a3367  fix(ci+overnight): green CI lanes + portal lockfiles + tomorrow runbooks
+c784c70  fix(ci): black format + default RECORDER_EXE_URL to v0.26.0 GitHub Release
+```
+On origin/main now. Watch CI at:
+https://github.com/howardleegeek/oyster-gamedata-pipeline/actions
 
-### 2. Provision real Supabase + Stripe keys — needs you
-The portals NOW hard-gate when keys are missing. Without them, every
-page on `/dashboard`, `/payouts`, `/browse`, `/cart`, `/checkout`,
-`/downloads`, etc. renders `<NotConfigured>` and the testers/buyers
-will not see anything beyond that amber panel.
+### 2. Provision real Supabase keys — needs you (REQUIRED for demo)
 
-Required to copy into Vercel project env (or `.env.local` for local):
+> **Stripe deferred — Howard 2026-05-08:** Stripe is NOT required for
+> tomorrow's real-user test. The demo scope is recording → upload →
+> dashboard (tester) and browse → inspect (buyer). Stripe-gated pages
+> (`/payouts`, `/cart`, `/checkout`) will render `<NotConfigured>` —
+> just don't click into them during the live demo.
 
-**web-tester:**
+**web-tester (REQUIRED for demo):**
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- `STRIPE_SECRET_KEY` (must start `sk_`)
 - `NEXT_PUBLIC_SITE_URL` (your Vercel deploy URL)
-- `RECORDER_EXE_URL` → public GitHub Releases asset URL OR drop the .exe
-  into `web-tester/public/downloads/OysterRecorder.exe`
+- `RECORDER_EXE_URL` → already defaulted to v0.26.0 GitHub Release in
+  `lib/env.ts`, no Vercel override needed unless you want a different
+  build per environment
 
-**web-buyer:**
+**web-tester (POST-DEMO, can skip tomorrow):**
+- `STRIPE_SECRET_KEY` (`/payouts` will show NotConfigured until set —
+  fine for demo, just don't click that nav link)
+- `STRIPE_WEBHOOK_SECRET`, `STRIPE_CONNECT_CLIENT_ID`
+
+**web-buyer (REQUIRED for demo):**
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- `STRIPE_SECRET_KEY`
-- `STRIPE_PUBLISHABLE_KEY`
-- `STRIPE_WEBHOOK_SECRET`
 - `NEXT_PUBLIC_SITE_URL`
+
+**web-buyer (POST-DEMO, can skip tomorrow):**
+- `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`
+  (`/cart` and `/checkout` will show NotConfigured until set — buyer
+  demo stops at /tarball/[id] tomorrow, that's the "early access" pitch)
 
 ### 3. .exe Windows verification — needs real hardware
 Mac can't run the Windows .exe. Either:
@@ -110,11 +114,20 @@ Mac can't run the Windows .exe. Either:
 - Brief the tester that they'll be the first run (have a fallback plan
   if SmartScreen blocks the unsigned binary)
 
+The .exe is at the GitHub Release URL (407 MB, signed-build SHA-256
+`5c0aa4b3...`):
+https://github.com/howardleegeek/oyster-gamedata-pipeline/releases/download/recorder-v0.26.0-real-game-state/OysterRecorder.exe
+
 ### 4. Apply Supabase migrations — needs your project
 ```bash
 # in supabase/ for both portals — buyer schema ADDS new tables
-supabase db push  # or run the SQL files manually
+supabase db push  # or paste the migration SQL into the dashboard editor
 ```
+Files (already on main):
+- `web-tester/supabase/migrations/20260507000000_init.sql`
+- `web-tester/supabase/migrations/20260507100000_stripe_connect.sql`
+  (run this anyway — the schema is harmless without Stripe configured)
+- `web-buyer/supabase/migrations/20260507000000_buyer_init.sql`
 
 ---
 
@@ -122,10 +135,11 @@ supabase db push  # or run the SQL files manually
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Tester sees amber "Supabase not configured" panel | Vercel env var not set on this branch | Add the env var in Vercel dashboard, redeploy |
-| Tester sees 404 on `Download .exe` button | `web-tester/public/downloads/OysterRecorder.exe` not present, or `RECORDER_EXE_URL` not pointing at GitHub Release | Drop the .exe into the public/ folder OR set the env var |
+| Tester sees amber "Supabase not configured" panel on /dashboard | Vercel Supabase env var not set | Add the var in Vercel → redeploy |
+| Tester sees 404 on `Download .exe` button | `RECORDER_EXE_URL` overridden to a bad value | Unset the override; default is the v0.26.0 Release URL |
 | Upload returns 503 | `SUPABASE_SERVICE_ROLE_KEY` missing on the deployed env | Add it in Vercel → redeploy |
-| Buyer sees "Stripe Checkout not configured" | Both `STRIPE_SECRET_KEY` and `STRIPE_PUBLISHABLE_KEY` need to be set | Add both in Vercel |
+| Tester sees "Stripe Connect not configured" on /payouts | Expected (Stripe deferred for tomorrow's demo) | **Don't click /payouts** during demo, or set `STRIPE_SECRET_KEY` |
+| Buyer sees "Stripe Checkout not configured" on /cart or /checkout | Expected (Stripe deferred for tomorrow's demo) | **Stop buyer demo at /tarball/[id]** — that's the "early access" pitch |
 | Cart says "Sign in required before checkout" | Buyer not signed in (this is correct, not a bug) | Sign in via GitHub or magic link |
 
 ---

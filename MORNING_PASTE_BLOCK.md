@@ -18,7 +18,11 @@ gh run watch  # or open https://github.com/howardleegeek/oyster-gamedata-pipelin
 
 Open https://vercel.com/dashboard, find both projects, **Settings → Environment Variables → Production**:
 
-### web-tester project
+> **Howard 2026-05-08 — Stripe deferred for tomorrow's demo.** Two
+> blocks per project: REQUIRED-FOR-DEMO (paste these) and
+> LATER-POST-DEMO (paste these AFTER tomorrow's session).
+
+### web-tester project — REQUIRED FOR DEMO
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR-TESTER-PROJECT.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...   # from Supabase dashboard → Project Settings → API
@@ -27,14 +31,19 @@ SUPABASE_TARBALL_BUCKET=tarballs
 NEXT_PUBLIC_SITE_URL=https://YOUR-TESTER-DEPLOY.vercel.app
 GAMEDATA_RATE_PER_HOUR_CENTS=600
 GAMEDATA_MIN_PAYOUT_CENTS=2000
-RECORDER_EXE_URL=https://github.com/howardleegeek/oyster-gamedata-pipeline/releases/download/recorder-v0.26.0-real-game-state/OysterRecorder.exe
 RECORDER_VERSION=0.26.0
+# RECORDER_EXE_URL — already defaulted in lib/env.ts to v0.26.0 release; leave unset
+```
+
+### web-tester project — LATER (after demo)
+```
+# Wire Stripe to unlock /payouts. Until then it shows <NotConfigured>.
 STRIPE_SECRET_KEY=sk_test_...                  # https://dashboard.stripe.com/test/apikeys
 STRIPE_WEBHOOK_SECRET=whsec_...
 STRIPE_CONNECT_CLIENT_ID=ca_...                # https://dashboard.stripe.com/test/connect/applications
 ```
 
-### web-buyer project
+### web-buyer project — REQUIRED FOR DEMO
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR-BUYER-PROJECT.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
@@ -44,6 +53,13 @@ NEXT_PUBLIC_SITE_URL=https://YOUR-BUYER-DEPLOY.vercel.app
 GAMEDATA_PRICE_PER_GB_CENTS=2500
 GAMEDATA_RESEARCH_DISCOUNT_PCT=40
 DOWNLOAD_LINK_TTL_SECONDS=86400
+```
+
+### web-buyer project — LATER (after demo)
+```
+# Wire Stripe Checkout to unlock /cart, /checkout, /downloads.
+# Until then those pages show <NotConfigured>; buyer demo stops at
+# /tarball/[id] which is the "early access catalog" pitch.
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_PUBLISHABLE_KEY=pk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
@@ -51,7 +67,7 @@ STRIPE_CHECKOUT_SUCCESS_PATH=/downloads?session_id={CHECKOUT_SESSION_ID}
 STRIPE_CHECKOUT_CANCEL_PATH=/cart
 ```
 
-After setting → **Redeploy** both projects.
+After setting REQUIRED block → **Redeploy** both projects.
 
 ---
 
@@ -71,11 +87,13 @@ Asset URL (407 MB): https://github.com/howardleegeek/oyster-gamedata-pipeline/re
 
 Open https://app.supabase.com → your project → SQL Editor → New query.
 
-### Tester portal project (run BOTH, in order):
+### Tester portal project (REQUIRED for demo):
 1. `web-tester/supabase/migrations/20260507000000_init.sql`
+
+### Tester portal project (RUN ANYWAY — adds the Stripe Connect columns; harmless without Stripe configured, ready for next week):
 2. `web-tester/supabase/migrations/20260507100000_stripe_connect.sql`
 
-### Buyer portal project:
+### Buyer portal project (REQUIRED for demo):
 3. `web-buyer/supabase/migrations/20260507000000_buyer_init.sql`
 
 OR use the CLI if you have it linked:

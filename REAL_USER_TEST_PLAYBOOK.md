@@ -4,6 +4,16 @@
 tester / buyer experiences themselves. Iron-law: every screen they
 see has either real data or `<NotConfigured>` — never a fabrication.**
 
+> **Howard 2026-05-08 — Stripe deferred for this demo.** Scope is:
+>
+> **Tester:** signup → download .exe → record gameplay → upload tarball → see real entry on /dashboard.
+> Skip flow A4 (Stripe Connect onboarding); /payouts will render `<NotConfigured>` (that's the iron-law-honest "coming soon" state).
+>
+> **Buyer:** browse catalog → inspect a tarball detail → see real preview JSON.
+> Stop at /tarball/[id]. Skip flows B3 (cart→checkout) + B4 (download); /cart and /checkout will render `<NotConfigured>`.
+>
+> The "early access" pitch is: *"This is what's live today — recording + catalog. Payments next week."*
+
 ---
 
 ## Setup before the tester arrives
@@ -66,15 +76,21 @@ in `pending` verdict (D5 will grade it later).
 **Fail mode:** Tarball appears but never moves out of `pending` → D5
 classifier offline (separate cluster issue).
 
-### A4. View earnings
-1. Click "Payouts" in nav
-2. If Stripe NOT configured: NotConfigured panel listing `STRIPE_SECRET_KEY`
-3. If Stripe configured but tester hasn't onboarded: "Connect Stripe"
-   button → Stripe Express onboarding flow → return to /payouts
-4. Earnings show real $/hr × duration of accepted tarballs
+### A4. View earnings — DEFERRED (Stripe not in this demo)
 
-**Pass:** Tester sees a real Stripe Express dashboard link they can use
-to update their bank account.
+**Skip this flow tomorrow.** Don't click "Payouts" in nav during the
+live demo — it will render `<NotConfigured>` (which is iron-law-honest
+but distracting in front of a fresh tester).
+
+If a tester asks "when do I get paid?" the answer is:
+> *"This week's payouts run as a one-off bank transfer based on accepted
+> tarballs (your /dashboard shows duration + verdict). Stripe Connect
+> automation ships next week — we wanted to ship the recording flow
+> first and prove the data quality."*
+
+When you wire Stripe later: set `STRIPE_SECRET_KEY` in Vercel +
+redeploy. /payouts then shows real Stripe Express onboarding +
+dashboard link, /api/stripe/connect/* routes go live.
 
 ---
 
@@ -106,31 +122,33 @@ the ingest pipeline hasn't materialized
 `<bucket>/<tarball_id>/action_camera_preview.jsonl`. Run
 `bin/regenerate_action_camera_preview.py` (TODO if it doesn't exist).
 
-### B3. Add to cart + checkout
-1. Click "Add to cart" → button changes to "In cart"
-2. Click cart icon → `/cart`
-3. Pick license type (Research vs Commercial)
-4. Click "Proceed to checkout"
-5. If buyer not signed in → bounce to `/login` first
-6. After sign-in: real Stripe Checkout session created
-7. Stripe-hosted checkout page opens (use a test card: `4242 4242 4242 4242`)
-8. Pay → redirects back to `/downloads?session_id=cs_test_...`
+### B3. Add to cart + checkout — DEFERRED (Stripe not in this demo)
 
-**Pass:** Buyer lands on `/downloads`, sees the purchased tarball with
-"Download .tar.gz" button.
+**Stop the buyer demo at /tarball/[id] tomorrow.** Don't click "Add to
+cart" or navigate to /cart or /checkout — they all render
+`<NotConfigured>` until Stripe is wired.
 
-**Fail mode:** "Stripe Checkout not configured" → both
-`STRIPE_SECRET_KEY` and `STRIPE_PUBLISHABLE_KEY` need to be set.
-**Fail mode:** "Sign in required before checkout" → expected, just sign in.
+If a buyer asks "how do I license this?" the answer is:
+> *"You're looking at our early-access catalog — same real tarballs we'll
+> charge $25/GB for next week. The Stripe checkout integration is
+> built and tested locally, we're just holding the live keys until our
+> Connect onboarding completes. If you want first-pick licensing,
+> drop your email at gamedata@oyster.example and we'll wire you up
+> manually this week."*
 
-### B4. Download tarball + license cert
-1. From `/downloads`, click "Download .tar.gz"
-2. Browser starts downloading the real tarball from a signed S3-style URL
-   (TTL 24h)
-3. Click "Download cert" — text license certificate downloads with the
-   buyer's real email, the tarball's real SHA-256, and the amount paid.
+When you wire Stripe later: set `STRIPE_SECRET_KEY` +
+`STRIPE_PUBLISHABLE_KEY` + `STRIPE_WEBHOOK_SECRET` in Vercel +
+redeploy. /cart and /checkout then go live.
 
-**Pass:** Real tar.gz downloads, opens, contains real video/depth/JSONL.
+### B4. Download tarball + license cert — DEFERRED (Stripe gated)
+
+Same deferral. /downloads requires a real purchase row in the DB,
+which can't exist without Stripe Checkout having created one. Skip
+in tomorrow's demo.
+
+(Alternatively: pre-seed a buyer + purchase row manually in Supabase
+if you want to demo the download UX without Stripe — but this is more
+trouble than it's worth for tomorrow.)
 
 ---
 
@@ -161,13 +179,18 @@ If any appear: the deploy is running an old commit. Force-redeploy.
 > we pay them six dollars an hour, and we sell the data to AI labs at
 > twenty-five dollars a gigabyte. Every tarball is graded by our D5
 > quality model — we surface the score so buyers filter by quality.
+>
 > Tester signs up here [show /signup], downloads a recorder build with
 > their ID baked into the filename [show /download], plays Minecraft,
-> and uploads tarballs [show /dashboard]. Buyer browses a catalog
-> [show /browse], inspects a sample [show /tarball/<id>], adds to cart,
-> pays via Stripe [show /checkout], gets a 24-hour signed download
-> link plus a license certificate [show /downloads]. License-clean,
-> quality-graded, multi-modal. No scraped Twitch footage. No DMCA risk."
+> and uploads tarballs [show /dashboard with real entry].
+>
+> Buyer browses the catalog [show /browse], inspects a sample with
+> real action_camera traces [show /tarball/<id> + Download sample JSON].
+>
+> Stripe checkout + automated payouts ship next week — today we're
+> proving the recording → upload → quality-grading loop with real
+> testers. License-clean, quality-graded, multi-modal. No scraped
+> Twitch footage. No DMCA risk."
 
 ---
 
