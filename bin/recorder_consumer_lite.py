@@ -85,7 +85,18 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.26.0-real-game-state"
+RECORDER_VERSION = "lite-v0.27.0-iron-law-strict"
+
+# R01 iron-law: supported MC versions for real game-state Fabric mod.
+# Kept in sync with .github/workflows/build-mc-mod.yml matrix.
+SUPPORTED_MC_VERSIONS = [
+    "1.20.1", "1.20.2", "1.20.4", "1.20.6",
+    "1.21.1", "1.21.2", "1.21.3", "1.21.4", "1.21.5",
+]
+
+
+class RecorderError(RuntimeError):
+    """Hard-fail error for iron-law violations (no silent fallback)."""
 RELEASES_API = (
     "https://api.github.com/repos/howardleegeek/oyster-gamedata-pipeline"
     "/releases?per_page=20"
@@ -491,6 +502,33 @@ def _get_minecraft_window_rect() -> Optional[dict[str, int]]:
         "height": int(rect.bottom - rect.top),
         "recordDpi": dpi,
     }
+
+
+import re as _re  # noqa: E402
+
+_MC_VERSION_RE = _re.compile(r"Minecraft\s+([\d.]+)")
+
+
+def _parse_mc_version_from_title(title: str) -> Optional[str]:
+    """Extract Minecraft version from window title (any locale).
+
+    Works for titles like:
+      - "Minecraft 1.21.4"
+      - "Minecraft 1.21.4 - 单人游戏"
+      - "Minecraft 1.21.4 - シングルプレイ"
+    """
+    m = _MC_VERSION_RE.search(title)
+    return m.group(1) if m else None
+
+
+def _recorder_version_tuple() -> tuple[int, ...]:
+    """Parse RECORDER_VERSION into a comparable numeric tuple.
+
+    "lite-v0.27.0-iron-law-strict" → (0, 27, 0)
+    """
+    import re  # noqa: PLC0415
+    nums = re.findall(r"\d+", RECORDER_VERSION.split("-v")[-1].split("-")[0])
+    return tuple(int(n) for n in nums)
 
 
 class InputCapture:
@@ -1598,10 +1636,9 @@ class RecorderApp(tk.Tk):
         intrinsics = {"fx": round(fy, 3), "fy": round(fy, 3),
                       "cx": 960.0, "cy": 540.0}
 
-        # Howard 2026-05-07: load real game-state from the Fabric mod's
-        # JSONL output if present. Closes the placeholder gap for camera
-        # / player position fields. If JSONL is missing (mod not installed)
-        # we fall back transparently to the existing placeholder values.
+        # R01 iron-law: load real game-state from Fabric mod JSONL.
+        # On v0.26.0+ this is MANDATORY — hard-fail if missing, unless
+        # --allow-placeholder was explicitly passed.
         try:
             from game_state_overlay import load as _gs_load, lookup_at_ms as _gs_lookup, apply_to_record as _gs_apply  # type: ignore  # noqa: PLC0415
         except ImportError:
@@ -1611,7 +1648,22 @@ class RecorderApp(tk.Tk):
         if _gs_samples:
             _trace(f"package: real game-state JSONL found, {len(_gs_samples)} samples — overlay enabled")
         else:
-            _trace("package: no game-state JSONL — using placeholder camera/player fields")
+            ver = _recorder_version_tuple()
+            allow_placeholder = getattr(self, "_allow_placeholder", False)
+            if ver >= (0, 26, 0) and not allow_placeholder:
+                supported_str = ", ".join(SUPPORTED_MC_VERSIONS)
+                raise RecorderError(
+                    "Real game-state Fabric mod not loaded.\n"
+                    f"Detected MC version: {_parse_mc_version_from_title((self._mc_window_rect or {}).get('title', '')) or 'unknown'}\n"
+                    f"Supported mod builds:  {supported_str}\n"
+                    "Download from:        https://github.com/howardleegeek/oyster-gamedata-pipeline/releases/latest\n"
+                    r"Install path:         %APPDATA%\.minecraft\mods" "\n"
+                    "Tarball NOT created."
+                )
+            if allow_placeholder:
+                _trace("package: --allow-placeholder active — using placeholder camera/player fields")
+            else:
+                _trace("package: no game-state JSONL — using placeholder camera/player fields (pre-v0.26.0)")
 
         action_records = []
         for f in range(target_frame_count):
@@ -1861,6 +1913,19 @@ class RecorderApp(tk.Tk):
             json.dumps(sys_info, indent=2), encoding="utf-8"
         )
 
+        # R01: if --allow-placeholder is active and JSONL was missing,
+        # stamp metadata.json with data_authenticity='placeholder' so
+        # buyers can identify non-real game-state tarballs.
+        if getattr(self, "_allow_placeholder", False) and not _gs_samples:
+            meta = {
+                "data_authenticity": "placeholder",
+                "warning": "camera/player fields are constant [0.0, 64.0, 0.0]",
+            }
+            (clip_dir / "metadata.json").write_text(
+                json.dumps(meta, indent=2), encoding="utf-8"
+            )
+            _trace("package: wrote metadata.json with data_authenticity=placeholder")
+
         # Write the tarball into the user's Documents/OysterClips/.
         out_tar = _output_dir() / f"clip-{ts}.tar.gz"
         with tarfile.open(out_tar, "w:gz") as tf:
@@ -1918,68 +1983,65 @@ class RecorderApp(tk.Tk):
     def _start_ffmpeg(self, out_path: Path) -> None:
         """Spawn ffmpeg with gdigrab to record the Minecraft window.
 
-        gdigrab title="Minecraft*" filter records ONLY the MC window. If
-        no exact match, falls back to full desktop capture.
+        R01 v2 (iron-law-strict): ALWAYS uses cropped-desktop capture
+        with geometry from mc_window rect. Title encoding is irrelevant —
+        we use -offset_x/-offset_y/-video_size + -i desktop, which is
+        fully locale-blind. Hard-fails if mc_window is None (no window
+        detected). The old title-based branch has been removed.
 
         v0.11.0: also captures audio via dshow if a device is detected.
         Falls back to video-only if no audio device or audio capture
         fails to start.
         """
-        # H.265 encoded MP4, output locked to 1920x1080 @ 30 fps to
-        # match the buyer-spec PRD (criteria 1 + 3). -draw_mouse 0 hides
-        # cursor in captured frames. -framerate before -i sets input rate.
-        # -vf scale=1920:1080 forces output regardless of monitor res
-        # (tester might have 4K, ultrawide, etc).
-        # -t 360 = 6-minute hard cap so even if Python misses MC exit,
-        # ffmpeg self-terminates and lint won't reject for over-length.
-        # v0.11.0: try to capture audio alongside video.
+        # R01 iron-law: hard-fail if Minecraft window not detected.
+        if self._mc_window_rect is None:
+            raise RecorderError(
+                "Minecraft window not detected. Is Minecraft running and visible?"
+            )
+
+        rect = self._mc_window_rect
+        mc_title = rect.get("title", "")
+        x = rect.get("x", 0)
+        y = rect.get("y", 0)
+        w = rect.get("width", 1920)
+        h = rect.get("height", 1080)
+
+        # R01 D section: parse MC version from title and warn if unsupported.
+        mc_ver = _parse_mc_version_from_title(mc_title)
+        if mc_ver and mc_ver not in SUPPORTED_MC_VERSIONS:
+            _trace(
+                f"WARN: Minecraft {mc_ver} not in supported list. "
+                "Real game-state mod only loads on stable releases. "
+                "Recording will hard-fail at packaging unless you switch "
+                "to a supported version OR pass --allow-placeholder."
+            )
+
+        # Audio probe.
         audio_dev = self._detect_audio_device()
         audio_inputs = []
         audio_codec = []
         if audio_dev:
             audio_inputs = ["-f", "dshow", "-i", f"audio={audio_dev}"]
-            # AAC at 128kbps, 48kHz stereo — common buyer-spec compatible.
             audio_codec = ["-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2"]
             _trace(f"ffmpeg: capturing audio from '{audio_dev}'")
         else:
             _trace("ffmpeg: no audio device found, recording video only")
 
-        # v0.14.0: prefer window-title capture so we only record MC, not
-        # the entire desktop (which includes our own GUI, browser, etc).
-        # Falls back to full desktop if window not found at ffmpeg start
-        # time. The MC window title was already detected in
-        # _get_minecraft_window_rect for systeminfo.json, so use it here
-        # too if available — gives ffmpeg a stable handle that survives
-        # MC moving / resizing.
-        # v0.17.0: only use window-title mode if title is purely ASCII
-        # AND doesn't contain '-' or '?' or other characters ffmpeg's
-        # gdigrab title parser chokes on. Otherwise fall back to full
-        # desktop capture, which always works. Symptom seen in earlier
-        # logs: 'Minecraft 26.2 Snapshot 6 - �?����,,�^?' — title had
-        # mojibake chars + a hyphen, which make ffmpeg silently fail to
-        # find the window and the recording produces 0 bytes.
-        mc_title = (self._mc_window_rect or {}).get("title", "") or ""
-        title_safe = (
-            bool(mc_title)
-            and mc_title.isascii()
-            and "-" not in mc_title
-            and "?" not in mc_title
-            and "<" not in mc_title
-            and ">" not in mc_title
-            and "|" not in mc_title
-            and "/" not in mc_title
-            and "\\" not in mc_title
+        # R01 v2: always cropped-desktop capture using detected geometry.
+        # locale-blind — title encoding never participates in the ffmpeg cmd.
+        video_input = [
+            "-f", "gdigrab",
+            "-framerate", "30",
+            "-draw_mouse", "0",
+            "-offset_x", str(x),
+            "-offset_y", str(y),
+            "-video_size", f"{w}x{h}",
+            "-i", "desktop",
+        ]
+        _trace(
+            f"ffmpeg: window-area capture title='{mc_title}' "
+            f"geometry={x},{y},{w},{h}"
         )
-        if title_safe:
-            video_input = ["-f", "gdigrab", "-framerate", "30",
-                           "-draw_mouse", "0",
-                           "-i", f"title={mc_title}"]
-            _trace(f"ffmpeg: window-mode capture title='{mc_title}'")
-        else:
-            video_input = ["-f", "gdigrab", "-framerate", "30",
-                           "-draw_mouse", "0",
-                           "-i", "desktop"]
-            _trace(f"ffmpeg: full-desktop capture (title unsafe={mc_title!r})")
 
         cmd = [
             str(_FFMPEG),
@@ -2131,9 +2193,27 @@ def _try_install_mod_first_launch() -> None:
 
 
 def main() -> int:
+    import argparse  # noqa: PLC0415
+    parser = argparse.ArgumentParser(description="OysterRecorder")
+    parser.add_argument(
+        "--allow-placeholder",
+        action="store_true",
+        default=False,
+        help="Allow placeholder camera/player fields (marks tarball as non-real)",
+    )
+    args, _unknown = parser.parse_known_args()
+
+    # R01 D section: print supported MC versions at startup.
+    supported_str = ", ".join(SUPPORTED_MC_VERSIONS)
+    _trace(
+        f"OysterRecorder {RECORDER_VERSION} — supported Minecraft versions "
+        f"for real game-state:\n  {supported_str}"
+    )
+
     try:
         _try_install_mod_first_launch()
         app = RecorderApp()
+        app._allow_placeholder = args.allow_placeholder  # type: ignore[attr-defined]
         app.mainloop()
         return 0
     except SystemExit:

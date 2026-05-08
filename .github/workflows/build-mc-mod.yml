@@ -26,15 +26,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Howard 2026-05-07: full 4-version matrix restored after CodexResearcher
-        # agent verified actual fabric-api / yarn / loader coordinates against
-        # maven.fabricmc.net via direct HTTP fetch. See build.gradle MC_MATRIX
-        # comment for verification timestamps.
+        # R01 (2026-05-08): expanded to all 9 stable MC versions.
+        # Coordinates verified against meta.fabricmc.net + maven.fabricmc.net.
         mc_version:
           - "1.20.1"
+          - "1.20.2"
           - "1.20.4"
+          - "1.20.6"
           - "1.21.1"
+          - "1.21.2"
+          - "1.21.3"
           - "1.21.4"
+          - "1.21.5"
 
     steps:
       - name: Checkout
@@ -94,3 +97,50 @@ jobs:
           name: oyster-recorder-mod-mc${{ matrix.mc_version }}
           path: mc-mod/build/libs/oyster-recorder-mod-*-mc${{ matrix.mc_version }}.jar
           if-no-files-found: error
+
+  # R01: snapshot best-effort lane. Tries the latest MC snapshot but
+  # failure does NOT block the release (continue-on-error: true).
+  build-snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Bootstrap gradlew if missing
+        working-directory: mc-mod
+        run: |
+          if [ ! -f gradlew ]; then
+            gradle wrapper --gradle-version 8.10
+          fi
+
+      - name: Fetch latest MC snapshot version
+        id: snapshot
+        run: |
+          SNAP=$(curl -s https://meta.fabricmc.net/v2/versions/game | python3 -c "
+          import json,sys
+          versions = json.load(sys.stdin)
+          snaps = [v['version'] for v in versions if not v.get('stable', False)]
+          print(snaps[0] if snaps else '')
+          ")
+          echo "version=$SNAP" >> "$GITHUB_OUTPUT"
+          echo "Detected latest snapshot: $SNAP"
+
+      - name: Build mod for snapshot ${{ steps.snapshot.outputs.version }}
+        if: steps.snapshot.outputs.version != ''
+        working-directory: mc-mod
+        env:
+          MC_VERSION: ${{ steps.snapshot.outputs.version }}
+        run: |
+          echo "::notice::Attempting best-effort snapshot build for MC $MC_VERSION"
+          ./gradlew build --no-daemon --info || echo "::warning::Snapshot $MC_VERSION not yet supported — this is expected"
