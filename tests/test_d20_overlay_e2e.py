@@ -134,8 +134,8 @@ def _emit_phase1_bundle(bundle_dir: Path, *, n_obs: int = 200) -> None:
 
 def test_e2e_overlay_produces_real_action_camera(tmp_path):
     """Full Python pipeline:
-        synthetic JSONL → adapter w/ overlay → action_camera with
-        _real_game_state=True → D5 classifies REAL (mod-driven).
+    synthetic JSONL → adapter w/ overlay → action_camera with
+    _real_game_state=True → D5 classifies REAL (mod-driven).
     """
     bundle_dir = tmp_path / "phase1_bundle"
     output_dir = tmp_path / "buyer_out"
@@ -167,8 +167,7 @@ def test_e2e_overlay_produces_real_action_camera(tmp_path):
     # the JSONL time window if the synthetic data is shorter).
     ratio = len(flagged) / len(records)
     assert ratio > 0.8, (
-        f"only {ratio:.1%} of records have _real_game_state — overlay "
-        f"didn't reach most frames"
+        f"only {ratio:.1%} of records have _real_game_state — overlay " f"didn't reach most frames"
     )
 
     # Verify position values are real (non-constant, non-default).
@@ -181,12 +180,8 @@ def test_e2e_overlay_produces_real_action_camera(tmp_path):
     # Now run D5 classifier and assert REAL (mod-driven) verdict.
     tac = _load_tac()
     state, evidence = tac._classify_action_camera(ac_path)
-    assert state == tac.REAL, (
-        f"D5 verdict is {state}, expected REAL. Evidence: {evidence}"
-    )
-    assert "mod-driven" in evidence, (
-        f"D5 should classify as mod-driven (tier 0), got: {evidence}"
-    )
+    assert state == tac.REAL, f"D5 verdict is {state}, expected REAL. Evidence: {evidence}"
+    assert "mod-driven" in evidence, f"D5 should classify as mod-driven (tier 0), got: {evidence}"
 
 
 def test_e2e_no_overlay_falls_back_cleanly(tmp_path):
@@ -252,17 +247,31 @@ def test_e2e_overlay_jsonl_shape_matches_d15_canonical():
     from game_state_overlay import load as gs_load  # type: ignore  # noqa: PLC0415
 
     EXPECTED_FIELDS = {
-        "tick", "timestamp_ms", "x", "y", "z",
-        "yaw_deg", "pitch_deg",
-        "look_x", "look_y", "look_z",
-        "velocity_x", "velocity_y", "velocity_z",
-        "on_ground", "sneaking", "sprinting",
-        "dimension", "game_mode",
+        "tick",
+        "timestamp_ms",
+        "x",
+        "y",
+        "z",
+        "yaw_deg",
+        "pitch_deg",
+        "look_x",
+        "look_y",
+        "look_z",
+        "velocity_x",
+        "velocity_y",
+        "velocity_z",
+        "on_ground",
+        "sneaking",
+        "sprinting",
+        "dimension",
+        "game_mode",
     }
 
     import tempfile  # noqa: PLC0415
-    with tempfile.NamedTemporaryFile(suffix=".jsonl", mode="w",
-                                     delete=False, encoding="utf-8") as fh:
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".jsonl", mode="w", delete=False, encoding="utf-8"
+    ) as fh:
         path = Path(fh.name)
     _emit_synthetic_jsonl(path, n_ticks=5)
     samples = gs_load(path)

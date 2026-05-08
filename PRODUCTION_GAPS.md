@@ -128,17 +128,74 @@ with testers.
 
 ---
 
-## 🟡 5. Other CI lanes failing
+## 🟡 5. Other CI lanes status
 
-`gh run list --status failure --limit 5`:
-- "Test" — needs investigation
-- "G189 · Heartbeat Skip Check" — needs investigation
-- "Deploy Web Buyer (Vercel)" — gap #1 above
-- "Deploy Web Tester (Vercel)" — gap #1 above
+`gh run list`:
+- "Test" — was failing on `black --check src/ tests/`. **Closed tonight:** reformatted 4 test files (`test_d19_multi_mc_version.py`, `test_d20_overlay_e2e.py`, `test_iron_law_no_fake_data.py`, `test_web_workflows.py`).
+- "G189 · Heartbeat Skip Check" — periodic, last seen succeeding then failing intermittently. Not on critical path — orchestration heartbeat for the dispatch cluster, not the production stack.
+- "Deploy Web Tester / Web Buyer (Vercel)" — gap #1 above.
 
-**Action:** I'll dig into "Test" and "G189" in the next session if you
-want them green before launch. They are probably orchestration / heartbeat
-checks unrelated to the demo critical path, but worth knowing.
+---
+
+## 🔴 6. Upload-tarball auth: open to anyone with a UUID
+
+**Symptom:** `/api/upload-tarball` accepts any well-formed `tester_id`
+without proving the caller is that tester. The `.exe` filename embeds a
+tester UUID, but anyone who learns / guesses a UUID could POST junk that
+gets attributed to that tester (charging us per-hour up to the rate-limit
+ceiling). The rate limiter caps blast radius to 30 tarballs/hour/tester,
+but doesn't fix the structural gap.
+
+**Why it shipped this way:** The recorder is a Windows .exe running
+without an interactive auth flow. Cookie-based session auth doesn't
+work. Bearer tokens require shipping the token to the .exe somehow.
+
+**Migration path (HMAC token, backwards-compatible):**
+
+1. Add `UPLOAD_HMAC_SECRET` env var to web-tester (server-only).
+2. `/api/download/[testerId]` computes `token = HMAC_SHA256(secret, testerId)`,
+   embeds it in the .exe filename: `OysterRecorder-<short>-<uuid>-<token16>.exe`,
+   or in a config file bundled alongside.
+3. Recorder reads the token from its own filename / config, sends as
+   `X-Upload-Token: <token>` header on POST.
+4. `/api/upload-tarball` verifies the HMAC matches the claimed `tester_id`.
+5. **Roll-out flag**: env var `UPLOAD_REQUIRE_TOKEN=false` (default) →
+   accept missing tokens with a `log.warn` line. Once recorder v0.27.0
+   with HMAC support is shipped to all testers, flip to `true` →
+   reject missing/invalid tokens with `401`.
+
+**Cost:** $0. **Time:** ~2 hours total (1h server, 1h recorder + release).
+
+**My recommendation:** Phase-in. Ship the server-side HMAC computation
+now (gated by `UPLOAD_REQUIRE_TOKEN`); ship recorder v0.27.0 in the
+following week; flip the gate once you confirm all active testers are
+on v0.27.0.
+
+---
+
+## 🟡 7. npm vulnerabilities — critical CVE closed tonight
+
+**Closed tonight:**
+- `next` 14.2.15 → **14.2.35** in both portals.
+- Critical CVE **GHSA-f82v-jwr5-mffw** (Authorization Bypass in Next.js Middleware) — **FIXED**. This was the biggest production blocker.
+
+**Remaining (all DoS-only, mitigated by Vercel edge):**
+| CVE | Severity | Vector | Mitigation |
+|---|---|---|---|
+| GHSA-9g9p-9gw9-jx7f | high | Image Optimizer DoS | We don't use remote `next/image` patterns — not exploitable |
+| GHSA-h25m-26qc-wcjf | high | RSC HTTP deserialization DoS | Vercel platform rate-limits + serverless timeout cap |
+| GHSA-ggv3-7p47-pfv8 | high | HTTP smuggling via rewrites | We don't use `next.config.js` rewrites |
+| GHSA-3x4c-7xq6-9pq8 | high | next/image disk cache exhaustion | We don't use `next/image` |
+| GHSA-q4gf-8mx6-v5v3 | high | Server Components DoS | Vercel serverless timeout cap |
+| GHSA-qx2v-qp2m-jg93 | moderate | PostCSS XSS in `</style>` stringify | We don't generate dynamic CSS at runtime |
+
+All remaining CVEs require Next.js 15.x (major version bump) to fix in
+the package itself. Practically, the production-attack-surface for
+these is zero given how we use Next.
+
+**Recommendation:** stay on 14.2.35 through launch. Schedule Next 15
+upgrade for ~2 weeks post-launch when there's slack to verify React 19
+compatibility.
 
 ---
 
@@ -153,6 +210,8 @@ checks unrelated to the demo critical path, but worth knowing.
 | `watch.sh` 24/7 production health monitor | ✅ shipped |
 | Empty-state honesty on buyer landing | ✅ shipped |
 | Iron-law lint blocks fabricated-data regressions | ✅ 24/24 |
+| **Next.js critical Auth-Bypass CVE** (14.2.15 → 14.2.35) | ✅ closed |
+| **Black formatting CI lane** (4 test files reformatted) | ✅ closed |
 
 ---
 
@@ -165,6 +224,7 @@ you need to:
 2. **Run `supabase db push` × 2** (5 min) → DB schema lands
 3. **Decide code-sign strategy** — buy EV cert / brief testers / both
 4. **Decide Stripe strategy** — wire it now / Venmo bridge / paid pilot
+5. **Decide upload-auth strategy** — green-light HMAC migration (2h work, ship recorder v0.27.0 next week)
 
-I cannot do any of those four for you. Everything else (rate limiting,
-logging, legal pages, monitoring, iron-law audit) is shipped on `main`.
+Items 1-2 are 10 minutes of work. Items 3-5 are decisions + downstream
+work. Everything I can do without your credentials is shipped on `main`.

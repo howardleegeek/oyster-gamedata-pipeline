@@ -51,7 +51,7 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>Account record</strong> — the email or GitHub identity you signed up with, plus
-            (later, when Stripe Connect goes live) the bank / payout details you enter into Stripe's
+            (later, when Stripe Connect goes live) the bank / payout details you enter into Stripe&rsquo;s
             hosted onboarding form. We do not see or store your bank credentials directly.
           </li>
         </ul>
@@ -76,7 +76,7 @@ export default function PrivacyPage() {
         <h2 className="text-2xl font-semibold text-oyster-100">Operational logs</h2>
         <p>
           The upload pipeline emits structured JSON log lines on accept, reject, duplicate, and error
-          events. Each line includes your tester ID, the file's SHA-256, byte size, latency, and a
+          events. Each line includes your tester ID, the file&rsquo;s SHA-256, byte size, latency, and a
           truncated client IP. These logs are retained for operational debugging only and are not
           shared with buyers or third parties.
         </p>

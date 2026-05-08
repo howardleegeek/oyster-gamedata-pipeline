@@ -96,8 +96,7 @@ def _raw_text(path: Path) -> str:
 
 def test_tester_workflow_exists():
     assert TESTER_WF.is_file(), (
-        "deploy-web-tester.yml must exist at "
-        f"{TESTER_WF.relative_to(REPO_ROOT)}"
+        "deploy-web-tester.yml must exist at " f"{TESTER_WF.relative_to(REPO_ROOT)}"
     )
 
 
@@ -107,9 +106,9 @@ def test_tester_workflow_path_filter_includes_web_tester(tester_workflow):
     assert push is not None, "push trigger missing"
     paths = push.get("paths")
     assert paths, "paths filter missing — workflow would run on every push"
-    assert any(p.startswith("web-tester/") for p in paths), (
-        f"web-tester/ path filter missing; got paths={paths}"
-    )
+    assert any(
+        p.startswith("web-tester/") for p in paths
+    ), f"web-tester/ path filter missing; got paths={paths}"
 
 
 def test_tester_workflow_does_not_trigger_on_buyer_paths(tester_workflow):
@@ -117,9 +116,9 @@ def test_tester_workflow_does_not_trigger_on_buyer_paths(tester_workflow):
     on = _on_block(tester_workflow)
     paths = on["push"]["paths"]
     for p in paths:
-        assert not p.startswith("web-buyer/"), (
-            f"tester workflow should NOT trigger on web-buyer paths; found {p!r}"
-        )
+        assert not p.startswith(
+            "web-buyer/"
+        ), f"tester workflow should NOT trigger on web-buyer paths; found {p!r}"
 
 
 def test_tester_workflow_does_not_trigger_on_root_push(tester_workflow):
@@ -128,9 +127,9 @@ def test_tester_workflow_does_not_trigger_on_root_push(tester_workflow):
     paths = on["push"]["paths"]
     forbidden = {"**", "*", ".", "./**"}
     overlap = forbidden.intersection(paths)
-    assert not overlap, (
-        f"tester workflow has overly-broad paths {overlap!r} that match the repo root"
-    )
+    assert (
+        not overlap
+    ), f"tester workflow has overly-broad paths {overlap!r} that match the repo root"
 
 
 def test_tester_workflow_uses_node_20(tester_workflow):
@@ -153,9 +152,9 @@ def test_tester_workflow_has_timeout_minutes(tester_workflow):
             f"job {job_name!r} missing timeout-minutes — a hung deploy would burn "
             "the default 6h of runner time"
         )
-        assert isinstance(timeout, int) and 1 <= timeout <= 60, (
-            f"job {job_name!r} has unreasonable timeout-minutes={timeout!r}"
-        )
+        assert (
+            isinstance(timeout, int) and 1 <= timeout <= 60
+        ), f"job {job_name!r} has unreasonable timeout-minutes={timeout!r}"
 
 
 def test_tester_workflow_references_vercel_token():
@@ -179,8 +178,7 @@ def test_tester_workflow_references_vercel_token():
 
 def test_buyer_workflow_exists():
     assert BUYER_WF.is_file(), (
-        "deploy-web-buyer.yml must exist at "
-        f"{BUYER_WF.relative_to(REPO_ROOT)}"
+        "deploy-web-buyer.yml must exist at " f"{BUYER_WF.relative_to(REPO_ROOT)}"
     )
 
 
@@ -190,18 +188,18 @@ def test_buyer_workflow_path_filter_includes_web_buyer(buyer_workflow):
     assert push is not None, "push trigger missing"
     paths = push.get("paths")
     assert paths, "paths filter missing — workflow would run on every push"
-    assert any(p.startswith("web-buyer/") for p in paths), (
-        f"web-buyer/ path filter missing; got paths={paths}"
-    )
+    assert any(
+        p.startswith("web-buyer/") for p in paths
+    ), f"web-buyer/ path filter missing; got paths={paths}"
 
 
 def test_buyer_workflow_does_not_trigger_on_tester_paths(buyer_workflow):
     on = _on_block(buyer_workflow)
     paths = on["push"]["paths"]
     for p in paths:
-        assert not p.startswith("web-tester/"), (
-            f"buyer workflow should NOT trigger on web-tester paths; found {p!r}"
-        )
+        assert not p.startswith(
+            "web-tester/"
+        ), f"buyer workflow should NOT trigger on web-tester paths; found {p!r}"
 
 
 def test_buyer_workflow_does_not_trigger_on_root_push(buyer_workflow):
@@ -209,9 +207,9 @@ def test_buyer_workflow_does_not_trigger_on_root_push(buyer_workflow):
     paths = on["push"]["paths"]
     forbidden = {"**", "*", ".", "./**"}
     overlap = forbidden.intersection(paths)
-    assert not overlap, (
-        f"buyer workflow has overly-broad paths {overlap!r} that match the repo root"
-    )
+    assert (
+        not overlap
+    ), f"buyer workflow has overly-broad paths {overlap!r} that match the repo root"
 
 
 def test_buyer_workflow_uses_node_20(buyer_workflow):
@@ -233,9 +231,9 @@ def test_buyer_workflow_has_timeout_minutes(buyer_workflow):
             f"job {job_name!r} missing timeout-minutes — a hung deploy would burn "
             "the default 6h of runner time"
         )
-        assert isinstance(timeout, int) and 1 <= timeout <= 60, (
-            f"job {job_name!r} has unreasonable timeout-minutes={timeout!r}"
-        )
+        assert (
+            isinstance(timeout, int) and 1 <= timeout <= 60
+        ), f"job {job_name!r} has unreasonable timeout-minutes={timeout!r}"
 
 
 def test_buyer_workflow_references_vercel_token():
@@ -255,18 +253,18 @@ def test_workflows_target_distinct_projects(tester_workflow, buyer_workflow):
     """Tester and buyer must reference different VERCEL_PROJECT_ID secrets."""
     tester_text = _raw_text(TESTER_WF)
     buyer_text = _raw_text(BUYER_WF)
-    assert "VERCEL_PROJECT_ID_TESTER" in tester_text, (
-        "tester workflow should reference VERCEL_PROJECT_ID_TESTER (per-portal Vercel project)"
-    )
-    assert "VERCEL_PROJECT_ID_BUYER" in buyer_text, (
-        "buyer workflow should reference VERCEL_PROJECT_ID_BUYER (per-portal Vercel project)"
-    )
-    assert "VERCEL_PROJECT_ID_BUYER" not in tester_text, (
-        "tester workflow leaks VERCEL_PROJECT_ID_BUYER — would deploy to wrong Vercel project"
-    )
-    assert "VERCEL_PROJECT_ID_TESTER" not in buyer_text, (
-        "buyer workflow leaks VERCEL_PROJECT_ID_TESTER — would deploy to wrong Vercel project"
-    )
+    assert (
+        "VERCEL_PROJECT_ID_TESTER" in tester_text
+    ), "tester workflow should reference VERCEL_PROJECT_ID_TESTER (per-portal Vercel project)"
+    assert (
+        "VERCEL_PROJECT_ID_BUYER" in buyer_text
+    ), "buyer workflow should reference VERCEL_PROJECT_ID_BUYER (per-portal Vercel project)"
+    assert (
+        "VERCEL_PROJECT_ID_BUYER" not in tester_text
+    ), "tester workflow leaks VERCEL_PROJECT_ID_BUYER — would deploy to wrong Vercel project"
+    assert (
+        "VERCEL_PROJECT_ID_TESTER" not in buyer_text
+    ), "buyer workflow leaks VERCEL_PROJECT_ID_TESTER — would deploy to wrong Vercel project"
 
 
 def test_workflows_have_deploy_hook_references():
@@ -279,6 +277,6 @@ def test_workflows_run_on_push_to_main(tester_workflow, buyer_workflow):
     for wf, name in [(tester_workflow, "tester"), (buyer_workflow, "buyer")]:
         on = _on_block(wf)
         branches = on["push"].get("branches")
-        assert branches and "main" in branches, (
-            f"{name} workflow does not target main branch; got branches={branches!r}"
-        )
+        assert (
+            branches and "main" in branches
+        ), f"{name} workflow does not target main branch; got branches={branches!r}"

@@ -226,9 +226,7 @@ def test_sample_data_file_is_gone_in_web_buyer():
 def test_devmodebanner_file_is_gone_in_web_buyer():
     """web-buyer's DevModeBanner advertised the fabrication; must stay deleted."""
     p = REPO_ROOT / "web-buyer" / "components" / "DevModeBanner.tsx"
-    assert not p.exists(), (
-        f"{p} must NOT exist — it advertised the DEV MODE fabrication."
-    )
+    assert not p.exists(), f"{p} must NOT exist — it advertised the DEV MODE fabrication."
 
 
 def test_NotConfigured_component_exists_in_web_buyer():
@@ -275,9 +273,7 @@ def test_checkout_route_returns_503_when_not_configured():
     if not p.is_file():
         return
     src = p.read_text()
-    assert "status: 503" in src, (
-        "Iron-law: /api/checkout must return 503 when not configured."
-    )
-    assert "fakeSession" not in src and "dev_session_" not in src, (
-        "Iron-law: /api/checkout must NOT mint dev_session_* fake Stripe sessions."
-    )
+    assert "status: 503" in src, "Iron-law: /api/checkout must return 503 when not configured."
+    assert (
+        "fakeSession" not in src and "dev_session_" not in src
+    ), "Iron-law: /api/checkout must NOT mint dev_session_* fake Stripe sessions."

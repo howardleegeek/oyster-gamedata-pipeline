@@ -38,8 +38,7 @@ def test_build_gradle_declares_all_4_mc_versions():
     src = _read("mc-mod/build.gradle")
     for v in EXPECTED_MC_VERSIONS:
         assert f'"{v}"' in src, (
-            f"mc-mod/build.gradle MC_MATRIX missing key {v!r} — "
-            f"add a row for it"
+            f"mc-mod/build.gradle MC_MATRIX missing key {v!r} — " f"add a row for it"
         )
 
 
@@ -47,17 +46,17 @@ def test_build_gradle_reads_MC_VERSION_env():
     """build.gradle must look up MC_VERSION from env so the GHA matrix
     can pass per-cell config."""
     src = _read("mc-mod/build.gradle")
-    assert 'System.getenv("MC_VERSION")' in src, (
-        "build.gradle must read System.getenv('MC_VERSION') for D19 matrix"
-    )
+    assert (
+        'System.getenv("MC_VERSION")' in src
+    ), "build.gradle must read System.getenv('MC_VERSION') for D19 matrix"
 
 
 def test_build_gradle_unknown_version_throws():
     """Unknown MC version must fail loudly, not silently use a default."""
     src = _read("mc-mod/build.gradle")
-    assert "throw new GradleException" in src, (
-        "build.gradle must throw on unknown MC_VERSION (no silent fallback)"
-    )
+    assert (
+        "throw new GradleException" in src
+    ), "build.gradle must throw on unknown MC_VERSION (no silent fallback)"
     assert "Unknown MC_VERSION" in src
 
 
@@ -65,9 +64,7 @@ def test_build_gradle_jar_name_includes_mc_version():
     """Output jar name MUST carry -mcX.Y.Z so 4 matrix cells produce
     distinct artifacts (not overwrite each other)."""
     src = _read("mc-mod/build.gradle")
-    assert "-mc${mcVersion}" in src, (
-        "version line must template -mc${mcVersion} into the jar name"
-    )
+    assert "-mc${mcVersion}" in src, "version line must template -mc${mcVersion} into the jar name"
 
 
 def test_fabric_mod_json_has_templated_minecraft_depends():
@@ -77,8 +74,7 @@ def test_fabric_mod_json_has_templated_minecraft_depends():
     data = json.loads(src)
     mc_dep = data.get("depends", {}).get("minecraft", "")
     assert mc_dep == "${mc_depends}", (
-        f"fabric.mod.json depends.minecraft must be '${{mc_depends}}' "
-        f"template, got {mc_dep!r}"
+        f"fabric.mod.json depends.minecraft must be '${{mc_depends}}' " f"template, got {mc_dep!r}"
     )
 
 
@@ -87,7 +83,7 @@ def test_build_gradle_expands_mc_depends_in_processResources():
     the templated fabric.mod.json gets per-cell value."""
     src = _read("mc-mod/build.gradle")
     # Loose match — order/quoting may vary, but both keys must be present.
-    assert 'expand(' in src
+    assert "expand(" in src
     assert '"mc_depends"' in src or "'mc_depends'" in src
 
 
@@ -100,9 +96,7 @@ def test_gha_workflow_has_matrix_with_ci_versions():
     assert "mc_version:" in src
     for v in EXPECTED_CI_VERSIONS:
         pattern = rf'-\s+"?{re.escape(v)}"?'
-        assert re.search(pattern, src), (
-            f"GHA matrix missing CI-verified mc_version {v!r}"
-        )
+        assert re.search(pattern, src), f"GHA matrix missing CI-verified mc_version {v!r}"
 
 
 def test_gha_workflow_passes_MC_VERSION_env():
