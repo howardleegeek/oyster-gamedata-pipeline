@@ -1,3 +1,10 @@
+## Web Portals — local dev
+
+Run the **tester** (`:3000`) and **buyer** (`:3001`) portals locally with one command.
+See **[LOCAL_DEV.md](LOCAL_DEV.md)** for prerequisites, bootstrap, smoke tests, and troubleshooting.
+
+---
+
 # oyster-gamedata-pipeline — GameData v1 production line
 
 > **🎯 Vendor / Partner: 直接看 [`docs/PRD.md`](docs/PRD.md) — 完整 PRD,拿到即可报价 + 启动第一批**
