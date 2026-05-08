@@ -1,7 +1,12 @@
-## Web Portals — local dev
+## Web Portals — local dev + production launch
 
 Run the **tester** (`:3000`) and **buyer** (`:3001`) portals locally with one command.
-See **[LOCAL_DEV.md](LOCAL_DEV.md)** for prerequisites, bootstrap, smoke tests, and troubleshooting.
+
+| Doc | Use |
+|---|---|
+| [`LOCAL_DEV.md`](LOCAL_DEV.md) | Prereqs + bootstrap + smoke + troubleshooting |
+| [`PRODUCTION_LAUNCH_SOP.md`](PRODUCTION_LAUNCH_SOP.md) | Stage 0–6 operational playbook (clone → live URLs → real users → incident response → release cadence) |
+| [`PRODUCTION_GAPS.md`](PRODUCTION_GAPS.md) | Audit of items still requiring credentials/decisions |
 
 ---
 
