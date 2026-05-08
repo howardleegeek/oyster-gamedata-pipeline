@@ -199,6 +199,42 @@ compatibility.
 
 ---
 
+## 🔴 8. Vercel 4.5 MB body limit blocks tarball uploads (ARCHITECTURAL)
+
+**Symptom:** `/api/upload-tarball` is wired to accept up to 1 GiB POST
+bodies (`MAX_BYTES = 1024 * 1024 * 1024`). Locally with `next dev`, that
+works. **On Vercel Hobby + Pro, route handlers cap request bodies at
+4.5 MB.** A real Minecraft session tarball (1-3 hour recording) is
+hundreds of MB to multiple GB. Every real upload will fail with 413
+before reaching our handler.
+
+**Why this isn't caught locally:** `next dev` has no body size cap. CI
+deploy lanes can't exercise the upload path without test data. The
+limit only manifests with real user uploads on real Vercel.
+
+**Fix (architectural — direct-to-Supabase upload):**
+
+Instead of POSTing the tarball through Next:
+
+1. Recorder calls `POST /api/upload-tarball/sign` (small request) with
+   `tester_id`, `sha256`, `size_bytes`, `duration_seconds`. Server
+   validates rate limit + auth (gap #6 HMAC), inserts a `tarballs` row
+   with status `pending_upload`, returns a Supabase storage signed
+   upload URL good for one PUT.
+2. Recorder uploads the binary directly to Supabase Storage via the
+   signed URL — bypasses Next.js entirely, bypasses Vercel's body cap.
+3. Recorder calls `POST /api/upload-tarball/finalize` with the
+   `tarball_id`. Server marks status `accepted`, kicks off D5 grading.
+
+**Time:** ~3 hours (server-side route split + recorder protocol bump).
+**Cost:** $0 (Supabase signed URLs are free).
+**Recorder version:** ships in v0.27.0 alongside HMAC token (gap #6).
+
+This pairs naturally with the HMAC token rollout — both require
+recorder v0.27.0, so do them together.
+
+---
+
 ## 🟢 What I closed tonight (no Howard credentials needed)
 
 | Gap | Status |
@@ -212,6 +248,8 @@ compatibility.
 | Iron-law lint blocks fabricated-data regressions | ✅ 24/24 |
 | **Next.js critical Auth-Bypass CVE** (14.2.15 → 14.2.35) | ✅ closed |
 | **Black formatting CI lane** (4 test files reformatted) | ✅ closed |
+| **Open-redirect in both auth callbacks** (sanitizeNextPath helper) | ✅ closed |
+| **Cart cookie missing Secure flag in production** | ✅ closed |
 
 ---
 
@@ -224,7 +262,14 @@ you need to:
 2. **Run `supabase db push` × 2** (5 min) → DB schema lands
 3. **Decide code-sign strategy** — buy EV cert / brief testers / both
 4. **Decide Stripe strategy** — wire it now / Venmo bridge / paid pilot
-5. **Decide upload-auth strategy** — green-light HMAC migration (2h work, ship recorder v0.27.0 next week)
+5. **Decide recorder v0.27.0 strategy** — HMAC token (gap #6) + direct-to-Supabase upload (gap #8) ship together; ~5h total work, requires Windows build of v0.27.0
 
 Items 1-2 are 10 minutes of work. Items 3-5 are decisions + downstream
 work. Everything I can do without your credentials is shipped on `main`.
+
+**Big picture:** the system is iron-law-honest, security-hardened
+(critical Next.js CVE closed, open-redirect closed, secure cookies, RLS
+on every table, structured logs, rate limits), and legally-papered
+(Privacy + ToS on both portals). The only thing keeping it from
+serving 1 GB tarballs from real users is the Vercel body-size cap —
+fixed by the v0.27.0 recorder rollout that also closes the auth gap.

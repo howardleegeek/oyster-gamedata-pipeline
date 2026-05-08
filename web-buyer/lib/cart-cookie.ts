@@ -32,6 +32,10 @@ export function writeCartCookie(ids: string[]) {
     value,
     httpOnly: true,
     sameSite: 'lax',
+    // Howard 2026-05-08: gate `secure` to production so localhost dev still
+    // works (browsers reject Secure cookies on plain http://). Vercel sets
+    // NODE_ENV=production automatically.
+    secure: process.env.NODE_ENV === 'production',
     path: '/',
     maxAge: COOKIE_MAX_AGE_SECONDS,
   });

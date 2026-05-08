@@ -9,11 +9,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '../../../lib/supabase-server';
 import { isSupabaseConfigured } from '../../../lib/env';
+import { sanitizeNextPath } from '../../../lib/safe-redirect';
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/dashboard';
+  // Howard 2026-05-08: sanitizeNextPath blocks open-redirect via `?next=//evil.com`.
+  const next = sanitizeNextPath(searchParams.get('next'), '/dashboard');
 
   if (!isSupabaseConfigured()) {
     return NextResponse.redirect(`${origin}${next}`);
