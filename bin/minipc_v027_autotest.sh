@@ -37,13 +37,15 @@
 #   - Minecraft Java 1.21.4 stable installed (NOT a snapshot)
 #   - Fabric loader 0.16.0+ installed for that version
 
-set -u
+set -eu
+set -o pipefail
 
 # ── config ───────────────────────────────────────────────────────────
 MINIPC_HOST="${MINIPC_HOST:-minipc-bwdxs}"
 MC_VERSION="${MC_VERSION:-1.21.4}"
 RELEASE_TAG="${RELEASE_TAG:-recorder-v0.27.0-rc1}"
 DRY_RUN="${DRY_RUN:-0}"
+DIAGNOSE="${DIAGNOSE:-0}"
 
 EXE_NAME="OysterRecorder.exe"
 MOD_NAME="oyster-recorder-mod-0.1.0-real-game-state-mc${MC_VERSION}.jar"
@@ -66,11 +68,23 @@ ask()  { printf "${BLU}%s${RST} " "$1"; read -r REPLY; }
 
 # ── helpers ──────────────────────────────────────────────────────────
 
-# Run PowerShell on minipc via SSH. Args are joined with spaces and
-# wrapped in -Command. Return non-zero on remote failure.
+# Run PowerShell on minipc via SSH using stdin-piped script.
+# Avoids the bash-double-quote / PowerShell-double-quote interaction
+# disaster that silently mangles complex scripts. Read the PS body
+# from stdin (heredoc).
+#
+# Returns the remote exit code; remote stderr is mixed into stdout.
 psh() {
   ssh -o BatchMode=yes -o ConnectTimeout=15 "$MINIPC_HOST" \
-    "powershell -NoProfile -Command \"$1\""
+    'powershell -NoProfile -ExecutionPolicy Bypass -Command -'
+}
+
+# Same as psh() but assert non-zero remote exit fails this script.
+psh_strict() {
+  local label="${1:-remote PowerShell}"
+  if ! psh; then
+    die "$label failed on minipc (remote PowerShell exit non-zero)"
+  fi
 }
 
 # Verify a single artifact's SHA against the manifest fetched from URL.
@@ -111,71 +125,113 @@ ok "manifest cached locally ($(wc -l </tmp/v027-rc1-manifest.txt | tr -d ' ') li
 
 [ "$DRY_RUN" = "1" ] && { ok "DRY_RUN — connectivity check passed, exiting"; exit 0; }
 
-# ── Stage 2: download + push to minipc ──────────────────────────────
-log "Stage 2 — download + push assets to minipc"
+# ── Stage 1.5: pre-flight diagnose (always runs, even before push) ──
+# Catches MC-missing / Fabric-missing BEFORE we waste time downloading.
+log "Stage 1.5 — minipc state diagnose"
 
-WIN_DROP='C:\Users\howar\Downloads'
-log "asking minipc to download assets directly from GitHub Releases (no Mac round-trip)…"
+DIAG_OUT=$(psh <<'PS_EOF'
+$ErrorActionPreference = 'Continue'
+$mc = "$env:APPDATA\.minecraft"
+$versions = Join-Path $mc 'versions'
+if (-not (Test-Path $mc))      { Write-Host "MC_DIR_MISSING"; exit 0 }
+if (-not (Test-Path $versions)) { Write-Host "MC_VERSIONS_MISSING"; exit 0 }
+Write-Host "MC_DIR_OK:$mc"
 
-psh "
-  Set-StrictMode -Version Latest
-  \$ErrorActionPreference = 'Stop'
-  \$base = '${RELEASE_URL_BASE}'
-  \$drop = '${WIN_DROP}'
-  foreach (\$f in @('${EXE_NAME}', '${MOD_NAME}')) {
-    \$dest = Join-Path \$drop \$f
-    Invoke-WebRequest -Uri \"\$base/\$f\" -OutFile \$dest -UseBasicParsing
-    \$h = (Get-FileHash -Path \$dest -Algorithm SHA256).Hash.ToLower()
-    Write-Host \"FETCHED:\$f:\$h\"
-  }
-" > /tmp/v027-fetch.log 2>&1 || die "remote fetch failed — see /tmp/v027-fetch.log"
+# Find any fabric-loader installation
+$fabricAll = Get-ChildItem $versions -Filter 'fabric-loader*' -ErrorAction SilentlyContinue
+if ($fabricAll) {
+  foreach ($f in $fabricAll) { Write-Host "FABRIC_FOUND:$($f.Name)" }
+} else {
+  Write-Host "FABRIC_MISSING_ALL"
+}
+PS_EOF
+) || die "minipc PowerShell pre-flight check failed (SSH/PowerShell layer broken)"
 
-# Verify each SHA matches the manifest.
-while IFS= read -r line; do
-  case "$line" in
-    FETCHED:*)
-      f=$(printf '%s\n' "$line" | cut -d: -f2)
-      h=$(printf '%s\n' "$line" | cut -d: -f3)
-      verify_sha "$h" "$f"
-      ;;
-  esac
-done < /tmp/v027-fetch.log
+echo "$DIAG_OUT" | sed 's/^/    /'
 
-# ── Stage 3: detect MC + Fabric ─────────────────────────────────────
-log "Stage 3 — detect Minecraft + Fabric loader"
+if [ "$DIAGNOSE" = "1" ]; then
+  ok "DIAGNOSE — pre-flight only, exiting"
+  exit 0
+fi
 
-mc_status=$(psh "
-  \$mc = \"\$env:APPDATA\\.minecraft\"
-  \$versions = Join-Path \$mc 'versions'
-  if (-not (Test-Path \$versions)) { Write-Host 'MC_MISSING'; exit 0 }
-  \$fabric = Get-ChildItem \$versions -Filter 'fabric-loader*${MC_VERSION}*' -ErrorAction SilentlyContinue
-  if (\$fabric) { Write-Host \"FABRIC_OK:\$(\$fabric.Name)\" } else { Write-Host 'FABRIC_MISSING' }
-  \$mods = Join-Path \$mc 'mods'
-  if (Test-Path \$mods) {
-    \$existing = Get-ChildItem \$mods -Filter 'oyster-recorder-mod*' -ErrorAction SilentlyContinue
-    if (\$existing) { Write-Host \"MOD_EXISTS:\$(\$existing.Name)\" }
-  } else {
-    Write-Host 'MODS_DIR_MISSING'
-  }
-" 2>&1) || die "minipc PowerShell check failed"
-
-case "$mc_status" in
-  *MC_MISSING*)     die "Minecraft not installed on minipc. Install Minecraft Java ${MC_VERSION} stable first." ;;
-  *FABRIC_MISSING*) die "Fabric loader for ${MC_VERSION} not found. Install from https://fabricmc.net/use/installer/" ;;
-  *FABRIC_OK*)      ok "Fabric loader found: $(echo "$mc_status" | grep -oE 'fabric-loader[^ ]+')" ;;
+# Hard-fail BEFORE wasting any download time if MC isn't there
+case "$DIAG_OUT" in
+  *MC_DIR_MISSING*|*MC_VERSIONS_MISSING*)
+    die "Minecraft not installed on minipc. Install Minecraft Java ${MC_VERSION} stable from the official Launcher first, then re-run."
+    ;;
 esac
 
-# ── Stage 4: install mod jar ────────────────────────────────────────
-log "Stage 4 — install mod jar into %APPDATA%\\.minecraft\\mods\\"
+# Check Fabric specifically for our target MC version
+if ! echo "$DIAG_OUT" | grep -q "FABRIC_FOUND:.*${MC_VERSION}"; then
+  echo "$DIAG_OUT" | grep FABRIC_FOUND | sed 's/^/    found: /'
+  die "Fabric loader for MC ${MC_VERSION} not installed. Get it: https://fabricmc.net/use/installer/  → pick Minecraft ${MC_VERSION}, click Install."
+fi
+ok "Fabric loader for ${MC_VERSION} present"
 
-psh "
-  \$mods = \"\$env:APPDATA\\.minecraft\\mods\"
-  if (-not (Test-Path \$mods)) { New-Item -ItemType Directory -Path \$mods | Out-Null }
-  Copy-Item -Path '${WIN_DROP}\\${MOD_NAME}' -Destination \$mods -Force
-  Write-Host \"INSTALLED: \$mods\\${MOD_NAME}\"
-" 2>&1 | tail -1
+# ── Stage 2: minipc downloads + verifies ────────────────────────────
+log "Stage 2 — minipc downloads .exe + mod jar from GitHub Releases"
 
-ok "mod jar installed"
+WIN_DROP='C:\Users\howar\Downloads'
+
+FETCH_OUT=$(psh <<PS_EOF
+\$ErrorActionPreference = 'Stop'
+\$base = '${RELEASE_URL_BASE}'
+\$drop = '${WIN_DROP}'
+foreach (\$f in @('${EXE_NAME}', '${MOD_NAME}')) {
+  \$dest = Join-Path \$drop \$f
+  try {
+    Invoke-WebRequest -Uri "\$base/\$f" -OutFile \$dest -UseBasicParsing
+  } catch {
+    Write-Host "FETCH_ERROR:\$f:\$(\$_.Exception.Message)"
+    exit 2
+  }
+  if (-not (Test-Path \$dest) -or (Get-Item \$dest).Length -eq 0) {
+    Write-Host "FETCH_EMPTY:\$f"
+    exit 3
+  }
+  \$h = (Get-FileHash -Path \$dest -Algorithm SHA256).Hash.ToLower()
+  \$sz = (Get-Item \$dest).Length
+  Write-Host "FETCHED:\$f:\$h:\$sz"
+}
+exit 0
+PS_EOF
+) || die "remote fetch failed — output: $FETCH_OUT"
+
+echo "$FETCH_OUT" | grep -E "^(FETCHED|FETCH_)" | sed 's/^/    /'
+
+# Iron-law: must have exactly 2 FETCHED lines, else fail loudly
+fetched_count=$(echo "$FETCH_OUT" | grep -c "^FETCHED:" || true)
+[ "$fetched_count" = "2" ] || die "expected 2 FETCHED lines, got $fetched_count — Stage 2 broken"
+
+# Verify each SHA against manifest
+while IFS=: read -r tag fname sha bytes; do
+  [ "$tag" != "FETCHED" ] && continue
+  verify_sha "$sha" "$fname"
+done < <(echo "$FETCH_OUT" | grep "^FETCHED:")
+
+# ── Stage 3: install mod jar (with explicit verification) ───────────
+log "Stage 3 — install mod jar into %APPDATA%\\.minecraft\\mods\\"
+
+INSTALL_OUT=$(psh <<PS_EOF
+\$ErrorActionPreference = 'Stop'
+\$mods = "\$env:APPDATA\\.minecraft\\mods"
+if (-not (Test-Path \$mods)) { New-Item -ItemType Directory -Path \$mods | Out-Null }
+\$src = '${WIN_DROP}\\${MOD_NAME}'
+\$dst = Join-Path \$mods '${MOD_NAME}'
+if (-not (Test-Path \$src)) { Write-Host "SRC_MISSING:\$src"; exit 4 }
+Copy-Item -Path \$src -Destination \$dst -Force
+if (-not (Test-Path \$dst)) { Write-Host "INSTALL_FAILED:\$dst"; exit 5 }
+\$dstSha = (Get-FileHash -Path \$dst -Algorithm SHA256).Hash.ToLower()
+\$srcSha = (Get-FileHash -Path \$src -Algorithm SHA256).Hash.ToLower()
+if (\$srcSha -ne \$dstSha) { Write-Host "COPY_CORRUPTED"; exit 6 }
+Write-Host "INSTALLED:\$dst:\$dstSha"
+exit 0
+PS_EOF
+) || die "mod jar install failed — output: $INSTALL_OUT"
+
+echo "$INSTALL_OUT" | sed 's/^/    /'
+echo "$INSTALL_OUT" | grep -q "^INSTALLED:" || die "no INSTALLED: line — install verification broken"
+ok "mod jar installed + SHA-verified at destination"
 
 # ── Stage 5: prompt Howard for the 30-sec play ──────────────────────
 log "Stage 5 — manual gameplay window"
@@ -205,30 +261,47 @@ ask "Press Enter when done (or type 'skip' to abort): "
 # ── Stage 6: fetch the diagnostic ───────────────────────────────────
 log "Stage 6 — fetching OysterRecorder_diagnostic.zip"
 
-# Pull the file via PowerShell + base64 stream (avoids scp setup quirks).
 DIAG_LOCAL="${LOCAL_DROP}/OysterRecorder_diagnostic_$(date +%Y%m%dT%H%M%SZ).zip"
 
-psh "
-  \$f = 'C:\\Users\\howar\\OysterRecorder_diagnostic.zip'
-  if (-not (Test-Path \$f)) { Write-Host 'DIAG_MISSING'; exit 1 }
-  \$mtime = (Get-Item \$f).LastWriteTime
-  Write-Host \"DIAG_MTIME:\$(\$mtime.ToString('o'))\"
-  \$bytes = [IO.File]::ReadAllBytes(\$f)
-  \$b64   = [Convert]::ToBase64String(\$bytes)
-  Write-Host \"DIAG_B64:\$b64\"
-" > /tmp/v027-diag.txt 2>&1
+# Use heredoc + base64 stream (avoids scp setup quirks). Defensive
+# checks: existence, post-script-start mtime (no stale zip), then b64.
+DIAG_OUT=$(psh <<PS_EOF
+\$f = 'C:\\Users\\howar\\OysterRecorder_diagnostic.zip'
+if (-not (Test-Path \$f)) { Write-Host "DIAG_MISSING"; exit 7 }
+\$mtimeUnix = [int](Get-Date (Get-Item \$f).LastWriteTime -UFormat %s)
+\$startUnix = ${SCRIPT_START_TS}
+if (\$mtimeUnix -lt \$startUnix) {
+  Write-Host "DIAG_STALE:mtime=\$mtimeUnix script_start=\$startUnix"
+  exit 8
+}
+Write-Host "DIAG_MTIME:\$mtimeUnix"
+Write-Host "DIAG_SIZE:\$((Get-Item \$f).Length)"
+\$bytes = [IO.File]::ReadAllBytes(\$f)
+\$b64 = [Convert]::ToBase64String(\$bytes)
+Write-Host "DIAG_B64:\$b64"
+exit 0
+PS_EOF
+) || {
+  echo "$DIAG_OUT" | head -5
+  die "diag zip retrieval failed — see output above"
+}
 
-if grep -q DIAG_MISSING /tmp/v027-diag.txt; then
-  die "OysterRecorder_diagnostic.zip not found on minipc — did you click 'Send log'?"
-fi
+case "$DIAG_OUT" in
+  *DIAG_MISSING*) die "OysterRecorder_diagnostic.zip not on minipc — did you click 'Send log'?" ;;
+  *DIAG_STALE*)   die "diag zip is older than script start — that's an OLD zip, not from this run. Click 'Send log' AFTER your 30-sec play." ;;
+esac
 
-mtime=$(grep DIAG_MTIME /tmp/v027-diag.txt | head -1 | cut -d: -f2-)
-log "diag zip mtime on minipc: $mtime"
+mtime_line=$(echo "$DIAG_OUT" | grep "^DIAG_MTIME:" | head -1)
+size_line=$(echo "$DIAG_OUT" | grep "^DIAG_SIZE:" | head -1)
+log "remote diag: $mtime_line  $size_line"
 
-grep DIAG_B64 /tmp/v027-diag.txt | head -1 | cut -d: -f2- | base64 -d > "$DIAG_LOCAL"
+# Extract the b64 payload and decode (cut -f3 instead of -f2- to get
+# everything past the second colon, in case the b64 has colons — it doesn't,
+# but defensive)
+echo "$DIAG_OUT" | grep "^DIAG_B64:" | head -1 | sed 's/^DIAG_B64://' | base64 -d > "$DIAG_LOCAL"
 
 if [ ! -s "$DIAG_LOCAL" ]; then
-  die "diag zip retrieval failed — empty file"
+  die "diag zip decode produced empty file — base64 layer broken"
 fi
 
 zip_size=$(stat -f%z "$DIAG_LOCAL" 2>/dev/null || stat -c%s "$DIAG_LOCAL")
