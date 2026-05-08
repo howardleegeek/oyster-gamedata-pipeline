@@ -18,7 +18,15 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-EXPECTED_MC_VERSIONS = ["1.20.1", "1.20.4", "1.21.1", "1.21.4"]
+# gradle MC_MATRIX has 4 entries (architecture supports all), but only
+# 1.21.4 is in the CI matrix because the other fabric-api versions need
+# verification against maven.fabricmc.net before claiming they build.
+# This list pins the CI-tested set — different from the gradle-supported
+# set tested by test_build_gradle_declares_all_4_mc_versions.
+EXPECTED_GRADLE_VERSIONS = ["1.20.1", "1.20.4", "1.21.1", "1.21.4"]
+EXPECTED_CI_VERSIONS = ["1.21.4"]
+# Backwards compat alias for tests that don't care which list:
+EXPECTED_MC_VERSIONS = EXPECTED_GRADLE_VERSIONS
 
 
 def _read(path: str) -> str:
@@ -83,17 +91,17 @@ def test_build_gradle_expands_mc_depends_in_processResources():
     assert '"mc_depends"' in src or "'mc_depends'" in src
 
 
-def test_gha_workflow_has_matrix_with_all_4_versions():
+def test_gha_workflow_has_matrix_with_ci_versions():
     """GHA build-mc-mod.yml must declare the matrix strategy with the
-    exact 4 versions test_build_gradle_declares_all_4_mc_versions checks."""
+    CI-verified subset (currently 1.21.4 only — other versions need
+    fabric-api version verification before re-enabling)."""
     src = _read(".github/workflows/build-mc-mod.yml")
     assert "matrix:" in src
     assert "mc_version:" in src
-    for v in EXPECTED_MC_VERSIONS:
-        # YAML lists may have - "1.20.1" or - 1.20.1 — accept both
+    for v in EXPECTED_CI_VERSIONS:
         pattern = rf'-\s+"?{re.escape(v)}"?'
         assert re.search(pattern, src), (
-            f"GHA matrix missing mc_version {v!r}"
+            f"GHA matrix missing CI-verified mc_version {v!r}"
         )
 
 
@@ -126,12 +134,22 @@ def test_gha_workflow_has_timeout():
     assert "timeout-minutes:" in src
 
 
-def test_matrix_versions_match_in_test_and_yaml():
-    """The constant EXPECTED_MC_VERSIONS in this test file MUST match
-    both build.gradle MC_MATRIX keys AND the GHA matrix list. Drift
-    here means a future addition only updates one side."""
+def test_gradle_matrix_versions_match_test_constant():
+    """build.gradle MC_MATRIX keys MUST match EXPECTED_GRADLE_VERSIONS.
+    Drift means a contributor added a row in gradle but not in this
+    test (or vice versa)."""
     gradle_src = _read("mc-mod/build.gradle")
+    for v in EXPECTED_GRADLE_VERSIONS:
+        assert f'"{v}"' in gradle_src, f"build.gradle MC_MATRIX missing {v}"
+
+
+def test_ci_matrix_subset_of_gradle_matrix():
+    """Every version in the CI matrix MUST be in the gradle matrix —
+    otherwise CI tries to build against an unconfigured version."""
     yaml_src = _read(".github/workflows/build-mc-mod.yml")
-    for v in EXPECTED_MC_VERSIONS:
-        assert f'"{v}"' in gradle_src, f"build.gradle missing {v}"
-        assert v in yaml_src, f"GHA workflow missing {v}"
+    for v in EXPECTED_CI_VERSIONS:
+        assert v in EXPECTED_GRADLE_VERSIONS, (
+            f"CI version {v} not declared in gradle matrix — add to "
+            f"build.gradle MC_MATRIX first"
+        )
+        assert v in yaml_src, f"GHA workflow missing CI version {v}"

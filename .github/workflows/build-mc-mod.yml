@@ -26,10 +26,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Howard 2026-05-07: CI matrix shrunk to verified-working 1.21.4
+        # only. The other versions (1.20.1/1.20.4/1.21.1) are still
+        # build-able locally via `MC_VERSION=1.20.4 ./gradlew build` — the
+        # gradle MC_MATRIX in build.gradle keeps their stub entries — but
+        # their fabric-api versions in build.gradle were estimated and
+        # need verification against maven.fabricmc.net before re-enabling
+        # in CI. When tester demand confirms a need for 1.20.x mod jar,
+        # update build.gradle's MC_MATRIX with the verified fabric-api
+        # version and add the cell back here.
         mc_version:
-          - "1.20.1"
-          - "1.20.4"
-          - "1.21.1"
           - "1.21.4"
 
     steps:
