@@ -24,7 +24,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # This list pins the CI-tested set — different from the gradle-supported
 # set tested by test_build_gradle_declares_all_4_mc_versions.
 EXPECTED_GRADLE_VERSIONS = ["1.20.1", "1.20.4", "1.21.1", "1.21.4"]
-EXPECTED_CI_VERSIONS = ["1.21.4"]
+EXPECTED_CI_VERSIONS = ["1.20.1", "1.20.4", "1.21.1", "1.21.4"]
 # Backwards compat alias for tests that don't care which list:
 EXPECTED_MC_VERSIONS = EXPECTED_GRADLE_VERSIONS
 

@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: #0a1817;
+  color: #e8f4f2;
+  min-height: 100%;
+}
+
+body {
+  font-feature-settings: 'rlig' 1, 'calt' 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Subtle aquatic glow for the landing hero */
+.hero-bg {
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(47, 156, 149, 0.18) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 30%, rgba(245, 177, 58, 0.10) 0%, transparent 55%),
+    linear-gradient(180deg, #082020 0%, #0a1817 100%);
+}
+
+.card {
+  @apply bg-oyster-900/60 backdrop-blur-sm border border-oyster-700/40 rounded-xl;
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg
+         bg-amber-accent text-oyster-950 font-semibold
+         hover:brightness-110 active:brightness-95 transition shadow-md shadow-amber-accent/20;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg
+         bg-oyster-700/60 text-oyster-50 font-semibold border border-oyster-600/40
+         hover:bg-oyster-700 active:brightness-95 transition;
+}
+
+.btn-ghost {
+  @apply inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-oyster-200
+         hover:bg-oyster-800/60 transition;
+}
+
+.input {
+  @apply w-full px-4 py-2.5 rounded-lg bg-oyster-950/60 border border-oyster-700/50
+         text-oyster-50 placeholder:text-oyster-400 focus:outline-none
+         focus:border-amber-accent focus:ring-2 focus:ring-amber-accent/30;
+}
+
+.tag {
+  @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
+}
+
+.tag-pending  { @apply bg-amber-accent/15  text-amber-accent; }
+.tag-accepted { @apply bg-oyster-400/20    text-oyster-200; }
+.tag-rejected { @apply bg-red-500/15       text-red-300; }
+.tag-paid     { @apply bg-emerald-500/15   text-emerald-300; }
+.tag-failed   { @apply bg-red-500/15       text-red-300; }

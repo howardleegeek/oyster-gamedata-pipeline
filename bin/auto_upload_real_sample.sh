@@ -1,40 +1,45 @@
 #!/usr/bin/env bash
 # =============================================================================
-# auto_upload_real_sample.sh — push every D5-validated REAL=6 tarball to the
-# `real-data-sample-v1-20260507-0742` GitHub release as a rotating buffer.
+# auto_upload_real_sample.sh — push every D5-validated REAL=6 tarball to a
+# pluggable storage backend (default: GitHub release for legacy compat).
 #
-# Howard 2026-05-07 iron-law: testers must always be able to download the
-# freshest real sample without us being on-call to push it manually. This
-# hook is wired into swarm_controller.sh after D5 returns "Verdict: REAL".
+# Howard 2026-05-07: GitHub release has 2 GiB hard cap per asset and 50 asset
+# limit per release. To scale beyond ~100 testers/day we now route through
+# bin/upload_tarball.py which selects backend via $STORAGE_BACKEND
+# (github | s3 | local). Default = github so existing testers see no change.
 #
 # USAGE:
 #   bin/auto_upload_real_sample.sh <tarball_path>
 #
 # Exit codes:
 #   0  uploaded (or skipped because already-uploaded)
-#   1  tarball missing or oversized (>2 GiB GitHub asset limit)
+#   1  tarball missing or oversized for the chosen backend
 #   2  D5 verdict not REAL=6
-#   3  gh CLI call failed
+#   3  backend upload failed
 #
-# RELEASE TAG (hardcoded — change here, not in caller):
-#   real-data-sample-v1-20260507-0742
-#
-# ROTATING BUFFER POLICY:
-#   - keep newest 3 oyster_REAL6_*.tar.gz assets
-#   - delete older ones (the smaller oyster_REAL6_test.tar.gz "seed" asset
-#     is preserved indefinitely as a stable known-good 18 MB reference)
+# ENV VARS:
+#   STORAGE_BACKEND        github (default) | s3 | local
+#   STORAGE_GITHUB_REPO    (default howardleegeek/oyster-gamedata-pipeline)
+#   STORAGE_GITHUB_TAG     (default real-data-sample-v1-20260507-0742)
+#   STORAGE_S3_BUCKET      (required for s3)
+#   STORAGE_S3_REGION      (default us-east-1)
+#   STORAGE_S3_ENDPOINT_URL (optional — for R2/B2/MinIO)
+#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (required for s3)
 # =============================================================================
 
 set -uo pipefail
 
-REPO="${REPO_OVERRIDE:-howardleegeek/oyster-gamedata-pipeline}"
-TAG="real-data-sample-v1-20260507-0742"
-GITHUB_ASSET_LIMIT=2147483648   # 2 GiB exact (GitHub hard cap)
-KEEP_NEWEST=3
-PROTECTED_ASSET="oyster_REAL6_test.tar.gz"  # stable seed sample
+REPO_DIR="${REPO_DIR_OVERRIDE:-/Users/howardli/Downloads/oyster-agent-runner}"
+PY_BIN="${PY_BIN_OVERRIDE:-${REPO_DIR}/.venv/bin/python}"
 LOG="${UPLOAD_LOG:-/tmp/auto_upload_real_sample.log}"
+BACKEND="${STORAGE_BACKEND:-github}"
 
-log() { echo "[$(date +%H:%M:%S)] auto_upload: $*" | tee -a "$LOG" >&2; }
+# Legacy env-var defaults (preserved so existing callers see no change).
+export STORAGE_GITHUB_REPO="${STORAGE_GITHUB_REPO:-${REPO_OVERRIDE:-howardleegeek/oyster-gamedata-pipeline}}"
+export STORAGE_GITHUB_TAG="${STORAGE_GITHUB_TAG:-real-data-sample-v1-20260507-0742}"
+export STORAGE_GITHUB_KEEP_NEWEST="${STORAGE_GITHUB_KEEP_NEWEST:-3}"
+
+log() { echo "[$(date +%H:%M:%S)] auto_upload[$BACKEND]: $*" | tee -a "$LOG" >&2; }
 
 INPUT_TAR="${1:-}"
 if [[ -z "$INPUT_TAR" ]]; then
@@ -47,66 +52,44 @@ if [[ ! -f "$INPUT_TAR" ]]; then
     exit 1
 fi
 
-# 1. size check (GitHub silently 422s tarballs > 2 GiB)
+# 1. Per-backend size guard. GitHub is the only one with a hard cap we enforce
+#    client-side; S3 and local accept anything (S3 multipart handles >2 GiB).
 SIZE=$(stat -f %z "$INPUT_TAR" 2>/dev/null || stat -c %s "$INPUT_TAR" 2>/dev/null)
-if [[ "$SIZE" -gt "$GITHUB_ASSET_LIMIT" ]]; then
-    log "skipping $INPUT_TAR — $SIZE bytes exceeds GitHub 2 GiB limit"
+GITHUB_ASSET_LIMIT=2147483648   # 2 GiB exact (GitHub hard cap)
+if [[ "$BACKEND" == "github" && "$SIZE" -gt "$GITHUB_ASSET_LIMIT" ]]; then
+    log "skipping $INPUT_TAR — $SIZE bytes exceeds GitHub 2 GiB limit (use STORAGE_BACKEND=s3 instead)"
     exit 1
 fi
 
-# 2. re-validate D5 (defense in depth — caller may have a different
-#    tarball than what was just validated). This is cheap (~5s) compared
-#    to a tester downloading 2 GB of bad data.
-REPO_DIR="${REPO_DIR_OVERRIDE:-/Users/howardli/Downloads/oyster-agent-runner}"
-PY_BIN="${REPO_DIR}/.venv/bin/python"
+# 2. Re-validate D5 (defense in depth — caller may have a different
+#    tarball than what was just validated). Cheap (~5s) compared to wasted upload.
 D5_OUT=$("$PY_BIN" "${REPO_DIR}/bin/tarball_authenticity_check.py" "$INPUT_TAR" 2>&1 | tail -10)
 if ! echo "$D5_OUT" | grep -q "REAL=6  PLACEHOLDER=0  UNKNOWN=0"; then
     log "skipping $INPUT_TAR — D5 verdict not REAL=6"
-    log "D5 output:\n$D5_OUT"
+    log "D5 output:"
+    echo "$D5_OUT" | tee -a "$LOG" >&2
     exit 2
 fi
 
-# 3. compute uploaded asset name from input filename
+# 3. Tester ID — deterministic from filename (stable across re-runs).
 BASE=$(basename "$INPUT_TAR" .tar.gz)
-ASSET_NAME="oyster_REAL6_${BASE#swarm_real_}.tar.gz"  # strip swarm_real_ prefix
+TESTER_ID="${TESTER_ID_OVERRIDE:-tester-${BASE#swarm_real_}}"
+TESTER_ID="${TESTER_ID:0:64}"  # trim to a reasonable upper bound
 
-# 4. check if already uploaded (idempotent — re-runs are no-ops)
-EXISTING=$(gh release view "$TAG" --repo "$REPO" --json assets 2>/dev/null \
-    | python3 -c "import json,sys; print(' '.join(a['name'] for a in json.load(sys.stdin).get('assets', [])))")
-if [[ " $EXISTING " == *" $ASSET_NAME "* ]]; then
-    log "asset $ASSET_NAME already uploaded — skip"
-    exit 0
-fi
+# 4. Hand off to the python CLI. It owns idempotency, signed-URL minting,
+#    and per-backend specifics.
+log "uploading $INPUT_TAR via backend=$BACKEND (size=$((SIZE / 1024 / 1024)) MB, tester=$TESTER_ID)"
+RESULT=$("$PY_BIN" "${REPO_DIR}/bin/upload_tarball.py" "$INPUT_TAR" \
+    --tester-id "$TESTER_ID" \
+    --d5-verdict "REAL" \
+    --backend "$BACKEND" 2>>"$LOG")
+RC=$?
 
-# 5. upload with rename
-log "uploading $INPUT_TAR as $ASSET_NAME ($((SIZE / 1024 / 1024)) MB)"
-TMP_LINK=$(mktemp -d)/"$ASSET_NAME"
-ln -sf "$INPUT_TAR" "$TMP_LINK"
-if ! gh release upload "$TAG" "$TMP_LINK" --repo "$REPO" --clobber 2>>"$LOG"; then
-    log "gh upload failed for $ASSET_NAME"
-    rm -rf "$(dirname "$TMP_LINK")"
+if [[ $RC -ne 0 ]]; then
+    log "upload_tarball.py failed (rc=$RC)"
     exit 3
 fi
-rm -rf "$(dirname "$TMP_LINK")"
 
-# 6. rotating buffer — keep newest KEEP_NEWEST oyster_REAL6_*.tar.gz assets
-#    that are NOT the protected seed. Older ones removed.
-log "pruning old assets (keep newest $KEEP_NEWEST + $PROTECTED_ASSET)"
-gh release view "$TAG" --repo "$REPO" --json assets 2>/dev/null \
-    | python3 -c "
-import json, sys
-assets = json.load(sys.stdin).get('assets', [])
-# keep oyster_REAL6_*.tar.gz only; sort by createdAt desc; skip protected
-oysters = [a for a in assets if a['name'].startswith('oyster_REAL6_') and a['name'] != '$PROTECTED_ASSET']
-oysters.sort(key=lambda a: a.get('createdAt', ''), reverse=True)
-to_delete = oysters[$KEEP_NEWEST:]
-for a in to_delete:
-    print(a['name'])
-" | while read -r OLD; do
-    [[ -z "$OLD" ]] && continue
-    log "deleting old asset: $OLD"
-    gh release delete-asset "$TAG" "$OLD" --repo "$REPO" --yes 2>>"$LOG" || log "  delete-asset failed: $OLD"
-done
-
-log "DONE — $ASSET_NAME uploaded, buffer trimmed to newest $KEEP_NEWEST"
+# Surface the JSON result to the log for downstream debugging.
+log "DONE: $RESULT"
 exit 0

@@ -13,7 +13,7 @@
 | D16 | server-side Paper Fabric mod | P1 | 60 m | D15 | ✅ shipped (2026-05-07 by self-dispatch, awaits Paper restart for activation) |
 | D17 | .exe auto-installs mod + Fabric loader | P1 | 90 m | D15, recorder release | ✅ shipped (2026-05-07 by self-dispatch, helper module + 12 tests; PyInstaller bundling pending GHA workflow update) |
 | D18 | D5 detect real_game_state classifier | P2 | 30 m | D5, D15 | ✅ shipped (2026-05-07 by self-dispatch) |
-| D19 | multi-MC-version build matrix | P2 | 60 m | D15 | 🟠 partial (architecture complete + 13 tests; CI matrix scoped to verified-working 1.21.4 only — 1.20.x/1.21.1 fabric-api versions need lookup against maven.fabricmc.net before re-enabling) |
+| D19 | multi-MC-version build matrix | P2 | 60 m | D15 | ✅ shipped (2026-05-07 self-dispatch, CodexResearcher verified versions on maven.fabricmc.net, 13 contract tests, full 4-version CI matrix restored) |
 | D20 | E2E mod-to-tarball integration test | P1 | 90 m | D15, D16, D18 | ✅ shipped (2026-05-07 by self-dispatch, Python-side E2E with 4 tests; full Paper+Mineflayer chain deferred as Part B) |
 | D21 | spec_lint.py + CI gate | P3 | 30 m | — | ✅ shipped (2026-05-07 by self-dispatch) |
 

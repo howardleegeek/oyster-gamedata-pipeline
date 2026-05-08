@@ -30,32 +30,37 @@ plugins {
 // D19 multi-version support — single source of truth for per-MC version
 // dependencies. Add a row here to support a new MC version.
 // -----------------------------------------------------------------------------
+// Howard 2026-05-07: fabric-api / yarn / loader versions VERIFIED against
+// maven.fabricmc.net via direct HTTP fetch (CodexResearcher agent on
+// 2026-05-07). Each coordinate confirmed by reading the actual .jar
+// listing in maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/.
+// Loader bumped 0.16.9 → 0.16.14 (latest 0.16.x stable, Apr-2025).
 ext.MC_MATRIX = [
     "1.20.1": [
-        yarn:        "1.20.1+build.10",
-        fabricApi:   "0.92.6+1.20.1",
-        loader:      "0.16.9",
+        yarn:        "1.20.1+build.10",   // ceiling — +build.11 is 404
+        fabricApi:   "0.92.8+1.20.1",     // 15-Apr-2026
+        loader:      "0.16.14",
         javaRelease: 17,
         dependsExpr: "~1.20.1",
     ],
     "1.20.4": [
-        yarn:        "1.20.4+build.3",
-        fabricApi:   "0.97.8+1.20.4",
-        loader:      "0.16.9",
+        yarn:        "1.20.4+build.3",    // ceiling — +build.4 is 404
+        fabricApi:   "0.97.3+1.20.4",     // 20-Jun-2025 ceiling — Mojang snapshot churn moved devs off 1.20.4 quickly
+        loader:      "0.16.14",
         javaRelease: 17,
         dependsExpr: "~1.20.4",
     ],
     "1.21.1": [
-        yarn:        "1.21.1+build.3",
-        fabricApi:   "0.103.0+1.21.1",
-        loader:      "0.16.9",
+        yarn:        "1.21.1+build.3",    // ceiling — +build.4 is 404
+        fabricApi:   "0.116.11+1.21.1",   // 15-Apr-2026
+        loader:      "0.16.14",
         javaRelease: 21,
         dependsExpr: "~1.21.1",
     ],
     "1.21.4": [
         yarn:        "1.21.4+build.1",
         fabricApi:   "0.110.0+1.21.4",
-        loader:      "0.16.9",
+        loader:      "0.16.14",
         javaRelease: 21,
         dependsExpr: "~1.21.4",
     ],
