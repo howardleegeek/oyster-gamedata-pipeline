@@ -194,11 +194,17 @@ class MockStripeClient:
         return transfer
 
 
-def make_stripe_client() -> StripeClient | MockStripeClient:
+def make_stripe_client(*, allow_mock: bool = False) -> StripeClient | MockStripeClient:
     secret = os.environ.get("STRIPE_SECRET_KEY", "")
     if secret.startswith("sk_"):
         return StripeClient(secret)
-    return MockStripeClient()
+    if allow_mock:
+        return MockStripeClient()
+    raise RuntimeError(
+        "STRIPE_SECRET_KEY is not set or does not start with 'sk_'. "
+        "Iron-law: payout_cron must not silently fall back to MockStripeClient "
+        "in production. Set STRIPE_SECRET_KEY or pass --dry-run for testing."
+    )
 
 
 # =====================================================================
@@ -352,14 +358,21 @@ class MockSupabaseClient:
         return row
 
 
-def make_supabase_client() -> SupabaseClient | MockSupabaseClient:
-    url = os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "") or os.environ.get(
-        "SUPABASE_URL", ""
-    )
+def make_supabase_client(
+    *,
+    allow_mock: bool = False,
+) -> SupabaseClient | MockSupabaseClient:
+    url = os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "") or os.environ.get("SUPABASE_URL", "")
     key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
     if url and key:
         return SupabaseClient(url, key)
-    return MockSupabaseClient()
+    if allow_mock:
+        return MockSupabaseClient()
+    raise RuntimeError(
+        "Supabase env vars (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY) are not set. "
+        "Iron-law: payout_cron must not silently fall back to MockSupabaseClient "
+        "in production. Set the env vars or pass --dry-run for testing."
+    )
 
 
 # =====================================================================
@@ -537,8 +550,8 @@ def main(argv: list[str] | None = None) -> int:
 
     logger = configure_logger(level=logging.DEBUG if args.verbose else logging.INFO)
     run_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    supabase = make_supabase_client()
-    stripe = make_stripe_client()
+    supabase = make_supabase_client(allow_mock=args.dry_run)
+    stripe = make_stripe_client(allow_mock=args.dry_run)
 
     mode_bits = []
     mode_bits.append("supabase=live" if isinstance(supabase, SupabaseClient) else "supabase=mock")
@@ -573,9 +586,8 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     if failed:
-        msg = (
-            f":warning: payout_cron {run_date}: {len(failed)} failed transfers — "
-            + ", ".join(f"{r.tester_id}({r.failure_reason})" for r in failed[:5])
+        msg = f":warning: payout_cron {run_date}: {len(failed)} failed transfers — " + ", ".join(
+            f"{r.tester_id}({r.failure_reason})" for r in failed[:5]
         )
         post_slack(msg)
 

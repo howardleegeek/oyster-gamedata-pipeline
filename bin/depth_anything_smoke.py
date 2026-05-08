@@ -23,6 +23,7 @@ def lazy_import_torch():
     """Lazy import torch to avoid mandatory dependency at import time."""
     try:
         import torch
+
         return torch
     except ImportError as exc:
         raise ImportError("torch required: pip install torch") from exc
@@ -33,6 +34,7 @@ def lazy_import_openexr():
     try:
         import OpenEXR
         import Imath
+
         return OpenEXR, Imath
     except ImportError as exc:
         raise ImportError("OpenEXR required: pip install OpenEXR") from exc
@@ -55,32 +57,19 @@ def load_depth_anything_v2_small():
     torch = lazy_import_torch()
     try:
         from depth_anything_v2.dpt import DepthAnythingV2
+
         print("Loading DepthAnything V2 Small model...")
-        model = DepthAnythingV2(
-            encoder="vits", features=64, out_channels=[48, 96, 192, 384]
-        )
+        model = DepthAnythingV2(encoder="vits", features=64, out_channels=[48, 96, 192, 384])
         model.eval()
         print("Model loaded successfully")
         return model
     except ImportError:
-        print("Warning: depth_anything_v2 not found, using mock model")
-
-        class MockDepthModel:
-            """Mock depth model for testing without real weights."""
-            def eval(self) -> "MockDepthModel":
-                return self
-
-            def to(self, device) -> "MockDepthModel":
-                return self
-
-            def __call__(self, x) -> "torch.Tensor":
-                b, c, h, w = x.shape
-                y_coords = torch.linspace(0, 1, h).view(h, 1).expand(h, w)
-                x_coords = torch.linspace(0, 1, w).view(1, w).expand(h, w)
-                depth = 0.3 + 0.7 * torch.sin(2 * 3.14159 * (x_coords + y_coords))
-                return depth.unsqueeze(0).unsqueeze(0)
-
-        return MockDepthModel()
+        raise RuntimeError(
+            "depth_anything_smoke requires the depth_anything_v2 package. "
+            "Install it or provide a real ONNX model path. "
+            "Iron-law: never return a mock depth model — fake depth "
+            "contaminates downstream tarball quality checks."
+        )
 
 
 def preprocess_for_depth(image: Image.Image, target_size: int = 518) -> "torch.Tensor":
@@ -158,8 +147,9 @@ def main(argv: Optional[list] = None) -> int:
     """
     parser = argparse.ArgumentParser(description="DepthAnything V2 Small smoke test")
     parser.add_argument("--output", "-o", type=Path, help="Output EXR file path")
-    parser.add_argument("--no-cleanup", action="store_true",
-                        help="Keep temporary files after completion")
+    parser.add_argument(
+        "--no-cleanup", action="store_true", help="Keep temporary files after completion"
+    )
     args = parser.parse_args(argv)
 
     temp_dir = None

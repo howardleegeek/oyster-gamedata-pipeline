@@ -418,3 +418,81 @@ def test_recorder_window_capture_uses_geometry_not_title():
         assert not arg.startswith(
             "title="
         ), f"Iron-law: must NOT use title-based capture. Found: {arg}"
+
+
+# ---------------------------------------------------------------------------
+# Placeholder-audit 2026-05-08: newly-closed gaps
+# ---------------------------------------------------------------------------
+
+
+def test_optical_flow_no_placeholder_frames():
+    """optical_flow_provider must not silently generate random placeholder frames."""
+    src = (REPO_ROOT / "bin" / "optical_flow_provider.py").read_text()
+    assert "_placeholder_frames" not in src, (
+        "Iron-law: optical_flow_provider must NOT have _placeholder_frames(). "
+        "It must raise RuntimeError when imageio is unavailable."
+    )
+    assert (
+        "generating placeholder frames" not in src
+    ), "Iron-law: optical_flow_provider must not log 'generating placeholder frames'."
+
+
+def test_depth_anything_smoke_no_mock_model():
+    """depth_anything_smoke must not silently return a MockDepthModel."""
+    src = (REPO_ROOT / "bin" / "depth_anything_smoke.py").read_text()
+    assert "MockDepthModel" not in src, (
+        "Iron-law: depth_anything_smoke must NOT define MockDepthModel. "
+        "It must raise RuntimeError when depth_anything_v2 is unavailable."
+    )
+    assert (
+        "using mock model" not in src
+    ), "Iron-law: depth_anything_smoke must not log 'using mock model'."
+
+
+def test_recorder_dav2_runner_no_mock_depth():
+    """recorder_dav2_runner must not silently fall back to _mock_depth()."""
+    src = (REPO_ROOT / "bin" / "recorder_dav2_runner.py").read_text()
+    assert "_mock_depth" not in src, (
+        "Iron-law: recorder_dav2_runner must NOT define _mock_depth(). "
+        "It must raise RuntimeError when the model is None."
+    )
+
+
+def test_vendor_alpha_dashboard_no_sample_data():
+    """vendor_alpha_dashboard must not generate fake metrics from a hash."""
+    src = (REPO_ROOT / "bin" / "vendor_alpha_dashboard.py").read_text()
+    assert "load_sample_data" not in src, (
+        "Iron-law: vendor_alpha_dashboard must NOT have load_sample_data(). "
+        "It must read real metrics files or hard-fail."
+    )
+    assert (
+        "vendor_hash" not in src
+    ), "Iron-law: vendor_alpha_dashboard must not derive fake metrics from hash."
+
+
+def test_sample_tarball_builder_no_fake_exr():
+    """sample_tarball_builder must not write fake EXR magic bytes."""
+    src = (REPO_ROOT / "bin" / "sample_tarball_builder.py").read_text()
+    assert "\\x76\\x2f\\x31\\x01" not in src and "EXR magic number" not in src, (
+        "Iron-law: sample_tarball_builder must NOT write raw EXR magic bytes. "
+        "It must raise RuntimeError when OpenEXR is unavailable."
+    )
+    assert "PK\\x03\\x04" not in src or "openpyxl" not in src.split("PK")[0], (
+        "Iron-law: sample_tarball_builder must NOT write raw XLSX ZIP magic. "
+        "It must raise RuntimeError when openpyxl is unavailable."
+    )
+
+
+def test_payout_cron_no_silent_mock_fallback():
+    """payout_cron must not silently return MockStripeClient/MockSupabaseClient
+    without explicit allow_mock=True."""
+    src = (REPO_ROOT / "bin" / "payout_cron.py").read_text()
+    # The factory functions must require allow_mock parameter
+    assert "allow_mock" in src, (
+        "Iron-law: make_stripe_client/make_supabase_client must accept "
+        "allow_mock parameter and raise when False + no env."
+    )
+    assert "allow_mock=args.dry_run" in src, (
+        "Iron-law: main() must pass allow_mock=args.dry_run so production "
+        "runs without --dry-run hard-fail when env is missing."
+    )

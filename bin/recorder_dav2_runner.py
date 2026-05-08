@@ -101,6 +101,7 @@ def ensure_model(
     # Prefer huggingface_hub when present (handles auth, retries, sharding).
     try:
         from huggingface_hub import hf_hub_download  # type: ignore
+
         local = hf_hub_download(
             repo_id=repo,
             filename=filename,
@@ -133,7 +134,8 @@ def ensure_model(
 
 
 def iter_video_frames(
-    video_path: Path, target_fps: int = DEFAULT_FPS,
+    video_path: Path,
+    target_fps: int = DEFAULT_FPS,
 ) -> Iterator[Tuple[int, np.ndarray]]:
     """Yield ``(frame_index, rgb_ndarray)`` sampled at ``target_fps``.
 
@@ -170,9 +172,7 @@ def iter_video_frames(
     try:
         import imageio.v3 as iio  # type: ignore
     except ImportError as exc:
-        raise RuntimeError(
-            "Need cv2 or imageio to read video; install one before running"
-        ) from exc
+        raise RuntimeError("Need cv2 or imageio to read video; install one before running") from exc
 
     meta = iio.immeta(str(video_path))
     src_fps = float(meta.get("fps", 30.0))
@@ -204,42 +204,33 @@ def _load_model(model_path: Path) -> Any:
         return None
 
 
-def _mock_depth(rgb: np.ndarray) -> np.ndarray:
-    """Deterministic mock depth: smooth ramp matching frame size."""
-    h, w = rgb.shape[:2]
-    yy, xx = np.meshgrid(
-        np.linspace(0, 1, h, dtype=np.float32),
-        np.linspace(0, 1, w, dtype=np.float32),
-        indexing="ij",
-    )
-    return (0.3 + 0.7 * np.sin(2 * np.pi * (xx + yy))).astype(np.float32)
-
-
 def infer_depth(model: Any, rgb: np.ndarray) -> np.ndarray:
-    """Run DA-V2 inference; fall back to a mock ramp if model unavailable."""
+    """Run DA-V2 inference. Hard-fails if model is None or inference fails."""
     if model is None:
-        return _mock_depth(rgb)
+        raise RuntimeError(
+            "infer_depth requires a loaded ONNX model (got None). "
+            "Ensure the DA-V2 model file exists and onnxruntime is installed. "
+            "Iron-law: never return mock/ramp depth — fake depth contaminates "
+            "tarball authenticity checks."
+        )
+    # ONNX expects NCHW float32 normalized; we resize to 518 for V2-Small.
+    h_target = w_target = 518
     try:
-        # ONNX expects NCHW float32 normalized; we resize to 518 for V2-Small.
-        h_target = w_target = 518
-        try:
-            import cv2  # type: ignore
-            resized = cv2.resize(rgb, (w_target, h_target))
-        except ImportError:
-            from PIL import Image
-            resized = np.array(
-                Image.fromarray(rgb).resize((w_target, h_target))
-            )
-        normed = resized.astype(np.float32) / 255.0
-        mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-        std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-        normed = (normed - mean) / std
-        nchw = np.transpose(normed, (2, 0, 1))[None, ...]
-        out = model.run(None, {model.get_inputs()[0].name: nchw})[0]
-        depth = np.squeeze(out).astype(np.float32)
-        return depth
-    except Exception:
-        return _mock_depth(rgb)
+        import cv2  # type: ignore
+
+        resized = cv2.resize(rgb, (w_target, h_target))
+    except ImportError:
+        from PIL import Image
+
+        resized = np.array(Image.fromarray(rgb).resize((w_target, h_target)))
+    normed = resized.astype(np.float32) / 255.0
+    mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+    std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+    normed = (normed - mean) / std
+    nchw = np.transpose(normed, (2, 0, 1))[None, ...]
+    out = model.run(None, {model.get_inputs()[0].name: nchw})[0]
+    depth = np.squeeze(out).astype(np.float32)
+    return depth
 
 
 def _write_exr(path: Path, depth: np.ndarray) -> bool:
@@ -320,9 +311,7 @@ def run_clip(
             encoding="utf-8",
         )
         summary["download_error"] = f"{type(exc).__name__}: {exc}"
-        (clip_dir / SUMMARY_FILENAME).write_text(
-            json.dumps(summary, indent=2), encoding="utf-8"
-        )
+        (clip_dir / SUMMARY_FILENAME).write_text(json.dumps(summary, indent=2), encoding="utf-8")
         return 2
 
     model = _load_model(model_path) if model_path else None
@@ -338,16 +327,12 @@ def run_clip(
                 summary["format"] = "npy"
             written += 1
     except Exception as exc:  # noqa: BLE001
-        summary["error"] = "".join(
-            traceback.format_exception_only(type(exc), exc)
-        ).strip()
+        summary["error"] = "".join(traceback.format_exception_only(type(exc), exc)).strip()
 
     summary["frames_written"] = written
     summary["elapsed_seconds"] = round(time.time() - started, 2)
     summary["finished_at"] = datetime.now(timezone.utc).isoformat()
-    (clip_dir / SUMMARY_FILENAME).write_text(
-        json.dumps(summary, indent=2), encoding="utf-8"
-    )
+    (clip_dir / SUMMARY_FILENAME).write_text(json.dumps(summary, indent=2), encoding="utf-8")
     return 0
 
 

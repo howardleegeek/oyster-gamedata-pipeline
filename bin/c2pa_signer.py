@@ -33,8 +33,9 @@ class C2PASigner:
     C2PA_VERSION = "2.1"
     C2PA_CONTEXT = "http://c2pa.org/contexts/v2.1"
 
-    def __init__(self, private_key_path: Optional[str] = None,
-                 certificate_path: Optional[str] = None):
+    def __init__(
+        self, private_key_path: Optional[str] = None, certificate_path: Optional[str] = None
+    ):
         """Initialize C2PA signer."""
         self.private_key_path = private_key_path
         self.certificate_path = certificate_path
@@ -95,13 +96,20 @@ class C2PASigner:
     def _detect_format(self, file_path: str) -> str:
         """Detect the format of a file based on extension."""
         ext = Path(file_path).suffix.lower()
-        fmt_map = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
-                   ".pdf": "application/pdf", ".mp4": "video/mp4", ".mov": "video/quicktime",
-                   ".mp3": "audio/mpeg", ".wav": "audio/wav"}
+        fmt_map = {
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".png": "image/png",
+            ".pdf": "application/pdf",
+            ".mp4": "video/mp4",
+            ".mov": "video/quicktime",
+            ".mp3": "audio/mpeg",
+            ".wav": "audio/wav",
+        }
         return fmt_map.get(ext, "application/octet-stream")
 
     def sign_manifest(self, manifest: Dict[str, Any]) -> Dict[str, Any]:
-        """Sign a C2PA manifest (placeholder for actual signing)."""
+        """Sign a C2PA manifest. Sets status='demo' when no key/cert provided."""
         if not self.private_key_path or not self.certificate_path:
             manifest["signature_info"]["status"] = "demo"
             return manifest
@@ -109,9 +117,7 @@ class C2PASigner:
         manifest["signature_info"]["timestamp"] = datetime.now(timezone.utc).isoformat()
         return manifest
 
-    def embed_manifest(
-        self, source_path: str, output_path: str, manifest: Dict[str, Any]
-    ) -> bool:
+    def embed_manifest(self, source_path: str, output_path: str, manifest: Dict[str, Any]) -> bool:
         """Embed C2PA manifest into a file (creates sidecar)."""
         try:
             manifest_path = output_path + ".c2pa"
@@ -130,11 +136,15 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
     parser.add_argument("--output", "-o", help="Path to output file")
     parser.add_argument("--model", "-m", required=True, help="AI/ML model name")
     parser.add_argument("--version", "-v", required=True, help="AI/ML model version")
-    parser.add_argument("--synthetic", "-s", action="store_true", help="Mark as synthetic (AI-generated)")
+    parser.add_argument(
+        "--synthetic", "-s", action="store_true", help="Mark as synthetic (AI-generated)"
+    )
     parser.add_argument("--params", "-p", help="Generation parameters as JSON or key=value pairs")
     parser.add_argument("--private-key", help="Path to private key for signing")
     parser.add_argument("--certificate", help="Path to certificate for signing")
-    parser.add_argument("--claim-generator", default="G145-C2PA-Signer/1.0", help="Claim generator ID")
+    parser.add_argument(
+        "--claim-generator", default="G145-C2PA-Signer/1.0", help="Claim generator ID"
+    )
     parser.add_argument("--verbose", "-V", action="store_true", help="Enable verbose output")
     return parser.parse_args(argv)
 

@@ -19,6 +19,7 @@ def _get_numpy():
     global _numpy
     if _numpy is None:
         import numpy
+
         _numpy = numpy
     return _numpy
 
@@ -50,7 +51,7 @@ def discover_corpus(corpus_path: Path) -> List[Path]:
 
 
 def lint_buyer_spec(file_path: Path) -> Tuple[bool, str]:
-    """Lint a buyer specification file (placeholder implementation)."""
+    """Lint a buyer specification file."""
     try:
         suffix = file_path.suffix.lower()
         if suffix in (".tar", ".gz", ".bz2", ".xz"):
@@ -61,6 +62,7 @@ def lint_buyer_spec(file_path: Path) -> Tuple[bool, str]:
                 ast.literal_eval(content)
             except (ValueError, SyntaxError):
                 import yaml
+
                 yaml.safe_load(content)
         return (True, "OK")
     except Exception as e:
@@ -88,21 +90,25 @@ def calculate_percentiles(values: List[float], percentiles: List[int]) -> List[f
 
 def format_results(timings: List[float], p50: float, p95: float, p99: float, total: int) -> str:
     """Format benchmark results."""
-    return "\n".join([
-        "Autoresearch Lint Performance Benchmark",
-        "=" * 40,
-        f"Total files: {total}",
-        f"Total elapsed: {sum(timings):.3f}s",
-        f"Average: {sum(timings)/len(timings):.3f}s",
-        "",
-        "Latency Percentiles:",
-        f"  p50: {p50*1000:.2f}ms",
-        f"  p95: {p95*1000:.2f}ms",
-        f"  p99: {p99*1000:.2f}ms",
-    ])
+    return "\n".join(
+        [
+            "Autoresearch Lint Performance Benchmark",
+            "=" * 40,
+            f"Total files: {total}",
+            f"Total elapsed: {sum(timings):.3f}s",
+            f"Average: {sum(timings)/len(timings):.3f}s",
+            "",
+            "Latency Percentiles:",
+            f"  p50: {p50*1000:.2f}ms",
+            f"  p95: {p95*1000:.2f}ms",
+            f"  p99: {p99*1000:.2f}ms",
+        ]
+    )
 
 
-def write_json(path: Path, timings: List[float], p50: float, p95: float, p99: float, total: int) -> None:
+def write_json(
+    path: Path, timings: List[float], p50: float, p95: float, p99: float, total: int
+) -> None:
     """Write results to JSON."""
     result = {
         "total_files": total,

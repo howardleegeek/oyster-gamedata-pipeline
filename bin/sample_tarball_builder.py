@@ -37,18 +37,18 @@ def synthesize_video(out_path: str, duration_sec: float = 300, fps: int = 30) ->
     """
     Generate a test video using ffmpeg testsrc filter (1080p H.264).
     This is a placeholder for sample - vendor doesn't get this in real workflow.
-    
+
     Args:
         out_path: Output video file path
         duration_sec: Duration in seconds (default 300 = 5 minutes)
         fps: Frames per second (default 30)
-    
+
     Returns:
         Path to the created video file
     """
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     # Fix #1: H.265 (libx265) per PRD criterion 4. Was libx264 — buyer rejects.
     # Fix #6: include audio track. PRD criteria 7-10 (audio quality / format /
     # channels / sample rate) require a real audio stream — synthesize with
@@ -56,26 +56,38 @@ def synthesize_video(out_path: str, duration_sec: float = 300, fps: int = 30) ->
     cmd = [
         "ffmpeg",
         "-y",  # Overwrite output
-        "-f", "lavfi",
-        "-i", f"testsrc=duration={duration_sec}:size=1920x1080:rate={fps}",
-        "-f", "lavfi",
-        "-i", f"sine=frequency=440:sample_rate=48000:duration={duration_sec}",
-        "-c:v", "libx265",
-        "-preset", "ultrafast",
-        "-x265-params", "log-level=error",
-        "-c:a", "aac",
-        "-b:a", "128k",
-        "-ac", "2",
-        "-pix_fmt", "yuv420p",
+        "-f",
+        "lavfi",
+        "-i",
+        f"testsrc=duration={duration_sec}:size=1920x1080:rate={fps}",
+        "-f",
+        "lavfi",
+        "-i",
+        f"sine=frequency=440:sample_rate=48000:duration={duration_sec}",
+        "-c:v",
+        "libx265",
+        "-preset",
+        "ultrafast",
+        "-x265-params",
+        "log-level=error",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        "-ac",
+        "2",
+        "-pix_fmt",
+        "yuv420p",
         "-shortest",
-        "-movflags", "+faststart",  # PRD compatibility
-        str(out_path)
+        "-movflags",
+        "+faststart",  # PRD compatibility
+        str(out_path),
     ]
-    
+
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(f"ffmpeg failed: {result.stderr}")
-    
+
     return str(out_path)
 
 
@@ -109,6 +121,7 @@ def synthesize_action_camera(
     import json as _json
     import math as _math
     from datetime import datetime, timedelta
+
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -172,40 +185,42 @@ def synthesize_action_camera(
             prev_y = 64.0 + 3.0 * _math.cos((i - 1) / 150.0)
             prev_z = 50.0 * _math.cos((i - 1) / 200.0)
             cam_speed = [(cam_x - prev_x) * 30.0, (cam_y - prev_y) * 30.0, (cam_z - prev_z) * 30.0]
-        records.append({
-            "frame": i,
-            "time": time_str,
-            "fps": 30.0,
-            "route_type": 1,
-            # PRD 文件2 字面：mouse_* 都是 list[float]，例 `{"mouse_x": [0.5]}`.
-            # mouse_x/y ∈ [0, 1]，mouse_dx/dy ∈ [-1, 1] (带方向，page 5).
-            # mouse_x ramps with sin(i/200) so R04 (differential) and R14
-            # (mouse-yaw correlation) both pass.
-            "mouse_x": [mouse_x_curr],
-            "mouse_y": [0.5],
-            "mouse_dx": [mouse_dx],
-            "mouse_dy": [0.0],
-            "keyCode": [wasd_pattern[i % 100]],
-            "camera_position": [cam_x, cam_y, cam_z],
-            # Fix #8: 'oula' (拼音 "欧拉") → 'euler' (English).
-            # PRD page 4 字面用 'camera_rotation_oula' (拼音). DO NOT rename.
-            "camera_rotation_oula": [pitch, yaw, 0.0],
-            "camera_rotation_quaternion": [qx, qy, qz, qw],
-            # PRD page 4 字面 'camera_Follow Offset' (带空格 + 大写 F).
-            # DO NOT rename to snake_case. Quirky but PRD-mandated.
-            "camera_Follow Offset": [0.0, 1.6, 0.0],
-            # Fix #10: intrinsics matched to recorder's 70° FOV.
-            # fy = (height/2) / tan(FOV_v/2) = 540 / tan(35°) ≈ 771.4
-            "camera_intrinsics": {"fx": 771.4, "fy": 771.4, "cx": 960.0, "cy": 540.0},
-            "camera_speed": cam_speed,
-            "player_position": [cam_x, cam_y, cam_z],
-            # PRD page 5 字面 'player_rotation_oula' (拼音). DO NOT rename to euler.
-            "player_rotation_oula": [pitch, yaw, 0.0],
-            "player_rotation_quaternion": [qx, qy, qz, qw],
-            # player tracks camera, so player_speed == camera_speed for sample.
-            "player_speed": list(cam_speed),
-            "metric_scale": 1.0,
-        })
+        records.append(
+            {
+                "frame": i,
+                "time": time_str,
+                "fps": 30.0,
+                "route_type": 1,
+                # PRD 文件2 字面：mouse_* 都是 list[float]，例 `{"mouse_x": [0.5]}`.
+                # mouse_x/y ∈ [0, 1]，mouse_dx/dy ∈ [-1, 1] (带方向，page 5).
+                # mouse_x ramps with sin(i/200) so R04 (differential) and R14
+                # (mouse-yaw correlation) both pass.
+                "mouse_x": [mouse_x_curr],
+                "mouse_y": [0.5],
+                "mouse_dx": [mouse_dx],
+                "mouse_dy": [0.0],
+                "keyCode": [wasd_pattern[i % 100]],
+                "camera_position": [cam_x, cam_y, cam_z],
+                # Fix #8: 'oula' (拼音 "欧拉") → 'euler' (English).
+                # PRD page 4 字面用 'camera_rotation_oula' (拼音). DO NOT rename.
+                "camera_rotation_oula": [pitch, yaw, 0.0],
+                "camera_rotation_quaternion": [qx, qy, qz, qw],
+                # PRD page 4 字面 'camera_Follow Offset' (带空格 + 大写 F).
+                # DO NOT rename to snake_case. Quirky but PRD-mandated.
+                "camera_Follow Offset": [0.0, 1.6, 0.0],
+                # Fix #10: intrinsics matched to recorder's 70° FOV.
+                # fy = (height/2) / tan(FOV_v/2) = 540 / tan(35°) ≈ 771.4
+                "camera_intrinsics": {"fx": 771.4, "fy": 771.4, "cx": 960.0, "cy": 540.0},
+                "camera_speed": cam_speed,
+                "player_position": [cam_x, cam_y, cam_z],
+                # PRD page 5 字面 'player_rotation_oula' (拼音). DO NOT rename to euler.
+                "player_rotation_oula": [pitch, yaw, 0.0],
+                "player_rotation_quaternion": [qx, qy, qz, qw],
+                # player tracks camera, so player_speed == camera_speed for sample.
+                "player_speed": list(cam_speed),
+                "metric_scale": 1.0,
+            }
+        )
         if session_id is not None:
             # R18 binding: each frame declares the session it belongs to.
             # Frankenstein splice (B-05) breaks here — attacker would need
@@ -222,6 +237,7 @@ def synthesize_action_camera(
 def synthesize_systeminfo(out_path: str) -> str:
     """Generate systeminfo.json (PDF p7 file 1, schema per PDF p3 文件1)."""
     import json as _json
+
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     # PRD page 3-4 specifies systeminfo.json has EXACTLY 5 fields.
@@ -243,37 +259,28 @@ def synthesize_depth_dir(out_dir: str, count: int = 1800) -> int:
     """
     Generate `count` placeholder OpenEXR float32 Z-channel files (16x16 minimal).
     Uses lazy import for OpenEXR.
-    
+
     Args:
         out_dir: Output directory for depth files
         count: Number of EXR files to generate (default 1800)
-    
+
     Returns:
         Number of files created
     """
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Lazy import OpenEXR
     try:
         import OpenEXR
         import Imath
     except ImportError:
-        # Fallback: create minimal placeholder files
-        # In production, OpenEXR would be required
-        for i in range(count):
-            exr_path = out_dir / f"depth_{i:06d}.exr"
-            # Create minimal EXR-like placeholder
-            # Real implementation would use OpenEXR library
-            with open(exr_path, 'wb') as f:
-                # Minimal EXR header + dummy data
-                f.write(b'\x76\x2f\x31\x01')  # EXR magic number
-                f.write(b'channels\n')
-                f.write(b'Z\n')
-                f.write(b'data\n')
-                f.write(b'\x00' * 512)  # Minimal padding
-        return count
-    
+        raise RuntimeError(
+            "sample_tarball_builder requires OpenEXR + Imath to create depth EXRs. "
+            "Install with: pip install OpenEXR. "
+            "Iron-law: never write fake EXR bytes — they corrupt D5 authenticity checks."
+        )
+
     # Fix #2 + #3: real 1920x1080 depth (was 16x16 stub, ~310 bytes per file).
     # Fix #11: ZIP_COMPRESSION reduces uncompressed 8MB/frame → ~500KB-1MB
     # depending on depth complexity. With 1800 frames at default,
@@ -281,12 +288,12 @@ def synthesize_depth_dir(out_dir: str, count: int = 1800) -> int:
     # brings it to ~1-2 GB (still big but tractable).
     W, H = 1920, 1080
     header = OpenEXR.Header(W, H)
-    header['channels'] = {'Z': Imath.Channel(Imath.PixelType(Imath.PixelType.FLOAT))}
-    header['compression'] = Imath.Compression(Imath.Compression.ZIP_COMPRESSION)
+    header["channels"] = {"Z": Imath.Channel(Imath.PixelType(Imath.PixelType.FLOAT))}
+    header["compression"] = Imath.Compression(Imath.Compression.ZIP_COMPRESSION)
 
     # Pre-compute a synthetic depth field once (ramp + circular feature) so
     # each frame writes 8 MB of REAL float32 Z values, not constant fill.
-    yy, xx = np.meshgrid(np.arange(H), np.arange(W), indexing='ij')
+    yy, xx = np.meshgrid(np.arange(H), np.arange(W), indexing="ij")
     base_depth = 10.0 + 0.005 * (xx + yy)  # plausible Z range 10-25 meters
 
     for i in range(count):
@@ -301,7 +308,7 @@ def synthesize_depth_dir(out_dir: str, count: int = 1800) -> int:
         depth_data[radial < 50] = 0.0
         z_channel = depth_data.tobytes()
         exr_file = OpenEXR.OutputFile(str(exr_path), header)
-        exr_file.writePixels({'Z': z_channel})
+        exr_file.writePixels({"Z": z_channel})
         exr_file.close()
 
     return count
@@ -310,24 +317,24 @@ def synthesize_depth_dir(out_dir: str, count: int = 1800) -> int:
 def create_gameinfo_xlsx(out_path: str, clip_id: str = "sample-clip-001") -> str:
     """
     Create a gameinfo.xlsx file with sample metadata.
-    
+
     Args:
         out_path: Output Excel file path
         clip_id: Clip identifier
-    
+
     Returns:
         Path to the created Excel file
     """
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     if Workbook is None:
-        # Fallback: create minimal placeholder
-        with open(out_path, 'wb') as f:
-            f.write(b'PK\x03\x04')  # ZIP magic (xlsx is a ZIP)
-            f.write(b'\x00' * 512)
-        return str(out_path)
-    
+        raise RuntimeError(
+            "sample_tarball_builder requires openpyxl to create gameinfo.xlsx. "
+            "Install with: pip install openpyxl. "
+            "Iron-law: never write fake XLSX bytes — they corrupt tarball validation."
+        )
+
     wb = Workbook()
     ws = wb.active
     ws.title = "GameInfo"
@@ -363,10 +370,10 @@ def create_gameinfo_xlsx(out_path: str, clip_id: str = "sample-clip-001") -> str
 def run_lint(tarball_path: str) -> bool:
     """
     Run oyster-buyer-lint on the tarball.
-    
+
     Args:
         tarball_path: Path to the tarball to lint
-    
+
     Returns:
         True if lint passes, False otherwise
     """
@@ -376,7 +383,7 @@ def run_lint(tarball_path: str) -> bool:
         ["python3", "-m", "oyster_buyer_lint", tarball_path],
         ["python3", "bin/oyster_buyer_lint.py", tarball_path],
     ]
-    
+
     for cmd in lint_commands:
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
@@ -390,20 +397,20 @@ def run_lint(tarball_path: str) -> bool:
         except subprocess.TimeoutExpired:
             print(f"Lint timeout with {cmd}")
             continue
-    
+
     # If no lint tool found, create a mock validation
     print("⚠ No oyster-buyer-lint found, performing basic validation...")
-    
+
     # Basic validation: check tarball structure
     try:
-        with tarfile.open(tarball_path, 'r:gz') as tar:
+        with tarfile.open(tarball_path, "r:gz") as tar:
             names = tar.getnames()
-            required = ['video.mp4', 'systeminfo.json', 'action_camera.json', 'gameinfo.xlsx']
+            required = ["video.mp4", "systeminfo.json", "action_camera.json", "gameinfo.xlsx"]
             for req in required:
                 if req not in names:
                     print(f"✗ Missing required file: {req}")
                     return False
-            if not any(n.startswith('depth/') for n in names):
+            if not any(n.startswith("depth/") for n in names):
                 print("✗ Missing depth/ directory")
                 return False
         print("✓ Basic validation passed")
@@ -422,13 +429,13 @@ def build_sample_tarball(
     """
     Orchestrate: video + action_camera + gameinfo.xlsx + depth/ → tar.gz.
     Run lint after.
-    
+
     Args:
         output_path: Output tarball path
         clip_id: Clip identifier
         skip_video: Skip video generation (for faster testing)
         skip_depth: Skip depth generation (for faster testing)
-    
+
     Returns:
         Path to the created tarball
     """
@@ -439,6 +446,7 @@ def build_sample_tarball(
     # session_manifest.json + per-frame session_id agree. Without this binding,
     # red-team B-05 (Frankenstein splice) is undetectable.
     import uuid as _uuid
+
     session_id = str(_uuid.uuid4())
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -448,7 +456,7 @@ def build_sample_tarball(
         print(f"Building sample tarball: {output_path}")
         print(f"Clip ID: {clip_id}")
         print(f"Session ID: {session_id}")
-        
+
         # 1. Video
         video_path = tmpdir / "video.mp4"
         if not skip_video:
@@ -457,9 +465,9 @@ def build_sample_tarball(
         else:
             print("Skipping video generation")
             # Create minimal placeholder
-            with open(video_path, 'wb') as f:
-                f.write(b'\x00' * 1024)
-        
+            with open(video_path, "wb") as f:
+                f.write(b"\x00" * 1024)
+
         # 2. systeminfo.json (PDF p7 file 1, was missing pre v0.1.0-rc4)
         print("Generating systeminfo.json...")
         systeminfo_path = tmpdir / "systeminfo.json"
@@ -468,29 +476,31 @@ def build_sample_tarball(
         # 3. Action camera data (JSON per PDF, not binary)
         print("Generating action_camera.json...")
         action_camera_path = tmpdir / "action_camera.json"
-        synthesize_action_camera(
-            str(action_camera_path), frame_count=9000, session_id=session_id
-        )
+        synthesize_action_camera(str(action_camera_path), frame_count=9000, session_id=session_id)
 
         # R18: write session_manifest.json alongside other artifacts so the
         # residual can verify each frame's session_id matches.
         import json as _json
+
         manifest_path = tmpdir / "session_manifest.json"
         manifest_path.write_text(
-            _json.dumps({
-                "session_id": session_id,
-                "recorder_version": "sample-tarball-builder",
-                "frame_count": 9000,
-                "clip_id": clip_id,
-            }, indent=2),
+            _json.dumps(
+                {
+                    "session_id": session_id,
+                    "recorder_version": "sample-tarball-builder",
+                    "frame_count": 9000,
+                    "clip_id": clip_id,
+                },
+                indent=2,
+            ),
             encoding="utf-8",
         )
-        
+
         # 3. Game info
         print("Generating gameinfo.xlsx...")
         gameinfo_path = tmpdir / "gameinfo.xlsx"
         create_gameinfo_xlsx(str(gameinfo_path), clip_id)
-        
+
         # 4. Depth directory
         depth_dir = tmpdir / "depth"
         if not skip_depth:
@@ -507,13 +517,14 @@ def build_sample_tarball(
             print("Skipping depth generation")
             depth_dir.mkdir()
             # Create minimal placeholder
-            (depth_dir / "depth_000000.exr").write_bytes(b'\x00' * 512)
+            (depth_dir / "depth_000000.exr").write_bytes(b"\x00" * 512)
 
         # R22 (D-04 defense): hash every depth/*.exr at *generation time*
         # and emit depth_manifest.json beside the depth/ dir. Verifier
         # rebuilds the hash and compares — file rename/shuffle no longer
         # passes silently the way R16's count-only check did.
         import json as _json
+
         depth_manifest = {}
         for exr_path in sorted(depth_dir.glob("*.exr")):
             sha = hashlib.sha256()
@@ -529,7 +540,7 @@ def build_sample_tarball(
 
         # Create tarball
         print("Creating tarball...")
-        with tarfile.open(output_path, 'w:gz') as tar:
+        with tarfile.open(output_path, "w:gz") as tar:
             tar.add(video_path, arcname="video.mp4")
             tar.add(systeminfo_path, arcname="systeminfo.json")
             tar.add(action_camera_path, arcname="action_camera.json")
@@ -537,42 +548,42 @@ def build_sample_tarball(
             tar.add(depth_manifest_path, arcname="depth_manifest.json")
             tar.add(gameinfo_path, arcname="gameinfo.xlsx")
             tar.add(depth_dir, arcname="depth")
-        
+
         # Run lint
         print("\nRunning lint...")
         lint_passed = run_lint(str(output_path))
-        
+
         if not lint_passed:
             print("⚠ Warning: Lint did not pass")
-        
+
         # Output SHA-256 and size
         sha256 = hashlib.sha256()
-        with open(output_path, 'rb') as f:
-            for chunk in iter(lambda: f.read(8192), b''):
+        with open(output_path, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
                 sha256.update(chunk)
-        
+
         size = output_path.stat().st_size
-        
+
         print(f"\n{'='*60}")
         print(f"Tarball created: {output_path}")
         print(f"SHA-256: {sha256.hexdigest()}")
         print(f"Size: {size:,} bytes ({size / (1024*1024):.2f} MB)")
         print(f"{'='*60}")
-        
+
         # Output for release artifact (machine-readable)
         print(f"\nRELEASE_ARTIFACT_SHA256={sha256.hexdigest()}")
         print(f"RELEASE_ARTIFACT_SIZE={size}")
-        
+
         return str(output_path)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     """
     Main entry point for CLI.
-    
+
     Args:
         argv: Command line arguments (default: sys.argv[1:])
-    
+
     Returns:
         Exit code (0 for success)
     """
@@ -583,35 +594,30 @@ def main(argv: Optional[List[str]] = None) -> int:
 Examples:
   python3 bin/sample_tarball_builder.py --output samples/buyer-spec-v1-rc1.tar.gz
   python3 bin/sample_tarball_builder.py --skip-video --skip-depth  # Fast test
-        """
+        """,
     )
-    
+
     parser.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         default="samples/buyer-spec-v1-rc1.tar.gz",
-        help="Output tarball path (default: samples/buyer-spec-v1-rc1.tar.gz)"
+        help="Output tarball path (default: samples/buyer-spec-v1-rc1.tar.gz)",
     )
-    
+
     parser.add_argument(
-        "--clip-id",
-        default="sample-clip-001",
-        help="Clip identifier (default: sample-clip-001)"
+        "--clip-id", default="sample-clip-001", help="Clip identifier (default: sample-clip-001)"
     )
-    
+
     parser.add_argument(
-        "--skip-video",
-        action="store_true",
-        help="Skip video generation (for faster testing)"
+        "--skip-video", action="store_true", help="Skip video generation (for faster testing)"
     )
-    
+
     parser.add_argument(
-        "--skip-depth",
-        action="store_true",
-        help="Skip depth generation (for faster testing)"
+        "--skip-depth", action="store_true", help="Skip depth generation (for faster testing)"
     )
-    
+
     args = parser.parse_args(argv)
-    
+
     try:
         build_sample_tarball(
             output_path=args.output,
@@ -623,6 +629,7 @@ Examples:
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         import traceback
+
         traceback.print_exc()
         return 1
 

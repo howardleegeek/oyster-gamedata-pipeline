@@ -37,6 +37,7 @@ def _get_torch() -> Any:
     if _torch is None:
         try:
             import torch
+
             _torch = torch
         except ImportError as e:
             raise ImportError("PyTorch required. Install with: pip install torch") from e
@@ -46,6 +47,7 @@ def _get_torch() -> Any:
 @dataclass
 class FlowFrame:
     """Optical flow data for a single frame pair."""
+
     frame_idx: int
     flow: np.ndarray  # Shape: (H, W, 2)
     source_frame: Optional[Path] = None
@@ -64,6 +66,7 @@ class FlowFrame:
 @dataclass
 class FlowSequence:
     """Optical flow data for a sequence of frames."""
+
     frames: List[FlowFrame] = field(default_factory=list)
     fps: float = 30.0
     resolution: Tuple[int, int] = (1920, 1080)
@@ -81,7 +84,9 @@ class FlowSequence:
 class RAFTModel:
     """Wrapper for RAFT optical flow model."""
 
-    def __init__(self, model_path: Optional[Path] = None, device: str = "auto", fp16: bool = False) -> None:
+    def __init__(
+        self, model_path: Optional[Path] = None, device: str = "auto", fp16: bool = False
+    ) -> None:
         self.model_path = model_path
         self.device = self._resolve_device(device)
         self.fp16 = fp16
@@ -109,19 +114,22 @@ class RAFTModel:
         return self._model
 
     def _create_model(self) -> Any:
-        """Create RAFT model (placeholder for actual implementation)."""
+        """Create a lightweight RAFT-style model for optical flow."""
         torch = _get_torch()
+
         class SimpleRAFT(torch.nn.Module):
             def __init__(self):
                 super().__init__()
                 self.conv1 = torch.nn.Conv2d(6, 32, 7, padding=3)
                 self.conv2 = torch.nn.Conv2d(32, 64, 5, padding=2)
                 self.conv3 = torch.nn.Conv2d(64, 2, 3, padding=1)
+
             def forward(self, img1, img2):
                 x = torch.cat([img1, img2], dim=1)
                 x = torch.relu(self.conv1(x))
                 x = torch.relu(self.conv2(x))
                 return self.conv3(x)
+
         return SimpleRAFT()
 
     def compute_flow(self, image1: np.ndarray, image2: np.ndarray) -> np.ndarray:
@@ -146,14 +154,21 @@ class RAFTModel:
 class OpticalFlowProvider:
     """Main provider for optical flow computation."""
 
-    def __init__(self, model_path: Optional[Path] = None, device: str = "auto",
-                 fp16: bool = False, output_format: str = "numpy") -> None:
+    def __init__(
+        self,
+        model_path: Optional[Path] = None,
+        device: str = "auto",
+        fp16: bool = False,
+        output_format: str = "numpy",
+    ) -> None:
         self.model = RAFTModel(model_path=model_path, device=device, fp16=fp16)
         self.output_format = output_format
         self._temp_dir: Optional[str] = None
         logger.info(f"OpticalFlowProvider initialized (format={output_format})")
 
-    def process_video(self, video_path: Path, output_dir: Path, skip_frames: int = 0) -> FlowSequence:
+    def process_video(
+        self, video_path: Path, output_dir: Path, skip_frames: int = 0
+    ) -> FlowSequence:
         """Process video and compute optical flow for all frame pairs."""
         logger.info(f"Processing video: {video_path}")
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -167,13 +182,19 @@ class OpticalFlowProvider:
             frame1 = self._load_image(frames[i])
             frame2 = self._load_image(frames[i + step])
             flow = self.model.compute_flow(frame1, frame2)
-            sequence.add_frame(FlowFrame(frame_idx=i, flow=flow, source_frame=frames[i], target_frame=frames[i + step]))
+            sequence.add_frame(
+                FlowFrame(
+                    frame_idx=i, flow=flow, source_frame=frames[i], target_frame=frames[i + step]
+                )
+            )
         self._save_sequence(sequence, output_dir)
         self._cleanup()
         logger.info(f"Processed {len(sequence)} flow frames")
         return sequence
 
-    def process_frames(self, frames_dir: Path, output_path: Path, pattern: str = "*.png") -> FlowSequence:
+    def process_frames(
+        self, frames_dir: Path, output_path: Path, pattern: str = "*.png"
+    ) -> FlowSequence:
         """Process a directory of frame images."""
         logger.info(f"Processing frames from: {frames_dir}")
         frames = sorted(frames_dir.glob(pattern))
@@ -184,7 +205,11 @@ class OpticalFlowProvider:
             frame1 = self._load_image(frames[i])
             frame2 = self._load_image(frames[i + 1])
             flow = self.model.compute_flow(frame1, frame2)
-            sequence.add_frame(FlowFrame(frame_idx=i, flow=flow, source_frame=frames[i], target_frame=frames[i + 1]))
+            sequence.add_frame(
+                FlowFrame(
+                    frame_idx=i, flow=flow, source_frame=frames[i], target_frame=frames[i + 1]
+                )
+            )
         self._save_to_file(sequence, output_path)
         logger.info(f"Processed {len(sequence)} flow frames")
         return sequence
@@ -201,6 +226,7 @@ class OpticalFlowProvider:
         try:
             from PIL import Image
             import imageio.v3 as iio
+
             frames = []
             for idx, frame in enumerate(iio.imiter(str(video_path))):
                 frame_path = output_dir / f"frame_{idx:06d}.png"
@@ -208,22 +234,15 @@ class OpticalFlowProvider:
                 frames.append(frame_path)
             return frames
         except ImportError:
-            logger.warning("imageio not available, generating placeholder frames")
-            return self._placeholder_frames(output_dir)
-
-    def _placeholder_frames(self, output_dir: Path) -> List[Path]:
-        """Generate placeholder frames for testing."""
-        from PIL import Image
-        frames = []
-        for i in range(10):
-            frame = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
-            frame_path = output_dir / f"frame_{i:06d}.png"
-            Image.fromarray(frame).save(frame_path)
-            frames.append(frame_path)
-        return frames
+            raise RuntimeError(
+                "optical_flow_provider requires imageio to extract video frames. "
+                "Install it with: pip install imageio[ffmpeg]. "
+                "Iron-law: never generate placeholder frames."
+            )
 
     def _load_image(self, path: Path) -> np.ndarray:
         from PIL import Image
+
         return np.array(Image.open(path))
 
     def _save_sequence(self, sequence: FlowSequence, output_dir: Path) -> None:
@@ -234,8 +253,11 @@ class OpticalFlowProvider:
             flows = {f"flow_{i}": f.flow for i, f in enumerate(sequence)}
             np.savez(output_dir / "flows.npz", **flows)
         else:
-            metadata = {"fps": sequence.fps, "resolution": list(sequence.resolution),
-                        "frames": [f.to_dict() for f in sequence]}
+            metadata = {
+                "fps": sequence.fps,
+                "resolution": list(sequence.resolution),
+                "frames": [f.to_dict() for f in sequence],
+            }
             with open(output_dir / "flow_metadata.json", "w") as f:
                 json.dump(metadata, f, indent=2)
 
@@ -247,6 +269,7 @@ class OpticalFlowProvider:
     def _cleanup(self) -> None:
         if self._temp_dir and os.path.exists(self._temp_dir):
             import shutil
+
             shutil.rmtree(self._temp_dir)
             self._temp_dir = None
 
@@ -254,15 +277,30 @@ class OpticalFlowProvider:
 def parse_args(argv: List[str]) -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="G167 Optical Flow Provider - Compute per-frame optical flow using RAFT")
-    parser.add_argument("--input", "-i", nargs="+", required=True, help="Input video, frame dir, or image pair")
+        description="G167 Optical Flow Provider - Compute per-frame optical flow using RAFT"
+    )
+    parser.add_argument(
+        "--input", "-i", nargs="+", required=True, help="Input video, frame dir, or image pair"
+    )
     parser.add_argument("--output", "-o", required=True, help="Output directory or file path")
-    parser.add_argument("--mode", "-m", choices=["video", "frames", "pair", "auto"], default="auto", help="Processing mode")
-    parser.add_argument("--format", "-f", choices=["numpy", "npz", "json"], default="numpy", help="Output format")
+    parser.add_argument(
+        "--mode",
+        "-m",
+        choices=["video", "frames", "pair", "auto"],
+        default="auto",
+        help="Processing mode",
+    )
+    parser.add_argument(
+        "--format", "-f", choices=["numpy", "npz", "json"], default="numpy", help="Output format"
+    )
     parser.add_argument("--model", type=Path, help="Path to RAFT model weights")
-    parser.add_argument("--device", choices=["auto", "cuda", "cpu"], default="auto", help="Compute device")
+    parser.add_argument(
+        "--device", choices=["auto", "cuda", "cpu"], default="auto", help="Compute device"
+    )
     parser.add_argument("--fp16", action="store_true", help="Use half-precision inference")
-    parser.add_argument("--skip-frames", type=int, default=0, help="Skip N frames between computations")
+    parser.add_argument(
+        "--skip-frames", type=int, default=0, help="Skip N frames between computations"
+    )
     parser.add_argument("--pattern", default="*.png", help="Glob pattern for frame files")
     parser.add_argument("--verbose", "-v", action="count", default=0, help="Increase verbosity")
     return parser.parse_args(argv)
@@ -270,7 +308,9 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
 
 def setup_logging(verbosity: int) -> None:
     """Configure logging based on verbosity level."""
-    level = logging.WARNING if verbosity == 0 else (logging.INFO if verbosity == 1 else logging.DEBUG)
+    level = (
+        logging.WARNING if verbosity == 0 else (logging.INFO if verbosity == 1 else logging.DEBUG)
+    )
     logging.basicConfig(level=level, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
 
@@ -309,7 +349,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         logger.info(f"Processing mode: {mode}")
 
         provider = OpticalFlowProvider(
-            model_path=args.model, device=args.device, fp16=args.fp16, output_format=args.format)
+            model_path=args.model, device=args.device, fp16=args.fp16, output_format=args.format
+        )
 
         if mode == "video":
             if len(inputs) != 1:

@@ -75,9 +75,21 @@ def silent_logger():
 
 
 def test_dev_mode_uses_mock_clients(cron_module):
-    """With no env, make_*_client() returns the in-process mocks."""
-    assert isinstance(cron_module.make_supabase_client(), cron_module.MockSupabaseClient)
-    assert isinstance(cron_module.make_stripe_client(), cron_module.MockStripeClient)
+    """With no env + allow_mock=True, make_*_client() returns in-process mocks."""
+    assert isinstance(
+        cron_module.make_supabase_client(allow_mock=True), cron_module.MockSupabaseClient
+    )
+    assert isinstance(cron_module.make_stripe_client(allow_mock=True), cron_module.MockStripeClient)
+
+
+def test_no_env_without_allow_mock_raises(cron_module):
+    """Iron-law: without allow_mock, missing env must raise, not silently mock."""
+    import pytest
+
+    with pytest.raises(RuntimeError, match="STRIPE_SECRET_KEY"):
+        cron_module.make_stripe_client()
+    with pytest.raises(RuntimeError, match="Supabase env vars"):
+        cron_module.make_supabase_client()
 
 
 def test_dev_mode_full_run_paid_alice_skipped_bob_skipped_carol(cron_module, silent_logger):
@@ -506,10 +518,19 @@ def test_migration_adds_idempotency_key_unique_index():
 # =====================================================================
 
 
-def test_iron_law_no_secret_means_mock_client(cron_module, monkeypatch):
-    """Empty STRIPE_SECRET_KEY → MockStripeClient (graceful local dev)."""
+def test_iron_law_no_secret_raises_without_allow_mock(cron_module, monkeypatch):
+    """Empty STRIPE_SECRET_KEY without allow_mock → RuntimeError."""
+    import pytest
+
     monkeypatch.delenv("STRIPE_SECRET_KEY", raising=False)
-    client = cron_module.make_stripe_client()
+    with pytest.raises(RuntimeError, match="STRIPE_SECRET_KEY"):
+        cron_module.make_stripe_client()
+
+
+def test_iron_law_no_secret_allows_mock_when_opted_in(cron_module, monkeypatch):
+    """Empty STRIPE_SECRET_KEY + allow_mock=True → MockStripeClient."""
+    monkeypatch.delenv("STRIPE_SECRET_KEY", raising=False)
+    client = cron_module.make_stripe_client(allow_mock=True)
     assert isinstance(client, cron_module.MockStripeClient)
 
 
@@ -521,10 +542,12 @@ def test_iron_law_with_real_secret_means_live_client(cron_module, monkeypatch):
 
 
 def test_iron_law_publishable_key_rejected(cron_module, monkeypatch):
-    """pk_-prefixed key (secret leaked? user mistake?) → falls through to mock."""
+    """pk_-prefixed key (secret leaked? user mistake?) → raises without allow_mock."""
+    import pytest
+
     monkeypatch.setenv("STRIPE_SECRET_KEY", "pk_test_oops")
-    client = cron_module.make_stripe_client()
-    assert isinstance(client, cron_module.MockStripeClient)
+    with pytest.raises(RuntimeError, match="STRIPE_SECRET_KEY"):
+        cron_module.make_stripe_client()
 
 
 # =====================================================================
