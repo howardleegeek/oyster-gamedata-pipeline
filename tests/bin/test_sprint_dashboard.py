@@ -196,9 +196,11 @@ def test_build_dashboard_produces_markdown():
         assert "## Build health" in dashboard
         assert "## Next 5 in queue" in dashboard
 
-        # Check specific content
+        # Check specific content. The dashboard renders fields with bold
+        # markdown (e.g. `- **Tests**: 12 passed / 3 failed`), so assertions
+        # match the actual rendered shape rather than a stripped variant.
         assert "Commits today" in dashboard
-        assert "Tests: 12 passed / 3 failed" in dashboard
+        assert "**Tests**: 12 passed / 3 failed" in dashboard
         assert "✅ Done: R001-R007" in dashboard
         assert "🟡 In flight: R008" in dashboard
 
@@ -216,8 +218,8 @@ def test_build_dashboard_no_pytest_file():
 
             dashboard = build_dashboard(repo_root=tmpdir)
 
-            # Should still work without pytest file
-            assert "Tests: 0 passed / 0 failed (0.0%)" in dashboard
+            # Should still work without pytest file. Match the bold-rendered shape.
+            assert "**Tests**: 0 passed / 0 failed (0.0%)" in dashboard
 
 
 def test_main_writes_to_file():
