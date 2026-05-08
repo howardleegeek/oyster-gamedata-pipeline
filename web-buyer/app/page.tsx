@@ -112,7 +112,27 @@ export default async function LandingPage() {
             ))}
           </div>
         </section>
-      ) : null}
+      ) : (
+        // Howard 2026-05-08 IRON-LAW: when Supabase is configured but the catalog
+        // is empty (e.g. fresh demo DB before the first tester upload), show an
+        // honest "live seeding" panel instead of silently dropping the section.
+        // This is a real status, not fabricated content.
+        <section className="max-w-6xl mx-auto px-4 py-12 md:py-16 border-t border-oyster-800/40">
+          <div className="flex items-end justify-between mb-6">
+            <h2 className="text-3xl font-bold">Featured tarballs</h2>
+          </div>
+          <div className="card p-8 text-center">
+            <div className="inline-block tag bg-amber-accent/15 text-amber-accent mb-3">
+              Catalog seeding live
+            </div>
+            <p className="text-oyster-200 max-w-xl mx-auto">
+              The catalog populates in real time as paid testers upload tarballs. New
+              uploads typically appear within a few minutes after a recording session
+              ends. Check <Link href="/browse" className="text-amber-accent hover:underline">/browse</Link> for the live list.
+            </p>
+          </div>
+        </section>
+      )}
 
       {/* Why */}
       <section className="max-w-6xl mx-auto px-4 py-12 md:py-20 border-t border-oyster-800/40">

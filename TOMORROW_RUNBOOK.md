@@ -144,6 +144,28 @@ Files (already on main):
 
 ---
 
+## Live monitoring during the demo — `./demo-watch.sh`
+
+While real users are clicking through, run this in a side terminal:
+
+```bash
+cd ~/Downloads/oyster-agent-runner
+TESTER_URL=https://<tester-deploy>  BUYER_URL=https://<buyer-deploy>  ./demo-watch.sh
+```
+
+Refreshes every 10 s, color-coded:
+- HTTP status for tester `/`, `/docs`, `/download`
+- HTTP status for buyer `/`, `/browse`
+- `catalog=N` — live row count from `/api/catalog` (proves Supabase + buyer wiring are healthy)
+- `exe=200` — proves the GitHub Release `OysterRecorder.exe` is still serving
+- Local disk free / used %
+
+If a column flips red mid-demo, you'll see it within 10 s. `INTERVAL=5`
+tightens cadence; `INTERVAL=30` reduces noise. Defaults to `localhost:3000` /
+`localhost:3001` — works against `next dev` when rehearsing locally.
+
+---
+
 ## Iron-law guard rails — do not regress
 
 If you (or a parallel agent) get tempted to "make demo easier" by
