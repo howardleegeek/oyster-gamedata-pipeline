@@ -88,3 +88,5 @@ qa_workdir/
 # while disk had 58 pending P0/P1. Never again.
 oyster-gamedata-pipeline/
 oyster-agent-runner/
+specs/auto/*
+!specs/auto/.gitkeep
