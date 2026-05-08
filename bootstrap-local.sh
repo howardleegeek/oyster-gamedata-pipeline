@@ -45,7 +45,17 @@ SUPA_DIR="${TESTER_DIR}/supabase"
 # ── start Supabase (tester project, ports 54321/54322/54323) ────────
 printf "\nStarting local Supabase stack (project: oyster-gamedata-tester) ...\n"
 cd "$TESTER_DIR"
-supabase start 2>&1 | tail -5
+# Howard 2026-05-08: --exclude vector skips the Logflare/Vector log-shipper
+# container, which fails to start on Colima (virtiofs rejects mounting the
+# host docker.sock into the container). Vector is only used for log
+# analytics in Studio — disabling it has zero effect on functional dev.
+# Drop --exclude when running on Docker Desktop if you want the analytics tab.
+supabase start --exclude vector 2>&1 | tail -5
+# `set -e` + tail -5 above masks supabase failures. Verify a critical
+# container is healthy before proceeding.
+if ! docker ps --filter "name=supabase_db_oyster-gamedata-tester" --filter "status=running" --format "{{.Names}}" | grep -q supabase_db; then
+  die "supabase_db container did not come up. Run \`supabase start --debug\` in web-tester/ for details."
+fi
 
 ok "Supabase started on port 54321."
 
@@ -68,14 +78,21 @@ ok "All buyer migrations applied."
 printf "\nExtracting keys from supabase status ...\n"
 
 cd "$TESTER_DIR"
-SUPA_STATUS="$(supabase status 2>/dev/null)"
+# Howard 2026-05-08: supabase CLI 2.98+ emits stable KEY=VALUE via
+# `--output env`, much more reliable than parsing the box-drawing default.
+# We eval into the current shell so API_URL / ANON_KEY / SERVICE_ROLE_KEY
+# become real variables. Strip surrounding double-quotes that the CLI adds.
+SUPA_ENV="$(supabase status --output env 2>/dev/null)"
 
-API_URL=$(printf '%s\n' "$SUPA_STATUS" | grep 'API URL' | sed 's/.*: *//')
-ANON_KEY=$(printf '%s\n' "$SUPA_STATUS" | grep 'anon key' | sed 's/.*: *//')
-SERVICE_ROLE_KEY=$(printf '%s\n' "$SUPA_STATUS" | grep 'service_role key' | sed 's/.*: *//')
+if [ -z "$SUPA_ENV" ]; then
+  die "supabase status --output env returned nothing. Is Supabase running?"
+fi
+
+# eval is safe here — output is from our own toolchain, not user input.
+eval "$SUPA_ENV"
 
 if [ -z "$API_URL" ] || [ -z "$ANON_KEY" ] || [ -z "$SERVICE_ROLE_KEY" ]; then
-  die "Failed to parse supabase status output. Raw output:\n${SUPA_STATUS}"
+  die "supabase status --output env missing one of API_URL/ANON_KEY/SERVICE_ROLE_KEY. Raw:\n${SUPA_ENV}"
 fi
 
 ok "API URL:          ${API_URL}"
