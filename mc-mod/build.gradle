@@ -2,10 +2,22 @@
 // Oyster Recorder Fabric Mod — build.gradle
 //
 // Howard 2026-05-07: minimal Fabric mod — no client/server split, no Mixins,
-// no rendering hooks. Single ClientModInitializer that registers a tick
-// listener. JSONL output via plain java.nio. No external runtime deps.
+// no rendering hooks. Single ClientModInitializer + ServerModInitializer that
+// register tick listeners. JSONL output via plain java.nio. No external
+// runtime deps.
 //
-// Build: ./gradlew build  →  build/libs/oyster-recorder-mod-X.Y.Z.jar
+// Build (default = MC 1.21.4):
+//     ./gradlew build  →  build/libs/oyster-recorder-mod-X.Y.Z-mc1.21.4.jar
+//
+// Build for a different MC version (D19 multi-version matrix):
+//     MC_VERSION=1.20.1 ./gradlew build
+//     MC_VERSION=1.20.4 ./gradlew build
+//     MC_VERSION=1.21.1 ./gradlew build
+//
+// All four cells produce the SAME Java source compiled against
+// version-specific yarn mappings + fabric-api + loader. Source MUST NOT
+// diverge — we only depend on stable APIs (ClientTickEvents,
+// ServerTickEvents, Player getters) present in all 4 supported versions.
 // =============================================================================
 
 plugins {
@@ -14,7 +26,57 @@ plugins {
     id 'java'
 }
 
-version = project.mod_version
+// -----------------------------------------------------------------------------
+// D19 multi-version support — single source of truth for per-MC version
+// dependencies. Add a row here to support a new MC version.
+// -----------------------------------------------------------------------------
+ext.MC_MATRIX = [
+    "1.20.1": [
+        yarn:        "1.20.1+build.10",
+        fabricApi:   "0.92.6+1.20.1",
+        loader:      "0.16.9",
+        javaRelease: 17,
+        dependsExpr: "~1.20.1",
+    ],
+    "1.20.4": [
+        yarn:        "1.20.4+build.3",
+        fabricApi:   "0.97.8+1.20.4",
+        loader:      "0.16.9",
+        javaRelease: 17,
+        dependsExpr: "~1.20.4",
+    ],
+    "1.21.1": [
+        yarn:        "1.21.1+build.3",
+        fabricApi:   "0.103.0+1.21.1",
+        loader:      "0.16.9",
+        javaRelease: 21,
+        dependsExpr: "~1.21.1",
+    ],
+    "1.21.4": [
+        yarn:        "1.21.4+build.1",
+        fabricApi:   "0.110.0+1.21.4",
+        loader:      "0.16.9",
+        javaRelease: 21,
+        dependsExpr: "~1.21.4",
+    ],
+]
+
+// Pick MC version from env var (set by D19 GHA matrix) or fall back to the
+// gradle.properties default (which is the canonical "stable / latest").
+def mcVersion = System.getenv("MC_VERSION") ?: project.minecraft_version
+def mcEntry = ext.MC_MATRIX[mcVersion]
+if (mcEntry == null) {
+    throw new GradleException(
+        "Unknown MC_VERSION=${mcVersion}. Add an entry to MC_MATRIX in " +
+        "build.gradle (current keys: ${ext.MC_MATRIX.keySet()})."
+    )
+}
+
+println "[D19] Building for Minecraft ${mcVersion} (Java ${mcEntry.javaRelease})"
+
+// Output jar name carries the MC version so a build matrix produces 4
+// distinct artifacts: oyster-recorder-mod-X.Y.Z-mc1.21.4.jar etc.
+version = "${project.mod_version}-mc${mcVersion}"
 group = project.maven_group
 base.archivesName = project.archives_base_name
 
@@ -24,32 +86,35 @@ repositories {
 }
 
 java {
-    // Fabric loom auto-targets the right MC Java version. 1.21.x = Java 21.
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    // Loom requires Java 21 at BUILD time even when targeting older MC
+    // bytecode (1.20 → 17). Source/target stays consistent with the matrix
+    // row's javaRelease so the .jar runs on the right MC's bundled JVM.
+    sourceCompatibility = JavaVersion.toVersion(mcEntry.javaRelease)
+    targetCompatibility = JavaVersion.toVersion(mcEntry.javaRelease)
     withSourcesJar()
 }
 
 dependencies {
-    // Minecraft + Fabric Loader + Yarn mappings (versions in gradle.properties)
-    minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
-    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-
-    // Fabric API — needed for ClientTickEvents
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+    minecraft "com.mojang:minecraft:${mcVersion}"
+    mappings "net.fabricmc:yarn:${mcEntry.yarn}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${mcEntry.loader}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${mcEntry.fabricApi}"
 }
 
 processResources {
     inputs.property "version", project.version
+    inputs.property "mc_depends", mcEntry.dependsExpr
     filesMatching("fabric.mod.json") {
-        expand "version": project.version
+        expand(
+            "version": project.version,
+            "mc_depends": mcEntry.dependsExpr,
+        )
     }
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
-    options.release = 21
+    options.release = mcEntry.javaRelease
 }
 
 jar {
