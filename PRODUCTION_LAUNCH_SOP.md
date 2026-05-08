@@ -294,6 +294,7 @@ ROLLBACK
 - [`MORNING_PASTE_BLOCK.md`](MORNING_PASTE_BLOCK.md) — Vercel env-var paste blocks
 - [`SOP.md`](SOP.md) — recorder/data-pipeline SOP (different domain)
 - [`watch.sh`](watch.sh) — 24/7 production health monitor
+- [`docs/AUTO_HEAL_LOOP.md`](docs/AUTO_HEAL_LOOP.md) — closed-loop diagnostics auto-heal (recorder-side)
 
 ---
 
