@@ -20,9 +20,13 @@ export const env = {
   // App
   siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000',
 
-  // Recorder
-  recorderExeUrl: process.env.RECORDER_EXE_URL ?? '/downloads/OysterRecorder.exe',
-  recorderVersion: process.env.RECORDER_VERSION ?? '0.1.0',
+  // Recorder — defaults to the v0.26.0 GitHub Release asset so the
+  // download button works out of the box on a fresh Vercel deploy
+  // even before RECORDER_EXE_URL is set.
+  recorderExeUrl:
+    process.env.RECORDER_EXE_URL ??
+    'https://github.com/howardleegeek/oyster-gamedata-pipeline/releases/download/recorder-v0.26.0-real-game-state/OysterRecorder.exe',
+  recorderVersion: process.env.RECORDER_VERSION ?? '0.26.0',
 
   // Earnings
   ratePerHourCents: parseInt(process.env.GAMEDATA_RATE_PER_HOUR_CENTS ?? '600', 10),

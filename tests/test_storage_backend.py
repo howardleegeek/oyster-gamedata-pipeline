@@ -298,7 +298,9 @@ def test_github_backend_signed_url_is_public_release_url(
     url = github_backend.get_signed_url(result.asset_name)
     # gh releases are publicly downloadable; the "signed" URL is just the
     # canonical release-asset URL — testers click it without any auth.
-    expected = f"https://github.com/howardleegeek/test-repo/releases/download/test-tag/{result.asset_name}"
+    expected = (
+        f"https://github.com/howardleegeek/test-repo/releases/download/test-tag/{result.asset_name}"
+    )
     assert url == expected
 
 
@@ -422,7 +424,10 @@ def test_compute_sha256_matches_hashlib(tmp_path: Path) -> None:
 
 
 def test_upload_tarball_cli(
-    tmp_path: Path, sample_tarball: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path,
+    sample_tarball: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.setenv("STORAGE_LOCAL_ROOT", str(tmp_path / "cli_store"))
     from bin.upload_tarball import main

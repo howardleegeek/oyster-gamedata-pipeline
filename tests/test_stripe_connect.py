@@ -430,8 +430,12 @@ def test_mock_stripe_idempotent_returns_same_object(cron_module):
 
 def test_mock_stripe_distinct_keys_get_distinct_transfers(cron_module):
     stripe = cron_module.MockStripeClient()
-    a = stripe.create_transfer(amount_cents=100, destination_account_id="acct", idempotency_key="k1")
-    b = stripe.create_transfer(amount_cents=200, destination_account_id="acct", idempotency_key="k2")
+    a = stripe.create_transfer(
+        amount_cents=100, destination_account_id="acct", idempotency_key="k1"
+    )
+    b = stripe.create_transfer(
+        amount_cents=200, destination_account_id="acct", idempotency_key="k2"
+    )
     assert a["id"] != b["id"]
     assert a["amount"] == 100
     assert b["amount"] == 200
@@ -447,7 +451,9 @@ def test_mock_stripe_distinct_keys_get_distinct_transfers(cron_module):
 
 
 def test_onboard_route_uses_correct_stripe_endpoints():
-    onboard = (REPO_ROOT / "web-tester" / "app" / "api" / "stripe" / "connect" / "onboard" / "route.ts").read_text()
+    onboard = (
+        REPO_ROOT / "web-tester" / "app" / "api" / "stripe" / "connect" / "onboard" / "route.ts"
+    ).read_text()
     # Must POST a multipart-shaped onboarding link request and return JSON {url}
     assert "createExpressAccount" in onboard
     assert "createAccountLink" in onboard
@@ -456,7 +462,9 @@ def test_onboard_route_uses_correct_stripe_endpoints():
 
 
 def test_return_route_calls_retrieve_and_persists_charges_enabled():
-    ret = (REPO_ROOT / "web-tester" / "app" / "api" / "stripe" / "connect" / "return" / "route.ts").read_text()
+    ret = (
+        REPO_ROOT / "web-tester" / "app" / "api" / "stripe" / "connect" / "return" / "route.ts"
+    ).read_text()
     assert "retrieveAccount" in ret
     assert "stripe_charges_enabled" in ret
     assert "stripe_payouts_enabled" in ret
@@ -465,7 +473,9 @@ def test_return_route_calls_retrieve_and_persists_charges_enabled():
 
 
 def test_dashboard_route_requires_completed_onboarding():
-    dash = (REPO_ROOT / "web-tester" / "app" / "api" / "stripe" / "connect" / "dashboard" / "route.ts").read_text()
+    dash = (
+        REPO_ROOT / "web-tester" / "app" / "api" / "stripe" / "connect" / "dashboard" / "route.ts"
+    ).read_text()
     assert "createLoginLink" in dash
     assert "stripe_charges_enabled" in dash
     # Must 409 when account exists but onboarding incomplete (UX safety net)
@@ -483,11 +493,7 @@ def test_stripe_lib_uses_real_endpoint_in_live_mode():
 
 def test_migration_adds_idempotency_key_unique_index():
     sql = (
-        REPO_ROOT
-        / "web-tester"
-        / "supabase"
-        / "migrations"
-        / "20260507100000_stripe_connect.sql"
+        REPO_ROOT / "web-tester" / "supabase" / "migrations" / "20260507100000_stripe_connect.sql"
     ).read_text()
     assert "stripe_account_id" in sql
     assert "idempotency_key" in sql
@@ -572,6 +578,7 @@ def test_cli_runs_with_no_env(cron_module, monkeypatch, capsys):
 #
 # Helper to make pytest -q output a one-liner on success that the parent
 # spec can grep for. Not strictly necessary but useful for the summary.
+
 
 def test_zzz_smoke_counter():
     """Ensures pytest collection ran end-to-end; if any earlier test

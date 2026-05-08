@@ -35,6 +35,7 @@ SCRIPT = REPO_ROOT / "bin" / "deploy_mod_to_cluster.sh"
 # Fixtures / helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_fake_paper_dir(
     base: Path,
     name: str,
@@ -122,6 +123,7 @@ def _run_script(
 # 1. Script exists + is executable
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.unit
 def test_script_exists():
     assert SCRIPT.exists(), f"deploy_mod_to_cluster.sh missing at {SCRIPT}"
@@ -129,9 +131,7 @@ def test_script_exists():
 
 @pytest.mark.unit
 def test_script_is_executable():
-    assert os.access(SCRIPT, os.X_OK), (
-        f"{SCRIPT} is not executable. Run: chmod +x {SCRIPT}"
-    )
+    assert os.access(SCRIPT, os.X_OK), f"{SCRIPT} is not executable. Run: chmod +x {SCRIPT}"
 
 
 @pytest.mark.unit
@@ -152,13 +152,17 @@ def test_companion_restart_md_exists():
 # 2. Successful deploy + idempotency
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.integration
 def test_drops_jar_into_each_fabric_paper_dir(tmp_path: Path):
     paper1 = _make_fake_paper_dir(tmp_path, "paper1", is_fabric=True)
     paper2 = _make_fake_paper_dir(tmp_path, "paper2", is_fabric=True)
     paper3 = _make_fake_paper_dir(
-        tmp_path, "paper3", is_fabric=True,
-        fabric_via_libraries=False, fabric_via_launcher_jar=True,
+        tmp_path,
+        "paper3",
+        is_fabric=True,
+        fabric_via_libraries=False,
+        fabric_via_launcher_jar=True,
     )
     mod = _make_fake_mod_jar(tmp_path)
 
@@ -189,9 +193,7 @@ def test_idempotent_running_twice_yields_one_jar(tmp_path: Path):
     assert proc2.returncode == 0, f"second run failed:\n{proc2.stderr}"
 
     after_second = list((paper / "mods").glob("oyster-recorder-mod-*.jar"))
-    assert len(after_second) == 1, (
-        f"idempotency violated — second run added a jar: {after_second}"
-    )
+    assert len(after_second) == 1, f"idempotency violated — second run added a jar: {after_second}"
     # Bytes still match the source.
     assert after_second[0].read_text() == mod.read_text()
 
@@ -201,7 +203,9 @@ def test_replaces_older_oyster_jars(tmp_path: Path):
     """Older oyster-recorder-mod-*.jar must be removed and replaced —
     not left alongside the new one (would double-load and crash Fabric)."""
     paper = _make_fake_paper_dir(
-        tmp_path, "paper", is_fabric=True,
+        tmp_path,
+        "paper",
+        is_fabric=True,
         existing_oyster_versions=["0.0.1", "0.0.2-rc1"],
     )
     mod = _make_fake_mod_jar(tmp_path, version="0.1.0")
@@ -218,6 +222,7 @@ def test_replaces_older_oyster_jars(tmp_path: Path):
 # 3. Refuses non-Fabric Paper
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.integration
 def test_refuses_non_fabric_paper_dir(tmp_path: Path):
     """If the dir has neither libraries/net/fabricmc/fabric-loader/ NOR
@@ -227,9 +232,9 @@ def test_refuses_non_fabric_paper_dir(tmp_path: Path):
     mod = _make_fake_mod_jar(tmp_path)
 
     proc = _run_script([paper], mod)
-    assert proc.returncode != 0, (
-        f"expected non-zero exit on vanilla Paper, got 0\n{proc.stdout}\n{proc.stderr}"
-    )
+    assert (
+        proc.returncode != 0
+    ), f"expected non-zero exit on vanilla Paper, got 0\n{proc.stdout}\n{proc.stderr}"
     # Importantly: no mod jar was dropped.
     staged = list((paper / "mods").glob("oyster-recorder-mod-*.jar"))
     assert staged == [], f"vanilla Paper got a mod jar dropped: {staged}"
@@ -281,6 +286,7 @@ def test_failure_in_one_dir_does_not_block_others(tmp_path: Path):
 # 4. Preserves non-Oyster mods
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.integration
 def test_preserves_other_mods_in_mods_dir(tmp_path: Path):
     """Sodium, Lithium, FerriteCore — anything that isn't
@@ -291,7 +297,9 @@ def test_preserves_other_mods_in_mods_dir(tmp_path: Path):
         "ferritecore-7.0.0-fabric.jar",
     ]
     paper = _make_fake_paper_dir(
-        tmp_path, "paper", is_fabric=True,
+        tmp_path,
+        "paper",
+        is_fabric=True,
         existing_mods=other_mods,
         existing_oyster_versions=["0.0.1"],
     )
@@ -315,6 +323,7 @@ def test_preserves_other_mods_in_mods_dir(tmp_path: Path):
 # 5. Bonus: exit code 2 when no mod jar can be obtained
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.integration
 def test_exits_2_when_mod_jar_override_missing(tmp_path: Path):
     """If MOD_JAR_OVERRIDE is set to a non-existent file, fail fast
@@ -323,8 +332,7 @@ def test_exits_2_when_mod_jar_override_missing(tmp_path: Path):
     fake = tmp_path / "does_not_exist.jar"
     proc = _run_script([paper], fake)
     assert proc.returncode == 2, (
-        f"expected exit 2 (mod jar unobtainable), got {proc.returncode}\n"
-        f"STDERR:\n{proc.stderr}"
+        f"expected exit 2 (mod jar unobtainable), got {proc.returncode}\n" f"STDERR:\n{proc.stderr}"
     )
     # No jar dropped.
     assert list((paper / "mods").glob("oyster-recorder-mod-*.jar")) == []
