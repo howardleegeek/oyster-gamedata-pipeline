@@ -25,6 +25,8 @@ import crypto from 'node:crypto';
 import { z } from 'zod';
 import { getSupabaseServiceClient } from '../../../lib/supabase-server';
 import { env, isSupabaseConfigured } from '../../../lib/env';
+import { checkRateLimit, clientIpFromHeaders } from '../../../lib/rate-limit';
+import { log } from '../../../lib/log';
 
 export const runtime = 'nodejs'; // need Buffer / fs / crypto
 export const maxDuration = 300; // long uploads OK
@@ -38,9 +40,50 @@ const FormFields = z.object({
 
 const MAX_BYTES = 1024 * 1024 * 1024; // 1 GiB hard ceiling
 
+// Rate limits per the production runbook. A normal recorder uploads
+// once per session (~1-3h gameplay), so even 30/hour/tester is generous;
+// 12/min/IP catches obvious flooding without blocking dorm/lab IPs that
+// host multiple legitimate testers.
+const RL_PER_IP_LIMIT = 12;
+const RL_PER_IP_WINDOW_MS = 60_000;
+const RL_PER_TESTER_LIMIT = 30;
+const RL_PER_TESTER_WINDOW_MS = 60 * 60_000;
+
+function rateLimitResponse(label: string, info: ReturnType<typeof checkRateLimit>) {
+  return NextResponse.json(
+    {
+      error: 'Rate limit exceeded',
+      scope: label,
+      limit: info.limit,
+      remaining: info.remaining,
+      resetAt: new Date(info.resetAt).toISOString(),
+    },
+    {
+      status: 429,
+      headers: {
+        'Retry-After': String(Math.max(1, Math.ceil((info.resetAt - Date.now()) / 1000))),
+        'X-RateLimit-Limit': String(info.limit),
+        'X-RateLimit-Remaining': String(info.remaining),
+        'X-RateLimit-Reset': String(Math.floor(info.resetAt / 1000)),
+      },
+    }
+  );
+}
+
 export async function POST(req: NextRequest) {
+  const startedAt = Date.now();
+  const ip = clientIpFromHeaders(req.headers);
+
+  // ---- IP-level rate limit (cheapest gate first, before form parsing) ---
+  const ipRl = checkRateLimit(`ip:${ip}`, RL_PER_IP_LIMIT, RL_PER_IP_WINDOW_MS);
+  if (!ipRl.allowed) {
+    log.warn('upload.rate_limited', { ip, scope: 'ip', limit: ipRl.limit });
+    return rateLimitResponse('ip', ipRl);
+  }
+
   // Howard 2026-05-07 IRON-LAW: hard-gate before any storage work.
   if (!isSupabaseConfigured()) {
+    log.error('upload.not_configured', { ip });
     return NextResponse.json(
       {
         error: 'Supabase not configured',
@@ -74,6 +117,17 @@ export async function POST(req: NextRequest) {
   }
   const { tester_id, duration_seconds } = parsed.data;
   let { sha256: clientSha } = parsed.data;
+
+  // ---- per-tester rate limit (after we know the tester_id is well-formed)
+  const testerRl = checkRateLimit(
+    `tester:${tester_id}`,
+    RL_PER_TESTER_LIMIT,
+    RL_PER_TESTER_WINDOW_MS
+  );
+  if (!testerRl.allowed) {
+    log.warn('upload.rate_limited', { ip, tester_id, scope: 'tester', limit: testerRl.limit });
+    return rateLimitResponse('tester', testerRl);
+  }
 
   const file = form.get('tarball');
   if (!(file instanceof Blob)) {
@@ -145,14 +199,30 @@ export async function POST(req: NextRequest) {
         .select('id, tester_id, uploaded_at, sha256, size_bytes, d5_verdict')
         .eq('sha256', sha)
         .single();
+      log.info('upload.duplicate', {
+        ip,
+        tester_id,
+        sha256: sha,
+        bytes: file.size,
+        latency_ms: Date.now() - startedAt,
+      });
       return NextResponse.json({ ...(existing ?? {}), duplicate: true });
     }
+    log.error('upload.db_insert_failed', { ip, tester_id, sha256: sha, code: insertErr.code });
     return NextResponse.json(
       { error: 'DB insert failed', details: insertErr.message },
       { status: 500 }
     );
   }
 
+  log.info('upload.accepted', {
+    ip,
+    tester_id,
+    sha256: sha,
+    bytes: file.size,
+    duration_seconds,
+    latency_ms: Date.now() - startedAt,
+  });
   return NextResponse.json({ ...row, accepted: true });
 }
 
