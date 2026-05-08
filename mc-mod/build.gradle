@@ -47,8 +47,8 @@ ext.MC_MATRIX = [
         dependsExpr: "~1.20.1",
     ],
     "1.20.2": [
-        yarn:        "1.20.2+build.7",    // verified 2026-05-08
-        fabricApi:   "0.100.2+1.20.2",    // 17-Jun-2024
+        yarn:        "1.20.2+build.4",    // ceiling — builds 1-4 only; +build.5+ is 404
+        fabricApi:   "0.91.6+1.20.2",     // ceiling for 1.20.2; 0.92+ never published for 1.20.2
         loader:      "0.16.14",
         javaRelease: 17,
         dependsExpr: "~1.20.2",
@@ -75,7 +75,7 @@ ext.MC_MATRIX = [
         dependsExpr: "~1.21.1",
     ],
     "1.21.2": [
-        yarn:        "1.21.2+build.5",    // verified 2026-05-08
+        yarn:        "1.21.2+build.1",    // ceiling — only build.1 exists
         fabricApi:   "0.102.3+1.21.2",    // 21-Aug-2024
         loader:      "0.16.14",
         javaRelease: 21,
