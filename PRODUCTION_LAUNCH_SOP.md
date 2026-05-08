@@ -295,6 +295,7 @@ ROLLBACK
 - [`SOP.md`](SOP.md) — recorder/data-pipeline SOP (different domain)
 - [`watch.sh`](watch.sh) — 24/7 production health monitor
 - [`docs/AUTO_HEAL_LOOP.md`](docs/AUTO_HEAL_LOOP.md) — closed-loop diagnostics auto-heal (recorder-side)
+- [`docs/AUTO_DETECTION.md`](docs/AUTO_DETECTION.md) — unified 6-layer detection orchestrator (host / stack / daemons / cluster / CI / backlog)
 
 ---
 
