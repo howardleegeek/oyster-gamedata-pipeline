@@ -25,9 +25,11 @@ export function getStripe(): Stripe {
   }
   if (_stripe) return _stripe;
   _stripe = new Stripe(env.stripeSecretKey, {
-    // Pin a recent stable API version. The client typedefs default to the
-    // SDK's bundled version; this just locks the wire format.
-    apiVersion: '2024-09-30.acacia',
+    // Pin a recent stable API version that matches what the installed
+    // Stripe SDK accepts at the type level. Real Stripe accepts any
+    // valid version string at runtime; the SDK's TS narrowing changes
+    // per-release.
+    apiVersion: '2024-06-20',
     appInfo: {
       name: 'Oyster GameData Buyer Portal',
       version: '0.1.0',

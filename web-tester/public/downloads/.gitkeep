@@ -1,0 +1,3 @@
+# Drop the built OysterRecorder.exe into this folder.
+# Until then, /api/download/[testerId] returns 404 with a remediation
+# message — never a fabricated stub (Howard 2026-05-07 IRON-LAW).

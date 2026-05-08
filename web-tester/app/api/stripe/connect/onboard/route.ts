@@ -23,6 +23,7 @@ export const dynamic = 'force-dynamic';
 interface OnboardResponse {
   url: string;
   account_id: string;
+  mode: 'live';
 }
 
 export async function POST(_req: NextRequest) {

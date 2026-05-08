@@ -12,14 +12,12 @@ from __future__ import annotations
 
 import gzip
 import hashlib
-import io
 import json
 import os
 import sys
 import tempfile
 from pathlib import Path
 from typing import Any
-from unittest.mock import patch
 
 import pytest
 
@@ -31,7 +29,6 @@ from bin.storage_backend import (  # noqa: E402
     GitHubReleaseStorageBackend,
     LocalFileStorageBackend,
     S3StorageBackend,
-    StorageBackend,
     TarballMetadata,
     UploadResult,
     compute_sha256,
@@ -39,7 +36,6 @@ from bin.storage_backend import (  # noqa: E402
     get_backend,
     register_backend,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

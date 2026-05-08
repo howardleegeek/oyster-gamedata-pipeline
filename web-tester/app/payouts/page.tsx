@@ -307,7 +307,7 @@ function StripeConnectCard({ state }: { state: ConnectState }) {
               >
                 Stripe Connect
               </a>{' '}
-              to send payouts. One-time onboarding takes a few minutes — you'll need a US bank
+              to send payouts. One-time onboarding takes a few minutes — you&apos;ll need a US bank
               account or debit card.
             </p>
           </div>

@@ -44,6 +44,7 @@ test = [
     "numpy>=1.26",
     "openpyxl>=3.1",
     "Pillow>=10.0",  # PIL — required by tests/bin/test_real_depth_filler.py
+    "PyYAML>=6.0",   # YAML — required by tests/test_web_workflows.py (Vercel deploy contract)
 ]
 exr = ["OpenEXR>=3.0", "numpy>=1.26"]
 xlsx = ["openpyxl>=3.1"]

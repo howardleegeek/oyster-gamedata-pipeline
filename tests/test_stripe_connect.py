@@ -27,7 +27,6 @@ import importlib
 import io
 import json
 import logging
-import os
 import sys
 import unittest.mock as mock
 import urllib.error
