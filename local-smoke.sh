@@ -73,7 +73,10 @@ printf "=== Local smoke probes ===\n\n"
 probe      "http://localhost:3000/"                        "tester portal  :3000"
 probe      "http://localhost:3001/"                        "buyer portal   :3001"
 probe_json "http://localhost:3001/api/catalog?limit=10"    "buyer /api/catalog"
-probe      "http://127.0.0.1:54321/"                       "supabase REST  :54321"
+# Supabase root (54321/) is always 404 by design — only `/rest/v1/*`,
+# `/auth/v1/*`, etc. have handlers. Probe `/rest/v1/` which returns
+# OpenAPI JSON when Supabase is up. Howard 2026-05-08.
+probe      "http://127.0.0.1:54321/rest/v1/"                "supabase REST  :54321/rest/v1/"
 
 printf "\n--- Results: ${GRN}%d passed${RST}, ${RED}%d failed${RST} ---\n" "$PASS" "$FAIL"
 
