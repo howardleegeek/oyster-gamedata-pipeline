@@ -33,7 +33,22 @@ public final class ServerSessionDir {
     private ServerSessionDir() {}
 
     public static Path outputPath(MinecraftServer server, String playerName) {
-        Path runDir = server.getRunDirectory().resolve("oyster_state");
+        // Howard 2026-05-07 (D19 cross-version fix): MinecraftServer
+        // .getRunDirectory() returns java.io.File in MC 1.20.x but
+        // java.nio.file.Path in 1.21.x. Use Object reflection so the same
+        // bytecode works on either API. Loom's per-cell yarn mappings turn
+        // the call into the right return type at compile time, but we need
+        // a normalised Path for our oyster_state subdir lookup.
+        Object runDirObj = server.getRunDirectory();
+        Path runDir;
+        if (runDirObj instanceof Path p) {
+            runDir = p.resolve("oyster_state");
+        } else if (runDirObj instanceof java.io.File f) {
+            runDir = f.toPath().resolve("oyster_state");
+        } else {
+            // Defensive — should not happen; fall back to current dir.
+            runDir = Paths.get(".").resolve("oyster_state");
+        }
         String safe = UNSAFE.matcher(playerName).replaceAll("_");
         if (safe.isEmpty()) {
             safe = "unknown";
