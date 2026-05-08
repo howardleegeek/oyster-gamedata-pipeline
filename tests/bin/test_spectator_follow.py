@@ -118,21 +118,29 @@ def test_send_retries_on_socket_error():
 
 
 def test_spectate_loop_respects_duration():
-    """Mock RconClient, time.time monotonic mock, assert sent N times."""
+    """Mock RconClient, time.time monotonic mock, assert sent N times.
+
+    Howard 2026-05-08: the previous tail `_it.repeat(100.0)` caused an
+    infinite loop in CI. The inner sleep-polling loop in spectate_loop is
+    `while time.time() < sleep_end:` where sleep_end = time.time() + 5.
+    Once time.time() pinned to 100.0 forever, sleep_end pinned to 105.0,
+    and `100 < 105` stayed true forever. Replaced with `_it.count(11.0)`
+    so each subsequent call advances and the inner loop can exit.
+    """
     mock_rcon = Mock()
     mock_rcon.send.return_value = "OK"
 
     # Mock time: start + 2 elapsed checks (1.0, 6.0) that allow 2 sends,
-    # then 11.0 to break the duration check. Inner sleep-polling loop also
-    # calls time.time() many times, so we tail with itertools.repeat to
-    # avoid StopIteration.
+    # then count up from 11.0 so the third elapsed check breaks the duration
+    # gate AND the inner sleep-polling loop sees monotonically-advancing
+    # values that eventually exceed any sleep_end.
     import itertools as _it
 
     time_iter = _it.chain(
         [0.0],  # start_time = time.time()
         [1.0, 1.05, 1.1],  # iter 1: elapsed=1.0 (send), then sleep-loop polls
         [6.0, 6.05, 6.1],  # iter 2: elapsed=6.0 (send), then sleep-loop polls
-        _it.repeat(100.0),  # next elapsed call >> 10 → break
+        _it.count(start=11.0),  # advances each call → inner loop + outer both exit
     )
 
     with patch("time.time", side_effect=time_iter), patch("time.sleep"):
@@ -215,11 +223,37 @@ def test_main_argparse_required_args():
 
 
 def test_spectate_loop_graceful_interrupt():
-    """Test that spectate_loop handles SIGINT gracefully."""
-    mock_rcon = Mock()
-    mock_rcon.send.return_value = "OK"
+    """Test that spectate_loop handles SIGINT gracefully.
 
-    # Mock time to return increasing values
+    Howard 2026-05-08: previous test was structurally broken — it mocked
+    signal.signal to capture the handler but never invoked it, so
+    duration_sec=None ran forever (CI timeout >120s). Now we capture the
+    real handler and trigger it from inside the rcon.send mock to
+    simulate SIGINT arriving mid-execution. This actually exercises the
+    stop_requested branch in spectate_loop.
+    """
+    # Capture the signal handler that spectate_loop registers.
+    captured_handler: list = []
+
+    def mock_signal(sig, handler):
+        if sig == signal.SIGINT:
+            captured_handler.append(handler)
+
+    # rcon.send fires the captured handler on its first invocation,
+    # simulating SIGINT delivery inside the spectate command call.
+    send_calls = {"count": 0}
+
+    def mock_send(cmd):
+        send_calls["count"] += 1
+        if send_calls["count"] == 1 and captured_handler:
+            captured_handler[0](signal.SIGINT, None)
+        return "OK"
+
+    mock_rcon = Mock()
+    mock_rcon.send.side_effect = mock_send
+
+    # Mock time so the inner sleep-poll loop has bounded iterations even
+    # if it runs (defence in depth — stop_requested should exit first).
     time_counter = [0.0]
 
     def mock_time():
@@ -227,74 +261,76 @@ def test_spectate_loop_graceful_interrupt():
         time_counter[0] += 1.0
         return val
 
-    with patch("time.time", side_effect=mock_time), patch("time.sleep"), patch("logging.info"):
-        with patch("logging.debug"):
-            # We'll simulate SIGINT by mocking signal handler
-            stop_requested = [False]
+    with (
+        patch("time.time", side_effect=mock_time),
+        patch("time.sleep"),
+        patch("logging.info"),
+        patch("logging.debug"),
+        patch("signal.signal", mock_signal),
+    ):
+        commands_sent = spectate_loop(
+            rcon=mock_rcon,
+            bot_username="Bot",
+            spectator_username="Spectator",
+            interval_sec=5.0,
+            duration_sec=None,
+        )
 
-            def mock_signal(sig, handler):
-                # Simulate SIGINT after first iteration
-                if sig == signal.SIGINT:
-                    # Call the handler after a short delay
-                    def trigger():
-                        stop_requested[0] = True
-
-                    # We can't easily call the handler from here
-                    # Instead we'll patch the stop_requested flag
-                    pass
-
-            with patch("signal.signal", mock_signal):
-                # Mock the stop_requested flag to become True after first iteration
-                # We'll patch the spectate_loop function's internal variable
-                # This is a bit hacky but works for testing
-                commands_sent = spectate_loop(
-                    rcon=mock_rcon,
-                    bot_username="Bot",
-                    spectator_username="Spectator",
-                    interval_sec=5.0,
-                    duration_sec=None,
-                )
-
-    # Should have sent at least one command
-    assert commands_sent >= 0
-    # Actually with our mock, it will run once and exit due to time mock
+    # First send fired SIGINT → stop_requested → outer break before iter 2.
+    assert commands_sent == 1
+    # Confirm a SIGINT handler was actually registered.
+    assert len(captured_handler) == 1
 
 
 def test_spectate_loop_retry_logic():
-    """Test exponential backoff and failure counting."""
-    mock_rcon = Mock()
+    """Test exponential backoff and failure counting.
 
-    # Make send fail 2 times then succeed
-    call_count = 0
+    Howard 2026-05-08: previous time_values=[0.0, 1.0, ...] with
+    duration_sec=1.0 made the first elapsed check (1.0 - 0.0 = 1.0)
+    >= duration immediately, so the loop broke before any retry
+    happened — mock_sleep.call_count was 0 not >= 2. Fixed by giving
+    duration_sec=5.0 head-room and using itertools.count after the
+    planned values so monotonic advancement guarantees the inner
+    sleep-poll loop and outer duration check both exit cleanly.
+    """
+    import itertools as _it
+
+    # Make send fail 2 times then succeed.
+    call_count = {"n": 0}
 
     def mock_send(cmd):
-        nonlocal call_count
-        call_count += 1
-        if call_count <= 2:
+        call_count["n"] += 1
+        if call_count["n"] <= 2:
             raise Exception("Test failure")
         return "OK"
 
+    mock_rcon = Mock()
     mock_rcon.send.side_effect = mock_send
 
-    # Mock time to control loop
-    time_values = [0.0, 1.0, 3.0, 7.0, 8.0, 9.0]
+    # 0.0 → start_time, 0.5 → iter1 elapsed (< 5 yes, enter retry),
+    # then count from 10.0 so any further time.time() call advances
+    # monotonically and exits both inner sleep loop and outer duration.
+    time_iter = _it.chain([0.0, 0.5], _it.count(start=10.0))
 
-    with patch("time.time", side_effect=time_values), patch("time.sleep") as mock_sleep:
-        with patch("logging.debug"):
-            with patch("logging.warning"):
-                with patch("logging.error"):
-                    commands_sent = spectate_loop(
-                        rcon=mock_rcon,
-                        bot_username="Bot",
-                        spectator_username="Spectator",
-                        interval_sec=2.0,
-                        duration_sec=1.0,  # Short duration to exit quickly
-                    )
+    with (
+        patch("time.time", side_effect=time_iter),
+        patch("time.sleep") as mock_sleep,
+        patch("logging.debug"),
+        patch("logging.warning"),
+        patch("logging.error"),
+    ):
+        commands_sent = spectate_loop(
+            rcon=mock_rcon,
+            bot_username="Bot",
+            spectator_username="Spectator",
+            interval_sec=2.0,
+            duration_sec=5.0,
+        )
 
-    # Should have retried with backoff
-    # First attempt fails, sleeps 1s, second fails, sleeps 2s, third succeeds
+    # Retry logic: attempt 0 fails (no sleep), attempt 1 sleeps 1s + fails,
+    # attempt 2 sleeps 2s + succeeds → at least 2 sleep calls.
     assert mock_sleep.call_count >= 2
-    # Should have sent 1 successful command
+    # Exactly one successful send before duration breaks outer.
     assert commands_sent == 1
 
 
@@ -342,28 +378,39 @@ def test_rcon_client_send_receive():
 
 
 def test_spectate_loop_stops_after_5_consecutive_failures():
-    """Test that spectate_loop stops after 5 consecutive failures."""
+    """Test that spectate_loop stops after 5 consecutive failures.
+
+    Howard 2026-05-08: previous fixed list of 7 time values raised
+    StopIteration once the inner sleep-poll loop consumed them. With
+    `duration_sec=None` and 5 outer iterations × N inner polls, 7 isn't
+    enough. Replaced with itertools.count(step=2.0) — each call advances
+    2 seconds, immediately exiting any 1-second inner sleep window.
+    """
+    import itertools as _it
+
     mock_rcon = Mock()
     mock_rcon.send.side_effect = Exception("Always fails")
 
-    # Mock time to control loop
-    time_values = [0.0, 1.0, 3.0, 7.0, 15.0, 31.0, 63.0]
+    # step=2.0 > interval_sec=1.0 means each inner-while check exits on
+    # the first iteration; outer loop terminates via consecutive_failures>=5.
+    time_iter = _it.count(start=0.0, step=2.0)
 
-    with patch("time.time", side_effect=time_values), patch("time.sleep"):
-        with patch("logging.debug"):
-            with patch("logging.warning"):
-                with patch("logging.error") as mock_error:
-                    commands_sent = spectate_loop(
-                        rcon=mock_rcon,
-                        bot_username="Bot",
-                        spectator_username="Spectator",
-                        interval_sec=1.0,
-                        duration_sec=None,
-                    )
+    with (
+        patch("time.time", side_effect=time_iter),
+        patch("time.sleep"),
+        patch("logging.debug"),
+        patch("logging.warning"),
+        patch("logging.error") as mock_error,
+    ):
+        commands_sent = spectate_loop(
+            rcon=mock_rcon,
+            bot_username="Bot",
+            spectator_username="Spectator",
+            interval_sec=1.0,
+            duration_sec=None,
+        )
 
-    # Should have 0 commands sent
     assert commands_sent == 0
-    # Should have logged error about too many failures
     assert any("Too many consecutive failures" in str(call) for call in mock_error.call_args_list)
 
 
