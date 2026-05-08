@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Redstone factory preview">
+  <defs>
+    <linearGradient id="bg3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#174d4a"/>
+      <stop offset="100%" stop-color="#082020"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="360" fill="url(#bg3)"/>
+  <!-- Redstone wires -->
+  <g stroke="#f5b13a" stroke-width="3" fill="none" opacity="0.9">
+    <path d="M40,300 L160,300 L160,200 L320,200 L320,260 L520,260" />
+    <path d="M40,250 L120,250 L120,180 L260,180 L260,160 L600,160" />
+    <path d="M60,330 L260,330 L260,280 L420,280 L420,310 L600,310" />
+  </g>
+  <!-- Pistons / repeaters -->
+  <g fill="#7eccc6">
+    <rect x="160" y="195" width="14" height="14"/>
+    <rect x="320" y="195" width="14" height="14"/>
+    <rect x="260" y="175" width="14" height="14"/>
+    <rect x="420" y="275" width="14" height="14"/>
+  </g>
+  <!-- Glow dots -->
+  <g fill="#f5b13a">
+    <circle cx="40"  cy="300" r="6"/>
+    <circle cx="600" cy="160" r="6"/>
+    <circle cx="600" cy="310" r="6"/>
+    <circle cx="520" cy="260" r="6"/>
+  </g>
+  <text x="40" y="60" fill="#aee0db" font-family="ui-sans-serif, system-ui" font-size="14" letter-spacing="2" font-weight="600">[DEV PREVIEW]</text>
+  <text x="40" y="100" fill="#eef9f8" font-family="ui-sans-serif, system-ui" font-size="30" font-weight="800">Redstone factory — sugarcane</text>
+  <text x="40" y="125" fill="#7eccc6" font-family="ui-sans-serif, system-ui" font-size="14">2 h 35 min · 2.9 GB · D5 0.85</text>
+</svg>

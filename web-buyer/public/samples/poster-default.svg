@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Tarball preview placeholder">
+  <defs>
+    <linearGradient id="bgD" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#174d4a"/>
+      <stop offset="100%" stop-color="#082020"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="360" fill="url(#bgD)"/>
+  <g stroke="#2f9c95" stroke-width="2" fill="none" opacity="0.4">
+    <rect x="40"  y="40" width="120" height="120"/>
+    <rect x="180" y="40" width="120" height="120"/>
+    <rect x="320" y="40" width="120" height="120"/>
+    <rect x="460" y="40" width="140" height="120"/>
+    <rect x="40"  y="180" width="180" height="160"/>
+    <rect x="240" y="180" width="180" height="160"/>
+    <rect x="440" y="180" width="160" height="160"/>
+  </g>
+  <text x="320" y="180" text-anchor="middle" fill="#aee0db" font-family="ui-sans-serif, system-ui" font-size="20" font-weight="700">no preview yet</text>
+  <text x="320" y="206" text-anchor="middle" fill="#7eccc6" font-family="ui-sans-serif, system-ui" font-size="13">tarball is licensed and ready to download</text>
+</svg>

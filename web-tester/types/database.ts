@@ -15,6 +15,9 @@ export interface TesterRow {
   total_hours: number;
   total_earnings_cents: number;
   stripe_account_id: string | null;
+  stripe_charges_enabled: boolean;
+  stripe_payouts_enabled: boolean;
+  stripe_details_submitted: boolean;
 }
 
 export interface TarballRow {
@@ -36,6 +39,9 @@ export interface PayoutRow {
   status: 'pending' | 'paid' | 'failed';
   paid_at: string | null;
   stripe_payout_id: string | null;
+  stripe_transfer_id?: string | null;
+  idempotency_key?: string | null;
+  failure_reason?: string | null;
   created_at: string;
 }
 

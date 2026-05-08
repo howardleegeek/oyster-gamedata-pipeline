@@ -1,39 +1,31 @@
 import Link from 'next/link';
 import { getSupabaseServerClient, getSupabaseServiceClient } from '../../lib/supabase-server';
 import { isSupabaseConfigured, env } from '../../lib/env';
-import { sampleStats, sampleTarballs } from '../../lib/sample-data';
 import { formatCents, formatHours, formatBytes, formatRelativeTime } from '../../lib/format';
 import { StatCard } from '../../components/StatCard';
+import { NotConfigured } from '../../components/NotConfigured';
 import type { TesterStats, TarballRow } from '../../types/database';
 
 export const dynamic = 'force-dynamic';
 
+// Howard 2026-05-07 IRON-LAW: dashboard renders REAL tester data only.
+// If Supabase isn't configured, show a hard-gate NotConfigured panel —
+// never fabricate "24.7 hours / $148.20 earnings" sample numbers. The
+// previous DEV MODE fallback to lib/sample-data.ts has been deleted.
 async function loadDashboard(): Promise<{
   stats: TesterStats;
   tarballs: TarballRow[];
-  liveMode: boolean;
 }> {
-  if (!isSupabaseConfigured()) {
-    const fakeId = '00000000-0000-0000-0000-000000000001';
-    return {
-      stats: sampleStats(fakeId),
-      tarballs: sampleTarballs(fakeId),
-      liveMode: false,
-    };
-  }
-
   const supabase = getSupabaseServerClient();
   if (!supabase) {
-    // Defensive: configured-flag flipped between the early check and now.
-    const fakeId = '00000000-0000-0000-0000-000000000001';
-    return { stats: sampleStats(fakeId), tarballs: sampleTarballs(fakeId), liveMode: false };
+    // Caller must check isSupabaseConfigured() before invoking us.
+    throw new Error('Supabase not configured — caller should render <NotConfigured>.');
   }
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    // Middleware should have redirected already, but handle defensively.
-    const fakeId = '00000000-0000-0000-0000-000000000001';
-    return { stats: sampleStats(fakeId), tarballs: sampleTarballs(fakeId), liveMode: false };
+    // Middleware should have redirected already.
+    throw new Error('Not authenticated.');
   }
 
   const service = getSupabaseServiceClient();
@@ -80,11 +72,26 @@ async function loadDashboard(): Promise<{
     joined_at: tester?.created_at ?? new Date().toISOString(),
   };
 
-  return { stats, tarballs: (tarballs ?? []) as TarballRow[], liveMode: true };
+  return { stats, tarballs: (tarballs ?? []) as TarballRow[] };
 }
 
 export default async function DashboardPage() {
-  const { stats, tarballs, liveMode } = await loadDashboard();
+  if (!isSupabaseConfigured()) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-16">
+        <NotConfigured
+          service="Supabase"
+          envVars={[
+            'NEXT_PUBLIC_SUPABASE_URL',
+            'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+            'SUPABASE_SERVICE_ROLE_KEY',
+          ]}
+          docsUrl="/docs#supabase-setup"
+        />
+      </div>
+    );
+  }
+  const { stats, tarballs } = await loadDashboard();
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10">
@@ -106,12 +113,6 @@ export default async function DashboardPage() {
           <Link href="/payouts" className="btn-secondary">Manage payouts</Link>
         </div>
       </div>
-
-      {!liveMode && (
-        <div className="mb-6 p-3 rounded-lg bg-amber-accent/10 border border-amber-accent/30 text-sm text-amber-accent">
-          [DEV MODE: showing sample data] — connect Supabase to switch to live data.
-        </div>
-      )}
 
       {/* Stat grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">

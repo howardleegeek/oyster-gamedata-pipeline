@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Megabuild castle parapet preview">
+  <defs>
+    <linearGradient id="sky2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7eccc6"/>
+      <stop offset="100%" stop-color="#103735"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="360" fill="url(#sky2)"/>
+  <!-- Sun -->
+  <circle cx="540" cy="80" r="36" fill="#f5b13a" opacity="0.85"/>
+  <!-- Castle silhouette -->
+  <g fill="#082020">
+    <rect x="60" y="200" width="520" height="160"/>
+    <!-- Towers -->
+    <rect x="60" y="140" width="60" height="220"/>
+    <rect x="520" y="140" width="60" height="220"/>
+    <rect x="290" y="120" width="60" height="240"/>
+    <!-- Crenellations -->
+    <g>
+      <rect x="60"  y="130" width="14" height="14"/>
+      <rect x="84"  y="130" width="14" height="14"/>
+      <rect x="108" y="130" width="14" height="14"/>
+      <rect x="290" y="110" width="14" height="14"/>
+      <rect x="314" y="110" width="14" height="14"/>
+      <rect x="338" y="110" width="14" height="14"/>
+      <rect x="520" y="130" width="14" height="14"/>
+      <rect x="544" y="130" width="14" height="14"/>
+      <rect x="568" y="130" width="14" height="14"/>
+    </g>
+    <!-- Window -->
+    <rect x="310" y="170" width="20" height="36" fill="#f5b13a" opacity="0.7"/>
+  </g>
+  <text x="40" y="60" fill="#aee0db" font-family="ui-sans-serif, system-ui" font-size="14" letter-spacing="2" font-weight="600">[DEV PREVIEW]</text>
+  <text x="40" y="100" fill="#eef9f8" font-family="ui-sans-serif, system-ui" font-size="30" font-weight="800">Megabuild — castle parapet</text>
+  <text x="40" y="125" fill="#7eccc6" font-family="ui-sans-serif, system-ui" font-size="14">4 h 47 min · 5.1 GB · D5 0.89</text>
+</svg>

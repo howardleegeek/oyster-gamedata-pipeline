@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Open-world exploration preview">
+  <defs>
+    <linearGradient id="sky4" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#aee0db"/>
+      <stop offset="60%" stop-color="#4cb4ad"/>
+      <stop offset="100%" stop-color="#103735"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="360" fill="url(#sky4)"/>
+  <!-- Mountains -->
+  <polygon points="0,360 0,260 80,180 180,240 280,140 380,220 480,170 580,230 640,200 640,360" fill="#082020"/>
+  <polygon points="0,360 80,300 200,250 320,290 440,240 560,290 640,260 640,360" fill="#0a1817"/>
+  <!-- Trees -->
+  <g fill="#103735">
+    <polygon points="80,290 90,260 100,290"/>
+    <polygon points="120,300 130,270 140,300"/>
+    <polygon points="380,300 390,270 400,300"/>
+    <polygon points="500,310 510,280 520,310"/>
+  </g>
+  <!-- Sun -->
+  <circle cx="540" cy="60" r="40" fill="#f5b13a" opacity="0.85"/>
+  <text x="40" y="60" fill="#082020" font-family="ui-sans-serif, system-ui" font-size="14" letter-spacing="2" font-weight="700">[DEV PREVIEW]</text>
+  <text x="40" y="100" fill="#082020" font-family="ui-sans-serif, system-ui" font-size="30" font-weight="800">Open-world exploration</text>
+  <text x="40" y="125" fill="#103735" font-family="ui-sans-serif, system-ui" font-size="14" font-weight="600">5 h 11 min · 6.7 GB · D5 0.91</text>
+</svg>

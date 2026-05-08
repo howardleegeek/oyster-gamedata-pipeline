@@ -1,0 +1,39 @@
+{
+  "name": "oyster-gamedata-web-buyer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Buyer portal for the Oyster GameData marketplace — AI/ML companies browse and purchase Minecraft gameplay datasets for world-model training.",
+  "scripts": {
+    "dev": "next dev -p 3001",
+    "build": "next build",
+    "start": "next start -p 3001",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "supabase:start": "supabase start",
+    "supabase:reset": "supabase db reset"
+  },
+  "dependencies": {
+    "@supabase/auth-helpers-nextjs": "^0.10.0",
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.45.4",
+    "next": "14.2.15",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "stripe": "^16.12.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.10",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "14.2.15",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13",
+    "typescript": "^5.6.2"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  }
+}

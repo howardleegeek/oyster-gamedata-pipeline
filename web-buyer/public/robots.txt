@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Allow: /browse
+Allow: /licenses
+Disallow: /cart
+Disallow: /checkout
+Disallow: /downloads
+Disallow: /api/

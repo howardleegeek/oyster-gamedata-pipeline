@@ -132,27 +132,111 @@ Plus:
 
 ---
 
-## Plugging in Stripe Connect (when ready)
+## Stripe Connect setup
 
-The `/payouts` page already shows a "Connect bank account" CTA — wire it like this:
+The `/payouts` page is wired to real Stripe Connect Express. The integration ships in two halves:
 
-1. Get a Stripe API key + Connect Client ID at https://dashboard.stripe.com/connect.
-2. Add to env:
-   ```bash
-   STRIPE_SECRET_KEY=sk_test_...
-   STRIPE_WEBHOOK_SECRET=whsec_...
-   STRIPE_CONNECT_CLIENT_ID=ca_...
-   ```
-3. Create `app/api/stripe/connect/route.ts`:
-   - On `POST`, call `stripe.accountLinks.create({ account: existingAccountId ?? newExpressAccount, refresh_url, return_url, type: 'account_onboarding' })`.
-   - Persist the resulting `account.id` to `testers.stripe_account_id`.
-4. Wire the disabled "Connect Stripe" button in `app/payouts/page.tsx` to POST to that endpoint and redirect to the returned `accountLink.url`.
-5. Add a webhook handler at `app/api/stripe/webhook/route.ts` that:
-   - Listens for `payout.paid` / `payout.failed`.
-   - Updates `payouts.status`, `payouts.paid_at`, `payouts.stripe_payout_id`.
-6. Add a cron / scheduled task that, weekly, sums each tester's accepted-but-unpaid earnings and creates `payouts` rows.
+1. **The Next.js app** (`web-tester/`) — onboarding, return webhook, dashboard login link, live payout history.
+2. **The cron script** (`bin/payout_cron.py`) — runs daily, transfers unpaid balances to onboarded testers.
 
-The DB schema and UI are already shaped for this — only the actual Stripe API calls are missing.
+Both halves fall back to an in-process mock when `STRIPE_SECRET_KEY` is missing, so you can iterate end-to-end locally without a Stripe account. **In a production deploy you must set the real key** — see "IRON-LAW" below.
+
+### 1. Get test-mode keys
+
+1. Sign up at https://dashboard.stripe.com (free).
+2. Go to **Developers -> API keys**: copy the **Secret key** (`sk_test_...`).
+3. Go to **Connect -> Settings**: enable **Express** as an account type. Copy the **Connect client ID** (`ca_...`) — optional but useful.
+4. Go to **Developers -> Webhooks**: add an endpoint pointing at `https://<your-app>/api/stripe/webhook` (TODO — not implemented yet). Copy the signing secret (`whsec_...`).
+
+### 2. Add to `.env.local`
+
+```bash
+STRIPE_SECRET_KEY=sk_test_xxxxx        # required for live mode
+STRIPE_WEBHOOK_SECRET=whsec_xxxxx      # optional today
+STRIPE_CONNECT_CLIENT_ID=ca_xxxxx      # optional today
+PAYOUT_CRON_SLACK_WEBHOOK=             # optional — alerts on failed transfers
+```
+
+### 3. Apply the Stripe migration
+
+The base migration only carries `testers.stripe_account_id`. The full Connect schema (capability flags + `payouts.idempotency_key` + the `tester_unpaid_balance` view) lives in `supabase/migrations/20260507100000_stripe_connect.sql`. Apply with:
+
+```bash
+supabase db reset                                         # local
+# OR paste the SQL into the Supabase dashboard SQL editor (production)
+```
+
+### 4. Run the app
+
+```bash
+npm run dev
+```
+
+Sign in, visit `/payouts`. You'll see one of three states:
+
+| State | UI | Trigger |
+|-------|----|---------|
+| `none` (no `stripe_account_id`) | "Connect bank account" CTA | First visit |
+| `incomplete` (has account, charges_enabled=false) | "Finish setup" CTA | Started but didn't complete onboarding |
+| `ready` (charges & payouts enabled) | "Manage on Stripe" + live payout history | Onboarded |
+
+### 5. Walk through onboarding (Stripe test mode)
+
+Click "Connect bank account" → you'll be redirected to Stripe's hosted Express onboarding. Use these test credentials:
+
+| Field | Value |
+|-------|-------|
+| Email | any email |
+| Phone | any 10-digit US number |
+| SSN last 4 | `0000` |
+| DOB | any date (must be 18+) |
+| Address | any US address |
+| Bank routing | `110000000` |
+| Bank account | `000123456789` |
+
+Stripe accepts test data instantly. You'll be redirected back to `/api/stripe/connect/return`, which calls `accounts.retrieve()` to read the live capability flags, then bounces back to `/payouts` showing the green "ready" state.
+
+### 6. Run the payout cron locally
+
+```bash
+python3 bin/payout_cron.py --verbose             # real run
+python3 bin/payout_cron.py --dry-run --verbose   # log only, no transfers
+```
+
+In production, install as a daily cron:
+
+```cron
+0 3 * * *  /usr/local/bin/python3 /path/to/bin/payout_cron.py >> /tmp/payout_cron.log 2>&1
+```
+
+The cron is **idempotent**: re-running on the same day creates zero duplicate transfers (idempotency key = `payout-<tester_id>-<date>` at both the Stripe Idempotency-Key header AND the `payouts.idempotency_key` unique index).
+
+### 7. IRON-LAW: production must use real Stripe
+
+The DEV MODE fallback exists for local development convenience. In a deployed environment:
+
+- `STRIPE_SECRET_KEY` MUST be set to a real `sk_test_...` (test-mode rollout) or `sk_live_...` (production).
+- If it's missing in production, every Stripe call falls back to the mock, the `/payouts` page shows the "[DEV MODE]" banner, and `payout_cron.py` writes "stripe=mock" into its log header. Operators should treat this as a deployment failure and fix the env var immediately.
+- The fallback is silent (no crash) by design so a single missing env var doesn't take down the entire portal — but it is loud (banner + log line) so operators notice.
+
+### Stripe API surface used
+
+| Endpoint | Where | Why |
+|----------|-------|-----|
+| `POST /v1/accounts` | `/api/stripe/connect/onboard` | Create Express account on first onboarding |
+| `POST /v1/account_links` | `/api/stripe/connect/onboard` | Generate one-shot onboarding URL |
+| `GET /v1/accounts/{id}` | `/api/stripe/connect/return` | Read `charges_enabled` after onboarding |
+| `POST /v1/accounts/{id}/login_links` | `/api/stripe/connect/dashboard` | One-shot Express dashboard login |
+| `GET /v1/payouts` (Stripe-Account header) | `/payouts` page | Show live payout history |
+| `POST /v1/transfers` (Idempotency-Key header) | `bin/payout_cron.py` | Move money on payout day |
+
+### Tests
+
+```bash
+pytest tests/test_stripe_connect.py -v
+```
+
+29 tests cover: idempotency, threshold filtering, balance arithmetic, Stripe HTTP error parsing, wire-format verification (real form-encoded payload sent to `api.stripe.com`), Slack webhook fan-out, the IRON-LAW (live-vs-mock client selection by env), and the route file contracts.
 
 ---
 
@@ -184,12 +268,16 @@ web-tester/
 │       ├── upload-tarball/route.ts
 │       ├── stats/[testerId]/route.ts
 │       └── download/[testerId]/route.ts
-├── components/        — SiteHeader, DevModeBanner, StatCard
-├── lib/               — env, supabase clients, formatters, sample-data
+│       ├── download/[testerId]/route.ts
+│       └── stripe/connect/{onboard,return,dashboard}/route.ts
+├── components/        — SiteHeader, DevModeBanner, StatCard, StripeConnectButton
+├── lib/               — env, supabase clients, formatters, sample-data, stripe
 ├── types/database.ts  — row + view interfaces
 ├── supabase/
 │   ├── config.toml
-│   └── migrations/20260507000000_init.sql
+│   └── migrations/
+│       ├── 20260507000000_init.sql
+│       └── 20260507100000_stripe_connect.sql
 ├── public/downloads/  — drop OysterRecorder.exe here
 ├── middleware.ts
 ├── next.config.mjs, tailwind.config.ts, postcss.config.mjs, tsconfig.json
@@ -197,13 +285,18 @@ web-tester/
 └── README.md
 ```
 
+The Python cron lives one level up:
+
+```
+bin/payout_cron.py   — daily Stripe transfers; idempotent re-runs
+```
+
 ---
 
 ## What still needs doing
 
 - [ ] Build OysterRecorder.exe and either drop it into `public/downloads/` or set `RECORDER_EXE_URL` to a hosted asset.
-- [ ] Wire Stripe Connect (see "Plugging in Stripe Connect" above).
-- [ ] Cron job that materialises `payouts` rows weekly from accepted tarballs.
+- [ ] Add `app/api/stripe/webhook/route.ts` for `payout.paid` / `payout.failed` to update `payouts.status` in real time (cron currently writes status=paid optimistically and trusts Stripe's idempotency).
 - [ ] D5 quality model worker that flips `d5_verdict` from `pending` to `accepted`/`rejected`.
 - [ ] Real GitHub OAuth app + Supabase configuration.
 - [ ] Email templates (magic link, payout confirmation, dispute resolution).

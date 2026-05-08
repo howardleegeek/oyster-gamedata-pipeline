@@ -15,7 +15,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSupabaseServerClient, getSupabaseServiceClient } from '../../../../lib/supabase-server';
 import { isSupabaseConfigured } from '../../../../lib/env';
-import { sampleStats, sampleTarballs } from '../../../../lib/sample-data';
 import type { TesterStats } from '../../../../types/database';
 
 const TesterIdSchema = z.string().uuid();
@@ -32,11 +31,17 @@ export async function GET(
   }
   const testerId = parsed.data;
 
-  // ---- DEV MODE -------------------------------------------------------
+  // Howard 2026-05-07 IRON-LAW: no fake-data fallback. Endpoint returns
+  // 503 if Supabase isn't configured — clear failure mode, never
+  // fabricated numbers.
   if (!isSupabaseConfigured()) {
-    const stats = sampleStats(testerId);
-    const recent = sampleTarballs(testerId).slice(0, 10);
-    return NextResponse.json({ stats, recent_uploads: recent, mode: 'dev_sample' });
+    return NextResponse.json(
+      {
+        error: 'Supabase not configured',
+        details: 'Set NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY',
+      },
+      { status: 503 },
+    );
   }
 
   // ---- LIVE MODE ------------------------------------------------------

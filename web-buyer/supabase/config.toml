@@ -1,0 +1,46 @@
+# Supabase local-dev config — picked up by `supabase start`.
+# Mirrors web-tester/supabase/config.toml but uses different ports so the
+# two portals can run simultaneously against separate local stacks.
+
+project_id = "oyster-gamedata-buyer"
+
+[api]
+enabled = true
+port = 54421
+schemas = ["public", "storage"]
+extra_search_path = ["public"]
+max_rows = 1000
+
+[db]
+port = 54422
+shadow_port = 54420
+major_version = 15
+
+[studio]
+enabled = true
+port = 54423
+api_url = "http://127.0.0.1:54421"
+
+[storage]
+enabled = true
+file_size_limit = "10000MiB"   # tarballs can be up to ~10 GB
+
+[auth]
+enabled = true
+site_url = "http://localhost:3001"
+additional_redirect_urls = ["http://localhost:3001/auth/callback"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false # magic links only
+
+[auth.external.github]
+enabled = true
+client_id   = "env(GITHUB_CLIENT_ID)"
+secret      = "env(GITHUB_CLIENT_SECRET)"
+redirect_uri = "http://localhost:54421/auth/v1/callback"
