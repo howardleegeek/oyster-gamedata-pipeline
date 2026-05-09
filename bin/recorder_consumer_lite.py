@@ -85,7 +85,57 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc10"
+RECORDER_VERSION = "lite-v0.28.0-rc11"
+
+# rc11 SF (Phase A.1, IRON LAW EXCEPTION pre-approved 2026-05-09):
+# game-agnostic failure-attribution. Every session writes terminator.json
+# alongside systeminfo.json so backend ingest can quarantine + we can
+# diagnose without reaching into testers' machines.
+TERMINATOR_REASONS = (
+    "clean_exit",            # 录满 5-6 min 玩家正常退游戏
+    "game_died",             # 游戏进程退出 (mc / roblox / fortnite ...)
+    "game_crashed",          # 游戏 process 异常退 (returncode != 0)
+    "ffmpeg_died",           # 录像编码进程崩
+    "ffmpeg_dirty_close",    # rc10 B2: 编码进程关闭脏 (mp4 trailer 未写)
+    "disk_full",             # rc10 B5 触发
+    "user_close_kill_game",  # 用户关录制器同时杀游戏
+    "user_close_keep_game",  # 用户关录制器保留游戏
+    "orphan_resumed",        # 启动时检到上次未清理的 tmp_dir
+    "duration_too_short",    # < 5 min, PRD reject
+    "crash",                 # recorder 自身异常退出 (excepthook 兜底)
+    "mod_handshake_failed",  # game-side mod 没回握手
+    "preflight_blocked",     # Layer 0 preflight 阻断了
+)
+# Future games extend this. game_specific.game_id is the abstraction key.
+CURRENT_GAME_ID = "minecraft_java"
+
+# rc11 SG (Phase A.2): heartbeat for external watchdog. The recorder
+# writes this every loop tick + every 30s during recording; an external
+# watcher (oyster_play.py) reads it and prompts to restart if stale > 90s.
+def _health_path() -> Path:
+    return Path(_real_documents_dir()) / "OysterRecorder" / "runtime" / "health.json"
+
+
+def _write_health(state: str, frame_count: int = 0, game_pid_alive: bool = False) -> None:
+    """rc11 SG: heartbeat write. Best-effort, never raises.
+
+    state: idle | armed | recording | finalizing | crashed
+    """
+    try:
+        path = _health_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "ts": time.time(),
+            "ts_iso": datetime.now().isoformat(),
+            "pid": os.getpid(),
+            "state": state,
+            "frame_count": frame_count,
+            "game_pid_alive": game_pid_alive,
+            "recorder_version": RECORDER_VERSION,
+        }
+        path.write_text(json.dumps(payload), encoding="utf-8")
+    except Exception:
+        pass  # never block on health write
 
 # R01 iron-law: supported MC versions for real game-state Fabric mod.
 # Kept in sync with .github/workflows/build-mc-mod.yml matrix.
@@ -867,6 +917,10 @@ class RecorderApp(tk.Tk):
         self._mc_window_rect: Optional[dict[str, int]] = None
         # rc10 B2: track whether ffmpeg closed cleanly (default True).
         self._ffmpeg_clean_close: bool = True
+        # rc11 SF: failure-attribution reason for current/last session.
+        # Set at every exit path; consumed by _write_terminator().
+        self._terminator_reason: Optional[str] = None
+        self._mod_handshake_ok: bool = False  # set by mod handshake on first ack
 
         # rc9 (Howard 2026-05-09): depth-progress UX state.
         #
@@ -1686,6 +1740,9 @@ class RecorderApp(tk.Tk):
             return
 
         while not self._stop_event.is_set():
+            # rc11 SG: idle heartbeat at top of loop so watchdog sees the
+            # process is alive even between recording sessions.
+            _write_health("idle", 0, _minecraft_running())
             self._run_one_session()
             # After a session ends naturally, reset the arm state so the
             # GUI button starts fresh and Phase 1 (wait for arm + MC)
@@ -1786,6 +1843,8 @@ class RecorderApp(tk.Tk):
             self._set("⚠️ 磁盘空间不足", ORANGE,
                       f"剩余 {_free_mb:.0f} MB, 录制需 ≥500 MB. 清理后重试.")
             _trace(f"disk_check: ABORT — only {_free_mb:.0f} MB free in {self._tmp_dir}")
+            self._terminator_reason = "disk_full"
+            self._write_terminator(None)  # no clip_dir yet — write to runtime/
             shutil.rmtree(self._tmp_dir, ignore_errors=True)
             return
         self._video_path = self._tmp_dir / "video.mp4"
@@ -1834,6 +1893,7 @@ class RecorderApp(tk.Tk):
         # PRD spec requires 5-6 min duration; auto-stop at 6 min so the
         # downstream lint doesn't reject for over-length.
         MAX_RECORD_SECONDS = 6 * 60
+        _last_health_write = 0.0
         while True:
             if self._stop_event.is_set():
                 _trace("watch_loop: stop_event set — finalizing whatever we have")
@@ -1843,12 +1903,25 @@ class RecorderApp(tk.Tk):
                 break
             if not _minecraft_running():
                 _trace("watch_loop: MC exited — finalizing")
+                # rc11 SF: distinguish clean game exit from session-cap exit.
+                # If MC vanished before 5 min, treat as game_died (not clean_exit).
+                self._terminator_reason = "game_died"
                 break
             elapsed = time.time() - self._record_started_at
             if elapsed >= MAX_RECORD_SECONDS:
                 self._set("⏱ 已到 6 分钟，自动停止", ORANGE,
                           "PRD 规格要求 5-6 分钟，正在收尾…")
                 break
+            # rc11 SG: heartbeat every 30s during recording so watchdog
+            # can detect freezes (vs the 2s sleep + condition checks).
+            now = time.time()
+            if now - _last_health_write >= 30.0:
+                _write_health(
+                    "recording",
+                    frame_count=len(self._captured_events or []),
+                    game_pid_alive=True,
+                )
+                _last_health_write = now
             time.sleep(2.0)
 
         # v0.9.0 BUG FIX: previously, hitting `_stop_event` returned
@@ -2324,6 +2397,18 @@ class RecorderApp(tk.Tk):
             )
             _trace("package: wrote metadata.json with data_authenticity=placeholder")
 
+        # rc11 SF: write game-agnostic failure-attribution manifest into
+        # clip_dir BEFORE tarball write so it's bundled. clean_exit reason
+        # is the default for normal-finish path; earlier exit paths set
+        # other reasons (disk_full, user_close_*, game_died, etc).
+        if self._terminator_reason is None:
+            self._terminator_reason = (
+                "duration_too_short" if elapsed_sec < 300.0 else "clean_exit"
+            )
+        if not self._ffmpeg_clean_close:
+            self._terminator_reason = "ffmpeg_dirty_close"
+        self._write_terminator(clip_dir)
+
         # Write the tarball into the user's Documents/OysterClips/.
         out_tar = _output_dir() / f"clip-{ts}.tar.gz"
         with tarfile.open(out_tar, "w:gz") as tf:
@@ -2466,6 +2551,57 @@ class RecorderApp(tk.Tk):
             creationflags=flags,
         )
 
+    def _write_terminator(self, clip_dir: Optional[Path]) -> None:
+        """rc11 SF: write game-agnostic failure-attribution manifest.
+
+        Called from finalize (clean_exit) AND from every early-return /
+        crash path. Cheap to call multiple times — last writer wins.
+        clip_dir may be None (early return before tmp_dir created); in
+        that case write to ~/Documents/OysterRecorder/runtime/terminator.json
+        as a "session-less" record.
+        """
+        reason = self._terminator_reason or "crash"
+        try:
+            game_alive = bool(_minecraft_running()) if reason != "game_died" else False
+            disk_free_mb = 0
+            try:
+                probe_path = clip_dir if clip_dir and clip_dir.exists() else _output_dir()
+                disk_free_mb = round(shutil.disk_usage(probe_path).free / (1024 * 1024), 1)
+            except Exception:
+                pass
+            payload = {
+                "schema_version": "1.0",
+                "session_id": getattr(self, "_session_id", None),
+                "reason": reason,
+                "last_recorded_at": datetime.now().isoformat(),
+                "duration_sec": (
+                    round(time.time() - self._record_started_at, 1)
+                    if getattr(self, "_record_started_at", 0) else None
+                ),
+                "frame_count": len(getattr(self, "_captured_events", []) or []),
+                "disk_free_mb_at_end": disk_free_mb,
+                "ffmpeg_clean_close": getattr(self, "_ffmpeg_clean_close", True),
+                "game_alive_at_terminate": game_alive,
+                "recorder_version": RECORDER_VERSION,
+                "game_specific": {
+                    "game_id": CURRENT_GAME_ID,
+                    "game_version": getattr(self, "_mc_version", None),
+                    "process_name": "javaw.exe",
+                    "mod_handshake_ok": getattr(self, "_mod_handshake_ok", False),
+                },
+            }
+            target_dir = clip_dir if clip_dir is not None else (
+                Path(_real_documents_dir()) / "OysterRecorder" / "runtime"
+            )
+            target_dir.mkdir(parents=True, exist_ok=True)
+            (target_dir / "terminator.json").write_text(
+                json.dumps(payload, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            _trace(f"terminator: reason={reason} written to {target_dir}/terminator.json")
+        except Exception:
+            _trace(f"terminator: write FAILED reason={reason} {traceback.format_exc()}")
+
     def _stop_ffmpeg(self) -> None:
         """Send 'q' to ffmpeg's stdin (clean shutdown), then wait 5s."""
         proc = self._ffmpeg_proc
@@ -2493,10 +2629,12 @@ class RecorderApp(tk.Tk):
         _trace("on_close: user closed window")
         self._stop_event.set()
         self._stop_ffmpeg()
-        # rc10 B1: ask tester whether to also kill Minecraft.
+        # rc10 B1 + rc11 SF: ask tester whether to also kill Minecraft;
+        # set terminator reason for failure-attribution either way.
         try:
             import tkinter.messagebox as _mb
             if _mb.askyesno("关闭确认", "也要关闭 Minecraft 吗?\n\n是 = 关 MC + 关录制\n否 = 仅关录制 (MC 继续运行无录像)"):
+                self._terminator_reason = "user_close_kill_game"
                 if os.name == "nt":
                     try:
                         rc = subprocess.run(
@@ -2510,8 +2648,17 @@ class RecorderApp(tk.Tk):
                         _trace(f"on_close: kill MC failed: {traceback.format_exc()}")
                 else:
                     _trace("on_close: kill MC skipped (non-Windows)")
+            else:
+                self._terminator_reason = "user_close_keep_game"
         except Exception:
+            self._terminator_reason = "user_close_keep_game"
             _trace(f"on_close: confirmation dialog failed: {traceback.format_exc()}")
+        # rc11 SF: write a session-less terminator at user-close so we
+        # can diagnose abrupt-exit cases that don't reach finalize.
+        try:
+            self._write_terminator(None)
+        except Exception:
+            pass
         # Final telemetry push so engineer sees the full session log.
         # Synchronous-ish but capped to 15s by urlopen timeout.
         try:
