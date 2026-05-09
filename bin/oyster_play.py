@@ -55,6 +55,13 @@ logger = logging.getLogger("oyster_play")
 
 
 RECORDER_EXE_NAME = "OysterRecorder.exe"
+# Bug 5 (R05E): when PyInstaller --onedir is invoked with
+# `--name OysterRecorder-onedir`, the produced binary is named
+# `OysterRecorder-onedir.exe` and lives in a sibling subdir of the same
+# name. installer.iss ships that subdir verbatim under {app}, so the
+# launcher must know to look for both names + both layouts.
+RECORDER_ONEDIR_DIR = "OysterRecorder-onedir"
+RECORDER_ONEDIR_EXE = "OysterRecorder-onedir.exe"
 RECORDER_BUTTON_LABEL = "▶ 开始录制"
 RECORDER_DISARM_LABEL = "⏹ 停止录制"
 RECORDER_WINDOW_CLASS = "TkTopLevel"  # Tkinter top-level windows
@@ -67,21 +74,37 @@ DEFAULT_READY_TIMEOUT_SEC = 30.0
 
 
 def find_recorder_exe(install_root_path: Path) -> Path | None:
-    """Locate ``OysterRecorder.exe`` next to OysterPlay.exe.
+    """Locate the recorder executable next to OysterPlay.exe.
 
-    Looks in standard install layouts:
-        - <INSTALL_ROOT>/recorder/OysterRecorder.exe
-        - <INSTALL_ROOT>/OysterRecorder.exe
-        - sibling of the running executable (when run from a PyInstaller bundle)
+    Looks in standard install layouts, in priority order:
+
+        1. <INSTALL_ROOT>/OysterRecorder-onedir/OysterRecorder-onedir.exe
+           — the layout R05E actually ships (PyInstaller --onedir with
+           `--name OysterRecorder-onedir` produces this naming + path).
+        2. <INSTALL_ROOT>/recorder/OysterRecorder.exe
+        3. <INSTALL_ROOT>/OysterRecorder.exe
+        4. sibling of the running executable (when run from a
+           PyInstaller bundle — OysterPlay.exe is dropped at {app})
+
+    Bug 5 (R05E): the .exe is shipped under
+    `OysterRecorder-onedir/OysterRecorder-onedir.exe`, NOT
+    `OysterRecorder.exe` directly under {app}. Without the onedir
+    candidates, the launcher errored::
+
+        OysterRecorder.exe not found near <INSTALL_ROOT>
     """
     candidates: list[Path] = [
+        # Onedir layout (current R05E ship layout) — check first.
+        install_root_path / RECORDER_ONEDIR_DIR / RECORDER_ONEDIR_EXE,
+        # Legacy / hand-installed layouts kept as fallbacks.
         install_root_path / "recorder" / RECORDER_EXE_NAME,
         install_root_path / RECORDER_EXE_NAME,
     ]
 
     # When bundled, sys.executable is OysterPlay.exe — recorder may be
-    # in the same dir.
+    # in the same dir under either layout.
     exe = Path(sys.executable).resolve()
+    candidates.append(exe.parent / RECORDER_ONEDIR_DIR / RECORDER_ONEDIR_EXE)
     candidates.append(exe.parent / RECORDER_EXE_NAME)
     candidates.append(exe.parent / "recorder" / RECORDER_EXE_NAME)
 
@@ -92,7 +115,11 @@ def find_recorder_exe(install_root_path: Path) -> Path | None:
 
 
 def is_recorder_running() -> bool:
-    """Return True if a process named ``OysterRecorder.exe`` is alive.
+    """Return True if a recorder process is alive (either exe naming).
+
+    Bug 5 (R05E): the actual shipped binary is
+    ``OysterRecorder-onedir.exe``, but legacy installs may still have
+    ``OysterRecorder.exe``. Match both.
 
     Windows-only via ``tasklist``. On non-Windows we always return False
     (testing path).
@@ -100,18 +127,21 @@ def is_recorder_running() -> bool:
     if os.name != "nt":
         return False
 
-    try:
-        # tasklist outputs CSV with /FO CSV, /NH = no header.
-        # /FI "IMAGENAME eq OysterRecorder.exe" filters by exe name.
-        out = subprocess.check_output(
-            ["tasklist", "/FI", f"IMAGENAME eq {RECORDER_EXE_NAME}",
-             "/FO", "CSV", "/NH"],
-            encoding="utf-8", errors="replace", timeout=10,
-        )
-    except (subprocess.SubprocessError, OSError) as e:
-        logger.warning("tasklist failed: %s — assuming recorder not running", e)
-        return False
-    return RECORDER_EXE_NAME.lower() in out.lower()
+    for image_name in (RECORDER_ONEDIR_EXE, RECORDER_EXE_NAME):
+        try:
+            out = subprocess.check_output(
+                ["tasklist", "/FI", f"IMAGENAME eq {image_name}",
+                 "/FO", "CSV", "/NH"],
+                encoding="utf-8", errors="replace", timeout=10,
+            )
+        except (subprocess.SubprocessError, OSError) as e:
+            logger.warning(
+                "tasklist failed for %s: %s — continuing", image_name, e,
+            )
+            continue
+        if image_name.lower() in out.lower():
+            return True
+    return False
 
 
 def spawn_recorder(recorder_exe: Path) -> subprocess.Popen | None:
