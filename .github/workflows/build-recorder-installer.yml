@@ -395,7 +395,6 @@ jobs:
             --name OysterRecorder-onedir `
             --distpath bundle `
             --workpath build/OysterRecorder-onedir `
-            --specpath build/OysterRecorder-onedir `
             --add-binary "ffmpeg.exe;." `
             --add-data "bin/lint_v3_prd_grounded.py;." `
             --add-data "bin/generate_systeminfo_json.py;." `
