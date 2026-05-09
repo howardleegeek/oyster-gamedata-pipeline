@@ -419,8 +419,31 @@ if not _FFMPEG.exists():
     _FFMPEG = Path(found) if found else _FFMPEG  # may not exist on dev box
 
 # Tester output directory: ~/Documents/OysterClips/
+#
+# rc8 fix: on Windows, "Documents" can be redirected to OneDrive (common
+# default on consumer boxes). When it is, `Path.home() / "Documents"` still
+# returns the un-redirected NTFS path, but Explorer's sidebar "Documents"
+# shortcut points at the redirected OneDrive path — so the tester opens
+# Explorer, clicks Documents, sees no OysterClips folder, panics. We resolve
+# the *real* Documents path from the registry (User Shell Folders\Personal)
+# the same way Explorer does, so files land where the tester actually looks.
+def _real_documents_dir() -> Path:
+    if os.name != "nt":
+        return Path.home() / "Documents"
+    try:
+        import winreg  # noqa: PLC0415 — Windows-only stdlib
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders",
+        ) as k:
+            raw, _ = winreg.QueryValueEx(k, "Personal")
+            return Path(os.path.expandvars(raw))
+    except OSError:
+        return Path.home() / "Documents"
+
+
 def _output_dir() -> Path:
-    docs = Path.home() / "Documents" / "OysterClips"
+    docs = _real_documents_dir() / "OysterClips"
     docs.mkdir(parents=True, exist_ok=True)
     return docs
 
@@ -877,6 +900,17 @@ class RecorderApp(tk.Tk):
             font=("Helvetica", 8), bg="white", fg="#666",
             bd=0, cursor="hand2",
             command=self._export_diagnostic_only,
+        ).pack(side="left", padx=4)
+        # rc8: prominent "View My Recordings" button — opens the OysterClips
+        # folder in Explorer at the registry-resolved (OneDrive-aware) path
+        # where session tarballs actually live. Bigger / styled vs the other
+        # helpbar buttons because this is the action testers ask for first.
+        tk.Button(
+            helpbar, text="📂 我的录像",
+            font=("Helvetica", 9, "bold"), bg="#1976d2", fg="white",
+            activebackground="#1565c0", activeforeground="white",
+            bd=0, padx=10, pady=3, cursor="hand2",
+            command=lambda: self._open_path(_output_dir()),
         ).pack(side="left", padx=4)
 
     def _export_diagnostic_only(self) -> None:
