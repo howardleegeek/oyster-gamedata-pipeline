@@ -78,6 +78,15 @@ USER_AGENT = (
 FABRIC_MAVEN_FALLBACK = "https://maven.fabricmc.net/"
 SHA1_URL_SUFFIX = ".sha1"
 
+# Modrinth API for fabric-api (Bug 2 fix). The mod refuses to load without
+# fabric-api at runtime ("requires any version of fabric-api, which is
+# missing"), so we ship the latest stable build for the pinned MC version.
+MODRINTH_FABRIC_API_VERSIONS_URL = (
+    "https://api.modrinth.com/v2/project/fabric-api/version"
+    "?game_versions=%5B%22{mc_version}%22%5D"
+    "&loaders=%5B%22fabric%22%5D"
+)
+
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -230,6 +239,31 @@ def _download_json(url: str) -> dict[str, Any]:
                 backoff = 2 ** (attempt - 1)
                 time.sleep(backoff)
     raise RuntimeError(f"JSON fetch failed after {DOWNLOAD_RETRIES} attempts: {last_exc}")
+
+
+def _download_json_array(url: str) -> list[dict[str, Any]]:
+    """Fetch a JSON array document with retries (Modrinth's response shape)."""
+    last_exc: Exception | None = None
+    for attempt in range(1, DOWNLOAD_RETRIES + 1):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+            with urllib.request.urlopen(  # noqa: S310 — pinned https URL
+                req, timeout=DOWNLOAD_TIMEOUT_SEC
+            ) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+                if not isinstance(payload, list):
+                    raise ValueError(
+                        f"expected JSON array, got {type(payload).__name__}"
+                    )
+                return payload
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
+            last_exc = exc
+            if attempt < DOWNLOAD_RETRIES:
+                backoff = 2 ** (attempt - 1)
+                time.sleep(backoff)
+    raise RuntimeError(
+        f"JSON-array fetch failed after {DOWNLOAD_RETRIES} attempts: {last_exc}"
+    )
 
 
 def _fetch_with_sha1_pin(
@@ -443,6 +477,103 @@ def _fetch_libraries(profile: dict[str, Any]) -> tuple[int, int, list[dict[str, 
 
 
 # ---------------------------------------------------------------------------
+# fabric-api fetcher (Bug 2 fix)
+# ---------------------------------------------------------------------------
+
+
+def _pick_latest_stable_release(
+    versions: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Pick the latest stable release from a Modrinth versions array.
+
+    Modrinth returns versions sorted newest-first, so the first element
+    with ``version_type == "release"`` is "latest stable". We never
+    accept ``alpha`` or ``beta`` builds — the consumer installer must
+    always ship a release build.
+    """
+    for v in versions:
+        if v.get("version_type") == "release":
+            return v
+    raise RuntimeError(
+        "no stable release found in Modrinth fabric-api versions; "
+        "refusing to ship an alpha/beta build to consumers"
+    )
+
+
+def _pick_primary_file(version: dict[str, Any]) -> dict[str, Any]:
+    """Return the version's primary file entry (the .jar end-users install)."""
+    files = version.get("files") or []
+    for f in files:
+        if f.get("primary"):
+            return f
+    raise RuntimeError(
+        f"Modrinth version {version.get('version_number')!r} has no primary file"
+    )
+
+
+def _fetch_fabric_api(mc_version: str) -> tuple[dict[str, Any], int]:
+    """Download fabric-api for ``mc_version`` from Modrinth.
+
+    Bug 2 fix: without fabric-api, the recorder mod fails to load with::
+
+        requires any version of fabric-api, which is missing
+
+    Saves to ``bundle/mc-instance/mods/fabric-api.jar`` (stable filename
+    so downstream tooling doesn't have to know which version we shipped).
+
+    Returns a (record, bytes_downloaded) pair where ``record`` is a
+    runtime-manifest entry (version_number, sha1, size, source url, ...).
+    """
+    mods_dir = MC_INSTANCE_DIR / "mods"
+    mods_dir.mkdir(parents=True, exist_ok=True)
+    dest = mods_dir / "fabric-api.jar"
+
+    # Discover latest stable
+    api_url = MODRINTH_FABRIC_API_VERSIONS_URL.format(mc_version=mc_version)
+    _log(f"querying Modrinth fabric-api for MC {mc_version}: {api_url}")
+    versions = _download_json_array(api_url)
+    if not versions:
+        _err(f"Modrinth returned 0 fabric-api versions for MC {mc_version}")
+        sys.exit(7)
+
+    chosen = _pick_latest_stable_release(versions)
+    primary = _pick_primary_file(chosen)
+    version_number = chosen.get("version_number") or "(unknown)"
+    url = primary.get("url")
+    sha1 = (primary.get("hashes") or {}).get("sha1")
+    if not url or not sha1:
+        _err(
+            f"fabric-api {version_number}: Modrinth primary file missing "
+            f"url or sha1 (url={url!r}, sha1={sha1!r})"
+        )
+        sys.exit(7)
+
+    _log(f"fabric-api: chose {version_number} -> {primary.get('filename')}")
+    cache = CACHE_DIR / "mods" / f"fabric-api-{version_number}.jar"
+    bytes_dl = _fetch_with_sha1_pin(
+        url=url,
+        dest=cache,
+        expected_sha1=sha1,
+        label=f"fabric-api {version_number}",
+    )
+    # Place at stable name so installer doesn't need to know version.
+    if not dest.is_file() or _sha1_file(dest).lower() != sha1.lower():
+        dest.write_bytes(cache.read_bytes())
+
+    record = {
+        "name": "fabric-api",
+        "minecraft_version": mc_version,
+        "version_number": version_number,
+        "filename": primary.get("filename"),
+        "size": int(primary.get("size") or 0),
+        "sha1": sha1,
+        "url": url,
+        "modrinth_version_id": chosen.get("id"),
+    }
+    return record, bytes_dl
+
+
+# ---------------------------------------------------------------------------
 # Verification + manifest
 # ---------------------------------------------------------------------------
 
@@ -492,6 +623,7 @@ def _write_runtime_manifest(
     profile: dict[str, Any],
     libraries: list[dict[str, str]],
     bytes_downloaded: int,
+    fabric_api: dict[str, Any] | None = None,
 ) -> None:
     """Emit bundle/mc-instance/manifest-fabric.json — runtime provenance record."""
     manifest = {
@@ -513,6 +645,7 @@ def _write_runtime_manifest(
             "library_count": len(libraries),
         },
         "libraries": libraries,
+        "fabric_api": fabric_api,
         "result": {
             "bytes_downloaded_this_run": bytes_downloaded,
             "instance_size_bytes_total": _dir_size_bytes(MC_INSTANCE_DIR),
@@ -567,9 +700,20 @@ def main() -> int:
     bytes_dl, libs_kept, library_records = _fetch_libraries(profile)
     _log(f"  libraries: {libs_kept} kept ({bytes_dl:,} bytes downloaded this run)")
 
+    # Stage 3: fabric-api (Bug 2 fix).
+    _log("fetching fabric-api from Modrinth")
+    fabric_api_record, fabric_api_bytes = _fetch_fabric_api(mc_version)
+    bytes_dl += fabric_api_bytes
+    _log(
+        f"  fabric-api: {fabric_api_record['version_number']} "
+        f"({fabric_api_bytes:,} bytes downloaded this run)"
+    )
+
     # Verify + write runtime manifest.
     _verify_post_fetch(profile, expected_main, required_files)
-    _write_runtime_manifest(pin, profile, library_records, bytes_dl)
+    _write_runtime_manifest(
+        pin, profile, library_records, bytes_dl, fabric_api=fabric_api_record
+    )
 
     instance_size = _dir_size_bytes(MC_INSTANCE_DIR)
     _log(
