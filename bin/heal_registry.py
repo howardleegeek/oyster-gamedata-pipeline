@@ -77,8 +77,20 @@ VALID_EVENT_TYPES: set[str] = {
 VALID_SEVERITY: set[str] = {"info", "warn", "error", "fatal"}
 
 
+_HEAL_LOG_PATH_CACHE: Optional[Path] = None
+
+
 def _heal_log_path() -> Path:
-    """Lazy-resolve so tests can mock _real_documents_dir."""
+    """Lazy-resolve so tests can mock _real_documents_dir.
+
+    rc15.5-fix BUG R7 H3: memoize. Was bug: re-imported recorder_consumer_lite
+    on every emit_event call (dozens per session). Module is in sys.modules
+    cache so import is fast, but attribute lookup + exception path overhead
+    is non-trivial for hot path. Cache the resolved Path on first success.
+    """
+    global _HEAL_LOG_PATH_CACHE
+    if _HEAL_LOG_PATH_CACHE is not None:
+        return _HEAL_LOG_PATH_CACHE
     try:
         # Import here to avoid circular: recorder_consumer_lite imports us.
         from recorder_consumer_lite import _real_documents_dir  # type: ignore
@@ -86,7 +98,15 @@ def _heal_log_path() -> Path:
     except Exception:
         # Standalone / test fallback
         base = Path.home() / "Documents"
-    return base / "OysterRecorder" / "runtime" / "heal_events.jsonl"
+    resolved = base / "OysterRecorder" / "runtime" / "heal_events.jsonl"
+    # Only cache if base resolution succeeded (don't lock in fallback path
+    # forever if recorder_consumer_lite was mid-import on first call).
+    try:
+        from recorder_consumer_lite import _real_documents_dir  # type: ignore  # noqa: F811
+        _HEAL_LOG_PATH_CACHE = resolved
+    except Exception:
+        pass  # don't cache fallback path
+    return resolved
 
 
 def emit_event(

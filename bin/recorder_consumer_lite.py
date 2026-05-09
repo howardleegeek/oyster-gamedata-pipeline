@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.4"
+RECORDER_VERSION = "lite-v0.28.0-rc15.5"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -954,9 +954,25 @@ def _list_windows_processes() -> set[str]:
     return names
 
 
+_MC_RUNNING_CACHE: tuple[float, bool] = (0.0, False)
+_MC_RUNNING_CACHE_TTL = 1.8  # < 2s sleep so cache misses align with loop
+
+
 def _minecraft_running() -> bool:
-    """True iff any process matching MC_PROCESS_NAMES is alive."""
-    return bool(MC_PROCESS_NAMES & _list_windows_processes())
+    """True iff any process matching MC_PROCESS_NAMES is alive.
+
+    rc15.5-fix BUG R7 H2: cache the result for 1.8s. Phase 3 hot loop
+    polls every 2s + tasklist subprocess takes 0.5-1s on AV-scanned
+    machines = effectively 50% CPU on tester boxes. Cache halves it.
+    """
+    global _MC_RUNNING_CACHE
+    now = time.time()
+    cached_ts, cached_val = _MC_RUNNING_CACHE
+    if (now - cached_ts) < _MC_RUNNING_CACHE_TTL:
+        return cached_val
+    val = bool(MC_PROCESS_NAMES & _list_windows_processes())
+    _MC_RUNNING_CACHE = (now, val)
+    return val
 
 
 def _find_minecraft_pids() -> list[int]:
@@ -1329,17 +1345,35 @@ class RecorderApp(tk.Tk):
             _trace(f"clipboard: copy failed {e}")
 
     def _open_path(self, path: Path) -> None:
-        """Open a file or folder in the OS file explorer."""
+        """Open a file or directory in the OS default handler.
+
+        rc15.5-fix BUG R7 H1 (SEC): restrict os.startfile to safe suffix
+        whitelist + directories. Was bug: os.startfile on Windows can
+        execute .exe/.bat/.lnk if path is ever attacker-controlled
+        (e.g. read from heal event details). Hard-fail unsafe suffixes.
+        """
+        SAFE_SUFFIXES = {"", ".html", ".htm", ".mp4", ".tar", ".gz", ".tgz",
+                         ".jsonl", ".json", ".log", ".txt", ".yaml", ".csv",
+                         ".png", ".jpg", ".webm", ".zip"}
+        try:
+            suffix = path.suffix.lower()
+            # Allow directories (suffix=="") + whitelist files only.
+            if path.is_file() and suffix not in SAFE_SUFFIXES:
+                _trace(f"_open_path: REFUSED unsafe suffix {suffix!r} for {path}")
+                return
+        except Exception:
+            return
+        # Fall through to original behavior (os.startfile / open / xdg-open)
         try:
             if os.name == "nt":
-                os.startfile(str(path))  # type: ignore[attr-defined]
+                os.startfile(str(path))  # type: ignore[attr-defined]  # nosec — whitelisted suffix
             elif sys.platform == "darwin":
                 subprocess.Popen(["open", str(path)])
             else:
                 subprocess.Popen(["xdg-open", str(path)])
-            _trace(f"open_path: opened {path}")
-        except Exception as e:
-            _trace(f"open_path: failed {e}")
+        except Exception as exc:
+            _trace(f"_open_path failed: {exc}")
+        return
 
     def _auto_lint(self, tarball: Path) -> None:
         """v0.7.0: run G165 lint v3 on the just-recorded tarball + show
