@@ -92,6 +92,63 @@ def _verify_sources() -> tuple[bool, list[str]]:
     return not problems, problems
 
 
+def _construct_pyinstaller_args(
+    *,
+    onefile: bool,
+    name: str,
+    icon: Path | None,
+    extra_data: list[tuple[Path, str]],
+    clean: bool,
+) -> list[str]:
+    """Build the PyInstaller argv. Pure function — no side effects.
+
+    Pulled out as a separate helper so ``--check-only`` can print the
+    *exact* arg list the build would invoke without actually running it.
+    Verifies cross-platform that ``--onefile`` is in the args by default
+    (Bug 4 regression check).
+    """
+    args: list[str] = [
+        sys.executable, "-m", "PyInstaller",
+        "--name", name,
+        "--noconsole",   # GUI app — no flashing console
+        "--clean" if clean else "--noconfirm",
+        "--distpath", str(DIST_DIR.parent),
+        "--workpath", str(BUILD_DIR.parent),
+        "--specpath", str(BUILD_DIR.parent),
+    ]
+    # Bug 4 fix (R05C): always ship --onefile so the resulting OysterPlay.exe
+    # is a single ~30 MB binary with no `_internal/` companion directory. An
+    # accidental --onedir build leaves the .exe useless when Inno Setup
+    # ships only `OysterPlay.exe` (without the `_internal/python3xx.dll`
+    # sibling), causing "Failed to load Python DLL".
+    if onefile:
+        args.append("--onefile")
+
+    # Bake oyster_launch_mc.py in as a hidden import — PyInstaller's
+    # static analyzer may miss the dynamic ``import oyster_launch_mc``
+    # we do in oyster_play.py.
+    args.extend(["--hidden-import", "oyster_launch_mc"])
+
+    # Add bin/ to module search so PyInstaller finds the sibling.
+    args.extend(["--paths", str(BIN_DIR)])
+
+    if icon is not None and icon.is_file():
+        args.extend(["--icon", str(icon)])
+
+    # Extra data files (mod jars, fabric installer jar, etc.). Each
+    # entry is (source_path_on_disk, target_dir_inside_bundle).
+    for src, dest in extra_data:
+        if not src.exists():
+            print(f"WARN: extra_data missing, skipping: {src}", file=sys.stderr)
+            continue
+        sep = ";" if os.name == "nt" else ":"
+        args.extend(["--add-data", f"{src}{sep}{dest}"])
+
+    # Entry script
+    args.append(str(ENTRY_SCRIPT))
+    return args
+
+
 def build(
     *,
     onefile: bool = True,
@@ -100,7 +157,12 @@ def build(
     extra_data: list[tuple[Path, str]] | None = None,
     clean: bool = False,
 ) -> int:
-    """Run PyInstaller. Returns the exit code from PyInstaller (0 = OK)."""
+    """Run PyInstaller. Returns the exit code from PyInstaller (0 = OK).
+
+    ``onefile`` defaults to True per Bug 4 (R05C): the bundled installer
+    only ships ``OysterPlay.exe`` so it MUST be a self-contained .exe
+    with no ``_internal/`` sibling.
+    """
     if not _has_pyinstaller():
         print(
             "ERROR: PyInstaller not installed. "
@@ -122,44 +184,17 @@ def build(
 
     DIST_DIR.parent.mkdir(parents=True, exist_ok=True)
 
-    # PyInstaller arg construction
-    # Windowed mode (--noconsole) so a double-click doesn't spawn a black
-    # console window. We still surface stderr from javaw via the
-    # MessageBox path baked into oyster_launch_mc.py.
-    args: list[str] = [
-        sys.executable, "-m", "PyInstaller",
-        "--name", name,
-        "--noconsole",   # GUI app — no flashing console
-        "--clean" if clean else "--noconfirm",
-        "--distpath", str(DIST_DIR.parent),
-        "--workpath", str(BUILD_DIR.parent),
-        "--specpath", str(BUILD_DIR.parent),
-    ]
+    args = _construct_pyinstaller_args(
+        onefile=onefile,
+        name=name,
+        icon=icon,
+        extra_data=extra_data or [],
+        clean=clean,
+    )
     if onefile:
-        args.append("--onefile")
-
-    # Bake oyster_launch_mc.py in as a hidden import — PyInstaller's
-    # static analyzer may miss the dynamic ``import oyster_launch_mc``
-    # we do in oyster_play.py.
-    args.extend(["--hidden-import", "oyster_launch_mc"])
-
-    # Add bin/ to module search so PyInstaller finds the sibling.
-    args.extend(["--paths", str(BIN_DIR)])
-
-    if icon is not None and icon.is_file():
-        args.extend(["--icon", str(icon)])
-
-    # Extra data files (mod jars, fabric installer jar, etc.). Each
-    # entry is (source_path_on_disk, target_dir_inside_bundle).
-    for src, dest in (extra_data or []):
-        if not src.exists():
-            print(f"WARN: extra_data missing, skipping: {src}", file=sys.stderr)
-            continue
-        sep = ";" if os.name == "nt" else ":"
-        args.extend(["--add-data", f"{src}{sep}{dest}"])
-
-    # Entry script
-    args.append(str(ENTRY_SCRIPT))
+        print("Building OysterPlay --onefile (no _internal/ companion).")
+    else:
+        print("Building OysterPlay --onedir (multi-file dist).")
 
     print(f"Running: {' '.join(str(a) for a in args)}")
     proc = subprocess.run(args, cwd=str(REPO_ROOT))
@@ -203,14 +238,42 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.check_only:
         if not _has_pyinstaller():
-            print("CHECK FAIL: PyInstaller not installed", file=sys.stderr)
-            return EXIT_NO_PYINSTALLER
-        ok, problems = _verify_sources()
+            # Bug 4: still print what the args WOULD be when PyInstaller
+            # is absent — so cross-platform validation works without
+            # forcing the dev to pip-install the heavy toolchain.
+            print("CHECK WARN: PyInstaller not installed (cannot build, "
+                  "but printing arg construction for cross-platform validation)",
+                  file=sys.stderr)
+        ok, problems = _verify_sources() if _has_pyinstaller() else (True, [])
         if not ok:
             for p in problems:
                 print(f"CHECK FAIL: {p}", file=sys.stderr)
             return EXIT_BAD_SOURCE
-        print("CHECK OK: PyInstaller installed + sources import cleanly")
+
+        # Construct + print the arg list so devs can verify --onefile
+        # is in there (Bug 4 regression check).
+        check_args = _construct_pyinstaller_args(
+            onefile=args.onefile,
+            name=args.name,
+            icon=args.icon,
+            extra_data=[],
+            clean=args.clean,
+        )
+        print("CHECK: constructed PyInstaller argv:")
+        for a in check_args:
+            print(f"  {a}")
+        if "--onefile" not in check_args:
+            print(
+                "CHECK FAIL: --onefile flag missing from PyInstaller argv "
+                "(Bug 4 regression). The bundled installer ships only "
+                "OysterPlay.exe, so it MUST be a single-file build.",
+                file=sys.stderr,
+            )
+            return EXIT_BAD_SOURCE
+        if not _has_pyinstaller():
+            return EXIT_NO_PYINSTALLER
+        print("CHECK OK: PyInstaller installed + sources import cleanly + "
+              "argv includes --onefile")
         return EXIT_OK
 
     extra_data: list[tuple[Path, str]] = []
