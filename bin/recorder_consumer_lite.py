@@ -343,9 +343,43 @@ def _stage_self_update(new_exe_url: str) -> bool:
             stderr=subprocess.DEVNULL,
         )
         _trace(f"update: staged via {bat_path}")
+        # rc15.2-fix BUG C3: wire B3 (bat retry) + B4 (same-drive tmp).
+        # Both rc10 features were dark in heal log until now.
+        try:
+            from heal_registry import emit_event as _heal_emit_local  # noqa: PLC0415
+            _heal_emit_local(
+                "B4_update_same_drive_tmp", "detect", "info",
+                f"update tmp on same drive as install: {target_dir}",
+                details={"target_dir": str(target_dir), "current_exe": str(current_exe)},
+                remediation={"action": "auto_clean", "performed": True,
+                             "next_step": "bat will retry move /Y up to 30s"},
+                recorder_version=RECORDER_VERSION,
+            )
+            _heal_emit_local(
+                "B3_update_bat_retry", "heal_success", "info",
+                "update bat staged with 30s retry loop",
+                details={"bat_path": str(bat_path), "size_bytes": new_path.stat().st_size},
+                remediation={"action": "auto_clean", "performed": True,
+                             "next_step": "process exits, bat swaps .exe + relaunches"},
+                recorder_version=RECORDER_VERSION,
+            )
+        except Exception:
+            pass
         return True
     except Exception as e:
         _trace(f"update: stage failed {e}")
+        try:
+            from heal_registry import emit_event as _heal_emit_local  # noqa: PLC0415
+            _heal_emit_local(
+                "B3_update_bat_retry", "heal_failed", "error",
+                f"update stage failed: {type(e).__name__}: {e}",
+                details={"exception_type": type(e).__name__, "msg": str(e)[:200]},
+                remediation={"action": "user_prompt", "performed": False,
+                             "next_step": "tester downloads installer manually from GitHub releases"},
+                recorder_version=RECORDER_VERSION,
+            )
+        except Exception:
+            pass
         return False
 
 
@@ -921,6 +955,39 @@ def _list_windows_processes() -> set[str]:
 def _minecraft_running() -> bool:
     """True iff any process matching MC_PROCESS_NAMES is alive."""
     return bool(MC_PROCESS_NAMES & _list_windows_processes())
+
+
+def _find_minecraft_pids() -> list[int]:
+    """rc15.2 BUG#7: return PIDs of MC processes (not all javaw.exe).
+
+    Uses tasklist /fo csv /nh to get image,PID per row, filters to
+    MC_PROCESS_NAMES. Empty list on non-Windows or detection failure.
+    """
+    if os.name != "nt":
+        return []
+    try:
+        out = subprocess.check_output(
+            ["tasklist", "/fo", "csv", "/nh"],
+            stderr=subprocess.DEVNULL,
+            creationflags=0x08000000,
+            text=True,
+            timeout=5,
+        )
+    except Exception:
+        return []
+    pids: list[int] = []
+    for line in out.splitlines():
+        try:
+            parts = [p.strip('"') for p in line.split(",")]
+            if len(parts) < 2:
+                continue
+            image, pid_str = parts[0], parts[1]
+            if image not in MC_PROCESS_NAMES:
+                continue
+            pids.append(int(pid_str))
+        except Exception:
+            continue
+    return pids
 
 
 # ---- Recorder app ----------------------------------------------------------
@@ -3019,8 +3086,14 @@ class RecorderApp(tk.Tk):
             )
             _trace(f"terminator: reason={reason} written to {target_dir}/terminator.json")
             # rc15 Heal Framework: mirror to central event log.
+            # rc15.2-fix BUG H2: duration_too_short is buyer-rejected →
+            # auto-quarantine = data loss outcome. Escalate severity from
+            # warn to error so dashboard renders red, not amber.
             severity = "info" if reason == "clean_exit" else (
-                "fatal" if reason == "crash" else "warn"
+                "fatal" if reason == "crash" else
+                "error" if reason in ("duration_too_short", "ffmpeg_dirty_close",
+                                      "game_crashed", "mod_handshake_failed") else
+                "warn"
             )
             _heal_emit(
                 "SF_terminator", "report", severity,
@@ -3043,23 +3116,39 @@ class RecorderApp(tk.Tk):
         proc = self._ffmpeg_proc
         if proc is None:
             return
+        # rc15.2-fix BUG C2: wire B2_ffmpeg_clean_close emit at each
+        # dirty-close path. Was: 3 spots set self._ffmpeg_clean_close
+        # = False but no central event log entry — feature was dark.
+        dirty_path: Optional[str] = None
         try:
             if proc.stdin:
                 proc.stdin.write(b"q\n")
                 proc.stdin.flush()
         except Exception:
             self._ffmpeg_clean_close = False
+            dirty_path = "stdin_write_failed"
         try:
             proc.wait(timeout=5.0)
         except subprocess.TimeoutExpired:
             self._ffmpeg_clean_close = False
+            dirty_path = dirty_path or "wait_5s_timeout_terminate"
             proc.terminate()
             try:
                 proc.wait(timeout=3.0)
             except subprocess.TimeoutExpired:
                 self._ffmpeg_clean_close = False
+                dirty_path = "wait_3s_timeout_kill"
                 proc.kill()
         self._ffmpeg_proc = None
+        if dirty_path:
+            _heal_emit(
+                "B2_ffmpeg_clean_close", "heal_failed", "error",
+                f"ffmpeg dirty-close via {dirty_path}",
+                details={"dirty_path": dirty_path},
+                remediation={"action": "none", "performed": False,
+                             "next_step": "mp4 may have missing trailer; lint will flag"},
+                recorder_version=RECORDER_VERSION,
+            )
 
     def _on_close(self) -> None:
         _trace("on_close: user closed window")
@@ -3073,19 +3162,47 @@ class RecorderApp(tk.Tk):
                 self._terminator_reason = "user_close_kill_game"
                 if os.name == "nt":
                     try:
-                        rc = subprocess.run(
-                            ["taskkill", "/F", "/IM", "javaw.exe"],
-                            creationflags=0x08000000,
-                            capture_output=True,
-                            timeout=5,
-                        ).returncode
-                        _trace(f"on_close: kill MC requested, taskkill exit={rc}")
+                        # rc15.2-fix BUG#7: kill by PID, not by image name.
+                        # `taskkill /IM javaw.exe` killed ALL java processes
+                        # including IntelliJ/Eclipse — tester complaint risk.
+                        # Resolve MC PIDs from tasklist + filter by window
+                        # title "Minecraft" via _get_minecraft_window_rect.
+                        mc_pids = _find_minecraft_pids()
+                        if not mc_pids:
+                            _trace("on_close: no MC PID found; skipping kill")
+                        for pid in mc_pids:
+                            try:
+                                rc = subprocess.run(
+                                    ["taskkill", "/F", "/PID", str(pid)],
+                                    creationflags=0x08000000,
+                                    capture_output=True,
+                                    timeout=5,
+                                ).returncode
+                                _trace(f"on_close: kill MC pid={pid} taskkill exit={rc}")
+                            except Exception:
+                                _trace(f"on_close: kill pid={pid} failed: {traceback.format_exc()}")
+                        # rc15.2-fix wire B1: emit user_action event
+                        _heal_emit(
+                            "B1_close_confirm_kill_mc", "user_action", "info",
+                            f"tester chose to kill MC on close ({len(mc_pids)} pid(s))",
+                            details={"mc_pids_killed": mc_pids},
+                            remediation={"action": "auto_clean", "performed": True,
+                                         "next_step": "MC closed, recorder also closing"},
+                            recorder_version=RECORDER_VERSION,
+                        )
                     except Exception:
                         _trace(f"on_close: kill MC failed: {traceback.format_exc()}")
                 else:
                     _trace("on_close: kill MC skipped (non-Windows)")
             else:
                 self._terminator_reason = "user_close_keep_game"
+                _heal_emit(
+                    "B1_close_confirm_kill_mc", "user_action", "info",
+                    "tester chose to keep MC running",
+                    remediation={"action": "none", "performed": False,
+                                 "next_step": "tester continues playing without recording"},
+                    recorder_version=RECORDER_VERSION,
+                )
         except Exception:
             self._terminator_reason = "user_close_keep_game"
             _trace(f"on_close: confirmation dialog failed: {traceback.format_exc()}")
@@ -3282,6 +3399,43 @@ def main() -> int:
             )
     except Exception:
         pass
+
+    # rc15.2-fix BUG H9: install threading.excepthook so daemon thread
+    # crashes (watch_loop, input_capture, auto_lint, auto_bft) don't die
+    # silently. Was bug: terminator reason "crash" enumerated but no path
+    # actually wrote it for daemon thread exceptions.
+    def _thread_excepthook(args):  # type: ignore[no-untyped-def]
+        try:
+            tname = getattr(args.thread, "name", "unknown")
+            exc_msg = f"{args.exc_type.__name__}: {args.exc_value}"
+            _trace(f"DAEMON CRASH thread={tname} {exc_msg}\n{traceback.format_exc()}")
+            _heal_emit(
+                "SF_terminator", "report", "fatal",
+                f"daemon thread crashed: {tname} — {exc_msg}",
+                details={"thread_name": tname, "exception": exc_msg},
+                remediation={"action": "user_prompt", "performed": False,
+                             "next_step": "restart recorder; check heal_report for details"},
+                recorder_version=RECORDER_VERSION,
+            )
+        except Exception:
+            pass
+    threading.excepthook = _thread_excepthook
+    # Also wire sys.excepthook for main thread.
+    _orig_excepthook = sys.excepthook
+    def _main_excepthook(exc_type, exc_value, exc_tb):  # type: ignore[no-untyped-def]
+        try:
+            _heal_emit(
+                "SF_terminator", "report", "fatal",
+                f"main thread crashed: {exc_type.__name__}: {exc_value}",
+                details={"exception": f"{exc_type.__name__}: {exc_value}"},
+                remediation={"action": "user_prompt", "performed": False,
+                             "next_step": "send diagnostic zip to engineer"},
+                recorder_version=RECORDER_VERSION,
+            )
+        except Exception:
+            pass
+        _orig_excepthook(exc_type, exc_value, exc_tb)
+    sys.excepthook = _main_excepthook
 
     try:
         _try_install_mod_first_launch()

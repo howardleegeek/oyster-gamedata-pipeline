@@ -194,7 +194,10 @@ def main() -> int:
     out = generate_html()
     print(f"heal_report.html written: {out}")
     try:
-        webbrowser.open(f"file://{out}")
+        # rc15.2-fix BUG#8: use Path.as_uri() instead of f"file://{out}".
+        # On Windows, str(Path(...)) returns backslashes which most browsers
+        # reject. as_uri() produces correct file:///C:/Users/... form.
+        webbrowser.open(out.as_uri())
     except Exception:
         pass
     return 0
