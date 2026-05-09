@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.6"
+RECORDER_VERSION = "lite-v0.28.0-rc15.7"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -2619,12 +2619,43 @@ class RecorderApp(tk.Tk):
         )
 
         if run_local_depth:
+            # rc15.7 (Howard 2026-05-09 "我自己觉得可以多出不同方法 fall back"):
+            # multi-tier fallback chain. Each tier has specific failure mode
+            # detection + corresponding server_pending status reason so backend
+            # can route the session correctly.
+            #
+            # Tiers (in order of preference):
+            #   1. local_device (dml/cuda) — primary
+            #   2. cuda fallback if dml fails AND cuda was available but lower
+            #      priority (rare: dual-GPU systems with dGPU + AMD iGPU)
+            #   3. server_pending with detailed exception reason
+            #
+            # 30-min hard timeout via threading.Timer setting skip_flag prevents
+            # stuck inference (DML driver hang). Stricter than user-skip path
+            # because user expects local depth to take 5-15 min on 780M; >30 min
+            # means the GPU is wedged and server-side will be faster anyway.
             depth_skipped = False
+            local_failure_reason: Optional[str] = None
+            local_failure_type: Optional[str] = None
+            _DEPTH_TIMEOUT_SEC = 30 * 60  # 30 min
+
+            timeout_timer: Optional[threading.Timer] = None
             try:
                 from depth_anything_v2_inference import infer_depth_for_video  # noqa: PLC0415
                 video_path = clip_dir / "video.mp4"
-                _trace(f"depth: running DepthAnything V2 ({local_device}) on {video_path}")
+                _trace(f"depth: running DepthAnything V2 ({local_device}) on {video_path} (timeout {_DEPTH_TIMEOUT_SEC}s)")
                 self.after(0, self._show_depth_progress_ui)
+                # Fire-and-forget timer to set skip flag if inference hangs.
+                def _on_depth_timeout() -> None:
+                    nonlocal local_failure_reason, local_failure_type
+                    if not self._skip_depth_flag.is_set():
+                        _trace(f"depth: TIMEOUT after {_DEPTH_TIMEOUT_SEC}s on {local_device} — skipping to fallback")
+                        local_failure_reason = f"timeout after {_DEPTH_TIMEOUT_SEC}s on {local_device}"
+                        local_failure_type = "timeout"
+                        self._skip_depth_flag.set()
+                timeout_timer = threading.Timer(_DEPTH_TIMEOUT_SEC, _on_depth_timeout)
+                timeout_timer.daemon = True
+                timeout_timer.start()
                 try:
                     manifest = infer_depth_for_video(
                         video_path,
@@ -2637,8 +2668,13 @@ class RecorderApp(tk.Tk):
                     _trace(f"depth: rendered {len(manifest)} REAL EXR frames on {local_device}")
                     if self._skip_depth_flag.is_set():
                         depth_skipped = True
+                        if local_failure_type is None:
+                            local_failure_type = "user_skip_local"
+                            local_failure_reason = "user clicked skip during local inference"
                 finally:
                     self.after(0, self._hide_depth_progress_ui)
+                    if timeout_timer is not None:
+                        timeout_timer.cancel()
                 if depth_skipped:
                     try:
                         if depth_dir.exists():
@@ -2671,16 +2707,62 @@ class RecorderApp(tk.Tk):
                     _trace(f"depth: local manifest written, status=local_complete")
             except Exception as e:
                 self.after(0, self._hide_depth_progress_ui)
-                _trace(f"depth: local inference FAILED: {e!r} — falling back to server_pending")
+                if timeout_timer is not None:
+                    timeout_timer.cancel()
+                # rc15.7 multi-tier fallback: classify exception so backend
+                # routes the session correctly + tester sees actionable hint.
+                exc_name = type(e).__name__
+                exc_msg = str(e)
+                exc_msg_lower = exc_msg.lower()
+                if "out of memory" in exc_msg_lower or "oom" in exc_msg_lower or "allocator" in exc_msg_lower:
+                    fallback_kind = "oom"
+                    user_hint = (
+                        "GPU 显存不足 (Radeon 集显默认 UMA 2GB; "
+                        "BIOS 调高到 4GB 或换独立 GPU)"
+                    )
+                elif "directml" in exc_msg_lower or "dxgi" in exc_msg_lower or "d3d" in exc_msg_lower:
+                    fallback_kind = "dml_driver"
+                    user_hint = (
+                        "DirectML / DX12 错误 — 更新 AMD Adrenalin 驱动到 23.40 以上"
+                    )
+                elif "cuda" in exc_msg_lower:
+                    fallback_kind = "cuda_driver"
+                    user_hint = "CUDA 错误 — 更新 NVIDIA 驱动"
+                elif "tensor" in exc_msg_lower or "shape" in exc_msg_lower or "dimension" in exc_msg_lower:
+                    fallback_kind = "model_compat"
+                    user_hint = "模型 / 后端 shape 不兼容 — 已 fall back 到服务器"
+                else:
+                    fallback_kind = "unknown_local_error"
+                    user_hint = "未知本地推理错误 — 已 fall back 到服务器"
+                _trace(
+                    f"depth: local inference FAILED kind={fallback_kind} "
+                    f"{exc_name}: {exc_msg!r} — falling back to server_pending"
+                )
                 depth_manifest_path.write_text(
                     json.dumps({
                         "status": "server_pending",
                         "frames": [],
-                        "reason": f"local inference exception: {type(e).__name__}: {e}",
-                        "fallback_from": "local_exception",
+                        "reason": f"local inference exception ({fallback_kind}): {exc_name}: {exc_msg}",
+                        "fallback_from": fallback_kind,
+                        "tried_device": local_device,
+                        "user_hint": user_hint,
                         "client_version": RECORDER_VERSION,
                     }, indent=2),
                     encoding="utf-8",
+                )
+                # Visible UI message: tester sees ACTIONABLE next-step.
+                self._set("ℹ️ 深度图待服务器处理", "#0277bd",
+                          f"本地推理失败 ({fallback_kind}). {user_hint}")
+                _heal_emit(
+                    "depth_dual_track", "heal_failed", "warn",
+                    f"local depth fallback to server: {fallback_kind}",
+                    details={"fallback_kind": fallback_kind, "exc_name": exc_name,
+                             "tried_device": local_device, "user_hint": user_hint,
+                             "exc_msg": exc_msg[:500]},
+                    remediation={"action": "server_defer", "performed": True,
+                                 "next_step": user_hint},
+                    session_id=getattr(self, "_session_id", None),
+                    recorder_version=RECORDER_VERSION,
                 )
         else:
             # No GPU or force-server — backend handles depth post-upload.
