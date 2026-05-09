@@ -85,7 +85,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.27.0-iron-law-strict"
+RECORDER_VERSION = "lite-v0.28.0-rc9"
 
 # R01 iron-law: supported MC versions for real game-state Fabric mod.
 # Kept in sync with .github/workflows/build-mc-mod.yml matrix.
@@ -393,7 +393,7 @@ def _upload_log_in_background(callback=None) -> None:
 try:
     _trace("importing tkinter…")
     import tkinter as tk
-    from tkinter import messagebox
+    from tkinter import messagebox, ttk  # ttk: rc9 depth-progress bar
     _trace("tkinter ok")
 except Exception:
     _trace(f"tkinter FAILED:\n{traceback.format_exc()}")
@@ -446,6 +446,68 @@ def _output_dir() -> Path:
     docs = _real_documents_dir() / "OysterClips"
     docs.mkdir(parents=True, exist_ok=True)
     return docs
+
+
+def _detect_gpu_available() -> bool:
+    """Return True if any GPU-accelerated depth inference path is reachable.
+
+    rc9 (Howard 2026-05-09): testers running on integrated-GPU laptops sit
+    through 30-60 minutes of CPU DepthAnything inference and assume the
+    recorder is hung. We detect available accelerators here so the UI can
+    pre-check the "Skip depth maps" button on no-GPU boxes (the tester
+    can still uncheck it manually if they want to wait).
+
+    Detection order on Windows (most → least preferred):
+      1. NVIDIA CUDA — try ``ctypes.WinDLL("nvcuda.dll")`` then
+         ``cuInit(0) == 0``. Loading nvcuda.dll alone isn't sufficient
+         because Windows ships the DLL stub even on Intel-only boxes.
+      2. DirectML / DXGI hardware adapter — every Win10+ machine has
+         ``dxgi.dll``, but a discrete GPU is implied by ``torch_directml``
+         being importable (we only ship it in the DML build).
+
+    Returns False on non-Windows (the recorder is Windows-only in
+    production; on dev macOS we just default to "GPU available"-style
+    behaviour by returning True since the integrated Apple GPU is fast
+    enough for testing). On unexpected exceptions we return False — the
+    UI prefers "default to skip" over a falsely promising progress bar.
+    """
+    if os.name != "nt":
+        # Dev / smoke-test path: macOS/Linux contributors testing the
+        # recorder still want the depth UI exercised. Return True so the
+        # skip button is NOT pre-checked. Real tester boxes are Windows.
+        return True
+    try:
+        import ctypes  # noqa: PLC0415
+    except Exception:
+        return False
+    # 1. NVIDIA path
+    try:
+        nvcuda = ctypes.WinDLL("nvcuda.dll")  # type: ignore[attr-defined]
+        cu_init = getattr(nvcuda, "cuInit", None)
+        if cu_init is not None:
+            try:
+                # cuInit returns 0 (CUDA_SUCCESS) on a real CUDA-capable box.
+                # Anything else (CUDA_ERROR_NO_DEVICE, etc) means no GPU.
+                rc = int(cu_init(0))
+                if rc == 0:
+                    return True
+            except Exception:
+                pass
+    except OSError:
+        # nvcuda.dll not present at all — no NVIDIA driver installed.
+        pass
+    except Exception:
+        pass
+    # 2. DirectML path — only meaningful if torch-directml made it into the
+    # bundle. Pure dxgi.dll presence isn't sufficient (every Win10+ has it).
+    try:
+        import importlib.util  # noqa: PLC0415
+
+        if importlib.util.find_spec("torch_directml") is not None:
+            return True
+    except Exception:
+        pass
+    return False
 
 
 # Process names treated as "Minecraft" — both Java and Bedrock variants.
@@ -791,6 +853,26 @@ class RecorderApp(tk.Tk):
         # WITHOUT us recording first.
         self._record_armed = False
         self._mc_window_rect: Optional[dict[str, int]] = None
+
+        # rc9 (Howard 2026-05-09): depth-progress UX state.
+        #
+        # _skip_depth_flag is a threading.Event the inference loop polls
+        # between frames. The recorder GUI sets it when the tester clicks
+        # "跳过深度图" / when GPU isn't detected and the tester left the
+        # default-skip checkbox armed.
+        #
+        # _depth_default_skip is a boolean computed once at startup —
+        # True means the GPU probe came back negative so the skip
+        # checkbox is pre-checked. The tester can still untick it on the
+        # progress UI to override.
+        #
+        # _depth_progress_widgets holds the live tk widgets for the
+        # progress UI so we can tear it down once inference returns to
+        # ready state.
+        self._skip_depth_flag = threading.Event()
+        self._depth_default_skip: bool = not _detect_gpu_available()
+        self._depth_progress_widgets: list[Any] = []
+        self._depth_progress_started_at: float = 0.0
 
         self._build_ui()
         # Start background watcher immediately — testers do not click anything.
@@ -1315,6 +1397,226 @@ class RecorderApp(tk.Tk):
             _trace("window restored from taskbar")
         except Exception as e:
             _trace(f"deiconify failed: {e}")
+
+    # ---- rc9 depth-progress UI ----------------------------------------
+    # Howard 2026-05-09: testers thought the recorder was hung because
+    # DepthAnything V2 inference runs invisibly for 30-60 minutes on CPU
+    # (10800 frames × 1-3 sec each). These methods replace the normal
+    # arm/idle UI with a progress bar + ETA + Skip button while inference
+    # is in flight, then restore the normal UI when it finishes (or the
+    # tester skips). All Tk mutations happen on the main thread via
+    # self.after(0, ...) so the depth runner can call back from any
+    # worker thread safely.
+    def _show_depth_progress_ui(self) -> None:
+        """Replace the normal recorder UI with a depth-inference progress
+        view. Force the window to re-appear from the taskbar so the tester
+        actually sees it.
+        """
+        # rc9 Bug 1: force restore from iconified — tester complained the
+        # recorder "stayed hidden" while depth ran for ~40 min.
+        try:
+            self.deiconify()
+            self.lift()
+            self.attributes("-topmost", True)
+            self.after(500, lambda: self.attributes("-topmost", False))
+            _trace("depth_progress: restored window from taskbar")
+        except Exception as e:
+            _trace(f"depth_progress: deiconify failed: {e}")
+
+        # Reset state.
+        self._skip_depth_flag.clear()
+        self._depth_progress_started_at = time.time()
+
+        # Hide the normal arm button + helpbar; we'll restore them on
+        # finish. We don't destroy them so layout state is preserved.
+        try:
+            self._arm_btn.pack_forget()
+            self._upload_btn.pack_forget()
+        except Exception:
+            pass
+
+        # Top-level status text — replaces the verdict banner.
+        self._set("📊 处理深度图中…", "#1976d2",
+                  "录制已结束，正在生成每帧深度图。\n"
+                  "深度图完成后会打包成最终 tarball。")
+
+        # Build the progress widgets. We keep refs in a list so
+        # _hide_depth_progress_ui can tear them down cleanly.
+        progress_frame = tk.Frame(self, bg="white")
+        progress_frame.pack(pady=(8, 4), fill="x", padx=24)
+
+        # Counter label: "1240 / 10800 帧"
+        counter = tk.Label(
+            progress_frame,
+            text="0 / ? 帧",
+            font=("Helvetica", 12, "bold"),
+            bg="white",
+            fg="#1976d2",
+        )
+        counter.pack(pady=(0, 4))
+
+        # Progress bar (ttk indeterminate-capable, but we'll drive it
+        # determinately via self["value"] = pct from the callback).
+        bar = ttk.Progressbar(
+            progress_frame,
+            orient="horizontal",
+            mode="determinate",
+            maximum=100.0,
+            length=400,
+        )
+        bar.pack(pady=(0, 6))
+        bar["value"] = 0.0
+
+        # ETA label: computed from rate × frames remaining.
+        eta_label = tk.Label(
+            progress_frame,
+            text="预计剩余时间：—",
+            font=("Helvetica", 10),
+            bg="white",
+            fg="#546e7a",
+        )
+        eta_label.pack(pady=(0, 6))
+
+        # Skip-depth row: pre-checked when no GPU detected.
+        skip_row = tk.Frame(progress_frame, bg="white")
+        skip_row.pack(pady=(4, 0))
+        skip_var = tk.BooleanVar(value=self._depth_default_skip)
+        skip_check = tk.Checkbutton(
+            skip_row,
+            text=(
+                "默认跳过 (未检测到独立显卡，CPU 推断会很慢)"
+                if self._depth_default_skip
+                else "跳过深度图（保留视频和操作数据）"
+            ),
+            variable=skip_var,
+            font=("Helvetica", 10),
+            bg="white",
+            fg="#546e7a",
+            selectcolor="white",
+            activebackground="white",
+            command=lambda: self._on_skip_depth_toggle(skip_var.get()),
+        )
+        skip_check.pack(side="left", padx=(0, 6))
+
+        skip_btn = tk.Button(
+            skip_row,
+            text="🚫 跳过深度图",
+            font=("Helvetica", 11, "bold"),
+            bg="#d97706",
+            fg="white",
+            activebackground="#b45309",
+            activeforeground="white",
+            bd=0,
+            padx=14,
+            pady=6,
+            cursor="hand2",
+            command=self._on_skip_depth_clicked,
+        )
+        skip_btn.pack(side="left", padx=(6, 0))
+
+        # If GPU isn't detected, set the flag immediately. The tester can
+        # still uncheck the box to override (which clears the flag).
+        if self._depth_default_skip:
+            self._skip_depth_flag.set()
+            _trace("depth_progress: default-skip armed (no GPU detected)")
+
+        self._depth_progress_widgets = [
+            progress_frame, counter, bar, eta_label,
+            skip_row, skip_check, skip_btn, skip_var,
+        ]
+
+    def _on_skip_depth_toggle(self, checked: bool) -> None:
+        """Skip checkbox toggled. Set/clear the cooperative skip flag."""
+        if checked:
+            self._skip_depth_flag.set()
+            _trace("depth_progress: skip flag SET via checkbox")
+        else:
+            self._skip_depth_flag.clear()
+            _trace("depth_progress: skip flag CLEARED via checkbox")
+
+    def _on_skip_depth_clicked(self) -> None:
+        """Tester clicked the prominent 'Skip depth maps' button."""
+        _trace("depth_progress: tester clicked SKIP DEPTH button")
+        self._skip_depth_flag.set()
+        # Replace the inline status text so the tester immediately sees
+        # the click landed even before the inference loop polls the flag.
+        self._set("⏳ 正在收尾跳过…", "#d97706",
+                  "等当前帧推断完，就会打包不带深度图的 tarball。")
+
+    def _on_depth_progress(self, frames_done: int, total_frames: int) -> None:
+        """Called from the depth runner thread — marshal to Tk via after().
+
+        Updates the counter, progress bar, and ETA. Safe to call with
+        total_frames == 0 (we just hide the percent + ETA in that case).
+        """
+        # Compute everything off the GUI thread, then schedule the apply.
+        elapsed = max(0.001, time.time() - self._depth_progress_started_at)
+        rate = frames_done / elapsed if elapsed > 0 else 0.0  # frames/sec
+        remaining = max(0, (total_frames - frames_done))
+        eta_sec = remaining / rate if rate > 0 else 0.0
+        pct = (100.0 * frames_done / total_frames) if total_frames > 0 else 0.0
+
+        def _apply() -> None:
+            try:
+                if not self._depth_progress_widgets:
+                    return  # UI already torn down
+                _, counter, bar, eta_label, *_rest = self._depth_progress_widgets
+                if total_frames > 0:
+                    counter.config(
+                        text=f"{frames_done} / {total_frames} 帧 ({pct:.1f}%)",
+                    )
+                    bar["value"] = pct
+                else:
+                    counter.config(text=f"{frames_done} / ? 帧")
+                # ETA — only meaningful once we have a rate AND a total.
+                if total_frames > 0 and rate > 0 and frames_done > 0:
+                    if eta_sec >= 60:
+                        eta_label.config(
+                            text=f"预计剩余时间：约 {int(round(eta_sec / 60))} 分钟",
+                        )
+                    else:
+                        eta_label.config(
+                            text=f"预计剩余时间：约 {int(round(eta_sec))} 秒",
+                        )
+                else:
+                    eta_label.config(text="预计剩余时间：估算中…")
+            except Exception as e:
+                _trace(f"depth_progress: apply failed: {e}")
+
+        try:
+            self.after(0, _apply)
+        except RuntimeError:
+            # Tk closed mid-inference; nothing to update.
+            pass
+
+    def _hide_depth_progress_ui(self) -> None:
+        """Tear down the depth-progress widgets and restore normal UI.
+
+        Called when inference finishes (success OR skip). Idempotent.
+        """
+        widgets = self._depth_progress_widgets
+        self._depth_progress_widgets = []
+
+        def _apply() -> None:
+            for w in widgets:
+                try:
+                    if hasattr(w, "destroy"):
+                        w.destroy()
+                except Exception:
+                    pass
+            # Re-add the arm + upload buttons so the tester can record
+            # again without restarting the .exe. Order matches _build_ui.
+            try:
+                self._arm_btn.pack(pady=(16, 4))
+                self._upload_btn.pack(pady=(0, 6))
+            except Exception:
+                pass
+            _trace("depth_progress: UI restored to ready state")
+
+        try:
+            self.after(0, _apply)
+        except RuntimeError:
+            pass
 
     def _toggle_arm(self) -> None:
         """Tester clicked the arm button. Toggle recording state.
@@ -1853,19 +2155,53 @@ class RecorderApp(tk.Tk):
         # If the bundled model fails to load (corrupted weights, missing
         # torch), the recording ABORTS the tarball — we refuse to ship
         # without real depth.
+        #
+        # rc9 (Howard 2026-05-09): show a depth-progress UI to the tester
+        # so they don't think the recorder is hung during the 30-60 min
+        # CPU pass. Also honour the cooperative skip flag — if the tester
+        # clicks "跳过深度图" (or no GPU was detected and the default-skip
+        # was left armed), we ship the tarball WITHOUT a depth/ directory.
+        # Iron-law-compatible: a skipped tarball is partial-by-choice, not
+        # a placeholder; downstream lint will FAIL on missing depth which
+        # is the correct behaviour.
+        depth_skipped = False
         try:
             from depth_anything_v2_inference import infer_depth_for_video  # noqa: PLC0415
             video_path = clip_dir / "video.mp4"
             depth_dir = clip_dir / "depth"
             _trace(f"depth: running DepthAnything V2 inference on {video_path}")
-            manifest = infer_depth_for_video(
-                video_path,
-                depth_dir,
-                model_variant="vits",
-                device="cpu",
-            )
-            _trace(f"depth: rendered {len(manifest)} REAL EXR frames")
+            self.after(0, self._show_depth_progress_ui)
+            try:
+                manifest = infer_depth_for_video(
+                    video_path,
+                    depth_dir,
+                    model_variant="vits",
+                    device="cpu",
+                    progress_callback=self._on_depth_progress,
+                    should_skip=self._skip_depth_flag.is_set,
+                )
+                _trace(f"depth: rendered {len(manifest)} REAL EXR frames")
+                if self._skip_depth_flag.is_set():
+                    # Cooperative skip raced past the loop's last poll.
+                    depth_skipped = True
+                    _trace("depth: skip flag observed after loop — treating as user skip")
+            finally:
+                self.after(0, self._hide_depth_progress_ui)
+            if depth_skipped:
+                # Drop the partial depth dir so the tarball cleanly OMITS
+                # depth/ rather than shipping a half-finished version.
+                try:
+                    if depth_dir.exists():
+                        shutil.rmtree(depth_dir, ignore_errors=True)
+                except Exception:
+                    pass
+                _trace("package: depth skipped by user — partial tarball")
+                # Surface the result to the tester before the lint runs.
+                self._set("⚠️ 已跳过深度图", "#d97706",
+                          "tarball 完成，但深度数据未包含。\n"
+                          "下游买家规格会在深度项标记 FAIL。")
         except Exception as e:
+            self.after(0, self._hide_depth_progress_ui)
             _trace(f"depth: DepthAnything inference FAILED: {e!r}")
             # No fake fallback — abort the entire packaging. The tester
             # sees a clear error in the log; we never ship placeholder.

@@ -316,7 +316,9 @@ def test_recorder_hard_gates_placeholder_in_v026_plus():
 
     # 1. Version must be >= 0.26.0.
     assert (
-        'RECORDER_VERSION = "lite-v0.27.0' in src or 'RECORDER_VERSION = "lite-v0.26.0' in src
+        'RECORDER_VERSION = "lite-v0.28' in src
+        or 'RECORDER_VERSION = "lite-v0.27.0' in src
+        or 'RECORDER_VERSION = "lite-v0.26.0' in src
     ), "RECORDER_VERSION must be >= 0.26.0 for iron-law hard-gate"
 
     # 2. RecorderError class must exist.
