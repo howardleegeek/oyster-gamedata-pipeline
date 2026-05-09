@@ -89,7 +89,11 @@ AppPublisher={#AppPublisher}
 AppPublisherURL=https://oyster.so/
 AppSupportURL=https://oyster.so/support
 AppUpdatesURL=https://oyster.so/recorder/download
-VersionInfoVersion={#AppVersion}
+; VersionInfoVersion must be strict N.N.N.N (Windows resource API) — strip
+; any -rc/-alpha/-beta suffix from {#AppVersion}. The user-facing version
+; string lives in AppVersion / AppVerName above.
+#define _SemVerCore Copy(AppVersion, 1, Pos("-", AppVersion+"-")-1)
+VersionInfoVersion={#_SemVerCore}.0
 VersionInfoCompany={#AppPublisher}
 VersionInfoProductName={#AppName}
 VersionInfoDescription={#AppName} bundled installer
