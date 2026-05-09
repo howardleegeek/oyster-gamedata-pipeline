@@ -631,13 +631,28 @@ def _detect_gpu_available() -> bool:
         pass
     except Exception:
         pass
+    # rc15.7-fix BUG R9 H5: not just find_spec — actually call is_available()
+    # so the detection result matches what infer_depth_for_video will see.
+    # Was bug: package present but driver pre-22.40 → find_spec returns True
+    # → detect_gpu = True → run_local_depth = True → device="dml" set →
+    # is_available False at runtime → fall through to "cuda" → cuda also fails
+    # → silent fallback to server. Now: if torch_directml.is_available()
+    # returns False, _detect_gpu_available also returns False (server-pending
+    # path entirely, no false-positive UI of local inference starting).
     # 2. DirectML path — only meaningful if torch-directml made it into the
     # bundle. Pure dxgi.dll presence isn't sufficient (every Win10+ has it).
     try:
         import importlib.util  # noqa: PLC0415
 
         if importlib.util.find_spec("torch_directml") is not None:
-            return True
+            # rc15.7-fix BUG R9 H5: also call is_available() — find_spec
+            # returning True only means the package is bundled; driver may
+            # be too old (pre-Adrenalin 22.40) to actually init DirectML.
+            try:
+                import torch_directml  # type: ignore  # noqa: PLC0415
+                return bool(torch_directml.is_available())  # type: ignore[attr-defined]
+            except Exception:
+                return False
     except Exception:
         pass
     return False
@@ -2645,6 +2660,14 @@ class RecorderApp(tk.Tk):
                 video_path = clip_dir / "video.mp4"
                 _trace(f"depth: running DepthAnything V2 ({local_device}) on {video_path} (timeout {_DEPTH_TIMEOUT_SEC}s)")
                 self.after(0, self._show_depth_progress_ui)
+                # rc15.7-fix BUG R9 H4: DML first-frame compiles HLSL shaders
+                # for 10-30s before any progress fires. Show explicit hint so
+                # tester doesn't think recorder froze + force-quit.
+                if local_device == "dml":
+                    self.after(0, lambda: self._set(
+                        "⏳ DML 初始化中", "#0277bd",
+                        "首次启动 DirectML 着色器编译 (10-30 秒, 之后会快)..."
+                    ))
                 # Fire-and-forget timer to set skip flag if inference hangs.
                 def _on_depth_timeout() -> None:
                     nonlocal local_failure_reason, local_failure_type
@@ -2695,16 +2718,31 @@ class RecorderApp(tk.Tk):
                               "tarball 完成，深度数据将由后端处理。")
                 else:
                     # Local depth succeeded — write manifest in proper shape.
+                    # rc15.7-fix BUG R9 C2 (CRITICAL): infer_depth_for_video
+                    # returns dict[int, str] (frame_idx → sha256), NOT list.
+                    # Was bug: isinstance(manifest, list) always False → wrote
+                    # empty [] → backend integrity check (R22) lost all
+                    # per-frame hashes → ABSTAIN on every local_complete.
+                    if isinstance(manifest, dict):
+                        frames_field: Any = manifest
+                        frame_count = len(manifest)
+                    elif isinstance(manifest, list):
+                        frames_field = manifest
+                        frame_count = len(manifest)
+                    else:
+                        frames_field = []
+                        frame_count = 0
                     depth_manifest_path.write_text(
                         json.dumps({
                             "status": "local_complete",
-                            "frames": manifest if isinstance(manifest, list) else [],
+                            "frames": frames_field,
+                            "frame_count": frame_count,
                             "device": local_device,
                             "client_version": RECORDER_VERSION,
                         }, indent=2),
                         encoding="utf-8",
                     )
-                    _trace(f"depth: local manifest written, status=local_complete")
+                    _trace(f"depth: local manifest written, status=local_complete, {frame_count} frames")
             except Exception as e:
                 self.after(0, self._hide_depth_progress_ui)
                 if timeout_timer is not None:

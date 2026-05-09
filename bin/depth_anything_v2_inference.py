@@ -86,7 +86,16 @@ def load_model(variant: str = "vits", device: str = "cpu"):
     if use_dml:
         try:
             import torch_directml  # type: ignore  # noqa: PLC0415
-            dml_device = torch_directml.device()
+            # rc15.7-fix BUG R9 H3: explicitly use default_device() instead of
+            # bare device() so dual-GPU systems with iGPU + dGPU pick the right
+            # adapter (driver-recommended) instead of arbitrary enumeration
+            # order. On 780M-only systems this is a no-op.
+            try:
+                dml_idx = torch_directml.default_device()
+                dml_device = torch_directml.device(dml_idx)
+            except Exception:
+                # Older torch-directml may lack default_device(); fall back.
+                dml_device = torch_directml.device()
             _PIPELINE.model.to(dml_device)
             _PIPELINE.device = dml_device  # transformers reads this for inputs
         except ImportError as e:
@@ -275,6 +284,12 @@ def infer_depth_for_video(
                 target = output_dir / f"frame_{frame_idx:06d}.exr"
                 _write_exr(depth, target)
                 manifest[frame_idx] = _sha256(target)
+                # rc15.7-fix BUG R9 C1 (CRITICAL): explicit cleanup of DML
+                # tensors. CPython refcount drops them on CPU but DML keeps
+                # device-memory backing alive until non-deterministic GC.
+                # Per-frame leak × 1800 frames OOMs 780M's 2GB UMA at ~100
+                # frames. Explicit del + periodic gc.collect() fixes.
+                del result, pt, depth, pil
             except Exception as e:
                 raise RuntimeError(f"frame {frame_idx} inference/write failed: {e}") from e
 
@@ -282,6 +297,11 @@ def infer_depth_for_video(
             done = frame_idx + 1
             if done % _PROGRESS_CALLBACK_EVERY_N_FRAMES == 0:
                 _emit_progress(done, total_frames)
+            # rc15.7-fix BUG R9 C1: GC every 50 frames as backstop for
+            # accumulated tensor refs that escaped the per-frame del.
+            if done % 50 == 0:
+                import gc as _gc  # noqa: PLC0415
+                _gc.collect()
 
         try:
             reader.close()
