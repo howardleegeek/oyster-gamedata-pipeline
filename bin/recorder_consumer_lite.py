@@ -86,7 +86,19 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc14"
+RECORDER_VERSION = "lite-v0.28.0-rc15"
+
+# rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
+# fallback. Recorder still runs if heal_registry.py is missing (dev mode);
+# in production the bundle always includes it.
+try:
+    from heal_registry import emit_event as _heal_emit  # type: ignore  # noqa: PLC0415
+    # PyInstaller hint: ensure heal_report is bundled (lazy-imported by
+    # _open_heal_report). Static analysis catches this top-level import.
+    import heal_report as _heal_report_module  # type: ignore  # noqa: F401, PLC0415
+except Exception:
+    def _heal_emit(*args: Any, **kwargs: Any) -> str:  # type: ignore
+        return ""  # noop when heal_registry unavailable
 
 # rc11 SF (Phase A.1, IRON LAW EXCEPTION pre-approved 2026-05-09):
 # game-agnostic failure-attribution. Every session writes terminator.json
@@ -982,6 +994,21 @@ class RecorderApp(tk.Tk):
                 _trace(f"preflight: {n_pass} pass, {n_warn} warn/info, ready (with warnings)")
             else:
                 _trace(f"preflight: all {n_pass} checks pass")
+            # rc15 Heal Framework: mirror preflight outcome.
+            severity = ("fatal" if n_fatal > 0
+                        else "warn" if n_warn > 0
+                        else "info")
+            _heal_emit(
+                "SH_preflight", "report", severity,
+                f"preflight: {n_pass} pass, {n_warn} warn/info, {n_fatal} fatal of {total} checks",
+                details={"results": [{"check": r["check"], "status": r["status"], "msg": r["message"][:100]}
+                                     for r in self._preflight_results]},
+                remediation={"action": "user_prompt" if n_fatal > 0 else "none",
+                             "performed": n_fatal > 0,
+                             "next_step": "fix fatal items before recording" if n_fatal > 0
+                             else "ok to proceed (warnings noted)"},
+                recorder_version=RECORDER_VERSION,
+            )
         except Exception:
             _trace(f"preflight: unexpected failure {traceback.format_exc()}")
 
@@ -1104,6 +1131,35 @@ class RecorderApp(tk.Tk):
             bd=0, padx=10, pady=3, cursor="hand2",
             command=lambda: self._open_path(_output_dir()),
         ).pack(side="left", padx=4)
+
+        # rc15 Heal Framework v1: dashboard button. Generates
+        # heal_report.html from heal_events.jsonl and opens it in browser.
+        tk.Button(
+            helpbar, text="📊 健康报告",
+            font=("Helvetica", 9, "bold"), bg="#0277bd", fg="white",
+            activebackground="#01579b", activeforeground="white",
+            bd=0, padx=10, pady=3, cursor="hand2",
+            command=self._open_heal_report,
+        ).pack(side="left", padx=4)
+
+    def _open_heal_report(self) -> None:
+        """rc15: generate + open heal_report.html. Failure is non-fatal."""
+        _trace("user clicked health-report button")
+        try:
+            from heal_report import generate_html  # type: ignore  # noqa: PLC0415
+            out = generate_html(limit=500)
+            self._open_path(out)
+            _heal_emit(
+                "heal_registry", "user_action", "info",
+                "tester opened health report",
+                details={"report_path": str(out)},
+            )
+        except Exception as exc:
+            _trace(f"open_heal_report failed: {exc}")
+            self._hint.config(
+                text=f"健康报告生成失败: {exc}",
+                fg="#c62828",
+            )
 
     def _export_diagnostic_only(self) -> None:
         """Build diagnostic zip and open the Desktop folder. No network."""
@@ -1887,6 +1943,17 @@ class RecorderApp(tk.Tk):
             _trace(f"disk_check: ABORT — only {_free_mb:.0f} MB free in {self._tmp_dir}")
             self._terminator_reason = "disk_full"
             self._write_terminator(None)  # no clip_dir yet — write to runtime/
+            _heal_emit(
+                "B5_disk_space_preflight", "heal_failed", "fatal",
+                f"disk free {_free_mb:.0f} MB < 500 MB threshold; recording aborted",
+                details={"free_mb": _free_mb, "threshold_mb": 500, "probe_path": str(self._tmp_dir)},
+                remediation={
+                    "action": "user_prompt",
+                    "performed": True,
+                    "next_step": "tester clears disk space and retries arm",
+                },
+                recorder_version=RECORDER_VERSION,
+            )
             shutil.rmtree(self._tmp_dir, ignore_errors=True)
             return
         self._video_path = self._tmp_dir / "video.mp4"
@@ -2004,6 +2071,16 @@ class RecorderApp(tk.Tk):
                         "请重新录制. 重启 Minecraft 后点 ▶ 开始录制 即可."
                     )
                     _trace(f"SK: prompted re-record (elapsed {elapsed_min:.1f} min)")
+                    # rc15 Heal Framework: tester saw the re-record prompt.
+                    _heal_emit(
+                        "SK_duration_too_short_prompt", "user_prompt", "warn",
+                        f"prompted tester to re-record ({elapsed_min:.1f} min < 5 min PRD min)",
+                        details={"elapsed_min": elapsed_min, "min_required_min": 5.0},
+                        remediation={"action": "user_prompt", "performed": True,
+                                     "next_step": "tester restarts MC + records 5-6 min"},
+                        session_id=getattr(self, "_session_id", None),
+                        recorder_version=RECORDER_VERSION,
+                    )
                 except Exception:
                     _trace(f"SK: messagebox failed {traceback.format_exc()}")
             self._set("✓ 录制完成", GREEN,
@@ -2374,6 +2451,19 @@ class RecorderApp(tk.Tk):
                 run_local_depth = True
                 track_reason = f"GPU detected — local inference on {local_device}"
         _trace(f"depth: track decision = {track_reason}")
+        # rc15 Heal Framework: depth track decision is high-value telemetry.
+        _heal_emit(
+            "depth_dual_track", "report", "info",
+            f"depth track: {track_reason}",
+            details={"run_local": run_local_depth, "device": local_device,
+                     "override": _depth_override or "auto"},
+            remediation={"action": "auto_clean" if run_local_depth else "server_defer",
+                         "performed": True,
+                         "next_step": "local inference runs" if run_local_depth
+                         else "backend GPU pool consumes upload (Phase C)"},
+            session_id=getattr(self, "_session_id", None),
+            recorder_version=RECORDER_VERSION,
+        )
 
         if run_local_depth:
             depth_skipped = False
@@ -2919,6 +3009,23 @@ class RecorderApp(tk.Tk):
                 encoding="utf-8",
             )
             _trace(f"terminator: reason={reason} written to {target_dir}/terminator.json")
+            # rc15 Heal Framework: mirror to central event log.
+            severity = "info" if reason == "clean_exit" else (
+                "fatal" if reason == "crash" else "warn"
+            )
+            _heal_emit(
+                "SF_terminator", "report", severity,
+                f"session ended: reason={reason} duration={payload.get('duration_sec')}s",
+                details={"reason": reason, "frame_count": payload.get("frame_count"),
+                         "ffmpeg_clean_close": payload.get("ffmpeg_clean_close"),
+                         "mod_handshake_ok": payload.get("game_specific", {}).get("mod_handshake_ok")},
+                remediation={"action": "none" if reason == "clean_exit" else "user_prompt",
+                             "performed": False,
+                             "next_step": "review session quality" if reason == "clean_exit"
+                             else "see HEAL_FAILURE_MODES for re-record guidance"},
+                session_id=getattr(self, "_session_id", None),
+                recorder_version=RECORDER_VERSION,
+            )
         except Exception:
             _trace(f"terminator: write FAILED reason={reason} {traceback.format_exc()}")
 
@@ -3148,6 +3255,22 @@ def main() -> int:
         n_orphans = _scan_and_clean_orphans()
         if n_orphans > 0:
             _trace(f"startup: cleaned {n_orphans} orphan oyster-rec-* tmp dirs")
+            # rc15 Heal Framework: orphans found = previous crash signal.
+            _heal_emit(
+                "SI_orphan_cleanup", "heal_success", "warn",
+                f"cleaned {n_orphans} orphan tmp dir(s) from prior crash/forced exit",
+                details={"orphans_cleaned": n_orphans},
+                remediation={"action": "auto_clean", "performed": True,
+                             "next_step": "investigate why prior session didn't finalize"},
+                recorder_version=RECORDER_VERSION,
+            )
+        else:
+            _heal_emit(
+                "SI_orphan_cleanup", "detect", "info",
+                "startup orphan scan found no leftover tmp dirs",
+                details={"orphans_cleaned": 0},
+                recorder_version=RECORDER_VERSION,
+            )
     except Exception:
         pass
 
