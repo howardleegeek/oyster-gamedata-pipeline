@@ -6,10 +6,11 @@
 ; This script compiles one self-contained Windows installer that ships
 ; *everything* a zero-knowledge consumer needs to record Minecraft sessions:
 ;
-;     OysterRecorder-Setup-vX.Y.Z.exe (~460 MB)
+;     OysterRecorder-Setup-vX.Y.Z.exe (~800 MB on disk; rc7)
 ;       |
 ;       +-- Eclipse Temurin OpenJDK 21 LTS JRE      (R05A, ~145 MB on disk)
 ;       +-- Vanilla Minecraft 1.21.4 client + libs  (R05B, ~200 MB)
+;       +-- Vanilla MC asset objects (rc7)          (R05B, ~390 MB)
 ;       +-- Fabric loader 0.16.10 + 9 mod jars      (R05B/mc-mod, ~10 MB)
 ;       +-- OysterRecorder-onedir/ (PyInstaller)    (~120 MB)
 ;       +-- OysterPlay.exe single-button launcher   (R05C, ~5 MB)
@@ -47,7 +48,7 @@
 ;   * NO SILENT INSTALL DEFAULT. We do not pass /SILENT or /VERYSILENT in
 ;     the build orchestrator, and we do not set DisableProgramGroupPage=
 ;     yes for "auto"; the installer always shows a Welcome page so users
-;     see the ~460 MB copy progress (Inno Setup defaults are correct here,
+;     see the ~800 MB copy progress (Inno Setup defaults are correct here,
 ;     this comment exists only to document the choice).
 ;
 ;   * NO TOUCHING %APPDATA%\.minecraft\. Mojang Launcher's private space
@@ -138,10 +139,11 @@ ShowLanguageDialog=auto
 DisableWelcomePage=no
 DisableFinishedPage=no
 
-; Compression — LZMA2/ultra64 keeps the ~460 MB bundle around
-; ~280-320 MB on disk in the .exe. solid=yes is essential here:
-; we are shipping ~5,000 files mostly small; without solid mode
-; the per-file overhead dominates.
+; Compression — LZMA2/ultra64 keeps the ~800 MB rc7 bundle (rc6 was
+; ~460 MB before bundling MC asset objects) around ~600 MB on disk in
+; the .exe. solid=yes is essential here: we are shipping ~9,000 files
+; mostly small (~4,000 of which are individual asset objects under
+; ~10 KB each); without solid mode the per-file overhead dominates.
 Compression=lzma2/ultra64
 SolidCompression=yes
 LZMAUseSeparateProcess=yes
@@ -219,9 +221,12 @@ Source: "{#BundleRoot}\\jre\\*"; \
     Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; --- (2) Bundled Minecraft instance + Fabric ------------------------------
-; ~200 MB. Source path comes from R05B/fetch_minecraft.py +
-; fetch_fabric.py. Excludes assets/objects/* — those are downloaded
-; on first launch (per spec, to keep installer < 500 MB).
+; ~590 MB (rc7: ~200 MB libs/jar + ~390 MB asset objects). Source path
+; comes from R05B/fetch_minecraft.py + fetch_fabric.py. Asset objects
+; (textures / sounds / models / langs) ARE shipped now — rc6 omitted
+; them and MC crashed with "Missing model for variant: ..." spam before
+; the main menu rendered. See fetch_minecraft.py docstring for the
+; layout under assets/objects/<2-char>/<sha1>.
 ;
 ; Bug fix #3 (R05D): exclude `mods\*` from the recursive glob so we don't
 ; accidentally ship all 9 supported MC versions' mod jars. The matching

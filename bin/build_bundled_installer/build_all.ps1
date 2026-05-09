@@ -18,7 +18,7 @@
         5.  PyInstaller --onedir   -> bundle/OysterRecorder-onedir/
         6.  copy 9 mod jars        -> bundle/mc-instance/mods/
         7.  ISCC.exe installer.iss -> dist/installer/...exe
-        8.  size verification (400-500 MB sanity gate)
+        8.  size verification (400-1000 MB sanity gate; rc7 bundles asset objects)
 
     Each stage hard-fails on first non-zero exit. The orchestrator is
     idempotent: rerunning it skips fetch steps whose outputs already
@@ -54,10 +54,12 @@
     Iron-law constraints from R05D this script enforces:
       * Every fetch step calls a Python module that does its own SHA-256
         verification — we never bypass that with -SkipVerify flags.
-      * The 400-500 MB size gate at the end catches "we forgot to bundle
-        the JRE" failures the spec explicitly calls out.
+      * The 400-1000 MB size gate at the end catches "we forgot to bundle
+        the JRE" failures the spec explicitly calls out. The upper bound
+        was raised from 500 -> 1000 MB in rc7 to accommodate the ~390 MB
+        of bundled MC asset objects (textures / sounds / models).
       * No silent /S flags ever passed to ISCC. The installer must show
-        progress for the ~460 MB copy.
+        progress for the ~800 MB copy.
 #>
 
 [CmdletBinding()]
@@ -90,10 +92,13 @@ $SupportedMcVersions = @(
     "1.21.1", "1.21.2", "1.21.3", "1.21.4", "1.21.5"
 )
 
-# Size gate (bytes). Iron-law: < 500 MB per spec, > 400 MB sanity gate so
-# we catch "we forgot to bundle the JRE" failures (unbundled .exe is ~5 MB).
-$ExpectedMinBytes = 400 * 1024 * 1024   # 400 MiB
-$ExpectedMaxBytes = 500 * 1024 * 1024   # 500 MiB
+# Size gate (bytes). Iron-law (rc7): asset objects (~390 MB) are now
+# bundled, pushing the expected installer up to ~800 MB. The 400 MB
+# floor still catches "we forgot to bundle the JRE" failures (an
+# unbundled .exe is ~5 MB); the 1000 MB ceiling absorbs minor mod /
+# weight bloat without falsely failing on a healthy build.
+$ExpectedMinBytes = 400 * 1024 * 1024    # 400 MiB
+$ExpectedMaxBytes = 1000 * 1024 * 1024   # 1000 MiB
 
 function Write-Stage {
     param([int]$Num, [string]$Title)
@@ -357,7 +362,7 @@ $IsccArgs = @(
 Invoke-Step "ISCC.exe" $InnoSetupPath $IsccArgs
 
 # -------------------------------------------------------------------------
-# Stage 8: Verify output size (400-500 MB sanity gate)
+# Stage 8: Verify output size (400-1000 MB sanity gate, post-rc7)
 # -------------------------------------------------------------------------
 Write-Stage 8 "Verify output size"
 

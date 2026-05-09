@@ -11,8 +11,17 @@ Iron-law constraints:
   * stdlib-only — urllib, hashlib, json, pathlib.
   * Library rules engine matches the official Minecraft launcher's logic
     so we ship the right natives for the target platform (Windows x64).
-  * NO asset objects downloaded — just the asset index JSON. The actual
-    ~280MB asset pack is lazy-fetched by Minecraft on first launch.
+  * Asset objects (~4035 files / ~390 MB) ARE downloaded in this build
+    (rc7 fix). Earlier rc6 shipped only the asset INDEX json; without the
+    actual asset OBJECTS (textures / models / sounds / langs) MC starts
+    but cannot render — emits "Missing model for variant: ..." spam and
+    javaw crashes before the main menu paints. The objects live at
+    https://resources.download.minecraft.net/<first-2-of-hash>/<full-hash>
+    and are stored on disk under the same hash-prefix layout the vanilla
+    launcher uses, so MC's AssetIndex loader picks them up unchanged.
+    A bounded thread pool (8 workers) takes the wall time from ~10 min
+    serial to ~3-5 min. Resume support: file present + correct size +
+    correct SHA-1 == cache hit, no network.
   * Output layout mirrors what bin/oyster_launch_mc.py expects:
         bundle/mc-instance/
           versions/1.21.4/
@@ -20,6 +29,7 @@ Iron-law constraints:
             1.21.4.json              (Mojang's per-version manifest, verbatim)
           libraries/<group>/<artifact>/<version>/<artifact>-<version>.jar
           assets/indexes/19.json     (asset index — ~370KB)
+          assets/objects/<2-char>/<sha1>          (~4035 files, ~390 MB)
 
 Usage (CI / local build):
     python bin/build_bundled_installer/fetch_minecraft.py
@@ -44,8 +54,23 @@ import time
 import urllib.error
 import urllib.request
 import zipfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
+
+# ---------------------------------------------------------------------------
+# Asset-object fetch tunables
+# ---------------------------------------------------------------------------
+# Mojang's CDN for asset objects (textures, sounds, lang files, models, ...).
+# Layout: <base>/<first-2-chars-of-hash>/<full-hash>  — no extension, the
+# file is content-addressed by SHA-1 and the launcher's AssetIndex loader
+# resolves the original path via the index JSON.
+ASSET_OBJECT_BASE_URL = "https://resources.download.minecraft.net"
+# 8 workers is the sweet spot on Mojang's CDN (Cloudfront): more risks
+# 503s during sustained bursts; fewer leaves bandwidth on the table.
+ASSET_FETCH_WORKERS = 8
+# Print progress every N objects so a 4035-object run isn't silent.
+ASSET_PROGRESS_EVERY = 250
 
 # ---------------------------------------------------------------------------
 # Repo layout
@@ -648,9 +673,10 @@ def _extract_natives(
 def _fetch_asset_index(per_version: dict[str, Any], expected_id: str) -> int:
     """Download + verify the asset index JSON. Returns bytes downloaded.
 
-    We deliberately do NOT download the ~280MB of asset objects. Minecraft
-    will lazy-fetch them from https://resources.download.minecraft.net/
-    on first launch. This keeps the bundle under 200MB.
+    The actual asset OBJECTS (~4035 files / ~390 MB referenced by this
+    index) are fetched separately by ``_fetch_asset_objects`` — kept as
+    two passes so a crash mid-objects doesn't have to re-verify the
+    SHA-1-pinned index json.
     """
     asset_index = per_version.get("assetIndex")
     if not asset_index or "url" not in asset_index or "sha1" not in asset_index:
@@ -680,6 +706,182 @@ def _fetch_asset_index(per_version: dict[str, Any], expected_id: str) -> int:
     if not final_path.is_file():
         final_path.write_bytes(cache_path.read_bytes())
     return bytes_dl
+
+
+# ---------------------------------------------------------------------------
+# Stage 3b: asset OBJECTS (textures / sounds / models — ~390 MB, ~4035 files)
+# ---------------------------------------------------------------------------
+
+
+def _asset_object_relpath(sha1: str) -> Path:
+    """Return ``<2-char-prefix>/<full-sha1>`` — Mojang's content-addressed layout.
+
+    Files are stored by hash, no extension. MC's AssetIndex loader walks
+    objects/<prefix>/<hash> when resolving a logical asset name, so this
+    layout is what the launcher already expects.
+    """
+    if len(sha1) < 2:
+        raise ValueError(f"asset entry sha1 too short: {sha1!r}")
+    return Path(sha1[:2]) / sha1
+
+
+def _fetch_one_asset_object(
+    logical_name: str,
+    sha1: str,
+    size: int,
+    objects_root: Path,
+) -> tuple[str, str, int, bool]:
+    """Worker: fetch one asset object (or hit cache) + SHA-1 verify.
+
+    Returns (logical_name, sha1, bytes_downloaded, was_cache_hit).
+
+    Raises on ANY anomaly — caller (the executor) propagates the exception
+    back up so the run aborts with a clean stack trace. Hard-fail policy
+    matches every other stage: the only acceptable exit for a SHA-1
+    mismatch is non-zero.
+    """
+    rel = _asset_object_relpath(sha1)
+    dest = objects_root / rel
+
+    # Resume support: present + correct size + correct SHA-1 == skip network.
+    if dest.is_file() and dest.stat().st_size == size:
+        if _sha1_file(dest).lower() == sha1.lower():
+            return logical_name, sha1, 0, True
+        # Stale / corrupt — re-download.
+        try:
+            dest.unlink()
+        except OSError:
+            pass
+
+    url = f"{ASSET_OBJECT_BASE_URL}/{sha1[:2]}/{sha1}"
+    try:
+        bytes_dl = _download_with_retries(url, dest)
+    except Exception as exc:  # noqa: BLE001 — re-raise as RuntimeError below
+        raise RuntimeError(f"asset object {logical_name!r} ({sha1}): {exc}") from exc
+
+    got = _sha1_file(dest)
+    if got.lower() != sha1.lower():
+        try:
+            dest.unlink()
+        except OSError:
+            pass
+        raise RuntimeError(
+            f"asset object {logical_name!r}: SHA-1 mismatch — "
+            f"expected={sha1} got={got}"
+        )
+
+    actual = dest.stat().st_size
+    if actual != size:
+        try:
+            dest.unlink()
+        except OSError:
+            pass
+        raise RuntimeError(
+            f"asset object {logical_name!r}: size mismatch — "
+            f"expected={size} got={actual}"
+        )
+
+    return logical_name, sha1, bytes_dl, False
+
+
+def _fetch_asset_objects(asset_index_id: str) -> tuple[int, int, int, int]:
+    """Fetch every asset object referenced by ``assets/indexes/<id>.json``.
+
+    Mojang's index file is a JSON ``{ "objects": { "<logical_name>": {
+    "hash": "<sha1>", "size": <int> }, ... } }``. We walk that map, fan
+    out across ``ASSET_FETCH_WORKERS`` threads, and SHA-1-verify every
+    payload against the declared hash. Already-correct files on disk are
+    skipped (resume / re-run safety).
+
+    Returns (objects_total, cache_hits, downloaded, bytes_downloaded).
+    """
+    index_path = MC_INSTANCE_DIR / "assets" / "indexes" / f"{asset_index_id}.json"
+    if not index_path.is_file():
+        _err(f"asset index missing — cannot fetch objects: {index_path}")
+        sys.exit(3)
+
+    try:
+        index_doc = json.loads(index_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        _err(f"asset index JSON unreadable: {exc}")
+        sys.exit(7)
+
+    objects = index_doc.get("objects")
+    if not isinstance(objects, dict) or not objects:
+        _err("asset index has no objects[] map — corrupt?")
+        sys.exit(7)
+
+    # De-dup by hash: many logical names share the same hash (e.g. legacy
+    # virtual icons). We still verify per logical name so any mismatch
+    # blames the right entry, but we only need to fetch each unique hash
+    # once. The thread pool deduplicates implicitly because subsequent
+    # workers see the file already on disk + SHA-correct == cache hit.
+    objects_root = MC_INSTANCE_DIR / "assets" / "objects"
+    objects_root.mkdir(parents=True, exist_ok=True)
+
+    total = len(objects)
+    _log(
+        f"  asset objects: {total} entries to verify (parallel workers="
+        f"{ASSET_FETCH_WORKERS})"
+    )
+
+    bytes_dl_total = 0
+    cache_hits = 0
+    downloaded = 0
+    completed = 0
+
+    # ThreadPoolExecutor uses daemon threads + a small queue, so a hard
+    # SIGINT propagates cleanly. Iterating ``as_completed`` lets us stream
+    # progress + abort fast on the first hard-fail.
+    with ThreadPoolExecutor(max_workers=ASSET_FETCH_WORKERS) as pool:
+        futures = []
+        for logical_name, entry in objects.items():
+            sha1 = entry.get("hash")
+            size = entry.get("size")
+            if not isinstance(sha1, str) or not isinstance(size, int):
+                _err(
+                    f"asset index entry malformed for {logical_name!r}: "
+                    f"hash={sha1!r} size={size!r}"
+                )
+                sys.exit(7)
+            futures.append(
+                pool.submit(
+                    _fetch_one_asset_object,
+                    logical_name,
+                    sha1,
+                    size,
+                    objects_root,
+                )
+            )
+
+        for fut in as_completed(futures):
+            try:
+                _name, _sha, bytes_dl, was_cached = fut.result()
+            except Exception as exc:  # noqa: BLE001 — pool boundary
+                # Cancel everything still pending and bail. SHA-1 mismatch
+                # is exit 2 (matches other stages); anything else is 4.
+                for f in futures:
+                    f.cancel()
+                msg = str(exc)
+                _err(msg)
+                if "SHA-1 mismatch" in msg or "size mismatch" in msg:
+                    sys.exit(2)
+                sys.exit(4)
+
+            bytes_dl_total += bytes_dl
+            if was_cached:
+                cache_hits += 1
+            else:
+                downloaded += 1
+            completed += 1
+            if completed % ASSET_PROGRESS_EVERY == 0 or completed == total:
+                _log(
+                    f"    progress: {completed}/{total} "
+                    f"(downloaded={downloaded}, cached={cache_hits}, "
+                    f"bytes_dl={bytes_dl_total:,})"
+                )
+
+    return total, cache_hits, downloaded, bytes_dl_total
 
 
 # ---------------------------------------------------------------------------
@@ -717,6 +919,9 @@ def _write_runtime_manifest(
     libraries_skipped: int,
     natives_jars: int = 0,
     natives_dlls: int = 0,
+    asset_objects_total: int = 0,
+    asset_objects_downloaded: int = 0,
+    asset_objects_cached: int = 0,
 ) -> None:
     """Emit bundle/mc-instance/manifest-mc.json — runtime provenance record."""
     client_dl = per_version.get("downloads", {}).get("client", {})
@@ -746,6 +951,9 @@ def _write_runtime_manifest(
             "libraries_skipped_for_os": libraries_skipped,
             "natives_jars_processed": natives_jars,
             "natives_dlls_extracted": natives_dlls,
+            "asset_objects_total": asset_objects_total,
+            "asset_objects_downloaded_this_run": asset_objects_downloaded,
+            "asset_objects_cache_hits": asset_objects_cached,
             "bytes_downloaded_this_run": bytes_downloaded,
             "instance_size_bytes_total": _dir_size_bytes(MC_INSTANCE_DIR),
         },
@@ -811,9 +1019,32 @@ def main() -> int:
         f"{natives_jars} classifier jar(s)"
     )
 
-    # Stage 3: asset index JSON only (no objects)
-    _log(f"fetching asset index {asset_index_id} (NO asset objects)")
+    # Stage 3: asset index JSON
+    _log(f"fetching asset index {asset_index_id}")
     bytes_dl_total += _fetch_asset_index(per_version, asset_index_id)
+
+    # Resolve the *actual* upstream asset index id. Mojang's per-version
+    # manifest is the source of truth — our pin is just a sanity guard,
+    # and ``_fetch_asset_index`` already silently prefers upstream when
+    # they disagree. Re-read it here so ``_fetch_asset_objects`` opens
+    # the file we actually wrote (e.g. ``assets/indexes/19.json``).
+    resolved_asset_id: str = (
+        per_version.get("assetIndex", {}).get("id") or asset_index_id
+    )
+
+    # Stage 3b: asset OBJECTS — ~4035 files / ~390 MB, parallelised.
+    _log(
+        f"fetching asset objects for index {resolved_asset_id!r} "
+        f"(parallel pool, SHA-1 verified)"
+    )
+    objs_total, objs_cached, objs_dl, objs_bytes = _fetch_asset_objects(
+        resolved_asset_id
+    )
+    bytes_dl_total += objs_bytes
+    _log(
+        f"  asset objects: {objs_total} total, {objs_dl} downloaded, "
+        f"{objs_cached} cache-hit, {objs_bytes:,} bytes downloaded"
+    )
 
     # Verify + write runtime manifest.
     _verify_post_fetch(required_files)
@@ -825,6 +1056,9 @@ def main() -> int:
         libs_skipped,
         natives_jars=natives_jars,
         natives_dlls=natives_dlls,
+        asset_objects_total=objs_total,
+        asset_objects_downloaded=objs_dl,
+        asset_objects_cached=objs_cached,
     )
 
     instance_size = _dir_size_bytes(MC_INSTANCE_DIR)

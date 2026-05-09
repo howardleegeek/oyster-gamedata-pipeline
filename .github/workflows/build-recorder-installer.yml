@@ -51,12 +51,13 @@ name: Build Recorder Bundled Installer (R05E)
 #   ~22-28 minutes on `windows-latest` (cold cache):
 #     * checkout + setup-python + choco install innosetup    ~ 4 min
 #     * R05A fetch JRE       (50 MB DL + extract + verify)   ~ 1 min
-#     * R05B fetch MC        (140 MB DL + verify ~60 libs)   ~ 4 min
+#     * R05B fetch MC        (140 MB DL + verify ~60 libs +  ~ 7 min
+#                             rc7: ~390 MB DL of asset objects, parallel)
 #     * R05B fetch Fabric    (5 MB DL + verify 8 libs)       ~ 1 min
 #     * R05C build OysterPlay.exe (PyInstaller, small)       ~ 2 min
 #     * Build OysterRecorder onedir (PyInstaller, ~700 MB)   ~ 6 min
 #     * Compose bundle/manifest.json (SHA-256 every file)    ~ 1 min
-#     * R05D Inno Setup compile (~460 MB installer .exe)     ~ 3 min
+#     * R05D Inno Setup compile (~800 MB installer .exe)     ~ 3 min
 #     * Final SHA + gh release create + upload               ~ 2 min
 #   Warm cache (JRE + MC zips reused) shaves ~4 min off the front.
 #
@@ -547,10 +548,13 @@ jobs:
             Write-Error "Installer is too small (${size_mb} MiB < 400 MiB) — JRE / MC bundle may be missing"
             exit 1
           }
-          if ($bytes -gt (700 * 1MB)) {
-            # Spec target is ~460 MB. We allow up to 700 to absorb the
-            # extra mod jars / depth weights vs. build_all.ps1's 500 cap.
-            Write-Error "Installer is too large (${size_mb} MiB > 700 MiB) — investigate Solid compression"
+          if ($bytes -gt (1000 * 1MB)) {
+            # rc7 target is ~800 MB (rc6 was ~460 MB before bundling MC
+            # asset objects). 1000 MB ceiling absorbs the ~390 MB of
+            # objects + minor mod / weight bloat without falsely failing
+            # a healthy build. Mirrors build_all.ps1's gate — keep both
+            # in sync when re-tuning.
+            Write-Error "Installer is too large (${size_mb} MiB > 1000 MiB) — investigate Solid compression"
             exit 1
           }
 
