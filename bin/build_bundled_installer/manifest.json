@@ -1,0 +1,36 @@
+{
+  "_comment_1": "Build-time pin for the bundled JRE. fetch_jre.py reads this file at",
+  "_comment_2": "build time and HARD-FAILS on SHA-256 mismatch. Bumping the JRE means",
+  "_comment_3": "changing this JSON (URL + sha256 + size + version) — never edit Python.",
+  "_comment_4": "Cross-check sha256 against the official .sha256.txt next to the asset:",
+  "_comment_5": "  curl -sfL <url>.sha256.txt   # must match `sha256` below.",
+  "schema_version": 1,
+  "vendor": "eclipse-temurin",
+  "release_tag": "jdk-21.0.11+10",
+  "version": {
+    "full": "21.0.11+10-LTS",
+    "semver": "21.0.11+10.0.LTS",
+    "major": 21,
+    "minor": 0,
+    "security": 11,
+    "build": 10,
+    "lts": true
+  },
+  "platform": {
+    "os": "windows",
+    "arch": "x64",
+    "image_type": "jre"
+  },
+  "source": {
+    "filename": "OpenJDK21U-jre_x64_windows_hotspot_21.0.11_10.zip",
+    "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.11%2B10/OpenJDK21U-jre_x64_windows_hotspot_21.0.11_10.zip",
+    "sha256": "be26677aaa20b39a62edcaab4c8857a8b76673b0f45abc0b6143b142b62717e4",
+    "sha256_url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.11%2B10/OpenJDK21U-jre_x64_windows_hotspot_21.0.11_10.zip.sha256.txt",
+    "size_bytes": 49005708
+  },
+  "post_extract_required_files": [
+    "bin/javaw.exe",
+    "bin/java.exe",
+    "release"
+  ]
+}
