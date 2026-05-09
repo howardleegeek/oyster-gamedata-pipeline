@@ -176,7 +176,13 @@ jobs:
           # --collect-all directives, not pinned at the workflow level.
           pip install "pyinstaller>=6.0"
           pip install pynput pillow numpy pyyaml
-          pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
+          # rc15.7.2 (Round 10 H2 finding): pin torch==2.4.1 explicitly to
+          # match torch-directml 0.2.5's hard requirement. Was bug: install
+          # latest cpu-torch (2.11.0+cpu) then torch-directml DOWNGRADED to
+          # 2.4.1 (no +cpu suffix → may pull CUDA-bundled wheel = +1.5GB
+          # bundle bloat + transformers compat risk). Pin first, install dml
+          # second, transformers last — deterministic resolution chain.
+          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.4.1 torchvision==0.19.1
           # rc15.6 (Howard 2026-05-09 "我只有 amd"): bundle torch-directml so
           # AMD/Intel GPU users can run DepthAnything V2 via DirectML on
           # Windows. No-op on machines without DX12 GPU (falls back to cpu).

@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.7"
+RECORDER_VERSION = "lite-v0.28.0-rc15.7.2"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -2724,13 +2724,18 @@ class RecorderApp(tk.Tk):
                     # empty [] → backend integrity check (R22) lost all
                     # per-frame hashes → ABSTAIN on every local_complete.
                     if isinstance(manifest, dict):
-                        frames_field: Any = manifest
+                        # rc15.7.2-fix BUG R10 #6: convert int keys → str keys
+                        # for JSON wire format. Was bug: json.dumps silently
+                        # str-coerces int keys → backend Pydantic models
+                        # typed `dict[int, str]` reject. Now explicit + schema
+                        # is `dict[str, str]` end-to-end (str of frame_idx).
+                        frames_field: Any = {str(k): v for k, v in manifest.items()}
                         frame_count = len(manifest)
                     elif isinstance(manifest, list):
                         frames_field = manifest
                         frame_count = len(manifest)
                     else:
-                        frames_field = []
+                        frames_field = {}
                         frame_count = 0
                     depth_manifest_path.write_text(
                         json.dumps({
@@ -2749,24 +2754,47 @@ class RecorderApp(tk.Tk):
                     timeout_timer.cancel()
                 # rc15.7 multi-tier fallback: classify exception so backend
                 # routes the session correctly + tester sees actionable hint.
+                # rc15.7.2-fix BUG R10 #5: also match exception CLASS NAME
+                # (locale-independent) before matching message string. On
+                # Chinese Windows torch errors are localized (e.g. "设备
+                # 内存不足") and English keyword match misses everything.
+                # Class names like "OutOfMemoryError" are stable across locales.
                 exc_name = type(e).__name__
+                exc_name_lower = exc_name.lower()
                 exc_msg = str(e)
                 exc_msg_lower = exc_msg.lower()
-                if "out of memory" in exc_msg_lower or "oom" in exc_msg_lower or "allocator" in exc_msg_lower:
+                if (
+                    "outofmemory" in exc_name_lower
+                    or "out of memory" in exc_msg_lower
+                    or "oom" in exc_msg_lower
+                    or "allocator" in exc_msg_lower
+                    or "内存不足" in exc_msg
+                ):
                     fallback_kind = "oom"
                     user_hint = (
                         "GPU 显存不足 (Radeon 集显默认 UMA 2GB; "
                         "BIOS 调高到 4GB 或换独立 GPU)"
                     )
-                elif "directml" in exc_msg_lower or "dxgi" in exc_msg_lower or "d3d" in exc_msg_lower:
+                elif (
+                    "directml" in exc_name_lower
+                    or "directml" in exc_msg_lower
+                    or "dxgi" in exc_msg_lower
+                    or "d3d" in exc_msg_lower
+                ):
                     fallback_kind = "dml_driver"
                     user_hint = (
                         "DirectML / DX12 错误 — 更新 AMD Adrenalin 驱动到 23.40 以上"
                     )
-                elif "cuda" in exc_msg_lower:
+                elif "cuda" in exc_name_lower or "cuda" in exc_msg_lower:
                     fallback_kind = "cuda_driver"
                     user_hint = "CUDA 错误 — 更新 NVIDIA 驱动"
-                elif "tensor" in exc_msg_lower or "shape" in exc_msg_lower or "dimension" in exc_msg_lower:
+                elif (
+                    "tensor" in exc_msg_lower
+                    or "shape" in exc_msg_lower
+                    or "dimension" in exc_msg_lower
+                    or "形状" in exc_msg
+                    or "尺寸" in exc_msg
+                ):
                     fallback_kind = "model_compat"
                     user_hint = "模型 / 后端 shape 不兼容 — 已 fall back 到服务器"
                 else:
