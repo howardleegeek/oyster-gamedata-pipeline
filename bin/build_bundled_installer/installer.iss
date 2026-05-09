@@ -159,7 +159,8 @@ MinVersion=10.0.17763
 
 ; ---------- Output / housekeeping -----------------------------------------
 ChangesAssociations=no
-ChangesEnvironment=no    ; iron-law: no PATH / JAVA_HOME mutation
+; iron-law: no PATH / JAVA_HOME mutation
+ChangesEnvironment=no
 RestartIfNeededByRun=no
 CloseApplications=force
 CloseApplicationsFilter=*.exe
