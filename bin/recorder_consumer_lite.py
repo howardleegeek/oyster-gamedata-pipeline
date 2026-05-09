@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc13"
+RECORDER_VERSION = "lite-v0.28.0-rc14"
 
 # rc11 SF (Phase A.1, IRON LAW EXCEPTION pre-approved 2026-05-09):
 # game-agnostic failure-attribution. Every session writes terminator.json
@@ -2331,52 +2331,89 @@ class RecorderApp(tk.Tk):
         # Iron-law-compatible: a skipped tarball is partial-by-choice, not
         # a placeholder; downstream lint will FAIL on missing depth which
         # is the correct behaviour.
-        depth_skipped = False
-        try:
-            from depth_anything_v2_inference import infer_depth_for_video  # noqa: PLC0415
-            video_path = clip_dir / "video.mp4"
-            depth_dir = clip_dir / "depth"
-            _trace(f"depth: running DepthAnything V2 inference on {video_path}")
-            self.after(0, self._show_depth_progress_ui)
+        # rc14 (Phase B/C pivot 2026-05-09): client-side depth inference
+        # is RETIRED. Reason: testers on integrated-GPU laptops sat
+        # through 30-60 min of CPU DepthAnything inference (rc9–rc13
+        # hardcoded device="cpu" even on GPU boxes); empty
+        # depth_manifest.json={} shipped to buyers; data quality dropped.
+        #
+        # New architecture (Howard 2026-05-09: "C 端用户什么都不懂"):
+        #   - Recorder ships video + game-state + inputs ONLY.
+        #   - Backend GPU worker (Phase C SM spec) consumes uploaded
+        #     tarball → DepthAnything V2 on real GPU → writes depth/*
+        #     and depth_manifest.json next to original tarball in R2.
+        #   - Buyer downloads merged session (video + depth + state).
+        #
+        # The recorder writes depth_manifest.json = {"status":
+        # "server_pending", ...} so backend ingest knows to enqueue a
+        # depth job. Old client-side path stays opt-in via env var
+        # OYSTER_LOCAL_DEPTH=1 for engineer testing on real GPU boxes.
+        depth_dir = clip_dir / "depth"
+        depth_manifest_path = clip_dir / "depth_manifest.json"
+        local_depth_opt_in = os.environ.get("OYSTER_LOCAL_DEPTH", "").strip() == "1"
+        if local_depth_opt_in:
+            depth_skipped = False
             try:
-                manifest = infer_depth_for_video(
-                    video_path,
-                    depth_dir,
-                    model_variant="vits",
-                    device="cpu",
-                    progress_callback=self._on_depth_progress,
-                    should_skip=self._skip_depth_flag.is_set,
-                )
-                _trace(f"depth: rendered {len(manifest)} REAL EXR frames")
-                if self._skip_depth_flag.is_set():
-                    # Cooperative skip raced past the loop's last poll.
-                    depth_skipped = True
-                    _trace("depth: skip flag observed after loop — treating as user skip")
-            finally:
-                self.after(0, self._hide_depth_progress_ui)
-            if depth_skipped:
-                # Drop the partial depth dir so the tarball cleanly OMITS
-                # depth/ rather than shipping a half-finished version.
+                from depth_anything_v2_inference import infer_depth_for_video  # noqa: PLC0415
+                video_path = clip_dir / "video.mp4"
+                _trace(f"depth: OYSTER_LOCAL_DEPTH=1 — running local DepthAnything V2 on {video_path}")
+                self.after(0, self._show_depth_progress_ui)
                 try:
-                    if depth_dir.exists():
-                        shutil.rmtree(depth_dir, ignore_errors=True)
-                except Exception:
-                    pass
-                _trace("package: depth skipped by user — partial tarball")
-                # Surface the result to the tester before the lint runs.
-                self._set("⚠️ 已跳过深度图", "#d97706",
-                          "tarball 完成，但深度数据未包含。\n"
-                          "下游买家规格会在深度项标记 FAIL。")
-        except Exception as e:
-            self.after(0, self._hide_depth_progress_ui)
-            _trace(f"depth: DepthAnything inference FAILED: {e!r}")
-            # No fake fallback — abort the entire packaging. The tester
-            # sees a clear error in the log; we never ship placeholder.
-            raise RuntimeError(
-                f"Depth inference failed: {e}. The recorder refuses to "
-                f"ship a tarball with placeholder depth. See "
-                f"~/OysterRecorder.log for details."
+                    manifest = infer_depth_for_video(
+                        video_path,
+                        depth_dir,
+                        model_variant="vits",
+                        device="cpu",
+                        progress_callback=self._on_depth_progress,
+                        should_skip=self._skip_depth_flag.is_set,
+                    )
+                    _trace(f"depth: rendered {len(manifest)} REAL EXR frames")
+                    if self._skip_depth_flag.is_set():
+                        depth_skipped = True
+                        _trace("depth: skip flag observed after loop — user skip")
+                finally:
+                    self.after(0, self._hide_depth_progress_ui)
+                if depth_skipped:
+                    try:
+                        if depth_dir.exists():
+                            shutil.rmtree(depth_dir, ignore_errors=True)
+                    except Exception:
+                        pass
+                    depth_manifest_path.write_text(
+                        json.dumps({
+                            "status": "skipped_by_user",
+                            "frames": [],
+                            "reason": "user clicked skip during local inference",
+                        }, indent=2),
+                        encoding="utf-8",
+                    )
+                    self._set("⚠️ 已跳过深度图", "#d97706",
+                              "tarball 完成，但深度数据未包含 (本地跳过)。")
+            except Exception as e:
+                self.after(0, self._hide_depth_progress_ui)
+                _trace(f"depth: local inference FAILED: {e!r} — falling back to server_pending")
+                depth_manifest_path.write_text(
+                    json.dumps({
+                        "status": "server_pending",
+                        "frames": [],
+                        "reason": f"local inference exception: {type(e).__name__}",
+                        "fallback_from_local": True,
+                    }, indent=2),
+                    encoding="utf-8",
+                )
+        else:
+            # rc14 default path: defer to backend GPU pool.
+            depth_manifest_path.write_text(
+                json.dumps({
+                    "status": "server_pending",
+                    "frames": [],
+                    "reason": "depth inference deferred to backend GPU pool (rc14+)",
+                    "client_version": RECORDER_VERSION,
+                    "expected_handler": "Phase C SM backend depth-worker",
+                }, indent=2),
+                encoding="utf-8",
             )
+            _trace("depth: server_pending manifest written — backend GPU pool will infer post-upload")
 
         # R22 (D-04 defense): hash every *.exr in depth/ and write
         # depth_manifest.json next to the directory. Stop-gap path
