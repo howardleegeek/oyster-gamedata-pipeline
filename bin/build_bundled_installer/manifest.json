@@ -52,7 +52,10 @@
     "post_fetch_required_files": [
       "versions/1.21.4/1.21.4.jar",
       "versions/1.21.4/1.21.4.json",
-      "assets/indexes/19.json"
+      "assets/indexes/19.json",
+      "versions/1.21.4/natives/lwjgl.dll",
+      "versions/1.21.4/natives/glfw.dll",
+      "versions/1.21.4/natives/lwjgl_opengl.dll"
     ]
   },
 

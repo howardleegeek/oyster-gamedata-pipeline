@@ -43,6 +43,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -508,6 +509,138 @@ def _fetch_libraries(
 
 
 # ---------------------------------------------------------------------------
+# Stage 2b: Extract LWJGL / native .dll files into versions/<id>/natives/
+# ---------------------------------------------------------------------------
+
+
+def _is_target_native_classifier(name: str, target_arch: str) -> bool:
+    """Return True if this maven coord is the natives jar for our target arch.
+
+    Modern (1.19+) Mojang manifests inline natives as separate library
+    entries with maven coords like:
+
+        org.lwjgl:lwjgl:3.3.3:natives-windows         (x64)
+        org.lwjgl:lwjgl:3.3.3:natives-windows-arm64
+        org.lwjgl:lwjgl:3.3.3:natives-windows-x86
+
+    The OS rule on each entry is identical ("windows"), so the rules
+    engine alone cannot discriminate. We pick the right jar by classifier
+    suffix: bare ``natives-windows`` is x64; explicit ``-arm64`` / ``-x86``
+    suffixes belong to the other archs and we drop them.
+    """
+    parts = name.split(":")
+    if len(parts) < 4:
+        return False  # no classifier
+    classifier = parts[3]
+
+    # Bug 1 fix: Windows x64 only — the bare ``natives-windows`` classifier.
+    # Skip ``-arm64`` and ``-x86`` even though their library rules also
+    # ``allow`` os.name=windows (Mojang doesn't put arch in the rule).
+    if target_arch == "x64":
+        return classifier == "natives-windows"
+    # We don't ship arm64 / x86 builds; if anyone ever does, just match
+    # the obvious classifier name.
+    return classifier == f"natives-windows-{target_arch}"
+
+
+def _extract_dlls_from_jar(jar_path: Path, natives_dir: Path) -> int:
+    """Extract every ``*.dll`` entry from a native classifier jar (flat).
+
+    The DLL inside an LWJGL natives jar is at a deep path like
+    ``windows/x64/org/lwjgl/lwjgl.dll`` (or in jtracy's case, just
+    ``jtracy-jni-windows.dll`` at the root). Java's
+    ``-Djava.library.path`` is a flat search path, so we drop every
+    extracted DLL into ``natives_dir`` keyed only by its basename.
+
+    Returns the number of DLLs extracted.
+    """
+    natives_dir.mkdir(parents=True, exist_ok=True)
+    extracted = 0
+    try:
+        with zipfile.ZipFile(jar_path, "r") as zf:
+            for member in zf.namelist():
+                if not member.lower().endswith(".dll"):
+                    continue
+                # Defence: skip anything that escapes the jar via "..".
+                if ".." in Path(member).parts:
+                    _err(f"refusing dll path with .. in jar {jar_path.name}: {member}")
+                    continue
+                basename = Path(member).name
+                target = natives_dir / basename
+                with zf.open(member) as src, target.open("wb") as dst:
+                    while True:
+                        buf = src.read(DOWNLOAD_CHUNK)
+                        if not buf:
+                            break
+                        dst.write(buf)
+                extracted += 1
+    except (zipfile.BadZipFile, OSError) as exc:
+        _err(f"could not extract dlls from {jar_path}: {exc}")
+        sys.exit(5)
+    return extracted
+
+
+def _extract_natives(
+    per_version: dict[str, Any],
+    target_os: str,
+    target_arch: str,
+    version_id: str,
+) -> tuple[int, int]:
+    """Extract Windows-x64 native ``.dll``s from already-cached classifier jars.
+
+    Bug 1 fix (R05B): the existing library walk downloads the
+    ``*:natives-windows`` jars but never extracts the DLLs out of them,
+    so MC crashes at startup with::
+
+        UnsatisfiedLinkError: Failed to locate library: lwjgl.dll
+
+    This second pass:
+      1. Iterates ``libraries[]`` again.
+      2. Honors each entry's ``rules`` block (so a Linux-only entry is
+         skipped even if it carries a Windows-looking classifier).
+      3. Selects entries whose maven coord ends in ``:natives-windows``
+         (Windows x64 — explicitly skipping ``-arm64`` / ``-x86``).
+      4. Extracts every ``.dll`` from the cached jar into
+         ``bundle/mc-instance/versions/<version_id>/natives/``.
+
+    Returns (jars_processed, dlls_extracted).
+    """
+    natives_dir = MC_INSTANCE_DIR / "versions" / version_id / "natives"
+    libraries = per_version.get("libraries", [])
+    jars_processed = 0
+    dlls_extracted = 0
+
+    for lib in libraries:
+        name = lib.get("name")
+        if not isinstance(name, str):
+            continue
+        if not _is_target_native_classifier(name, target_arch):
+            continue
+        if not _evaluate_rules(lib.get("rules"), target_os):
+            continue
+
+        artifact = lib.get("downloads", {}).get("artifact") or {}
+        rel = artifact.get("path")
+        if not rel:
+            try:
+                rel = str(_maven_path(name))
+            except ValueError:
+                continue
+        cache_jar = CACHE_DIR / "libs" / rel
+        if not cache_jar.is_file():
+            # _fetch_libraries should have produced this; log + skip if not.
+            _err(f"natives jar missing in cache (expected for {name}): {cache_jar}")
+            continue
+
+        n = _extract_dlls_from_jar(cache_jar, natives_dir)
+        _log(f"  extracted {n} dll(s) from {name}")
+        jars_processed += 1
+        dlls_extracted += n
+
+    return jars_processed, dlls_extracted
+
+
+# ---------------------------------------------------------------------------
 # Stage 3: asset index JSON (no objects!)
 # ---------------------------------------------------------------------------
 
@@ -582,6 +715,8 @@ def _write_runtime_manifest(
     bytes_downloaded: int,
     libraries_kept: int,
     libraries_skipped: int,
+    natives_jars: int = 0,
+    natives_dlls: int = 0,
 ) -> None:
     """Emit bundle/mc-instance/manifest-mc.json — runtime provenance record."""
     client_dl = per_version.get("downloads", {}).get("client", {})
@@ -609,6 +744,8 @@ def _write_runtime_manifest(
         "result": {
             "libraries_kept": libraries_kept,
             "libraries_skipped_for_os": libraries_skipped,
+            "natives_jars_processed": natives_jars,
+            "natives_dlls_extracted": natives_dlls,
             "bytes_downloaded_this_run": bytes_downloaded,
             "instance_size_bytes_total": _dir_size_bytes(MC_INSTANCE_DIR),
         },
@@ -663,13 +800,32 @@ def main() -> int:
     bytes_dl_total += libs_bytes
     _log(f"  libraries: {libs_kept} kept, {libs_skipped} skipped (rules)")
 
+    # Stage 2b: extract native .dlls from windows-x64 classifier jars
+    target_arch: str = pin["platform"]["arch"]
+    _log(f"extracting native dlls (target arch: {target_arch})")
+    natives_jars, natives_dlls = _extract_natives(
+        per_version, target_os, target_arch, version_id
+    )
+    _log(
+        f"  natives: {natives_dlls} dll(s) extracted from "
+        f"{natives_jars} classifier jar(s)"
+    )
+
     # Stage 3: asset index JSON only (no objects)
     _log(f"fetching asset index {asset_index_id} (NO asset objects)")
     bytes_dl_total += _fetch_asset_index(per_version, asset_index_id)
 
     # Verify + write runtime manifest.
     _verify_post_fetch(required_files)
-    _write_runtime_manifest(pin, per_version, bytes_dl_total, libs_kept, libs_skipped)
+    _write_runtime_manifest(
+        pin,
+        per_version,
+        bytes_dl_total,
+        libs_kept,
+        libs_skipped,
+        natives_jars=natives_jars,
+        natives_dlls=natives_dlls,
+    )
 
     instance_size = _dir_size_bytes(MC_INSTANCE_DIR)
     _log(
