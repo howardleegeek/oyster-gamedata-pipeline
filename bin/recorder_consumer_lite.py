@@ -2088,7 +2088,7 @@ class RecorderApp(tk.Tk):
                 record_dpi=float(rect.get("recordDpi", 96)) / 96.0,  # ratio
             )
             sys_info["recordedAt"] = ts
-            sys_info["recorderVersion"] = "lite-v0.10.0"
+            sys_info["recorderVersion"] = RECORDER_VERSION  # rc13: was hardcoded 'lite-v0.10.0'
             sys_info["_real_window_geometry"] = bool(self._mc_window_rect)
         except Exception as e:  # noqa: BLE001
             _trace(f"systeminfo: helper import failed, using stub ({e})")
@@ -2100,7 +2100,7 @@ class RecorderApp(tk.Tk):
                 "height": rect.get("height", 1080),
                 "recordDpi": rect.get("recordDpi", 96),
                 "recordedAt": ts,
-                "recorderVersion": "lite-v0.10.0-fallback",
+                "recorderVersion": f"{RECORDER_VERSION}-fallback",  # rc13: was hardcoded 'lite-v0.10.0-fallback'
             }
         (clip_dir / "systeminfo.json").write_text(
             json.dumps(sys_info, indent=2), encoding="utf-8"
@@ -2144,6 +2144,11 @@ class RecorderApp(tk.Tk):
         _gs_samples = _gs_load() if _gs_load else None
         if _gs_samples:
             _trace(f"package: real game-state JSONL found, {len(_gs_samples)} samples — overlay enabled")
+            # rc13 SF-fix: real game-state ingest = mod handshake confirmed.
+            # Without this, terminator.json reports mod_handshake_ok=false
+            # even when buyer data is fully real. Backend would quarantine
+            # legit sessions thinking they're placeholder.
+            self._mod_handshake_ok = True
         else:
             ver = _recorder_version_tuple()
             allow_placeholder = getattr(self, "_allow_placeholder", False)
@@ -2272,7 +2277,7 @@ class RecorderApp(tk.Tk):
             (clip_dir / "session_manifest.json").write_text(
                 json.dumps({
                     "session_id": getattr(self, "_session_id", ""),
-                    "recorder_version": "lite-v0.21.0",
+                    "recorder_version": RECORDER_VERSION,  # rc13: was hardcoded 'lite-v0.21.0'
                     "start_time": _dt.fromtimestamp(self._record_started_at).isoformat(),
                     "frame_count": target_frame_count,
                     "fps": FPS,
@@ -2552,6 +2557,10 @@ class RecorderApp(tk.Tk):
 
         # R01 D section: parse MC version from title and warn if unsupported.
         mc_ver = _parse_mc_version_from_title(mc_title)
+        # rc13 SF-fix: stash detected MC version for terminator.json.
+        # Without this, game_specific.game_version is always null even
+        # when MC is running. Buyer can't filter sessions by MC version.
+        self._mc_version = mc_ver
         if mc_ver and mc_ver not in SUPPORTED_MC_VERSIONS:
             _trace(
                 f"WARN: Minecraft {mc_ver} not in supported list. "
