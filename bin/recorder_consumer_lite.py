@@ -2331,46 +2331,69 @@ class RecorderApp(tk.Tk):
         # Iron-law-compatible: a skipped tarball is partial-by-choice, not
         # a placeholder; downstream lint will FAIL on missing depth which
         # is the correct behaviour.
-        # rc14 (Phase B/C pivot 2026-05-09): client-side depth inference
-        # is RETIRED. Reason: testers on integrated-GPU laptops sat
-        # through 30-60 min of CPU DepthAnything inference (rc9–rc13
-        # hardcoded device="cpu" even on GPU boxes); empty
-        # depth_manifest.json={} shipped to buyers; data quality dropped.
+        # rc14 dual-track depth (Howard 2026-05-09 选项 C):
+        #   - GPU 可用 → 本地 DepthAnything V2 (cuda 或 dml, NOT cpu)
+        #   - GPU 不可用 → server_pending, backend GPU worker 处理 (Phase C SM)
+        #   - OYSTER_LOCAL_DEPTH=0 强制服务器 (调试)
+        #   - OYSTER_LOCAL_DEPTH=1 强制本地 (即使无 GPU, 跑 CPU)
         #
-        # New architecture (Howard 2026-05-09: "C 端用户什么都不懂"):
-        #   - Recorder ships video + game-state + inputs ONLY.
-        #   - Backend GPU worker (Phase C SM spec) consumes uploaded
-        #     tarball → DepthAnything V2 on real GPU → writes depth/*
-        #     and depth_manifest.json next to original tarball in R2.
-        #   - Buyer downloads merged session (video + depth + state).
-        #
-        # The recorder writes depth_manifest.json = {"status":
-        # "server_pending", ...} so backend ingest knows to enqueue a
-        # depth job. Old client-side path stays opt-in via env var
-        # OYSTER_LOCAL_DEPTH=1 for engineer testing on real GPU boxes.
+        # 修复 rc9-rc13 的核心 bug: device="cpu" 硬编码导致集显用户卡死
+        # 30-60 min. 现在真 GPU 用户拿到本地 depth, 无 GPU 用户不阻塞 — 数据
+        # 质量在两条路径上不一致是已知 trade-off, backend ingest 通过
+        # depth_manifest.status 知道哪些 session 需要 server-side 重算.
         depth_dir = clip_dir / "depth"
         depth_manifest_path = clip_dir / "depth_manifest.json"
-        local_depth_opt_in = os.environ.get("OYSTER_LOCAL_DEPTH", "").strip() == "1"
-        if local_depth_opt_in:
+
+        _depth_override = os.environ.get("OYSTER_LOCAL_DEPTH", "").strip()
+        if _depth_override == "1":
+            run_local_depth = True
+            local_device = "cpu"  # explicit force, accept the CPU pain
+            track_reason = "OYSTER_LOCAL_DEPTH=1 force-local (CPU)"
+        elif _depth_override == "0":
+            run_local_depth = False
+            local_device = None
+            track_reason = "OYSTER_LOCAL_DEPTH=0 force-server"
+        else:
+            # Auto: pick device by GPU detection
+            gpu_ok = _detect_gpu_available()
+            if not gpu_ok:
+                run_local_depth = False
+                local_device = None
+                track_reason = "no GPU detected — server-pending"
+            else:
+                # rc14: prefer real accelerators. cuda first (nvcuda.dll
+                # loadable), DirectML second (torch_directml importable).
+                # cpu is NEVER auto-selected — that was rc9-rc13's bug.
+                local_device = "cuda"
+                try:
+                    import torch_directml  # type: ignore  # noqa: PLC0415
+                    if torch_directml.is_available():  # type: ignore[attr-defined]
+                        local_device = "dml"
+                except Exception:
+                    pass
+                run_local_depth = True
+                track_reason = f"GPU detected — local inference on {local_device}"
+        _trace(f"depth: track decision = {track_reason}")
+
+        if run_local_depth:
             depth_skipped = False
             try:
                 from depth_anything_v2_inference import infer_depth_for_video  # noqa: PLC0415
                 video_path = clip_dir / "video.mp4"
-                _trace(f"depth: OYSTER_LOCAL_DEPTH=1 — running local DepthAnything V2 on {video_path}")
+                _trace(f"depth: running DepthAnything V2 ({local_device}) on {video_path}")
                 self.after(0, self._show_depth_progress_ui)
                 try:
                     manifest = infer_depth_for_video(
                         video_path,
                         depth_dir,
                         model_variant="vits",
-                        device="cpu",
+                        device=local_device,
                         progress_callback=self._on_depth_progress,
                         should_skip=self._skip_depth_flag.is_set,
                     )
-                    _trace(f"depth: rendered {len(manifest)} REAL EXR frames")
+                    _trace(f"depth: rendered {len(manifest)} REAL EXR frames on {local_device}")
                     if self._skip_depth_flag.is_set():
                         depth_skipped = True
-                        _trace("depth: skip flag observed after loop — user skip")
                 finally:
                     self.after(0, self._hide_depth_progress_ui)
                 if depth_skipped:
@@ -2381,14 +2404,28 @@ class RecorderApp(tk.Tk):
                         pass
                     depth_manifest_path.write_text(
                         json.dumps({
-                            "status": "skipped_by_user",
+                            "status": "server_pending",
                             "frames": [],
-                            "reason": "user clicked skip during local inference",
+                            "reason": "user skipped local inference — defer to backend",
+                            "fallback_from": "user_skip_local",
+                            "client_version": RECORDER_VERSION,
                         }, indent=2),
                         encoding="utf-8",
                     )
-                    self._set("⚠️ 已跳过深度图", "#d97706",
-                              "tarball 完成，但深度数据未包含 (本地跳过)。")
+                    self._set("ℹ️ 深度图待服务器处理", "#0277bd",
+                              "tarball 完成，深度数据将由后端处理。")
+                else:
+                    # Local depth succeeded — write manifest in proper shape.
+                    depth_manifest_path.write_text(
+                        json.dumps({
+                            "status": "local_complete",
+                            "frames": manifest if isinstance(manifest, list) else [],
+                            "device": local_device,
+                            "client_version": RECORDER_VERSION,
+                        }, indent=2),
+                        encoding="utf-8",
+                    )
+                    _trace(f"depth: local manifest written, status=local_complete")
             except Exception as e:
                 self.after(0, self._hide_depth_progress_ui)
                 _trace(f"depth: local inference FAILED: {e!r} — falling back to server_pending")
@@ -2396,18 +2433,19 @@ class RecorderApp(tk.Tk):
                     json.dumps({
                         "status": "server_pending",
                         "frames": [],
-                        "reason": f"local inference exception: {type(e).__name__}",
-                        "fallback_from_local": True,
+                        "reason": f"local inference exception: {type(e).__name__}: {e}",
+                        "fallback_from": "local_exception",
+                        "client_version": RECORDER_VERSION,
                     }, indent=2),
                     encoding="utf-8",
                 )
         else:
-            # rc14 default path: defer to backend GPU pool.
+            # No GPU or force-server — backend handles depth post-upload.
             depth_manifest_path.write_text(
                 json.dumps({
                     "status": "server_pending",
                     "frames": [],
-                    "reason": "depth inference deferred to backend GPU pool (rc14+)",
+                    "reason": track_reason,
                     "client_version": RECORDER_VERSION,
                     "expected_handler": "Phase C SM backend depth-worker",
                 }, indent=2),
