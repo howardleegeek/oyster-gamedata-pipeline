@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -85,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc11"
+RECORDER_VERSION = "lite-v0.28.0-rc12"
 
 # rc11 SF (Phase A.1, IRON LAW EXCEPTION pre-approved 2026-05-09):
 # game-agnostic failure-attribution. Every session writes terminator.json
@@ -108,6 +109,21 @@ TERMINATOR_REASONS = (
 )
 # Future games extend this. game_specific.game_id is the abstraction key.
 CURRENT_GAME_ID = "minecraft_java"
+
+# rc12 SH (Phase A.3, IRON LAW EXCEPTION pre-approved 2026-05-09):
+# game-agnostic preflight self-check registry. Add a new game by adding
+# an entry; preflight loop reads from CURRENT_GAME_ID lookup. Universal
+# checks (Win version, disk, network, IME, etc.) run regardless of game.
+GAME_PROBE_REGISTRY: dict[str, dict[str, Any]] = {
+    "minecraft_java": {
+        "display_name": "Minecraft (Java Edition)",
+        "process_names": ["javaw.exe", "java.exe", "Minecraft.exe"],
+        "window_title_substrings": ["Minecraft", "我的世界"],
+        "required_companion": "java",
+        "min_companion_version": "21",
+    },
+    # 未来 roblox / fortnite / valorant ...
+}
 
 # rc11 SG (Phase A.2): heartbeat for external watchdog. The recorder
 # writes this every loop tick + every 30s during recording; an external
@@ -943,6 +959,32 @@ class RecorderApp(tk.Tk):
         self._depth_progress_started_at: float = 0.0
 
         self._build_ui()
+        # rc12 SH: run preflight self-check after UI mount so we can
+        # disable arm button on fatal + show summary in helpbar.
+        self._preflight_results: list[dict[str, Any]] = []
+        try:
+            self._preflight_results = self._run_preflight()
+            n_pass = sum(1 for r in self._preflight_results if r["status"] == "pass")
+            n_warn = sum(1 for r in self._preflight_results if r["status"] in ("warn", "info"))
+            n_fatal = sum(1 for r in self._preflight_results if r["status"] in ("fail", "fatal"))
+            total = len(self._preflight_results)
+            if n_fatal > 0:
+                self._set("⛔ 系统检查失败", RED,
+                          f"{n_fatal}/{total} 致命错误 — 请先解决再录制")
+                self._terminator_reason = "preflight_blocked"
+                self._write_terminator(None)
+                # disable arm button
+                try:
+                    self._arm_btn.config(state="disabled")
+                except Exception:
+                    pass
+            elif n_warn > 0:
+                _trace(f"preflight: {n_pass} pass, {n_warn} warn/info, ready (with warnings)")
+            else:
+                _trace(f"preflight: all {n_pass} checks pass")
+        except Exception:
+            _trace(f"preflight: unexpected failure {traceback.format_exc()}")
+
         # Start background watcher immediately — testers do not click anything.
         threading.Thread(target=self._watch_loop, daemon=True).start()
 
@@ -2550,6 +2592,181 @@ class RecorderApp(tk.Tk):
             stderr=subprocess.DEVNULL,
             creationflags=flags,
         )
+
+    def _run_preflight(self) -> list[dict[str, Any]]:
+        """rc12 SH: preflight environment self-check.
+
+        Returns list of {check, status, message} dicts. status in
+        {pass, info, warn, fail, fatal}. Any 'fatal' disables arm
+        button; 'warn' shows in helpbar but doesn't block; 'info' is
+        logged-only. game-agnostic via GAME_PROBE_REGISTRY.
+        """
+        results: list[dict[str, Any]] = []
+
+        def add(check: str, status: str, message: str) -> None:
+            results.append({"check": check, "status": status, "message": message})
+            _trace(f"preflight: {status.upper()} {check}: {message}")
+
+        # 1. Windows version
+        try:
+            import platform as _pf
+            ver = _pf.version()
+            major = int(ver.split(".")[0]) if ver else 0
+            if os.name == "nt" and major < 10:
+                add("windows_version", "fatal", f"Windows < 10 不支持 ({ver})")
+            else:
+                add("windows_version", "pass", _pf.platform())
+        except Exception as e:
+            add("windows_version", "info", f"detect failed: {e}")
+
+        # 2. disk free
+        try:
+            free_gb = shutil.disk_usage(_output_dir()).free / (1024**3)
+            if free_gb < 0.5:
+                add("disk_free", "fatal", f"剩余 {free_gb:.1f} GB < 500 MB")
+            elif free_gb < 5.0:
+                add("disk_free", "warn", f"剩余 {free_gb:.1f} GB (建议 ≥5 GB)")
+            else:
+                add("disk_free", "pass", f"{free_gb:.1f} GB free")
+        except Exception as e:
+            add("disk_free", "info", f"detect failed: {e}")
+
+        # 3. admin
+        if os.name == "nt":
+            try:
+                import ctypes
+                is_admin = bool(ctypes.windll.shell32.IsUserAnAdmin())
+                if is_admin:
+                    add("admin", "pass", "running as admin")
+                else:
+                    add("admin", "warn", "非管理员 — 自动更新可能不工作")
+            except Exception as e:
+                add("admin", "info", f"detect failed: {e}")
+
+        # 4. OneDrive sync
+        try:
+            out_path = str(_output_dir()).lower()
+            if "onedrive" in out_path:
+                add("onedrive", "warn", "输出目录在 OneDrive — 建议暂停同步避免抢 IO")
+            else:
+                add("onedrive", "pass", "not in OneDrive")
+        except Exception:
+            pass
+
+        # 5. install path length
+        try:
+            install_path = str(Path(sys.executable).parent)
+            if len(install_path) >= 240:
+                add("path_length", "warn", f"安装路径 {len(install_path)} 字符接近 260 限制")
+            else:
+                add("path_length", "pass", f"{len(install_path)} chars")
+        except Exception:
+            pass
+
+        # 6. install path non-ASCII
+        try:
+            install_path = str(Path(sys.executable).parent)
+            if re.search(r"[^\x00-\x7F]", install_path):
+                add("path_unicode", "info", "安装路径含非 ASCII 字符 (中文/日文)")
+            else:
+                add("path_unicode", "pass", "ASCII only")
+        except Exception:
+            pass
+
+        # 7. network reachable
+        try:
+            import urllib.request
+            urllib.request.urlopen("https://api.github.com", timeout=5).close()
+            add("network", "pass", "github reachable")
+        except Exception as e:
+            add("network", "warn", f"github 不可达 — 自更新跳过 ({type(e).__name__})")
+
+        # 8. self-exe still present (antivirus delayed-quarantine probe)
+        try:
+            if Path(sys.executable).exists():
+                add("antivirus", "pass", "self-exe present at startup+200ms")
+            else:
+                add("antivirus", "warn", "self-exe vanished — 杀软隔离?")
+        except Exception:
+            pass
+
+        # 9. remote desktop
+        if os.name == "nt":
+            try:
+                import ctypes
+                is_remote = bool(ctypes.windll.user32.GetSystemMetrics(0x1000))  # SM_REMOTESESSION
+                if is_remote:
+                    add("remote_desktop", "warn", "远程桌面会话 — DirectX 录制可能失败")
+                else:
+                    add("remote_desktop", "pass", "local session")
+            except Exception:
+                pass
+
+        # 10. DPI scaling
+        if os.name == "nt":
+            try:
+                import ctypes
+                hwnd = ctypes.windll.user32.GetDesktopWindow()
+                dpi = ctypes.windll.user32.GetDpiForWindow(hwnd) if hasattr(ctypes.windll.user32, "GetDpiForWindow") else 96
+                if dpi != 96:
+                    add("dpi", "info", f"DPI 缩放 {int(dpi/96*100)}%")
+                else:
+                    add("dpi", "pass", "100%")
+            except Exception:
+                pass
+
+        # 11. GPU (reuse rc9)
+        try:
+            gpu_ok = _detect_gpu_available() if "_detect_gpu_available" in globals() else False
+            if gpu_ok:
+                add("gpu", "pass", "DirectML / CUDA available")
+            else:
+                add("gpu", "info", "无 GPU — depth 推理会跑 CPU 或跳过")
+        except Exception:
+            pass
+
+        # 12. Chinese IME (locale 0x0804 = zh-CN)
+        if os.name == "nt":
+            try:
+                import ctypes
+                hkl = ctypes.windll.user32.GetKeyboardLayout(0)
+                lang_id = hkl & 0xFFFF
+                if lang_id == 0x0804:
+                    add("ime", "warn", "检测到中文输入法 — 录制时切英文 (WASD 会被拦截)")
+                else:
+                    add("ime", "pass", f"locale 0x{lang_id:04x}")
+            except Exception:
+                pass
+
+        # === game-specific checks (from GAME_PROBE_REGISTRY) ===
+        game_cfg = GAME_PROBE_REGISTRY.get(CURRENT_GAME_ID, {})
+
+        # 13. Java present (companion check)
+        if game_cfg.get("required_companion") == "java":
+            try:
+                res = subprocess.run(
+                    ["java", "-version"],
+                    capture_output=True, text=True, timeout=5,
+                    creationflags=0x08000000 if os.name == "nt" else 0,
+                )
+                output = (res.stderr or res.stdout or "").strip().split("\n")[0]
+                if "version" in output.lower():
+                    add("java", "pass", output[:80])
+                else:
+                    add("java", "warn", "java 在 PATH 但版本输出不正常")
+            except FileNotFoundError:
+                add("java", "warn", "Java 未安装或不在 PATH — 装 Temurin 21 后可玩 MC")
+            except Exception as e:
+                add("java", "info", f"java 检测失败: {e}")
+
+        # 14. game window title locale tolerance
+        try:
+            substrs = game_cfg.get("window_title_substrings", [])
+            add("game_window_locales", "info", f"支持窗口标题: {', '.join(substrs)}")
+        except Exception:
+            pass
+
+        return results
 
     def _write_terminator(self, clip_dir: Optional[Path]) -> None:
         """rc11 SF: write game-agnostic failure-attribution manifest.
