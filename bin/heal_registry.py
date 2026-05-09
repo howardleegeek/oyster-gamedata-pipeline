@@ -1,5 +1,12 @@
 """bin/heal_registry.py — Central self-heal event registry (Heal Framework v1).
 
+rc15-fix (2026-05-09 audit):
+  - BUG#1: json.dumps now uses default=str so Path/datetime/set in
+    details dict don't silently drop the event.
+  - BUG#2: emit_event guarded by threading.Lock so concurrent writes
+    from daemon threads don't interleave half-lines.
+
+
 Howard 2026-05-09: "新 feature 都需要有良好的 self-heal 和 report 系统".
 
 Every recorder feature emits structured events here so we can:
@@ -19,12 +26,19 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 import traceback
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
+
+# rc15-fix BUG#2: serialize file appends across threads. Without this,
+# 2 daemon threads emitting at the same μs could write half-lines that
+# corrupt the heal_events.jsonl. append-mode atomicity is OS-dependent
+# and not reliable on Windows for >4KB writes.
+_EMIT_LOCK = threading.Lock()
 
 # === Registry contract ===
 # Add new features here. Lint refuses to merge PRs that emit unregistered
@@ -147,11 +161,18 @@ def emit_event(
     if contract_warnings:
         payload["_contract_warnings"] = contract_warnings
 
+    # rc15-fix BUG#1: details may contain Path/datetime/set/etc that
+    # json.dumps can't serialize natively. Use default=str so writer
+    # never silently fails on caller laziness. Was: emit returned a
+    # fake event_id but log file got nothing.
     try:
         path = _heal_log_path()
         path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        # rc15-fix BUG#2: lock around the open+write so concurrent emits
+        # from daemon threads don't interleave half-lines.
+        with _EMIT_LOCK:
+            with path.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(payload, ensure_ascii=False, default=str) + "\n")
     except Exception:
         # Last-resort: dump to stderr but never raise.
         try:
