@@ -38,12 +38,18 @@ def load_model(variant: str = "vits", device: str = "cpu"):
 
     Args:
         variant: "vits" | "vitb" | "vitl"
-        device: "cpu" or "cuda"
+        device: "cpu", "cuda", or "dml" (DirectML for AMD/Intel/NVIDIA on Win)
     Returns:
         Cached HF pipeline.
     Raises:
         ValueError on unknown variant.
         RuntimeError if model load fails (network, weights mismatch).
+
+    rc15.6 (Howard 2026-05-09 "我只有 amd 怎么办"): added "dml" device path.
+    Strategy: HF transformers pipeline doesn't natively understand "dml",
+    so we load with device="cpu" then move the model to torch_directml.
+    device() afterward. This works because pipeline only uses `device` for
+    initial placement; subsequent .to() moves the weights cleanly.
     """
     global _PIPELINE
     if _PIPELINE is not None:
@@ -64,14 +70,32 @@ def load_model(variant: str = "vits", device: str = "cpu"):
             "transformers package required. Install: pip install transformers"
         ) from e
 
+    # rc15.6: route DML through cpu-init + .to(dml_device).
+    use_dml = (device == "dml")
+    pipeline_device = "cpu" if use_dml else device
+
     try:
         _PIPELINE = pipeline(
             "depth-estimation",
             model=repo_map[variant],
-            device=device,
+            device=pipeline_device,
         )
     except Exception as e:
         raise RuntimeError(f"Failed to load DepthAnything V2 {variant}: {e}") from e
+
+    if use_dml:
+        try:
+            import torch_directml  # type: ignore  # noqa: PLC0415
+            dml_device = torch_directml.device()
+            _PIPELINE.model.to(dml_device)
+            _PIPELINE.device = dml_device  # transformers reads this for inputs
+        except ImportError as e:
+            raise RuntimeError(
+                "device='dml' requested but torch_directml not installed. "
+                "Install: pip install torch-directml"
+            ) from e
+        except Exception as e:
+            raise RuntimeError(f"Failed to move model to DirectML: {e}") from e
 
     return _PIPELINE
 

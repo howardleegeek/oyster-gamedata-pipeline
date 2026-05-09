@@ -29,6 +29,8 @@ jobs:
           # CPU-only torch keeps the .exe smaller (~1 GB vs ~3 GB CUDA).
           pip install pyinstaller pynput pillow numpy pyyaml
           pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
+          # rc15.6: bundle torch-directml for AMD/Intel GPU support on Windows.
+          pip install torch-directml
           pip install transformers imageio[ffmpeg] OpenEXR Imath huggingface_hub
 
       - name: Pre-download DepthAnything V2 weights
@@ -131,6 +133,7 @@ jobs:
             --collect-all PIL `
             --collect-all yaml `
             --collect-all torch `
+            --collect-all torch_directml `
             --collect-all transformers `
             --collect-all OpenEXR `
             --collect-all Imath `
@@ -178,6 +181,7 @@ jobs:
             --collect-all PIL `
             --collect-all yaml `
             --collect-all torch `
+            --collect-all torch_directml `
             --collect-all transformers `
             --collect-all OpenEXR `
             --collect-all Imath `

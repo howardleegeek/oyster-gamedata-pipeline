@@ -177,6 +177,10 @@ jobs:
           pip install "pyinstaller>=6.0"
           pip install pynput pillow numpy pyyaml
           pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
+          # rc15.6 (Howard 2026-05-09 "我只有 amd"): bundle torch-directml so
+          # AMD/Intel GPU users can run DepthAnything V2 via DirectML on
+          # Windows. No-op on machines without DX12 GPU (falls back to cpu).
+          pip install torch-directml
           pip install transformers "imageio[ffmpeg]" OpenEXR Imath huggingface_hub
           python -c "import PyInstaller, sys; print(f'PyInstaller {PyInstaller.__version__} on Python {sys.version.split()[0]}')"
 
@@ -415,6 +419,7 @@ jobs:
             --collect-all PIL `
             --collect-all yaml `
             --collect-all torch `
+            --collect-all torch_directml `
             --collect-all transformers `
             --collect-all OpenEXR `
             --collect-all Imath `
