@@ -69,6 +69,20 @@
   #define AppVersion "0.0.0-dev"
 #endif
 
+; Iron-law (R05D bug fix #3): the installer ships exactly ONE mod jar —
+; the one matching the MC version Fabric was pinned to. Bundling all 9
+; supported mod jars caused Fabric to load the wrong-version mod (the
+; mc1.21.5 mod against the 1.21.4 game), refusing to start. The other
+; 8 jars are uploaded to the GitHub Release as `release-extras/` for
+; advanced users who manually swap the game version.
+;
+; To bump the bundled MC version:
+;   1) update mc_pin.version_id + fabric_pin.minecraft_version in
+;      bin/build_bundled_installer/manifest.json
+;   2) update {#BundledMcVersion} below to the same string
+;   3) (re)run bin/build_bundled_installer/build_all.ps1
+#define BundledMcVersion "1.21.4"
+
 #define AppName        "Oyster Recorder"
 #define AppPublisher   "Oyster Labs"
 #define AppExeName     "OysterPlay.exe"
@@ -208,9 +222,32 @@ Source: "{#BundleRoot}\\jre\\*"; \
 ; ~200 MB. Source path comes from R05B/fetch_minecraft.py +
 ; fetch_fabric.py. Excludes assets/objects/* — those are downloaded
 ; on first launch (per spec, to keep installer < 500 MB).
+;
+; Bug fix #3 (R05D): exclude `mods\*` from the recursive glob so we don't
+; accidentally ship all 9 supported MC versions' mod jars. The matching
+; mod jar is added explicitly in (2b) below.
 Source: "{#BundleRoot}\\mc-instance\\*"; \
     DestDir: "{app}\\mc-instance"; \
+    Excludes: "\\mods\\*"; \
     Flags: ignoreversion recursesubdirs createallsubdirs
+
+; --- (2b) Single MC-version-matching recorder mod jar ---------------------
+; Only the recorder mod compiled against the same MC version Fabric was
+; pinned to. Mismatched mods (e.g. mc1.21.5 against a 1.21.4 game) make
+; Fabric refuse to start. The other 8 supported-MC-version mod jars are
+; published to the GitHub Release as `release-extras/` instead of being
+; bundled here.
+Source: "{#BundleRoot}\\mc-instance\\mods\\oyster-recorder-mod-*+mc{#BundledMcVersion}.jar"; \
+    DestDir: "{app}\\mc-instance\\mods"; \
+    Flags: ignoreversion
+
+; --- (2c) fabric-api jar --------------------------------------------------
+; Required at runtime — without it Fabric loader refuses with
+; "requires any version of fabric-api, which is missing".
+; Produced by R05B/fetch_fabric.py at a stable filename.
+Source: "{#BundleRoot}\\mc-instance\\mods\\fabric-api.jar"; \
+    DestDir: "{app}\\mc-instance\\mods"; \
+    Flags: ignoreversion
 
 ; --- (3) OysterRecorder PyInstaller --onedir bundle -----------------------
 ; ~120 MB. Source comes from the existing build-recorder-exe.yml workflow
