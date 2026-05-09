@@ -22,7 +22,7 @@ RELEASE_TAG="${RELEASE_TAG:-recorder-v0.28.0-rc2}"
 REPO="howardleegeek/oyster-gamedata-pipeline"
 SSH_TARGET="${SSH_TARGET:-minipc-bwdxs}"
 
-INSTALLER_NAME="OysterRecorder-Setup-${RELEASE_TAG#recorder-}.exe"
+INSTALLER_NAME="OysterRecorder-Setup-${RELEASE_TAG}.exe"
 MANIFEST_NAME="SHA-256-manifest.txt"
 
 say() { printf '\033[1;36m[install]\033[0m %s\n' "$*"; }
@@ -50,7 +50,9 @@ say "[2/6] reading expected SHA from manifest..."
 mkdir -p /tmp/v028-install
 gh release download "$RELEASE_TAG" --repo "$REPO" --pattern "$MANIFEST_NAME" \
   --dir /tmp/v028-install --clobber 2>/dev/null
-EXPECTED_SHA="$(awk -v name="$INSTALLER_NAME" '$2 == name {print $1}' /tmp/v028-install/"$MANIFEST_NAME")"
+# NOTE: manifest is written by Windows Out-File ascii → CRLF endings, so
+# strip \r from each field before comparing.
+EXPECTED_SHA="$(awk -v name="$INSTALLER_NAME" '{ gsub(/\r/, "") } $2 == name {print $1}' /tmp/v028-install/"$MANIFEST_NAME")"
 [ -n "$EXPECTED_SHA" ] || die "could not extract expected SHA for $INSTALLER_NAME from manifest"
 say "   expected SHA: $EXPECTED_SHA"
 

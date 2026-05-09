@@ -85,7 +85,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc9"
+RECORDER_VERSION = "lite-v0.28.0-rc10"
 
 # R01 iron-law: supported MC versions for real game-state Fabric mod.
 # Kept in sync with .github/workflows/build-mc-mod.yml matrix.
@@ -202,7 +202,10 @@ def _stage_self_update(new_exe_url: str) -> bool:
         return False
     try:
         import urllib.request
-        new_path = Path(tempfile.gettempdir()) / "OysterRecorder-update.exe"
+        # B4: download to same drive as current_exe for instant rename (not cross-drive copy)
+        target_dir = Path(sys.executable).parent / "_update_tmp"
+        target_dir.mkdir(parents=True, exist_ok=True)
+        new_path = target_dir / "OysterRecorder-update.exe"
         _trace(f"update: downloading {new_exe_url} -> {new_path}")
         with urllib.request.urlopen(new_exe_url, timeout=120) as resp, \
                 new_path.open("wb") as fh:
@@ -219,11 +222,20 @@ def _stage_self_update(new_exe_url: str) -> bool:
 
     current_exe = Path(sys.executable)
     bat_path = Path(tempfile.gettempdir()) / "OysterRecorder-update.bat"
+    # B3: bat with retry loop to wait for .exe handle release (max 30s)
     bat_body = (
         "@echo off\r\n"
-        "rem Wait for the recorder to fully exit before swapping.\r\n"
-        "timeout /t 3 /nobreak > nul\r\n"
-        f'move /Y "{new_path}" "{current_exe}"\r\n'
+        "set RETRY=0\r\n"
+        ":retry\r\n"
+        "timeout /t 1 /nobreak > nul\r\n"
+        f'move /Y "{new_path}" "{current_exe}" 2>nul\r\n'
+        "if errorlevel 1 (\r\n"
+        "  set /a RETRY+=1\r\n"
+        "  if %RETRY% LSS 30 goto retry\r\n"
+        "  echo update FAILED after 30s, abort\r\n"
+        f'del "{new_path}" 2>nul\r\n'
+        "  exit /b 1\r\n"
+        ")\r\n"
         f'start "" "{current_exe}"\r\n'
         f'del "{bat_path}"\r\n'
     )
@@ -853,6 +865,8 @@ class RecorderApp(tk.Tk):
         # WITHOUT us recording first.
         self._record_armed = False
         self._mc_window_rect: Optional[dict[str, int]] = None
+        # rc10 B2: track whether ffmpeg closed cleanly (default True).
+        self._ffmpeg_clean_close: bool = True
 
         # rc9 (Howard 2026-05-09): depth-progress UX state.
         #
@@ -1761,6 +1775,19 @@ class RecorderApp(tk.Tk):
         # a 5-file PRD-shaped tarball after MC exits.
         ts = datetime.now().strftime("%Y%m%d-%H%M%S")
         self._tmp_dir = Path(tempfile.mkdtemp(prefix=f"oyster-rec-{ts}-"))
+        # rc10 B5 (IRON LAW EXCEPTION 2026-05-09): pre-flight disk space check.
+        # Aliyun cluster 3x dispatch failed on this single hunk (model context
+        # exhausted by 112KB file + small SE delta); Howard granted 1-time
+        # Edit-tool exception. See feedback_aliyun_cluster_only.md update.
+        _MIN_FREE_BYTES = 500 * 1024 * 1024  # 500 MB
+        _free_bytes = shutil.disk_usage(self._tmp_dir).free
+        if _free_bytes < _MIN_FREE_BYTES:
+            _free_mb = _free_bytes / (1024 * 1024)
+            self._set("⚠️ 磁盘空间不足", ORANGE,
+                      f"剩余 {_free_mb:.0f} MB, 录制需 ≥500 MB. 清理后重试.")
+            _trace(f"disk_check: ABORT — only {_free_mb:.0f} MB free in {self._tmp_dir}")
+            shutil.rmtree(self._tmp_dir, ignore_errors=True)
+            return
         self._video_path = self._tmp_dir / "video.mp4"
         self._record_started_at = time.time()
         # R18 session-binding: one UUID per recording, propagated into
@@ -2115,6 +2142,7 @@ class RecorderApp(tk.Tk):
                     "start_time": _dt.fromtimestamp(self._record_started_at).isoformat(),
                     "frame_count": target_frame_count,
                     "fps": FPS,
+                    "mp4_clean_close": getattr(self, "_ffmpeg_clean_close", True),
                 }, indent=2),
                 encoding="utf-8",
             )
@@ -2448,14 +2476,16 @@ class RecorderApp(tk.Tk):
                 proc.stdin.write(b"q\n")
                 proc.stdin.flush()
         except Exception:
-            pass
+            self._ffmpeg_clean_close = False
         try:
             proc.wait(timeout=5.0)
         except subprocess.TimeoutExpired:
+            self._ffmpeg_clean_close = False
             proc.terminate()
             try:
                 proc.wait(timeout=3.0)
             except subprocess.TimeoutExpired:
+                self._ffmpeg_clean_close = False
                 proc.kill()
         self._ffmpeg_proc = None
 
@@ -2463,6 +2493,25 @@ class RecorderApp(tk.Tk):
         _trace("on_close: user closed window")
         self._stop_event.set()
         self._stop_ffmpeg()
+        # rc10 B1: ask tester whether to also kill Minecraft.
+        try:
+            import tkinter.messagebox as _mb
+            if _mb.askyesno("关闭确认", "也要关闭 Minecraft 吗?\n\n是 = 关 MC + 关录制\n否 = 仅关录制 (MC 继续运行无录像)"):
+                if os.name == "nt":
+                    try:
+                        rc = subprocess.run(
+                            ["taskkill", "/F", "/IM", "javaw.exe"],
+                            creationflags=0x08000000,
+                            capture_output=True,
+                            timeout=5,
+                        ).returncode
+                        _trace(f"on_close: kill MC requested, taskkill exit={rc}")
+                    except Exception:
+                        _trace(f"on_close: kill MC failed: {traceback.format_exc()}")
+                else:
+                    _trace("on_close: kill MC skipped (non-Windows)")
+        except Exception:
+            _trace(f"on_close: confirmation dialog failed: {traceback.format_exc()}")
         # Final telemetry push so engineer sees the full session log.
         # Synchronous-ish but capped to 15s by urlopen timeout.
         try:
