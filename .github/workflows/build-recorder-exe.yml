@@ -119,6 +119,8 @@ jobs:
             --add-data "bin/depth_anything_v2_inference.py;." `
             --add-data "bin/install_fabric_loader.py;." `
             --add-data "bin/game_state_overlay.py;." `
+            --add-data "bin/heal_registry.py;." `
+            --add-data "bin/heal_report.py;." `
             --add-data "fabric-installer.jar;." `
             --add-data "oyster-recorder-mod.jar;." `
             --add-data "hf_cache;hf_cache" `
@@ -142,6 +144,8 @@ jobs:
             --hidden-import depth_anything_v2_inference `
             --hidden-import install_fabric_loader `
             --hidden-import game_state_overlay `
+            --hidden-import heal_registry `
+            --hidden-import heal_report `
             --hidden-import PIL.Image `
             bin/recorder_consumer_lite.py
 
@@ -162,6 +166,8 @@ jobs:
             --add-data "bin/depth_anything_v2_inference.py;." `
             --add-data "bin/install_fabric_loader.py;." `
             --add-data "bin/game_state_overlay.py;." `
+            --add-data "bin/heal_registry.py;." `
+            --add-data "bin/heal_report.py;." `
             --add-data "fabric-installer.jar;." `
             --add-data "oyster-recorder-mod.jar;." `
             --add-data "hf_cache;hf_cache" `
@@ -185,6 +191,8 @@ jobs:
             --hidden-import depth_anything_v2_inference `
             --hidden-import install_fabric_loader `
             --hidden-import game_state_overlay `
+            --hidden-import heal_registry `
+            --hidden-import heal_report `
             --hidden-import PIL.Image `
             bin/recorder_consumer_lite.py
           # Zip the onedir output for distribution.

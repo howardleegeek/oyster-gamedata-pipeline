@@ -142,6 +142,23 @@ def emit_event(
             f"severity '{severity}' not in VALID_SEVERITY"
         )
 
+    # rc15.3-fix BUG#13 (PREVENTIVE): cap details size to defend against
+    # crash-storm bloat (e.g. excepthook payload with full traceback ×
+    # 100 events = jsonl > 10MB in seconds). Stress test showed no upper
+    # bound; a single excepthook can emit 50KB. Cap at 4KB raw JSON +
+    # marker so we keep enough context for debug without runaway growth.
+    _details_safe = details or {}
+    try:
+        _details_str = json.dumps(_details_safe, ensure_ascii=False, default=str)
+        if len(_details_str) > 4096:
+            _details_safe = {
+                "_truncated": True,
+                "_original_size_bytes": len(_details_str),
+                "_preview": _details_str[:3500] + "...[truncated]",
+            }
+    except Exception:
+        _details_safe = {"_serialize_failed": True}
+
     payload: dict[str, Any] = {
         "schema_version": "1.0",
         "event_id": str(uuid.uuid4()),
@@ -151,7 +168,7 @@ def emit_event(
         "event_type": event_type,
         "severity": severity,
         "summary": summary[:300],  # cap
-        "details": details or {},
+        "details": _details_safe,
         "remediation": remediation or {},
     }
     if session_id:

@@ -936,6 +936,8 @@ def _list_windows_processes() -> set[str]:
             ["tasklist", "/FO", "CSV", "/NH"],
             stderr=subprocess.DEVNULL,
             text=True,
+            encoding="utf-8",        # rc15.3-fix BUG#15: was cp1252 default
+            errors="replace",        # rc15.3-fix BUG#15: tolerate non-ASCII
             timeout=5,
             creationflags=0x08000000,  # CREATE_NO_WINDOW
         )
@@ -962,23 +964,33 @@ def _find_minecraft_pids() -> list[int]:
 
     Uses tasklist /fo csv /nh to get image,PID per row, filters to
     MC_PROCESS_NAMES. Empty list on non-Windows or detection failure.
+
+    rc15.3-fix BUG#14: use csv.reader for column parsing (line.split(",")
+    breaks on process names containing commas, e.g. "My App, Inc.").
+    rc15.3-fix BUG#15: pin encoding=utf-8 errors=replace so non-ASCII
+    process names don't UnicodeDecodeError on cp1252 default.
     """
     if os.name != "nt":
         return []
+    import csv as _csv  # noqa: PLC0415
     try:
         out = subprocess.check_output(
             ["tasklist", "/fo", "csv", "/nh"],
             stderr=subprocess.DEVNULL,
             creationflags=0x08000000,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=5,
         )
     except Exception:
         return []
     pids: list[int] = []
     for line in out.splitlines():
+        if not line.strip():
+            continue
         try:
-            parts = [p.strip('"') for p in line.split(",")]
+            parts = next(_csv.reader([line]))
             if len(parts) < 2:
                 continue
             image, pid_str = parts[0], parts[1]
@@ -3400,42 +3412,53 @@ def main() -> int:
     except Exception:
         pass
 
-    # rc15.2-fix BUG H9: install threading.excepthook so daemon thread
-    # crashes (watch_loop, input_capture, auto_lint, auto_bft) don't die
-    # silently. Was bug: terminator reason "crash" enumerated but no path
-    # actually wrote it for daemon thread exceptions.
-    def _thread_excepthook(args):  # type: ignore[no-untyped-def]
-        try:
-            tname = getattr(args.thread, "name", "unknown")
-            exc_msg = f"{args.exc_type.__name__}: {args.exc_value}"
-            _trace(f"DAEMON CRASH thread={tname} {exc_msg}\n{traceback.format_exc()}")
-            _heal_emit(
-                "SF_terminator", "report", "fatal",
-                f"daemon thread crashed: {tname} — {exc_msg}",
-                details={"thread_name": tname, "exception": exc_msg},
-                remediation={"action": "user_prompt", "performed": False,
-                             "next_step": "restart recorder; check heal_report for details"},
-                recorder_version=RECORDER_VERSION,
-            )
-        except Exception:
-            pass
-    threading.excepthook = _thread_excepthook
-    # Also wire sys.excepthook for main thread.
-    _orig_excepthook = sys.excepthook
-    def _main_excepthook(exc_type, exc_value, exc_tb):  # type: ignore[no-untyped-def]
-        try:
-            _heal_emit(
-                "SF_terminator", "report", "fatal",
-                f"main thread crashed: {exc_type.__name__}: {exc_value}",
-                details={"exception": f"{exc_type.__name__}: {exc_value}"},
-                remediation={"action": "user_prompt", "performed": False,
-                             "next_step": "send diagnostic zip to engineer"},
-                recorder_version=RECORDER_VERSION,
-            )
-        except Exception:
-            pass
-        _orig_excepthook(exc_type, exc_value, exc_tb)
-    sys.excepthook = _main_excepthook
+    # rc15.2-fix BUG H9 + rc15.3-fix BUG#16+#18: install threading.excepthook
+    # so daemon thread crashes don't die silently.
+    # rc15.3-fix BUG#16: idempotency guard — main() may be re-entered (test
+    # harness, dev mode) and re-installing creates infinite call chain.
+    # rc15.3-fix BUG#18: traceback.format_exc() reads sys.exc_info() which
+    # is EMPTY inside excepthook → returned "NoneType: None\n". Use
+    # traceback.format_exception(args.exc_type, args.exc_value,
+    # args.exc_traceback) for the real stack.
+    if not getattr(sys, "_oyster_excepthook_installed", False):
+        def _thread_excepthook(args):  # type: ignore[no-untyped-def]
+            try:
+                tname = getattr(args.thread, "name", "unknown")
+                exc_msg = f"{args.exc_type.__name__}: {args.exc_value}"
+                tb_str = "".join(traceback.format_exception(
+                    args.exc_type, args.exc_value, args.exc_traceback))
+                _trace(f"DAEMON CRASH thread={tname} {exc_msg}\n{tb_str}")
+                _heal_emit(
+                    "SF_terminator", "report", "fatal",
+                    f"daemon thread crashed: {tname} — {exc_msg}",
+                    details={"thread_name": tname, "exception": exc_msg,
+                             "traceback": tb_str[:3000]},  # cap respects 4KB details cap
+                    remediation={"action": "user_prompt", "performed": False,
+                                 "next_step": "restart recorder; check heal_report for details"},
+                    recorder_version=RECORDER_VERSION,
+                )
+            except Exception:
+                pass
+        threading.excepthook = _thread_excepthook
+        # Also wire sys.excepthook for main thread.
+        _orig_excepthook = sys.excepthook
+        def _main_excepthook(exc_type, exc_value, exc_tb):  # type: ignore[no-untyped-def]
+            try:
+                tb_str = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+                _heal_emit(
+                    "SF_terminator", "report", "fatal",
+                    f"main thread crashed: {exc_type.__name__}: {exc_value}",
+                    details={"exception": f"{exc_type.__name__}: {exc_value}",
+                             "traceback": tb_str[:3000]},
+                    remediation={"action": "user_prompt", "performed": False,
+                                 "next_step": "send diagnostic zip to engineer"},
+                    recorder_version=RECORDER_VERSION,
+                )
+            except Exception:
+                pass
+            _orig_excepthook(exc_type, exc_value, exc_tb)
+        sys.excepthook = _main_excepthook
+        sys._oyster_excepthook_installed = True  # type: ignore[attr-defined]
 
     try:
         _try_install_mod_first_launch()
