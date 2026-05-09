@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc12"
+RECORDER_VERSION = "lite-v0.28.0-rc13"
 
 # rc11 SF (Phase A.1, IRON LAW EXCEPTION pre-approved 2026-05-09):
 # game-agnostic failure-attribution. Every session writes terminator.json
@@ -1987,6 +1987,25 @@ class RecorderApp(tk.Tk):
 
         if output_tar.exists():
             size_mb = output_tar.stat().st_size / (1024 * 1024)
+            # rc13 SK (Phase B.3): duration enforcement — buyer rejects
+            # < 5 min sessions per PRD criterion 2. Show modal so tester
+            # knows to re-record instead of silently shipping rejected data.
+            if self._terminator_reason == "duration_too_short":
+                try:
+                    import tkinter.messagebox as _mb
+                    elapsed_min = (
+                        (time.time() - self._record_started_at) / 60.0
+                        if getattr(self, "_record_started_at", 0) else 0.0
+                    )
+                    _mb.showwarning(
+                        "录制时长不足",
+                        f"本次录制 {elapsed_min:.1f} 分钟 (< 5 分钟). "
+                        "买家规格要求 5–6 分钟, 这次录像会被自动隔离, "
+                        "请重新录制. 重启 Minecraft 后点 ▶ 开始录制 即可."
+                    )
+                    _trace(f"SK: prompted re-record (elapsed {elapsed_min:.1f} min)")
+                except Exception:
+                    _trace(f"SK: messagebox failed {traceback.format_exc()}")
             self._set("✓ 录制完成", GREEN,
                       f"{output_tar.name} ({size_mb:.1f} MB) 已保存。"
                       f"正在验证买家规格…")
@@ -2975,6 +2994,52 @@ def _try_install_mod_first_launch() -> None:
             pass
 
 
+def _scan_and_clean_orphans() -> int:
+    """rc13 SI (Phase B.1): scan tempfile.gettempdir() for stale
+    oyster-rec-* dirs from prior crashes and clean them up.
+
+    A dir is "orphan" if it's older than 1 hour AND its prefix matches
+    'oyster-rec-' AND no live process owns it. Returns count cleaned.
+    Also writes a session-less terminator.json with reason='orphan_resumed'
+    so we capture the failure mode in telemetry once backend is online.
+    """
+    cleaned = 0
+    try:
+        tmp_root = Path(tempfile.gettempdir())
+        cutoff = time.time() - 3600  # 1 hour ago
+        for entry in tmp_root.glob("oyster-rec-*"):
+            try:
+                if not entry.is_dir():
+                    continue
+                if entry.stat().st_mtime > cutoff:
+                    continue  # too fresh — might be a live session
+                shutil.rmtree(entry, ignore_errors=True)
+                cleaned += 1
+                _trace(f"orphan_cleanup: removed {entry}")
+            except Exception as exc:
+                _trace(f"orphan_cleanup: skip {entry} ({exc})")
+        if cleaned > 0:
+            try:
+                runtime_dir = Path(_real_documents_dir()) / "OysterRecorder" / "runtime"
+                runtime_dir.mkdir(parents=True, exist_ok=True)
+                (runtime_dir / "terminator.json").write_text(
+                    json.dumps({
+                        "schema_version": "1.0",
+                        "reason": "orphan_resumed",
+                        "last_recorded_at": datetime.now().isoformat(),
+                        "orphans_cleaned": cleaned,
+                        "recorder_version": RECORDER_VERSION,
+                        "game_specific": {"game_id": CURRENT_GAME_ID},
+                    }, indent=2),
+                    encoding="utf-8",
+                )
+            except Exception:
+                pass
+    except Exception as exc:
+        _trace(f"orphan_cleanup: scan failed {exc}")
+    return cleaned
+
+
 def main() -> int:
     import argparse  # noqa: PLC0415
     parser = argparse.ArgumentParser(description="OysterRecorder")
@@ -2992,6 +3057,15 @@ def main() -> int:
         f"OysterRecorder {RECORDER_VERSION} — supported Minecraft versions "
         f"for real game-state:\n  {supported_str}"
     )
+
+    # rc13 SI: scan + clean orphan tmp dirs from prior crashes BEFORE
+    # mod install / app start so disk pressure is gone.
+    try:
+        n_orphans = _scan_and_clean_orphans()
+        if n_orphans > 0:
+            _trace(f"startup: cleaned {n_orphans} orphan oyster-rec-* tmp dirs")
+    except Exception:
+        pass
 
     try:
         _try_install_mod_first_launch()
