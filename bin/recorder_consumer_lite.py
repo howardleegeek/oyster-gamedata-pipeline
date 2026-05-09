@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.7.2"
+RECORDER_VERSION = "lite-v0.28.0-rc15.8"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -252,15 +252,30 @@ def _latest_release_tag_and_url() -> tuple[Optional[str], Optional[str]]:
 
 
 def _is_newer_tag(latest: str, current: str) -> bool:
-    """Compare recorder-vA.B.C semver-ish tags. Returns True if latest > current."""
+    """Compare recorder-vA.B.C semver-ish tags. Returns True if latest > current.
+
+    rc15.8-fix BUG R11 H10 (CRITICAL): old impl parsed "0-rc15" as
+    ValueError → 0. So rc16 ("v0.28.0-rc16") = (0,28,0) compared LESS
+    than rc15.7.2 ("v0.28.0-rc15.7.2") = (0,28,0,7,2) — Python tuple
+    comparison treats shorter as smaller when prefix equal. Result:
+    auto-update from rc15.7.2 to future rc16 NEVER fires. Fix: extract
+    all digit groups from each piece via regex so 'rc15' contributes 15
+    to the comparison key.
+    """
+    import re as _re  # noqa: PLC0415
     def _key(t: str) -> tuple[int, ...]:
         v = t.replace("recorder-v", "").split(".")
-        out = []
+        out: list[int] = []
         for piece in v:
             try:
                 out.append(int(piece))
             except ValueError:
-                out.append(0)
+                # "0-rc15" → [0, 15], "rc16" → [16], "alpha" → [0]
+                ints = [int(m) for m in _re.findall(r'\d+', piece)]
+                if ints:
+                    out.extend(ints)
+                else:
+                    out.append(0)
         return tuple(out)
     return _key(latest) > _key(current)
 
