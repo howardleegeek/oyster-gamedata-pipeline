@@ -189,6 +189,23 @@ def emit_event(
     try:
         path = _heal_log_path()
         path.parent.mkdir(parents=True, exist_ok=True)
+        # rc15.4-fix BUG R6 C1: gate file size at 20MB to prevent unbounded
+        # growth (orphan_resumed × N runs). On overflow, rotate file →.1
+        # and start fresh. ~5K typical events = .1 = ~5MB rotated keeps.
+        try:
+            if path.exists() and path.stat().st_size > 20_000_000:
+                rotated = path.with_suffix(".jsonl.1")
+                try:
+                    if rotated.exists():
+                        rotated.unlink()
+                except Exception:
+                    pass
+                try:
+                    path.rename(rotated)
+                except Exception:
+                    pass
+        except Exception:
+            pass
         # rc15-fix BUG#2: lock around the open+write so concurrent emits
         # from daemon threads don't interleave half-lines.
         with _EMIT_LOCK:
@@ -209,24 +226,29 @@ def read_recent_events(limit: int = 200) -> list[dict[str, Any]]:
 
     Returns up to `limit` most recent events, parsed. Bad lines skipped.
     Never raises.
+
+    rc15.4-fix BUG R6 C1: use deque(fh, maxlen=limit) for O(1) memory tail
+    so we don't load 20MB into RAM just to slice last 200 events.
     """
+    from collections import deque  # noqa: PLC0415
     out: list[dict[str, Any]] = []
     try:
         path = _heal_log_path()
         if not path.exists():
             return out
         with path.open("r", encoding="utf-8") as fh:
-            for line in fh:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    out.append(json.loads(line))
-                except Exception:
-                    continue
+            tail_lines = deque(fh, maxlen=limit)
+        for line in tail_lines:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                out.append(json.loads(line))
+            except Exception:
+                continue
     except Exception:
         return out
-    return out[-limit:]
+    return out
 
 
 def aggregate_by_feature(events: list[dict[str, Any]]) -> dict[str, dict[str, int]]:

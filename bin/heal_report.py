@@ -122,7 +122,7 @@ def generate_html(limit: int = 200) -> Path:
 <meta charset="utf-8">
 <title>Oyster Recorder — Health Report</title>
 <style>
-body {{ font-family: -apple-system, "Segoe UI", sans-serif; max-width: 1280px; margin: 24px auto; padding: 0 20px; color: #222; }}
+body {{ font-family: -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif; max-width: 1280px; margin: 24px auto; padding: 0 20px; color: #222; }}
 h1 {{ font-size: 22px; margin: 8px 0; }}
 h2 {{ font-size: 16px; margin: 24px 0 8px; color: #444; border-bottom: 1px solid #ddd; padding-bottom: 4px; }}
 .meta {{ color: #666; font-size: 13px; }}
@@ -191,15 +191,24 @@ tr.row-fatal td {{ background: rgba(106,27,154,0.08); font-weight: 600; }}
 
 
 def main() -> int:
-    out = generate_html()
-    print(f"heal_report.html written: {out}")
+    # rc15.4-fix BUG R6 H4: wrap entire body in try/except so generate_html
+    # failure doesn't cause stale HTML to open or NameError to propagate.
+    try:
+        out = generate_html()
+        print(f"heal_report.html written: {out}")
+        if not (out and out.exists()):
+            print("ERROR: heal_report.html not produced")
+            return 2
+    except Exception as e:
+        print(f"ERROR: generate_html failed: {e}")
+        return 3
     try:
         # rc15.2-fix BUG#8: use Path.as_uri() instead of f"file://{out}".
         # On Windows, str(Path(...)) returns backslashes which most browsers
         # reject. as_uri() produces correct file:///C:/Users/... form.
         webbrowser.open(out.as_uri())
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"WARNING: browser open failed: {e}; manual open: {out}")
     return 0
 
 

@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15"
+RECORDER_VERSION = "lite-v0.28.0-rc15.4"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -1941,15 +1941,28 @@ class RecorderApp(tk.Tk):
         """After a recording session, restore the button to '▶ 开始录制' so
         the tester can immediately start another session without
         restarting the .exe.
+
+        rc15.4-fix BUG R6 H3: re-run preflight + re-enable button if last
+        run had a fatal preflight (e.g. disk freed up since startup). Was
+        bug: preflight FATAL disabled arm permanently, tester had to
+        restart recorder to recover.
         """
         try:
             self._record_armed = False
+            # Re-run preflight to see if fatal condition cleared.
+            try:
+                fresh = self._run_preflight()
+                self._preflight_results = fresh
+                n_fatal = sum(1 for r in fresh if r["status"] in ("fail", "fatal"))
+            except Exception:
+                n_fatal = 0  # don't lock arm if probe itself crashed
             self._arm_btn.config(
                 text="▶ 开始录制",
                 bg="#1976d2",
                 activebackground="#1565c0",
+                state="normal" if n_fatal == 0 else "disabled",
             )
-            _trace("button reset for next session")
+            _trace(f"button reset for next session (preflight fatal={n_fatal}, arm={'on' if n_fatal == 0 else 'off'})")
         except Exception:
             pass
 
@@ -2019,22 +2032,23 @@ class RecorderApp(tk.Tk):
         ts = datetime.now().strftime("%Y%m%d-%H%M%S")
         self._tmp_dir = Path(tempfile.mkdtemp(prefix=f"oyster-rec-{ts}-"))
         # rc10 B5 (IRON LAW EXCEPTION 2026-05-09): pre-flight disk space check.
-        # Aliyun cluster 3x dispatch failed on this single hunk (model context
-        # exhausted by 112KB file + small SE delta); Howard granted 1-time
-        # Edit-tool exception. See feedback_aliyun_cluster_only.md update.
-        _MIN_FREE_BYTES = 500 * 1024 * 1024  # 500 MB
+        # rc15.4-fix BUG R4 H4: gate was 500MB but session writes 80-110MB +
+        # depth dir. Tester at 600MB free passed gate then ran out mid-record →
+        # ffmpeg dirty close, corrupted partial mp4. Raise to 2GB to leave
+        # margin for: 1 session video (~110MB) + retry buffer + tmp staging.
+        _MIN_FREE_BYTES = 2 * 1024 * 1024 * 1024  # 2 GB
         _free_bytes = shutil.disk_usage(self._tmp_dir).free
         if _free_bytes < _MIN_FREE_BYTES:
             _free_mb = _free_bytes / (1024 * 1024)
             self._set("⚠️ 磁盘空间不足", ORANGE,
                       f"剩余 {_free_mb:.0f} MB, 录制需 ≥500 MB. 清理后重试.")
-            _trace(f"disk_check: ABORT — only {_free_mb:.0f} MB free in {self._tmp_dir}")
+            _trace(f"disk_check: ABORT — only {_free_mb:.0f} MB free in {self._tmp_dir} (threshold 2GB)")
             self._terminator_reason = "disk_full"
             self._write_terminator(None)  # no clip_dir yet — write to runtime/
             _heal_emit(
                 "B5_disk_space_preflight", "heal_failed", "fatal",
-                f"disk free {_free_mb:.0f} MB < 500 MB threshold; recording aborted",
-                details={"free_mb": _free_mb, "threshold_mb": 500, "probe_path": str(self._tmp_dir)},
+                f"disk free {_free_mb:.0f} MB < 2048 MB threshold; recording aborted",
+                details={"free_mb": _free_mb, "threshold_mb": 2048, "probe_path": str(self._tmp_dir)},
                 remediation={
                     "action": "user_prompt",
                     "performed": True,
@@ -2171,13 +2185,30 @@ class RecorderApp(tk.Tk):
                     )
                 except Exception:
                     _trace(f"SK: messagebox failed {traceback.format_exc()}")
-            self._set("✓ 录制完成", GREEN,
-                      f"{output_tar.name} ({size_mb:.1f} MB) 已保存。"
-                      f"正在验证买家规格…")
-            self._hint.config(
-                text=f"已保存: {output_tar}",
-                fg=GREEN,
-            )
+                # rc15.4-fix BUG R5#4: move partial tarball to _rejected/
+                # so buyer ingest can filter cleanly + tester can recover.
+                try:
+                    rejected_dir = output_tar.parent / "_rejected"
+                    rejected_dir.mkdir(parents=True, exist_ok=True)
+                    rejected_tar = rejected_dir / output_tar.name
+                    output_tar.rename(rejected_tar)
+                    output_tar = rejected_tar
+                    _trace(f"SK: moved partial tarball to {rejected_tar}")
+                except Exception:
+                    _trace(f"SK: failed to move partial tarball {traceback.format_exc()}")
+                # rc15.4-fix BUG R4 H1: orange verdict (NOT green) so UI is
+                # consistent with the warning popup that just appeared.
+                self._set("⚠️ 录制时长不足 — 已隔离", "#ef6c00",
+                          f"{output_tar.name} 已移至 _rejected/ 目录, 请重录")
+                self._hint.config(text=f"已隔离: {output_tar}", fg="#ef6c00")
+            else:
+                self._set("✓ 录制完成", GREEN,
+                          f"{output_tar.name} ({size_mb:.1f} MB) 已保存。"
+                          f"正在验证买家规格…")
+                self._hint.config(
+                    text=f"已保存: {output_tar}",
+                    fg=GREEN,
+                )
             # v0.6.0: window was iconified when arm was pressed to free
             # MC focus. MC has now exited, so restore our window so the
             # tester sees the green "✓ 录制完成" verdict without needing
@@ -2636,24 +2667,29 @@ class RecorderApp(tk.Tk):
         # has zero EXR files so the manifest is the empty object {},
         # which still lets the consumer-side R22 vote PASS instead of
         # ABSTAIN once the full recorder ships EXR frames.
+        # rc15.4-fix BUG R5#1 (CRITICAL): was overwriting depth_manifest.json
+        # (status envelope from rc14 dual-track) with a flat EXR hash map →
+        # buyer ingest lost status field → server_pending sessions misclassified
+        # as having complete depth. Now: hashes go to SEPARATE file
+        # depth_hashes.json, status manifest preserved untouched.
         try:
             import hashlib as _hashlib  # noqa: PLC0415
             depth_dir_path = clip_dir / "depth"
-            depth_manifest: dict[str, str] = {}
+            depth_hashes: dict[str, str] = {}
             for exr_path in sorted(depth_dir_path.glob("*.exr")):
                 sha = _hashlib.sha256()
                 with exr_path.open("rb") as fh:
                     for chunk in iter(lambda fh=fh: fh.read(1 << 20), b""):
                         sha.update(chunk)
-                depth_manifest[exr_path.name] = sha.hexdigest()
-            (clip_dir / "depth_manifest.json").write_text(
-                json.dumps(depth_manifest, indent=2),
+                depth_hashes[exr_path.name] = sha.hexdigest()
+            (clip_dir / "depth_hashes.json").write_text(
+                json.dumps(depth_hashes, indent=2),
                 encoding="utf-8",
             )
-            _trace(f"package: wrote depth_manifest.json ({len(depth_manifest)} entries)")
+            _trace(f"package: wrote depth_hashes.json ({len(depth_hashes)} entries) — depth_manifest.json status envelope preserved")
         except Exception as e:  # noqa: BLE001
-            _trace(f"package: depth_manifest.json write failed: {e}")
-            # Non-fatal — R22 will ABSTAIN on missing manifest, same as
+            _trace(f"package: depth_hashes.json write failed: {e}")
+            # Non-fatal — R22 will ABSTAIN on missing hashes, same as
             # behaviour before this hook landed.
 
         # 6. v0.18.0: intrinsics.yaml — buyer expects fx/fy/Cx/Cy.
@@ -3013,7 +3049,11 @@ class RecorderApp(tk.Tk):
                 hkl = ctypes.windll.user32.GetKeyboardLayout(0)
                 lang_id = hkl & 0xFFFF
                 if lang_id == 0x0804:
-                    add("ime", "warn", "检测到中文输入法 — 录制时切英文 (WASD 会被拦截)")
+                    # rc15.4-fix BUG R4 H2: was warn → arm enabled → tester
+                    # records with IME on → WASD blocked → broken session.
+                    # Escalate to fatal so arm button stays disabled until
+                    # tester switches IME (Shift / Win+Space toggles to EN).
+                    add("ime", "fatal", "检测到中文输入法 — 录制按钮已禁用. 请切换到英文输入法 (Shift 或 Win+Space) 后重启录制器")
                 else:
                     add("ime", "pass", f"locale 0x{lang_id:04x}")
             except Exception:
@@ -3170,7 +3210,7 @@ class RecorderApp(tk.Tk):
         # set terminator reason for failure-attribution either way.
         try:
             import tkinter.messagebox as _mb
-            if _mb.askyesno("关闭确认", "也要关闭 Minecraft 吗?\n\n是 = 关 MC + 关录制\n否 = 仅关录制 (MC 继续运行无录像)"):
+            if _mb.askyesno("关闭确认", "也要关闭 Minecraft 吗?\n\n是 = 关 MC + 关录制 (本次会话保存)\n否 = 只关录制器 (MC继续, 但本次录像不保存)"):
                 self._terminator_reason = "user_close_kill_game"
                 if os.name == "nt":
                     try:
