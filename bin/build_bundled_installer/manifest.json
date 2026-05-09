@@ -1,9 +1,9 @@
 {
-  "_comment_1": "Build-time pin for the bundled JRE. fetch_jre.py reads this file at",
-  "_comment_2": "build time and HARD-FAILS on SHA-256 mismatch. Bumping the JRE means",
-  "_comment_3": "changing this JSON (URL + sha256 + size + version) — never edit Python.",
-  "_comment_4": "Cross-check sha256 against the official .sha256.txt next to the asset:",
-  "_comment_5": "  curl -sfL <url>.sha256.txt   # must match `sha256` below.",
+  "_comment_1": "Build-time pin for the bundled JRE + Minecraft + Fabric. The fetch_*.py",
+  "_comment_2": "scripts read this file at build time and HARD-FAIL on SHA-256 mismatch.",
+  "_comment_3": "Bumping anything means editing this JSON — never edit constants in code.",
+  "_comment_4": "JRE pin lives at root level for backward compat with fetch_jre.py;",
+  "_comment_5": "MC + Fabric pins live under mc_pin / fabric_pin namespaces.",
   "schema_version": 1,
   "vendor": "eclipse-temurin",
   "release_tag": "jdk-21.0.11+10",
@@ -32,5 +32,43 @@
     "bin/javaw.exe",
     "bin/java.exe",
     "release"
-  ]
+  ],
+
+  "_comment_mc_1": "Vanilla Minecraft Java Edition pin. fetch_minecraft.py uses the",
+  "_comment_mc_2": "version_manifest_url to discover 1.21.4's per-version manifest URL,",
+  "_comment_mc_3": "then re-verifies SHA-1 of every artifact against Mojang's own pins.",
+  "_comment_mc_4": "We do NOT pin client.jar's SHA here — Mojang's manifest IS the pin,",
+  "_comment_mc_5": "and we hard-fail if Mojang changes 1.21.4 (immutable per Mojang policy).",
+  "mc_pin": {
+    "schema_version": 1,
+    "vendor": "mojang",
+    "version_id": "1.21.4",
+    "asset_index_id": "19",
+    "platform": {
+      "os": "windows",
+      "arch": "x64"
+    },
+    "version_manifest_url": "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json",
+    "post_fetch_required_files": [
+      "versions/1.21.4/1.21.4.jar",
+      "versions/1.21.4/1.21.4.json",
+      "assets/indexes/19.json"
+    ]
+  },
+
+  "_comment_fabric_1": "Fabric loader pin for MC 1.21.4. fetch_fabric.py uses the profile_url",
+  "_comment_fabric_2": "to fetch the launcher profile JSON, then downloads its 8 libraries from",
+  "_comment_fabric_3": "Maven and re-verifies SHA-1 against Fabric's own pins in the profile.",
+  "fabric_pin": {
+    "schema_version": 1,
+    "vendor": "fabricmc",
+    "loader_version": "0.16.10",
+    "minecraft_version": "1.21.4",
+    "profile_url": "https://meta.fabricmc.net/v2/versions/loader/1.21.4/0.16.10/profile/json",
+    "expected_main_class": "net.fabricmc.loader.impl.launch.knot.KnotClient",
+    "expected_libraries_count": 8,
+    "post_fetch_required_files": [
+      "versions/fabric-loader-0.16.10-1.21.4/fabric-loader-0.16.10-1.21.4.json"
+    ]
+  }
 }

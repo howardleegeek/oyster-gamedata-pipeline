@@ -90,3 +90,8 @@ oyster-gamedata-pipeline/
 oyster-agent-runner/
 specs/auto/*
 !specs/auto/.gitkeep
+
+# Bundled-installer build artifacts (R05A/R05B). The fetch_*.py scripts
+# rebuild these from pinned URLs in bin/build_bundled_installer/manifest.json
+# at CI time, so checking them in would just rot. ~100MB+ of binary blobs.
+bundle/
