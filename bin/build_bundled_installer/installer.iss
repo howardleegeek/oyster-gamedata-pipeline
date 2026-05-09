@@ -237,7 +237,7 @@ Source: "{#BundleRoot}\\mc-instance\\*"; \
 ; Fabric refuse to start. The other 8 supported-MC-version mod jars are
 ; published to the GitHub Release as `release-extras/` instead of being
 ; bundled here.
-Source: "{#BundleRoot}\\mc-instance\\mods\\oyster-recorder-mod-*+mc{#BundledMcVersion}.jar"; \
+Source: "{#BundleRoot}\\mc-instance\\mods\\oyster-recorder-mod-*-mc{#BundledMcVersion}.jar"; \
     DestDir: "{app}\\mc-instance\\mods"; \
     Flags: ignoreversion
 
