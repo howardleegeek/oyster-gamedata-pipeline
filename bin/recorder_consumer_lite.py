@@ -91,14 +91,23 @@ RECORDER_VERSION = "lite-v0.28.0-rc15"
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
 # in production the bundle always includes it.
+#
+# rc15-fix BUG#4 (HIGH): split into two try/except blocks. Was bug:
+# both imports in one block — if heal_report failed (e.g. PyInstaller
+# missed it), heal_registry's _heal_emit ALSO got replaced with noop,
+# silently disabling all heal event emission. Now: heal_registry +
+# heal_report fail independently.
 try:
     from heal_registry import emit_event as _heal_emit  # type: ignore  # noqa: PLC0415
+except Exception:
+    def _heal_emit(*args: Any, **kwargs: Any) -> str:  # type: ignore
+        return ""  # noop when heal_registry unavailable
+try:
     # PyInstaller hint: ensure heal_report is bundled (lazy-imported by
     # _open_heal_report). Static analysis catches this top-level import.
     import heal_report as _heal_report_module  # type: ignore  # noqa: F401, PLC0415
 except Exception:
-    def _heal_emit(*args: Any, **kwargs: Any) -> str:  # type: ignore
-        return ""  # noop when heal_registry unavailable
+    _heal_report_module = None  # type: ignore  # dashboard button will inline-error
 
 # rc11 SF (Phase A.1, IRON LAW EXCEPTION pre-approved 2026-05-09):
 # game-agnostic failure-attribution. Every session writes terminator.json

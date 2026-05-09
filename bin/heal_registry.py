@@ -161,6 +161,10 @@ def emit_event(
     if contract_warnings:
         payload["_contract_warnings"] = contract_warnings
 
+    # rc15-fix BUG#3: lazy self-check on first real emit (avoids the
+    # circular-import trap that put first ~10 events into wrong path).
+    _maybe_self_check()
+
     # rc15-fix BUG#1: details may contain Path/datetime/set/etc that
     # json.dumps can't serialize natively. Use default=str so writer
     # never silently fails on caller laziness. Was: emit returned a
@@ -225,24 +229,45 @@ def aggregate_by_feature(events: list[dict[str, Any]]) -> dict[str, dict[str, in
 
 
 # === Contract self-check ===
-# Run at import time: warn (in stderr) if any feature in this file's
-# integrations isn't using the registry. Lint elsewhere will check
-# bin/recorder_consumer_lite.py for raw _trace calls that look like
-# they should be emit_event.
-def _self_check() -> None:
-    """Self-test the registry on import. Never raises."""
+# rc15-fix BUG#3 (CRITICAL): self-check is now LAZY — called on first
+# emit_event() invocation, NOT at module import. Was bug:
+# recorder_consumer_lite imports heal_registry which immediately calls
+# _self_check() → emit_event() → _heal_log_path() → tries to import
+# recorder_consumer_lite._real_documents_dir BEFORE that module body
+# finished executing → ImportError silently swallowed → first events
+# go to wrong fallback path (Path.home()/Documents instead of the
+# OneDrive-redirected real path). Two-path log split confused testers.
+# Lazy guard avoids the cycle entirely.
+_SELF_CHECK_DONE = False
+_SELF_CHECK_LOCK = threading.Lock()
+
+
+def _maybe_self_check() -> None:
+    """First-call-wins self check. Never raises."""
+    global _SELF_CHECK_DONE
+    with _SELF_CHECK_LOCK:
+        if _SELF_CHECK_DONE:
+            return
+        _SELF_CHECK_DONE = True
+    # IMPORTANT: don't recurse via emit_event — write a sentinel event
+    # directly so this can't loop forever even if emit_event is broken.
     try:
-        # Sanity: emit a heartbeat event for the registry itself.
-        emit_event(
-            "heal_registry",
-            "report",
-            "info",
-            f"heal_registry loaded, {len(VALID_FEATURES)} features registered",
-            details={"valid_features": sorted(VALID_FEATURES)},
-            remediation={"action": "none", "performed": True, "next_step": "no action"},
-        )
+        path = _heal_log_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        sentinel = {
+            "schema_version": "1.0",
+            "event_id": str(uuid.uuid4()),
+            "ts": time.time(),
+            "ts_iso": datetime.now().isoformat(),
+            "feature_id": "heal_registry",
+            "event_type": "report",
+            "severity": "info",
+            "summary": f"heal_registry loaded, {len(VALID_FEATURES)} features registered",
+            "details": {"valid_features": sorted(VALID_FEATURES)},
+            "remediation": {"action": "none", "performed": True, "next_step": "no action"},
+        }
+        with _EMIT_LOCK:
+            with path.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(sentinel, ensure_ascii=False, default=str) + "\n")
     except Exception:
         pass
-
-
-_self_check()

@@ -67,7 +67,11 @@ def _row_for_event(ev: dict) -> str:
     sev = ev.get("severity", "info")
     sev_color = SEV_COLORS.get(sev, "#666")
     summary = html.escape(ev.get("summary", ""))
-    details = html.escape(json.dumps(ev.get("details", {}), ensure_ascii=False)[:200])
+    # rc15-fix BUG#5: default=str so non-JSON-native values (Path,
+    # datetime) in details don't crash the dashboard generator. Was
+    # safe when details came from JSONL re-read (already strings) but
+    # crashed when called with in-memory dict containing Path objects.
+    details = html.escape(json.dumps(ev.get("details", {}), ensure_ascii=False, default=str)[:200])
     rem = ev.get("remediation") or {}
     next_step = html.escape(rem.get("next_step", ""))
     return (
