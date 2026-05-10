@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.20"
+RECORDER_VERSION = "lite-v0.28.0-rc15.21"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -441,7 +441,10 @@ TRANSFER_SH_ENDPOINT = "https://transfer.sh"
 # upload speeds (5-10Mbps) make >100MB take >2 min and frequently fail.
 # If diagnostic zip exceeds, fall through to local-only path.
 DIAG_UPLOAD_MAX_BYTES = 100 * 1024 * 1024
-DIAG_UPLOAD_TIMEOUT_SEC = 600
+# rc15.21 C-H2 (round 14): 600s = 10 min per tier × 2 tiers = 20 min
+# UI hang on captive portal / network drop. Lowered to 120s; at 5-10
+# Mbps Chinese ISP, 100MB takes 80-160s — 120 is upper-bound for slow.
+DIAG_UPLOAD_TIMEOUT_SEC = 120
 
 
 def _upload_diagnostic_zip(zip_path: Path) -> Optional[str]:
@@ -511,6 +514,15 @@ def _upload_diagnostic_zip(zip_path: Path) -> Optional[str]:
         _trace(f"upload_diag: catbox returned non-URL: {url[:200]}")
     except Exception as exc:
         _trace(f"upload_diag: catbox.moe failed [{type(exc).__name__}]: {exc}")
+        # rc15.21 C6 (round 14 C-C2): on Tier 1 exception, `data` (the
+        # 100MB+ multipart blob) is still alive in this scope. Without
+        # explicit del, Tier 2 below allocates ANOTHER 100MB → 2-3× peak
+        # RAM on the tester's box right when MuMu was just killed to
+        # free RAM. Drop it now.
+        try:
+            del data
+        except NameError:
+            pass
 
     # Tier 2: transfer.sh — PUT /<filename> with raw body, returns plain-text URL.
     # Replaces file.io (which now requires paid auth as of 2024).
@@ -905,6 +917,24 @@ def _get_minecraft_window_rect() -> Optional[dict[str, int]]:
     found_hwnd: list[int] = []
     found_title: list[str] = []
 
+    # rc15.21 C1 (round 14, P0 recording blocker for Chinese MC):
+    # bingd's MC title may be "我的世界 1.21.4 - 单人游戏" with NO ASCII
+    # "minecraft" substring. Old code only checked `"minecraft" in
+    # title.lower()` — regex hardcoded English → Chinese MC clients
+    # silently failed to detect → _start_ffmpeg raised RecorderError
+    # "Minecraft window not detected". Now: use GAME_PROBE_REGISTRY's
+    # window_title_substrings list (which already contains both
+    # "Minecraft" and "我的世界").
+    try:
+        _title_substrings = [
+            s.lower()
+            for s in GAME_PROBE_REGISTRY.get(CURRENT_GAME_ID, {}).get(
+                "window_title_substrings", ["minecraft"]
+            )
+        ]
+    except Exception:
+        _title_substrings = ["minecraft"]
+
     def _callback(hwnd, _lparam):
         if not IsWindowVisible(hwnd):
             return True
@@ -914,7 +944,8 @@ def _get_minecraft_window_rect() -> Optional[dict[str, int]]:
         buf = ctypes.create_unicode_buffer(ln + 1)
         GetWindowText(hwnd, buf, ln + 1)
         title = buf.value
-        if "minecraft" in title.lower():
+        title_lower = title.lower()
+        if any(s in title_lower for s in _title_substrings):
             found_hwnd.append(hwnd)
             found_title.append(title)
             return False  # stop iteration
@@ -1271,6 +1302,17 @@ class RecorderApp(tk.Tk):
         # WITHOUT us recording first.
         self._record_armed = False
         self._mc_window_rect: Optional[dict[str, int]] = None
+        # rc15.21 C8 (round 14 D-C2): assign session_id at __init__ so
+        # ANY artifact write (preliminary terminator, partial action_camera,
+        # heal_event, session_manifest) always has a non-empty session_id.
+        # Old code assigned in _run_one_session line 2398 — if exception
+        # before that (preflight_blocked, etc.), all artifacts had
+        # session_id="" → R18 Frankenstein-splice false-negative.
+        try:
+            import uuid as _uuid_init
+            self._session_id = str(_uuid_init.uuid4())
+        except Exception:
+            self._session_id = ""
         # rc10 B2: track whether ffmpeg closed cleanly (default True).
         self._ffmpeg_clean_close: bool = True
         # rc11 SF: failure-attribution reason for current/last session.
@@ -2188,6 +2230,12 @@ class RecorderApp(tk.Tk):
         if not self._record_armed:
             # Arm
             self._record_armed = True
+            # rc15.21 C4 (round 14 B-H3): clear the stop_event on RE-arm.
+            # Old bug: disarm-during-settle then re-arm left _stop_event
+            # set, so the new watch_loop iteration immediately exited and
+            # the arm button stayed visually "■ 停止录制" with no thread
+            # running. Tester was stuck until exe restart.
+            self._stop_event.clear()
             self._arm_btn.config(
                 text="■ 停止录制",
                 bg="#c62828",
@@ -2366,6 +2414,10 @@ class RecorderApp(tk.Tk):
         # R18 session-binding: one UUID per recording, propagated into
         # session_manifest.json + every action_camera frame + inputs.jsonl
         # session_start. Closes red-team B-05 (Frankenstein splice).
+        # rc15.21 C8: rotate session_id per recording session (was set in
+        # __init__ as init-fallback so artifacts before this line aren't
+        # ""; now reroll for each new recording so distinct sessions get
+        # distinct UUIDs).
         import uuid as _uuid_mod
         self._session_id = str(_uuid_mod.uuid4())
         try:
@@ -2421,6 +2473,28 @@ class RecorderApp(tk.Tk):
                 # If MC vanished before 5 min, treat as game_died (not clean_exit).
                 self._terminator_reason = "game_died"
                 break
+            # rc15.21 C5 (round 14 B-H2 + A-H7): detect ffmpeg self-death.
+            # Old loop only polled MC + stop_event + elapsed. If user
+            # killed ffmpeg.exe via Task Manager, OR if ffmpeg's `-t 360`
+            # cap fired causing it to self-exit, OR if ffmpeg crashed mid-
+            # encode (disk full, codec error), the loop kept sleeping 2s
+            # at a time and the resulting tarball had a corrupt mp4 with
+            # `_ffmpeg_clean_close=True` (since proc.wait() succeeded
+            # immediately on already-dead proc). Now: explicit poll +
+            # set ffmpeg_died reason if non-zero return code.
+            if self._ffmpeg_proc is not None:
+                _ffret = self._ffmpeg_proc.poll()
+                if _ffret is not None:
+                    if _ffret == 0:
+                        # Clean self-exit (likely 6-min `-t 360` cap fired).
+                        _trace(f"watch_loop: ffmpeg self-exited cleanly "
+                               f"(rc={_ffret}, likely -t cap) — finalizing")
+                    else:
+                        _trace(f"watch_loop: ffmpeg DIED with rc={_ffret} — "
+                               "finalizing as ffmpeg_died (capture corrupt)")
+                        self._ffmpeg_clean_close = False
+                        self._terminator_reason = "ffmpeg_died"
+                    break
             elapsed = time.time() - self._record_started_at
             if elapsed >= MAX_RECORD_SECONDS:
                 self._set("⏱ 已到 6 分钟，自动停止", ORANGE,
@@ -2558,11 +2632,16 @@ class RecorderApp(tk.Tk):
                     if os.name == "nt":
                         # explorer /select,<file> opens parent dir + selects
                         # the file (blue highlight). Cannot be missed.
+                        # rc15.21 H9 (round 14, E-C2): path with spaces
+                        # (e.g. OneDrive-redirected `OneDrive - Personal\
+                        # Documents\OysterClips\...`) silently fails the
+                        # /select arg without quoting. Now quoted so any
+                        # space/Unicode path lands properly in Explorer.
                         subprocess.Popen(
-                            ["explorer", f"/select,{output_tar}"],
+                            ["explorer", f'/select,"{output_tar}"'],
                             creationflags=0x08000000,
                         )
-                        _trace(f"rc15.13: Explorer /select fired on {output_tar}")
+                        _trace(f"rc15.13+21: Explorer /select fired on {output_tar}")
                 except Exception as exc:
                     _trace(f"rc15.13: Explorer /select failed: {exc}")
                 try:
@@ -3563,12 +3642,62 @@ class RecorderApp(tk.Tk):
             )
         if not self._ffmpeg_clean_close:
             self._terminator_reason = "ffmpeg_dirty_close"
+        # rc15.21 C7 (round 14 D-C1): wire up capture_stalled. Old code
+        # tracked _capture_last_frame_count via stderr reader thread but
+        # NEVER assigned _terminator_reason="capture_stalled" → bingd's
+        # 1-frame video would terminate as clean_exit, masking the bug.
+        # Now: if elapsed > 30s but ffmpeg reported < 1 fps avg, mark as
+        # capture_stalled so heal aggregation surfaces it.
+        try:
+            cap_frames = getattr(self, "_capture_last_frame_count", 0)
+            if elapsed_sec >= 30.0 and cap_frames < int(elapsed_sec):
+                # got fewer than 1 fps over the recording — almost certainly
+                # the gdigrab-on-fullscreen failure mode (1-frame video).
+                self._terminator_reason = "capture_stalled"
+                _trace(
+                    f"rc15.21 C7: capture_stalled detected — "
+                    f"elapsed={elapsed_sec:.1f}s but ffmpeg reported only "
+                    f"{cap_frames} frames (< 1 fps); marking quarantine"
+                )
+                _heal_emit(
+                    "capture_dual_track", "heal_failed", "error",
+                    f"capture stalled: only {cap_frames} frames in "
+                    f"{elapsed_sec:.0f}s — likely gdigrab fullscreen miss",
+                    details={
+                        "frames": cap_frames,
+                        "expected_min": int(elapsed_sec),
+                        "tier": getattr(self, "_capture_tier", "?"),
+                    },
+                    remediation={
+                        "action": "user_prompt", "performed": False,
+                        "next_step": "tester 检查 MC 是否全屏独占,试试窗口模式",
+                    },
+                    session_id=getattr(self, "_session_id", None),
+                    recorder_version=RECORDER_VERSION,
+                )
+        except Exception as _capexc:
+            _trace(f"rc15.21 C7: stall detect skipped: {_capexc}")
         self._write_terminator(clip_dir)
 
         # Write the tarball into the user's Documents/OysterClips/.
+        # rc15.21 C2 (round 14 A-C1 + C-C1): atomic rename. Old code
+        # opened tar.gz in "w:gz" mode which TRUNCATES in-place. If
+        # power cuts mid-write, the tarball in OysterClips/ is left
+        # corrupt with no backup (preliminary already overwritten in
+        # the same path). Now: write to .tmp sibling, then os.replace
+        # (atomic on NTFS) on success. On failure: unlink the .tmp.
         out_tar = _output_dir() / f"clip-{ts}.tar.gz"
-        with tarfile.open(out_tar, "w:gz") as tf:
-            tf.add(clip_dir, arcname=f"clip-{ts}")
+        out_tar_tmp = _output_dir() / f"clip-{ts}.tar.gz.tmp"
+        try:
+            with tarfile.open(out_tar_tmp, "w:gz") as tf:
+                tf.add(clip_dir, arcname=f"clip-{ts}")
+            os.replace(str(out_tar_tmp), str(out_tar))
+        except Exception:
+            try:
+                out_tar_tmp.unlink(missing_ok=True)
+            except Exception:
+                pass
+            raise
         # rc15.20 C-C1: final tarball succeeded, remove preliminary sentinel
         # (if it was created) so ingest pipelines now see this as final.
         try:
@@ -4331,6 +4460,27 @@ class RecorderApp(tk.Tk):
                 self._ffmpeg_clean_close = False
                 dirty_path = "wait_3s_timeout_kill"
                 proc.kill()
+                # rc15.21 C11 (round 14 C-H1): kill() without wait()
+                # leaks pipe FDs on Windows + leaves zombie on POSIX.
+                # Always wait after kill (with bounded timeout to avoid
+                # hang if Windows handle never signals).
+                try:
+                    proc.wait(timeout=2.0)
+                except Exception:
+                    pass
+        # rc15.21 C11: explicitly close stdin/stderr pipes to release
+        # FDs even if proc.__del__ hasn't been called yet. Long sessions
+        # accumulate FDs without these closes.
+        try:
+            if proc.stdin is not None:
+                proc.stdin.close()
+        except Exception:
+            pass
+        try:
+            if proc.stderr is not None:
+                proc.stderr.close()
+        except Exception:
+            pass
         self._ffmpeg_proc = None
         if dirty_path:
             _heal_emit(
@@ -4345,6 +4495,13 @@ class RecorderApp(tk.Tk):
     def _on_close(self) -> None:
         _trace("on_close: user closed window")
         self._stop_event.set()
+        # rc15.21 C3 (round 14 B-C1): also signal the depth pipeline to
+        # cooperatively skip. Old bug: depth ran on the watch_loop thread
+        # and only polled `_skip_depth_flag`. _on_close set _stop_event
+        # but NOT _skip_depth_flag, so depth kept running for up to 30
+        # min after window destroy, calling self.after(0,...) on the
+        # destroyed Tk root and potentially leaving partial tarballs.
+        self._skip_depth_flag.set()
         self._stop_ffmpeg()
         # rc10 B1 + rc11 SF: ask tester whether to also kill Minecraft;
         # set terminator reason for failure-attribution either way.
