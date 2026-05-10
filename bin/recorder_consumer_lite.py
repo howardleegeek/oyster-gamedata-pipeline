@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.13"
+RECORDER_VERSION = "lite-v0.28.0-rc15.14"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -422,6 +422,100 @@ def _check_for_update_in_background(on_done=None) -> None:
 # Always write a local diagnostic zip to Desktop as fallback so the tester
 # can manually send via WeChat/email even if both endpoints fail.
 TELEMETRY_ENDPOINT = "https://0x0.st"  # multipart POST with field name "file"
+
+# rc15.14 (Howard 2026-05-10 "diagnostic 是否可以让他们直接上传 是不是
+# 需要服务器"): tester 一键上传 ENTIRE diagnostic zip (含 javaw + heal
+# events + sysinfo) 到匿名文件主机. NO server needed for short-term.
+# Multi-host fallback chain: catbox.moe (永久) → file.io (14天) → 0x0.st
+# (5MB log only, last resort). Each is anonymous, no auth required.
+CATBOX_ENDPOINT = "https://catbox.moe/user/api.php"
+FILE_IO_ENDPOINT = "https://file.io"
+
+
+def _upload_diagnostic_zip(zip_path: Path) -> Optional[str]:
+    """rc15.14: upload entire diagnostic zip to anonymous host with fallback.
+
+    Returns hosted URL on success, None on all-host failure. Tester sees
+    URL in helpbar + clipboard. Howard reads URL, downloads zip, debugs.
+
+    Tries in order:
+      1. catbox.moe (permanent, 200MB max) — preferred
+      2. file.io (14 days, 5GB max) — fallback
+      3. 0x0.st (existing path, log-only, 5MB) — last resort
+
+    NEVER raises (caller will fall through to local-only diagnostic).
+    """
+    if not zip_path.exists():
+        return None
+    body = zip_path.read_bytes()
+    if len(body) > 200 * 1024 * 1024:  # 200MB safety cap
+        _trace(f"upload_diag: zip too large ({len(body)/1e6:.1f}MB), skipping")
+        return None
+
+    import urllib.request  # noqa: PLC0415
+    import uuid as _uuid  # noqa: PLC0415
+
+    # Tier 1: catbox.moe
+    try:
+        boundary = f"----CatBox{_uuid.uuid4().hex}"
+        crlf = "\r\n"
+        # catbox.moe wants reqtype=fileupload + file field
+        parts: list[bytes] = []
+        parts.append(f"--{boundary}{crlf}".encode())
+        parts.append(f'Content-Disposition: form-data; name="reqtype"{crlf}{crlf}'.encode())
+        parts.append(b"fileupload" + crlf.encode())
+        parts.append(f"--{boundary}{crlf}".encode())
+        parts.append(
+            f'Content-Disposition: form-data; name="fileToUpload"; filename="{zip_path.name}"{crlf}'.encode()
+            + f"Content-Type: application/zip{crlf}{crlf}".encode()
+        )
+        parts.append(body)
+        parts.append(f"{crlf}--{boundary}--{crlf}".encode())
+        data = b"".join(parts)
+        req = urllib.request.Request(
+            CATBOX_ENDPOINT, data=data,
+            headers={
+                "User-Agent": "OysterRecorder/diagnostic-upload",
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            url = resp.read().decode("utf-8", errors="replace").strip()
+        if url.startswith("http"):
+            _trace(f"upload_diag: catbox.moe success {url}")
+            return url
+        _trace(f"upload_diag: catbox returned non-URL: {url[:200]}")
+    except Exception as exc:
+        _trace(f"upload_diag: catbox.moe failed [{type(exc).__name__}]: {exc}")
+
+    # Tier 2: file.io
+    try:
+        boundary = f"----FileIO{_uuid.uuid4().hex}"
+        head = (
+            f"--{boundary}{crlf}"
+            f'Content-Disposition: form-data; name="file"; filename="{zip_path.name}"{crlf}'
+            f"Content-Type: application/zip{crlf}{crlf}"
+        ).encode()
+        tail = f"{crlf}--{boundary}--{crlf}".encode()
+        data = head + body + tail
+        req = urllib.request.Request(
+            FILE_IO_ENDPOINT, data=data,
+            headers={
+                "User-Agent": "OysterRecorder/diagnostic-upload",
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            import json as _json  # noqa: PLC0415
+            payload = _json.loads(resp.read().decode("utf-8", errors="replace"))
+            if payload.get("success") and payload.get("link"):
+                _trace(f"upload_diag: file.io success {payload['link']}")
+                return payload["link"]
+        _trace(f"upload_diag: file.io non-success response")
+    except Exception as exc:
+        _trace(f"upload_diag: file.io failed [{type(exc).__name__}]: {exc}")
+
+    return None
 DIAGNOSTIC_ZIP_NAME = "OysterRecorder_diagnostic.zip"
 
 
@@ -1347,14 +1441,37 @@ class RecorderApp(tk.Tk):
             )
 
     def _export_diagnostic_only(self) -> None:
-        """Build diagnostic zip and open the Desktop folder. No network."""
+        """Build diagnostic zip + auto-upload to anonymous host. rc15.14:
+        tester one-click → upload to catbox.moe (or file.io fallback) →
+        URL shown in helpbar + copied to clipboard. Tester can paste in
+        WeChat/email to engineer instantly. NO server needed.
+        """
         _trace("user clicked export-diagnostic button")
+        self._hint.config(text="正在打包诊断 + 上传…", fg="#0277bd")
+
         def _go():
             zp = _build_diagnostic_zip()
+            url = None
+            if zp:
+                url = _upload_diagnostic_zip(zp)
             def apply():
-                if zp:
+                if zp and url:
+                    # Copy URL to clipboard for instant paste.
+                    try:
+                        self.clipboard_clear()
+                        self.clipboard_append(url)
+                    except Exception:
+                        pass
                     self._hint.config(
-                        text=f"诊断包已导出: {zp}\n请发给工程师",
+                        text=(f"✓ 已上传, URL 已复制到剪贴板:\n{url}\n"
+                              f"(本地备份: {zp})"),
+                        fg="#1976d2",
+                    )
+                    _trace(f"export_diagnostic: uploaded to {url}")
+                elif zp:
+                    self._hint.config(
+                        text=(f"诊断包已导出 (上传失败, 网络问题):\n{zp}\n"
+                              f"请手动发给工程师"),
                         fg="#1976d2",
                     )
                     self._open_path(zp.parent)
