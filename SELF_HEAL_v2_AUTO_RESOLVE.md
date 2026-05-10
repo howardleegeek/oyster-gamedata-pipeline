@@ -49,11 +49,17 @@ Each tier transition emits `heal_event(depth_dual_track, "heal_attempt")` with `
 
 ## Phase rollout
 
-### Phase B (rc15.9 — IMMEDIATE)
-- Add tier 3: `onnxruntime-directml` + DepthAnything ONNX export
-- Convert HF model to ONNX at first run (lazy, cached locally)
+### Phase B (rc15.9 — IMPLEMENTED)
+- Add tier 3: `onnxruntime-directml` + pre-converted HF community ONNX
+  (`onnx-community/Depth-Anything-V2-Small`, ~99MB, fp32)
+- Lazy download to %LOCALAPPDATA%/OysterRecorder/depth_models/ on first use
+  (avoids fragile runtime torch.onnx.export)
 - Wire into rc15.7's fallback chain at the `model_compat` exception classifier
-- ~50 MB bundle add (onnxruntime-directml package)
+- Full per-frame inference loop: PIL→518²→ImageNet norm→ONNX session.run→
+  EXR write (matches torch path's wire format byte-for-byte)
+- Bundle: onnxruntime-directml (~80MB) + huggingface_hub (already present)
+- PRD compliance: produces same EXR format as torch path → buyer ingest
+  cannot tell which runtime served
 
 ### Phase C (concurrent — 2 weeks)
 - Backend SM ingest endpoint accepts `depth_manifest.fallback_from` field
