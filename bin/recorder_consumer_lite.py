@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.17"
+RECORDER_VERSION = "lite-v0.28.0-rc15.18"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -618,6 +618,33 @@ def _build_diagnostic_zip() -> Optional[Path]:
                     zf.write(term, "terminator.json")
             except Exception:
                 pass
+            # rc15.18 B1: bundle the mod's active_session/game_state.jsonl
+            # (raw mod output) so engineer can confirm whether yaw/pitch are
+            # zero at the source or zeroed by the recorder's overlay step.
+            try:
+                from game_state_overlay import jsonl_path as _gs_path  # noqa: PLC0415
+                gs = _gs_path()
+                if gs.exists() and gs.stat().st_size > 0:
+                    # Tail-only if very large (>5MB) to keep zip < 200MB total.
+                    raw = gs.read_bytes()
+                    if len(raw) > 5 * 1024 * 1024:
+                        # Keep first 256KB + last 4MB so we see startup + recent
+                        head = raw[:256 * 1024]
+                        tail = raw[-(4 * 1024 * 1024):]
+                        bundled = head + b"\n--- TRUNCATED ---\n" + tail
+                        zf.writestr("active_session_game_state.jsonl", bundled)
+                        _trace(
+                            f"diagnostic_zip: bundled game_state.jsonl "
+                            f"(truncated, {len(raw)} → {len(bundled)} bytes)"
+                        )
+                    else:
+                        zf.writestr("active_session_game_state.jsonl", raw)
+                        _trace(
+                            f"diagnostic_zip: bundled game_state.jsonl "
+                            f"({len(raw)} bytes)"
+                        )
+            except Exception as exc:
+                _trace(f"diagnostic_zip: game_state.jsonl bundle skipped: {exc}")
         _trace(f"diagnostic_zip: built {zip_path}")
         return zip_path
     except Exception as exc:
@@ -2700,11 +2727,20 @@ class RecorderApp(tk.Tk):
                     cur_mx = int(ev.get("mouseX", cur_mx))
                     cur_my = int(ev.get("mouseY", cur_my))
                 ev_idx += 1
-            # Normalized mouse coords (0..1) per PRD; deltas
-            mx_n = cur_mx / SCREEN_W
-            my_n = cur_my / SCREEN_H
-            mdx = (cur_mx - prev_mx) / SCREEN_W
-            mdy = (cur_my - prev_my) / SCREEN_H
+            # rc15.18 B2 (Howard 2026-05-10 数据 audit): clamp absolute
+            # coords to screen bounds BEFORE normalize. bingd's session
+            # had cur_mx=2374 (off primary monitor right edge); without
+            # clamp the normalized mouse_x became 1.236 (>PRD's [0,1]
+            # invariant). pynput captures global cursor coords so any
+            # multi-monitor or off-edge cursor was leaking through.
+            _cmx = max(0, min(SCREEN_W - 1, cur_mx))
+            _cmy = max(0, min(SCREEN_H - 1, cur_my))
+            _pmx = max(0, min(SCREEN_W - 1, prev_mx))
+            _pmy = max(0, min(SCREEN_H - 1, prev_my))
+            mx_n = _cmx / SCREEN_W
+            my_n = _cmy / SCREEN_H
+            mdx = (_cmx - _pmx) / SCREEN_W
+            mdy = (_cmy - _pmy) / SCREEN_H
             prev_mx, prev_my = cur_mx, cur_my
             rec = {
                 "frame": f,
@@ -2755,6 +2791,85 @@ class RecorderApp(tk.Tk):
             json.dumps(action_records, separators=(",", ":"), ensure_ascii=False),
             encoding="utf-8",
         )
+
+        # rc15.18 B1 (Howard 2026-05-10 数据 audit "player 有移动的 这些都是bug"):
+        # Bingd's rc15.16 session showed 9793/9793 frames with rotation=
+        # [0,0,0] and constant position despite real gameplay. Recorder
+        # reports `_real_game_state: true` (mod handshake OK) so the
+        # mod's JSONL DID flow, but somewhere in the mod→JSONL→overlay
+        # chain the rotation/velocity got zeroed. Without the raw JSONL
+        # we're flying blind. Fix: include the mod's game_state.jsonl
+        # IN the tarball so engineer can see exactly what the mod wrote
+        # and compare to what apply_to_record produced.
+        try:
+            from game_state_overlay import jsonl_path as _gs_path  # noqa: PLC0415
+            _src_jsonl = _gs_path()
+            if _src_jsonl.exists() and _src_jsonl.stat().st_size > 0:
+                shutil.copy2(_src_jsonl, clip_dir / "game_state.jsonl")
+                _trace(f"rc15.18: bundled mod's game_state.jsonl "
+                       f"({_src_jsonl.stat().st_size} bytes) into tarball "
+                       f"for engineer diff vs action_camera.json")
+        except Exception as exc:
+            _trace(f"rc15.18: game_state.jsonl bundle skipped: {exc}")
+
+        # rc15.18 B3: static-camera/static-position detection.
+        # If rotation never deviated AND position never moved across
+        # the whole session, that's almost certainly a data pipeline
+        # bug (mod read wrong field, lookup returned same sample for
+        # every frame, etc.) — surface immediately as a heal event +
+        # tester popup so we don't ship dead data silently.
+        try:
+            if action_records:
+                rot_set = set()
+                pos_set = set()
+                for r in action_records:
+                    rot = r.get("camera_rotation_oula", [0, 0, 0])
+                    pos = r.get("camera_position", [0, 0, 0])
+                    # Round to 0.01 to dampen float noise.
+                    rot_set.add(tuple(round(v, 2) for v in rot))
+                    pos_set.add(tuple(round(v, 2) for v in pos))
+                static_rot = len(rot_set) <= 1
+                static_pos = len(pos_set) <= 1
+                if (static_rot or static_pos) and len(action_records) > 60:
+                    # 60 frames = 2 seconds at 30 fps. Below that, a
+                    # static camera is plausible (loading/death/etc).
+                    _trace(
+                        f"rc15.18 STATIC-CAMERA detected: "
+                        f"rotations={len(rot_set)} positions={len(pos_set)} "
+                        f"frames={len(action_records)} — "
+                        f"likely mod-recorder data pipeline bug"
+                    )
+                    _heal_emit(
+                        "depth_dual_track",  # piggy-back, no new feature ID needed
+                        "detect", "warn",
+                        f"static camera/position over {len(action_records)} frames "
+                        f"(unique rotations={len(rot_set)}, "
+                        f"unique positions={len(pos_set)}) — "
+                        "suspect mod-recorder data flow bug",
+                        details={
+                            "frames_total": len(action_records),
+                            "unique_rotations": len(rot_set),
+                            "unique_positions": len(pos_set),
+                            "static_rot": static_rot,
+                            "static_pos": static_pos,
+                            "first_rot": list(next(iter(rot_set))) if rot_set else None,
+                            "first_pos": list(next(iter(pos_set))) if pos_set else None,
+                        },
+                        remediation={
+                            "action": "user_prompt", "performed": False,
+                            "next_step": "engineer 检查 game_state.jsonl 是否含真实 yaw/pitch",
+                        },
+                        session_id=getattr(self, "_session_id", None),
+                        recorder_version=RECORDER_VERSION,
+                    )
+                    # Stash on self so package's terminator can flag it.
+                    self._suspect_static_camera = {
+                        "frames": len(action_records),
+                        "unique_rotations": len(rot_set),
+                        "unique_positions": len(pos_set),
+                    }
+        except Exception as exc:
+            _trace(f"rc15.18 static-camera detect failed: {exc}")
 
         # v0.20.2: write inputs.jsonl — raw pynput events (key_down, key_up,
         # mouse_move, mouse_click) with millisecond timestamps. Producer-side
