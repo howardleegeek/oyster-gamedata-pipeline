@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.10"
+RECORDER_VERSION = "lite-v0.28.0-rc15.11"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -463,6 +463,45 @@ def _build_diagnostic_zip() -> Optional[Path]:
             zf.writestr("sysinfo.txt", "\n".join(sys_info_lines))
             if _STARTUP_LOG.exists():
                 zf.write(_STARTUP_LOG, "OysterRecorder.log")
+            # rc15.11 (Howard 2026-05-10 测试员 bingd MC exit-1): also bundle
+            # latest 3 javaw_*.log files. Was bug: tester sent diagnostic
+            # missing the actual MC crash trace (only had OysterRecorder.log
+            # which is the recorder's log, not Minecraft's). Now diagnostic
+            # zip self-contained for both recorder + game.
+            try:
+                if os.name == "nt":
+                    java_logs_dir = (
+                        Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
+                        / "OysterRecorder" / "logs"
+                    )
+                else:
+                    java_logs_dir = Path.home() / ".oyster_recorder" / "logs"
+                if java_logs_dir.exists():
+                    java_logs = sorted(
+                        java_logs_dir.glob("javaw_*.log"),
+                        key=lambda p: p.stat().st_mtime,
+                        reverse=True,
+                    )[:3]
+                    for log in java_logs:
+                        zf.write(log, f"java_logs/{log.name}")
+                    _trace(f"diagnostic_zip: bundled {len(java_logs)} javaw_*.log files")
+            except Exception as exc:
+                _trace(f"diagnostic_zip: javaw log bundle failed: {exc}")
+            # rc15.11: also bundle heal_events.jsonl for self-heal telemetry.
+            try:
+                heal_log = Path(_real_documents_dir()) / "OysterRecorder" / "runtime" / "heal_events.jsonl"
+                if heal_log.exists():
+                    zf.write(heal_log, "heal_events.jsonl")
+            except Exception:
+                pass
+            # rc15.11: bundle latest terminator.json (session-less or per-session).
+            try:
+                runtime_dir = Path(_real_documents_dir()) / "OysterRecorder" / "runtime"
+                term = runtime_dir / "terminator.json"
+                if term.exists():
+                    zf.write(term, "terminator.json")
+            except Exception:
+                pass
         _trace(f"diagnostic_zip: built {zip_path}")
         return zip_path
     except Exception as exc:
@@ -593,6 +632,18 @@ def _real_documents_dir() -> Path:
 def _output_dir() -> Path:
     docs = _real_documents_dir() / "OysterClips"
     docs.mkdir(parents=True, exist_ok=True)
+    # rc15.11 (Howard 2026-05-10 测试员 bingd MC exit-1 调查): pre-create
+    # all dirs the Fabric mod tries to write to. If active_session/ doesn't
+    # exist when mod's JsonlWriter does first append, mod throws → MC
+    # crashes mid-init with exit code 1. Defensive create here costs nothing.
+    # Also pre-create _rejected/ so SK partial-tarball move at finalize
+    # never races against missing dir on first session.
+    try:
+        (docs / "active_session").mkdir(parents=True, exist_ok=True)
+        (docs / "_rejected").mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass  # never let mkdir break startup; fall through and let mod fail
+              # naturally with a clearer error than missing dir.
     return docs
 
 
