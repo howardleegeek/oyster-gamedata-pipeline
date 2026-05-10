@@ -82,6 +82,13 @@ name: Build Recorder Bundled Installer (R05E)
 permissions:
   contents: write
 
+# rc15.25 ISC-6 (round 16 B8): concurrency group prevents two same-tag
+# pushes from racing for `gh release create` and corrupting partial
+# assets. cancel-in-progress: false so we don't drop a real build.
+concurrency:
+  group: recorder-build-installer-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   bundle-and-release:
     # Inno Setup compiler (iscc.exe) is Windows-only — there is no Linux

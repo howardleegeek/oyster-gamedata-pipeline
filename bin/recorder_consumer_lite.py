@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.24"
+RECORDER_VERSION = "lite-v0.28.0-rc15.25"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -342,7 +342,13 @@ def _stage_self_update(new_exe_url: str) -> bool:
         f'del "{bat_path}"\r\n'
     )
     try:
-        bat_path.write_text(bat_body, encoding="ascii")
+        # rc15.25 ISC-9 (round 14 E-H1): use utf-8-sig instead of ascii.
+        # Old code crashed UnicodeEncodeError if Windows username has
+        # Chinese chars (`C:\Users\张三\AppData\...`) — bat body interpolates
+        # the username path, ascii encode raised, self-update silently
+        # failed. utf-8-sig (BOM-prefixed UTF-8) is read correctly by
+        # cmd.exe on Win10+ regardless of system codepage.
+        bat_path.write_text(bat_body, encoding="utf-8-sig")
         # v0.15.0: add CREATE_NO_WINDOW (0x08000000) so the cmd.exe
         # invocation doesn't FLASH a black console window on screen.
         # DETACHED_PROCESS (0x08) alone only detaches from the parent's
@@ -440,7 +446,7 @@ TRANSFER_SH_ENDPOINT = "https://transfer.sh"
 # Largest zip we'll attempt to upload — catbox is 200MB but Chinese ISP
 # upload speeds (5-10Mbps) make >100MB take >2 min and frequently fail.
 # If diagnostic zip exceeds, fall through to local-only path.
-DIAG_UPLOAD_MAX_BYTES = 100 * 1024 * 1024
+DIAG_UPLOAD_MAX_BYTES = 100 * 1024 * 1024  # rc15.25 C2: name says MAX → use >= below
 # rc15.21 C-H2 (round 14): 600s = 10 min per tier × 2 tiers = 20 min
 # UI hang on captive portal / network drop. Lowered to 120s; at 5-10
 # Mbps Chinese ISP, 100MB takes 80-160s — 120 is upper-bound for slow.
@@ -467,7 +473,7 @@ def _upload_diagnostic_zip(zip_path: Path) -> Optional[str]:
     except OSError as exc:
         _trace(f"upload_diag: stat failed: {exc}")
         return None
-    if size > DIAG_UPLOAD_MAX_BYTES:
+    if size >= DIAG_UPLOAD_MAX_BYTES:
         _trace(f"upload_diag: zip too large ({size/1e6:.1f}MB > {DIAG_UPLOAD_MAX_BYTES/1e6:.0f}MB), skipping")
         return None
     if size == 0:
@@ -620,16 +626,18 @@ def _build_diagnostic_zip() -> Optional[Path]:
                 heal_log = Path(_real_documents_dir()) / "OysterRecorder" / "runtime" / "heal_events.jsonl"
                 if heal_log.exists():
                     zf.write(heal_log, "heal_events.jsonl")
-            except Exception:
-                pass
+            except Exception as exc:
+                # rc15.25 ISC-11 (round 15 E1): trace silent skip
+                _trace(f"diagnostic_zip: heal_events bundle skipped: {exc}")
             # rc15.11: bundle latest terminator.json (session-less or per-session).
             try:
                 runtime_dir = Path(_real_documents_dir()) / "OysterRecorder" / "runtime"
                 term = runtime_dir / "terminator.json"
                 if term.exists():
                     zf.write(term, "terminator.json")
-            except Exception:
-                pass
+            except Exception as exc:
+                # rc15.25 ISC-11 (round 15 E2): trace silent skip
+                _trace(f"diagnostic_zip: terminator bundle skipped: {exc}")
             # rc15.18 B1: bundle the mod's active_session/game_state.jsonl
             # (raw mod output) so engineer can confirm whether yaw/pitch are
             # zero at the source or zeroed by the recorder's overlay step.
@@ -1725,7 +1733,8 @@ class RecorderApp(tk.Tk):
                 subprocess.Popen(["xdg-open", str(path)])
         except Exception as exc:
             _trace(f"_open_path failed: {exc}")
-        return
+        # rc15.25 ISC-3 (round 15 B1): trailing bare `return` removed —
+        # method already falls off the end after the try/except.
 
     def _compute_data_health(self, tarball: Path) -> dict[str, Any]:
         """rc15.22 (Howard 2026-05-10 "数据问题会不会再出现 我记得我们还有
@@ -1751,6 +1760,11 @@ class RecorderApp(tk.Tk):
 
         Returns dict with score, breakdown, issues. Never raises.
         """
+        # rc15.25 ISC-10 (round 15 D11): pre-initialize all breakdown
+        # keys to 0. Old code returned partial breakdown on early-return
+        # paths (e.g. tarball extract fails); sum() worked but key
+        # absence made consumers think a check was skipped vs failed.
+        # Now: every key is always present, value is the points scored.
         report: dict[str, Any] = {
             "schema_version": "1.0",
             "recorder_version": RECORDER_VERSION,
@@ -1758,7 +1772,15 @@ class RecorderApp(tk.Tk):
             "tarball": str(tarball),
             "score": 0,
             "max_score": 100,
-            "breakdown": {},
+            "breakdown": {
+                "tarball_extract": 0,
+                "video_real_frames": 0,
+                "rotation_diversity": 0,
+                "position_diversity": 0,
+                "game_state_sanity": 0,
+                "inputs_present": 0,
+                "session_id_consistent": 0,
+            },
             "issues": [],
             "session_ids_seen": [],
         }
@@ -2533,6 +2555,20 @@ class RecorderApp(tk.Tk):
         click the taskbar icon any time to bring us back and click
         '停止录制'.
         """
+        # rc15.25 ISC-8 (round 14 A-H3): debounce rapid double-clicks.
+        # Old bug: arm→disarm→arm in same Tk event drain entered each
+        # branch in sequence, leaving _stop_event in inconsistent state.
+        # Now: disable button for 500ms after click. Click during debounce
+        # = no-op (Tk drops command on disabled state).
+        try:
+            self._arm_btn.config(state="disabled")
+            self.after(
+                500,
+                lambda: self._arm_btn.config(state="normal")
+                if hasattr(self, "_arm_btn") else None,
+            )
+        except Exception:
+            pass
         if not self._record_armed:
             # Arm
             self._record_armed = True
@@ -3580,6 +3616,15 @@ class RecorderApp(tk.Tk):
                             "final tarball will overwrite this with "
                             "real terminator after depth completes",
                     "recorder_version": RECORDER_VERSION,
+                    # rc15.25 ISC-4 (round 14 D-H2): include a minimal
+                    # schema-compliant set of fields so downstream parsers
+                    # doing terminator["session_id"] don't KeyError on
+                    # preliminary tarballs that escape the sentinel.
+                    "session_id": getattr(self, "_session_id", None),
+                    "duration_sec": None,
+                    "frame_count": None,
+                    "ffmpeg_clean_close": None,
+                    "preliminary": True,
                 }, indent=2),
                 encoding="utf-8",
             )
@@ -4060,7 +4105,12 @@ class RecorderApp(tk.Tk):
         # capture_stalled so heal aggregation surfaces it.
         try:
             cap_frames = getattr(self, "_capture_last_frame_count", 0)
-            if elapsed_sec >= 30.0 and cap_frames < int(elapsed_sec):
+            # rc15.25 C1 (round 15): was `< int(elapsed_sec)` = strict 1fps
+            # threshold; at exactly 1fps stalled (e.g. 30 frames in 30s)
+            # we MISSED quarantine. Now: < elapsed*3 = 3fps avg = catches
+            # the 1-frame-stuck failure mode without false-flagging legit
+            # slow CPU capture (which still produces 8-15 fps).
+            if elapsed_sec >= 30.0 and cap_frames < int(elapsed_sec * 3):
                 # got fewer than 1 fps over the recording — almost certainly
                 # the gdigrab-on-fullscreen failure mode (1-frame video).
                 self._terminator_reason = "capture_stalled"

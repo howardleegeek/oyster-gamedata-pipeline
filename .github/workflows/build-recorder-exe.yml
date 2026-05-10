@@ -6,6 +6,14 @@ on:
       - 'recorder-v*'
   workflow_dispatch:
 
+# rc15.25 ISC-6 (round 16 B8): concurrency group prevents two same-tag
+# pushes from racing for `gh release upload --clobber` and corrupting
+# partial assets. cancel-in-progress: false so we don't drop a real build
+# mid-way; just queue the next one.
+concurrency:
+  group: recorder-build-exe-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -43,6 +51,10 @@ jobs:
           # treat [ffmpeg] as a glob/array expression and silently install
           # bare imageio without the ffmpeg extra.
           pip install transformers "imageio[ffmpeg]" OpenEXR Imath huggingface_hub
+          # rc15.25: ISC-7 torch-directml/onnxruntime-directml version
+          # pin DEFERRED — exact known-good versions need verification
+          # against the existing CI green builds; pinning to wrong version
+          # would regress. Tracked in defer queue.
 
       - name: Pre-download DepthAnything V2 weights
         # Bundle the model offline so testers don't need internet on first

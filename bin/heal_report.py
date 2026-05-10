@@ -18,7 +18,7 @@ import json
 import sys
 import webbrowser
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -145,7 +145,7 @@ tr.row-fatal td {{ background: rgba(106,27,154,0.08); font-weight: 600; }}
 <body>
 <h1>🐚 Oyster Recorder — Health Report</h1>
 <div class="meta">
-  Generated: {datetime.now().isoformat()}<br>
+  Generated: {datetime.now(timezone.utc).isoformat()} (UTC)<br>
   Source: <code>{html.escape(str(log_path))}</code><br>
   Total events: {total_events} (showing last {min(limit, total_events)})
 </div>
