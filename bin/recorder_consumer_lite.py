@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.22"
+RECORDER_VERSION = "lite-v0.28.0-rc15.23"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -1459,7 +1459,7 @@ class RecorderApp(tk.Tk):
             self,
             text=(
                 f"录制完成后会保存到: {_output_dir()}\n"
-                f"如果出问题，点上面按钮自动打包诊断包到桌面。"
+                "如果出问题，点上面按钮自动打包诊断包到桌面。"
             ),
             font=("Helvetica", 9),
             bg="white",
@@ -1584,7 +1584,7 @@ class RecorderApp(tk.Tk):
                 elif zp:
                     self._hint.config(
                         text=(f"诊断包已导出 (上传失败, 网络问题):\n{zp}\n"
-                              f"请手动发给工程师"),
+                              "请手动发给工程师"),
                         fg="#1976d2",
                     )
                     self._open_path(zp.parent)
@@ -2172,7 +2172,7 @@ class RecorderApp(tk.Tk):
             return
         # Don't auto-replace mid-recording; wait until tester is idle.
         if self._record_armed:
-            _trace(f"update: deferred — recording in progress, will retry on close")
+            _trace("update: deferred — recording in progress, will retry on close")
             return
         _trace(f"update: staging {latest_tag}")
         self.after(0, lambda: self._set("⏳ 自动更新中…", ORANGE,
@@ -2657,7 +2657,7 @@ class RecorderApp(tk.Tk):
         if _free_bytes < _MIN_FREE_BYTES:
             _free_mb = _free_bytes / (1024 * 1024)
             self._set("⚠️ 磁盘空间不足", ORANGE,
-                      f"剩余 {_free_mb:.0f} MB, 录制需 ≥500 MB. 清理后重试.")
+                      f"剩余 {_free_mb:.0f} MB, 录制需 ≥2 GB (2048 MB). 清理后重试.")
             _trace(f"disk_check: ABORT — only {_free_mb:.0f} MB free in {self._tmp_dir} (threshold 2GB)")
             self._terminator_reason = "disk_full"
             self._write_terminator(None)  # no clip_dir yet — write to runtime/
@@ -3370,7 +3370,7 @@ class RecorderApp(tk.Tk):
                         f"rc15.18 STATIC-CAMERA detected: "
                         f"rotations={len(rot_set)} positions={len(pos_set)} "
                         f"frames={len(action_records)} — "
-                        f"likely mod-recorder data pipeline bug"
+                        "likely mod-recorder data pipeline bug"
                     )
                     _heal_emit(
                         # rc15.20 C-H1/D-H2 (round 13): use proper feature
