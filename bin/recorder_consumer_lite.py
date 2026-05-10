@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.26"
+RECORDER_VERSION = "lite-v0.28.0-rc15.27"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -368,10 +368,20 @@ def _stage_self_update(new_exe_url: str) -> bool:
         # Both rc10 features were dark in heal log until now.
         try:
             from heal_registry import emit_event as _heal_emit_local  # noqa: PLC0415
+            # rc15.27 B-PII (round 17): redact username from heal event
+            # details. heal_events.jsonl bundles into diagnostic zip
+            # which goes to public catbox.moe. _home_str captured once
+            # for both call sites below.
+            _home_str = str(Path.home())
+            def _redact_path(s: str) -> str:
+                return s.replace(_home_str, "<USER>") if _home_str else s
             _heal_emit_local(
                 "B4_update_same_drive_tmp", "detect", "info",
-                f"update tmp on same drive as install: {target_dir}",
-                details={"target_dir": str(target_dir), "current_exe": str(current_exe)},
+                f"update tmp on same drive as install: {_redact_path(str(target_dir))}",
+                details={
+                    "target_dir": _redact_path(str(target_dir)),
+                    "current_exe": _redact_path(str(current_exe)),
+                },
                 remediation={"action": "auto_clean", "performed": True,
                              "next_step": "bat will retry move /Y up to 30s"},
                 recorder_version=RECORDER_VERSION,
@@ -379,7 +389,10 @@ def _stage_self_update(new_exe_url: str) -> bool:
             _heal_emit_local(
                 "B3_update_bat_retry", "heal_success", "info",
                 "update bat staged with 30s retry loop",
-                details={"bat_path": str(bat_path), "size_bytes": new_path.stat().st_size},
+                details={
+                    "bat_path": _redact_path(str(bat_path)),
+                    "size_bytes": new_path.stat().st_size,
+                },
                 remediation={"action": "auto_clean", "performed": True,
                              "next_step": "process exits, bat swaps .exe + relaunches"},
                 recorder_version=RECORDER_VERSION,
@@ -580,6 +593,14 @@ def _build_diagnostic_zip() -> Optional[Path]:
     try:
         import zipfile, platform
         zip_path = _desktop_path() / DIAGNOSTIC_ZIP_NAME
+        # rc15.27 B-PII (round 17): redact home path username before any
+        # text leaves the local machine. catbox.moe is permanent + public,
+        # transfer.sh is 14d public; URL holder gets full content. Replace
+        # `C:\Users\<username>` with `<USER>` so the username doesn't end
+        # up indexable.
+        _home_str = str(Path.home())
+        def _redact(s: str) -> str:
+            return s.replace(_home_str, "<USER>") if _home_str else s
         sys_info_lines = [
             f"recorder_version: {RECORDER_VERSION}",
             f"timestamp: {datetime.now().isoformat()}",
@@ -587,9 +608,9 @@ def _build_diagnostic_zip() -> Optional[Path]:
             f"python: {sys.version}",
             f"frozen: {getattr(sys, 'frozen', False)}",
             f"is_onedir: {_is_onedir_install() if getattr(sys, 'frozen', False) else 'N/A'}",
-            f"sys.executable: {sys.executable}",
-            f"home: {Path.home()}",
-            f"log_file: {_STARTUP_LOG}",
+            _redact(f"sys.executable: {sys.executable}"),
+            _redact(f"home: {Path.home()}"),
+            _redact(f"log_file: {_STARTUP_LOG}"),
             f"log_exists: {_STARTUP_LOG.exists()}",
             f"log_size_bytes: {_STARTUP_LOG.stat().st_size if _STARTUP_LOG.exists() else 0}",
         ]
@@ -690,6 +711,17 @@ def _upload_log_remote() -> Optional[str]:
         return None
     if len(body) > 5_000_000:  # 0x0.st limit ~512MB but trim aggressively
         body = body[-1_000_000:]
+    # rc15.27 B-PII (round 17): scrub home path before uploading. Was
+    # leaking `C:\Users\<username>` in tracebacks + every _trace path.
+    # 0x0.st is anonymous public hosting; once URL leaks, content is
+    # forever indexable. One replace covers tracebacks + paths in one
+    # pass since both are the same byte sequence.
+    try:
+        _home_bytes = str(Path.home()).encode("utf-8")
+        if _home_bytes:
+            body = body.replace(_home_bytes, b"<USER>")
+    except Exception:
+        pass
     try:
         # 0x0.st expects multipart/form-data with field name "file".
         # Build a minimal multipart body with stdlib (no `requests` dep).

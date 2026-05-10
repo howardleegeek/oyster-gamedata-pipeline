@@ -70,7 +70,10 @@ def _check_video_specs(d: Path, rpt: LintReport) -> None:
     bad_fmt = list(d.glob("**/*.mov")) + list(d.glob("**/*.mkv")) + list(d.glob("**/*.flv"))
     rpt.add(LintResult(1, "Video Resolution", bool(vids), "1920x1080 required" if vids else "No videos"))
     rpt.add(LintResult(2, "Video Duration", bool(vids), "5-6 min required" if vids else "No videos"))
-    rpt.add(LintResult(3, "Video FPS", True, "FPS check passed"))
+    # rc15.27 A-L1 (round 17): mark stub criteria so 24/24 PASS doesn't
+    # falsely imply 24 real checks. bingd's 1-frame video passed because
+    # 10 of 24 criteria are stubs that always return True.
+    rpt.add(LintResult(3, "Video FPS", True, "FPS check passed (stub — not implemented)"))
     rpt.add(LintResult(4, "Video Format", not bad_fmt,
                        "All MP4/AVI" if not bad_fmt else f"Invalid: {[f.name for f in bad_fmt[:5]]}"))
 
@@ -86,17 +89,17 @@ def _check_image_specs(d: Path, rpt: LintReport) -> None:
         except Exception: pass
     rpt.add(LintResult(5, "Image Resolution", not invalid,
                        f"All 1920x1080" if not invalid else f"{len(invalid)} wrong", {"samples": invalid[:5]}))
-    rpt.add(LintResult(6, "Image Format", True, "Image format check passed"))
+    rpt.add(LintResult(6, "Image Format", True, "Image format check passed (stub — not implemented)"))
 
 def _check_audio_specs(d: Path, rpt: LintReport) -> None:
     """Criteria 7-10: Audio quality, format, channels, sample rate."""
     audios = list(d.glob("**/*.wav")) + list(d.glob("**/*.mp3"))
     bad_audio = list(d.glob("**/*.aac")) + list(d.glob("**/*.ogg"))
-    rpt.add(LintResult(7, "Audio Quality", True, "Audio quality check passed"))
+    rpt.add(LintResult(7, "Audio Quality", True, "Audio quality check passed (stub — not implemented)"))
     rpt.add(LintResult(8, "Audio Format", not bad_audio,
                        "All WAV/MP3" if not bad_audio else f"Invalid: {[f.name for f in bad_audio[:5]]}"))
-    rpt.add(LintResult(9, "Audio Channels", True, "Audio channels check passed"))
-    rpt.add(LintResult(10, "Audio Sample Rate", True, "Sample rate check passed"))
+    rpt.add(LintResult(9, "Audio Channels", True, "Audio channels check passed (stub — not implemented)"))
+    rpt.add(LintResult(10, "Audio Sample Rate", True, "Sample rate check passed (stub — not implemented)"))
 
 def _check_route_dist(d: Path, rpt: LintReport) -> None:
     """Criterion 11: Route distribution validation."""
@@ -109,7 +112,7 @@ def _check_route_dist(d: Path, rpt: LintReport) -> None:
                 data = yaml.safe_load(f)
                 if data and "routes" in data: details[r.name] = "valid"
         except Exception: details[r.name] = "parse error"
-    rpt.add(LintResult(11, "Route Distribution", True, "Route distribution check passed", details))
+    rpt.add(LintResult(11, "Route Distribution", True, "Route distribution check passed (stub — not implemented)", details))
 
 def _check_intrinsics(d: Path, rpt: LintReport) -> None:
     """Criterion 12: Camera intrinsics fx==fy."""
@@ -149,7 +152,7 @@ def _check_quaternion(d: Path, rpt: LintReport) -> None:
         except Exception: pass
     rpt.add(LintResult(13, "Quaternion xyzw Order", not issues,
                        "All quaternions valid" if not issues else f"{len(issues)} issues"))
-    rpt.add(LintResult(14, "Quaternion Normalization", not issues, "Quaternion normalization check passed"))
+    rpt.add(LintResult(14, "Quaternion Normalization", not issues, "Quaternion normalization check passed (stub — uses xyzw shape only)"))
 
 def _check_depth_ratio(d: Path, rpt: LintReport) -> None:
     """Criteria 15-16: Depth invalid-pixel ratio (<5%).
@@ -238,13 +241,13 @@ def _check_keycode(d: Path, rpt: LintReport) -> None:
         except Exception: pass
     rpt.add(LintResult(17, "keyCode Integer Format", not issues,
                        "All keyCode int" if not issues else f"{len(issues)} non-int"))
-    rpt.add(LintResult(18, "KeyCode Validation", not issues, "KeyCode validation passed"))
+    rpt.add(LintResult(18, "KeyCode Validation", not issues, "KeyCode validation passed (stub — uses int-shape only)"))
 
 def _check_no_overlays(d: Path, rpt: LintReport) -> None:
     """Criteria 19-21: No UI overlay, no logo, no popup."""
-    rpt.add(LintResult(19, "No UI Overlay", True, "No UI overlay detected"))
-    rpt.add(LintResult(20, "No Logo", True, "No logo detected"))
-    rpt.add(LintResult(21, "No Popup", True, "No popup detected"))
+    rpt.add(LintResult(19, "No UI Overlay", True, "No UI overlay detected (stub — not implemented)"))
+    rpt.add(LintResult(20, "No Logo", True, "No logo detected (stub — not implemented)"))
+    rpt.add(LintResult(21, "No Popup", True, "No popup detected (stub — not implemented)"))
 
 def _check_metadata(d: Path, rpt: LintReport) -> None:
     """Criterion 22: Metadata completeness."""

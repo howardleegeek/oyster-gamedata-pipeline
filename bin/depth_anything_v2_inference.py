@@ -170,8 +170,17 @@ def _video_total_frames(video_path: Path) -> int:
         fps = meta.get("fps")
         if duration and fps:
             return int(round(float(duration) * float(fps)))
-    except Exception:
-        pass
+    except Exception as _e:
+        # rc15.27 A-L2 (round 17): trace the silent fail so engineers
+        # can debug missing-codec / corrupt-mp4 edge cases without
+        # changing the behavior contract (still returns 0 on failure).
+        try:
+            import logging as _logging  # noqa: PLC0415
+            _logging.getLogger(__name__).debug(
+                "_video_total_frames: %s", _e
+            )
+        except Exception:
+            pass
     return 0
 
 
@@ -305,8 +314,17 @@ def infer_depth_for_video(
 
         try:
             reader.close()
-        except Exception:
-            pass
+        except Exception as _ce:
+            # rc15.27 A-L3 (round 17): trace silent reader.close fail.
+            # Cleanup is best-effort but a corrupt mp4 raising on close
+            # is useful diagnostic info.
+            try:
+                import logging as _logging  # noqa: PLC0415
+                _logging.getLogger(__name__).debug(
+                    "reader.close failed: %s", _ce
+                )
+            except Exception:
+                pass
 
         # Final progress tick so the UI bar lands on 100% (or the partial
         # value at skip time) rather than the last N-aligned tick.

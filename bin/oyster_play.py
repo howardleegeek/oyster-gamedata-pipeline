@@ -154,11 +154,16 @@ def spawn_recorder(recorder_exe: Path) -> subprocess.Popen | None:
         logger.info("recorder already running — skipping spawn")
         return None
     logger.info("spawning recorder: %s", recorder_exe)
-    # CREATE_NEW_PROCESS_GROUP so the recorder lives independently.
+    # rc15.27 C-#1 (round 17): on a PyInstaller --noconsole parent, the
+    # recorder's stdout/stderr inherit a detached console handle which
+    # Windows may keep alive as a zombie object. Add CREATE_NO_WINDOW
+    # (0x08000000) and route stdio to DEVNULL.
     return subprocess.Popen(
         [str(recorder_exe)],
         cwd=str(recorder_exe.parent),
-        creationflags=0x00000200,  # CREATE_NEW_PROCESS_GROUP
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        creationflags=0x00000200 | 0x08000000,  # CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW
     )
 
 
@@ -369,10 +374,17 @@ def write_desktop_shortcut(
         logger.warning(
             "pywin32 not available — falling back to PowerShell shortcut creation"
         )
+        # rc15.27 C-#3 (round 17): escape PowerShell single-quotes ('').
+        # Was: paths with apostrophes (`O'Brian` desktop, OneDrive
+        # `User's Files`) broke PS quoting and produced a parse error
+        # rather than a working shortcut. PS escapes ' as ''.
+        _safe_lnk = str(lnk_path).replace("'", "''")
+        _safe_exe = str(target_exe).replace("'", "''")
+        _safe_dir = str(target_exe.parent).replace("'", "''")
         ps = (
-            f"$s = (New-Object -ComObject WScript.Shell).CreateShortcut('{lnk_path}'); "
-            f"$s.TargetPath='{target_exe}'; "
-            f"$s.WorkingDirectory='{target_exe.parent}'; "
+            f"$s = (New-Object -ComObject WScript.Shell).CreateShortcut('{_safe_lnk}'); "
+            f"$s.TargetPath='{_safe_exe}'; "
+            f"$s.WorkingDirectory='{_safe_dir}'; "
             f"$s.Save()"
         )
         try:
@@ -527,8 +539,12 @@ def run_session(
                     creationflags=0x08000000,
                     capture_output=True, timeout=5,
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                # rc15.27 C-#2 (round 17): was silent. If taskkill fails
+                # (Access Denied for elevated MuMu, process gone, etc.)
+                # we silently downsized heap but left hog running → MC
+                # OOMs anyway and tester sees no clue.
+                logger.warning("taskkill %s failed: %s", hog_image, exc)
     if resized_xmx != java_xmx:
         # Heap was downsized due to low avail RAM.
         java_xmx = resized_xmx
