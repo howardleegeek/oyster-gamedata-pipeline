@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.16"
+RECORDER_VERSION = "lite-v0.28.0-rc15.17"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -3397,6 +3397,195 @@ class RecorderApp(tk.Tk):
         _trace(f"audio_probe: device={first_audio!r}")
         return first_audio
 
+    def _build_probe_cmd(
+        self, method: str, x: int, y: int, w: int, h: int, out_path: Path
+    ) -> list[str]:
+        """rc15.17: build a 2-second ffmpeg probe command for given capture
+        method. Encodes to libx264 (ultrafast) — no audio, no scale."""
+        if method == "ddagrab":
+            ddagrab_idx = os.environ.get("OYSTER_DDAGRAB_OUTPUT_IDX", "0").strip()
+            return [
+                str(_FFMPEG),
+                "-f", "lavfi",
+                "-i", f"ddagrab=output_idx={ddagrab_idx}:framerate=30:draw_mouse=0",
+                "-vf", f"hwdownload,format=bgra,crop={w}:{h}:{x}:{y},format=yuv420p",
+                "-c:v", "libx264", "-preset", "ultrafast",
+                "-t", "2", "-y", str(out_path),
+            ]
+        else:  # gdigrab
+            return [
+                str(_FFMPEG),
+                "-f", "gdigrab",
+                "-framerate", "30",
+                "-offset_x", str(x), "-offset_y", str(y),
+                "-video_size", f"{w}x{h}",
+                "-i", "desktop",
+                "-c:v", "libx264", "-preset", "ultrafast",
+                "-t", "2", "-y", str(out_path),
+            ]
+
+    def _select_capture_tier(
+        self, x: int, y: int, w: int, h: int
+    ) -> tuple[str, list[dict[str, Any]]]:
+        """rc15.17 capture self-heal v3 (Howard 2026-05-10 "对 fallback 并行处理吧"):
+        spawn ddagrab + gdigrab probe processes in PARALLEL. First to
+        validate (≥12 frames in <4s) wins, loser killed. Cuts probe wall
+        time from 4-6s (serial) to ~2-3s.
+
+        Returns: (selected_tier, history) where history is one dict per
+        probe with frame_count, stderr tail, winner flag — all attached
+        to capture_dual_track heal events.
+        """
+        import tempfile  # noqa: PLC0415
+
+        history: list[dict[str, Any]] = []
+        probes: list[dict[str, Any]] = []
+
+        # Phase 1: spawn both probes in parallel.
+        for method in ("ddagrab", "gdigrab"):
+            probe_path: Optional[Path] = None
+            try:
+                tf = tempfile.NamedTemporaryFile(
+                    suffix=f"_probe_{method}.mp4", delete=False
+                )
+                probe_path = Path(tf.name)
+                tf.close()
+                cmd = self._build_probe_cmd(method, x, y, w, h, probe_path)
+                proc = subprocess.Popen(
+                    cmd,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
+                    creationflags=0x08000000 if os.name == "nt" else 0,
+                )
+                probes.append({
+                    "method": method,
+                    "proc": proc,
+                    "path": probe_path,
+                    "frame_count": 0,
+                    "stderr_lines": [],
+                })
+            except Exception as exc:
+                history.append({
+                    "method": method,
+                    "spawn_error": f"{type(exc).__name__}: {exc}",
+                })
+                if probe_path is not None:
+                    try:
+                        probe_path.unlink(missing_ok=True)
+                    except Exception:
+                        pass
+
+        # Phase 2: stderr readers update frame_count concurrently.
+        def _stderr_reader(probe: dict[str, Any]) -> None:
+            try:
+                fh = probe["proc"].stderr
+                if fh is None:
+                    return
+                for raw in iter(fh.readline, b""):
+                    line = raw.decode("utf-8", errors="replace")
+                    m = _re.search(r"frame=\s*(\d+)", line)
+                    if m:
+                        probe["frame_count"] = int(m.group(1))
+                    probe["stderr_lines"].append(line.rstrip())
+                    if len(probe["stderr_lines"]) > 50:
+                        probe["stderr_lines"] = probe["stderr_lines"][-50:]
+            except Exception:
+                pass
+
+        for p in probes:
+            threading.Thread(
+                target=_stderr_reader, args=(p,), daemon=True
+            ).start()
+
+        # Phase 3: poll for winner.
+        THRESHOLD_FRAMES = 12  # 0.4s of 30fps captured
+        MAX_WAIT_SEC = 4.0
+        start = time.time()
+        winner: Optional[dict[str, Any]] = None
+        while time.time() - start < MAX_WAIT_SEC and winner is None:
+            for p in probes:
+                if (p["frame_count"] >= THRESHOLD_FRAMES
+                        and p["proc"].poll() is None):
+                    winner = p
+                    break
+            if winner is None:
+                time.sleep(0.1)
+
+        # Phase 4: kill all probes (winner included — we restart for real).
+        for p in probes:
+            try:
+                if p["proc"].poll() is None:
+                    p["proc"].terminate()
+                    try:
+                        p["proc"].wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        p["proc"].kill()
+            except Exception:
+                pass
+            try:
+                p["path"].unlink(missing_ok=True)
+            except Exception:
+                pass
+
+            entry = {
+                "method": p["method"],
+                "frame_count": p["frame_count"],
+                "stderr_tail": "\n".join(p["stderr_lines"][-10:])[-400:],
+                "winner": p is winner,
+            }
+            history.append(entry)
+
+            # Heal event per probe attempt.
+            try:
+                ev_type = (
+                    "heal_success" if p is winner
+                    else "detect" if p["frame_count"] >= THRESHOLD_FRAMES
+                    else "heal_failed"
+                )
+                ev_sev = (
+                    "info" if p is winner or p["frame_count"] >= THRESHOLD_FRAMES
+                    else "warn"
+                )
+                _heal_emit(
+                    "capture_dual_track", ev_type, ev_sev,
+                    f"capture probe {p['method']}: frames={p['frame_count']}"
+                    + (" WINNER" if p is winner else ""),
+                    details={
+                        "frame_count": p["frame_count"],
+                        "method": p["method"],
+                        "stderr_tail": entry["stderr_tail"][:300],
+                    },
+                    session_id=getattr(self, "_session_id", None),
+                    recorder_version=RECORDER_VERSION,
+                )
+            except Exception:
+                pass
+
+        if winner is not None:
+            return winner["method"], history
+
+        # All probes failed → ddagrab as last-resort (it CAN capture
+        # fullscreen, gdigrab definitely cannot if MC is fullscreen).
+        try:
+            _heal_emit(
+                "capture_dual_track", "heal_failed", "fatal",
+                "all capture probes failed — defaulting to ddagrab",
+                details={"history": history},
+                remediation={
+                    "action": "user_prompt", "performed": False,
+                    "next_step": (
+                        "tester 检查 MC 是否前台、关闭其他全屏程序、"
+                        "或按 F11 切换窗口模式"
+                    ),
+                },
+                session_id=getattr(self, "_session_id", None),
+                recorder_version=RECORDER_VERSION,
+            )
+        except Exception:
+            pass
+        return "ddagrab", history
+
     def _start_ffmpeg(self, out_path: Path) -> None:
         """Spawn ffmpeg with gdigrab to record the Minecraft window.
 
@@ -3448,27 +3637,85 @@ class RecorderApp(tk.Tk):
         else:
             _trace("ffmpeg: no audio device found, recording video only")
 
-        # R01 v2: always cropped-desktop capture using detected geometry.
-        # locale-blind — title encoding never participates in the ffmpeg cmd.
-        video_input = [
-            "-f", "gdigrab",
-            "-framerate", "30",
-            "-draw_mouse", "0",
-            "-offset_x", str(x),
-            "-offset_y", str(y),
-            "-video_size", f"{w}x{h}",
-            "-i", "desktop",
-        ]
+        # rc15.17 (Howard 2026-05-10 "视频只有一帧 卡在那了" + "有风险就需要
+        # 诊断工具和自愈模式"):
+        #
+        # bingd's session 15:16-15:21 produced a 5-min recording where
+        # video.mp4 had exactly 1 visible frame. Root cause: gdigrab can
+        # NOT capture DirectX exclusive fullscreen (MC after F11). gdigrab
+        # uses Win32 BitBlt against the GDI surface, which is bypassed by
+        # exclusive fullscreen → returns the last frozen desktop frame
+        # forever → ffmpeg encodes 1 IDR + extends duration via timestamps
+        # without new pixel data.
+        #
+        # FIX (capture self-heal v1, modeled on rc15.9 depth_dual_track):
+        #   1. Probe each tier with a 2-second test recording
+        #   2. Parse ffmpeg stderr `frame= NNN` to count actual frames
+        #   3. Pick first tier with frames ≥ 12 (40% of 30 fps × 2s)
+        #   4. Emit heal_events for every probe attempt
+        #
+        # Tiers (in order):
+        #   - ddagrab — DXGI Desktop Duplication, captures fullscreen
+        #     exclusive + borderless + windowed. Bundled BtbN ffmpeg has it.
+        #   - gdigrab — Win32 BitBlt, only captures windowed/borderless.
+        #
+        # Env-var overrides (debug):
+        #   OYSTER_FORCE_CAPTURE=ddagrab|gdigrab — skip probe, use this tier
+        #   OYSTER_SKIP_CAPTURE_PROBE=1 — skip probe, use ddagrab default
+        forced = os.environ.get("OYSTER_FORCE_CAPTURE", "").strip().lower()
+        skip_probe = os.environ.get("OYSTER_SKIP_CAPTURE_PROBE", "").strip() == "1"
+
+        if forced in ("ddagrab", "gdigrab"):
+            selected_tier = forced
+            probe_history: list[dict[str, Any]] = [
+                {"method": forced, "reason": "OYSTER_FORCE_CAPTURE override"}
+            ]
+            _trace(f"ffmpeg: capture tier FORCED to {forced}")
+        elif skip_probe:
+            selected_tier = "ddagrab"
+            probe_history = [{"method": "ddagrab", "reason": "OYSTER_SKIP_CAPTURE_PROBE"}]
+            _trace("ffmpeg: capture probe skipped, using ddagrab")
+        else:
+            selected_tier, probe_history = self._select_capture_tier(x, y, w, h)
+            _trace(f"ffmpeg: capture self-heal selected tier={selected_tier} "
+                   f"history={probe_history}")
+
+        # Stash for post-record validation + diagnostic zip.
+        self._capture_tier = selected_tier
+        self._capture_probe_history = probe_history
+
+        if selected_tier == "ddagrab":
+            ddagrab_idx = os.environ.get("OYSTER_DDAGRAB_OUTPUT_IDX", "0").strip()
+            video_input = [
+                "-f", "lavfi",
+                "-i", f"ddagrab=output_idx={ddagrab_idx}:framerate=30:draw_mouse=0",
+            ]
+            video_filter = (
+                f"hwdownload,format=bgra,crop={w}:{h}:{x}:{y},"
+                "scale=1920:1080:flags=lanczos,format=yuv420p"
+            )
+        else:  # gdigrab
+            video_input = [
+                "-f", "gdigrab",
+                "-framerate", "30",
+                "-draw_mouse", "0",
+                "-offset_x", str(x),
+                "-offset_y", str(y),
+                "-video_size", f"{w}x{h}",
+                "-i", "desktop",
+            ]
+            video_filter = "scale=1920:1080:flags=lanczos,format=yuv420p"
+
         _trace(
-            f"ffmpeg: window-area capture title='{mc_title}' "
-            f"geometry={x},{y},{w},{h}"
+            f"ffmpeg: {selected_tier} capture title='{mc_title}' "
+            f"crop={w}x{h}@{x},{y}"
         )
 
         cmd = [
             str(_FFMPEG),
             *video_input,
             *audio_inputs,
-            "-vf", "scale=1920:1080:flags=lanczos",
+            "-vf", video_filter,
             "-c:v", "libx265",
             "-preset", "ultrafast",
             "-pix_fmt", "yuv420p",
@@ -3481,13 +3728,41 @@ class RecorderApp(tk.Tk):
         # On Windows, CREATE_NO_WINDOW (0x08000000) hides the ffmpeg
         # console window so the tester only sees our Tk window.
         flags = 0x08000000 if os.name == "nt" else 0
+        # rc15.17: capture stderr so we can parse frame count for
+        # post-record validation (ISC-5). stdout still discarded.
         self._ffmpeg_proc = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
             creationflags=flags,
         )
+        # Spawn stderr reader thread that captures `frame= NNN` progress
+        # to self._capture_last_frame_count. Used for post-record sanity
+        # check: if final frame count < 30 (1 sec) for a 5-min recording,
+        # quarantine the session as capture_stalled.
+        self._capture_last_frame_count = 0
+        self._capture_stderr_buf: list[str] = []
+
+        def _stderr_reader():
+            try:
+                fh = self._ffmpeg_proc.stderr  # type: ignore[union-attr]
+                if fh is None:
+                    return
+                for raw in iter(fh.readline, b""):
+                    line = raw.decode("utf-8", errors="replace")
+                    # ffmpeg progress: "frame= 1234 fps=..."
+                    m = _re.search(r"frame=\s*(\d+)", line)
+                    if m:
+                        self._capture_last_frame_count = int(m.group(1))
+                    # Keep last 200 lines of stderr for diagnostic zip.
+                    self._capture_stderr_buf.append(line.rstrip())
+                    if len(self._capture_stderr_buf) > 200:
+                        self._capture_stderr_buf = self._capture_stderr_buf[-200:]
+            except Exception:
+                pass
+
+        threading.Thread(target=_stderr_reader, daemon=True).start()
 
     def _run_preflight(self) -> list[dict[str, Any]]:
         """rc12 SH: preflight environment self-check.

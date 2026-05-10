@@ -60,6 +60,8 @@ VALID_FEATURES: set[str] = {
     "SK_duration_too_short_prompt",    # < 5min reprompt modal
     # rc14 dual-track
     "depth_dual_track",                # cuda/dml/cpu/server-pending router
+    # rc15.17 capture self-heal
+    "capture_dual_track",              # ddagrab/gdigrab parallel probe + auto-fallback
     # framework itself
     "heal_registry",                    # meta-events about the registry
 }
