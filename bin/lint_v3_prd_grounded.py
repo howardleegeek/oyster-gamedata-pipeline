@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 # Lazy imports for optional dependencies
-_np, _pil, _yaml = None, None, None
+_np, _pil, _yaml, _iio = None, None, None, None
 def _get_np():
     global _np
     if _np is None: import numpy; _np = numpy
@@ -26,6 +26,20 @@ def _get_yaml():
     global _yaml
     if _yaml is None: import yaml; _yaml = yaml
     return _yaml
+def _get_iio():
+    """rc15.28 A-A1: imageio for FPS / audio meta (already bundled)."""
+    global _iio
+    if _iio is None:
+        try:
+            import imageio.v2 as imageio_v2  # noqa
+            _iio = imageio_v2
+        except ImportError:
+            try:
+                import imageio
+                _iio = imageio
+            except ImportError:
+                _iio = False  # explicit fail sentinel
+    return _iio
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -70,10 +84,31 @@ def _check_video_specs(d: Path, rpt: LintReport) -> None:
     bad_fmt = list(d.glob("**/*.mov")) + list(d.glob("**/*.mkv")) + list(d.glob("**/*.flv"))
     rpt.add(LintResult(1, "Video Resolution", bool(vids), "1920x1080 required" if vids else "No videos"))
     rpt.add(LintResult(2, "Video Duration", bool(vids), "5-6 min required" if vids else "No videos"))
-    # rc15.27 A-L1 (round 17): mark stub criteria so 24/24 PASS doesn't
-    # falsely imply 24 real checks. bingd's 1-frame video passed because
-    # 10 of 24 criteria are stubs that always return True.
-    rpt.add(LintResult(3, "Video FPS", True, "FPS check passed (stub — not implemented)"))
+    # rc15.28 A-A1.3 (round 18): real Video FPS check via imageio meta.
+    # PRD spec: 30 fps target. Tolerance 25-35 absorbs slight CPU pacing.
+    iio = _get_iio()
+    if not vids:
+        rpt.add(LintResult(3, "Video FPS", False, "No videos to check FPS"))
+    elif iio is False:
+        # imageio not available — fall back to stub-style PASS but flag it
+        rpt.add(LintResult(3, "Video FPS", True,
+                           "FPS check skipped (imageio unavailable)"))
+    else:
+        bad: list[tuple[str, Any]] = []
+        sample: list[tuple[str, float]] = []
+        for v in vids[:5]:
+            try:
+                meta = iio.get_reader(str(v), format="FFMPEG").get_meta_data()
+                fps = float(meta.get("fps") or 0)
+                sample.append((v.name, fps))
+                if not (25.0 <= fps <= 35.0):
+                    bad.append((v.name, fps))
+            except Exception as e:
+                bad.append((v.name, f"probe failed: {e}"))
+        rpt.add(LintResult(3, "Video FPS", not bad,
+                           f"{len(sample)} videos in 25-35 fps range"
+                           if not bad else f"{len(bad)} bad fps: {bad[:3]}",
+                           {"sample": sample[:5]}))
     rpt.add(LintResult(4, "Video Format", not bad_fmt,
                        "All MP4/AVI" if not bad_fmt else f"Invalid: {[f.name for f in bad_fmt[:5]]}"))
 
@@ -89,17 +124,95 @@ def _check_image_specs(d: Path, rpt: LintReport) -> None:
         except Exception: pass
     rpt.add(LintResult(5, "Image Resolution", not invalid,
                        f"All 1920x1080" if not invalid else f"{len(invalid)} wrong", {"samples": invalid[:5]}))
-    rpt.add(LintResult(6, "Image Format", True, "Image format check passed (stub — not implemented)"))
+    # rc15.28 A-A1.6 (round 18): real Image Format check via PIL.
+    # Verify PIL's detected format matches the file suffix (catches
+    # mislabeled .png that's actually JPEG, etc.)
+    fmt_bad: list[tuple[str, str]] = []
+    for p in imgs[:30]:
+        try:
+            with Image.open(p) as im:
+                expected = "PNG" if p.suffix.lower() == ".png" else "JPEG"
+                if im.format and im.format != expected:
+                    fmt_bad.append((p.name, im.format))
+        except Exception as e:
+            fmt_bad.append((p.name, f"open_failed: {e}"))
+    rpt.add(LintResult(6, "Image Format", not fmt_bad,
+                       "All formats match suffix" if not fmt_bad
+                       else f"{len(fmt_bad)} mismatches",
+                       {"samples": fmt_bad[:5]}))
 
 def _check_audio_specs(d: Path, rpt: LintReport) -> None:
-    """Criteria 7-10: Audio quality, format, channels, sample rate."""
+    """Criteria 7-10: Audio quality, format, channels, sample rate.
+
+    rc15.28 A-A1.7/9/10 (round 18): real implementation.
+
+    Audio is OPTIONAL in the recorder (ffmpeg falls back to video-only
+    when no input device detected). So the meaningful states are:
+      - No audio file: PASS with note "video-only session"
+      - Audio file present + meta probeable: real check vs PRD targets
+      - Probe fails: FAIL with reason
+    """
     audios = list(d.glob("**/*.wav")) + list(d.glob("**/*.mp3"))
     bad_audio = list(d.glob("**/*.aac")) + list(d.glob("**/*.ogg"))
-    rpt.add(LintResult(7, "Audio Quality", True, "Audio quality check passed (stub — not implemented)"))
     rpt.add(LintResult(8, "Audio Format", not bad_audio,
                        "All WAV/MP3" if not bad_audio else f"Invalid: {[f.name for f in bad_audio[:5]]}"))
-    rpt.add(LintResult(9, "Audio Channels", True, "Audio channels check passed (stub — not implemented)"))
-    rpt.add(LintResult(10, "Audio Sample Rate", True, "Sample rate check passed (stub — not implemented)"))
+
+    if not audios:
+        # Video-only session — acceptable per recorder design.
+        rpt.add(LintResult(7, "Audio Quality", True,
+                           "No audio file (video-only session — acceptable)"))
+        rpt.add(LintResult(9, "Audio Channels", True,
+                           "No audio file (video-only)"))
+        rpt.add(LintResult(10, "Audio Sample Rate", True,
+                           "No audio file (video-only)"))
+        return
+
+    iio = _get_iio()
+    if iio is False:
+        # imageio unavailable — can't probe audio meta; report skip
+        rpt.add(LintResult(7, "Audio Quality", True,
+                           "Audio probe skipped (imageio unavailable)"))
+        rpt.add(LintResult(9, "Audio Channels", True,
+                           "Audio probe skipped (imageio unavailable)"))
+        rpt.add(LintResult(10, "Audio Sample Rate", True,
+                           "Audio probe skipped (imageio unavailable)"))
+        return
+
+    qual_bad: list[tuple[str, str]] = []
+    chan_bad: list[tuple[str, int]] = []
+    sr_bad: list[tuple[str, int]] = []
+    for a in audios[:5]:
+        try:
+            r = iio.get_reader(str(a))
+            meta = r.get_meta_data()
+            # PRD: any reasonable sample rate (>= 22050 Hz),
+            # 1 or 2 channels, codec is wav/mp3 (already validated above).
+            sr = int(meta.get("fps") or meta.get("sample_rate") or 0)
+            if sr and sr < 22050:
+                sr_bad.append((a.name, sr))
+            channels = int(meta.get("channels") or meta.get("nchannels") or 0)
+            if channels and channels not in (1, 2):
+                chan_bad.append((a.name, channels))
+            # Quality heuristic: file size / duration. Tiny duration
+            # or 0-byte file = corrupt.
+            try:
+                size = a.stat().st_size
+                if size < 1024:  # 1 KB threshold
+                    qual_bad.append((a.name, f"too small {size}b"))
+            except Exception:
+                pass
+        except Exception as e:
+            qual_bad.append((a.name, f"probe failed: {e}"))
+    rpt.add(LintResult(7, "Audio Quality", not qual_bad,
+                       "All audio files non-trivial" if not qual_bad
+                       else f"{len(qual_bad)} bad", {"samples": qual_bad[:5]}))
+    rpt.add(LintResult(9, "Audio Channels", not chan_bad,
+                       "All 1-or-2 channels" if not chan_bad
+                       else f"{len(chan_bad)} unusual", {"samples": chan_bad[:5]}))
+    rpt.add(LintResult(10, "Audio Sample Rate", not sr_bad,
+                       "All ≥22050 Hz" if not sr_bad
+                       else f"{len(sr_bad)} below threshold",
+                       {"samples": sr_bad[:5]}))
 
 def _check_route_dist(d: Path, rpt: LintReport) -> None:
     """Criterion 11: Route distribution validation."""
@@ -152,7 +265,46 @@ def _check_quaternion(d: Path, rpt: LintReport) -> None:
         except Exception: pass
     rpt.add(LintResult(13, "Quaternion xyzw Order", not issues,
                        "All quaternions valid" if not issues else f"{len(issues)} issues"))
-    rpt.add(LintResult(14, "Quaternion Normalization", not issues, "Quaternion normalization check passed (stub — uses xyzw shape only)"))
+    # rc15.28 A-A1.14 (round 18): real Quaternion Normalization check.
+    # Verify |q| = sqrt(x² + y² + z² + w²) ≈ 1.0 within tolerance 0.05.
+    # Anything outside [0.95, 1.05] is either an unnormalized output or
+    # a math bug (e.g. _euler_to_quaternion sign error).
+    norm_issues: list[tuple[str, float]] = []
+    for jf in list(d.glob("**/*.json"))[:15]:
+        try:
+            with open(jf) as f:
+                data = json.load(f)
+            samples: list[Any] = []
+            if isinstance(data, dict) and "quaternion" in data:
+                samples = [data["quaternion"]]
+            elif isinstance(data, list):
+                # action_camera.json: list of frames each with a quaternion
+                for r in data[:50]:  # sample first 50 frames
+                    if isinstance(r, dict):
+                        for k in ("camera_rotation_quaternion",
+                                  "player_rotation_quaternion",
+                                  "quaternion"):
+                            if k in r:
+                                samples.append(r[k])
+                                break
+            for q in samples:
+                if isinstance(q, list) and len(q) == 4:
+                    try:
+                        mag = sum(float(x) * float(x) for x in q) ** 0.5
+                        if not (0.95 <= mag <= 1.05):
+                            norm_issues.append((jf.name, round(mag, 4)))
+                            break  # one bad q per file is enough
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+    rpt.add(LintResult(14, "Quaternion Normalization",
+                       not issues and not norm_issues,
+                       ("All quaternions xyzw-shape and |q|≈1.0"
+                        if not issues and not norm_issues
+                        else f"shape_issues={len(issues)} "
+                             f"norm_issues={norm_issues[:5]}"),
+                       {"norm_failures": norm_issues[:5]}))
 
 def _check_depth_ratio(d: Path, rpt: LintReport) -> None:
     """Criteria 15-16: Depth invalid-pixel ratio (<5%).
@@ -241,7 +393,56 @@ def _check_keycode(d: Path, rpt: LintReport) -> None:
         except Exception: pass
     rpt.add(LintResult(17, "keyCode Integer Format", not issues,
                        "All keyCode int" if not issues else f"{len(issues)} non-int"))
-    rpt.add(LintResult(18, "KeyCode Validation", not issues, "KeyCode validation passed (stub — uses int-shape only)"))
+    # rc15.28 A-A1.18 (round 18): real KeyCode VK Range check.
+    # Windows Virtual Key codes are 0-255 (uint8 range). pynput's `vk`
+    # field maps directly to VK; ord(char) for printable can exceed 255
+    # for unicode codepoints (Round 16 D3 noted this). Check
+    # action_camera.json keyCode list AND inputs.jsonl per-event keyCode.
+    range_bad: list[tuple[str, int]] = []
+    sampled = 0
+    for jf in list(d.glob("**/*.json"))[:10]:
+        try:
+            with open(jf) as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                for r in data[:200]:
+                    if isinstance(r, dict) and isinstance(r.get("keyCode"), list):
+                        for kc in r["keyCode"]:
+                            if isinstance(kc, int) and not (0 <= kc <= 255):
+                                range_bad.append((jf.name, kc))
+                            sampled += 1
+                            if sampled > 500:
+                                break
+                    if sampled > 500:
+                        break
+        except Exception:
+            pass
+    for jl in list(d.glob("**/inputs.jsonl"))[:3]:
+        try:
+            with open(jl) as f:
+                for ln in f:
+                    ln = ln.strip()
+                    if not ln:
+                        continue
+                    try:
+                        e = json.loads(ln)
+                    except Exception:
+                        continue
+                    kc = e.get("keyCode")
+                    if isinstance(kc, int) and not (0 <= kc <= 255):
+                        range_bad.append((jl.name, kc))
+                    sampled += 1
+                    if sampled > 5000:
+                        break
+        except Exception:
+            pass
+    rpt.add(LintResult(18, "KeyCode Validation",
+                       not issues and not range_bad,
+                       ("All keyCode int-shape AND in VK range [0,255]"
+                        if not issues and not range_bad
+                        else f"shape_issues={len(issues)} "
+                             f"range_issues={range_bad[:5]}"),
+                       {"out_of_range": range_bad[:10]}))
 
 def _check_no_overlays(d: Path, rpt: LintReport) -> None:
     """Criteria 19-21: No UI overlay, no logo, no popup."""
