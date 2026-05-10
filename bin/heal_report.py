@@ -61,7 +61,11 @@ def _row_for_feature(feature_id: str, counts: dict[str, int]) -> str:
 
 
 def _row_for_event(ev: dict) -> str:
-    ts = ev.get("ts_iso", "?")
+    # rc15.24 C1 (round 16): escape ts_iso. Every other field already
+    # ran through html.escape(); ts_iso was the lone gap. Threat is
+    # low (file is local + trusted), but a tampered/corrupt JSONL line
+    # with `<` in ts_iso would inject. 1-line hardening, can't regress.
+    ts = html.escape(ev.get("ts_iso", "?"))
     fid = html.escape(ev.get("feature_id", "?"))
     et = html.escape(ev.get("event_type", "?"))
     sev = ev.get("severity", "info")

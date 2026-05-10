@@ -19,7 +19,11 @@ jobs:
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          # rc15.24 B1 (round 16): align with build-recorder-installer.yml
+          # which uses 3.12. Mismatched runtime versions across workflows
+          # made the EXE artifact and onedir installer non-byte-equivalent
+          # and exposed version-specific behavior differences.
+          python-version: '3.12'
 
       - name: Install build dependencies
         run: |
@@ -35,7 +39,10 @@ jobs:
           pip install torch-directml
           # rc15.9 self-heal v2 inner-tier 3: ONNX Runtime DML.
           pip install onnxruntime-directml
-          pip install transformers imageio[ffmpeg] OpenEXR Imath huggingface_hub
+          # rc15.24 B3 (round 16): quote the bracket so PowerShell doesn't
+          # treat [ffmpeg] as a glob/array expression and silently install
+          # bare imageio without the ffmpeg extra.
+          pip install transformers "imageio[ffmpeg]" OpenEXR Imath huggingface_hub
 
       - name: Pre-download DepthAnything V2 weights
         # Bundle the model offline so testers don't need internet on first
@@ -236,6 +243,10 @@ jobs:
             dist/OysterRecorder.exe
             dist/OysterRecorder-onedir.zip
           if-no-files-found: error
+          # rc15.24 B2 (round 16): match build-recorder-installer.yml's
+          # 30-day retention. Was using GitHub default (90 days) which
+          # at our 10-tag/30h cadence accumulates 30+ ~800MB artifacts.
+          retention-days: 30
 
       - name: Attach to GitHub Release (tag push only)
         if: startsWith(github.ref, 'refs/tags/recorder-v')

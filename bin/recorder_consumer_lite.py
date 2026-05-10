@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.23"
+RECORDER_VERSION = "lite-v0.28.0-rc15.24"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -1090,7 +1090,43 @@ class InputCapture:
                 else:
                     name = getattr(key, "name", None)
                     if name:
-                        kc = hash(name) & 0xFFFF
+                        # rc15.24 D3 (round 16): was hash(name) & 0xFFFF —
+                        # Python's str hash is randomized per interpreter
+                        # invocation (PYTHONHASHSEED), so the same key
+                        # got DIFFERENT integer codes across recording
+                        # sessions, breaking R13 multimodal verification's
+                        # cross-session keyCode comparison. Use a stable
+                        # Win32 VK lookup for common named keys; unknown
+                        # names fall back to a deterministic CRC-style
+                        # hash (sum of ord chars × prime) so at least
+                        # the same name → same number every session.
+                        _VK_BY_NAME = {
+                            "f1": 112, "f2": 113, "f3": 114, "f4": 115,
+                            "f5": 116, "f6": 117, "f7": 118, "f8": 119,
+                            "f9": 120, "f10": 121, "f11": 122, "f12": 123,
+                            "esc": 27, "escape": 27, "space": 32, "enter": 13,
+                            "backspace": 8, "tab": 9, "shift": 16,
+                            "shift_l": 160, "shift_r": 161,
+                            "ctrl": 17, "ctrl_l": 162, "ctrl_r": 163,
+                            "alt": 18, "alt_l": 164, "alt_r": 165,
+                            "alt_gr": 165, "caps_lock": 20,
+                            "up": 38, "down": 40, "left": 37, "right": 39,
+                            "page_up": 33, "page_down": 34, "home": 36,
+                            "end": 35, "delete": 46, "insert": 45,
+                            "num_lock": 144, "scroll_lock": 145,
+                            "print_screen": 44, "pause": 19,
+                            "cmd": 91, "cmd_l": 91, "cmd_r": 92,
+                        }
+                        nk = name.lower()
+                        if nk in _VK_BY_NAME:
+                            kc = _VK_BY_NAME[nk]
+                        else:
+                            # Deterministic fallback: simple polynomial
+                            # accumulator stable across invocations.
+                            acc = 0
+                            for ch in nk:
+                                acc = (acc * 31 + ord(ch)) & 0xFFFF
+                            kc = acc
         except Exception:
             kc = -1
         with self._lock:
@@ -1114,9 +1150,14 @@ class InputCapture:
           - last_event_age_ms: int (time since last event)
           - healthy: bool (all checks pass)
         """
+        # rc15.24 D1 (round 16): read total under the same lock as
+        # `sample`. Was: `total = len(self.events)` ran AFTER the with
+        # block closed → TOCTOU race against listener threads appending
+        # concurrently → returned `total_events` could be torn relative
+        # to the sample slice. Now both reads are atomic together.
         with self._lock:
             sample = self.events[-last_n:] if len(self.events) > last_n else list(self.events)
-        total = len(self.events)
+            total = len(self.events)
         if not sample:
             return {
                 "total_events": 0,
