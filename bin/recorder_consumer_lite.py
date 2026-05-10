@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.12"
+RECORDER_VERSION = "lite-v0.28.0-rc15.13"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -2324,6 +2324,45 @@ class RecorderApp(tk.Tk):
                     text=f"已保存: {output_tar}",
                     fg=GREEN,
                 )
+                # rc15.13 (Howard 2026-05-10 "新文件找不到 旧文件出来了"):
+                # OneDrive sync trap — Documents may be cloud-redirected,
+                # tester opens "我的录像" and sees stale cloud-restored
+                # files. New tarball wrote OK to absolute path but
+                # invisible until OneDrive sync. Two-pronged fix:
+                # 1. Auto-open Explorer with new file SELECTED (highlighted)
+                #    so tester literally cannot miss it.
+                # 2. Write LATEST_RECORDING.txt to Desktop with absolute
+                #    path so tester has unmissable pointer even if
+                #    Explorer auto-open fails.
+                try:
+                    if os.name == "nt":
+                        # explorer /select,<file> opens parent dir + selects
+                        # the file (blue highlight). Cannot be missed.
+                        subprocess.Popen(
+                            ["explorer", f"/select,{output_tar}"],
+                            creationflags=0x08000000,
+                        )
+                        _trace(f"rc15.13: Explorer /select fired on {output_tar}")
+                except Exception as exc:
+                    _trace(f"rc15.13: Explorer /select failed: {exc}")
+                try:
+                    desktop = _desktop_path()
+                    pointer = desktop / "LATEST_RECORDING.txt"
+                    pointer.write_text(
+                        f"最新录制文件位置 (Latest recording path):\n\n"
+                        f"{output_tar}\n\n"
+                        f"如果 Explorer 没自动打开, 双击此 .txt 旁的资源管理器\n"
+                        f"地址栏粘贴上面这个路径即可找到.\n\n"
+                        f"录制时长: {size_mb:.1f} MB · {datetime.now().isoformat()}\n"
+                        f"如果文件夹打开但看到旧文件 (云端同步还原):\n"
+                        f"  - 等几秒让 OneDrive 同步完\n"
+                        f"  - 或按 F5 刷新\n"
+                        f"  - 或打开 OneDrive 设置看是否在同步\n",
+                        encoding="utf-8",
+                    )
+                    _trace(f"rc15.13: wrote desktop pointer {pointer}")
+                except Exception as exc:
+                    _trace(f"rc15.13: desktop pointer failed: {exc}")
             # v0.6.0: window was iconified when arm was pressed to free
             # MC focus. MC has now exited, so restore our window so the
             # tester sees the green "✓ 录制完成" verdict without needing
