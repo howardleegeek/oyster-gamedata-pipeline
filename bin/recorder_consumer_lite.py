@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.25"
+RECORDER_VERSION = "lite-v0.28.0-rc15.26"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -736,8 +736,9 @@ def _upload_log_in_background(callback=None) -> None:
         if callback is not None:
             try:
                 callback(url)
-            except Exception:
-                pass
+            except Exception as exc:
+                # rc15.26 ISC-1 (round 15 E3): trace silent callback fail
+                _trace(f"upload_log callback raised: {exc}")
     threading.Thread(target=_go, daemon=True).start()
 
 try:
@@ -2097,7 +2098,9 @@ class RecorderApp(tk.Tk):
                 if getattr(sys, "frozen", False):
                     sys.path.insert(0, str(_BUNDLE_ROOT))
                 from bin.bft_orchestrator import orchestrator as orch  # noqa: PLC0415
-                import json  # noqa: PLC0415
+                # rc15.26 ISC-2 (round 15 A2): `json` already top-level
+                # imported (line 45); the in-function re-import was
+                # dead overhead. Removed.
 
                 # Extract tarball + read action_camera.json.
                 with tempfile.TemporaryDirectory() as td:
@@ -3140,19 +3143,30 @@ class RecorderApp(tk.Tk):
                       "请联系工程师并截图本窗口。")
 
     def _package_tarball(self, ts: str) -> Path:
-        """Package the recording into a 5-file PRD-shaped tarball.
+        """Package the recording into the PRD-shaped tarball.
 
-        Layout (per docs/CONSUMER_QA_CHECKLIST.md):
+        Layout (rc15.x current, evolved from v0.7's 5-file stub):
             clip-YYYYMMDD-HHMMSS.tar.gz
-            ├── video.mp4            (real recording)
-            ├── systeminfo.json      (window geometry — best-effort)
-            ├── action_camera.json   (placeholder; full impl in Rust app)
-            ├── gameinfo.xlsx        (placeholder; full impl in Rust app)
-            └── depth/               (empty; full impl needs G198 shader)
+            ├── video.mp4              (real recording)
+            ├── systeminfo.json        (window geometry)
+            ├── action_camera.json     (per-frame state, mod-overlaid)
+            ├── inputs.jsonl           (rc14: pynput key+mouse events)
+            ├── session_manifest.json  (rc14: session_id + frame_count + fps)
+            ├── terminator.json        (rc11 SF: failure attribution)
+            ├── intrinsics.yaml        (camera intrinsics)
+            ├── game_state.jsonl       (rc15.18: mod's raw JSONL bundle)
+            ├── depth_manifest.json    (rc14: status envelope)
+            ├── depth_hashes.json      (rc15.4: separate from manifest)
+            ├── depth/                 (EXR frames if local depth ran)
+            ├── gameinfo.xlsx          (placeholder; full impl in Rust app)
+            └── metadata.json          (conditional: data_authenticity tag)
 
-        This will FAIL G165 lint (24/24 PRD criteria) on depth/audio,
-        but at least gets the SHAPE right so the validator's structural
-        checks can pass and engineers see exactly which fields are stubbed.
+        rc15.16 added preliminary tarball write BEFORE depth (overwritten
+        on success, retained on crash). rc15.20 atomic .tmp + os.replace.
+
+        On normal-finish path, returns the resulting tarball Path. Raises
+        RecorderError on hard-fail conditions (mod missing without
+        --allow-placeholder, etc).
         """
         clip_dir = self._tmp_dir / f"clip-{ts}"
         clip_dir.mkdir(parents=True, exist_ok=True)
@@ -4451,17 +4465,26 @@ class RecorderApp(tk.Tk):
         return "ddagrab", history
 
     def _start_ffmpeg(self, out_path: Path) -> None:
-        """Spawn ffmpeg with gdigrab to record the Minecraft window.
+        """Spawn ffmpeg with the selected capture tier to record the
+        Minecraft window. Tier is chosen by parallel probe in
+        `_select_capture_tier` (rc15.17 v3, rc15.20 winner-check fix):
+        ddagrab (DXGI Desktop Duplication, captures fullscreen exclusive)
+        OR gdigrab (Win32 BitBlt, windowed only) — whichever produces
+        ≥12 frames in <4s on a 2-second probe wins.
 
-        R01 v2 (iron-law-strict): ALWAYS uses cropped-desktop capture
-        with geometry from mc_window rect. Title encoding is irrelevant —
-        we use -offset_x/-offset_y/-video_size + -i desktop, which is
-        fully locale-blind. Hard-fails if mc_window is None (no window
-        detected). The old title-based branch has been removed.
+        Hard-fails if mc_window is None (no window detected — was the
+        rc15.21 C1 Chinese 我的世界 title bug; now uses
+        GAME_PROBE_REGISTRY substrings to detect zh-CN clients).
 
         v0.11.0: also captures audio via dshow if a device is detected.
         Falls back to video-only if no audio device or audio capture
         fails to start.
+
+        Env-var overrides (debug):
+          OYSTER_FORCE_CAPTURE=ddagrab|gdigrab — skip probe, force tier
+          OYSTER_SKIP_CAPTURE_PROBE=1           — skip probe, use ddagrab
+          OYSTER_DDAGRAB_OUTPUT_IDX=N           — multi-monitor selection
+          OYSTER_DISABLE_DDAGRAB=1              — legacy gdigrab-only
         """
         # R01 iron-law: hard-fail if Minecraft window not detected.
         if self._mc_window_rect is None:
@@ -4856,6 +4879,20 @@ class RecorderApp(tk.Tk):
                     "process_name": "javaw.exe",
                     "mod_handshake_ok": getattr(self, "_mod_handshake_ok", False),
                 },
+                # rc15.26 ISC-5 (round 15 B3): surface the orphan
+                # `_suspect_static_camera` attr that was being set by
+                # _package_tarball but never read. Now it lands in
+                # terminator.json so engineer triage + heal aggregation
+                # see the full picture without re-extracting the tarball.
+                "suspect_static_camera": getattr(
+                    self, "_suspect_static_camera", None
+                ),
+                # rc15.26 ISC-5: also expose capture_tier + last frame
+                # count for cross-cutting triage.
+                "capture_tier": getattr(self, "_capture_tier", None),
+                "capture_last_frame_count": getattr(
+                    self, "_capture_last_frame_count", None
+                ),
             }
             target_dir = clip_dir if clip_dir is not None else (
                 Path(_real_documents_dir()) / "OysterRecorder" / "runtime"
@@ -5019,14 +5056,16 @@ class RecorderApp(tk.Tk):
         # can diagnose abrupt-exit cases that don't reach finalize.
         try:
             self._write_terminator(None)
-        except Exception:
-            pass
+        except Exception as exc:
+            # rc15.26 ISC-1 (round 15 E6): trace silent terminator fail
+            _trace(f"on_close: write_terminator failed: {exc}")
         # Final telemetry push so engineer sees the full session log.
         # Synchronous-ish but capped to 15s by urlopen timeout.
         try:
             _upload_log_remote()
-        except Exception:
-            pass
+        except Exception as exc:
+            # rc15.26 ISC-1 (round 15 E7): trace silent upload fail
+            _trace(f"on_close: final upload failed: {exc}")
         self.destroy()
 
     # ---- UI updates (thread-safe via after) -----------------------------
