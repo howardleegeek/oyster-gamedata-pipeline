@@ -81,32 +81,58 @@ def _euler_to_quaternion(yaw_deg: float, pitch_deg: float) -> list[float]:
     return [qx, qy, qz, qw]
 
 
-def lookup_at_ms(samples: list[dict[str, Any]], frame_ms: int) -> dict[str, Any] | None:
+def lookup_at_ms(
+    samples: list[dict[str, Any]],
+    frame_ms: int,
+    base_ms: int | None = None,
+) -> dict[str, Any] | None:
     """Return the sample whose ``timestamp_ms`` is closest to ``frame_ms``.
 
-    Linear scan — for 1801 frames × thousands of samples it's still <200 ms
-    on real data; not worth bisecting. Returns ``None`` if list empty.
+    rc15.19 (Howard 2026-05-10 "player 有移动的 这些都是 bug" — bingd's
+    rc15.18 diagnostic exposed two coupled bugs:
+
+      Bug 1 (CRITICAL silent corruption): the loop's `else: break` triggers
+      on EQUAL distances, not just GREATER. The mod ticks at ~20 TPS but
+      occasionally double-fires in the same ms (System.currentTimeMillis()
+      grain), producing two consecutive samples with identical
+      timestamp_ms. When the lookup hits these, d == best_dist → else →
+      break. Result: lookup returns a sample from ~6.8s into mod time
+      for ALL frames >=30s. 98% of bingd's 10854 frames mapped to the
+      SAME stale sample (rotation 1.2/73.5/0), making action_camera.json
+      look like the player never moved beyond the first 7 seconds.
+      Fix: `elif d > best_dist: break` so equal-distance samples are
+      tolerated, scan only stops on STRICTLY-growing distance.
+
+      Bug 2 (CRITICAL timing offset): old code used `samples[0].timestamp_ms`
+      as base, but the mod starts ticking when MC LOADS, not when the
+      recorder arms. bingd's mod ran for 22 seconds before recording
+      started, so `target = base + frame_ms` was looking up samples
+      22s EARLIER than the actual frame's wall-clock time. Now caller
+      passes `base_ms` = `int(record_started_at * 1000)` so target
+      correctly aligns to recording wall time. Backward-compat: if
+      base_ms is None, fall back to samples[0].ts (legacy behaviour).
     """
     if not samples:
         return None
     if len(samples) == 1:
         return samples[0]
-    # Anchor first sample's timestamp_ms to t=0 for the recording so the
-    # mod's wall-clock timestamps line up with frame_ms (which is recording-
-    # relative ms-since-record-start).
-    base = samples[0]["timestamp_ms"]
-    target = base + frame_ms
-    # Linear scan; samples are sorted ascending.
+    if base_ms is None:
+        # Legacy behaviour for tests / callers that don't pass base.
+        base_ms = samples[0]["timestamp_ms"]
+    target = base_ms + frame_ms
+    # Linear scan; samples are sorted ascending by timestamp_ms.
     best = samples[0]
     best_dist = abs(best["timestamp_ms"] - target)
     for s in samples[1:]:
         d = abs(s["timestamp_ms"] - target)
         if d < best_dist:
             best, best_dist = s, d
-        else:
-            # since sorted ascending, once distance starts growing we can
-            # stop scanning further
+        elif d > best_dist:
+            # rc15.19 Bug 1 fix: only break on STRICTLY growing distance.
+            # Equal distances tolerate duplicate timestamps without
+            # corrupting the scan.
             break
+        # d == best_dist: skip but DON'T break — handles dup-timestamp ticks
     return best
 
 

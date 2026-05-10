@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.18"
+RECORDER_VERSION = "lite-v0.28.0-rc15.19"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -2444,6 +2444,38 @@ class RecorderApp(tk.Tk):
         # falls through to packaging so the tester always gets a tarball
         # representing what was actually recorded up to that point.
 
+        # rc15.19 ISC-4 (Howard 2026-05-10 "6 分钟自动停 没提醒 他开始录制就最小化了
+        # 看不到 结束了没提醒"): bingd minimizes the recorder window during MC
+        # play, then misses the 6-min auto-stop because there's no signal.
+        # Notification chain when ffmpeg exits (any reason — disarm, MC exit,
+        # 6-min cap): restore window from taskbar + ring system bell + flash
+        # taskbar so tester sees it AT THE EDGE OF THEIR SCREEN even from
+        # full-screen MC. Fires BEFORE packaging starts so tester knows
+        # immediately, not after 30s of depth processing.
+        try:
+            def _alert_recording_done():
+                try:
+                    self.deiconify()       # restore from taskbar
+                    self.lift()            # raise above other windows
+                    self.attributes("-topmost", True)
+                    self.after(800, lambda: self.attributes("-topmost", False))
+                    self.bell()            # system beep
+                    if os.name == "nt":
+                        # FlashWindow flag 3 = caption + taskbar flash
+                        try:
+                            import ctypes  # noqa: PLC0415
+                            ctypes.windll.user32.FlashWindow(
+                                self.winfo_id(), True
+                            )
+                        except Exception:
+                            pass
+                except Exception as exc:
+                    _trace(f"rc15.19 alert: {exc}")
+            self.after(0, _alert_recording_done)
+            _trace("rc15.19: recording-done alert dispatched (deiconify+bell+flash)")
+        except Exception as exc:
+            _trace(f"rc15.19 alert dispatch failed: {exc}")
+
         # Phase 4: finalize ffmpeg + input capture, then package.
         self._stop_ffmpeg()
         if self._input_capture is not None:
@@ -2780,7 +2812,13 @@ class RecorderApp(tk.Tk):
             # Howard 2026-05-07: if the mod is installed, overlay real
             # camera/player fields from the JSONL onto this record.
             if _gs_samples and _gs_apply:
-                sample = _gs_lookup(_gs_samples, f_ms)
+                # rc15.19 Bug 2 fix: pass real recording-start wall time
+                # so lookup target aligns to when ffmpeg started, not when
+                # MC was launched (mod started ticking earlier).
+                _gs_base_ms = int(self._record_started_at * 1000) if getattr(
+                    self, "_record_started_at", 0
+                ) else None
+                sample = _gs_lookup(_gs_samples, f_ms, base_ms=_gs_base_ms)
                 if sample is not None:
                     _gs_apply(rec, sample)
             action_records.append(rec)
@@ -3516,11 +3554,16 @@ class RecorderApp(tk.Tk):
         self, method: str, x: int, y: int, w: int, h: int, out_path: Path
     ) -> list[str]:
         """rc15.17: build a 2-second ffmpeg probe command for given capture
-        method. Encodes to libx264 (ultrafast) — no audio, no scale."""
+        method. Encodes to libx264 (ultrafast) — no audio, no scale.
+
+        rc15.19: ddagrab probe also gets `-init_hw_device d3d11va=dx`
+        (matches the real-recording cmd). bingd's rc15.18 probe failed
+        with -22 because the device wasn't initialized."""
         if method == "ddagrab":
             ddagrab_idx = os.environ.get("OYSTER_DDAGRAB_OUTPUT_IDX", "0").strip()
             return [
                 str(_FFMPEG),
+                "-init_hw_device", "d3d11va=dx",
                 "-f", "lavfi",
                 "-i", f"ddagrab=output_idx={ddagrab_idx}:framerate=30:draw_mouse=0",
                 "-vf", f"hwdownload,format=bgra,crop={w}:{h}:{x}:{y},format=yuv420p",
@@ -3801,7 +3844,14 @@ class RecorderApp(tk.Tk):
 
         if selected_tier == "ddagrab":
             ddagrab_idx = os.environ.get("OYSTER_DDAGRAB_OUTPUT_IDX", "0").strip()
+            # rc15.19 ISC-3 (Howard's diagnostic showed ddagrab probe failed
+            # with `Task finished with error code: -22 (Invalid argument)`):
+            # ddagrab needs an explicit D3D11 device init. Without
+            # `-init_hw_device d3d11va=dx`, BtbN's ffmpeg ddagrab source
+            # exits -22 before producing a single frame. Now: register a
+            # named hw device 'dx' globally so ddagrab can attach to it.
             video_input = [
+                "-init_hw_device", "d3d11va=dx",
                 "-f", "lavfi",
                 "-i", f"ddagrab=output_idx={ddagrab_idx}:framerate=30:draw_mouse=0",
             ]
