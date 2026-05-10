@@ -446,9 +446,50 @@ def _check_keycode(d: Path, rpt: LintReport) -> None:
 
 def _check_no_overlays(d: Path, rpt: LintReport) -> None:
     """Criteria 19-21: No UI overlay, no logo, no popup."""
-    rpt.add(LintResult(19, "No UI Overlay", True, "No UI overlay detected (stub — not implemented)"))
-    rpt.add(LintResult(20, "No Logo", True, "No logo detected (stub — not implemented)"))
-    rpt.add(LintResult(21, "No Popup", True, "No popup detected (stub — not implemented)"))
+    # rc15.28 A-A1.19/20/21 (round 18 → rc15.29 step-up): filename-pattern
+    # heuristic. Real implementation would need vision ML / OCR which is
+    # too risky for "不引入 bug". Conservative middle ground: scan all
+    # filenames in the data dir for known overlay/logo/popup keywords;
+    # if found, FAIL the corresponding criterion. Won't catch
+    # baked-in pixel overlays, but will catch the case of a tester /
+    # automation accidentally including assets named like "logo.png" or
+    # "watermark_overlay.png" in the tarball.
+    all_files = [
+        p.name.lower() for p in d.rglob("*") if p.is_file()
+    ]
+
+    overlay_hits = [
+        n for n in all_files
+        if any(kw in n for kw in ("overlay", "watermark", "hud_"))
+    ]
+    rpt.add(LintResult(19, "No UI Overlay",
+                       not overlay_hits,
+                       "No overlay/watermark/HUD filename hints"
+                       if not overlay_hits
+                       else f"{len(overlay_hits)} suspicious: {overlay_hits[:3]}",
+                       {"hits": overlay_hits[:5]}))
+
+    logo_hits = [
+        n for n in all_files
+        if any(kw in n for kw in ("logo", "brand", "trademark"))
+    ]
+    rpt.add(LintResult(20, "No Logo",
+                       not logo_hits,
+                       "No logo/brand filename hints"
+                       if not logo_hits
+                       else f"{len(logo_hits)} suspicious: {logo_hits[:3]}",
+                       {"hits": logo_hits[:5]}))
+
+    popup_hits = [
+        n for n in all_files
+        if any(kw in n for kw in ("popup", "modal", "dialog", "notification"))
+    ]
+    rpt.add(LintResult(21, "No Popup",
+                       not popup_hits,
+                       "No popup/modal/dialog filename hints"
+                       if not popup_hits
+                       else f"{len(popup_hits)} suspicious: {popup_hits[:3]}",
+                       {"hits": popup_hits[:5]}))
 
 def _check_metadata(d: Path, rpt: LintReport) -> None:
     """Criterion 22: Metadata completeness."""

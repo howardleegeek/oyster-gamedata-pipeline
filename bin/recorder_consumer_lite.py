@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.28"
+RECORDER_VERSION = "lite-v0.28.0-rc15.29"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -3160,16 +3160,14 @@ class RecorderApp(tk.Tk):
                     _trace(f"data_health: outer exception {_hexc}")
 
             threading.Thread(target=_go_health, daemon=True).start()
-            # Engineer-side telemetry: push the full session log to a
-            # remote pastebin so engineering can curl <url> and see what
-            # happened on tester's machine without asking for files.
-            def _on_url(url: Optional[str]) -> None:
-                if url:
-                    self.after(0, lambda: self._hint.config(
-                        text=f"已保存: {output_tar}\n远程日志: {url}",
-                        fg=GREEN,
-                    ))
-            _upload_log_in_background(_on_url)
+            # rc15.29 B-#1 (round 17 PII): silent auto-upload of
+            # OysterRecorder.log to 0x0.st REMOVED. Was uploading every
+            # recording-end without consent — log contains tester's
+            # Windows username, paths, tracebacks, every _trace step.
+            # Now: tester explicitly clicks "导出诊断包" button (which
+            # has its own consent dialog from rc15.15 H1) when they
+            # actively want to share. Engineer can still see the data
+            # via the tester-initiated path; no more silent telemetry.
         else:
             self._set("⚠️ 录制结束但文件未生成", ORANGE,
                       "请联系工程师并截图本窗口。")

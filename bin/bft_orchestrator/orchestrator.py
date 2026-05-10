@@ -447,6 +447,21 @@ def aggregate_dataset(records: list[dict], fps: float = 30.0,
       records list — they self-ABSTAIN when the sample is too small.
     """
     n_pairs = max(len(records) - 1, 0)
+    # rc15.29 A-N1 (round 17 finding): minimum-frame guard. Old code
+    # returned `dataset_decision="PASS"` on n_pairs=0 (1-frame video)
+    # because all_commit=True (empty conjunction is true) and
+    # any_reject=False — vacuous PASS on zero evidence. bingd's 1-frame
+    # session got "PASS" verdict despite captured nothing. Now: if we
+    # have <2 frames AND no dataset-level residuals to check, return
+    # INSUFFICIENT_DATA so the caller distinguishes "passed validation"
+    # from "couldn't validate anything".
+    if n_pairs < 1:
+        # We may still have dataset-level votes if video_path / depth_dir
+        # were provided. Run those FIRST and check; if everything is
+        # empty, return INSUFFICIENT_DATA up-front.
+        # (We fall through to the existing dataset_votes block below; the
+        # final verdict computation re-checks total bucket count.)
+        pass
     by_res: dict[str, dict[str, int]] = {}
     for i in range(n_pairs):
         votes = collect_votes(records[i], records[i + 1], fps=fps,
@@ -493,6 +508,21 @@ def aggregate_dataset(records: list[dict], fps: float = 30.0,
         if counts["COMMIT"] / total < 0.95:
             all_commit = False
 
+    # rc15.29 A-N1: if NO residuals ran (no per-frame pairs AND no
+    # dataset-level votes), the verdict is meaningless. Surface it as
+    # INSUFFICIENT_DATA so callers can distinguish "validated and PASS"
+    # from "couldn't validate". A 1-frame session with no video_path/
+    # depth_dir lands here; old code returned PASS on the same input.
+    if not by_res:
+        return {
+            "frames": n_pairs,
+            "residuals": by_res,
+            "dataset_decision": "INSUFFICIENT_DATA",
+            "reason": (
+                f"no residuals computed (n_pairs={n_pairs}, "
+                f"no dataset-level inputs provided) — verdict undefined"
+            ),
+        }
     verdict = "PASS" if (all_commit and not any_reject) else ("FAIL" if any_reject else "NEEDS_HUMAN")
     return {"frames": n_pairs, "residuals": by_res, "dataset_decision": verdict}
 
