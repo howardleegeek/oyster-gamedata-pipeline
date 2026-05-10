@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.21"
+RECORDER_VERSION = "lite-v0.28.0-rc15.22"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -1686,6 +1686,271 @@ class RecorderApp(tk.Tk):
             _trace(f"_open_path failed: {exc}")
         return
 
+    def _compute_data_health(self, tarball: Path) -> dict[str, Any]:
+        """rc15.22 (Howard 2026-05-10 "数据问题会不会再出现 我记得我们还有
+        数据检测"): comprehensive post-record health check that goes
+        BEYOND _auto_lint (file-existence + schema) to actually validate
+        the captured CONTENT.
+
+        Old story: session_manifest.frame_count was computed as
+        elapsed * 30 fps, NOT decoded from the mp4. A 1-frame video
+        still got frame_count=9793 in the manifest, fooling all
+        downstream consumers. Likewise rotation/position diversity
+        wasn't checked; bingd's bug shipped 9793 identical rotations
+        and the lint passed 24/24.
+
+        Now: open the tarball, decode each artifact, score 0-100:
+          - 25 pts: video.mp4 has real frames (ffprobe via ffmpeg)
+          - 20 pts: action_camera.json rotation diversity (>=20 unique)
+          - 20 pts: action_camera.json position diversity (>=20 unique)
+          - 10 pts: game_state.jsonl >100 rows, monotonic timestamps
+          - 10 pts: inputs.jsonl parses + non-empty
+          - 10 pts: session_id consistent across artifacts
+          -  5 pts: tarball can fully extract (no corruption)
+
+        Returns dict with score, breakdown, issues. Never raises.
+        """
+        report: dict[str, Any] = {
+            "schema_version": "1.0",
+            "recorder_version": RECORDER_VERSION,
+            "computed_at": datetime.now().isoformat(),
+            "tarball": str(tarball),
+            "score": 0,
+            "max_score": 100,
+            "breakdown": {},
+            "issues": [],
+            "session_ids_seen": [],
+        }
+
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                td_path = Path(td)
+                # Test extraction integrity
+                try:
+                    with tarfile.open(tarball, "r:gz") as tf:
+                        tf.extractall(td_path)
+                    report["breakdown"]["tarball_extract"] = 5
+                except Exception as exc:
+                    report["issues"].append(f"tarball_extract_failed: {exc}")
+                    report["breakdown"]["tarball_extract"] = 0
+                    return report
+
+                inner_dirs = [p for p in td_path.iterdir() if p.is_dir()]
+                clip_root = inner_dirs[0] if len(inner_dirs) == 1 else td_path
+
+                # 1. ffprobe video.mp4 real frame count
+                video_path = clip_root / "video.mp4"
+                if video_path.exists():
+                    try:
+                        # ffmpeg can count frames via -count_packets / -count_frames
+                        # via stderr stats. Avoids needing separate ffprobe binary.
+                        # Trick: pipe to null, capture stderr line "frame=NNN".
+                        result = subprocess.run(
+                            [str(_FFMPEG), "-i", str(video_path),
+                             "-c", "copy", "-f", "null", "-"],
+                            capture_output=True, timeout=60,
+                            creationflags=0x08000000 if os.name == "nt" else 0,
+                        )
+                        stderr = result.stderr.decode("utf-8", errors="replace")
+                        # Look for last "frame= NNN" line
+                        real_frames = 0
+                        for line in stderr.splitlines():
+                            m = _re.search(r"frame=\s*(\d+)", line)
+                            if m:
+                                real_frames = int(m.group(1))
+                        report["video_real_frame_count"] = real_frames
+                        # Compare to manifest claim
+                        manifest_path = clip_root / "session_manifest.json"
+                        manifest_frames = None
+                        if manifest_path.exists():
+                            try:
+                                manifest = json.loads(
+                                    manifest_path.read_text(encoding="utf-8")
+                                )
+                                manifest_frames = manifest.get("frame_count")
+                                report["video_manifest_frame_count"] = manifest_frames
+                                sid = manifest.get("session_id", "")
+                                if sid:
+                                    report["session_ids_seen"].append(("manifest", sid))
+                            except Exception:
+                                pass
+                        if real_frames >= 60:
+                            report["breakdown"]["video_real_frames"] = 25
+                        elif real_frames >= 10:
+                            report["breakdown"]["video_real_frames"] = 10
+                            report["issues"].append(
+                                f"low_video_frames: only {real_frames} decoded"
+                            )
+                        else:
+                            report["breakdown"]["video_real_frames"] = 0
+                            report["issues"].append(
+                                f"video_capture_failed: {real_frames} frames "
+                                f"(manifest claimed {manifest_frames}) — "
+                                "likely gdigrab fullscreen miss"
+                            )
+                    except Exception as exc:
+                        report["issues"].append(f"ffprobe_failed: {exc}")
+                        report["breakdown"]["video_real_frames"] = 0
+                else:
+                    report["issues"].append("video.mp4_missing")
+                    report["breakdown"]["video_real_frames"] = 0
+
+                # 2. action_camera.json rotation/position diversity
+                ac_path = clip_root / "action_camera.json"
+                if ac_path.exists():
+                    try:
+                        records = json.loads(ac_path.read_text(encoding="utf-8"))
+                        rot_set: set = set()
+                        pos_set: set = set()
+                        for r in records:
+                            rot_set.add(tuple(round(v, 2) for v in r.get(
+                                "camera_rotation_oula", [])))
+                            pos_set.add(tuple(round(v, 2) for v in r.get(
+                                "camera_position", [])))
+                            sid = r.get("session_id", "")
+                            if sid and ("action_camera", sid) not in report[
+                                "session_ids_seen"
+                            ]:
+                                report["session_ids_seen"].append(
+                                    ("action_camera", sid)
+                                )
+                                break  # one is enough
+                        report["action_camera_unique_rotations"] = len(rot_set)
+                        report["action_camera_unique_positions"] = len(pos_set)
+                        if len(rot_set) >= 20:
+                            report["breakdown"]["rotation_diversity"] = 20
+                        elif len(rot_set) >= 5:
+                            report["breakdown"]["rotation_diversity"] = 10
+                            report["issues"].append(
+                                f"low_rotation_diversity: {len(rot_set)} unique"
+                            )
+                        else:
+                            report["breakdown"]["rotation_diversity"] = 0
+                            report["issues"].append(
+                                f"rotation_stuck: only {len(rot_set)} unique "
+                                "values across whole session"
+                            )
+                        if len(pos_set) >= 20:
+                            report["breakdown"]["position_diversity"] = 20
+                        elif len(pos_set) >= 5:
+                            report["breakdown"]["position_diversity"] = 10
+                            report["issues"].append(
+                                f"low_position_diversity: {len(pos_set)} unique"
+                            )
+                        else:
+                            report["breakdown"]["position_diversity"] = 0
+                            report["issues"].append(
+                                f"position_stuck: only {len(pos_set)} unique"
+                            )
+                    except Exception as exc:
+                        report["issues"].append(f"action_camera_parse: {exc}")
+                        report["breakdown"]["rotation_diversity"] = 0
+                        report["breakdown"]["position_diversity"] = 0
+                else:
+                    report["issues"].append("action_camera.json_missing")
+                    report["breakdown"]["rotation_diversity"] = 0
+                    report["breakdown"]["position_diversity"] = 0
+
+                # 3. game_state.jsonl mod data sanity
+                gs_path = clip_root / "game_state.jsonl"
+                if gs_path.exists():
+                    try:
+                        rows = []
+                        with gs_path.open("r", encoding="utf-8") as fh:
+                            for ln in fh:
+                                ln = ln.strip()
+                                if ln:
+                                    try:
+                                        rows.append(json.loads(ln))
+                                    except json.JSONDecodeError:
+                                        pass
+                        report["game_state_row_count"] = len(rows)
+                        # Check monotonic timestamps
+                        monotonic_ok = True
+                        prev_ts = -1
+                        for r in rows:
+                            ts = r.get("timestamp_ms", 0)
+                            if ts < prev_ts:
+                                monotonic_ok = False
+                                break
+                            prev_ts = ts
+                        if len(rows) >= 100 and monotonic_ok:
+                            report["breakdown"]["game_state_sanity"] = 10
+                        elif len(rows) >= 20:
+                            report["breakdown"]["game_state_sanity"] = 5
+                            report["issues"].append(
+                                f"low_game_state_rows: {len(rows)} "
+                                f"(monotonic={monotonic_ok})"
+                            )
+                        else:
+                            report["breakdown"]["game_state_sanity"] = 0
+                            report["issues"].append(
+                                f"game_state_too_sparse: {len(rows)} rows"
+                            )
+                    except Exception as exc:
+                        report["issues"].append(f"game_state_parse: {exc}")
+                        report["breakdown"]["game_state_sanity"] = 0
+                else:
+                    # Mod not installed is OK; bundle is optional
+                    report["breakdown"]["game_state_sanity"] = 5
+                    report["issues"].append("game_state_jsonl_missing_optional")
+
+                # 4. inputs.jsonl
+                inp_path = clip_root / "inputs.jsonl"
+                if inp_path.exists():
+                    try:
+                        evt_count = 0
+                        sid_in_inputs = ""
+                        with inp_path.open("r", encoding="utf-8") as fh:
+                            for ln in fh:
+                                ln = ln.strip()
+                                if ln:
+                                    try:
+                                        ev = json.loads(ln)
+                                        evt_count += 1
+                                        if (not sid_in_inputs
+                                                and ev.get("event_type") ==
+                                                "session_start"):
+                                            sid_in_inputs = ev.get(
+                                                "session_id", ""
+                                            )
+                                    except json.JSONDecodeError:
+                                        pass
+                        report["inputs_event_count"] = evt_count
+                        if sid_in_inputs:
+                            report["session_ids_seen"].append(
+                                ("inputs", sid_in_inputs)
+                            )
+                        report["breakdown"]["inputs_present"] = (
+                            10 if evt_count >= 10 else 0
+                        )
+                        if evt_count < 10:
+                            report["issues"].append(
+                                f"inputs_too_sparse: {evt_count} events"
+                            )
+                    except Exception as exc:
+                        report["issues"].append(f"inputs_parse: {exc}")
+                        report["breakdown"]["inputs_present"] = 0
+                else:
+                    report["issues"].append("inputs.jsonl_missing")
+                    report["breakdown"]["inputs_present"] = 0
+
+                # 5. cross-file session_id consistency
+                ids = {sid for _src, sid in report["session_ids_seen"] if sid}
+                if len(ids) <= 1:
+                    report["breakdown"]["session_id_consistent"] = 10
+                else:
+                    report["breakdown"]["session_id_consistent"] = 0
+                    report["issues"].append(
+                        f"session_id_mismatch: {report['session_ids_seen']}"
+                    )
+
+            # Sum score
+            report["score"] = sum(report["breakdown"].values())
+        except Exception as exc:
+            report["issues"].append(f"compute_health_failed: {exc}")
+        return report
+
     def _auto_lint(self, tarball: Path) -> None:
         """v0.7.0: run G165 lint v3 on the just-recorded tarball + show
         24-criteria PRD result inline. Runs on a daemon thread so the
@@ -2679,6 +2944,110 @@ class RecorderApp(tk.Tk):
             # across 4 independent verifiers and surfaces specific
             # disagreements so tester knows what to re-record.
             self._auto_bft(output_tar)
+            # rc15.22 (Howard "数据问题会不会再出现 我记得我们还有数据检测"):
+            # comprehensive data health check that goes beyond _auto_lint
+            # (file existence/schema) and _auto_bft (frame-pair physics).
+            # Decodes the actual mp4 frame count + measures rotation/
+            # position diversity + verifies session_id consistency. Score
+            # 0-100 written into tarball as data_health.json + heal_event
+            # + UI bubble for tester. Fixes the core observability gap
+            # bingd's bugs exposed: lint passed 24/24 even with 1-frame
+            # video and stuck rotation.
+            def _go_health():
+                try:
+                    health = self._compute_data_health(output_tar)
+                    score = health.get("score", 0)
+                    issues = health.get("issues", [])
+                    _trace(
+                        f"data_health: score={score}/100 issues={len(issues)} "
+                        f"({issues[:3] if issues else 'none'})"
+                    )
+                    # Persist into tarball companion (next-to, not inside)
+                    try:
+                        report_path = output_tar.parent / (
+                            output_tar.stem.replace(".tar", "")
+                            + ".data_health.json"
+                        )
+                        report_path.write_text(
+                            json.dumps(health, indent=2, ensure_ascii=False),
+                            encoding="utf-8",
+                        )
+                    except Exception as _ex:
+                        _trace(f"data_health: write report failed: {_ex}")
+                    # Heal event for engineer triage
+                    try:
+                        sev = ("info" if score >= 80
+                               else "warn" if score >= 50
+                               else "error")
+                        _heal_emit(
+                            "capture_dual_track", "report", sev,
+                            f"data health score={score}/100 issues={len(issues)}",
+                            details={
+                                "score": score,
+                                "max_score": health.get("max_score", 100),
+                                "issues": issues[:8],
+                                "video_real_frame_count": health.get(
+                                    "video_real_frame_count"
+                                ),
+                                "video_manifest_frame_count": health.get(
+                                    "video_manifest_frame_count"
+                                ),
+                                "rotation_uniques": health.get(
+                                    "action_camera_unique_rotations"
+                                ),
+                                "position_uniques": health.get(
+                                    "action_camera_unique_positions"
+                                ),
+                            },
+                            remediation={
+                                "action": "user_prompt" if score < 80
+                                else "none",
+                                "performed": False,
+                                "next_step": (
+                                    "tester 重录" if score < 50
+                                    else "review issues before submit"
+                                    if score < 80
+                                    else "no action"
+                                ),
+                            },
+                            session_id=getattr(self, "_session_id", None),
+                            recorder_version=RECORDER_VERSION,
+                        )
+                    except Exception as _ex:
+                        _trace(f"data_health: heal_emit failed: {_ex}")
+                    # UI surface — only if score is bad enough that
+                    # tester should NOT trust this recording.
+                    if score < 50:
+                        def _ui_warn():
+                            try:
+                                self._hint.config(
+                                    text=(
+                                        f"⚠️ 数据健康分: {score}/100 "
+                                        f"(共 {len(issues)} 项问题). "
+                                        "建议重新录制. 详见 .data_health.json"
+                                    ),
+                                    fg="#dc2626",
+                                )
+                            except Exception:
+                                pass
+                        self.after(0, _ui_warn)
+                    elif score < 80:
+                        def _ui_warn2():
+                            try:
+                                self._hint.config(
+                                    text=(
+                                        f"⚠️ 数据健康分: {score}/100 — "
+                                        "请检查 .data_health.json"
+                                    ),
+                                    fg="#ef6c00",
+                                )
+                            except Exception:
+                                pass
+                        self.after(0, _ui_warn2)
+                except Exception as _hexc:
+                    _trace(f"data_health: outer exception {_hexc}")
+
+            threading.Thread(target=_go_health, daemon=True).start()
             # Engineer-side telemetry: push the full session log to a
             # remote pastebin so engineering can curl <url> and see what
             # happened on tester's machine without asking for files.
