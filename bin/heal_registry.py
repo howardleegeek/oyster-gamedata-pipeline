@@ -62,6 +62,9 @@ VALID_FEATURES: set[str] = {
     "depth_dual_track",                # cuda/dml/cpu/server-pending router
     # rc15.17 capture self-heal
     "capture_dual_track",              # ddagrab/gdigrab parallel probe + auto-fallback
+    # rc15.20 (round 13 H1+H2): static-camera detect was piggy-backing on
+    # depth_dual_track in rc15.18 — wrong attribution polluted depth aggs.
+    "capture_static_camera",           # detected camera/position never moved
     # framework itself
     "heal_registry",                    # meta-events about the registry
 }
@@ -206,31 +209,33 @@ def emit_event(
 
     # rc15-fix BUG#1: details may contain Path/datetime/set/etc that
     # json.dumps can't serialize natively. Use default=str so writer
-    # never silently fails on caller laziness. Was: emit returned a
-    # fake event_id but log file got nothing.
+    # never silently fails on caller laziness.
     try:
         path = _heal_log_path()
         path.parent.mkdir(parents=True, exist_ok=True)
-        # rc15.4-fix BUG R6 C1: gate file size at 20MB to prevent unbounded
-        # growth (orphan_resumed × N runs). On overflow, rotate file →.1
-        # and start fresh. ~5K typical events = .1 = ~5MB rotated keeps.
-        try:
-            if path.exists() and path.stat().st_size > 20_000_000:
-                rotated = path.with_suffix(".jsonl.1")
-                try:
-                    if rotated.exists():
-                        rotated.unlink()
-                except Exception:
-                    pass
-                try:
-                    path.rename(rotated)
-                except Exception:
-                    pass
-        except Exception:
-            pass
-        # rc15-fix BUG#2: lock around the open+write so concurrent emits
-        # from daemon threads don't interleave half-lines.
+        # rc15.20 D-C1 (round 13, H7 from round 12 finally fixed):
+        # rotation block is INSIDE _EMIT_LOCK now. Was: rotation ran
+        # outside the lock, two threads in crash-storm could both rotate
+        # → second's `if rotated.exists(): rotated.unlink()` deletes the
+        # first's just-renamed 21MB backup. Now: stat + unlink + rename
+        # + open + write are all serialized under one lock. The lock
+        # is held for ~10ms per emit on cold disk; unmeasurable for
+        # ~20 events/session typical use.
         with _EMIT_LOCK:
+            try:
+                if path.exists() and path.stat().st_size > 20_000_000:
+                    rotated = path.with_suffix(".jsonl.1")
+                    try:
+                        if rotated.exists():
+                            rotated.unlink()
+                    except Exception:
+                        pass
+                    try:
+                        path.rename(rotated)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
             with path.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps(payload, ensure_ascii=False, default=str) + "\n")
     except Exception:

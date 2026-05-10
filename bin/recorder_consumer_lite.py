@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.19"
+RECORDER_VERSION = "lite-v0.28.0-rc15.20"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -2812,15 +2812,30 @@ class RecorderApp(tk.Tk):
             # Howard 2026-05-07: if the mod is installed, overlay real
             # camera/player fields from the JSONL onto this record.
             if _gs_samples and _gs_apply:
-                # rc15.19 Bug 2 fix: pass real recording-start wall time
-                # so lookup target aligns to when ffmpeg started, not when
-                # MC was launched (mod started ticking earlier).
-                _gs_base_ms = int(self._record_started_at * 1000) if getattr(
-                    self, "_record_started_at", 0
-                ) else None
+                # rc15.19 Bug 2 fix + rc15.20 B-C2 hardening: pass real
+                # recording-start wall time so lookup target aligns to
+                # when ffmpeg started, not when MC was launched. Use
+                # explicit `is not None` (not truthy-check) so a tiny
+                # positive _record_started_at like 0.0001 doesn't slip
+                # through to int(0)=epoch corruption.
+                _rec_start = getattr(self, "_record_started_at", None)
+                _gs_base_ms = (
+                    int(_rec_start * 1000) if _rec_start is not None else None
+                )
                 sample = _gs_lookup(_gs_samples, f_ms, base_ms=_gs_base_ms)
                 if sample is not None:
-                    _gs_apply(rec, sample)
+                    # rc15.20 B-H3: apply_to_record uses bare key access
+                    # (sample["yaw_deg"] etc). If mod ever ships a sample
+                    # missing a required key (schema drift / partial write),
+                    # KeyError propagates up the for-loop, killing the
+                    # entire action_records build mid-stream → silent
+                    # truncation. Guard each call so a bad sample is
+                    # skipped, not catastrophic.
+                    try:
+                        _gs_apply(rec, sample)
+                    except (KeyError, TypeError) as _ge:
+                        _trace(f"rc15.20 B-H3: skipped malformed mod sample "
+                               f"at frame {f}: {type(_ge).__name__}: {_ge}")
             action_records.append(rec)
 
         (clip_dir / "action_camera.json").write_text(
@@ -2830,23 +2845,55 @@ class RecorderApp(tk.Tk):
             encoding="utf-8",
         )
 
-        # rc15.18 B1 (Howard 2026-05-10 数据 audit "player 有移动的 这些都是bug"):
-        # Bingd's rc15.16 session showed 9793/9793 frames with rotation=
-        # [0,0,0] and constant position despite real gameplay. Recorder
-        # reports `_real_game_state: true` (mod handshake OK) so the
-        # mod's JSONL DID flow, but somewhere in the mod→JSONL→overlay
-        # chain the rotation/velocity got zeroed. Without the raw JSONL
-        # we're flying blind. Fix: include the mod's game_state.jsonl
-        # IN the tarball so engineer can see exactly what the mod wrote
-        # and compare to what apply_to_record produced.
+        # rc15.18 B1 (Howard "player 有移动的 这些都是 bug"): include the
+        # mod's game_state.jsonl IN the tarball so engineer can compare
+        # raw mod output to overlay-applied action_camera.json.
+        #
+        # rc15.20 C-C2 (round 13 critical): shutil.copy2 races with the
+        # mod's per-tick append. If a tick fires mid-copy, the destination
+        # has a truncated last line that breaks downstream JSONL parsers.
+        # After copy: tail-read the destination, validate the last line
+        # is parseable JSON; if not, truncate at the last full newline.
         try:
             from game_state_overlay import jsonl_path as _gs_path  # noqa: PLC0415
             _src_jsonl = _gs_path()
             if _src_jsonl.exists() and _src_jsonl.stat().st_size > 0:
-                shutil.copy2(_src_jsonl, clip_dir / "game_state.jsonl")
-                _trace(f"rc15.18: bundled mod's game_state.jsonl "
-                       f"({_src_jsonl.stat().st_size} bytes) into tarball "
-                       f"for engineer diff vs action_camera.json")
+                _dst_jsonl = clip_dir / "game_state.jsonl"
+                shutil.copy2(_src_jsonl, _dst_jsonl)
+                # rc15.20 C-C2: validate last line. Read the trailing 4KB
+                # which contains last few lines for any reasonable JSONL.
+                try:
+                    _dst_size = _dst_jsonl.stat().st_size
+                    if _dst_size > 0:
+                        with open(_dst_jsonl, "rb") as _vfh:
+                            _vfh.seek(-min(4096, _dst_size), 2)
+                            _tail = _vfh.read().decode("utf-8", errors="replace")
+                        # Last newline marks the boundary of the last
+                        # complete line. If anything follows it, that's a
+                        # mid-write fragment.
+                        _last_nl = _tail.rfind("\n")
+                        if _last_nl >= 0 and _last_nl < len(_tail) - 1:
+                            _frag = _tail[_last_nl + 1:].strip()
+                            if _frag:
+                                try:
+                                    json.loads(_frag)
+                                except json.JSONDecodeError:
+                                    # Truncate the partial line.
+                                    _full = _dst_jsonl.read_bytes()
+                                    _last_full_nl = _full.rfind(b"\n")
+                                    if _last_full_nl > 0:
+                                        _dst_jsonl.write_bytes(
+                                            _full[: _last_full_nl + 1]
+                                        )
+                                        _trace(
+                                            "rc15.20 C-C2: truncated malformed "
+                                            "trailing line of game_state.jsonl "
+                                            f"({len(_frag)} bytes mid-write)"
+                                        )
+                except Exception as _vexc:
+                    _trace(f"rc15.20 C-C2 validate skipped: {_vexc}")
+                _trace(f"rc15.18+20: bundled mod's game_state.jsonl "
+                       f"({_src_jsonl.stat().st_size} bytes, validated)")
         except Exception as exc:
             _trace(f"rc15.18: game_state.jsonl bundle skipped: {exc}")
 
@@ -2878,7 +2925,12 @@ class RecorderApp(tk.Tk):
                         f"likely mod-recorder data pipeline bug"
                     )
                     _heal_emit(
-                        "depth_dual_track",  # piggy-back, no new feature ID needed
+                        # rc15.20 C-H1/D-H2 (round 13): use proper feature
+                        # ID, was piggy-backing on depth_dual_track which
+                        # polluted depth aggregations + made queries
+                        # ambiguous. capture_static_camera registered in
+                        # heal_registry.VALID_FEATURES.
+                        "capture_static_camera",
                         "detect", "warn",
                         f"static camera/position over {len(action_records)} frames "
                         f"(unique rotations={len(rot_set)}, "
@@ -3045,9 +3097,26 @@ class RecorderApp(tk.Tk):
             _preliminary_tar = _output_dir() / f"clip-{ts}.tar.gz"
             with tarfile.open(_preliminary_tar, "w:gz") as _ptf:
                 _ptf.add(clip_dir, arcname=f"clip-{ts}")
-            _trace(f"rc15.16: preliminary tarball written to {_preliminary_tar} "
-                   f"({_preliminary_tar.stat().st_size / 1024 / 1024:.1f} MB) — "
-                   f"tester can already see this; depth will overwrite on success")
+            # rc15.20 C-C1 (round 13 critical): write a sibling sentinel
+            # `.preliminary` file so any ingest pipeline (manual upload,
+            # future auto-upload daemon) can skip preliminary tarballs
+            # that still have placeholder `reason="preliminary_pre_depth"`
+            # terminator. Sentinel removed at end of _package_tarball
+            # after final write succeeds.
+            _preliminary_sentinel = _output_dir() / f"clip-{ts}.tar.gz.preliminary"
+            try:
+                _preliminary_sentinel.write_text(
+                    f"recorder_version={RECORDER_VERSION}\n"
+                    f"created_at={datetime.now().isoformat()}\n"
+                    "note=Preliminary tarball — depth pipeline still running. "
+                    "DO NOT UPLOAD until this file is gone.\n",
+                    encoding="utf-8",
+                )
+            except Exception:
+                pass
+            _trace(f"rc15.16+20: preliminary tarball written to {_preliminary_tar} "
+                   f"({_preliminary_tar.stat().st_size / 1024 / 1024:.1f} MB) "
+                   "+ sentinel — depth will overwrite + delete sentinel on success")
         except Exception as _pte:
             _trace(f"rc15.16: preliminary tarball write failed: {_pte}")
 
@@ -3500,6 +3569,14 @@ class RecorderApp(tk.Tk):
         out_tar = _output_dir() / f"clip-{ts}.tar.gz"
         with tarfile.open(out_tar, "w:gz") as tf:
             tf.add(clip_dir, arcname=f"clip-{ts}")
+        # rc15.20 C-C1: final tarball succeeded, remove preliminary sentinel
+        # (if it was created) so ingest pipelines now see this as final.
+        try:
+            (_output_dir() / f"clip-{ts}.tar.gz.preliminary").unlink(
+                missing_ok=True
+            )
+        except Exception:
+            pass
 
         # Cleanup tmp dir.
         try:
@@ -3657,18 +3734,44 @@ class RecorderApp(tk.Tk):
             ).start()
 
         # Phase 3: poll for winner.
+        # rc15.20 A-C1 (round 13 critical): old code required `proc.poll()
+        # is None` (process still running) for winner. But probes use
+        # `-t 2` so ffmpeg exits cleanly at ~2s with returncode=0 — at
+        # which point poll() returns 0, not None. Result: winner check
+        # was always False, ALL probes since rc15.17 fell through to
+        # "ddagrab last-resort" default. The entire parallel-probe
+        # feature was dead code. Now: accept exit code 0 OR still-running.
         THRESHOLD_FRAMES = 12  # 0.4s of 30fps captured
-        MAX_WAIT_SEC = 4.0
+        MAX_WAIT_SEC = 5.0  # rc15.20 also bumped 4s → 5s for cold-GPU init
         start = time.time()
         winner: Optional[dict[str, Any]] = None
         while time.time() - start < MAX_WAIT_SEC and winner is None:
             for p in probes:
+                ret = p["proc"].poll()
                 if (p["frame_count"] >= THRESHOLD_FRAMES
-                        and p["proc"].poll() is None):
+                        and (ret is None or ret == 0)):
                     winner = p
                     break
             if winner is None:
                 time.sleep(0.1)
+
+        # rc15.20 A-C1 fallback path: even if MAX_WAIT_SEC elapsed without
+        # the loop selecting a winner, prefer ddagrab over gdigrab if both
+        # cleared the threshold (since ddagrab handles fullscreen exclusive).
+        if winner is None:
+            cleared = [
+                p for p in probes
+                if p["frame_count"] >= THRESHOLD_FRAMES
+                and (p["proc"].poll() in (None, 0))
+            ]
+            if cleared:
+                # Prefer ddagrab if both qualified; fullscreen-safe.
+                for p in cleared:
+                    if p["method"] == "ddagrab":
+                        winner = p
+                        break
+                if winner is None:
+                    winner = cleared[0]
 
         # Phase 4: kill all probes (winner included — we restart for real).
         for p in probes:
@@ -3679,6 +3782,20 @@ class RecorderApp(tk.Tk):
                         p["proc"].wait(timeout=2)
                     except subprocess.TimeoutExpired:
                         p["proc"].kill()
+                        # rc15.20 A-C2 (round 13): kill() without wait()
+                        # leaves zombie on POSIX, leaks pipe FDs on Windows.
+                        try:
+                            p["proc"].wait(timeout=2)
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+            # rc15.20 A-C2: explicitly close stderr pipe so reader thread
+            # can exit cleanly and tempfile unlink doesn't race with FFmpeg
+            # still holding a write handle.
+            try:
+                if p["proc"].stderr is not None:
+                    p["proc"].stderr.close()
             except Exception:
                 pass
             try:
