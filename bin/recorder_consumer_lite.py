@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.9"
+RECORDER_VERSION = "lite-v0.28.0-rc15.10"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -3312,11 +3312,15 @@ class RecorderApp(tk.Tk):
                 hkl = ctypes.windll.user32.GetKeyboardLayout(0)
                 lang_id = hkl & 0xFFFF
                 if lang_id == 0x0804:
-                    # rc15.4-fix BUG R4 H2: was warn → arm enabled → tester
-                    # records with IME on → WASD blocked → broken session.
-                    # Escalate to fatal so arm button stays disabled until
-                    # tester switches IME (Shift / Win+Space toggles to EN).
-                    add("ime", "fatal", "检测到中文输入法 — 录制按钮已禁用. 请切换到英文输入法 (Shift 或 Win+Space) 后重启录制器")
+                    # rc15.10 (Howard 2026-05-09 测试员"录制按键点不了"):
+                    # rc15.4 IME fatal 太霸道 — 中文 Windows 默认就是中文 IME,
+                    # 用户开机就被 disable arm. 真实场景: 大部分中国测试员
+                    # 第一秒被卡死. 降回 warn + 显眼 UI 提示 WASD 风险, 让
+                    # user 自己选: 切英文或接受拦键风险.
+                    add("ime", "warn",
+                        "中文输入法可能拦 WASD — 建议录制前切英文 "
+                        "(Shift 或 Win+Space 切换). 不切也能录, "
+                        "但可能丢移动键事件.")
                 else:
                     add("ime", "pass", f"locale 0x{lang_id:04x}")
             except Exception:
