@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.15"
+RECORDER_VERSION = "lite-v0.28.0-rc15.16"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -2855,6 +2855,49 @@ class RecorderApp(tk.Tk):
         depth_dir = clip_dir / "depth"
         depth_manifest_path = clip_dir / "depth_manifest.json"
 
+        # rc15.16 (Howard 2026-05-10 "数据在哪 找不到 点开目录也是空的"):
+        # CRITICAL UX FIX. The historic flow ran depth FIRST (which can take
+        # 30s-30min on AMD/CPU) and only wrote the tarball at the very end
+        # of _package_tarball. If depth hung / crashed / tester closed the
+        # recorder mid-depth, OysterClips/ stayed EMPTY and the temp dir
+        # got nuked by the next-startup orphan_cleanup → permanent data loss.
+        #
+        # Fix: write a *preliminary* tarball to OysterClips/ NOW, before
+        # depth runs. Tester sees their .tar.gz within ~3s of disarm, no
+        # matter what depth does later. The end-of-fn final tarball write
+        # uses `tarfile.open(..., "w:gz")` which truncates and rewrites,
+        # so the preliminary will be transparently replaced by the
+        # depth-included version on success. On crash, preliminary stays.
+        #
+        # Preliminary contents: video.mp4 + inputs.jsonl + session_manifest
+        # + systeminfo.json + action_camera.json + game-state JSONL. Only
+        # missing piece is depth/ + depth_manifest.json — which the buyer
+        # ingest treats as server_pending if absent. Tester can ALWAYS
+        # find their recording, depth becomes a "best effort upgrade".
+        try:
+            _preliminary_terminator = clip_dir / "terminator.json"
+            # Write a placeholder terminator marking this as in-progress
+            # so even the preliminary tarball is internally consistent.
+            _preliminary_terminator.write_text(
+                json.dumps({
+                    "schema_version": "1.0",
+                    "reason": "preliminary_pre_depth",
+                    "note": "tarball written before depth pipeline; "
+                            "final tarball will overwrite this with "
+                            "real terminator after depth completes",
+                    "recorder_version": RECORDER_VERSION,
+                }, indent=2),
+                encoding="utf-8",
+            )
+            _preliminary_tar = _output_dir() / f"clip-{ts}.tar.gz"
+            with tarfile.open(_preliminary_tar, "w:gz") as _ptf:
+                _ptf.add(clip_dir, arcname=f"clip-{ts}")
+            _trace(f"rc15.16: preliminary tarball written to {_preliminary_tar} "
+                   f"({_preliminary_tar.stat().st_size / 1024 / 1024:.1f} MB) — "
+                   f"tester can already see this; depth will overwrite on success")
+        except Exception as _pte:
+            _trace(f"rc15.16: preliminary tarball write failed: {_pte}")
+
         _depth_override = os.environ.get("OYSTER_LOCAL_DEPTH", "").strip()
         if _depth_override == "1":
             run_local_depth = True
@@ -2875,15 +2918,37 @@ class RecorderApp(tk.Tk):
                 # rc14: prefer real accelerators. cuda first (nvcuda.dll
                 # loadable), DirectML second (torch_directml importable).
                 # cpu is NEVER auto-selected — that was rc9-rc13's bug.
-                local_device = "cuda"
+                #
+                # rc15.16 (Howard 2026-05-10 "人家不一定是 amd 人家可能是 nvidia"):
+                # Old logic was `local_device = "cuda"; if torch_directml
+                # available: local_device = "dml"` — UNCONDITIONAL DML
+                # override. Win11 always has DirectML, so NVIDIA cards
+                # were force-routed to DML and hit `model_compat` errors
+                # (DML lacks the deformable-conv op DepthAnything V2 uses).
+                # Correct: try CUDA FIRST, only fall to DML if CUDA path
+                # not loadable. Fixes bingd's silent-loss failure mode.
+                local_device = None
                 try:
-                    import torch_directml  # type: ignore  # noqa: PLC0415
-                    if torch_directml.is_available():  # type: ignore[attr-defined]
-                        local_device = "dml"
+                    import torch  # type: ignore  # noqa: PLC0415
+                    if torch.cuda.is_available():
+                        local_device = "cuda"
                 except Exception:
                     pass
-                run_local_depth = True
-                track_reason = f"GPU detected — local inference on {local_device}"
+                if local_device is None:
+                    try:
+                        import torch_directml  # type: ignore  # noqa: PLC0415
+                        if torch_directml.is_available():  # type: ignore[attr-defined]
+                            local_device = "dml"
+                    except Exception:
+                        pass
+                if local_device is None:
+                    # GPU detected by _detect_gpu_available but neither
+                    # torch.cuda nor torch_directml loadable → defer to server.
+                    run_local_depth = False
+                    track_reason = "GPU detected but no torch backend — server-pending"
+                else:
+                    run_local_depth = True
+                    track_reason = f"GPU detected — local inference on {local_device}"
         _trace(f"depth: track decision = {track_reason}")
         # rc15 Heal Framework: depth track decision is high-value telemetry.
         _heal_emit(
@@ -3882,24 +3947,55 @@ def _try_install_mod_first_launch() -> None:
 
 
 def _scan_and_clean_orphans() -> int:
-    """rc13 SI (Phase B.1): scan tempfile.gettempdir() for stale
-    oyster-rec-* dirs from prior crashes and clean them up.
+    """rc13 SI (Phase B.1) + rc15.16 salvage: scan tempfile.gettempdir() for
+    stale oyster-rec-* dirs from prior crashes and recover their data.
 
     A dir is "orphan" if it's older than 1 hour AND its prefix matches
-    'oyster-rec-' AND no live process owns it. Returns count cleaned.
-    Also writes a session-less terminator.json with reason='orphan_resumed'
-    so we capture the failure mode in telemetry once backend is online.
+    'oyster-rec-'. Returns count cleaned.
+
+    rc15.16 (Howard 2026-05-10 "录制文件还是空的找不到"): bingd lost a
+    real recording (7093 game-state samples + 50802 input events + valid
+    video.mp4) because depth pipeline hung mid-session, tester closed
+    recorder, next-startup orphan_cleanup nuked the temp dir. Now: BEFORE
+    deleting, scan for clip-*/ subdirs containing video.mp4. If found,
+    move clip-*/ to OysterClips/_orphan_recovered/ so tester can manually
+    repackage / replay. Only THEN rmtree the husk.
     """
     cleaned = 0
     try:
         tmp_root = Path(tempfile.gettempdir())
         cutoff = time.time() - 3600  # 1 hour ago
+        try:
+            recovery_root = (
+                Path(_real_documents_dir()) / "OysterRecorder" / "_orphan_recovered"
+            )
+            recovery_root.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            recovery_root = None
         for entry in tmp_root.glob("oyster-rec-*"):
             try:
                 if not entry.is_dir():
                     continue
                 if entry.stat().st_mtime > cutoff:
                     continue  # too fresh — might be a live session
+                # rc15.16: salvage clip-* subdirs containing video.mp4
+                # before deleting the tmp dir.
+                if recovery_root is not None:
+                    for clip in entry.glob("clip-*"):
+                        try:
+                            if not clip.is_dir():
+                                continue
+                            video = clip / "video.mp4"
+                            if not video.exists() or video.stat().st_size < 1024:
+                                continue  # no real recording, skip salvage
+                            dest = recovery_root / clip.name
+                            if dest.exists():
+                                # avoid clobber on collision; suffix with mtime
+                                dest = recovery_root / f"{clip.name}_{int(clip.stat().st_mtime)}"
+                            shutil.move(str(clip), str(dest))
+                            _trace(f"orphan_cleanup: SALVAGED {clip.name} → {dest}")
+                        except Exception as sx:
+                            _trace(f"orphan_cleanup: salvage skip {clip} ({sx})")
                 shutil.rmtree(entry, ignore_errors=True)
                 cleaned += 1
                 _trace(f"orphan_cleanup: removed {entry}")
