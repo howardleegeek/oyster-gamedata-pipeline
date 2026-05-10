@@ -187,6 +187,11 @@ jobs:
           # AMD/Intel GPU users can run DepthAnything V2 via DirectML on
           # Windows. No-op on machines without DX12 GPU (falls back to cpu).
           pip install torch-directml
+          # rc15.9 self-heal v2: also bundle onnxruntime-directml as
+          # inner-tier 3 fallback. ONNX op coverage on DML is wider than
+          # torch_directml's, resolves AMD 780M × DepthAnything V2
+          # model_compat error seen in rc15.8 testing.
+          pip install onnxruntime-directml
           pip install transformers "imageio[ffmpeg]" OpenEXR Imath huggingface_hub
           python -c "import PyInstaller, sys; print(f'PyInstaller {PyInstaller.__version__} on Python {sys.version.split()[0]}')"
 
@@ -426,6 +431,8 @@ jobs:
             --collect-all yaml `
             --collect-all torch `
             --collect-all torch_directml `
+            --collect-all onnxruntime `
+            --collect-submodules depth_runtimes `
             --collect-all transformers `
             --collect-all OpenEXR `
             --collect-all Imath `

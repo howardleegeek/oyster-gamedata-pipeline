@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.8"
+RECORDER_VERSION = "lite-v0.28.0-rc15.9"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -2817,20 +2817,86 @@ class RecorderApp(tk.Tk):
                     user_hint = "未知本地推理错误 — 已 fall back 到服务器"
                 _trace(
                     f"depth: local inference FAILED kind={fallback_kind} "
-                    f"{exc_name}: {exc_msg!r} — falling back to server_pending"
+                    f"{exc_name}: {exc_msg!r}"
                 )
-                depth_manifest_path.write_text(
-                    json.dumps({
-                        "status": "server_pending",
-                        "frames": [],
-                        "reason": f"local inference exception ({fallback_kind}): {exc_name}: {exc_msg}",
-                        "fallback_from": fallback_kind,
-                        "tried_device": local_device,
-                        "user_hint": user_hint,
-                        "client_version": RECORDER_VERSION,
-                    }, indent=2),
-                    encoding="utf-8",
-                )
+
+                # rc15.9 self-heal v2: BEFORE giving up to server_pending,
+                # try ONNX Runtime DML as inner-tier 3 (different op
+                # dispatcher than torch_directml; resolves AMD 780M
+                # model_compat issue when torch_directml lacks the op).
+                # See SELF_HEAL_v2_AUTO_RESOLVE.md for full N×M matrix.
+                fallback_history: list[dict[str, str]] = [
+                    {"tier": f"torch+{local_device}", "exception_class": exc_name,
+                     "exception_msg": exc_msg[:300]},
+                ]
+                onnx_attempted = False
+                onnx_succeeded = False
+                if fallback_kind in ("model_compat", "dml_driver", "unknown_local_error"):
+                    onnx_attempted = True
+                    _trace(f"depth: rc15.9 v2 — trying onnxruntime+dml inner tier")
+                    try:
+                        from depth_runtimes.onnx_runtime import (  # noqa: PLC0415
+                            infer_depth_for_video as _onnx_infer,
+                        )
+                        manifest = _onnx_infer(
+                            video_path,
+                            depth_dir,
+                            model_variant="vits",
+                            progress_callback=self._on_depth_progress,
+                            should_skip=self._skip_depth_flag.is_set,
+                        )
+                        onnx_succeeded = True
+                        _trace(f"depth: ONNX+DML tier succeeded, {len(manifest)} frames")
+                    except Exception as onnx_exc:
+                        onnx_exc_name = type(onnx_exc).__name__
+                        onnx_exc_msg = str(onnx_exc)
+                        fallback_history.append({
+                            "tier": "onnx+dml",
+                            "exception_class": onnx_exc_name,
+                            "exception_msg": onnx_exc_msg[:300],
+                        })
+                        _trace(f"depth: ONNX+DML also failed {onnx_exc_name}: {onnx_exc_msg!r}")
+                _trace(f"depth: all local tiers exhausted — falling back to server_pending (history={len(fallback_history)} attempts)")
+                # rc15.9: write either local_complete (ONNX won) or
+                # server_pending with full fallback_history (all tiers failed).
+                if onnx_succeeded:
+                    depth_manifest_path.write_text(
+                        json.dumps({
+                            "status": "local_complete",
+                            "frames": {str(k): v for k, v in (manifest or {}).items()} if isinstance(manifest, dict) else manifest,
+                            "frame_count": len(manifest) if hasattr(manifest, "__len__") else 0,
+                            "device": "onnx+dml",
+                            "fallback_history": fallback_history,
+                            "client_version": RECORDER_VERSION,
+                        }, indent=2),
+                        encoding="utf-8",
+                    )
+                    self._set("ℹ️ ONNX 备援成功", "#0277bd",
+                              f"torch+{local_device} 失败, 已切到 onnx+dml. 深度数据本地完成.")
+                    _heal_emit(
+                        "depth_dual_track", "heal_success", "info",
+                        f"v2 self-heal: tier 2 failed → tier 3 (onnx+dml) succeeded",
+                        details={"fallback_history": fallback_history,
+                                 "winning_tier": "onnx+dml"},
+                        remediation={"action": "auto_clean", "performed": True,
+                                     "next_step": "no action — auto-resolved via tier 3"},
+                        session_id=getattr(self, "_session_id", None),
+                        recorder_version=RECORDER_VERSION,
+                    )
+                else:
+                    depth_manifest_path.write_text(
+                        json.dumps({
+                            "status": "server_pending",
+                            "frames": [],
+                            "reason": f"local inference exception ({fallback_kind}): {exc_name}: {exc_msg}",
+                            "fallback_from": fallback_kind,
+                            "tried_device": local_device,
+                            "fallback_history": fallback_history,
+                            "user_hint": user_hint,
+                            "client_version": RECORDER_VERSION,
+                        }, indent=2),
+                        encoding="utf-8",
+                    )
                 # Visible UI message: tester sees ACTIONABLE next-step.
                 self._set("ℹ️ 深度图待服务器处理", "#0277bd",
                           f"本地推理失败 ({fallback_kind}). {user_hint}")

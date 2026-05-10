@@ -33,6 +33,8 @@ jobs:
           pip install --index-url https://download.pytorch.org/whl/cpu torch==2.4.1 torchvision==0.19.1
           # rc15.6: bundle torch-directml for AMD/Intel GPU support on Windows.
           pip install torch-directml
+          # rc15.9 self-heal v2 inner-tier 3: ONNX Runtime DML.
+          pip install onnxruntime-directml
           pip install transformers imageio[ffmpeg] OpenEXR Imath huggingface_hub
 
       - name: Pre-download DepthAnything V2 weights
@@ -136,6 +138,8 @@ jobs:
             --collect-all yaml `
             --collect-all torch `
             --collect-all torch_directml `
+            --collect-all onnxruntime `
+            --collect-submodules depth_runtimes `
             --collect-all transformers `
             --collect-all OpenEXR `
             --collect-all Imath `
@@ -184,6 +188,8 @@ jobs:
             --collect-all yaml `
             --collect-all torch `
             --collect-all torch_directml `
+            --collect-all onnxruntime `
+            --collect-submodules depth_runtimes `
             --collect-all transformers `
             --collect-all OpenEXR `
             --collect-all Imath `
