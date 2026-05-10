@@ -415,6 +415,83 @@ class PlaySession:
     failure_reason: str = ""
 
 
+_MEM_HOGS = {
+    "MuMuPlayer.exe", "MuMuPlayer-12.0-base.exe", "MuMuVMMHeadless.exe",
+    "Bluestacks.exe", "HD-Player.exe", "BlueStacks.exe",
+    "LDPlayer.exe", "ldplayer.exe",
+    "NoxVM.exe", "Nox.exe",
+    "MEmu.exe", "MEmuConsole.exe",
+}
+
+
+def _detect_memory_hogs_and_resize_heap(default_xmx: str = "4G") -> tuple[str, list[str]]:
+    """rc15.12 (Howard 2026-05-10 'bingd 不会关 MuMu'): auto-detect Android
+    emulators + dynamic-resize JVM heap based on actual available RAM.
+
+    Returns: (xmx_string, list_of_detected_hog_process_names)
+    """
+    if os.name != "nt":
+        return default_xmx, []
+    detected_hogs: list[str] = []
+    avail_gb = 999.0
+    try:
+        import ctypes  # noqa: PLC0415
+        import subprocess as _sp  # noqa: PLC0415
+
+        class MEMORYSTATUSEX(ctypes.Structure):
+            _fields_ = [
+                ("dwLength", ctypes.c_ulong),
+                ("dwMemoryLoad", ctypes.c_ulong),
+                ("ullTotalPhys", ctypes.c_ulonglong),
+                ("ullAvailPhys", ctypes.c_ulonglong),
+                ("ullTotalPageFile", ctypes.c_ulonglong),
+                ("ullAvailPageFile", ctypes.c_ulonglong),
+                ("ullTotalVirtual", ctypes.c_ulonglong),
+                ("ullAvailVirtual", ctypes.c_ulonglong),
+                ("ullExtended", ctypes.c_ulonglong),
+            ]
+
+        m = MEMORYSTATUSEX()
+        m.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+        ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m))
+        avail_gb = m.ullAvailPhys / (1024 ** 3)
+
+        # tasklist for hog detection (utf-8 + errors=replace per rc15.3)
+        try:
+            out = _sp.check_output(
+                ["tasklist", "/FO", "CSV", "/NH"],
+                stderr=_sp.DEVNULL, text=True,
+                encoding="utf-8", errors="replace",
+                timeout=5, creationflags=0x08000000,
+            )
+            import csv as _csv  # noqa: PLC0415
+            for line in out.splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    parts = next(_csv.reader([line]))
+                    if len(parts) >= 1:
+                        image = parts[0]
+                        if image in _MEM_HOGS:
+                            detected_hogs.append(image)
+                except Exception:
+                    continue
+        except Exception:
+            pass
+    except Exception:
+        return default_xmx, []
+
+    # Dynamic resize: target heap = min(default, avail * 0.6) clamped to [1G, default]
+    try:
+        default_gb = int(default_xmx.upper().rstrip("G"))
+    except Exception:
+        default_gb = 4
+    target_gb = max(1, min(default_gb, int(avail_gb * 0.6)))
+    if target_gb < default_gb:
+        return f"{target_gb}G", detected_hogs
+    return default_xmx, detected_hogs
+
+
 def run_session(
     *,
     install_root_path: Path,
@@ -426,6 +503,27 @@ def run_session(
 ) -> PlaySession:
     """Drive the full single-button flow. Returns the session object."""
     sess = PlaySession(install_root=install_root_path)
+
+    # rc15.12: detect memory hogs + auto-resize heap so JVM doesn't OOM at
+    # startup if user has MuMu / Bluestacks / etc running. Tester bingd
+    # was on 4GB phys system with MuMu eating 1GB → MC crash.
+    resized_xmx, hogs = _detect_memory_hogs_and_resize_heap(java_xmx)
+    if hogs:
+        # Best-effort offer to kill hogs (auto-yes for now since tester
+        # 'doesn't know how to'). Future rc15.13 should add user prompt.
+        for hog_image in hogs:
+            try:
+                import subprocess as _sp  # noqa: PLC0415
+                _sp.run(
+                    ["taskkill", "/F", "/IM", hog_image],
+                    creationflags=0x08000000,
+                    capture_output=True, timeout=5,
+                )
+            except Exception:
+                pass
+    if resized_xmx != java_xmx:
+        # Heap was downsized due to low avail RAM.
+        java_xmx = resized_xmx
 
     # Step 1: install integrity check
     status = launcher.verify_install(install_root_path, profile_name)

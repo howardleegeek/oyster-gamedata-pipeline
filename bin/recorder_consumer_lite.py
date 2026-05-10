@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.11"
+RECORDER_VERSION = "lite-v0.28.0-rc15.12"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
