@@ -43,6 +43,13 @@ _PROGRESS_CALLBACK_EVERY_N_FRAMES = 15
 # File: onnx/model.onnx (~99 MB, fp32; or model_fp16.onnx ~50 MB)
 _ONNX_REPO = "onnx-community/Depth-Anything-V2-Small"
 _ONNX_FILENAME = "onnx/model.onnx"
+# rc15.15 C3: real model is ~99 MB. 10MB sanity check (rc15.9 original) lets
+# truncated downloads (e.g. 50MB partial) silently pass and crash later in
+# InferenceSession with a confusing protobuf parse error. 80MB floor is
+# tight enough to catch all observed truncations + loose enough to absorb
+# minor HF re-uploads.
+_ONNX_MIN_SIZE_BYTES = 80 * 1024 * 1024
+_ONNX_MAX_SIZE_BYTES = 200 * 1024 * 1024  # paranoid upper-bound
 
 
 def _onnx_cache_dir() -> Path:
@@ -54,15 +61,46 @@ def _onnx_cache_dir() -> Path:
     return Path.home() / ".cache" / "oyster-recorder" / "depth_models"
 
 
+def _is_valid_onnx_cache(path: Path) -> bool:
+    """rc15.15 C3: validate cached ONNX is full + parseable."""
+    if not path.exists():
+        return False
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return False
+    if not (_ONNX_MIN_SIZE_BYTES <= size <= _ONNX_MAX_SIZE_BYTES):
+        return False
+    # Cheap sniff: every ONNX file starts with protobuf magic for ModelProto.
+    # Field 1 = ir_version (varint) so byte 0 is 0x08 (field=1, wire=varint).
+    try:
+        with open(path, "rb") as fh:
+            head = fh.read(8)
+        if not head or head[0] != 0x08:
+            return False
+    except OSError:
+        return False
+    return True
+
+
 def _ensure_onnx_model(variant: str = "vits") -> Path:
     """Lazy-download pre-converted DepthAnything V2 ONNX from HF community.
 
     Returns path to cached .onnx file. Raises DepthRuntimeUnavailable if
     huggingface_hub missing or network failure on first run.
+
+    rc15.15 C3: validates cached file isn't truncated; on partial-download
+    detection, removes the stale file and re-downloads.
     """
     cache = _onnx_cache_dir() / f"depth_anything_v2_{variant}.onnx"
-    if cache.exists() and cache.stat().st_size > 10_000_000:  # > 10MB sanity
+    if _is_valid_onnx_cache(cache):
         return cache
+    if cache.exists():
+        # Stale or truncated. Nuke + re-download.
+        try:
+            cache.unlink()
+        except OSError:
+            pass
     cache.parent.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -85,6 +123,23 @@ def _ensure_onnx_model(variant: str = "vits") -> Path:
         raise DepthRuntimeError(
             f"failed to download {_ONNX_REPO}/{_ONNX_FILENAME}: {e}"
         ) from e
+
+    # rc15.15 C3: verify the freshly-copied file is valid (network can
+    # truncate, disk can fill mid-copy).
+    if not _is_valid_onnx_cache(cache):
+        try:
+            actual_size = cache.stat().st_size if cache.exists() else 0
+        except OSError:
+            actual_size = -1
+        try:
+            cache.unlink()
+        except OSError:
+            pass
+        raise DepthRuntimeError(
+            f"ONNX model verification failed after download: "
+            f"size={actual_size} not in [{_ONNX_MIN_SIZE_BYTES}, {_ONNX_MAX_SIZE_BYTES}] "
+            f"or magic mismatch. Removed corrupted cache."
+        )
 
     return cache
 

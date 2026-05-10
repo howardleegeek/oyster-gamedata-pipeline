@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.14"
+RECORDER_VERSION = "lite-v0.28.0-rc15.15"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -426,61 +426,85 @@ TELEMETRY_ENDPOINT = "https://0x0.st"  # multipart POST with field name "file"
 # rc15.14 (Howard 2026-05-10 "diagnostic 是否可以让他们直接上传 是不是
 # 需要服务器"): tester 一键上传 ENTIRE diagnostic zip (含 javaw + heal
 # events + sysinfo) 到匿名文件主机. NO server needed for short-term.
-# Multi-host fallback chain: catbox.moe (永久) → file.io (14天) → 0x0.st
-# (5MB log only, last resort). Each is anonymous, no auth required.
+#
+# rc15.15 (Howard 2026-05-10 round-12 audit fixes):
+#   - C1: stat() first, never read body before size check (was 200MB OOM risk)
+#   - C2: free body buffer before urllib send (was 2× peak RAM)
+#   - H2: timeout 60s → 600s (China tester 5-10Mbps + 200MB = needs minutes)
+#   - H3: file.io tier removed (anon endpoint dead since 2024, returns 401);
+#         transfer.sh added as Tier 2 (still anon, 14d TTL, 10GB max)
+#   - H1 consent gating moved to caller (_export_diagnostic_only) so it's
+#     visible at click time, not buried in upload helper.
 CATBOX_ENDPOINT = "https://catbox.moe/user/api.php"
-FILE_IO_ENDPOINT = "https://file.io"
+TRANSFER_SH_ENDPOINT = "https://transfer.sh"
+# Largest zip we'll attempt to upload — catbox is 200MB but Chinese ISP
+# upload speeds (5-10Mbps) make >100MB take >2 min and frequently fail.
+# If diagnostic zip exceeds, fall through to local-only path.
+DIAG_UPLOAD_MAX_BYTES = 100 * 1024 * 1024
+DIAG_UPLOAD_TIMEOUT_SEC = 600
 
 
 def _upload_diagnostic_zip(zip_path: Path) -> Optional[str]:
-    """rc15.14: upload entire diagnostic zip to anonymous host with fallback.
+    """rc15.14 + rc15.15: upload zip to anonymous host with fallback.
 
-    Returns hosted URL on success, None on all-host failure. Tester sees
-    URL in helpbar + clipboard. Howard reads URL, downloads zip, debugs.
+    Returns hosted URL on success, None on all-host failure. Caller has
+    already shown consent dialog (rc15.15 H1).
 
     Tries in order:
       1. catbox.moe (permanent, 200MB max) — preferred
-      2. file.io (14 days, 5GB max) — fallback
-      3. 0x0.st (existing path, log-only, 5MB) — last resort
+      2. transfer.sh (14 days, 10GB max) — fallback (file.io retired in rc15.15)
 
-    NEVER raises (caller will fall through to local-only diagnostic).
+    NEVER raises (caller falls through to local-only diagnostic).
     """
     if not zip_path.exists():
         return None
-    body = zip_path.read_bytes()
-    if len(body) > 200 * 1024 * 1024:  # 200MB safety cap
-        _trace(f"upload_diag: zip too large ({len(body)/1e6:.1f}MB), skipping")
+    # rc15.15 C1: stat() FIRST, never read body before size check.
+    try:
+        size = zip_path.stat().st_size
+    except OSError as exc:
+        _trace(f"upload_diag: stat failed: {exc}")
+        return None
+    if size > DIAG_UPLOAD_MAX_BYTES:
+        _trace(f"upload_diag: zip too large ({size/1e6:.1f}MB > {DIAG_UPLOAD_MAX_BYTES/1e6:.0f}MB), skipping")
+        return None
+    if size == 0:
+        _trace("upload_diag: zip is empty, skipping")
         return None
 
     import urllib.request  # noqa: PLC0415
     import uuid as _uuid  # noqa: PLC0415
 
+    crlf = "\r\n"
+
     # Tier 1: catbox.moe
     try:
         boundary = f"----CatBox{_uuid.uuid4().hex}"
-        crlf = "\r\n"
-        # catbox.moe wants reqtype=fileupload + file field
-        parts: list[bytes] = []
-        parts.append(f"--{boundary}{crlf}".encode())
-        parts.append(f'Content-Disposition: form-data; name="reqtype"{crlf}{crlf}'.encode())
-        parts.append(b"fileupload" + crlf.encode())
-        parts.append(f"--{boundary}{crlf}".encode())
-        parts.append(
-            f'Content-Disposition: form-data; name="fileToUpload"; filename="{zip_path.name}"{crlf}'.encode()
-            + f"Content-Type: application/zip{crlf}{crlf}".encode()
-        )
-        parts.append(body)
-        parts.append(f"{crlf}--{boundary}--{crlf}".encode())
-        data = b"".join(parts)
+        # rc15.15 M1: filename quote chars escaped (multipart hates raw `"` / `\`)
+        safe_name = zip_path.name.replace('"', '_').replace('\\', '_').replace('\r', '_').replace('\n', '_')
+        head = (
+            f"--{boundary}{crlf}"
+            f'Content-Disposition: form-data; name="reqtype"{crlf}{crlf}'
+            f"fileupload{crlf}"
+            f"--{boundary}{crlf}"
+            f'Content-Disposition: form-data; name="fileToUpload"; filename="{safe_name}"{crlf}'
+            f"Content-Type: application/zip{crlf}{crlf}"
+        ).encode()
+        tail = f"{crlf}--{boundary}--{crlf}".encode()
+        body = zip_path.read_bytes()
+        data = head + body + tail
+        # rc15.15 C2: free intermediate body before send (peak RAM = 1× zip).
+        del body
         req = urllib.request.Request(
             CATBOX_ENDPOINT, data=data,
             headers={
-                "User-Agent": "OysterRecorder/diagnostic-upload",
+                "User-Agent": "Mozilla/5.0 (compatible; OysterRecorder)",
                 "Content-Type": f"multipart/form-data; boundary={boundary}",
+                "Content-Length": str(len(data)),
             },
         )
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with urllib.request.urlopen(req, timeout=DIAG_UPLOAD_TIMEOUT_SEC) as resp:
             url = resp.read().decode("utf-8", errors="replace").strip()
+        del data
         if url.startswith("http"):
             _trace(f"upload_diag: catbox.moe success {url}")
             return url
@@ -488,32 +512,30 @@ def _upload_diagnostic_zip(zip_path: Path) -> Optional[str]:
     except Exception as exc:
         _trace(f"upload_diag: catbox.moe failed [{type(exc).__name__}]: {exc}")
 
-    # Tier 2: file.io
+    # Tier 2: transfer.sh — PUT /<filename> with raw body, returns plain-text URL.
+    # Replaces file.io (which now requires paid auth as of 2024).
     try:
-        boundary = f"----FileIO{_uuid.uuid4().hex}"
-        head = (
-            f"--{boundary}{crlf}"
-            f'Content-Disposition: form-data; name="file"; filename="{zip_path.name}"{crlf}'
-            f"Content-Type: application/zip{crlf}{crlf}"
-        ).encode()
-        tail = f"{crlf}--{boundary}--{crlf}".encode()
-        data = head + body + tail
+        body = zip_path.read_bytes()
+        safe_name = zip_path.name.replace('"', '_').replace('\\', '_').replace('/', '_')
         req = urllib.request.Request(
-            FILE_IO_ENDPOINT, data=data,
+            f"{TRANSFER_SH_ENDPOINT}/{safe_name}",
+            data=body, method="PUT",
             headers={
-                "User-Agent": "OysterRecorder/diagnostic-upload",
-                "Content-Type": f"multipart/form-data; boundary={boundary}",
+                "User-Agent": "Mozilla/5.0 (compatible; OysterRecorder)",
+                "Content-Type": "application/zip",
+                "Content-Length": str(len(body)),
+                "Max-Days": "14",  # transfer.sh respects this header
             },
         )
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            import json as _json  # noqa: PLC0415
-            payload = _json.loads(resp.read().decode("utf-8", errors="replace"))
-            if payload.get("success") and payload.get("link"):
-                _trace(f"upload_diag: file.io success {payload['link']}")
-                return payload["link"]
-        _trace(f"upload_diag: file.io non-success response")
+        with urllib.request.urlopen(req, timeout=DIAG_UPLOAD_TIMEOUT_SEC) as resp:
+            url = resp.read().decode("utf-8", errors="replace").strip()
+        del body
+        if url.startswith("http"):
+            _trace(f"upload_diag: transfer.sh success {url}")
+            return url
+        _trace(f"upload_diag: transfer.sh non-URL response: {url[:200]}")
     except Exception as exc:
-        _trace(f"upload_diag: file.io failed [{type(exc).__name__}]: {exc}")
+        _trace(f"upload_diag: transfer.sh failed [{type(exc).__name__}]: {exc}")
 
     return None
 DIAGNOSTIC_ZIP_NAME = "OysterRecorder_diagnostic.zip"
@@ -1442,18 +1464,40 @@ class RecorderApp(tk.Tk):
 
     def _export_diagnostic_only(self) -> None:
         """Build diagnostic zip + auto-upload to anonymous host. rc15.14:
-        tester one-click → upload to catbox.moe (or file.io fallback) →
+        tester one-click → upload to catbox.moe (or transfer.sh fallback) →
         URL shown in helpbar + copied to clipboard. Tester can paste in
         WeChat/email to engineer instantly. NO server needed.
+
+        rc15.15 H1: consent dialog gates upload. catbox.moe stores files
+        publicly + permanently — tester must explicitly opt-in per-click.
+        Diagnostic zip contains: machine name, Windows username (in paths),
+        installed-software inventory, MC session logs. Not "private" but
+        also not nothing. Consent before broadcast.
         """
+        from tkinter import messagebox  # noqa: PLC0415
+
         _trace("user clicked export-diagnostic button")
-        self._hint.config(text="正在打包诊断 + 上传…", fg="#0277bd")
+        # rc15.15 H1: explicit consent before public upload.
+        agreed = messagebox.askyesno(
+            "诊断包上传确认",
+            "将上传诊断包到公开匿名文件主机 (catbox.moe / transfer.sh)。\n\n"
+            "上传内容包含:\n"
+            "  · Windows 用户名 / 机器路径\n"
+            "  · 系统硬件信息\n"
+            "  · MC 启动日志 (含游戏会话信息)\n"
+            "  · Oyster 录制日志 + 自愈事件\n\n"
+            "URL 持有人可以下载完整诊断包。请仅在愿意发给 Oyster 工程师的情况下上传。\n\n"
+            "确认上传?  (取消则只生成本地副本到桌面)",
+            icon="question",
+        )
+        self._hint.config(
+            text=("正在打包诊断 + 上传…" if agreed else "正在打包诊断 (本地)…"),
+            fg="#0277bd",
+        )
 
         def _go():
             zp = _build_diagnostic_zip()
-            url = None
-            if zp:
-                url = _upload_diagnostic_zip(zp)
+            url = _upload_diagnostic_zip(zp) if (zp and agreed) else None
             def apply():
                 if zp and url:
                     # Copy URL to clipboard for instant paste.

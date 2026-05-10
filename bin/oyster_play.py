@@ -453,8 +453,16 @@ def _detect_memory_hogs_and_resize_heap(default_xmx: str = "4G") -> tuple[str, l
 
         m = MEMORYSTATUSEX()
         m.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
-        ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m))
-        avail_gb = m.ullAvailPhys / (1024 ** 3)
+        # rc15.15 H6: GlobalMemoryStatusEx returns BOOL — 0 on failure.
+        # Without this check, m.ullAvailPhys is uninitialized → avail_gb=0
+        # → target_gb=1G → MC OOMs at startup with a useless heap.
+        ok = ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m))
+        if not ok:
+            # Treat unknown RAM as "fine, don't downsize"; emulator detection
+            # still runs below to surface hogs in detected_hogs list.
+            avail_gb = 999.0
+        else:
+            avail_gb = m.ullAvailPhys / (1024 ** 3)
 
         # tasklist for hog detection (utf-8 + errors=replace per rc15.3)
         try:
