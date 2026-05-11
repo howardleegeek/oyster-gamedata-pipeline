@@ -129,6 +129,14 @@ def _construct_pyinstaller_args(
     # we do in oyster_play.py.
     args.extend(["--hidden-import", "oyster_launch_mc"])
 
+    # rc16.11: diag_uploader is imported lazily from a daemon thread
+    # inside oyster_play._spawn_diag_uploader_thread(). PyInstaller's
+    # static analyzer doesn't follow imports inside nested defs, so
+    # we declare it explicitly here. If this line is missing, the
+    # bundled OysterPlay.exe silently falls through the try/except
+    # ImportError branch — diag uploader becomes dead code in prod.
+    args.extend(["--hidden-import", "diag_uploader"])
+
     # Add bin/ to module search so PyInstaller finds the sibling.
     args.extend(["--paths", str(BIN_DIR)])
 

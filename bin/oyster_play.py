@@ -609,6 +609,104 @@ def _input_watchdog(deadline_seconds: float = 60.0) -> None:
         logger.warning("rc16.8 input-watchdog: check failed (%s)", e)
 
 
+def _find_latest_session_dir() -> Path | None:
+    """rc16.11: locate the most-recently-modified recordings/<session>/
+    under %LOCALAPPDATA%/GameData Recorder/. Mirrors the discovery
+    pattern in _input_watchdog so the diag uploader operates on the
+    same dir the lint pipeline produced. Best-effort; returns None on
+    any error (caller skips upload offer)."""
+    try:
+        local = os.environ.get("LOCALAPPDATA") or str(
+            Path.home() / "AppData" / "Local"
+        )
+        root = Path(local) / "GameData Recorder" / "recordings"
+        if not root.is_dir():
+            return None
+        # Pick the most-recently-modified child dir. Freshly aborted
+        # recordings may not have inputs.jsonl yet, so we don't filter
+        # on file presence here — the diag bundler tolerates sparse
+        # session dirs.
+        candidates: list[Path] = [c for c in root.iterdir() if c.is_dir()]
+        if not candidates:
+            return None
+        return max(candidates, key=lambda p: p.stat().st_mtime)
+    except Exception as e:  # noqa: BLE001 — discovery must never raise
+        logger.warning("rc16.11 diag-uploader: session-dir lookup failed (%s)", e)
+        return None
+
+
+def _spawn_diag_uploader_thread() -> None:
+    """rc16.11: launch run_layer4 in a daemon thread so the launcher
+    main thread can return without blocking on a Tk dialog. Privacy
+    invariant: auto_confirm=False is passed unconditionally so the
+    user MUST click Send. If the launcher exits before the user
+    responds, the daemon thread dies with the process — and no
+    upload happens. This is the intended, privacy-safe failure mode.
+
+    Importable diag_uploader is best-effort: if the module is missing
+    (e.g. dev checkout without the banked file, or PyInstaller bundle
+    that forgot --hidden-import), we log warning and continue. Never
+    raises into the launcher main thread."""
+    session_dir = _find_latest_session_dir()
+    if session_dir is None:
+        logger.info("rc16.11 diag-uploader: no session dir found, skipping")
+        return
+
+    # Read lint report if it exists; otherwise pass None and let
+    # run_layer4 decide (treats None as "lint didn't run, err on
+    # the side of offering upload"). Read on the launcher thread
+    # because it's small + synchronous; the heavy work (ZIP + Tk
+    # + HTTP) happens in the daemon thread below.
+    lint_report: dict | None = None
+    lint_json_path = session_dir / "lint_v3_report.json"
+    if lint_json_path.is_file():
+        try:
+            import json  # noqa: PLC0415
+            lint_report = json.loads(lint_json_path.read_text(encoding="utf-8"))
+        except Exception as e:  # noqa: BLE001 — bad JSON => treat as missing
+            logger.warning("rc16.11 diag-uploader: lint JSON parse failed (%s)", e)
+            lint_report = None
+
+    def _diag_worker() -> None:
+        try:
+            from diag_uploader import run_layer4  # noqa: PLC0415
+            # auto_confirm=False is REQUIRED by the privacy contract:
+            # no silent upload, user must click Send. Do NOT change.
+            bundle = run_layer4(
+                session_dir, lint_report=lint_report, auto_confirm=False,
+            )
+            if bundle is not None and bundle.upload_url:
+                logger.info(
+                    "rc16.11 diag-uploader: uploaded to %s", bundle.upload_url,
+                )
+            elif bundle is not None:
+                logger.info(
+                    "rc16.11 diag-uploader: bundle saved locally at %s",
+                    bundle.zip_path,
+                )
+            else:
+                logger.info(
+                    "rc16.11 diag-uploader: nothing to upload (clean session)",
+                )
+        except ImportError as e:
+            # diag_uploader.py missing from this build — log + continue.
+            # Production CI must --add-data + --hidden-import it (see
+            # build_oysterplay_exe.py rc16.11 block).
+            logger.warning("rc16.11 diag-uploader: module not importable (%s)", e)
+        except Exception as e:  # noqa: BLE001 — must never crash launcher
+            logger.warning("rc16.11 diag-uploader: worker failed (%s)", e)
+
+    # daemon=True so the launcher process exit kills this thread cleanly
+    # without leaking a Tk root window. NEVER join this thread on the
+    # main path — the launcher must be free to return immediately. The
+    # privacy invariant ("no upload unless user clicks Send") is
+    # preserved by run_layer4's dialog being modal: if the launcher
+    # exits before the user responds, the dialog dies, no upload.
+    threading.Thread(
+        target=_diag_worker, daemon=True, name="oyster-diag-uploader",
+    ).start()
+
+
 def run_session(
     *,
     install_root_path: Path,
@@ -791,6 +889,23 @@ def run_session(
             click_recorder_button(
                 sess.recorder_window, button_label=RECORDER_DISARM_LABEL,
             )
+
+    # rc16.11 (Layer 4): auto-diagnostic uploader. Fires only if lint
+    # detected failures OR OYSTER_AUTO_UPLOAD=1 is set. The dialog is
+    # non-blocking (runs in background thread) and silent-success on
+    # upload completion. User opt-out via OYSTER_DISABLE_AUTODIAG=1.
+    #
+    # NON-BLOCKING is critical (grill-me lesson, repeated tonight as
+    # rc16.1 watchdog and rc16.8 preflight): we MUST NOT join the
+    # daemon thread before returning. If the user clicks Decline OR
+    # the launcher process exits before the 30s dialog timeout, the
+    # daemon thread dies with the process — and per the privacy
+    # invariant, no upload happens unless the user explicitly clicks
+    # Send. auto_confirm=False is passed inside the worker so
+    # run_layer4 cannot silent-upload even if OYSTER_AUTO_UPLOAD=1.
+    if os.environ.get("OYSTER_DISABLE_AUTODIAG", "").strip().lower() \
+            not in {"1", "true", "yes", "on"}:
+        _spawn_diag_uploader_thread()
 
     return sess
 
