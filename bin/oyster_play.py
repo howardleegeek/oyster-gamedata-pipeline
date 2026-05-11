@@ -76,37 +76,47 @@ DEFAULT_READY_TIMEOUT_SEC = 30.0
 def find_recorder_exe(install_root_path: Path) -> Path | None:
     """Locate the recorder executable next to OysterPlay.exe.
 
+    rc16 (Howard 2026-05-11): Rust+OBS recorder is now the PRIMARY path.
+    Python recorder (OysterRecorder-onedir/) is the FALLBACK, opt-in via
+    ``OYSTER_PY_RECORDER=1``.
+
     Looks in standard install layouts, in priority order:
 
-        1. <INSTALL_ROOT>/OysterRecorder-onedir/OysterRecorder-onedir.exe
-           — the layout R05E actually ships (PyInstaller --onedir with
-           `--name OysterRecorder-onedir` produces this naming + path).
-        2. <INSTALL_ROOT>/recorder/OysterRecorder.exe
+        1. <INSTALL_ROOT>/recorder/OysterRecorder.exe
+           — rc16 PRIMARY: Rust+OBS recorder, shipped by
+           build-recorder-rust.yml + staged by installer.iss section (3b).
+        2. <INSTALL_ROOT>/OysterRecorder-onedir/OysterRecorder-onedir.exe
+           — FALLBACK: PyInstaller --onedir Python recorder (R05E layout).
         3. <INSTALL_ROOT>/OysterRecorder.exe
+           — legacy / hand-installed layout.
         4. sibling of the running executable (when run from a
-           PyInstaller bundle — OysterPlay.exe is dropped at {app})
+           PyInstaller bundle — OysterPlay.exe is dropped at {app}),
+           tried under each of the layouts above.
 
-    Bug 5 (R05E): the .exe is shipped under
-    `OysterRecorder-onedir/OysterRecorder-onedir.exe`, NOT
-    `OysterRecorder.exe` directly under {app}. Without the onedir
-    candidates, the launcher errored::
-
-        OysterRecorder.exe not found near <INSTALL_ROOT>
+    When ``OYSTER_PY_RECORDER=1`` is set, the Rust paths (1 + sibling-of-1)
+    are skipped entirely and the Python recorder paths are tried directly.
+    This lets users fall back without reinstalling when the Rust path
+    misbehaves on their rig.
     """
-    candidates: list[Path] = [
-        # Onedir layout (current R05E ship layout) — check first.
-        install_root_path / RECORDER_ONEDIR_DIR / RECORDER_ONEDIR_EXE,
-        # Legacy / hand-installed layouts kept as fallbacks.
-        install_root_path / "recorder" / RECORDER_EXE_NAME,
-        install_root_path / RECORDER_EXE_NAME,
-    ]
+    # rc16: env-gate — empty/unset (default) means Rust-first; "1" means
+    # Python-only. Any other value is treated as default for safety.
+    py_only = os.environ.get("OYSTER_PY_RECORDER", "").strip() == "1"
+
+    candidates: list[Path] = []
+    if not py_only:
+        # rc16 PRIMARY: Rust+OBS recorder lives under {app}/recorder/.
+        candidates.append(install_root_path / "recorder" / RECORDER_EXE_NAME)
+    # FALLBACK chain: Python onedir, then legacy single-file.
+    candidates.append(install_root_path / RECORDER_ONEDIR_DIR / RECORDER_ONEDIR_EXE)
+    candidates.append(install_root_path / RECORDER_EXE_NAME)
 
     # When bundled, sys.executable is OysterPlay.exe — recorder may be
-    # in the same dir under either layout.
+    # in the same dir under either layout. Same priority order applies.
     exe = Path(sys.executable).resolve()
+    if not py_only:
+        candidates.append(exe.parent / "recorder" / RECORDER_EXE_NAME)
     candidates.append(exe.parent / RECORDER_ONEDIR_DIR / RECORDER_ONEDIR_EXE)
     candidates.append(exe.parent / RECORDER_EXE_NAME)
-    candidates.append(exe.parent / "recorder" / RECORDER_EXE_NAME)
 
     for c in candidates:
         if c.is_file():

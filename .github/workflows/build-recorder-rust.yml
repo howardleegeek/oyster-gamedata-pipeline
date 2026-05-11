@@ -1,0 +1,262 @@
+name: Build Recorder Rust EXE (R-rust-primary)
+
+# rc16 - Rust+OBS recorder = PRIMARY screen-capture path
+# ============================================================================
+# This workflow builds the Rust recorder vendored at `vendor/recorder/` and
+# uploads it as a CI artifact that the bundled-installer workflow consumes.
+#
+# Architecture pivot (rc16, Howard 2026-05-11):
+#   * PRIMARY    - Rust+OBS recorder (this workflow's output, OysterRecorder.exe
+#                  under {app}/recorder/ in the installer)
+#   * FALLBACK   - Python recorder (bin/recorder_consumer_lite.py via
+#                  build-recorder-exe.yml's PyInstaller path, env-gated by
+#                  OYSTER_PY_RECORDER=1)
+#
+# Why: bingd's tester rig (AMD 780M + WSA + MuMu emulator) produced 1-frame
+# video across 14 rc releases of the Python mss/ddagrab/gdigrab capture
+# chain. The Rust recorder ships v1.6.1 to production already (its zip lives
+# at vendor/recorder/gamedata-recorder-v1.6.1-windows-x86_64.zip). The
+# Python recorder stays in the installer as the fallback path.
+#
+# Trigger semantics
+# -----------------
+#   * push to `recorder-v0.28.0-rc16` branch                -> CI build (artifact)
+#   * push of any tag matching `recorder-v0.28.0-rc16.*`    -> same (artifact)
+#   * workflow_dispatch                                     -> manual smoke build
+#
+# Reference
+# ---------
+#   The upstream Rust recorder's own workflow lives at
+#   vendor/recorder/.github/workflows/rust-build.yml. We mirror its OBS
+#   bundling + dist staging steps verbatim - that pipeline produces v1.6.1
+#   zips already, we are just re-running it against our pinned submodule
+#   SHA and renaming the binary to OysterRecorder.exe so oyster_play.py's
+#   `RECORDER_EXE_NAME = "OysterRecorder.exe"` finds it.
+
+on:
+  push:
+    branches:
+      - 'recorder-v0.28.0-rc16'
+    tags:
+      - 'recorder-v0.28.0-rc16.*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# rc16: concurrency group prevents two same-branch pushes from racing for
+# the same artifact name. cancel-in-progress: false so we don't drop a
+# real build that the installer workflow is waiting on.
+concurrency:
+  group: recorder-build-rust-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      # ---------------------------------------------------------------------
+      # 1. Checkout with the recorder submodule
+      # ---------------------------------------------------------------------
+      # `submodules: recursive` is essential - the Rust recorder lives at
+      # vendor/recorder/ and is itself pinned to a specific upstream SHA
+      # (cb9ff5b as of rc16.0). Without recursive checkout the submodule
+      # directory will be empty.
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Verify recorder submodule is populated
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'vendor/recorder/Cargo.toml')) {
+            Write-Error "vendor/recorder/Cargo.toml missing after checkout - submodule fetch failed"
+            exit 1
+          }
+          $sha = (git -C vendor/recorder rev-parse --short HEAD).Trim()
+          Write-Host "vendor/recorder pinned at: $sha"
+          "RUST_RECORDER_SHA=$sha" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+
+      # ---------------------------------------------------------------------
+      # 2. Rust toolchain (matches upstream rust-build.yml)
+      # ---------------------------------------------------------------------
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          target: x86_64-pc-windows-msvc
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: vendor/recorder
+
+      # ---------------------------------------------------------------------
+      # 3. Build the Rust binary (Cargo.toml [package].name = "gamedata-recorder")
+      # ---------------------------------------------------------------------
+      # We don't run `cargo fmt -- --check` (upstream does) because we treat
+      # the submodule as read-only - any formatting drift is upstream's
+      # problem, not ours, and we don't want a vendor-side rustfmt config
+      # bump to fail our integration build.
+      - name: Build Rust application (release)
+        shell: pwsh
+        working-directory: vendor/recorder
+        run: |
+          cargo build --release --target x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "cargo build failed with exit code $LASTEXITCODE"
+            exit 1
+          }
+
+      # ---------------------------------------------------------------------
+      # 4. Stage dist/ (verbatim from upstream rust-build.yml steps)
+      # ---------------------------------------------------------------------
+      # The OBS runtime (effects, plugin DLLs, data/ tree) is produced by
+      # cargo-obs-build which downloads the pinned OBS Studio release ZIP
+      # and unpacks it into the dist dir. This is what upstream ships in
+      # v1.6.1 and what makes the recorder actually work - the binary
+      # alone is non-functional without the OBS runtime tree next to it.
+      - name: Create dist directory
+        shell: pwsh
+        working-directory: vendor/recorder
+        run: New-Item -ItemType Directory -Force -Path dist | Out-Null
+
+      - name: Install cargo-obs-build + fetch OBS runtime into dist/
+        shell: pwsh
+        working-directory: vendor/recorder
+        run: |
+          cargo install cargo-obs-build
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "cargo install cargo-obs-build failed"
+            exit 1
+          }
+          cargo obs-build build --out-dir dist\
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "cargo obs-build build failed"
+            exit 1
+          }
+
+      - name: Clean unnecessary OBS files
+        shell: pwsh
+        working-directory: vendor/recorder
+        run: |
+          # Upstream's clean script removes ~30 MB of OBS plugins we don't
+          # use (win-dshow, aja, rtmp-services, vlc-video, obs-text,
+          # obs-transitions). Keeps the artifact small.
+          if (Test-Path 'build-resources/scripts/clean_obs_build.ps1') {
+            .\build-resources\scripts\clean_obs_build.ps1
+          } else {
+            Write-Host "WARN: clean_obs_build.ps1 not found at expected path - skipping OBS cleanup"
+          }
+
+      - name: Copy Rust binary as OysterRecorder.exe
+        shell: pwsh
+        working-directory: vendor/recorder
+        run: |
+          # Upstream binary is `gamedata-recorder.exe` (per Cargo.toml
+          # [package].name). We rename to OysterRecorder.exe on the way
+          # into dist so oyster_play.py's RECORDER_EXE_NAME constant
+          # finds it without launcher code change.
+          $bin = "target\x86_64-pc-windows-msvc\release\gamedata-recorder.exe"
+          if (-not (Test-Path $bin)) {
+            # Fallback: cargo build may place it elsewhere if the binary
+            # name changes upstream. Pick the first .exe that isn't the
+            # OBS ffmpeg-mux helper (which has its own name).
+            $bin = Get-ChildItem "target\x86_64-pc-windows-msvc\release\*.exe" -File `
+              | Where-Object { $_.Name -ne "obs-ffmpeg-mux.exe" } `
+              | Select-Object -First 1 -ExpandProperty FullName
+          }
+          if (-not (Test-Path $bin)) {
+            Write-Error "No Rust binary found in target/x86_64-pc-windows-msvc/release/"
+            Get-ChildItem "target\x86_64-pc-windows-msvc\release\" | Format-Table Name, Length
+            exit 1
+          }
+          Copy-Item $bin "dist\OysterRecorder.exe"
+          $size_mb = [math]::Round((Get-Item "dist\OysterRecorder.exe").Length / 1MB, 1)
+          Write-Host "OysterRecorder.exe = ${size_mb} MB (from $(Split-Path -Leaf $bin))"
+
+      - name: Copy OBS FFmpeg mux helper
+        shell: pwsh
+        working-directory: vendor/recorder
+        run: |
+          # obs-ffmpeg-mux.exe is the OBS-side helper process the recorder
+          # spawns to mux H.265/AAC into MP4. Without it the recorder
+          # errors with "Unable to start the recording helper process".
+          # libobs-wrapper builds this as a separate binary in the same
+          # target dir.
+          $mux = "target\x86_64-pc-windows-msvc\release\obs-ffmpeg-mux.exe"
+          if (Test-Path $mux) {
+            Copy-Item $mux "dist\obs-ffmpeg-mux.exe"
+            Write-Host "Copied obs-ffmpeg-mux.exe to dist/"
+          } else {
+            Write-Host "WARN: obs-ffmpeg-mux.exe not found at $mux - recorder may fail at runtime"
+          }
+
+      - name: Copy assets (icons, LICENSE, etc.)
+        shell: pwsh
+        working-directory: vendor/recorder
+        run: |
+          # Icons + cursor textures for the egui UI + click-overlay.
+          # README/LICENSE are nice-to-have for the artifact.
+          if (Test-Path 'assets') {
+            Copy-Item -Path 'assets' -Destination 'dist\assets' -Recurse -Force
+          }
+          if (Test-Path 'LICENSE') {
+            Copy-Item 'LICENSE' 'dist\LICENSE' -Force
+          }
+
+      # ---------------------------------------------------------------------
+      # 5. Verify the dist layout matches what the installer expects
+      # ---------------------------------------------------------------------
+      - name: Verify dist contents (fail loud on missing files)
+        shell: pwsh
+        working-directory: vendor/recorder
+        run: |
+          Write-Host "=== dist/ tree (top-level only) ==="
+          Get-ChildItem -Path dist -Force | Format-Table Name, Length, Mode
+          Write-Host ""
+          Write-Host "=== dist/ size ==="
+          $size_mb = [math]::Round((Get-ChildItem -Recurse dist | Measure-Object -Property Length -Sum).Sum / 1MB, 1)
+          Write-Host "Total: ${size_mb} MB"
+          Write-Host ""
+          $required = @(
+            'dist\OysterRecorder.exe',
+            'dist\obs-ffmpeg-mux.exe',
+            'dist\data',
+            'dist\obs-plugins'
+          )
+          $missing = @()
+          foreach ($p in $required) {
+            if (-not (Test-Path $p)) { $missing += $p }
+          }
+          if ($missing.Count -gt 0) {
+            Write-Error "dist layout invariant violated. Missing:"
+            $missing | ForEach-Object { Write-Error "  $_" }
+            exit 1
+          }
+          Write-Host "OK - all required files present in dist/"
+
+      # ---------------------------------------------------------------------
+      # 6. Upload the artifact
+      # ---------------------------------------------------------------------
+      # The build-recorder-installer.yml workflow downloads this artifact
+      # by name pattern `OysterRecorder-rust-*` (see rc16 installer changes)
+      # and stages it under bundle/recorder/ -> which Inno Setup ships as
+      # {app}/recorder/OysterRecorder.exe - the path oyster_play.py's
+      # find_recorder_exe() checks first.
+      - name: Upload Rust recorder artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OysterRecorder-rust-${{ github.ref_name }}-${{ github.sha }}
+          path: vendor/recorder/dist/
+          if-no-files-found: error
+          retention-days: 30

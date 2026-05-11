@@ -254,11 +254,42 @@ Source: "{#BundleRoot}\\mc-instance\\mods\\fabric-api.jar"; \
     DestDir: "{app}\\mc-instance\\mods"; \
     Flags: ignoreversion
 
-; --- (3) OysterRecorder PyInstaller --onedir bundle -----------------------
+; --- (3) OysterRecorder PyInstaller --onedir bundle (FALLBACK, rc16) -------
 ; ~120 MB. Source comes from the existing build-recorder-exe.yml workflow
 ; (which we now run locally inside build_all.ps1 step 5).
+;
+; rc16 (Howard 2026-05-11): demoted from PRIMARY to FALLBACK. The Rust+OBS
+; recorder in section (3b) below is the primary screen-capture path. This
+; Python recorder is kept in the installer so users on rigs where the
+; Rust path fails can opt in via OYSTER_PY_RECORDER=1 env var without
+; reinstalling.
 Source: "{#BundleRoot}\\OysterRecorder-onedir\\*"; \
     DestDir: "{app}\\OysterRecorder-onedir"; \
+    Flags: ignoreversion recursesubdirs createallsubdirs
+
+; --- (3b) Rust+OBS recorder (PRIMARY, rc16) -------------------------------
+; ~200-300 MB. Source comes from build-recorder-rust.yml's artifact, staged
+; into bundle/recorder/ by the installer workflow's "rc16 - Stage Rust
+; recorder" step. Contains:
+;   OysterRecorder.exe        — the renamed gamedata-recorder.exe (Rust bin)
+;   obs-ffmpeg-mux.exe        — OBS-side helper for muxing H.265 → MP4
+;   data/                     — OBS effect shaders, audio resampling tables, etc.
+;   obs-plugins/              — required plugin DLLs (image-source,
+;                                obs-ffmpeg, obs-x264, win-capture, ...)
+;
+; The launcher (oyster_play.py find_recorder_exe) checks this path FIRST,
+; so as long as the Rust recorder is shipped here, it wins. The Python
+; FALLBACK in (3) above is only used when OYSTER_PY_RECORDER=1 is set.
+;
+; Why: bingd's AMD 780M / WSA / MuMu tester rig produced 1-frame video
+; across 14 rc15 releases of the Python mss/ddagrab/gdigrab capture
+; chain. The Rust+OBS path uses libobs (the OBS Studio engine) directly,
+; which is the same code path that ships in OBS Studio v30 to millions
+; of streamers — it handles exclusive-fullscreen MC, hardware-accelerated
+; H.265 encoding (NVENC / AMD VCE / Intel QSV), and game-capture hook
+; injection out of the box.
+Source: "{#BundleRoot}\\recorder\\*"; \
+    DestDir: "{app}\\recorder"; \
     Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; --- (4) OysterPlay.exe single-button launcher (R05C) ---------------------

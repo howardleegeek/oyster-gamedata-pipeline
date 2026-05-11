@@ -72,6 +72,17 @@ name: Build Recorder Bundled Installer (R05E)
   push:
     tags:
       - 'recorder-v*'
+  # rc16 (Howard 2026-05-11): chain after build-recorder-rust.yml completes
+  # on the rc16 branch so the installer always has a fresh Rust artifact
+  # available when it tries to download one. This avoids the race condition
+  # where both workflows trigger on the same push and the installer runs
+  # before the Rust artifact exists. Tag pushes (above) still drive the
+  # release flow directly; the workflow_run path is for branch-push CI.
+  workflow_run:
+    workflows: ['Build Recorder Rust EXE (R-rust-primary)']
+    types: [completed]
+    branches:
+      - 'recorder-v0.28.0-rc16'
   workflow_dispatch:
     inputs:
       smoke_tag:
@@ -96,6 +107,14 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 45
 
+    # rc16: when triggered by workflow_run, only proceed if the upstream
+    # Rust build succeeded. github.event.workflow_run is null for the
+    # other trigger paths (push, workflow_dispatch), so the condition
+    # is true for them too.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+
     env:
       # ASCII-only Python output — Windows runners default to cp1252 and
       # `print` of non-ASCII (e.g. status emojis from fetch_*.py) crashes
@@ -116,6 +135,13 @@ jobs:
           # safe choice — calling `git fetch --tags --depth=...` with a
           # bounded depth is fragile when the previous tag is far back.
           fetch-depth: 0
+          # rc16: when chained via workflow_run, checkout@v4 defaults to
+          # the workflow file's own branch (typically the default branch),
+          # NOT the head_sha of the triggering workflow. Pass the upstream
+          # sha explicitly so we build the same commit the Rust artifact
+          # was produced from. For other triggers this evaluates to '' and
+          # checkout uses its default (current ref).
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       # ---------------------------------------------------------------------
       # 2. Resolve the version we're building
@@ -136,18 +162,40 @@ jobs:
         shell: pwsh
         env:
           SMOKE_TAG_INPUT: ${{ github.event.inputs.smoke_tag }}
+          # rc16: when chained via workflow_run, GITHUB_REF is the default
+          # branch — we need the upstream-workflow's branch + sha instead.
+          WORKFLOW_RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          WORKFLOW_RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           if ($env:GITHUB_EVENT_NAME -eq 'push' -and $env:GITHUB_REF -like 'refs/tags/recorder-v*') {
             $tag = $env:GITHUB_REF -replace '^refs/tags/', ''
             $version = $tag -replace '^recorder-v', ''
             $isRelease = 'true'
+          } elseif ($env:GITHUB_EVENT_NAME -eq 'workflow_run' -and $env:WORKFLOW_RUN_HEAD_BRANCH -eq 'recorder-v0.28.0-rc16') {
+            # rc16 (Howard 2026-05-11): branch-push CI build, chained after
+            # build-recorder-rust.yml succeeded. Synthesize a version string
+            # so all downstream filename logic still works, but mark
+            # IS_RELEASE=false so we don't upload to a non-existent GitHub
+            # Release. The artifact upload at the end of this workflow
+            # still runs so we can download + inspect the built installer
+            # from the workflow run page.
+            # Use dash-separated semver pre-release form (no `+` build
+            # metadata) so Inno Setup's OutputBaseFilename + filesystem
+            # path handling stay vanilla. The Pascal trick that derives
+            # VersionInfoVersion via `Copy(AppVersion, 1, Pos("-", ...)-1)`
+            # still truncates everything from the first `-`, yielding
+            # VersionInfoVersion=0.28.0.0 - Windows-resource-API-valid.
+            $shortSha = $env:WORKFLOW_RUN_HEAD_SHA.Substring(0,7)
+            $tag = "recorder-v0.28.0-rc16-$shortSha"
+            $version = "0.28.0-rc16-$shortSha"
+            $isRelease = 'false'
           } else {
             $tag = $env:SMOKE_TAG_INPUT
             if ([string]::IsNullOrWhiteSpace($tag)) { $tag = 'v0.0.0-smoke' }
             # Reject anything that isn't a tame version-ish identifier so
             # downstream filenames / gh CLI args can't be hijacked.
             if ($tag -notmatch '^[A-Za-z0-9._\-]+$') {
-              Write-Error "Refusing smoke_tag '$tag' — must match ^[A-Za-z0-9._-]+$"
+              Write-Error "Refusing smoke_tag '$tag' - must match ^[A-Za-z0-9._-]+$"
               exit 1
             }
             $version = $tag -replace '^v', ''
@@ -469,13 +517,87 @@ jobs:
           }
 
       # ---------------------------------------------------------------------
+      # 11b. rc16: pull Rust+OBS recorder artifact from build-recorder-rust.yml
+      # ---------------------------------------------------------------------
+      # Architecture pivot: the Rust recorder is the PRIMARY screen-capture
+      # path (Python recorder above is now the FALLBACK). We download the
+      # artifact produced by build-recorder-rust.yml's most recent successful
+      # run on the same ref and stage it at bundle/recorder/. installer.iss
+      # ships that directly to {app}/recorder/ — the path oyster_play.py's
+      # find_recorder_exe() checks first.
+      #
+      # Why download-artifact instead of building inline: the Rust build
+      # adds ~15-25 min (cargo + cargo-obs-build) on top of the already
+      # 22-28 min Python pipeline. Keeping them in separate workflows means
+      # the Rust artifact can be cached + reused, and either workflow can
+      # be re-run independently if one path breaks.
+      - name: rc16 - Download Rust recorder artifact (from build-recorder-rust.yml)
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: build-recorder-rust.yml
+          workflow_conclusion: success
+          # rc16: pin to the SAME commit the Rust workflow built from.
+          # When chained via workflow_run, github.sha resolves to the
+          # default branch HEAD (a checkout@v4 quirk), so we use the
+          # workflow_run head_sha explicitly. For tag pushes / dispatch
+          # the workflow_run context is empty, so github.sha is correct.
+          commit: ${{ github.event.workflow_run.head_sha || github.sha }}
+          name_is_regexp: true
+          name: '^OysterRecorder-rust-.*'
+          path: rust-recorder-artifact
+          if_no_artifact_found: fail
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: rc16 - Stage Rust recorder under bundle/recorder/
+        shell: pwsh
+        run: |
+          # action-download-artifact unpacks each matched artifact into a
+          # subdirectory named after the artifact, so the actual files end
+          # up at rust-recorder-artifact/<artifact-name>/<files...>. We
+          # find the OysterRecorder.exe to anchor the staging move.
+          $rustExe = Get-ChildItem -Recurse rust-recorder-artifact `
+                       -Filter 'OysterRecorder.exe' -File `
+                       | Select-Object -First 1
+          if (-not $rustExe) {
+            Write-Error "rc16 invariant violated: OysterRecorder.exe not found in downloaded rust artifact"
+            Write-Host "=== rust-recorder-artifact tree ==="
+            Get-ChildItem -Recurse rust-recorder-artifact | Format-Table FullName, Length
+            exit 1
+          }
+          # The artifact's root dir contains the binary + OBS runtime
+          # (data/, obs-plugins/, obs-ffmpeg-mux.exe). Stage the whole
+          # directory to bundle/recorder/ so the [Files] line in
+          # installer.iss can do a recursive copy.
+          $artifactRoot = Split-Path -Parent $rustExe.FullName
+          New-Item -ItemType Directory -Force -Path 'bundle/recorder' | Out-Null
+          Copy-Item -Path "$artifactRoot/*" -Destination 'bundle/recorder/' -Recurse -Force
+          # Sanity check — same set the build-recorder-rust.yml verify step uses.
+          $required = @(
+            'bundle/recorder/OysterRecorder.exe',
+            'bundle/recorder/obs-ffmpeg-mux.exe',
+            'bundle/recorder/data',
+            'bundle/recorder/obs-plugins'
+          )
+          foreach ($p in $required) {
+            if (-not (Test-Path $p)) {
+              Write-Error "rc16 invariant violated: $p missing after staging Rust artifact"
+              Write-Host "=== bundle/recorder contents ==="
+              Get-ChildItem bundle/recorder | Format-Table Name, Length
+              exit 1
+            }
+          }
+          $size_mb = [math]::Round((Get-ChildItem -Recurse bundle/recorder | Measure-Object -Property Length -Sum).Sum / 1MB, 1)
+          Write-Host "Rust recorder staged at bundle/recorder/ (${size_mb} MB)"
+
+      # ---------------------------------------------------------------------
       # 12. Stage the full bundle layout that installer.iss expects
       # ---------------------------------------------------------------------
       # The exact paths come from bin/build_bundled_installer/installer.iss
       # `[Files]` block (kept in sync deliberately):
       #   Source: "{#BundleRoot}\jre\*"                  -> bundle/jre/...
       #   Source: "{#BundleRoot}\mc-instance\*"          -> bundle/mc-instance/...
-      #   Source: "{#BundleRoot}\OysterRecorder-onedir\*"-> bundle/OysterRecorder-onedir/
+      #   Source: "{#BundleRoot}\OysterRecorder-onedir\*"-> bundle/OysterRecorder-onedir/  (Python FALLBACK)
+      #   Source: "{#BundleRoot}\recorder\*"             -> bundle/recorder/                (Rust PRIMARY, rc16)
       #   Source: "{#BundleRoot}\OysterPlay.exe"         -> bundle/OysterPlay.exe
       #   Source: "{#BundleRoot}\manifest.json"          -> bundle/manifest.json
       - name: Compose bundle/ layout
@@ -485,13 +607,17 @@ jobs:
           # bundle/launcher/) — installer.iss references it by that exact path.
           Copy-Item 'dist/OysterPlay.exe' -Destination 'bundle/OysterPlay.exe' -Force
           # Sanity: every file installer.iss will reference must exist.
+          # rc16: bundle/recorder/OysterRecorder.exe (Rust PRIMARY) is now
+          # required alongside the Python FALLBACK onedir.
           $required = @(
             'bundle/jre/bin/javaw.exe',
             'bundle/mc-instance/versions/1.21.4/1.21.4.jar',
             'bundle/mc-instance/versions/fabric-loader-0.16.10-1.21.4/fabric-loader-0.16.10-1.21.4.json',
             'bundle/mc-instance/mods',
             'bundle/OysterPlay.exe',
-            'bundle/OysterRecorder-onedir/OysterRecorder-onedir.exe'
+            'bundle/OysterRecorder-onedir/OysterRecorder-onedir.exe',
+            'bundle/recorder/OysterRecorder.exe',
+            'bundle/recorder/obs-ffmpeg-mux.exe'
           )
           foreach ($p in $required) {
             if (-not (Test-Path $p)) {
