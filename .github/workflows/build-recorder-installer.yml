@@ -479,6 +479,7 @@ jobs:
             --add-data "bin/game_state_overlay.py;." `
             --add-data "bin/heal_registry.py;." `
             --add-data "bin/heal_report.py;." `
+            --add-data "bin/preflight_capture.py;." `
             --add-data "fabric-installer.jar;." `
             --add-data "oyster-recorder-mod.jar;." `
             --add-data "hf_cache;hf_cache" `
@@ -507,6 +508,7 @@ jobs:
             --hidden-import game_state_overlay `
             --hidden-import heal_registry `
             --hidden-import heal_report `
+            --hidden-import preflight_capture `
             --hidden-import mss `
             --hidden-import mss.windows `
             --hidden-import PIL.Image `
