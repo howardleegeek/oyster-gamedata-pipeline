@@ -98,9 +98,12 @@ def find_recorder_exe(install_root_path: Path) -> Path | None:
     This lets users fall back without reinstalling when the Rust path
     misbehaves on their rig.
     """
-    # rc16: env-gate — empty/unset (default) means Rust-first; "1" means
-    # Python-only. Any other value is treated as default for safety.
-    py_only = os.environ.get("OYSTER_PY_RECORDER", "").strip() == "1"
+    # rc16.1: env-gate — empty/unset (default) means Rust-first.
+    # Accepts standard truthy values ("1", "true", "yes", "on") case-
+    # insensitively so users following typical env-var convention aren't
+    # silently ignored. Anything else is treated as default (Rust-first).
+    _py_only_raw = os.environ.get("OYSTER_PY_RECORDER", "").strip().lower()
+    py_only = _py_only_raw in {"1", "true", "yes", "on"}
 
     candidates: list[Path] = []
     if not py_only:
@@ -175,6 +178,87 @@ def spawn_recorder(recorder_exe: Path) -> subprocess.Popen | None:
         stderr=subprocess.DEVNULL,
         creationflags=0x00000200 | 0x08000000,  # CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW
     )
+
+
+def _is_rust_recorder(exe_path: Path) -> bool:
+    """rc16.1: classify a recorder exe path as Rust or Python.
+
+    Rust+OBS binary lives under ``{install_root}/recorder/OysterRecorder.exe``
+    per installer.iss section 3b. Anything else (``OysterRecorder-onedir/``
+    or the legacy ``{install_root}/OysterRecorder.exe`` location) is the
+    Python PyInstaller build.
+    """
+    return exe_path.parent.name == "recorder"
+
+
+def spawn_recorder_with_fallback(
+    install_root: Path,
+    min_run_seconds: float = 15.0,
+) -> tuple[subprocess.Popen | None, Path | None, str]:
+    """rc16.1: spawn recorder with **runtime** fallback Rust → Python.
+
+    Closes bug #7 from the rc16.0 audit: the original ``find_recorder_exe``
+    only falls back when the Rust file is *missing*. If Rust is present
+    but crashes at startup (e.g. ``libobs-d3d11.dll`` fails to load on
+    bingd's AMD 780M + WSA + MuMu rig), the user would be left with no
+    recording and no recovery path short of setting OYSTER_PY_RECORDER=1
+    and restarting manually.
+
+    This function:
+
+    1. Picks the recorder via ``find_recorder_exe`` (Rust first unless
+       env-gated).
+    2. Spawns it.
+    3. If Rust was chosen, ``wait`` up to ``min_run_seconds``. A timeout
+       means Rust is healthy and we return that proc. An early exit means
+       Rust crashed; force-set ``OYSTER_PY_RECORDER=1``, re-pick (now
+       Python wins), and respawn.
+    4. If Python was chosen, no fallback needed — return immediately.
+
+    Returns ``(proc | None, exe | None, engine)`` where ``engine`` is one
+    of ``"rust"``, ``"python"``, ``"none"``.
+    """
+    primary = find_recorder_exe(install_root)
+    if primary is None:
+        logger.error("rc16.1: no recorder exe found at install root or sibling-of-exe — Rust AND Python missing")
+        return None, None, "none"
+
+    primary_engine = "rust" if _is_rust_recorder(primary) else "python"
+    proc = spawn_recorder(primary)
+    if proc is None:
+        # Non-Windows test mode or already-running. No fallback applicable.
+        return None, primary, primary_engine
+
+    if primary_engine == "python":
+        # Python was chosen (env-gated or Rust missing). No further fallback.
+        return proc, primary, "python"
+
+    # Rust was chosen — watch for early exit.
+    logger.info(
+        "rc16.1: rust recorder spawned (pid=%d) — watching for crash within %.1fs",
+        proc.pid, min_run_seconds,
+    )
+    try:
+        proc.wait(timeout=min_run_seconds)
+        exit_code = proc.returncode
+        logger.warning(
+            "rc16.1: rust recorder exited in <%.1fs (code=%s) — falling back to Python",
+            min_run_seconds, exit_code,
+        )
+    except subprocess.TimeoutExpired:
+        # Survived the threshold — Rust is healthy.
+        logger.info("rc16.1: rust recorder survived %.1fs — keeping it", min_run_seconds)
+        return proc, primary, "rust"
+
+    # Force-fallback to Python.
+    os.environ["OYSTER_PY_RECORDER"] = "1"
+    fallback = find_recorder_exe(install_root)
+    if fallback is None or _is_rust_recorder(fallback):
+        logger.error("rc16.1: rust crashed AND Python recorder not found — giving up")
+        return None, primary, "rust"
+    logger.info("rc16.1: respawning with Python recorder at %s", fallback)
+    fallback_proc = spawn_recorder(fallback)
+    return fallback_proc, fallback, "python"
 
 
 # --------------------------------------------------------------------------
@@ -592,8 +676,12 @@ def run_session(
     if dry_run:
         return sess
 
-    # Step 3: ensure recorder is up
-    recorder = find_recorder_exe(install_root_path)
+    # Step 3: ensure recorder is up. rc16.1 — use the runtime-fallback
+    # wrapper so a Rust+OBS startup crash auto-falls-back to Python within
+    # 15s instead of leaving the user with no recording.
+    recorder_proc, recorder, engine = spawn_recorder_with_fallback(
+        install_root_path, min_run_seconds=15.0,
+    )
     if recorder is None:
         sess.failure_reason = (
             f"OysterRecorder.exe not found near {install_root_path}. "
@@ -603,7 +691,8 @@ def run_session(
             "Oyster Recorder — recorder missing", sess.failure_reason,
         )
         return sess
-    sess.recorder_proc = spawn_recorder(recorder)
+    logger.info("rc16.1: recorder engine = %s (path=%s)", engine, recorder)
+    sess.recorder_proc = recorder_proc
 
     # Step 4: spawn javaw
     sess.javaw_proc = launcher.launch_javaw(plan, detach=False)
