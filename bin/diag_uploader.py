@@ -27,6 +27,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+try:
+    from _i18n import _t  # type: ignore[import-not-found]
+except ImportError:  # pragma: no cover — defensive: dialog text never crashes import
+    def _t(en: str, zh: str) -> str:  # type: ignore[no-redef]
+        return en
+
 logger = logging.getLogger(__name__)
 
 MODULE_VERSION: str = "rc16.11"
@@ -192,22 +198,32 @@ def show_upload_dialog(bundle: DiagnosticBundle,
         except Exception: pass  # noqa: BLE001, E701
     try:
         root = tk.Tk()
-        root.title("Oyster Recorder — Diagnostic Upload")
+        root.title(_t(
+            "Oyster Recorder — Diagnostic Upload",
+            "Oyster Recorder — 诊断上传",
+        ))
         try: root.attributes("-topmost", True)  # noqa: E701
         except Exception: pass  # noqa: BLE001, E701
         root.geometry("460x220"); root.resizable(False, False)
         tk.Label(root, justify="left", padx=20, pady=12,
-                 text=("Your recording had issues that our team can fix faster\n"
-                       "if you share the diagnostic bundle.\n\n"
-                       f"Bundle: {bundle.zip_path.name}\n"
-                       f"Size:   {size_mb:.1f} MB\n\n"
-                       f"Auto-send in {int(auto_confirm_seconds)}s if no choice.")
+                 text=_t(
+                     "Your recording had issues that our team can fix faster\n"
+                     "if you share the diagnostic bundle.\n\n"
+                     f"Bundle: {bundle.zip_path.name}\n"
+                     f"Size:   {size_mb:.1f} MB\n\n"
+                     f"Auto-send in {int(auto_confirm_seconds)}s if no choice.",
+                     "您的录制出现问题。如果分享诊断包,\n"
+                     "我们的技术支持团队可以更快地修复。\n\n"
+                     f"诊断包: {bundle.zip_path.name}\n"
+                     f"大小:   {size_mb:.1f} MB\n\n"
+                     f"{int(auto_confirm_seconds)} 秒内未选择将自动发送。",
+                 ),
                  ).pack(fill="both", expand=True)
         bf = tk.Frame(root); bf.pack(pady=8)
-        send_btn = tk.Button(bf, text="Send", width=12, default="active",
+        send_btn = tk.Button(bf, text=_t("Send", "发送"), width=12, default="active",
                              command=lambda: _close(True, root))
         send_btn.pack(side="left", padx=6)
-        tk.Button(bf, text="Decline", width=12,
+        tk.Button(bf, text=_t("Decline", "拒绝"), width=12,
                   command=lambda: _close(False, root)).pack(side="left", padx=6)
         try: root.after(int(auto_confirm_seconds * 1000), lambda: _close(True, root))  # noqa: E701
         except Exception: pass  # noqa: BLE001, E701

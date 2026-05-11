@@ -25,6 +25,12 @@ import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+try:
+    from _i18n import _t  # type: ignore[import-not-found]
+except ImportError:  # pragma: no cover — defensive: dialog text never crashes import
+    def _t(en: str, zh: str) -> str:  # type: ignore[no-redef]
+        return en
+
 logger = logging.getLogger("preflight_capture")
 
 APP_DIR_NAME = "Oyster Recorder"
@@ -282,20 +288,28 @@ def show_picker_dialog(monitors: list[MonitorInfo], default_idx: int) -> int:
     from tkinter import ttk
 
     root = tk.Tk()
-    root.title("Oyster Recorder — Pre-flight: choose a monitor")
+    root.title(_t(
+        "Oyster Recorder — Pre-flight: choose a monitor",
+        "Oyster Recorder — 启动前确认: 选择显示器",
+    ))
     root.attributes("-topmost", True)
     root.resizable(False, False)
     # PhotoImage refs must outlive the dialog or Tk stops painting them.
     root._oyster_thumb_refs = []  # type: ignore[attr-defined]
 
     selected = tk.IntVar(value=default_idx)
-    countdown = tk.StringVar(value=f"Auto-confirms in {DIALOG_AUTO_CONFIRM_SECONDS}s…")
+    countdown = tk.StringVar(value=_t(
+        f"Auto-confirms in {DIALOG_AUTO_CONFIRM_SECONDS}s…",
+        f"{DIALOG_AUTO_CONFIRM_SECONDS} 秒后自动确认…",
+    ))
     cols = max(1, len(monitors))
 
-    ttk.Label(root, padding=(12, 10), text=(
+    ttk.Label(root, padding=(12, 10), text=_t(
         "Recording will start on the selected monitor.\n"
-        "If the wrong screen is highlighted, pick the right one.")
-    ).grid(row=0, column=0, columnspan=cols, sticky="w")
+        "If the wrong screen is highlighted, pick the right one.",
+        "录制将在所选显示器上开始。\n"
+        "如果高亮的不是正确屏幕，请选择正确的显示器。",
+    )).grid(row=0, column=0, columnspan=cols, sticky="w")
 
     thumb_frame = ttk.Frame(root, padding=(8, 4))
     thumb_frame.grid(row=1, column=0, columnspan=cols)
@@ -309,12 +323,16 @@ def show_picker_dialog(monitors: list[MonitorInfo], default_idx: int) -> int:
             root._oyster_thumb_refs.append(img)  # type: ignore[attr-defined]
             ttk.Label(cell, image=img).pack()
         except Exception:
-            ttk.Label(cell, text="(preview unavailable)", width=28, anchor="center").pack(pady=18)
-        bits = [f"Monitor {mon.index + 1}", f"({mon.resolution_label})"]
+            ttk.Label(cell, text=_t("(preview unavailable)", "(预览不可用)"),
+                      width=28, anchor="center").pack(pady=18)
+        bits = [
+            _t(f"Monitor {mon.index + 1}", f"显示器 {mon.index + 1}"),
+            f"({mon.resolution_label})",
+        ]
         if mon.is_primary:
-            bits.append("· primary")
+            bits.append(_t("· primary", "· 主显示器"))
         if mon.is_game_window:
-            bits.append("· game window here")
+            bits.append(_t("· game window here", "· 游戏窗口在此"))
         ttk.Label(cell, text=" ".join(bits)).pack(pady=(4, 2))
         ttk.Radiobutton(cell, value=i, variable=selected).pack()
 
@@ -336,10 +354,14 @@ def show_picker_dialog(monitors: list[MonitorInfo], default_idx: int) -> int:
             result["idx"] = int(selected.get())
             root.destroy()
             return
-        countdown.set(f"Auto-confirms in {remaining['sec']}s…")
+        countdown.set(_t(
+            f"Auto-confirms in {remaining['sec']}s…",
+            f"{remaining['sec']} 秒后自动确认…",
+        ))
         root.after(1000, _tick)
 
-    ttk.Button(button_row, text="Confirm", command=_confirm).pack(side="right")
+    ttk.Button(button_row, text=_t("Confirm", "确认"),
+               command=_confirm).pack(side="right")
     root.after(1000, _tick)
     root.mainloop()
     return int(result["idx"])

@@ -46,6 +46,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
 
+try:
+    from _i18n import _t  # type: ignore[import-not-found]
+except ImportError:  # pragma: no cover — defensive: dialog text never crashes import
+    def _t(en: str, zh: str) -> str:  # type: ignore[no-redef]
+        return en
+
 logger = logging.getLogger("oyster_launch_mc")
 
 # --------------------------------------------------------------------------
@@ -647,12 +653,21 @@ def surface_failure_messagebox(
 ) -> None:
     """Read the tail of the JVM log and pop an error dialog."""
     tail = _tail_file(plan.log_file, n_lines=80)
-    body = (
+    body = _t(
         f"Minecraft (Fabric) exited with code {return_code}.\n"
         f"Log: {plan.log_file}\n\n"
-        f"--- last 80 lines ---\n{tail}"
+        f"--- last 80 lines ---\n{tail}",
+        f"Minecraft (Fabric) 退出,代码 {return_code}。\n"
+        f"日志: {plan.log_file}\n\n"
+        f"--- 最后 80 行 ---\n{tail}",
     )
-    _show_messagebox("Oyster Recorder — Minecraft failed to start", body)
+    _show_messagebox(
+        _t(
+            "Oyster Recorder — Minecraft failed to start",
+            "Oyster Recorder — Minecraft 启动失败",
+        ),
+        body,
+    )
 
 
 # --------------------------------------------------------------------------

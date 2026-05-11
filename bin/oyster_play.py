@@ -47,6 +47,12 @@ except ImportError:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import oyster_launch_mc as launcher  # type: ignore[no-redef]
 
+try:
+    from _i18n import _t  # type: ignore[import-not-found]
+except ImportError:  # pragma: no cover — defensive: dialog text never crashes import
+    def _t(en: str, zh: str) -> str:  # type: ignore[no-redef]
+        return en
+
 logger = logging.getLogger("oyster_play")
 
 
@@ -596,11 +602,20 @@ def _input_watchdog(deadline_seconds: float = 60.0) -> None:
             from tkinter import messagebox  # noqa: PLC0415
             r = tk.Tk(); r.withdraw()
             messagebox.showwarning(
-                "Oyster Recorder - Input Capture Issue",
-                f"Only {real_events} keyboard/mouse events were captured in "
-                f"the first {int(deadline_seconds)}s. The recording may be "
-                f"missing your inputs.\n\nTo fix: close this app, then run "
-                f"`set OYSTER_PY_RECORDER=1` before relaunching.",
+                _t(
+                    "Oyster Recorder - Input Capture Issue",
+                    "Oyster Recorder - 输入捕获异常",
+                ),
+                _t(
+                    f"Only {real_events} keyboard/mouse events were captured in "
+                    f"the first {int(deadline_seconds)}s. The recording may be "
+                    f"missing your inputs.\n\nTo fix: close this app, then run "
+                    f"`set OYSTER_PY_RECORDER=1` before relaunching.",
+                    f"前 {int(deadline_seconds)} 秒内只捕获到 {real_events} 个键盘/"
+                    f"鼠标事件。录制可能缺失您的输入操作。\n\n"
+                    f"修复方法: 关闭本应用,然后运行 "
+                    f"`set OYSTER_PY_RECORDER=1` 后重新启动。",
+                ),
             )
             r.destroy()
         except Exception:
@@ -747,13 +762,19 @@ def run_session(
     # Step 1: install integrity check
     status = launcher.verify_install(install_root_path, profile_name)
     if not status.ok:
-        sess.failure_reason = (
+        sess.failure_reason = _t(
             "Install incomplete. Please reinstall.\nMissing:\n  " +
-            "\n  ".join(status.missing)
+            "\n  ".join(status.missing),
+            "安装不完整,请重新安装。\n缺少文件:\n  " +
+            "\n  ".join(status.missing),
         )
         if not dry_run:
             launcher._show_messagebox(  # noqa: SLF001 — internal helper
-                "Oyster Recorder — install corrupted", sess.failure_reason,
+                _t(
+                    "Oyster Recorder — install corrupted",
+                    "Oyster Recorder — 安装损坏",
+                ),
+                sess.failure_reason,
             )
         return sess
 
@@ -766,10 +787,17 @@ def run_session(
             profile_name=profile_name,
         )
     except (FileNotFoundError, ValueError, RuntimeError) as e:
-        sess.failure_reason = f"Could not build launch command: {e}"
+        sess.failure_reason = _t(
+            f"Could not build launch command: {e}",
+            f"无法构建启动命令: {e}",
+        )
         if not dry_run:
             launcher._show_messagebox(  # noqa: SLF001
-                "Oyster Recorder — launch failed", sess.failure_reason,
+                _t(
+                    "Oyster Recorder — launch failed",
+                    "Oyster Recorder — 启动失败",
+                ),
+                sess.failure_reason,
             )
         return sess
     sess.plan = plan
@@ -795,12 +823,18 @@ def run_session(
     # documented in TESTER_NOTES.md.
     recorder = find_recorder_exe(install_root_path)
     if recorder is None:
-        sess.failure_reason = (
+        sess.failure_reason = _t(
             f"OysterRecorder.exe not found near {install_root_path}. "
-            "Please reinstall."
+            "Please reinstall.",
+            f"在 {install_root_path} 附近未找到 OysterRecorder.exe。"
+            "请重新安装。",
         )
         launcher._show_messagebox(  # noqa: SLF001
-            "Oyster Recorder — recorder missing", sess.failure_reason,
+            _t(
+                "Oyster Recorder — recorder missing",
+                "Oyster Recorder — 录制器缺失",
+            ),
+            sess.failure_reason,
         )
         return sess
     logger.info("rc16.1c: recorder = %s (engine inferred from path)", recorder)
@@ -841,6 +875,41 @@ def run_session(
         except Exception as e:  # noqa: BLE001 — preflight must never block
             logger.warning("rc16.9 preflight: failed (%s) — continuing "
                            "without preflight", e)
+
+    # rc16.13 environment sanity check — runs AFTER preflight but BEFORE
+    # we spawn the recorder. Detects known-bad runtime conditions (HDR,
+    # Shadowplay overlay, Discord overlay, OBS already running, RTSS,
+    # non-100% DPI) and warns the user. Set OYSTER_SKIP_SANITY=1 to bypass.
+    if os.name == "nt" and os.environ.get("OYSTER_SKIP_SANITY", "") \
+            .strip().lower() not in {"1", "true", "yes"}:
+        try:
+            from env_sanity import (  # noqa: PLC0415
+                check_environment, show_sanity_warnings,
+            )
+            report = check_environment()
+            if report.issues:
+                logger.warning("rc16.13 sanity: %d issues detected",
+                               len(report.issues))
+                for issue in report.issues:
+                    logger.warning("  [%s] %s: %s",
+                                   issue.severity, issue.code,
+                                   issue.message_en)
+                # Show dialog only for warning/fatal severity (not info).
+                if any(i.severity in ("warning", "fatal")
+                       for i in report.issues):
+                    continue_anyway = show_sanity_warnings(
+                        report,
+                        lang=os.environ.get("OYSTER_LANG", "en"),
+                    )
+                    if not continue_anyway:
+                        logger.info("rc16.13 sanity: user aborted recording")
+                        sess.failure_reason = (
+                            "User aborted after sanity warnings"
+                        )
+                        return sess
+        except Exception as e:  # noqa: BLE001 — sanity must never block
+            logger.warning("rc16.13 sanity: check failed (%s) — continuing",
+                           e)
 
     sess.recorder_proc = spawn_recorder(recorder)
 
