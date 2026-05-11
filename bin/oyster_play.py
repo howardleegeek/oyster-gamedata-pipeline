@@ -707,26 +707,41 @@ def run_session(
         return sess
     logger.info("rc16.1c: recorder = %s (engine inferred from path)", recorder)
 
-    # rc16.8 (Layer 1 wiring): preflight monitor confirmation before the
-    # recorder spawns. User picks/confirms a monitor in a 30s auto-confirm
-    # Tk dialog. Skipped on non-Windows; opt-out via OYSTER_SKIP_PREFLIGHT=1.
-    # Any failure is logged and swallowed — preflight must never block.
-    if os.name == "nt" and os.environ.get("OYSTER_SKIP_PREFLIGHT", "") \
-            .strip().lower() not in {"1", "true", "yes", "on"}:
+    # rc16.9 (grill-me revision): preflight monitor confirmation INVERTED
+    # from opt-out to opt-in. Default behavior is now NO preflight dialog.
+    #
+    # Why inverted:
+    #   1. Preflight in rc16.8 was opt-out (default ON) but had ZERO
+    #      functional effect — the Rust recorder doesn't read
+    #      OYSTER_PREFLIGHT_MONITOR_IDX. Cosmetic Tk dialog only.
+    #   2. The dialog BLOCKS the launcher main thread for up to 30s on
+    #      every launch — UX regression on the happy path (same anti-
+    #      pattern as the rc16.1 watchdog we already retracted tonight).
+    #   3. The dialog may STEAL CURSOR FOCUS before recorder spawns, which
+    #      breaks rc16.2's cursor-monitor fallback (Rust uses cursor pos
+    #      when game HWND is null — dialog leaves cursor on launcher's
+    #      monitor, not game's).
+    #
+    # When rc16.10 lands and bumps the submodule to the rc16.9-preflight-
+    # monitor-wired branch (which makes the Rust recorder READ the env var),
+    # preflight becomes functional and the default can flip back to opt-out.
+    # Until then: opt-in only via OYSTER_ENABLE_PREFLIGHT=1.
+    if os.name == "nt" and os.environ.get("OYSTER_ENABLE_PREFLIGHT", "") \
+            .strip().lower() in {"1", "true", "yes", "on"}:
         try:
             from preflight_capture import run_preflight  # noqa: PLC0415
             pf = run_preflight(target_pid=None, skip_dialog=False)
             if pf is None:
-                logger.warning("rc16.8 preflight: declined or no monitor — "
+                logger.warning("rc16.9 preflight: declined or no monitor — "
                                "continuing with system default")
             else:
-                logger.info("rc16.8 preflight: user confirmed monitor %d (%s)",
+                logger.info("rc16.9 preflight: user confirmed monitor %d (%s)",
                             pf.index, pf.name)
-                # Future: pass index to recorder via env var so OBS captures
-                # the right monitor.
+                # Effective only after rc16.10 (submodule bump to rc16.9-
+                # preflight-monitor-wired); currently cosmetic.
                 os.environ["OYSTER_PREFLIGHT_MONITOR_IDX"] = str(pf.index)
         except Exception as e:  # noqa: BLE001 — preflight must never block
-            logger.warning("rc16.8 preflight: failed (%s) — continuing "
+            logger.warning("rc16.9 preflight: failed (%s) — continuing "
                            "without preflight", e)
 
     sess.recorder_proc = spawn_recorder(recorder)
