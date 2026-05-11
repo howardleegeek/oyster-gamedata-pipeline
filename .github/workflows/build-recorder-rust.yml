@@ -54,6 +54,14 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  # rc16.0b fix: Windows MAX_PATH=260 kills glfw-sys-passthrough's CMake
+  # TryCompile inside our deeply nested checkout (D:\a\oyster-gamedata-
+  # pipeline\oyster-gamedata-pipeline\vendor\recorder\target\...\TryCompile-
+  # xxxxxx\cmTC_xxxxx.dir\Debug\cmTC_xxxxx.tlog\link-rc.read.1.tlog ~ 380
+  # chars). Upstream rust-build.yml works because their checkout root is
+  # `D:\a\gamedata-recorder\gamedata-recorder\` (30 chars shorter, no
+  # vendor/recorder nesting). Redirect target dir to a 4-char root.
+  CARGO_TARGET_DIR: C:\rt
 
 jobs:
   build-windows:
@@ -173,18 +181,21 @@ jobs:
           # [package].name). We rename to OysterRecorder.exe on the way
           # into dist so oyster_play.py's RECORDER_EXE_NAME constant
           # finds it without launcher code change.
-          $bin = "target\x86_64-pc-windows-msvc\release\gamedata-recorder.exe"
+          # rc16.0b: target dir redirected to CARGO_TARGET_DIR (C:\rt) to
+          # dodge Windows MAX_PATH on glfw-sys-passthrough CMake TryCompile.
+          $tgt = $env:CARGO_TARGET_DIR
+          $bin = "$tgt\x86_64-pc-windows-msvc\release\gamedata-recorder.exe"
           if (-not (Test-Path $bin)) {
             # Fallback: cargo build may place it elsewhere if the binary
             # name changes upstream. Pick the first .exe that isn't the
             # OBS ffmpeg-mux helper (which has its own name).
-            $bin = Get-ChildItem "target\x86_64-pc-windows-msvc\release\*.exe" -File `
+            $bin = Get-ChildItem "$tgt\x86_64-pc-windows-msvc\release\*.exe" -File `
               | Where-Object { $_.Name -ne "obs-ffmpeg-mux.exe" } `
               | Select-Object -First 1 -ExpandProperty FullName
           }
           if (-not (Test-Path $bin)) {
-            Write-Error "No Rust binary found in target/x86_64-pc-windows-msvc/release/"
-            Get-ChildItem "target\x86_64-pc-windows-msvc\release\" | Format-Table Name, Length
+            Write-Error "No Rust binary found in $tgt\x86_64-pc-windows-msvc\release\"
+            Get-ChildItem "$tgt\x86_64-pc-windows-msvc\release\" | Format-Table Name, Length
             exit 1
           }
           Copy-Item $bin "dist\OysterRecorder.exe"
@@ -200,7 +211,8 @@ jobs:
           # errors with "Unable to start the recording helper process".
           # libobs-wrapper builds this as a separate binary in the same
           # target dir.
-          $mux = "target\x86_64-pc-windows-msvc\release\obs-ffmpeg-mux.exe"
+          # rc16.0b: target dir redirected via CARGO_TARGET_DIR
+          $mux = "$env:CARGO_TARGET_DIR\x86_64-pc-windows-msvc\release\obs-ffmpeg-mux.exe"
           if (Test-Path $mux) {
             Copy-Item $mux "dist\obs-ffmpeg-mux.exe"
             Write-Host "Copied obs-ffmpeg-mux.exe to dist/"
