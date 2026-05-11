@@ -2,15 +2,16 @@
 """
 G165 · bin/lint_v3_prd_grounded.py
 
-Cluster A: Full PRD page-by-page lint tool checking all 24 acceptance criteria.
+Cluster A: Full PRD page-by-page lint tool checking all 25 acceptance criteria.
 Criteria: video/image specs, audio quality, camera intrinsics fx==fy, quaternion xyzw,
-depth invalid-pixel ratio, keyCode int format, 5-6 min duration, 1920x1080, no UI/logo/popup.
+depth invalid-pixel ratio, keyCode int format, 5-6 min duration, 1920x1080, no UI/logo/popup,
+video content health (rc16.5: detect pure-black / static recordings).
 """
 from __future__ import annotations
-import argparse, json, logging, sys
+import argparse, json, logging, shutil, subprocess, sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 # Lazy imports for optional dependencies
 _np, _pil, _yaml, _iio = None, None, None, None
@@ -58,7 +59,7 @@ class LintReport:
     """Complete lint report for a data package."""
     data_dir: Path
     results: List[LintResult] = field(default_factory=list)
-    total_checks: int = 24
+    total_checks: int = 25
     passed_count: int = 0
     failed_count: int = 0
 
@@ -536,8 +537,123 @@ def _check_structure(d: Path, rpt: LintReport) -> None:
                        {"required_files": required_files, "required_dirs": required_dirs,
                         "existing_files": sorted(existing_files), "existing_dirs": sorted(existing_dirs)}))
 
+def _probe_video_frame_count(video: Path) -> int:
+    """Return decoded frame count via ffprobe (0 on failure)."""
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0",
+             "-count_frames", "-show_entries", "stream=nb_read_frames",
+             "-of", "default=nokey=1:noprint_wrappers=1", str(video)],
+            capture_output=True, text=True, timeout=60, check=False,
+        )
+        return int((out.stdout or "0").strip() or 0)
+    except Exception:
+        return 0
+
+def _signalstats_for_frame(video: Path, frame_n: int, ffmpeg: str) -> Optional[Tuple[float, float, float]]:
+    """Run signalstats on a 2-frame window starting at frame_n; return (YAVG, YDIF, YHIGH).
+
+    Sampling a 2-frame slice (not 1) so YDIF — which compares against the
+    previous *decoded* frame — has a meaningful value. select=between picks
+    consecutive frames; signalstats emits one metadata block per frame; we
+    read the second (YDIF==0 on the first by definition).
+    """
+    try:
+        proc = subprocess.run(
+            [ffmpeg, "-v", "error", "-i", str(video),
+             "-vf", f"select=between(n\\,{frame_n}\\,{frame_n + 1}),signalstats,metadata=print:file=-",
+             "-vframes", "2", "-f", "null", "-"],
+            capture_output=True, text=True, timeout=60, check=False,
+        )
+    except Exception:
+        return None
+    yavg = ydif = yhigh = None
+    # signalstats writes metadata to stdout (file=-); take the LAST frame block.
+    for line in proc.stdout.splitlines():
+        if "lavfi.signalstats.YAVG=" in line:
+            yavg = float(line.split("=", 1)[1])
+        elif "lavfi.signalstats.YDIF=" in line:
+            ydif = float(line.split("=", 1)[1])
+        elif "lavfi.signalstats.YHIGH=" in line:
+            yhigh = float(line.split("=", 1)[1])
+    if yavg is None or yhigh is None:
+        return None
+    return (yavg, ydif if ydif is not None else 0.0, yhigh)
+
+def _check_video_content_health(d: Path, rpt: LintReport) -> None:
+    """Criterion 25: Video Content Health (rc16.5).
+
+    Detect recordings that ARE valid video files (pass criteria 1-4) but
+    contain useless content: pure-black frames (encoder running on a
+    blank capture surface) or a single static frame repeated. bingd's
+    failed session passed all 24 prior criteria yet was 5 minutes of
+    YUV black — this catches that class of failure.
+    """
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        rpt.add(LintResult(25, "Video Content Health", True,
+                           "ffmpeg not available, skipped"))
+        return
+    vids = list(d.glob("video.mp4")) + list(d.glob("recording.mp4"))
+    if not vids:
+        vids = (list(d.glob("**/video.mp4")) + list(d.glob("**/recording.mp4")))[:1]
+    if not vids:
+        rpt.add(LintResult(25, "Video Content Health", False,
+                           "No video.mp4 or recording.mp4 found"))
+        return
+    video = vids[0]
+    nb = _probe_video_frame_count(video)
+    if nb < 10:
+        rpt.add(LintResult(25, "Video Content Health", False,
+                           f"Video has only {nb} frames — cannot assess content"))
+        return
+    # 9 samples at 10%..90% of duration (avoid edges where frames may be black).
+    sample_frames = [int(nb * pct / 100) for pct in (10, 20, 30, 40, 50, 60, 70, 80, 90)]
+    yavgs: list[float] = []
+    ydifs: list[float] = []
+    yhighs: list[float] = []
+    frame_hashes: set[tuple[int, int, int]] = set()
+    for fn in sample_frames:
+        stats = _signalstats_for_frame(video, fn, ffmpeg)
+        if stats is None:
+            continue
+        yavg, ydif, yhigh = stats
+        yavgs.append(yavg)
+        ydifs.append(ydif)
+        yhighs.append(yhigh)
+        # Quantized fingerprint: identical YAVG/YDIF/YHIGH triples => same content.
+        frame_hashes.add((round(yavg, 1).__hash__() & 0xFFFF,
+                          round(ydif, 1).__hash__() & 0xFFFF,
+                          round(yhigh, 1).__hash__() & 0xFFFF))
+    if not yavgs:
+        rpt.add(LintResult(25, "Video Content Health", False,
+                           "signalstats probe returned no data on any sampled frame"))
+        return
+    yavg_mean = sum(yavgs) / len(yavgs)
+    ydif_max = max(ydifs) if ydifs else 0.0
+    yhigh_max = max(yhighs) if yhighs else 0.0
+    unique_hashes = len(frame_hashes)
+    details = {
+        "samples": len(yavgs), "YAVG_mean": round(yavg_mean, 2),
+        "YDIF_max": round(ydif_max, 2), "YHIGH_max": round(yhigh_max, 2),
+        "unique_frame_hashes": unique_hashes, "video": video.name,
+    }
+    # YUV black = 16; treat <=20 as black, <=40 as mostly-black.
+    if yavg_mean <= 20 and yhigh_max <= 20:
+        reason = "video is pure black (YUV black floor)"
+    elif yavg_mean <= 40:
+        reason = f"video is mostly black (YAVG_mean={yavg_mean:.1f})"
+    elif unique_hashes < 3 and ydif_max <= 5:
+        reason = f"video shows static frame ({unique_hashes} unique samples, YDIF_max={ydif_max:.1f})"
+    else:
+        reason = None
+    passed = (yavg_mean > 20) and (unique_hashes >= 3 or ydif_max > 5)
+    rpt.add(LintResult(25, "Video Content Health", passed,
+                       "Video content varied and non-black" if passed else (reason or "content health check failed"),
+                       details))
+
 def run_all_checks(data_dir: Path) -> LintReport:
-    """Run all 24 lint checks on the data directory."""
+    """Run all 25 lint checks on the data directory."""
     rpt = LintReport(data_dir=data_dir)
     _check_video_specs(data_dir, rpt)
     _check_image_specs(data_dir, rpt)
@@ -551,6 +667,7 @@ def run_all_checks(data_dir: Path) -> LintReport:
     _check_metadata(data_dir, rpt)
     _check_naming(data_dir, rpt)
     _check_structure(data_dir, rpt)
+    _check_video_content_health(data_dir, rpt)
     return rpt
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -561,7 +678,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     Returns:
         Exit code: 0 if all pass, 1 if any fail, 2 on error.
     """
-    parser = argparse.ArgumentParser(description="G165 PRD Grounded Lint Tool - Checks all 24 acceptance criteria")
+    parser = argparse.ArgumentParser(description="G165 PRD Grounded Lint Tool - Checks all 25 acceptance criteria")
     parser.add_argument("data_dir", type=Path, help="Path to data directory to lint")
     parser.add_argument("--output", "-o", type=Path, default=None, help="Output JSON report path")
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
