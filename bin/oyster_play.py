@@ -796,6 +796,117 @@ def run_session(
 
 
 # --------------------------------------------------------------------------
+# rc16.10 — Smoke test (fast user self-validation, no Minecraft launch)
+# --------------------------------------------------------------------------
+
+
+def run_smoke_test() -> int:
+    """rc16.10: record ~10s of the primary monitor, validate via lint
+    Criterion 25 (black-frame check), return 0/1. Plan B — Rust recorder
+    has no ``--smoke-test`` CLI flag, so we drive it via env vars
+    ``GAMEDATA_CI_MODE=1`` + ``GAMEDATA_OUTPUT_DIR=<d>`` (see
+    ``vendor/recorder/src/config.rs``). Auto-record needs 10s of stable
+    window + 20s process lifetime, so we let it run ~30s then signal
+    graceful shutdown to flush the MP4.
+    """
+    import shutil  # noqa: PLC0415
+    import tempfile  # noqa: PLC0415
+
+    print("Oyster Recorder smoke test (rc16.10)")
+    print("  Step 1/4: Locating recorder binary")
+    root = launcher.install_root(None)
+    recorder = find_recorder_exe(root) or find_recorder_exe(
+        Path(sys.executable).resolve().parent,
+    )
+    if recorder is None:
+        print(f"  FAIL: recorder binary not found (checked {root} + exe-sibling)")
+        return 1
+    print(f"     OK: {recorder}")
+
+    session_dir = Path(tempfile.mkdtemp(prefix="oyster_smoke_"))
+    print(f"  Step 2/4: Recording ~10s into {session_dir}")
+    print("     (recorder needs ~20s stability gate before capture begins)")
+
+    env = os.environ.copy()
+    env["GAMEDATA_CI_MODE"] = "1"
+    env["GAMEDATA_OUTPUT_DIR"] = str(session_dir)
+    env.pop("OYSTER_ENABLE_PREFLIGHT", None)  # preflight dialog would block
+
+    # CREATE_NEW_PROCESS_GROUP enables CTRL_BREAK_EVENT for graceful Windows
+    # shutdown; on non-Windows it's a no-op and we use proc.terminate().
+    creationflags = (0x00000200 | 0x08000000) if os.name == "nt" else 0
+    proc = subprocess.Popen(
+        [str(recorder)], cwd=str(recorder.parent), env=env,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        creationflags=creationflags,
+    )
+    try:
+        proc.wait(timeout=30.0)  # 20s gate + 10s capture
+        print(f"     NOTE: recorder exited early (rc={proc.returncode})")
+    except subprocess.TimeoutExpired:
+        pass
+
+    if proc.poll() is None:
+        if os.name == "nt":
+            try:
+                import signal as _signal  # noqa: PLC0415
+                proc.send_signal(_signal.CTRL_BREAK_EVENT)
+            except (OSError, ValueError):
+                proc.terminate()
+        else:
+            proc.terminate()
+    try:
+        proc.wait(timeout=15.0)
+    except subprocess.TimeoutExpired:
+        print("     WARN: recorder didn't exit gracefully — killing")
+        proc.kill()
+        proc.wait(timeout=5.0)
+    print("     OK: recording phase complete")
+
+    print("  Step 3/4: Locating output video")
+    # Rust recorder writes ``main_record.mp4`` (see
+    # ``vendor/recorder/src/record/session_manager.rs``); lint Criterion 25
+    # globs for ``video.mp4`` / ``recording.mp4``, so we copy to that name.
+    mp4s = list(session_dir.glob("**/*.mp4"))
+    if not mp4s:
+        print(f"  FAIL: no .mp4 produced in {session_dir}")
+        print("     (recorder spawned but never captured — likely OBS or D3D init failure)")
+        return 1
+    src_video = mp4s[0]
+    canonical = session_dir / "video.mp4"
+    if src_video.resolve() != canonical.resolve():
+        shutil.copyfile(src_video, canonical)
+    print(f"     OK: {src_video.name} ({src_video.stat().st_size / 1024 / 1024:.1f} MB)")
+
+    print("  Step 4/4: Validating frame content (black-frame check)")
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        from lint_v3_prd_grounded import (  # noqa: PLC0415
+            LintReport, _check_video_content_health,
+        )
+    except ImportError as e:
+        print(f"  WARN: lint module unavailable ({e}); recording kept at {session_dir}")
+        return 1
+    rpt = LintReport(data_dir=session_dir)
+    _check_video_content_health(session_dir, rpt)
+    crit = next((r for r in rpt.results if r.criterion_id == 25), None)
+    if crit is None:
+        print(f"  WARN: no Criterion 25 result (ffmpeg missing?); kept {session_dir}")
+        return 1
+    if crit.passed:
+        print(f"     PASS: {crit.message}")
+        print(f"     details: {crit.details}")
+        shutil.rmtree(session_dir, ignore_errors=True)
+        print("\nSMOKE TEST PASSED — recorder is working on this rig")
+        return 0
+    print(f"     FAIL: {crit.message}")
+    print(f"     details: {crit.details}")
+    print(f"\nSMOKE TEST FAILED — recording at {session_dir} kept for inspection")
+    print("   Send this directory to Howard for diagnostic.")
+    return 1
+
+
+# --------------------------------------------------------------------------
 # CLI
 # --------------------------------------------------------------------------
 
@@ -816,6 +927,12 @@ def main(argv: list[str] | None = None) -> int:
                              "cmd line; never spawn anything.")
     parser.add_argument("--write-desktop-shortcut", action="store_true",
                         help="(Windows only) write the desktop .lnk and exit.")
+    parser.add_argument(
+        "--smoke-test", action="store_true",
+        help="rc16.10: record ~10s of primary monitor + validate output, "
+             "then exit. No Minecraft launch. Fast self-test for users to "
+             "verify the recorder works on their rig.",
+    )
     parser.add_argument("--verbose", action="store_true")
 
     args = parser.parse_args(argv)
@@ -824,6 +941,9 @@ def main(argv: list[str] | None = None) -> int:
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+
+    if args.smoke_test:
+        return run_smoke_test()
 
     root = launcher.install_root(args.install_root)
 
