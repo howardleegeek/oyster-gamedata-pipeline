@@ -25,6 +25,7 @@ import logging
 import os
 import subprocess
 import sys
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -546,6 +547,68 @@ def _detect_memory_hogs_and_resize_heap(default_xmx: str = "4G") -> tuple[str, l
     return default_xmx, detected_hogs
 
 
+# rc16.8 input-watchdog: real event_type strings emitted by the Rust
+# recorder (see vendor/recorder/src/output_types/mod.rs::InputEventType).
+# Lifecycle events (START/END/VIDEO_*/HOOK_START/UNFOCUS/FOCUS) excluded —
+# they fire regardless of whether input capture works.
+_REAL_INPUT_EVENT_TAGS: tuple[str, ...] = (
+    '"event_type":"KEYBOARD"', '"event_type":"MOUSE_MOVE"',
+    '"event_type":"MOUSE_BUTTON"', '"event_type":"SCROLL"',
+    '"event_type":"GAMEPAD_BUTTON"', '"event_type":"GAMEPAD_BUTTON_VALUE"',
+    '"event_type":"GAMEPAD_AXIS"',
+)
+
+
+def _input_watchdog(deadline_seconds: float = 60.0) -> None:
+    """rc16.8: 60s after recording starts, scan the most recent inputs.jsonl
+    under %LOCALAPPDATA%/GameData Recorder/recordings/<session>/ for real
+    KEYBOARD/MOUSE/SCROLL/GAMEPAD events. <3 → loud log + Tk popup pointing
+    at OYSTER_PY_RECORDER=1 fallback. Best-effort; never raises."""
+    time.sleep(deadline_seconds)
+    try:
+        local = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
+        root = Path(local) / "GameData Recorder" / "recordings"
+        inputs_path: Path | None = None
+        if root.is_dir():
+            cands = sorted(root.glob("*/inputs.jsonl"),
+                           key=lambda p: p.stat().st_mtime, reverse=True)
+            inputs_path = cands[0] if cands else None
+        if inputs_path is None or not inputs_path.is_file():
+            logger.warning("rc16.8 input-watchdog: no inputs.jsonl found "
+                           "%.0fs after start", deadline_seconds)
+            return
+        with inputs_path.open("r", encoding="utf-8", errors="replace") as f:
+            real_events = sum(
+                1 for line in f
+                if any(tag in line for tag in _REAL_INPUT_EVENT_TAGS)
+            )
+        if real_events >= 3:
+            logger.info("rc16.8 input-watchdog: %d events in %.0fs — healthy",
+                        real_events, deadline_seconds)
+            return
+        logger.error(
+            "rc16.8 INPUT WATCHDOG: only %d input events in %ss — input "
+            "capture may be broken. Set OYSTER_PY_RECORDER=1 to switch to "
+            "Python recorder fallback.", real_events, deadline_seconds,
+        )
+        try:
+            import tkinter as tk  # noqa: PLC0415
+            from tkinter import messagebox  # noqa: PLC0415
+            r = tk.Tk(); r.withdraw()
+            messagebox.showwarning(
+                "Oyster Recorder - Input Capture Issue",
+                f"Only {real_events} keyboard/mouse events were captured in "
+                f"the first {int(deadline_seconds)}s. The recording may be "
+                f"missing your inputs.\n\nTo fix: close this app, then run "
+                f"`set OYSTER_PY_RECORDER=1` before relaunching.",
+            )
+            r.destroy()
+        except Exception:
+            logger.debug("rc16.8 input-watchdog: Tk popup failed", exc_info=True)
+    except Exception as e:  # noqa: BLE001 — watchdog must never crash launcher
+        logger.warning("rc16.8 input-watchdog: check failed (%s)", e)
+
+
 def run_session(
     *,
     install_root_path: Path,
@@ -643,7 +706,39 @@ def run_session(
         )
         return sess
     logger.info("rc16.1c: recorder = %s (engine inferred from path)", recorder)
+
+    # rc16.8 (Layer 1 wiring): preflight monitor confirmation before the
+    # recorder spawns. User picks/confirms a monitor in a 30s auto-confirm
+    # Tk dialog. Skipped on non-Windows; opt-out via OYSTER_SKIP_PREFLIGHT=1.
+    # Any failure is logged and swallowed — preflight must never block.
+    if os.name == "nt" and os.environ.get("OYSTER_SKIP_PREFLIGHT", "") \
+            .strip().lower() not in {"1", "true", "yes", "on"}:
+        try:
+            from preflight_capture import run_preflight  # noqa: PLC0415
+            pf = run_preflight(target_pid=None, skip_dialog=False)
+            if pf is None:
+                logger.warning("rc16.8 preflight: declined or no monitor — "
+                               "continuing with system default")
+            else:
+                logger.info("rc16.8 preflight: user confirmed monitor %d (%s)",
+                            pf.index, pf.name)
+                # Future: pass index to recorder via env var so OBS captures
+                # the right monitor.
+                os.environ["OYSTER_PREFLIGHT_MONITOR_IDX"] = str(pf.index)
+        except Exception as e:  # noqa: BLE001 — preflight must never block
+            logger.warning("rc16.8 preflight: failed (%s) — continuing "
+                           "without preflight", e)
+
     sess.recorder_proc = spawn_recorder(recorder)
+
+    # rc16.8 input-capture runtime watchdog: daemon thread so it never blocks
+    # shutdown. 60s after spawn, if <3 real input events landed in
+    # inputs.jsonl we log loud + show a Tk popup pointing at the fallback.
+    if os.name == "nt":
+        threading.Thread(
+            target=_input_watchdog, kwargs={"deadline_seconds": 60.0},
+            daemon=True, name="oyster-input-watchdog",
+        ).start()
 
     # Step 4: spawn javaw
     sess.javaw_proc = launcher.launch_javaw(plan, detach=False)
