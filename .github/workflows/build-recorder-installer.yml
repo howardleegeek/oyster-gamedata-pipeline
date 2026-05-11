@@ -183,6 +183,10 @@ jobs:
           # --collect-all directives, not pinned at the workflow level.
           pip install "pyinstaller>=6.0"
           pip install pynput pillow numpy pyyaml
+          # rc15.31 (Howard "用视频录制器解决"): mss for DXGI Desktop
+          # Duplication capture — handles MC exclusive fullscreen where
+          # gdigrab freezes and ddagrab failed with -22 on AMD 780M.
+          pip install mss
           # rc15.7.2 (Round 10 H2 finding): pin torch==2.4.1 explicitly to
           # match torch-directml 0.2.5's hard requirement. Was bug: install
           # latest cpu-torch (2.11.0+cpu) then torch-directml DOWNGRADED to
@@ -455,6 +459,8 @@ jobs:
             --hidden-import game_state_overlay `
             --hidden-import heal_registry `
             --hidden-import heal_report `
+            --hidden-import mss `
+            --hidden-import mss.windows `
             --hidden-import PIL.Image `
             bin/recorder_consumer_lite.py
           if (-not (Test-Path 'bundle/OysterRecorder-onedir/OysterRecorder-onedir.exe')) {

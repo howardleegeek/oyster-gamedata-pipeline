@@ -40,6 +40,9 @@ jobs:
           # so testers' recordings include REAL depth (no placeholder).
           # CPU-only torch keeps the .exe smaller (~1 GB vs ~3 GB CUDA).
           pip install pyinstaller pynput pillow numpy pyyaml
+          # rc15.31 (Howard "用视频录制器解决"): mss for DXGI Desktop
+          # Duplication capture path — handles MC exclusive fullscreen.
+          pip install mss
           # rc15.7.2: pin torch==2.4.1 to match torch-directml dep (avoids
           # bundle-bloat downgrade dance discovered in rc15.6 CI).
           pip install --index-url https://download.pytorch.org/whl/cpu torch==2.4.1 torchvision==0.19.1
@@ -174,6 +177,8 @@ jobs:
             --hidden-import game_state_overlay `
             --hidden-import heal_registry `
             --hidden-import heal_report `
+            --hidden-import mss `
+            --hidden-import mss.windows `
             --hidden-import PIL.Image `
             bin/recorder_consumer_lite.py
 
@@ -224,6 +229,8 @@ jobs:
             --hidden-import game_state_overlay `
             --hidden-import heal_registry `
             --hidden-import heal_report `
+            --hidden-import mss `
+            --hidden-import mss.windows `
             --hidden-import PIL.Image `
             bin/recorder_consumer_lite.py
           # Zip the onedir output for distribution.

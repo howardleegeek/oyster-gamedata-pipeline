@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.30"
+RECORDER_VERSION = "lite-v0.28.0-rc15.31"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -4499,6 +4499,170 @@ class RecorderApp(tk.Tk):
             pass
         return "ddagrab", history
 
+    def _start_mss_capture(
+        self, out_path: Path, x: int, y: int, w: int, h: int,
+        audio_dev: Optional[str],
+    ) -> bool:
+        """rc15.31 (Howard 2026-05-11 "用视频录制器解决"): mss-based
+        capture path. mss is a Python DXGI Desktop Duplication wrapper
+        — same underlying tech as ddagrab/Win10 game-bar but accessed
+        from Python so we own the capture loop. Works in MC exclusive
+        fullscreen.
+
+        Returns True on successful start (>=12 frames captured in first
+        2s), False on import failure / capture stall.
+
+        Architecture:
+          - spawn ffmpeg reading raw BGRA frames from stdin
+          - Python thread uses mss.grab() at 30 fps + writes raw bytes
+            to ffmpeg.stdin
+          - on stop_event / proc exit, close stdin → ffmpeg finalizes mp4
+        """
+        try:
+            import mss  # noqa: PLC0415
+        except ImportError as exc:
+            _trace(f"rc15.31 mss: import failed ({exc}) — falling back")
+            return False
+
+        # rc15.31: stderr reader still parses `frame= NNN` so
+        # capture_last_frame_count works. Audio inputs piped separately
+        # via dshow if audio_dev present.
+        audio_inputs: list[str] = []
+        audio_codec: list[str] = []
+        if audio_dev:
+            audio_inputs = ["-f", "dshow", "-i", f"audio={audio_dev}"]
+            audio_codec = ["-c:a", "aac", "-b:a", "128k",
+                           "-ar", "48000", "-ac", "2"]
+
+        cmd = [
+            str(_FFMPEG),
+            "-f", "rawvideo",
+            "-pix_fmt", "bgra",
+            "-s", f"{w}x{h}",
+            "-r", "30",
+            "-i", "-",  # video from stdin
+            *audio_inputs,
+            "-vf", "scale=1920:1080:flags=lanczos,format=yuv420p",
+            "-c:v", "libx265",
+            "-preset", "ultrafast",
+            "-pix_fmt", "yuv420p",
+            *audio_codec,
+            "-r", "30",
+            "-t", "360",
+            "-y", str(out_path),
+        ]
+        _trace(f"rc15.31 mss: spawning ffmpeg pipe at {w}x{h}@30fps")
+        flags = 0x08000000 if os.name == "nt" else 0
+        proc = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            creationflags=flags,
+        )
+        self._ffmpeg_proc = proc
+        self._capture_last_frame_count = 0
+        self._capture_stderr_buf: list[str] = []
+
+        # stderr reader (same pattern as rc15.17)
+        def _stderr_reader():
+            try:
+                fh = proc.stderr
+                if fh is None:
+                    return
+                for raw in iter(fh.readline, b""):
+                    line = raw.decode("utf-8", errors="replace")
+                    m = _re.search(r"frame=\s*(\d+)", line)
+                    if m:
+                        self._capture_last_frame_count = int(m.group(1))
+                    self._capture_stderr_buf.append(line.rstrip())
+                    if len(self._capture_stderr_buf) > 200:
+                        self._capture_stderr_buf = self._capture_stderr_buf[-200:]
+            except Exception:
+                pass
+
+        threading.Thread(target=_stderr_reader, daemon=True).start()
+
+        # Capture loop in dedicated thread
+        self._mss_stop_event = threading.Event()
+        self._mss_frame_count = 0
+
+        def _capture_loop():
+            try:
+                with mss.mss() as sct:
+                    monitor = {"left": x, "top": y, "width": w, "height": h}
+                    frame_interval = 1.0 / 30.0
+                    next_frame = time.monotonic()
+                    while (not self._mss_stop_event.is_set()
+                           and proc.poll() is None):
+                        try:
+                            img = sct.grab(monitor)
+                            proc.stdin.write(img.bgra)
+                            self._mss_frame_count += 1
+                        except (BrokenPipeError, OSError, ValueError) as exc:
+                            _trace(f"rc15.31 mss: write failed: {exc}")
+                            break
+                        except Exception as exc:
+                            _trace(f"rc15.31 mss: grab failed: {exc}")
+                            break
+                        # 30 fps pacing
+                        next_frame += frame_interval
+                        sleep_for = next_frame - time.monotonic()
+                        if sleep_for > 0:
+                            time.sleep(sleep_for)
+                        else:
+                            # behind schedule — reset baseline, don't accumulate
+                            next_frame = time.monotonic()
+                _trace(
+                    f"rc15.31 mss: capture loop ended at "
+                    f"frame {self._mss_frame_count}"
+                )
+            except Exception as exc:
+                _trace(f"rc15.31 mss: capture loop crashed: {exc}")
+            finally:
+                try:
+                    if proc.stdin:
+                        proc.stdin.close()
+                except Exception:
+                    pass
+
+        capture_thread = threading.Thread(target=_capture_loop, daemon=True)
+        capture_thread.start()
+        self._mss_capture_thread = capture_thread
+
+        # Wait up to 2s for at least 12 frames (matches probe threshold)
+        start_wait = time.monotonic()
+        while time.monotonic() - start_wait < 2.5:
+            if self._mss_frame_count >= 12:
+                _trace(f"rc15.31 mss: validated ({self._mss_frame_count} "
+                       "frames in <2.5s)")
+                return True
+            if proc.poll() is not None:
+                _trace(f"rc15.31 mss: ffmpeg exited early "
+                       f"(rc={proc.returncode})")
+                return False
+            time.sleep(0.1)
+        # Didn't hit threshold — abort + fall back
+        _trace(f"rc15.31 mss: only {self._mss_frame_count} frames in "
+               "2.5s — failing over to ddagrab/gdigrab")
+        self._mss_stop_event.set()
+        try:
+            if proc.stdin:
+                proc.stdin.close()
+        except Exception:
+            pass
+        try:
+            proc.terminate()
+            proc.wait(timeout=2)
+        except Exception:
+            try:
+                proc.kill()
+                proc.wait(timeout=2)
+            except Exception:
+                pass
+        self._ffmpeg_proc = None
+        return False
+
     def _start_ffmpeg(self, out_path: Path) -> None:
         """Spawn ffmpeg with the selected capture tier to record the
         Minecraft window. Tier is chosen by parallel probe in
@@ -4586,6 +4750,28 @@ class RecorderApp(tk.Tk):
         #   OYSTER_SKIP_CAPTURE_PROBE=1 — skip probe, use ddagrab default
         forced = os.environ.get("OYSTER_FORCE_CAPTURE", "").strip().lower()
         skip_probe = os.environ.get("OYSTER_SKIP_CAPTURE_PROBE", "").strip() == "1"
+        disable_mss = os.environ.get("OYSTER_DISABLE_MSS", "").strip() == "1"
+
+        # rc15.31 (Howard 2026-05-11 "用视频录制器解决"): try mss-based
+        # capture FIRST. mss is a mature Python DXGI Desktop Duplication
+        # wrapper — same underlying tech as ddagrab but accessed from
+        # Python, so we control the loop, error handling, and frame
+        # pacing. Works in MC's exclusive fullscreen where gdigrab
+        # freezes. Tested on AMD/NVIDIA/Intel GPUs. If mss import fails
+        # OR the capture loop doesn't produce frames in 2s, fall through
+        # to the existing ddagrab/gdigrab probe.
+        if not disable_mss and not forced:
+            try:
+                mss_ok = self._start_mss_capture(out_path, x, y, w, h, audio_dev)
+                if mss_ok:
+                    self._capture_tier = "mss"
+                    self._capture_probe_history = [
+                        {"method": "mss", "reason": "rc15.31 primary path"}
+                    ]
+                    _trace("ffmpeg: rc15.31 mss capture started successfully")
+                    return  # success; skip ddagrab/gdigrab fallback
+            except Exception as exc:
+                _trace(f"ffmpeg: mss capture failed: {type(exc).__name__}: {exc}")
 
         if forced in ("ddagrab", "gdigrab"):
             selected_tier = forced
@@ -4982,6 +5168,13 @@ class RecorderApp(tk.Tk):
         proc = self._ffmpeg_proc
         if proc is None:
             return
+        # rc15.31: if mss capture is running, signal the loop to stop so
+        # it closes stdin → ffmpeg finalizes its mp4 trailer cleanly.
+        try:
+            if getattr(self, "_mss_stop_event", None) is not None:
+                self._mss_stop_event.set()
+        except Exception:
+            pass
         # rc15.2-fix BUG C2: wire B2_ffmpeg_clean_close emit at each
         # dirty-close path. Was: 3 spots set self._ffmpeg_clean_close
         # = False but no central event log entry — feature was dark.
