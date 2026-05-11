@@ -676,11 +676,19 @@ def run_session(
     if dry_run:
         return sess
 
-    # Step 3: ensure recorder is up. rc16.1 — use the runtime-fallback
-    # wrapper so a Rust+OBS startup crash auto-falls-back to Python within
-    # 15s instead of leaving the user with no recording.
+    # Step 3: ensure recorder is up. rc16.1 — runtime fallback wrapper
+    # so a Rust+OBS startup crash auto-falls-back to Python instead of
+    # leaving the user with no recording.
+    #
+    # rc16.1a (grill-me revision): threshold raised 15s → 60s. The
+    # original 15s was a guess; OBS Studio init on AMD 780M + WSA +
+    # MuMu virtualized graphics can plausibly take 20-40s. 15s would
+    # have false-fired the fallback every session on bingd's rig,
+    # defeating the entire pivot. 60s gives generous margin while
+    # still detecting genuine startup crashes (which exit in <5s).
+    # rc16.2 will replace this with a log-driven readiness signal.
     recorder_proc, recorder, engine = spawn_recorder_with_fallback(
-        install_root_path, min_run_seconds=15.0,
+        install_root_path, min_run_seconds=60.0,
     )
     if recorder is None:
         sess.failure_reason = (
