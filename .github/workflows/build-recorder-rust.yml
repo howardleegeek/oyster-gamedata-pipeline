@@ -62,17 +62,24 @@ jobs:
 
     steps:
       # ---------------------------------------------------------------------
-      # 1. Checkout with the recorder submodule
+      # 1. Checkout — selective submodule init
       # ---------------------------------------------------------------------
-      # `submodules: recursive` is essential - the Rust recorder lives at
-      # vendor/recorder/ and is itself pinned to a specific upstream SHA
-      # (cb9ff5b as of rc16.0). Without recursive checkout the submodule
-      # directory will be empty.
-      - name: Checkout (with submodules)
+      # rc16.0a fix: `submodules: recursive` triggers a 404 on
+      # `vendor/enrichment` (oyster-enrichment.git is private/missing),
+      # which is a known-skipped submodule. Mirror ci.yml's pattern:
+      # checkout without submodules, then selectively init only
+      # vendor/recorder which is the one this workflow actually needs.
+      - name: Checkout (no submodules)
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false
           fetch-depth: 1
+
+      - name: Init vendor/recorder submodule only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git submodule update --init --recursive vendor/recorder
 
       - name: Verify recorder submodule is populated
         shell: pwsh
