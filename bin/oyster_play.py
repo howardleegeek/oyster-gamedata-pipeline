@@ -180,85 +180,25 @@ def spawn_recorder(recorder_exe: Path) -> subprocess.Popen | None:
     )
 
 
-def _is_rust_recorder(exe_path: Path) -> bool:
-    """rc16.1: classify a recorder exe path as Rust or Python.
-
-    Rust+OBS binary lives under ``{install_root}/recorder/OysterRecorder.exe``
-    per installer.iss section 3b. Anything else (``OysterRecorder-onedir/``
-    or the legacy ``{install_root}/OysterRecorder.exe`` location) is the
-    Python PyInstaller build.
-    """
-    return exe_path.parent.name == "recorder"
-
-
-def spawn_recorder_with_fallback(
-    install_root: Path,
-    min_run_seconds: float = 15.0,
-) -> tuple[subprocess.Popen | None, Path | None, str]:
-    """rc16.1: spawn recorder with **runtime** fallback Rust → Python.
-
-    Closes bug #7 from the rc16.0 audit: the original ``find_recorder_exe``
-    only falls back when the Rust file is *missing*. If Rust is present
-    but crashes at startup (e.g. ``libobs-d3d11.dll`` fails to load on
-    bingd's AMD 780M + WSA + MuMu rig), the user would be left with no
-    recording and no recovery path short of setting OYSTER_PY_RECORDER=1
-    and restarting manually.
-
-    This function:
-
-    1. Picks the recorder via ``find_recorder_exe`` (Rust first unless
-       env-gated).
-    2. Spawns it.
-    3. If Rust was chosen, ``wait`` up to ``min_run_seconds``. A timeout
-       means Rust is healthy and we return that proc. An early exit means
-       Rust crashed; force-set ``OYSTER_PY_RECORDER=1``, re-pick (now
-       Python wins), and respawn.
-    4. If Python was chosen, no fallback needed — return immediately.
-
-    Returns ``(proc | None, exe | None, engine)`` where ``engine`` is one
-    of ``"rust"``, ``"python"``, ``"none"``.
-    """
-    primary = find_recorder_exe(install_root)
-    if primary is None:
-        logger.error("rc16.1: no recorder exe found at install root or sibling-of-exe — Rust AND Python missing")
-        return None, None, "none"
-
-    primary_engine = "rust" if _is_rust_recorder(primary) else "python"
-    proc = spawn_recorder(primary)
-    if proc is None:
-        # Non-Windows test mode or already-running. No fallback applicable.
-        return None, primary, primary_engine
-
-    if primary_engine == "python":
-        # Python was chosen (env-gated or Rust missing). No further fallback.
-        return proc, primary, "python"
-
-    # Rust was chosen — watch for early exit.
-    logger.info(
-        "rc16.1: rust recorder spawned (pid=%d) — watching for crash within %.1fs",
-        proc.pid, min_run_seconds,
-    )
-    try:
-        proc.wait(timeout=min_run_seconds)
-        exit_code = proc.returncode
-        logger.warning(
-            "rc16.1: rust recorder exited in <%.1fs (code=%s) — falling back to Python",
-            min_run_seconds, exit_code,
-        )
-    except subprocess.TimeoutExpired:
-        # Survived the threshold — Rust is healthy.
-        logger.info("rc16.1: rust recorder survived %.1fs — keeping it", min_run_seconds)
-        return proc, primary, "rust"
-
-    # Force-fallback to Python.
-    os.environ["OYSTER_PY_RECORDER"] = "1"
-    fallback = find_recorder_exe(install_root)
-    if fallback is None or _is_rust_recorder(fallback):
-        logger.error("rc16.1: rust crashed AND Python recorder not found — giving up")
-        return None, primary, "rust"
-    logger.info("rc16.1: respawning with Python recorder at %s", fallback)
-    fallback_proc = spawn_recorder(fallback)
-    return fallback_proc, fallback, "python"
+# rc16.1c (grill-me revert): the runtime fallback functions
+# `_is_rust_recorder` + `spawn_recorder_with_fallback` were removed after
+# the second grill found 4 unfixable problems for tonight's ship:
+#   1. 60s blocking proc.wait() froze the launcher main thread on the
+#      HAPPY PATH — UX regression on every session, even when Rust worked
+#   2. "process alive == working" is the wrong signal — Rust can be
+#      alive-but-hung in libobs init waiting on an unavailable D3D11
+#      device, and a watchdog timer can't detect that
+#   3. 95 lines of new code with zero Windows runtime execution
+#   4. The parent pivot (Rust+OBS works on AMD 780M) is itself
+#      unvalidated — adding fallback code without empirical evidence
+#      from the tester is premature optimization
+#
+# Path forward: ship rc16.0-shape (file-presence-only fallback). For the
+# scenario where Rust ships but crashes at startup, the manual recovery
+# is `OYSTER_PY_RECORDER=1` documented in TESTER_NOTES — one line of
+# instruction beats 95 lines of untested watchdog code for a single
+# tester rig. When we have data showing Rust crashes on real users,
+# rc17 can revisit with a properly threaded + log-driven watchdog.
 
 
 # --------------------------------------------------------------------------
@@ -676,20 +616,23 @@ def run_session(
     if dry_run:
         return sess
 
-    # Step 3: ensure recorder is up. rc16.1 — runtime fallback wrapper
-    # so a Rust+OBS startup crash auto-falls-back to Python instead of
-    # leaving the user with no recording.
+    # Step 3: ensure recorder is up.
     #
-    # rc16.1a (grill-me revision): threshold raised 15s → 60s. The
-    # original 15s was a guess; OBS Studio init on AMD 780M + WSA +
-    # MuMu virtualized graphics can plausibly take 20-40s. 15s would
-    # have false-fired the fallback every session on bingd's rig,
-    # defeating the entire pivot. 60s gives generous margin while
-    # still detecting genuine startup crashes (which exit in <5s).
-    # rc16.2 will replace this with a log-driven readiness signal.
-    recorder_proc, recorder, engine = spawn_recorder_with_fallback(
-        install_root_path, min_run_seconds=60.0,
-    )
+    # rc16.1c (grill-me revert): the runtime watchdog from rc16.1/.1a was
+    # reverted after the second grill found 4 fatal problems:
+    #   - 60s blocking wait on main thread = 60s frozen launcher on the
+    #     HAPPY PATH (when Rust works fine) — a UX regression on the
+    #     common case to handle a hypothetical failure mode
+    #   - "process alive == working" is wrong signal — Rust can be
+    #     alive-but-hung in libobs init waiting on D3D11 device
+    #   - 95 lines of new code with zero Windows execution
+    #   - parent pivot (Rust+OBS works on AMD 780M) is unvalidated, so
+    #     adding fallback code without that data is premature
+    # Falls back to the simpler rc16.0 shape: file-presence-based
+    # selection only. If Rust EXE exists, use Rust. If user reports
+    # Rust crashes at startup, manual fallback is OYSTER_PY_RECORDER=1
+    # documented in TESTER_NOTES.md.
+    recorder = find_recorder_exe(install_root_path)
     if recorder is None:
         sess.failure_reason = (
             f"OysterRecorder.exe not found near {install_root_path}. "
@@ -699,8 +642,8 @@ def run_session(
             "Oyster Recorder — recorder missing", sess.failure_reason,
         )
         return sess
-    logger.info("rc16.1: recorder engine = %s (path=%s)", engine, recorder)
-    sess.recorder_proc = recorder_proc
+    logger.info("rc16.1c: recorder = %s (engine inferred from path)", recorder)
+    sess.recorder_proc = spawn_recorder(recorder)
 
     # Step 4: spawn javaw
     sess.javaw_proc = launcher.launch_javaw(plan, detach=False)
