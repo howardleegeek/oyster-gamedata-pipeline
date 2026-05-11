@@ -22,10 +22,21 @@ jobs:
     steps:
       - name: Detect skip marker in commit message
         id: detect
+        env:
+          # rc15.30 G189 fix: pass commit message as ENV VAR (security
+          # best-practice per GitHub Actions injection guide). Was using
+          # template substitution `COMMIT_MSG="${{ github.event.head_
+          # commit.message }}"` which embedded the message LITERALLY into
+          # the bash script at render time. Any commit with `(`, `)`,
+          # backticks, or newlines (every recent commit has parens like
+          # "(round 17)") broke bash parser: "syntax error near unexpected
+          # token `('". Env-var pattern: GitHub passes the value as a
+          # process environment variable; bash sees only the variable
+          # name at parse time, not the literal content. Same fix
+          # mitigates command-injection security risk.
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
         run: |
           set -euo pipefail
-
-          COMMIT_MSG="${{ github.event.head_commit.message }}"
           SKIP="false"
           REASON=""
 

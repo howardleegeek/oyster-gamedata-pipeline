@@ -86,7 +86,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc15.29"
+RECORDER_VERSION = "lite-v0.28.0-rc15.30"
 
 # rc15 (Howard 2026-05-09 "一次就测完"): heal_registry import with safe
 # fallback. Recorder still runs if heal_registry.py is missing (dev mode);
@@ -4266,17 +4266,22 @@ class RecorderApp(tk.Tk):
         """rc15.17: build a 2-second ffmpeg probe command for given capture
         method. Encodes to libx264 (ultrafast) — no audio, no scale.
 
-        rc15.19: ddagrab probe also gets `-init_hw_device d3d11va=dx`
-        (matches the real-recording cmd). bingd's rc15.18 probe failed
-        with -22 because the device wasn't initialized."""
+        rc15.19: ddagrab probe also gets `-init_hw_device d3d11va=dx`.
+        rc15.30: probe also switches to -filter_complex form (matches
+        the real-recording cmd, which is canonical ffmpeg ddagrab usage).
+        Previous -f lavfi -i form left the filter chain unbound from
+        the d3d11va device → 0 packets → -22 Invalid argument."""
         if method == "ddagrab":
             ddagrab_idx = os.environ.get("OYSTER_DDAGRAB_OUTPUT_IDX", "0").strip()
+            chain = (
+                f"ddagrab=output_idx={ddagrab_idx}:framerate=30:draw_mouse=0,"
+                f"hwdownload,format=bgra,"
+                f"crop={w}:{h}:{x}:{y},format=yuv420p"
+            )
             return [
                 str(_FFMPEG),
                 "-init_hw_device", "d3d11va=dx",
-                "-f", "lavfi",
-                "-i", f"ddagrab=output_idx={ddagrab_idx}:framerate=30:draw_mouse=0",
-                "-vf", f"hwdownload,format=bgra,crop={w}:{h}:{x}:{y},format=yuv420p",
+                "-filter_complex", chain,
                 "-c:v", "libx264", "-preset", "ultrafast",
                 "-t", "2", "-y", str(out_path),
             ]
@@ -4603,21 +4608,30 @@ class RecorderApp(tk.Tk):
 
         if selected_tier == "ddagrab":
             ddagrab_idx = os.environ.get("OYSTER_DDAGRAB_OUTPUT_IDX", "0").strip()
-            # rc15.19 ISC-3 (Howard's diagnostic showed ddagrab probe failed
-            # with `Task finished with error code: -22 (Invalid argument)`):
-            # ddagrab needs an explicit D3D11 device init. Without
-            # `-init_hw_device d3d11va=dx`, BtbN's ffmpeg ddagrab source
-            # exits -22 before producing a single frame. Now: register a
-            # named hw device 'dx' globally so ddagrab can attach to it.
-            video_input = [
-                "-init_hw_device", "d3d11va=dx",
-                "-f", "lavfi",
-                "-i", f"ddagrab=output_idx={ddagrab_idx}:framerate=30:draw_mouse=0",
-            ]
-            video_filter = (
-                f"hwdownload,format=bgra,crop={w}:{h}:{x}:{y},"
+            # rc15.30 (Howard 2026-05-11 "录制视频还是卡住一个画面"):
+            # rc15.19 added `-init_hw_device d3d11va=dx` but kept the
+            # `-f lavfi -i ddagrab=...` form. Still failed with -22 on
+            # bingd's machine. Root cause: ddagrab is a FILTER SOURCE,
+            # not an input demuxer. The canonical ffmpeg form is
+            # `-filter_complex` so the filter chain binds to the
+            # initialized D3D11 device. With `-f lavfi -i`, the device
+            # was created but never connected to the filter graph →
+            # 0 packets → -22 Invalid argument.
+            #
+            # Switch to filter_complex with the full chain in one
+            # expression: ddagrab → hwdownload → crop → scale → yuv420p.
+            # No more -vf (single chain replaces it).
+            ddagrab_chain = (
+                f"ddagrab=output_idx={ddagrab_idx}:framerate=30:draw_mouse=0,"
+                f"hwdownload,format=bgra,"
+                f"crop={w}:{h}:{x}:{y},"
                 "scale=1920:1080:flags=lanczos,format=yuv420p"
             )
+            video_input = [
+                "-init_hw_device", "d3d11va=dx",
+                "-filter_complex", ddagrab_chain,
+            ]
+            video_filter = None  # filter_complex already chains everything
         else:  # gdigrab
             video_input = [
                 "-f", "gdigrab",
@@ -4635,11 +4649,15 @@ class RecorderApp(tk.Tk):
             f"crop={w}x{h}@{x},{y}"
         )
 
+        # rc15.30: ddagrab path uses filter_complex (one chain). gdigrab
+        # path uses -vf (legacy). Conditionally include -vf only if
+        # video_filter is set (None on ddagrab path).
+        vf_args = ["-vf", video_filter] if video_filter else []
         cmd = [
             str(_FFMPEG),
             *video_input,
             *audio_inputs,
-            "-vf", video_filter,
+            *vf_args,
             "-c:v", "libx265",
             "-preset", "ultrafast",
             "-pix_fmt", "yuv420p",
