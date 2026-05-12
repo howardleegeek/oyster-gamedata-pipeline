@@ -164,27 +164,131 @@ def is_recorder_running() -> bool:
     return False
 
 
+# AUDIT-N-1 (rc17.0): hard debounce against any external auto-restart loop.
+# Howard's debug log showed 5 recorder spawns in 25s (~5s cadence) which
+# caused 13-25s OBS re-init storms. Static analysis confirmed `oyster_play.py`
+# itself contains NO retry loop — `run_session` is called once from `main`
+# and calls `spawn_recorder` exactly once at L914. The grill-me revert at
+# rc16.1c (see comment block below) explicitly removed all watchdog/relaunch
+# code. The 5-restart loop therefore originates outside this file (likely a
+# launcher shell script, scheduled task, or external watchdog).
+#
+# We add defense-in-depth here because `bin/oyster_play.py` is the only
+# correct chokepoint for spawning the recorder. Even if some external
+# caller invokes us 5x in 25s, only the first attempt will actually launch
+# OysterRecorder.exe — subsequent attempts within MIN_RESPAWN_GAP_SEC are
+# debounced and a loud warning is logged so the upstream culprit shows up
+# in diagnostic bundles.
+MIN_RESPAWN_GAP_SEC: float = 60.0
+EARLY_EXIT_THRESHOLD_SEC: float = 5.0
+EARLY_EXIT_STDERR_TAIL_BYTES: int = 4096
+
+_last_spawn_monotonic: float | None = None
+_last_spawn_lock = threading.Lock()
+
+
+def _check_recorder_health(proc: subprocess.Popen) -> None:
+    """AUDIT-N-1: after spawn, poll once at EARLY_EXIT_THRESHOLD_SEC. If
+    the recorder already exited, log exit code + stderr tail loudly so a
+    restart loop is diagnosable from a single session log. Daemon thread
+    so we never block the launcher main thread. Never raises."""
+    try:
+        try:
+            proc.wait(timeout=EARLY_EXIT_THRESHOLD_SEC)
+        except subprocess.TimeoutExpired:
+            # Healthy — recorder is still running after the threshold.
+            logger.info(
+                "AUDIT-N-1: recorder alive %.0fs after spawn (pid=%d) — healthy",
+                EARLY_EXIT_THRESHOLD_SEC, proc.pid,
+            )
+            return
+
+        # Recorder exited within the threshold — capture exit code + stderr tail.
+        rc = proc.returncode
+        stderr_tail = ""
+        try:
+            if proc.stderr is not None:
+                raw = proc.stderr.read() or b""
+                if raw:
+                    tail = raw[-EARLY_EXIT_STDERR_TAIL_BYTES:]
+                    stderr_tail = tail.decode("utf-8", errors="replace")
+        except Exception as e:  # noqa: BLE001 — diagnostic path must never crash
+            logger.debug("AUDIT-N-1: stderr read failed (%s)", e)
+
+        logger.error(
+            "AUDIT-N-1 RECORDER EARLY EXIT: rc=%s within %.0fs (pid=%d). "
+            "If this fires repeatedly an external watchdog is restarting "
+            "us — check launcher shell scripts, scheduled tasks, or any "
+            "process that invokes OysterPlay.exe / oyster_play.py. "
+            "Stderr tail:\n%s",
+            rc, EARLY_EXIT_THRESHOLD_SEC, proc.pid,
+            stderr_tail or "(empty)",
+        )
+    except Exception as e:  # noqa: BLE001 — health check must never crash launcher
+        logger.warning("AUDIT-N-1: health check failed (%s)", e)
+
+
 def spawn_recorder(recorder_exe: Path) -> subprocess.Popen | None:
     """Start ``OysterRecorder.exe`` if not already running. Returns the
-    Popen handle (or None when no spawn was needed / non-Windows)."""
+    Popen handle (or None when no spawn was needed / non-Windows).
+
+    AUDIT-N-1: this function is intentionally single-shot. There is NO
+    retry on subprocess exit — if the recorder crashes, the user must
+    manually re-trigger (relaunch OysterPlay or click the recorder
+    button again). A module-level debounce guards against external
+    auto-restart loops; see ``MIN_RESPAWN_GAP_SEC``."""
+    global _last_spawn_monotonic
+
     if os.name != "nt":
         logger.info("non-Windows — skipping recorder spawn (test mode)")
         return None
     if is_recorder_running():
         logger.info("recorder already running — skipping spawn")
         return None
+
+    # AUDIT-N-1 hard debounce: catch external auto-restart loops.
+    with _last_spawn_lock:
+        now = time.monotonic()
+        if _last_spawn_monotonic is not None:
+            gap = now - _last_spawn_monotonic
+            if gap < MIN_RESPAWN_GAP_SEC:
+                logger.error(
+                    "AUDIT-N-1 SPAWN DEBOUNCED: spawn_recorder called %.1fs "
+                    "after last spawn (min gap %.0fs). This indicates an "
+                    "EXTERNAL restart loop — `oyster_play.py` itself never "
+                    "auto-retries. Look for the culprit in launcher shell "
+                    "scripts, scheduled tasks, or any wrapper that invokes "
+                    "OysterPlay.exe. Returning None — user must manually "
+                    "relaunch.",
+                    gap, MIN_RESPAWN_GAP_SEC,
+                )
+                return None
+        _last_spawn_monotonic = now
+
     logger.info("spawning recorder: %s", recorder_exe)
     # rc15.27 C-#1 (round 17): on a PyInstaller --noconsole parent, the
     # recorder's stdout/stderr inherit a detached console handle which
     # Windows may keep alive as a zombie object. Add CREATE_NO_WINDOW
-    # (0x08000000) and route stdio to DEVNULL.
-    return subprocess.Popen(
+    # (0x08000000). stdout stays DEVNULL (high-volume frame logs), but
+    # stderr is captured to PIPE so AUDIT-N-1's _check_recorder_health
+    # can dump a tail on early exit.
+    proc = subprocess.Popen(
         [str(recorder_exe)],
         cwd=str(recorder_exe.parent),
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
         creationflags=0x00000200 | 0x08000000,  # CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW
     )
+
+    # AUDIT-N-1: post-spawn health monitor. Daemon thread so launcher
+    # main path stays non-blocking (rc16.1c iron-law: NEVER block on
+    # proc.wait() from the main thread).
+    threading.Thread(
+        target=_check_recorder_health, args=(proc,),
+        daemon=True, name="oyster-recorder-health",
+    ).start()
+
+    return proc
 
 
 # rc16.1c (grill-me revert): the runtime fallback functions
