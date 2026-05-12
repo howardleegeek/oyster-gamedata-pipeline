@@ -650,6 +650,100 @@ def _find_latest_session_dir() -> Path | None:
         return None
 
 
+def _run_schema_validation_step(
+    session_dir: Path, *, timeout_sec: float = 60.0,
+) -> int:
+    """Audit D-P0-2 (rc17.0 Stream T): local PRD-schema gate run BEFORE any
+    upload attempt. Validates ``<session_dir>/action_camera.json`` against
+    the strict PRD schema (see ``bin/verify_prd_schema.py``) and returns
+    the validator's exit code so callers can gate the upload trigger.
+
+    Return values (mirrors verify_prd_schema.main):
+      * ``0``                — every record passed, safe to proceed
+      * ``99``               — file missing / parse error (e.g. recorder
+                               aborted before flush); treat as gate-fail
+      * ``1..254``           — failed-record count (capped at 254 to stay
+                               in POSIX exit-code range)
+      * ``1`` (fallback)     — module unimportable or unexpected exception;
+                               gate-fail-closed so we never upload data we
+                               couldn't validate
+
+    Never raises. Logs warnings on failure so the launcher main thread is
+    always free to return. ``timeout_sec`` is enforced via a watchdog
+    ``threading.Timer`` that sets a flag — the validator is sub-second on
+    real session data (~3k frames), so this timeout is purely defensive.
+
+    Wired into ``_spawn_diag_uploader_thread`` so a bad session's
+    ``action_camera.json`` cannot reach the upload dialog. Override with
+    ``OYSTER_FORCE_UPLOAD=1`` for engineering smoke tests against known-
+    broken fixtures (e.g. when the diagnostic itself IS the failed schema).
+    """
+    if session_dir is None or not session_dir.is_dir():
+        logger.warning(
+            "Audit D-P0-2 schema-gate: session_dir missing/invalid (%s) — "
+            "fail-closed (rc=1)", session_dir,
+        )
+        return 1
+
+    timed_out = {"flag": False}
+
+    def _on_timeout() -> None:
+        timed_out["flag"] = True
+        logger.warning(
+            "Audit D-P0-2 schema-gate: validation exceeded %.0fs on %s — "
+            "fail-closed", timeout_sec, session_dir,
+        )
+
+    timer = threading.Timer(timeout_sec, _on_timeout)
+    timer.daemon = True
+    timer.start()
+
+    try:
+        try:
+            import verify_prd_schema  # noqa: PLC0415
+        except ImportError as exc:
+            logger.warning(
+                "Audit D-P0-2 schema-gate: verify_prd_schema not importable "
+                "(%s) — fail-closed (rc=1). Production CI must "
+                "--add-data + --hidden-import this module (see "
+                ".github/workflows/build-recorder-installer.yml).", exc,
+            )
+            return 1
+        try:
+            rc = verify_prd_schema.main([str(session_dir)])
+        except SystemExit as exc:  # main() may sys.exit on argparse misuse
+            rc_code = exc.code if isinstance(exc.code, int) else 1
+            logger.warning(
+                "Audit D-P0-2 schema-gate: validator sys.exit(%s) on %s",
+                rc_code, session_dir,
+            )
+            return rc_code
+        except Exception as exc:  # noqa: BLE001 — gate must never crash
+            logger.warning(
+                "Audit D-P0-2 schema-gate: validator raised %s on %s — "
+                "fail-closed (rc=1)", exc, session_dir,
+            )
+            return 1
+        if timed_out["flag"]:
+            # Timer fired but validator returned anyway — honor the timeout
+            # by reporting fail-closed to keep the contract crisp.
+            return 1
+        if rc == 0:
+            logger.info(
+                "Audit D-P0-2 schema-gate: PASS on %s — upload may proceed",
+                session_dir,
+            )
+        else:
+            logger.warning(
+                "Audit D-P0-2 schema-gate: FAIL rc=%d on %s — "
+                "upload gated off (set OYSTER_FORCE_UPLOAD=1 to override)",
+                rc, session_dir,
+            )
+        return rc
+    finally:
+        timer.cancel()
+
+
 def _spawn_diag_uploader_thread() -> None:
     """rc16.11: launch run_layer4 in a daemon thread so the launcher
     main thread can return without blocking on a Tk dialog. Privacy
@@ -665,6 +759,23 @@ def _spawn_diag_uploader_thread() -> None:
     session_dir = _find_latest_session_dir()
     if session_dir is None:
         logger.info("rc16.11 diag-uploader: no session dir found, skipping")
+        return
+
+    # Audit D-P0-2 (rc17.0 Stream T): local PRD-schema gate. Bad
+    # action_camera.json was historically only caught server-side after
+    # upload + tester sample-rejection — customer pain. Validate locally
+    # FIRST. If schema fails, do NOT spawn the upload dialog (which
+    # would offer the user a Send button on data we already know is
+    # bad). Override with OYSTER_FORCE_UPLOAD=1 for engineering smoke
+    # tests against deliberately-broken fixtures.
+    schema_rc = _run_schema_validation_step(session_dir)
+    if schema_rc != 0 and os.environ.get("OYSTER_FORCE_UPLOAD", "") \
+            .strip().lower() not in {"1", "true", "yes", "on"}:
+        logger.warning(
+            "Audit D-P0-2 schema-gate: skipping diag uploader (rc=%d). "
+            "Session data retained locally at %s for inspection.",
+            schema_rc, session_dir,
+        )
         return
 
     # Read lint report if it exists; otherwise pass None and let
