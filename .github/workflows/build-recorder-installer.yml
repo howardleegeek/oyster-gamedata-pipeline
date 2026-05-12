@@ -481,6 +481,7 @@ jobs:
             --add-data "bin/heal_report.py;." `
             --add-data "bin/preflight_capture.py;." `
             --add-data "bin/env_sanity.py;." `
+            --add-data "bin/diag_uploader.py;." `
             --add-data "fabric-installer.jar;." `
             --add-data "oyster-recorder-mod.jar;." `
             --add-data "hf_cache;hf_cache" `
@@ -511,6 +512,7 @@ jobs:
             --hidden-import heal_report `
             --hidden-import preflight_capture `
             --hidden-import env_sanity `
+            --hidden-import diag_uploader `
             --hidden-import mss `
             --hidden-import mss.windows `
             --hidden-import PIL.Image `
