@@ -154,31 +154,59 @@ def _hwnd_for_pid_windows(target_pid: int) -> int | None:
     user32.EnumWindows(EnumWindowsProc(_cb), 0)
     return found["hwnd"] or None
 
-def detect_game_monitor(target_pid: int) -> MonitorInfo | None:
-    """Return the ``MonitorInfo`` the target PID's main window is on.
-    On macOS / failure returns the primary monitor (best effort)."""
-    monitors = enumerate_monitors()
-    if not monitors:
-        return None
-    if os.name != "nt":
-        return next((m for m in monitors if m.is_primary), monitors[0])
+def _foreground_hwnd_windows() -> int | None:
+    """Return the HWND of the current foreground window, or None on failure.
+
+    Audit I-6: when no ``target_pid`` is supplied, the foreground window is
+    the best proxy for "the screen the user is looking at" — typically the
+    game window the operator just alt-tabbed away from."""
     try:
         import ctypes
         user32 = ctypes.windll.user32
-        hwnd = _hwnd_for_pid_windows(target_pid)
+        hwnd = int(user32.GetForegroundWindow())
+        return hwnd or None
+    except Exception:
+        logger.debug("GetForegroundWindow failed", exc_info=True)
+        return None
+
+def detect_game_monitor(target_pid: int | None = None) -> MonitorInfo | None:
+    """Return the ``MonitorInfo`` the target window is on.
+
+    Resolution order on Windows:
+      1. If ``target_pid`` is given → window of that PID via ``EnumWindows``.
+      2. Otherwise → current foreground window via ``GetForegroundWindow``.
+      3. Fallback → primary monitor.
+
+    On macOS / Linux / failure returns the primary monitor (best effort)."""
+    monitors = enumerate_monitors()
+    if not monitors:
+        return None
+    primary = next((m for m in monitors if m.is_primary), monitors[0])
+    if os.name != "nt":
+        return primary
+    try:
+        import ctypes
+        user32 = ctypes.windll.user32
+        hwnd: int | None = None
+        if target_pid is not None:
+            hwnd = _hwnd_for_pid_windows(target_pid)
+            if not hwnd:
+                logger.info("no visible window for pid=%s — falling back to foreground", target_pid)
         if not hwnd:
-            logger.info("no visible window for pid=%s", target_pid)
-            return None
+            hwnd = _foreground_hwnd_windows()
+        if not hwnd:
+            logger.info("no foreground window — returning primary monitor")
+            return primary
         MONITOR_DEFAULTTONEAREST = 2
         hmon = int(user32.MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST))
         for m in monitors:
             if m.handle == hmon:
                 return m
         logger.warning("MonitorFromWindow returned %s not in enumerated set", hmon)
-        return None
+        return primary
     except Exception:
-        logger.exception("detect_game_monitor failed for pid=%s", target_pid)
-        return None
+        logger.exception("detect_game_monitor failed (pid=%s)", target_pid)
+        return primary
 
 # --- screenshots ---------------------------------------------------------
 def screenshot_monitor(monitor: MonitorInfo, scale: float = THUMBNAIL_SCALE) -> Path:
@@ -367,20 +395,81 @@ def show_picker_dialog(monitors: list[MonitorInfo], default_idx: int) -> int:
     return int(result["idx"])
 
 # --- public entry-point --------------------------------------------------
+TARGET_MONITOR_ENV = "OYSTER_TARGET_MONITOR"
+
+def _read_target_monitor_env(monitor_count: int) -> int | None:
+    """Parse ``OYSTER_TARGET_MONITOR`` env var. Accepts 0-based monitor index.
+
+    Returns ``None`` if unset, malformed, or out of range (with a log warning
+    for malformed/oob — never raises). This lets ops force a specific monitor
+    on multi-display rigs without touching code or the picker dialog."""
+    raw = os.environ.get(TARGET_MONITOR_ENV)
+    if raw is None or raw.strip() == "":
+        return None
+    try:
+        idx = int(raw.strip())
+    except ValueError:
+        logger.warning("%s=%r is not an int — ignoring", TARGET_MONITOR_ENV, raw)
+        return None
+    if not (0 <= idx < monitor_count):
+        logger.warning("%s=%d out of range [0,%d) — ignoring",
+                       TARGET_MONITOR_ENV, idx, monitor_count)
+        return None
+    return idx
+
+def _emit_target_monitor_notice(chosen: MonitorInfo, monitors: list[MonitorInfo],
+                                source: str) -> None:
+    """Audit I-6: always announce which monitor will be captured.
+
+    ``source`` describes how the index was determined: ``"env"``, ``"saved"``,
+    ``"game"``, ``"foreground"``, ``"primary"``, or ``"dialog"``. On
+    multi-monitor rigs we also print the override hint to stderr so
+    non-log-watching operators see it. On single-monitor rigs this is a
+    one-line info log."""
+    summary = (f"preflight: capturing monitor {chosen.index} "
+               f"({chosen.resolution_label}, {chosen.name!r}) "
+               f"[source={source}]")
+    logger.info(summary)
+    if len(monitors) > 1 and source not in ("env", "saved"):
+        # Stderr so it shows up in CI logs / operator terminals even when
+        # the Python logger is silenced or going to a file.
+        try:
+            sys.stderr.write(
+                f"[oyster-preflight] Multi-monitor detected "
+                f"({len(monitors)} screens). Recording monitor "
+                f"{chosen.index} ({chosen.resolution_label}, {chosen.name}). "
+                f"To force a different monitor, set "
+                f"{TARGET_MONITOR_ENV}=<index> (0..{len(monitors) - 1}).\n"
+            )
+            sys.stderr.flush()
+        except Exception:
+            logger.debug("stderr notice emit failed", exc_info=True)
+
 def run_preflight(target_pid: int | None = None,
                   skip_dialog: bool = False) -> MonitorInfo | None:
     """Orchestrate the full preflight. Returns the chosen ``MonitorInfo``.
 
-    Flow: enumerate → detect game monitor (if ``target_pid`` given) →
-    consult saved pick by rig hash → else show dialog (or auto-pick when
-    ``skip_dialog``) → save chosen index → return ``MonitorInfo``.
+    Audit I-6: target-monitor *identification* always runs — regardless of
+    whether ``target_pid`` is supplied or the picker dialog is skipped. The
+    only optional step is the visual capture-frame preview (the Tk dialog),
+    gated by ``skip_dialog``.
+
+    Resolution order for the chosen monitor:
+      1. ``OYSTER_TARGET_MONITOR`` env var (operator override, highest).
+      2. Saved pick for this rig hash (returning user).
+      3. Target window monitor (PID if given, else foreground window).
+      4. Primary monitor (last resort).
     """
     monitors = enumerate_monitors()
     if not monitors:
         logger.error("no monitors found — preflight cannot continue")
         return None
 
-    game_monitor = detect_game_monitor(target_pid) if target_pid is not None else None
+    # AUDIT I-6: target-monitor identification ALWAYS runs (previously only
+    # when target_pid was non-None — meaning oyster_play.py's call with
+    # target_pid=None silently skipped this step and could pick the wrong
+    # screen on multi-monitor rigs).
+    game_monitor = detect_game_monitor(target_pid)
     if game_monitor is not None:
         monitors = [
             MonitorInfo(**{**asdict(m), "is_game_window": (m.index == game_monitor.index)})
@@ -388,25 +477,48 @@ def run_preflight(target_pid: int | None = None,
         ]
 
     rig_hash = compute_rig_hash(monitors)
+
+    # Priority 1: explicit env override. Bypasses dialog + saved-pick.
+    env_idx = _read_target_monitor_env(len(monitors))
+    if env_idx is not None:
+        chosen = monitors[env_idx]
+        _emit_target_monitor_notice(chosen, monitors, "env")
+        return chosen
+
+    # Priority 2: saved pick from previous session on this rig.
     saved_idx = load_user_pick(rig_hash)
     if saved_idx is not None and 0 <= saved_idx < len(monitors):
-        logger.info("preflight: using saved monitor idx=%s for rig=%s", saved_idx, rig_hash[:8])
-        return monitors[saved_idx]
+        chosen = monitors[saved_idx]
+        logger.info("preflight: using saved monitor idx=%s for rig=%s",
+                    saved_idx, rig_hash[:8])
+        _emit_target_monitor_notice(chosen, monitors, "saved")
+        return chosen
 
-    default_idx = (game_monitor.index if game_monitor
-                   else next((m.index for m in monitors if m.is_primary), 0))
+    # Priority 3: detected target/foreground monitor; else primary.
+    if game_monitor is not None:
+        default_idx = game_monitor.index
+        default_source = "game" if target_pid is not None else "foreground"
+    else:
+        default_idx = next((m.index for m in monitors if m.is_primary), 0)
+        default_source = "primary"
 
     if skip_dialog:
+        chosen = monitors[default_idx]
         logger.info("preflight: skip_dialog → idx=%s", default_idx)
-        return monitors[default_idx]
+        _emit_target_monitor_notice(chosen, monitors, default_source)
+        return chosen
 
     try:
         chosen_idx = show_picker_dialog(monitors, default_idx)
     except Exception:
         logger.exception("preflight dialog failed — falling back to idx=%s", default_idx)
-        return monitors[default_idx]
+        chosen = monitors[default_idx]
+        _emit_target_monitor_notice(chosen, monitors, default_source)
+        return chosen
 
     if not (0 <= chosen_idx < len(monitors)):
         chosen_idx = default_idx
     save_user_pick(rig_hash, chosen_idx)
-    return monitors[chosen_idx]
+    chosen = monitors[chosen_idx]
+    _emit_target_monitor_notice(chosen, monitors, "dialog")
+    return chosen
