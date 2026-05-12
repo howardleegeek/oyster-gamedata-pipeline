@@ -229,6 +229,66 @@ def detect_display_scaling() -> dict[int, float]:
         return {}
 
 
+def detect_amd_igpu_battery_mode() -> dict[str, Any]:
+    """Audit I-1: detect AMD iGPU running on battery.
+
+    AMD 780M (and other AMD iGPUs) throttle DXGI Desktop Duplication to
+    ~1Hz when the laptop is on battery power. The recorder will silently
+    produce a near-frozen capture. We must warn the user.
+
+    Returns ``{'on_battery': bool, 'is_amd_igpu': bool, 'risk': str}``
+    where ``risk`` is one of ``'high'`` (battery + AMD), ``'medium'``
+    (battery only), ``'low'`` (AC power), ``'n/a'`` (non-Windows), or
+    ``'unknown'`` (detection failed). Never raises."""
+    if not _is_windows():
+        return {"on_battery": False, "is_amd_igpu": False, "risk": "n/a"}
+    try:
+        import ctypes  # noqa: PLC0415
+        from ctypes import wintypes  # noqa: PLC0415
+
+        class _SPS(ctypes.Structure):
+            _fields_ = [
+                ("ACLineStatus", wintypes.BYTE),
+                ("BatteryFlag", wintypes.BYTE),
+                ("BatteryLifePercent", wintypes.BYTE),
+                ("SystemStatusFlag", wintypes.BYTE),
+                ("BatteryLifeTime", wintypes.DWORD),
+                ("BatteryFullLifeTime", wintypes.DWORD),
+            ]
+        sps = _SPS()
+        ok = bool(ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(sps)))
+        # ACLineStatus: 0 = offline (battery), 1 = online, 255 = unknown.
+        on_battery = ok and sps.ACLineStatus == 0
+    except Exception as exc:  # noqa: BLE001 — must never raise
+        logger.warning("env_sanity: power status probe raised %s", exc)
+        return {"on_battery": False, "is_amd_igpu": False,
+                "risk": "unknown", "error": str(exc)}
+
+    # Best-effort AMD iGPU detection via WMIC. wmic is deprecated on
+    # newer Windows builds; fall back to registry if it fails.
+    is_amd = False
+    try:
+        import subprocess  # noqa: PLC0415
+        result = subprocess.run(  # noqa: S603,S607
+            ["wmic", "path", "win32_VideoController", "get", "Name"],
+            capture_output=True, text=True, timeout=5, check=False,
+        )
+        out = (result.stdout or "").upper()
+        is_amd = "AMD" in out or "RADEON" in out
+    except Exception:  # noqa: BLE001
+        # Registry fallback — enumerate display adapters under
+        # HKLM\SYSTEM\CurrentControlSet\Enum\PCI\... is brittle; skip.
+        pass
+
+    if on_battery and is_amd:
+        risk = "high"
+    elif on_battery:
+        risk = "medium"
+    else:
+        risk = "low"
+    return {"on_battery": on_battery, "is_amd_igpu": is_amd, "risk": risk}
+
+
 def _rig_summary() -> dict[str, Any]:
     """Best-effort hardware/OS fingerprint for logging + telemetry."""
     summary: dict[str, Any] = {
@@ -293,6 +353,30 @@ def check_environment() -> SanityReport:
                 severity=severity, code=code,
                 message_en=en, message_zh=zh, auto_fix_available=auto,
             ))
+
+    # Audit I-1: AMD iGPU + battery — high risk of 1Hz DXGI throttle.
+    try:
+        amd_batt = detect_amd_igpu_battery_mode()
+    except Exception as exc:  # noqa: BLE001 — never raise
+        logger.warning("env_sanity: amd-battery probe raised %s", exc)
+        amd_batt = {"on_battery": False, "is_amd_igpu": False,
+                    "risk": "unknown"}
+    summary["amd_igpu_battery"] = amd_batt
+    if amd_batt.get("risk") == "high":
+        issues.append(SanityIssue(
+            severity="warning", code="AMD_IGPU_BATTERY_MODE",
+            message_en=("AMD iGPU detected on battery power. DXGI Desktop "
+                        "Duplication throttles to ~1Hz on battery and the "
+                        "recorder will produce a near-frozen capture. Plug "
+                        "in AC power, or set OYSTER_CAPTURE_MODE_ENV=window "
+                        "to use the window-capture path instead."),
+            message_zh=("检测到 AMD 集显且笔记本在电池供电下运行。"
+                        "AMD 在电池模式下会将 DXGI Desktop Duplication "
+                        "降至 ~1Hz，录制画面会几乎冻结。请接通电源，"
+                        "或设置 OYSTER_CAPTURE_MODE_ENV=window 使用"
+                        "窗口捕获模式。"),
+            auto_fix_available=False,
+        ))
 
     # DPI scaling — special: report info-level if any monitor != 100%.
     try:
