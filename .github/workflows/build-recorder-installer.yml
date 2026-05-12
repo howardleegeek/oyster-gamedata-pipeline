@@ -832,11 +832,49 @@ jobs:
           #   * the 9 standalone mod jars (advanced users)
           # Notably absent: JRE zip, MC client.jar, Fabric profile JSON,
           # OysterPlay.exe, OysterRecorder-onedir, bundle/manifest.json.
-          gh release upload "$RELEASE_TAG" \
-            "dist/OysterRecorder-Setup-${RELEASE_TAG}.exe" \
-            "dist/SHA-256-manifest.txt" \
-            release-extras/oyster-recorder-mod-*.jar \
-            --clobber
+          # rc17.0.2: split per-file with timeout + retry to fix flaky
+          # `gh release upload` hangs on large Windows runner uploads.
+          # Root cause: gh CLI has no inherent retry, single 900MB upload
+          # can stall mid-stream and hang for 16+ min with zero progress.
+          # Fix: split, set per-attempt timeout, retry 5x on installer.
+
+          INSTALLER="dist/OysterRecorder-Setup-${RELEASE_TAG}.exe"
+          echo "Installer size: $(stat -c %s "$INSTALLER" 2>/dev/null || stat -f %z "$INSTALLER") bytes"
+
+          # 1) Installer (large, retry up to 5x with 8min timeout each)
+          for attempt in 1 2 3 4 5; do
+            echo "=== Installer upload attempt $attempt/5 ==="
+            if timeout 480s gh release upload "$RELEASE_TAG" "$INSTALLER" --clobber; then
+              echo "✓ Installer uploaded on attempt $attempt"
+              break
+            fi
+            if [ $attempt -eq 5 ]; then
+              echo "✗ Installer upload exhausted retries"
+              exit 1
+            fi
+            echo "Installer upload attempt $attempt failed, retry in 20s..."
+            sleep 20
+          done
+
+          # 2) SHA manifest (tiny, short timeout)
+          for attempt in 1 2 3; do
+            if timeout 60s gh release upload "$RELEASE_TAG" "dist/SHA-256-manifest.txt" --clobber; then
+              echo "✓ SHA manifest uploaded on attempt $attempt"
+              break
+            fi
+            [ $attempt -eq 3 ] && { echo "✗ SHA manifest failed"; exit 1; }
+            sleep 5
+          done
+
+          # 3) Mod jars batch (9 × 15KB)
+          for attempt in 1 2 3; do
+            if timeout 120s gh release upload "$RELEASE_TAG" release-extras/oyster-recorder-mod-*.jar --clobber; then
+              echo "✓ Mod jars uploaded on attempt $attempt"
+              break
+            fi
+            [ $attempt -eq 3 ] && { echo "✗ Mod jars failed"; exit 1; }
+            sleep 5
+          done
 
       # ---------------------------------------------------------------------
       # 18. Always upload the artifacts to the workflow run for inspection
