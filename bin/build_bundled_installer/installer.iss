@@ -199,6 +199,14 @@ Name: "{app}\logs"; Permissions: users-modify
 Name: "{app}\mc-instance\saves"; Permissions: users-modify
 Name: "{app}\mc-instance\screenshots"; Permissions: users-modify
 Name: "{app}\runtime"; Permissions: users-modify
+; rc17.2 (Stream BL, Howard 2026-05-12 "点进去都是空的"): pre-create the
+; recordings root so the Start Menu / Desktop "Open Recordings Folder"
+; shortcut below can open immediately on first install. The launcher
+; (oyster_play.py) writes sessions to %LOCALAPPDATA%\GameData Recorder\
+; recordings\session_<ts>_<hash>\, which is a SEPARATE root from {app}
+; (= %LOCALAPPDATA%\OysterRecorder\). Without this entry, the shortcut
+; would 404 until the user finishes their first session.
+Name: "{localappdata}\GameData Recorder\recordings"; Permissions: users-modify
 
 [Files]
 ; ---------------------------------------------------------------------------
@@ -313,6 +321,21 @@ Name: "{group}\\{#AppShortcutLbl}"; \
     WorkingDir: "{app}"; \
     Comment: "Launch {#AppName} (records gameplay automatically)"
 
+; rc17.2 (Stream BL, Howard 2026-05-12 "点进去都是空的"): launcher writes
+; sessions to %LOCALAPPDATA%\GameData Recorder\recordings — a SEPARATE
+; root from {app} (= %LOCALAPPDATA%\OysterRecorder). Without an explicit
+; shortcut to the real recordings root, users open {app} expecting their
+; mp4s and see only jre/, mc-instance/, runtime/. They conclude the
+; recorder is broken. Fix: one Start Menu entry that invokes explorer.exe
+; on the real path. [Dirs] above pre-creates the folder so first click
+; never 404s. explorer.exe (not a bare folder Filename) is intentional —
+; it handles transient deletions gracefully.
+Name: "{group}\\Open Recordings Folder"; \
+    Filename: "explorer.exe"; \
+    Parameters: """{localappdata}\\GameData Recorder\\recordings"""; \
+    WorkingDir: "{localappdata}\\GameData Recorder"; \
+    Comment: "Browse recorded gameplay sessions"
+
 Name: "{group}\\Uninstall {#AppName}"; \
     Filename: "{uninstallexe}"; \
     WorkingDir: "{app}"
@@ -326,6 +349,18 @@ Name: "{userdesktop}\\{#AppShortcutLbl}"; \
     Filename: "{app}\\{#AppExeName}"; \
     WorkingDir: "{app}"; \
     Comment: "Launch {#AppName}"; \
+    Tasks: desktopicon
+
+; rc17.2 (Stream BL): desktop companion to the Start Menu Recordings
+; shortcut. Gated on the same `desktopicon` task as the launcher
+; shortcut above — if the user opts out of desktop icons, neither
+; appears. Naming uses a distinct suffix so it doesn't visually
+; collide with the launcher icon on the desktop.
+Name: "{userdesktop}\\Open Recordings Folder"; \
+    Filename: "explorer.exe"; \
+    Parameters: """{localappdata}\\GameData Recorder\\recordings"""; \
+    WorkingDir: "{localappdata}\\GameData Recorder"; \
+    Comment: "Browse recorded {#AppName} sessions"; \
     Tasks: desktopicon
 
 [Run]
