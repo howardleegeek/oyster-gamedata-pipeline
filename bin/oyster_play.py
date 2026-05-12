@@ -178,11 +178,25 @@ def spawn_recorder(recorder_exe: Path) -> subprocess.Popen | None:
     # recorder's stdout/stderr inherit a detached console handle which
     # Windows may keep alive as a zombie object. Add CREATE_NO_WINDOW
     # (0x08000000) and route stdio to DEVNULL.
+    # rc17.0.4: Minecraft Java is an OpenGL game — DXGI Desktop Duplication
+    # (default "Monitor" mode) throttles to ~1Hz on AMD iGPUs (780M
+    # observed) and produces black frames on some discrete NVIDIA
+    # configurations. GameHook (via Window Capture pipe) is the
+    # documented-stable path for OpenGL games. Force it unless the user
+    # has already provided an explicit OYSTER_CAPTURE_MODE override.
+    env = os.environ.copy()
+    if "OYSTER_CAPTURE_MODE" not in env:
+        env["OYSTER_CAPTURE_MODE"] = "game"
+        logger.info(
+            "rc17.0.4: OYSTER_CAPTURE_MODE=game forced for MC Java OpenGL "
+            "(skips DXGI 1Hz throttle on AMD/NVIDIA iGPU rigs)"
+        )
     return subprocess.Popen(
         [str(recorder_exe)],
         cwd=str(recorder_exe.parent),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        env=env,
         creationflags=0x00000200 | 0x08000000,  # CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW
     )
 
