@@ -652,6 +652,59 @@ def _check_video_content_health(d: Path, rpt: LintReport) -> None:
                        "Video content varied and non-black" if passed else (reason or "content health check failed"),
                        details))
 
+def _check_gameinfo_xlsx(d: Path, rpt: LintReport) -> None:
+    """Criterion 26 (Audit D-P1-1): Verify gameinfo.xlsx structure per PRD page 12.
+
+    PRD page 12 specifies a resource-tracking schema: each row identifies a
+    resource by ``Name`` with a ``TimeStamp`` baseline plus periodic
+    ``T+Nm`` / ``T-Nm`` snapshot columns. Stream V audit: the lint never
+    opened the Excel file — silent pass meant truncated/empty workbooks
+    shipped through unchecked.
+
+    Pass conditions:
+      * gameinfo.xlsx exists in the session
+      * header row contains the required core columns
+      * at least one ``T+`` / ``T-`` time-marker column is present
+    """
+    xlsx_files = list(d.glob("**/*gameinfo*.xlsx"))
+    if not xlsx_files:
+        rpt.add(LintResult(26, "gameinfo.xlsx structure", False,
+                           "gameinfo.xlsx missing"))
+        return
+    try:
+        from openpyxl import load_workbook
+    except ImportError:
+        rpt.add(LintResult(26, "gameinfo.xlsx structure", False,
+                           "openpyxl required for xlsx validation"))
+        return
+    try:
+        wb = load_workbook(xlsx_files[0], read_only=True, data_only=True)
+        ws = wb.active
+        first_row = next(ws.iter_rows(min_row=1, max_row=1), ())
+        headers = [c.value for c in first_row]
+        required_cols = ["Name", "TimeStamp"]
+        time_marker_cols = [
+            h for h in headers
+            if isinstance(h, str) and (h.startswith("T+") or h.startswith("T-"))
+        ]
+        missing = [c for c in required_cols if c not in headers]
+        if missing:
+            rpt.add(LintResult(26, "gameinfo.xlsx structure", False,
+                               f"missing required columns: {missing}",
+                               {"headers": [str(h) for h in headers]}))
+            return
+        if len(time_marker_cols) < 1:
+            rpt.add(LintResult(26, "gameinfo.xlsx structure", False,
+                               "no time-marker columns (T+1m, T+2m, ...) found",
+                               {"headers": [str(h) for h in headers]}))
+            return
+        rpt.add(LintResult(26, "gameinfo.xlsx structure", True,
+                           f"columns OK: {len(headers)} cols, {len(time_marker_cols)} time markers",
+                           {"time_markers": time_marker_cols[:10]}))
+    except Exception as exc:
+        rpt.add(LintResult(26, "gameinfo.xlsx structure", False,
+                           f"xlsx parse error: {exc}"))
+
 def run_all_checks(data_dir: Path) -> LintReport:
     """Run all 25 lint checks on the data directory."""
     rpt = LintReport(data_dir=data_dir)
@@ -668,6 +721,7 @@ def run_all_checks(data_dir: Path) -> LintReport:
     _check_naming(data_dir, rpt)
     _check_structure(data_dir, rpt)
     _check_video_content_health(data_dir, rpt)
+    _check_gameinfo_xlsx(data_dir, rpt)
     return rpt
 
 def main(argv: Optional[List[str]] = None) -> int:
