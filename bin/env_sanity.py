@@ -229,6 +229,41 @@ def detect_display_scaling() -> dict[int, float]:
         return {}
 
 
+# Audit I-7: image-name allowlist of well-known OpenGL renderers. WGC
+# is known to produce a black surface for OpenGL-rendered games (the
+# DWM does not composite the GL swapchain), so when the recorder
+# targets one of these we should steer the user to the GameHook path.
+# Kept as a module-level constant so test fixtures can extend it.
+OPENGL_PROCESSES: frozenset[str] = frozenset({
+    "javaw.exe",       # Minecraft Java Edition launcher
+    "java.exe",        # Minecraft Java alt entry point
+    "factorio.exe",    # Factorio
+    "kerbal.exe",      # Kerbal Space Program
+    "ksp.exe",         # KSP alt name
+    "ksp_x64.exe",     # KSP 64-bit
+    "minetest.exe",    # Minetest
+    "0ad.exe",         # 0 A.D.
+    "supertuxkart.exe",
+})
+
+
+def detect_opengl_target(target_process: str | None) -> bool:
+    """Audit I-7: True if ``target_process`` (image name) is a known
+    OpenGL renderer that breaks Windows Graphics Capture (WGC).
+
+    Comparison is case-insensitive and matches on the bare image name
+    (no path). Returns False for ``None``, empty strings, or names not
+    in the allowlist. Never raises and is OS-agnostic — the same call
+    works on Mac for unit tests."""
+    if not target_process:
+        return False
+    try:
+        name = os.path.basename(str(target_process)).lower()
+    except Exception:  # noqa: BLE001
+        return False
+    return name in OPENGL_PROCESSES
+
+
 def auto_disable_hdr() -> bool:
     """Audit I-5: attempt to disable Windows HDR. Best-effort.
 
@@ -427,6 +462,31 @@ def check_environment(target_process: str | None = None) -> SanityReport:
                 message_en=en, message_zh=zh, auto_fix_available=auto,
             ))
 
+    # Audit I-7: OpenGL game targeting — WGC produces black frames for
+    # OpenGL swapchains. Steer the user to OYSTER_CAPTURE_MODE_ENV=game
+    # which routes through GameHook (DLL injection capture) instead.
+    try:
+        is_opengl = detect_opengl_target(target_process)
+    except Exception as exc:  # noqa: BLE001 — never raise
+        logger.warning("env_sanity: opengl probe raised %s", exc)
+        is_opengl = False
+    summary["opengl_target"] = is_opengl
+    summary["target_process"] = target_process
+    if is_opengl:
+        issues.append(SanityIssue(
+            severity="warning", code="OPENGL_TARGET_WGC_BROKEN",
+            message_en=(f"Target process '{target_process}' is a known "
+                        "OpenGL renderer. Windows Graphics Capture (WGC) "
+                        "produces a black surface for OpenGL swapchains. "
+                        "Set OYSTER_CAPTURE_MODE_ENV=game to route through "
+                        "the GameHook path instead."),
+            message_zh=(f"目标进程 '{target_process}' 是已知的 OpenGL 渲染器。"
+                        "Windows 图形捕获 (WGC) 无法捕获 OpenGL 交换链，"
+                        "会得到黑屏。请设置 OYSTER_CAPTURE_MODE_ENV=game "
+                        "以使用 GameHook 注入捕获路径。"),
+            auto_fix_available=False,
+        ))
+
     # Audit I-1: AMD iGPU + battery — high risk of 1Hz DXGI throttle.
     try:
         amd_batt = detect_amd_igpu_battery_mode()
@@ -575,12 +635,28 @@ def show_sanity_warnings(report: SanityReport, lang: str = "en") -> bool:
 
 
 if __name__ == "__main__":  # pragma: no cover
+    import argparse  # noqa: PLC0415
     logging.basicConfig(level=logging.INFO)
-    rep = check_environment()
+    _ap = argparse.ArgumentParser(
+        description="rc16.13 pre-record environment sanity check",
+    )
+    _ap.add_argument(
+        "--target-process", default=None,
+        help="Image name of the game executable (e.g. javaw.exe). Used "
+             "by Audit I-7 OpenGL detection to recommend GameHook over "
+             "WGC when the game is known to render via OpenGL.",
+    )
+    _ap.add_argument(
+        "--no-dialog", action="store_true",
+        help="Skip the Tk dialog; print issues to stdout only.",
+    )
+    _args = _ap.parse_args()
+
+    rep = check_environment(target_process=_args.target_process)
     print("Rig:", rep.rig_summary)
     print(f"Found {len(rep.issues)} issue(s):")
     for it in rep.issues:
         print(f"  [{it.severity}] {it.code}: {it.message_en}")
-    if rep.issues:
+    if rep.issues and not _args.no_dialog:
         ok = show_sanity_warnings(rep, lang=os.environ.get("OYSTER_LANG", "en"))
         print("continue =", ok)
