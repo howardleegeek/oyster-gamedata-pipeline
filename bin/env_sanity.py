@@ -229,6 +229,55 @@ def detect_display_scaling() -> dict[int, float]:
         return {}
 
 
+def auto_disable_hdr() -> bool:
+    """Audit I-5: attempt to disable Windows HDR. Best-effort.
+
+    Modern Windows (10 2004+ / 11) stores per-display HDR state under
+    HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\
+    VideoSettings\\<adapter-id> with a binary blob. The documented
+    Display.Config API is the supported path but is COM-only and
+    fragile to bind from Python. We therefore:
+
+    1. Try to flip the legacy
+       ``HKLM\\...\\GraphicsDrivers\\HighDynamicRange\\Enabled`` key off.
+       This works on some older builds. Requires admin; will fail
+       silently otherwise.
+    2. Return ``True`` only if the toggle succeeded AND ``detect_hdr()``
+       now returns False. Otherwise return False — caller must surface
+       a blocking instruction to the user.
+
+    Never raises. Returns False on non-Windows."""
+    if not _is_windows():
+        return False
+    if not detect_hdr():
+        return False  # nothing to disable
+    try:
+        import winreg  # noqa: PLC0415
+        # Best-effort: clear the legacy global flag. On modern Windows
+        # this is informational only — the real switch lives in the
+        # per-monitor binary blob under HKCU VideoSettings. We do not
+        # attempt to mutate that blob (very fragile, can brick the
+        # display configuration on driver mismatch).
+        try:
+            with winreg.OpenKey(
+                    winreg.HKEY_LOCAL_MACHINE,
+                    r"SYSTEM\CurrentControlSet\Control\GraphicsDrivers"
+                    r"\HighDynamicRange",
+                    0,
+                    winreg.KEY_SET_VALUE | winreg.KEY_WOW64_64KEY,
+            ) as k:
+                winreg.SetValueEx(k, "Enabled", 0, winreg.REG_DWORD, 0)
+        except OSError as exc:
+            logger.info("env_sanity: HDR registry toggle failed (%s); "
+                        "user must disable manually", exc)
+            return False
+        # Verify post-condition.
+        return not detect_hdr()
+    except Exception as exc:  # noqa: BLE001 — never raise
+        logger.warning("env_sanity: auto_disable_hdr raised %s", exc)
+        return False
+
+
 def detect_amd_igpu_battery_mode() -> dict[str, Any]:
     """Audit I-1: detect AMD iGPU running on battery.
 
@@ -307,12 +356,21 @@ def _rig_summary() -> dict[str, Any]:
 
 
 # (key, detector_fn_name, code, severity, message_en, message_zh, auto_fix)
+# Audit I-5: HDR upgraded to "fatal" — the dialog renders fatal issues
+# with a red header and recording is rejected by the artifact lint. The
+# auto_fix_available flag is True because check_environment() invokes
+# auto_disable_hdr() before emitting this issue (best-effort).
 _DETECTORS = (
-    ("hdr", "detect_hdr", "HDR_ENABLED", "warning",
-     "Windows HDR is enabled. Captured frames may appear black or washed out. "
-     "Turn HDR OFF on the gameplay monitor (Win+Alt+B) before recording.",
-     "检测到 Windows HDR 已开启。录制画面可能全黑或泛白。"
-     "请在游戏显示器上按 Win+Alt+B 关闭 HDR 后再录制。", False),
+    ("hdr", "detect_hdr", "HDR_ENABLED", "fatal",
+     "Windows HDR is enabled. Auto-toggle failed (requires admin / "
+     "modern Windows stores HDR per-display via DisplayConfig API). "
+     "Press Win+Alt+B on the gameplay monitor to disable HDR, then "
+     "click 'Continue'. Recording will be REJECTED by artifact lint "
+     "until HDR is off.",
+     "检测到 Windows HDR 已开启。自动关闭失败（需要管理员权限，"
+     "新版 Windows 通过 DisplayConfig API 按显示器存储 HDR 状态）。"
+     "请在游戏显示器上按 Win+Alt+B 关闭 HDR 后点击\"仍然录制\"。"
+     "HDR 开启状态下录制的素材会被产物 lint 拒收。", True),
     ("shadowplay", "detect_shadowplay", "SHADOWPLAY_OVERLAY", "warning",
      "NVIDIA Shadowplay / GeForce Experience overlay is active and conflicts "
      "with the recorder's capture path. Disable 'In-Game Overlay'.",
@@ -336,10 +394,25 @@ _DETECTORS = (
 )
 
 
-def check_environment() -> SanityReport:
-    """Run all detectors and return a SanityReport. Never raises."""
+def check_environment(target_process: str | None = None) -> SanityReport:
+    """Run all detectors and return a SanityReport. Never raises.
+
+    ``target_process`` (optional): image name of the game executable
+    being targeted (e.g. ``"javaw.exe"``). Used by Audit I-7 OpenGL
+    detection to recommend the GameHook path over WGC when the game
+    is known to use OpenGL."""
     issues: list[SanityIssue] = []
     summary = _rig_summary()
+
+    # Audit I-5: attempt HDR auto-disable BEFORE the detector loop, so a
+    # successful auto-fix prevents the issue from appearing at all. The
+    # function is a no-op when HDR is already off or on non-Windows.
+    try:
+        summary["hdr_auto_disabled"] = auto_disable_hdr()
+    except Exception as exc:  # noqa: BLE001 — never raise
+        logger.warning("env_sanity: auto_disable_hdr raised %s", exc)
+        summary["hdr_auto_disabled"] = False
+
     g = globals()
     for key, fn_name, code, severity, en, zh, auto in _DETECTORS:
         try:
