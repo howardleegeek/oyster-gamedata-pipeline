@@ -38,7 +38,7 @@ on:
     branches:
       - 'recorder-v0.28.0-rc16'
     tags:
-      - 'recorder-v0.28.0-rc16.*'
+      - 'recorder-v*'
   workflow_dispatch:
 
 permissions:
