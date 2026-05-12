@@ -84,10 +84,41 @@
 ;   3) (re)run bin/build_bundled_installer/build_all.ps1
 #define BundledMcVersion "1.21.4"
 
-#define AppName        "Oyster Recorder"
+; rc17.1.2 (Stream BM-rebrand, Howard "现在很乱了" 2026-05-12): unify
+; user-facing brand identity to "GameData Recorder". The previous "Oyster
+; Recorder" name was carried over from rc1-rc15; rc15.31 rebranded the
+; Rust recorder + output paths to "GameData Recorder" but installer +
+; launcher were never updated. Result: download filename / install
+; wizard / Start Menu all said "Oyster Recorder", but tray icon + output
+; dir + notification titles said "GameData Recorder". Three names for
+; one product. Fixed below.
+;
+; What stays "Oyster*" deliberately:
+;   * AppId — Inno Setup's upgrade machinery keys off this GUID. Changing
+;     it would make rc17.1.2 install side-by-side with existing rc17.0.4
+;     instead of upgrading in place. Keep forever.
+;   * AppExeName / OysterPlay.exe — internal launcher binary name.
+;     oyster_play.py's process detection (is_recorder_running()) greps
+;     for "OysterPlay.exe" and "OysterRecorder.exe" by literal name;
+;     renaming would break detection + the singleton-mutex guard.
+;     Internal code-name; users don't see this through Start Menu (the
+;     Start Menu shortcut LABEL is the user-facing string, not the exe).
+;   * OysterRecorder.exe — same reason. Rust Cargo `[[bin]]` name. The
+;     `crates/constants/.../singleton-mutex` key embeds this name.
+;
+; What changes to "GameData Recorder":
+;   * AppName — wizard title, Start Menu group, Add/Remove Programs label
+;   * AppShortcutLbl — visible label on Start Menu + Desktop shortcuts
+;   * DefaultDirName — fresh installs go to %LOCALAPPDATA%\GameData Recorder\
+;     (same parent dir as the recordings root, unified namespace).
+;     Existing rc17.0.x users upgrading via AppId continue to use their
+;     OysterRecorder\ dir — no breakage. New users get the clean path.
+;   * OutputBaseFilename — installer .exe filename
+;   * AppPublisher stays "Oyster Labs" (the company name, not the product)
+#define AppName        "GameData Recorder"
 #define AppPublisher   "Oyster Labs"
 #define AppExeName     "OysterPlay.exe"
-#define AppShortcutLbl "Oyster Recording"
+#define AppShortcutLbl "GameData Recorder"
 #define AppId          "{{C7E4F0D2-9B5E-4F1A-8C3D-OY5T3RR3C0RD}}"
 
 ; --- Bundle root --- the orchestrator stages everything under
@@ -121,7 +152,13 @@ VersionInfoDescription={#AppName} bundled installer
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=
 
-DefaultDirName={localappdata}\OysterRecorder
+; rc17.1.2 (Stream BM-rebrand): fresh installs go to "GameData Recorder"
+; — same parent dir as the recordings root ({localappdata}\GameData
+; Recorder\recordings\), unifying the namespace. Existing rc17.0.x
+; installs upgrade in place via AppId, staying in their OysterRecorder\
+; dir. The launcher resolves paths via {app} at runtime, so both layouts
+; work — only the wizard's default-dir suggestion for new users changes.
+DefaultDirName={localappdata}\GameData Recorder
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=auto
 DisableDirPage=no
@@ -149,9 +186,11 @@ SolidCompression=yes
 LZMAUseSeparateProcess=yes
 LZMANumBlockThreads=2
 
-; Output
+; Output — rc17.1.2 (Stream BM-rebrand): installer filename matches
+; the public brand. Final asset name on GitHub Release becomes
+; GameDataRecorder-Setup-vrecorder-v0.28.0-rc17.1.2.exe (~800 MB).
 OutputDir=..\\..\\dist\\installer
-OutputBaseFilename=OysterRecorder-Setup-v{#AppVersion}
+OutputBaseFilename=GameDataRecorder-Setup-v{#AppVersion}
 
 ; Architecture — Windows x64 only. The bundled JRE is x64; we
 ; refuse to install on 32-bit Windows or ARM64 (no Temurin x64 fallback).

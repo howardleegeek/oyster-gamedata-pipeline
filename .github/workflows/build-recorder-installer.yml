@@ -3,7 +3,7 @@ name: Build Recorder Bundled Installer (R05E)
 # R05E · Single-file consumer release pipeline
 # ============================================
 # This workflow runs the entire R05A→D bundled installer chain and uploads
-# the resulting `OysterRecorder-Setup-vX.Y.Z.exe` to a GitHub Release.
+# the resulting `GameDataRecorder-Setup-vX.Y.Z.exe` to a GitHub Release.
 #
 # Trigger semantics
 # -----------------
@@ -23,7 +23,7 @@ name: Build Recorder Bundled Installer (R05E)
 #     env/secrets into the notes file.
 #   * Don't ship intermediate artifacts to the Release page — the only
 #     uploads are:
-#       - OysterRecorder-Setup-${TAG}.exe   (the bundled installer)
+#       - GameDataRecorder-Setup-${TAG}.exe   (the bundled installer)
 #       - SHA-256-manifest.txt              (post-build manifest)
 #       - 9 standalone mod jars             (advanced-user override path)
 #     We do NOT upload the JRE zip, the MC client.jar, the Fabric profile
@@ -796,11 +796,11 @@ jobs:
       # ---------------------------------------------------------------------
       # installer.iss declares:
       #   OutputDir=..\\..\\dist\\installer
-      #   OutputBaseFilename=OysterRecorder-Setup-v{#AppVersion}
+      #   OutputBaseFilename=GameDataRecorder-Setup-v{#AppVersion}
       # so passing /DAppVersion=$APP_VERSION (e.g. 1.2.3) yields:
-      #   dist/installer/OysterRecorder-Setup-v1.2.3.exe
+      #   dist/installer/GameDataRecorder-Setup-v1.2.3.exe
       # We copy that into dist/ with a release-tag-prefixed name (e.g.
-      # OysterRecorder-Setup-recorder-v1.2.3.exe) for the upload step,
+      # GameDataRecorder-Setup-recorder-v1.2.3.exe) for the upload step,
       # since the Release page's filename should match the tag exactly.
       - name: R05D — Inno Setup compile installer
         shell: pwsh
@@ -818,17 +818,17 @@ jobs:
           }
           # installer.iss's OutputDir is "..\\..\\dist\\installer" (relative
           # to the .iss file); resolved to repo-root that's dist/installer/.
-          $issOut = "dist/installer/OysterRecorder-Setup-v$env:APP_VERSION.exe"
+          $issOut = "dist/installer/GameDataRecorder-Setup-v$env:APP_VERSION.exe"
           if (-not (Test-Path $issOut)) {
             Write-Error "Inno Setup output not found at $issOut"
-            Get-ChildItem -Recurse -Filter 'OysterRecorder-Setup-*.exe' `
+            Get-ChildItem -Recurse -Filter 'GameDataRecorder-Setup-*.exe' `
               | ForEach-Object { Write-Host "  found candidate: $($_.FullName)" }
             exit 1
           }
           # Final upload filename is keyed on the RELEASE_TAG (e.g.
           # `recorder-v1.2.3`), not the bare semver, so the Release page
           # asset name and the tag are 1:1.
-          $finalExe = "dist/OysterRecorder-Setup-$env:RELEASE_TAG.exe"
+          $finalExe = "dist/GameDataRecorder-Setup-$env:RELEASE_TAG.exe"
           Copy-Item -Force $issOut $finalExe
           $size_mb = [math]::Round((Get-Item $finalExe).Length / 1MB, 1)
           Write-Host "Installer built: $finalExe (${size_mb} MB)"
@@ -854,7 +854,7 @@ jobs:
       - name: SHA-256 installer + write SHA-256-manifest.txt
         shell: pwsh
         run: |
-          $installer = "dist/OysterRecorder-Setup-$env:RELEASE_TAG.exe"
+          $installer = "dist/GameDataRecorder-Setup-$env:RELEASE_TAG.exe"
           $instHash = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLower()
           # release-extras/*.jar (the 9 advanced-user mod jars) get hashed
           # too, so power users can verify any individual download.
@@ -891,11 +891,11 @@ jobs:
           {
             echo "# Oyster Recorder ${RELEASE_TAG}"
             echo
-            echo "Single-file Windows installer with bundled JRE + Minecraft 1.21.4 + Fabric loader + Oyster recording mod. Double-click \`OysterRecorder-Setup-${RELEASE_TAG}.exe\` to install (no admin required, installs to \`%LOCALAPPDATA%\\OysterRecorder\\\`)."
+            echo "Single-file Windows installer with bundled JRE + Minecraft 1.21.4 + Fabric loader + Oyster recording mod. Double-click \`GameDataRecorder-Setup-${RELEASE_TAG}.exe\` to install (no admin required, installs to \`%LOCALAPPDATA%\\OysterRecorder\\\`)."
             echo
             echo "## What's in this release"
             echo
-            echo "- **\`OysterRecorder-Setup-${RELEASE_TAG}.exe\`** — main bundled installer (recommended download)"
+            echo "- **\`GameDataRecorder-Setup-${RELEASE_TAG}.exe\`** — main bundled installer (recommended download)"
             echo "- **\`SHA-256-manifest.txt\`** — verification hashes for every release artifact"
             echo "- **9 mod jars** — \`oyster-recorder-mod-*-mc<MC_VERSION>.jar\` for advanced users running their own MC outside the bundled instance"
             echo
@@ -915,7 +915,7 @@ jobs:
             echo "All artifacts are SHA-256 pinned. Compare your local hash against \`SHA-256-manifest.txt\`:"
             echo
             echo '```powershell'
-            echo "Get-FileHash OysterRecorder-Setup-${RELEASE_TAG}.exe -Algorithm SHA256"
+            echo "Get-FileHash GameDataRecorder-Setup-${RELEASE_TAG}.exe -Algorithm SHA256"
             echo '```'
           } > release_notes.md
           echo "--- release_notes.md preview ---"
@@ -961,7 +961,7 @@ jobs:
           # can stall mid-stream and hang for 16+ min with zero progress.
           # Fix: split, set per-attempt timeout, retry 5x on installer.
 
-          INSTALLER="dist/OysterRecorder-Setup-${RELEASE_TAG}.exe"
+          INSTALLER="dist/GameDataRecorder-Setup-${RELEASE_TAG}.exe"
           echo "Installer size: $(stat -c %s "$INSTALLER" 2>/dev/null || stat -f %z "$INSTALLER") bytes"
 
           # 1) Installer (large, retry up to 5x with 8min timeout each)
@@ -1010,7 +1010,7 @@ jobs:
         with:
           name: OysterRecorder-bundled-${{ env.RELEASE_TAG }}
           path: |
-            dist/OysterRecorder-Setup-*.exe
+            dist/GameDataRecorder-Setup-*.exe
             dist/SHA-256-manifest.txt
             release-extras/*.jar
             bundle/manifest.json
