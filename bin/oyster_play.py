@@ -178,18 +178,41 @@ def spawn_recorder(recorder_exe: Path) -> subprocess.Popen | None:
     # recorder's stdout/stderr inherit a detached console handle which
     # Windows may keep alive as a zombie object. Add CREATE_NO_WINDOW
     # (0x08000000) and route stdio to DEVNULL.
-    # rc17.0.4: Minecraft Java is an OpenGL game — DXGI Desktop Duplication
-    # (default "Monitor" mode) throttles to ~1Hz on AMD iGPUs (780M
-    # observed) and produces black frames on some discrete NVIDIA
-    # configurations. GameHook (via Window Capture pipe) is the
-    # documented-stable path for OpenGL games. Force it unless the user
-    # has already provided an explicit OYSTER_CAPTURE_MODE override.
+    # rc17.0.5: scope GameHook forcing to known OpenGL games. Stream O added
+    # OPENGL_PROCESSES detector in env_sanity.py — reuse same list.
+    # rc17.0.4 (superseded): forced game-mode unconditionally, which broke
+    # DirectX titles where DXGI Monitor is faster than GameHook and where
+    # injection-detection can trigger anti-cheat bans. We now require the
+    # caller's OYSTER_TARGET_PROCESS (defaults to javaw.exe for MC) to be in
+    # a known-good OpenGL set before forcing game mode.
+    OPENGL_PROCESSES_FOR_GAMEHOOK = frozenset({
+        "javaw.exe",      # Minecraft Java
+        "java.exe",       # Minecraft Java (older)
+        "factorio.exe",
+        "kerbal.exe",
+        "ksp.exe",
+        "ksp_x64.exe",
+        "minetest.exe",
+        "0ad.exe",
+        "supertuxkart.exe",
+    })
+
     env = os.environ.copy()
-    if "OYSTER_CAPTURE_MODE" not in env:
+    target_process = os.environ.get("OYSTER_TARGET_PROCESS", "javaw.exe").lower()
+    if (
+        "OYSTER_CAPTURE_MODE" not in env
+        and target_process in OPENGL_PROCESSES_FOR_GAMEHOOK
+    ):
         env["OYSTER_CAPTURE_MODE"] = "game"
         logger.info(
-            "rc17.0.4: OYSTER_CAPTURE_MODE=game forced for MC Java OpenGL "
-            "(skips DXGI 1Hz throttle on AMD/NVIDIA iGPU rigs)"
+            "rc17.0.5: OYSTER_CAPTURE_MODE=game forced for OpenGL target '%s' "
+            "(skips DXGI 1Hz throttle on AMD/NVIDIA iGPU rigs)",
+            target_process,
+        )
+    elif "OYSTER_CAPTURE_MODE" not in env:
+        logger.debug(
+            "rc17.0.5: target '%s' not in OpenGL list, leaving capture mode default",
+            target_process,
         )
     return subprocess.Popen(
         [str(recorder_exe)],
