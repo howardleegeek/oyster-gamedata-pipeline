@@ -682,6 +682,57 @@ def _spawn_diag_uploader_thread() -> None:
             logger.warning("rc16.11 diag-uploader: lint JSON parse failed (%s)", e)
             lint_report = None
 
+    # rc17 Stream D PRD compliance gate: validate action_camera.json against
+    # the strict PRD schema (verify_prd_schema.py) BEFORE handing off to the
+    # upload worker. If validation fails we MUST NOT spawn the upload — a
+    # non-conforming bundle would poison buyer ingestion. Failures are logged
+    # at ERROR so they show up in diag bundles even when upload is blocked.
+    # Import is local to keep the launcher startup path cheap and to fail
+    # gracefully if verify_prd_schema isn't bundled in a given build.
+    schema_ok = True
+    try:
+        from verify_prd_schema import (  # noqa: PLC0415
+            _load_records, validate_records,
+        )
+        ac_path = session_dir / "action_camera.json"
+        if ac_path.is_file():
+            records = _load_records(ac_path)
+            schema_rpt = validate_records(records)
+            if schema_rpt["failed"] > 0:
+                logger.error(
+                    "rc17 schema gate: %d/%d action_camera records FAILED PRD "
+                    "validation — blocking upload. First violations: %s",
+                    schema_rpt["failed"], schema_rpt["total"],
+                    schema_rpt["violations"][:3],
+                )
+                schema_ok = False
+            else:
+                logger.info(
+                    "rc17 schema gate: %d records pass PRD validation",
+                    schema_rpt["total"],
+                )
+        else:
+            logger.info(
+                "rc17 schema gate: no action_camera.json at %s — skipping",
+                ac_path,
+            )
+    except ImportError as e:
+        logger.warning(
+            "rc17 schema gate: verify_prd_schema not importable (%s) — "
+            "skipping validation (build missing --hidden-import?)", e,
+        )
+    except Exception as e:  # noqa: BLE001 — must never crash launcher
+        logger.warning(
+            "rc17 schema gate: validation crashed (%s) — allowing upload", e,
+        )
+
+    if not schema_ok:
+        logger.info(
+            "rc17 schema gate: upload blocked at %s due to schema failures",
+            session_dir,
+        )
+        return
+
     def _diag_worker() -> None:
         try:
             from diag_uploader import run_layer4  # noqa: PLC0415
