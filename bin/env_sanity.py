@@ -229,6 +229,62 @@ def detect_display_scaling() -> dict[int, float]:
         return {}
 
 
+def detect_dpi_scaling() -> dict[str, Any]:
+    """Audit I-8: detect non-100% DPI scaling on the primary monitor.
+
+    Distinct from the per-monitor probe ``detect_display_scaling()``
+    which is informational. This function focuses on the *primary*
+    monitor and emits a concrete recommendation to set
+    ``OYSTER_DPI_OVERRIDE=100`` or change Windows scaling to 100%,
+    because 125% / 150% causes capture-region / mouse-coord mismatch.
+
+    Returns ``{'scaling_percent': int,
+               'effective_resolution': (width, height),
+               'needs_override': bool}``. Returns safe defaults on
+    non-Windows or detection failure. Never raises."""
+    safe_default: dict[str, Any] = {
+        "scaling_percent": 100,
+        "effective_resolution": (1920, 1080),
+        "needs_override": False,
+    }
+    if not _is_windows():
+        return safe_default
+    try:
+        import ctypes  # noqa: PLC0415
+        user32 = ctypes.windll.user32
+        # Mark the process DPI-aware so the metrics queries return
+        # physical pixels rather than the legacy DPI-virtualized
+        # numbers. SetProcessDPIAware is idempotent.
+        try:
+            user32.SetProcessDPIAware()
+        except Exception:  # noqa: BLE001
+            pass
+        # GetScaleFactorForDevice returns the percentage scale (100,
+        # 125, 150, 175, 200) for the device. 0 = primary monitor
+        # (DEVICE_PRIMARY).
+        try:
+            scaling = int(ctypes.windll.shcore.GetScaleFactorForDevice(0))
+        except Exception as exc:  # noqa: BLE001
+            logger.info("env_sanity: GetScaleFactorForDevice failed (%s); "
+                        "falling back to 100%%", exc)
+            scaling = 100
+        # SM_CXSCREEN = 0, SM_CYSCREEN = 1 — primary monitor metrics
+        # in physical pixels now that the process is DPI-aware.
+        try:
+            width = int(user32.GetSystemMetrics(0))
+            height = int(user32.GetSystemMetrics(1))
+        except Exception:  # noqa: BLE001
+            width, height = 1920, 1080
+        return {
+            "scaling_percent": scaling,
+            "effective_resolution": (width, height),
+            "needs_override": scaling != 100,
+        }
+    except Exception as exc:  # noqa: BLE001 — never raise
+        logger.warning("env_sanity: detect_dpi_scaling raised %s", exc)
+        return safe_default
+
+
 # Audit I-7: image-name allowlist of well-known OpenGL renderers. WGC
 # is known to produce a black surface for OpenGL-rendered games (the
 # DWM does not composite the GL swapchain), so when the recorder
@@ -508,6 +564,34 @@ def check_environment(target_process: str | None = None) -> SanityReport:
                         "降至 ~1Hz，录制画面会几乎冻结。请接通电源，"
                         "或设置 OYSTER_CAPTURE_MODE_ENV=window 使用"
                         "窗口捕获模式。"),
+            auto_fix_available=False,
+        ))
+
+    # Audit I-8: primary-monitor DPI scaling — recommend override env
+    # var. Distinct from the per-monitor info-level scan below.
+    try:
+        dpi_info = detect_dpi_scaling()
+    except Exception as exc:  # noqa: BLE001 — never raise
+        logger.warning("env_sanity: dpi-scaling probe raised %s", exc)
+        dpi_info = {"scaling_percent": 100,
+                    "effective_resolution": (1920, 1080),
+                    "needs_override": False}
+    summary["primary_dpi"] = dpi_info
+    if dpi_info.get("needs_override"):
+        pct = dpi_info.get("scaling_percent", 100)
+        w, h = dpi_info.get("effective_resolution", (1920, 1080))
+        issues.append(SanityIssue(
+            severity="warning", code="DPI_SCALING_OVERRIDE_RECOMMENDED",
+            message_en=(f"Primary monitor scaling is {pct}% "
+                        f"(effective resolution {w}x{h}). Capture "
+                        "regions and mouse coordinates may not line "
+                        "up with the rendered frame. Set "
+                        "OYSTER_DPI_OVERRIDE=100, or change Windows "
+                        "Display Settings -> Scale to 100%."),
+            message_zh=(f"主显示器缩放为 {pct}%（有效分辨率 {w}x{h}）。"
+                        "录制区域和鼠标坐标可能与渲染帧错位。"
+                        "请设置 OYSTER_DPI_OVERRIDE=100，"
+                        "或在 Windows 显示设置中将缩放调为 100%。"),
             auto_fix_available=False,
         ))
 
