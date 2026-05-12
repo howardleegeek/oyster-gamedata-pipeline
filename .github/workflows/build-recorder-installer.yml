@@ -69,20 +69,31 @@ name: Build Recorder Bundled Installer (R05E)
 #   ever opens the dispatch UI to anyone with read perms.
 
 "on":
-  push:
-    tags:
-      - 'recorder-v*'
-  # rc16 (Howard 2026-05-11): chain after build-recorder-rust.yml completes
-  # on the rc16 branch so the installer always has a fresh Rust artifact
-  # available when it tries to download one. This avoids the race condition
-  # where both workflows trigger on the same push and the installer runs
-  # before the Rust artifact exists. Tag pushes (above) still drive the
-  # release flow directly; the workflow_run path is for branch-push CI.
+  # rc17.0.4 (Stream BA, Howard 2026-05-11): bundler is *always* downstream
+  # of build-recorder-rust.yml. Previously this workflow ran on both
+  # `push: tags: recorder-v*` AND `workflow_run` (rc16 branch only), which
+  # created a race: tag push triggered both workflows in parallel, bundler
+  # raced ahead at ~6 min, tried to download the Rust artifact, and failed
+  # with "no matching workflow run found" while Rust was still 7 minutes
+  # from finishing. Every rc17.x release required a manual
+  # `gh run rerun <bundler>` after Rust completed.
+  #
+  # Fix: drive the bundler exclusively off `workflow_run` completion of
+  # the Rust workflow. The Rust workflow itself triggers on tag pushes
+  # (`recorder-v*`), the rc16 branch, and workflow_dispatch, so this
+  # downstream listener inherits all three trigger paths transitively.
+  # When upstream was a tag push, workflow_run.head_branch is the tag
+  # name (e.g. "recorder-v0.28.0-rc17.1"); when upstream was a branch
+  # push, it is the branch name. The job-level `if:` gate filters to
+  # only successful runs; the Resolve step inspects head_branch and the
+  # upstream workflow's event to pick release vs CI mode.
+  #
+  # The `branches` filter is intentionally absent. Tag-push runs carry
+  # no branch context, so a `branches` filter would silently drop them
+  # and break every release tag push.
   workflow_run:
     workflows: ['Build Recorder Rust EXE (R-rust-primary)']
     types: [completed]
-    branches:
-      - 'recorder-v0.28.0-rc16'
   workflow_dispatch:
     inputs:
       smoke_tag:
@@ -166,12 +177,15 @@ jobs:
           # branch — we need the upstream-workflow's branch + sha instead.
           WORKFLOW_RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           WORKFLOW_RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          # rc17.0.4 (Stream BA): when upstream Rust workflow was triggered
+          # by a tag push, workflow_run.event is 'push' AND head_branch is
+          # the tag name (since tag refs have no branch context). We use
+          # this to detect "upstream was a tag push" without a direct
+          # `push.tags` trigger on this workflow, which was the source of
+          # the race condition that broke every rc17.x ship.
+          WORKFLOW_RUN_EVENT: ${{ github.event.workflow_run.event }}
         run: |
-          if ($env:GITHUB_EVENT_NAME -eq 'push' -and $env:GITHUB_REF -like 'refs/tags/recorder-v*') {
-            $tag = $env:GITHUB_REF -replace '^refs/tags/', ''
-            $version = $tag -replace '^recorder-v', ''
-            $isRelease = 'true'
-          } elseif ($env:GITHUB_EVENT_NAME -eq 'workflow_run' -and $env:WORKFLOW_RUN_HEAD_BRANCH -eq 'recorder-v0.28.0-rc16') {
+          if ($env:GITHUB_EVENT_NAME -eq 'workflow_run' -and $env:WORKFLOW_RUN_HEAD_BRANCH -eq 'recorder-v0.28.0-rc16') {
             # rc16 (Howard 2026-05-11): branch-push CI build, chained after
             # build-recorder-rust.yml succeeded. Synthesize a version string
             # so all downstream filename logic still works, but mark
@@ -185,10 +199,31 @@ jobs:
             # VersionInfoVersion via `Copy(AppVersion, 1, Pos("-", ...)-1)`
             # still truncates everything from the first `-`, yielding
             # VersionInfoVersion=0.28.0.0 - Windows-resource-API-valid.
+            #
+            # rc17.0.4 (Stream BA): this branch case MUST be checked BEFORE
+            # the tag-push case below, because the rc16 BRANCH name
+            # (recorder-v0.28.0-rc16) also matches the tag regex
+            # ^recorder-v\d. Order matters: exact rc16 branch first, then
+            # the catch-all tag pattern.
             $shortSha = $env:WORKFLOW_RUN_HEAD_SHA.Substring(0,7)
             $tag = "recorder-v0.28.0-rc16-$shortSha"
             $version = "0.28.0-rc16-$shortSha"
             $isRelease = 'false'
+          } elseif ($env:GITHUB_EVENT_NAME -eq 'workflow_run' -and `
+                    $env:WORKFLOW_RUN_EVENT -eq 'push' -and `
+                    $env:WORKFLOW_RUN_HEAD_BRANCH -match '^recorder-v\d') {
+            # rc17.0.4 (Stream BA): upstream was a `recorder-v*` tag push.
+            # The "branch" reported here is actually the tag name (refs to
+            # tags carry no branch context). Treat as full release - this
+            # is the path that replaces the old `push: tags: recorder-v*`
+            # direct trigger. By gating on WORKFLOW_RUN_EVENT='push' AND
+            # the tag pattern, we ignore workflow_run firings for branch
+            # pushes / workflow_dispatch of the Rust workflow. The rc16
+            # branch case above pre-empts this so we never misclassify a
+            # branch CI build as a release.
+            $tag = $env:WORKFLOW_RUN_HEAD_BRANCH
+            $version = $tag -replace '^recorder-v', ''
+            $isRelease = 'true'
           } else {
             $tag = $env:SMOKE_TAG_INPUT
             if ([string]::IsNullOrWhiteSpace($tag)) { $tag = 'v0.0.0-smoke' }
