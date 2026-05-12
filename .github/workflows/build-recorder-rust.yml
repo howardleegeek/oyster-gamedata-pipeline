@@ -148,6 +148,13 @@ jobs:
       - name: Install cargo-obs-build + fetch OBS runtime into dist/
         shell: pwsh
         working-directory: vendor/recorder
+        env:
+          # rc17.2.1: cargo-obs-build hits GH API for pinned OBS release;
+          # anon 60/hr quota exhausted causing rc17.2 build to die with 403.
+          # GITHUB_TOKEN raises limit to 5000/hr. Submodule's own CI
+          # already has this fix (Stream BA, dd29ea5); drift between
+          # parent + submodule CIs is what bit us.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cargo install cargo-obs-build
           if ($LASTEXITCODE -ne 0) {
