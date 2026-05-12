@@ -705,6 +705,56 @@ def _check_gameinfo_xlsx(d: Path, rpt: LintReport) -> None:
         rpt.add(LintResult(26, "gameinfo.xlsx structure", False,
                            f"xlsx parse error: {exc}"))
 
+def _check_depth_count(d: Path, rpt: LintReport) -> None:
+    """Criterion 27 (Audit D-P1-2): Depth EXR count matches PRD 6 fps rate.
+
+    PRD page 7 specifies depth captures at 6 fps. Per-file invalid-pixel
+    ratio is already covered by criterion 15; this check enforces the
+    *count* invariant — a 5-minute session must produce ~1800 .exr files.
+
+    Reads ``duration`` (seconds) from metadata.json (or any single ``*.json``
+    fallback), computes ``expected = round(duration * 6)``, and accepts a
+    90% tolerance to absorb start/stop frame loss.
+    """
+    meta_file = next(iter(d.glob("metadata.json")), None)
+    if meta_file is None:
+        json_candidates = [
+            p for p in d.glob("*.json")
+            if p.name.lower() not in {"action_camera.json", "systeminfo.json"}
+        ]
+        meta_file = json_candidates[0] if json_candidates else None
+    if meta_file is None:
+        rpt.add(LintResult(27, "Depth EXR count", False,
+                           "metadata.json missing"))
+        return
+    try:
+        meta = json.loads(meta_file.read_text(encoding="utf-8"))
+        duration_sec = float(meta.get("duration", 0) or 0)
+    except Exception as exc:
+        rpt.add(LintResult(27, "Depth EXR count", False,
+                           f"metadata parse error: {exc}"))
+        return
+    if duration_sec <= 0:
+        rpt.add(LintResult(27, "Depth EXR count", False,
+                           f"invalid duration: {duration_sec}"))
+        return
+    expected = int(round(duration_sec * 6))  # 6 fps depth sample rate per PRD
+    actual = len(list(d.glob("**/*.exr")))
+    tolerance = 0.9  # accept 90%+ as PASS
+    details = {
+        "duration_sec": round(duration_sec, 2),
+        "expected_exrs": expected,
+        "actual_exrs": actual,
+        "tolerance_pct": int(tolerance * 100),
+    }
+    if actual >= expected * tolerance:
+        rpt.add(LintResult(27, "Depth EXR count", True,
+                           f"{actual} EXRs (expected ~{expected})", details))
+    else:
+        rpt.add(LintResult(27, "Depth EXR count", False,
+                           f"only {actual} EXRs (expected ~{expected}, tolerance {int(tolerance*100)}%)",
+                           details))
+
 def run_all_checks(data_dir: Path) -> LintReport:
     """Run all 25 lint checks on the data directory."""
     rpt = LintReport(data_dir=data_dir)
@@ -722,6 +772,7 @@ def run_all_checks(data_dir: Path) -> LintReport:
     _check_structure(data_dir, rpt)
     _check_video_content_health(data_dir, rpt)
     _check_gameinfo_xlsx(data_dir, rpt)
+    _check_depth_count(data_dir, rpt)
     return rpt
 
 def main(argv: Optional[List[str]] = None) -> int:
