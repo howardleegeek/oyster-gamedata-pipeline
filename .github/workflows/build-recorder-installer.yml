@@ -69,28 +69,39 @@ name: Build Recorder Bundled Installer (R05E)
 #   ever opens the dispatch UI to anyone with read perms.
 
 "on":
-  # rc17.0.4 (Stream BA, Howard 2026-05-11): bundler is *always* downstream
-  # of build-recorder-rust.yml. Previously this workflow ran on both
-  # `push: tags: recorder-v*` AND `workflow_run` (rc16 branch only), which
-  # created a race: tag push triggered both workflows in parallel, bundler
-  # raced ahead at ~6 min, tried to download the Rust artifact, and failed
-  # with "no matching workflow run found" while Rust was still 7 minutes
-  # from finishing. Every rc17.x release required a manual
-  # `gh run rerun <bundler>` after Rust completed.
+  # rc17.1.1 (Stream BE, Howard 2026-05-12): trigger triage post-mortem.
   #
-  # Fix: drive the bundler exclusively off `workflow_run` completion of
-  # the Rust workflow. The Rust workflow itself triggers on tag pushes
-  # (`recorder-v*`), the rc16 branch, and workflow_dispatch, so this
-  # downstream listener inherits all three trigger paths transitively.
-  # When upstream was a tag push, workflow_run.head_branch is the tag
-  # name (e.g. "recorder-v0.28.0-rc17.1"); when upstream was a branch
-  # push, it is the branch name. The job-level `if:` gate filters to
-  # only successful runs; the Resolve step inspects head_branch and the
-  # upstream workflow's event to pick release vs CI mode.
+  # Stream BA (rc17.0.4) tried to drive this bundler EXCLUSIVELY off
+  # `workflow_run` completion of build-recorder-rust.yml, to fix a real
+  # race: when both `push: tags: recorder-v*` and `workflow_run` were
+  # active, the tag push triggered both workflows in parallel, the
+  # bundler raced ahead at ~6 min, tried to download the Rust artifact,
+  # and failed with "no matching workflow run found" while Rust was
+  # still building.
   #
-  # The `branches` filter is intentionally absent. Tag-push runs carry
-  # no branch context, so a `branches` filter would silently drop them
-  # and break every release tag push.
+  # BUT — and this is the bug we hit on rc17.0.5 / rc17.1 — `workflow_run`
+  # uses the workflow file *as defined on the default branch* at trigger
+  # time. The Stream BA change was committed to `rc17.0-integrated` but
+  # never merged to `main`, and main's bundler had no `workflow_run`
+  # trigger. So when rc17.0.5/rc17.1 tag-pushed from rc17.0-integrated:
+  #   - Rust workflow at the tag ref had push.tags → ran ✓
+  #   - Bundler workflow at the tag ref had ONLY workflow_run → didn't fire
+  #     on tag push ✗
+  #   - workflow_run downstream gate on main had no workflow_run trigger
+  #     either → didn't fire ✗
+  # Result: zero bundler runs for rc17.0.5 / rc17.1, no installer .exe
+  # was ever produced.
+  #
+  # Real fix: restore `push.tags` as the primary trigger so tag pushes
+  # always fire the bundler immediately (no main-branch coupling). To
+  # solve the race that motivated Stream BA, add an explicit
+  # "Wait for upstream Rust workflow" step at the start of the job
+  # (see steps[Wait for upstream Rust...]) that polls until Rust
+  # succeeded for the same commit before any artifact download runs.
+  # workflow_run is kept for rc16 branch CI only.
+  push:
+    tags:
+      - 'recorder-v*'
   workflow_run:
     workflows: ['Build Recorder Rust EXE (R-rust-primary)']
     types: [completed]
@@ -118,13 +129,25 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 45
 
-    # rc16: when triggered by workflow_run, only proceed if the upstream
-    # Rust build succeeded. github.event.workflow_run is null for the
-    # other trigger paths (push, workflow_dispatch), so the condition
-    # is true for them too.
+    # rc17.1.1 (Stream BE, Howard 2026-05-12): explicit per-trigger gate
+    # to prevent double-fire on tag push. Tag pushes are handled by the
+    # `push.tags` trigger (primary, fires reliably on tag creation);
+    # workflow_run path is restricted to the rc16 branch CI flow only.
+    #
+    # Without this filter, a tag push that *also* completes the Rust
+    # workflow successfully would queue two bundler runs (one from
+    # push.tags, one from workflow_run on the tag-ref completion).
+    # They would have different `github.ref` values (refs/tags/... vs
+    # refs/heads/main), so the concurrency group would NOT serialize
+    # them — they'd race for `gh release create` and corrupt the
+    # release assets. Exclusive selection here keeps the bundler
+    # single-firing per tag.
     if: >-
-      github.event_name != 'workflow_run' ||
-      github.event.workflow_run.conclusion == 'success'
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/recorder-v')) ||
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'recorder-v0.28.0-rc16')
 
     env:
       # ASCII-only Python output — Windows runners default to cp1252 and
@@ -151,8 +174,64 @@ jobs:
           # NOT the head_sha of the triggering workflow. Pass the upstream
           # sha explicitly so we build the same commit the Rust artifact
           # was produced from. For other triggers this evaluates to '' and
-          # checkout uses its default (current ref).
+          # checkout uses its default (current ref = the tag for push.tags).
           ref: ${{ github.event.workflow_run.head_sha }}
+
+      # ---------------------------------------------------------------------
+      # 1b. Wait for upstream Rust workflow (rc17.1.1 Stream BE)
+      # ---------------------------------------------------------------------
+      # On tag push, this bundler is queued by `push.tags` IMMEDIATELY
+      # — but `build-recorder-rust.yml` (which produces the Rust EXE
+      # artifact we download below) is also just starting. The
+      # original race that motivated Stream BA was: bundler hit the
+      # `gh run download` step at ~6 min, Rust was still 7 min from
+      # done, download failed with "no matching workflow run found".
+      #
+      # This step polls until Rust finishes (success → continue,
+      # failure/cancelled → abort bundler so we don't ship a half-baked
+      # installer). On workflow_dispatch (smoke) we skip — no upstream
+      # Rust run is expected for synthetic tags. On workflow_run (rc16
+      # branch CI) we also skip — the trigger itself guarantees
+      # upstream success via the job-level `if:` gate.
+      - name: Wait for upstream Rust workflow to succeed
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/recorder-v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          MAX_WAIT_MIN=30
+          POLL_SECONDS=30
+          deadline=$(( $(date +%s) + MAX_WAIT_MIN*60 ))
+          echo "Polling build-recorder-rust.yml on commit $COMMIT_SHA (max ${MAX_WAIT_MIN}min, every ${POLL_SECONDS}s)"
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            out=$(gh run list --workflow=build-recorder-rust.yml \
+                              --commit "$COMMIT_SHA" \
+                              --json status,conclusion,databaseId \
+                              --limit 1 2>/dev/null || echo '[]')
+            status=$(echo "$out" | jq -r '.[0].status // "missing"')
+            conclusion=$(echo "$out" | jq -r '.[0].conclusion // "null"')
+            run_id=$(echo "$out" | jq -r '.[0].databaseId // "?"')
+            echo "[$(date -u +%H:%M:%S)] rust run=$run_id status=$status conclusion=$conclusion"
+            case "$conclusion" in
+              success)
+                echo "✓ Upstream Rust workflow succeeded — bundler may proceed."
+                exit 0
+                ;;
+              failure|cancelled|timed_out|action_required|startup_failure|stale)
+                echo "✗ Upstream Rust workflow ended in '$conclusion' — aborting bundler."
+                exit 1
+                ;;
+              null|"")
+                # Still running (status=in_progress|queued|waiting) or missing run.
+                ;;
+            esac
+            sleep "$POLL_SECONDS"
+          done
+          echo "✗ Upstream Rust workflow did not succeed within ${MAX_WAIT_MIN}min — aborting."
+          exit 1
 
       # ---------------------------------------------------------------------
       # 2. Resolve the version we're building
@@ -185,7 +264,16 @@ jobs:
           # the race condition that broke every rc17.x ship.
           WORKFLOW_RUN_EVENT: ${{ github.event.workflow_run.event }}
         run: |
-          if ($env:GITHUB_EVENT_NAME -eq 'workflow_run' -and $env:WORKFLOW_RUN_HEAD_BRANCH -eq 'recorder-v0.28.0-rc16') {
+          if ($env:GITHUB_EVENT_NAME -eq 'push' -and $env:GITHUB_REF -match '^refs/tags/recorder-v') {
+            # rc17.1.1 (Stream BE, Howard 2026-05-12): direct tag push.
+            # This is the primary trigger path after the workflow_run-only
+            # regression broke rc17.0.5/rc17.1. The Wait-for-Rust step
+            # earlier in this job ensures the Rust artifact is already
+            # uploaded by the time we hit the artifact download below.
+            $tag = $env:GITHUB_REF_NAME
+            $version = $tag -replace '^recorder-v', ''
+            $isRelease = 'true'
+          } elseif ($env:GITHUB_EVENT_NAME -eq 'workflow_run' -and $env:WORKFLOW_RUN_HEAD_BRANCH -eq 'recorder-v0.28.0-rc16') {
             # rc16 (Howard 2026-05-11): branch-push CI build, chained after
             # build-recorder-rust.yml succeeded. Synthesize a version string
             # so all downstream filename logic still works, but mark
