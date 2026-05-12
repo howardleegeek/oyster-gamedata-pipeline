@@ -76,6 +76,13 @@ MC_READY_MARKERS = (
     "[Render thread/INFO]",  # standard MC log line, very early
 )
 
+# PRD-100 (2026-05-11): customer PRD mandates "全屏录制, 系统分辨率和
+# 游戏分辨率为 1920×1080". We force this at MC launch via Mojang's
+# documented ``--width``/``--height``/``--fullscreen`` launcher args.
+PRD_WINDOW_WIDTH = 1920
+PRD_WINDOW_HEIGHT = 1080
+ENV_SESSION_DIR = "OYSTER_SESSION_DIR"
+
 
 # --------------------------------------------------------------------------
 # Cross-platform sandbox path
@@ -542,6 +549,14 @@ def build_launch_plan(
         "--xuid", "",
         "--userType", "legacy",
         "--versionType", "release",
+        # PRD-100: force 1920x1080 fullscreen. Mojang's launcher passes
+        # --width/--height/--fullscreen which MC's Minecraft.main() honors
+        # via Options.overrideWidth/Height + fullscreen toggle on first
+        # frame. Without these MC defaults to 854×480 windowed and the
+        # recorder captures the wrong resolution.
+        "--width", str(PRD_WINDOW_WIDTH),
+        "--height", str(PRD_WINDOW_HEIGHT),
+        "--fullscreen",
     ]
     cmd.extend(game_args)
 
@@ -586,16 +601,60 @@ def _tail_file(path: Path, n_lines: int = 80) -> str:
     return "\n".join(lines[-n_lines:])
 
 
+def recordings_root() -> Path:
+    """PRD-100: Return ``%LOCALAPPDATA%/GameData Recorder/recordings``.
+
+    Mirrors ``oyster_play._find_latest_session_dir``'s root so the mod
+    writes ``game_state.jsonl`` into the same parent the Rust recorder
+    uses for ``action_camera.json`` and the video.
+    """
+    if os.name == "nt":
+        local = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
+    elif sys.platform == "darwin":
+        # Dev-mode only — production is Windows.
+        local = str(Path.home() / "Library" / "Application Support")
+    else:
+        local = str(Path.home() / ".local" / "share")
+    return Path(local) / "GameData Recorder" / "recordings"
+
+
+def predict_session_dir() -> Path:
+    """PRD-100: Pre-create the session directory the mod will write into.
+
+    Matches the Rust recorder's session_id format
+    ``session_YYYYMMDD_HHMMSS_<8hex>`` (see
+    ``vendor/recorder/src/record/session_manager.rs::generate_session_id``)
+    so the dir survives the post-record pipeline's
+    ``_find_latest_session_dir`` selection.
+    """
+    now = time.gmtime()
+    suffix = uuid.uuid4().hex[:8]
+    session_id = (
+        f"session_{now.tm_year:04d}{now.tm_mon:02d}{now.tm_mday:02d}_"
+        f"{now.tm_hour:02d}{now.tm_min:02d}{now.tm_sec:02d}_{suffix}"
+    )
+    target = recordings_root() / session_id
+    target.mkdir(parents=True, exist_ok=True)
+    return target
+
+
 def launch_javaw(
     plan: LaunchPlan,
     *,
     detach: bool = False,
+    session_dir: Path | None = None,
 ) -> subprocess.Popen:
     """Spawn the JVM with stderr → log file (bug-fix #3).
 
     ``detach=False`` (default): caller manages the Popen object.
     ``detach=True``: Windows ``CREATE_NEW_PROCESS_GROUP`` so the
     launcher can exit while MC keeps running.
+
+    ``session_dir`` (PRD-100): directory the mod writes
+    ``game_state.jsonl`` into. If ``None`` we honor a pre-set
+    ``OYSTER_SESSION_DIR`` env var, otherwise predict + create one under
+    ``%LOCALAPPDATA%/GameData Recorder/recordings/``. Exported into the
+    JVM's environment so ``SessionDir.outputPath()`` resolves it.
     """
     plan.instance_dir.mkdir(parents=True, exist_ok=True)
     plan.log_file.parent.mkdir(parents=True, exist_ok=True)
@@ -605,8 +664,38 @@ def launch_javaw(
         # CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS
         creation_flags = 0x00000200 | 0x00000008
 
+    # PRD-100: resolve session dir + export to JVM env. We don't override
+    # an explicit OYSTER_SESSION_DIR the parent already set (oyster_play
+    # may want to control this).
+    env = os.environ.copy()
+    if session_dir is None:
+        existing = env.get(ENV_SESSION_DIR, "").strip()
+        if existing:
+            session_dir = Path(existing)
+        else:
+            try:
+                session_dir = predict_session_dir()
+            except OSError as exc:  # noqa: BLE001 — never block launch on FS error
+                logger.warning(
+                    "PRD-100: could not pre-create session dir (%s); mod will "
+                    "fall back to ~/Documents/OysterClips/active_session",
+                    exc,
+                )
+                session_dir = None
+    if session_dir is not None:
+        try:
+            session_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            logger.warning("PRD-100: session_dir mkdir failed (%s)", exc)
+        env[ENV_SESSION_DIR] = str(session_dir)
+        logger.info("PRD-100: OYSTER_SESSION_DIR=%s exported to MC JVM",
+                    session_dir)
+
     log_handle = plan.log_file.open("w", encoding="utf-8", errors="replace")
-    log_handle.write(f"=== oyster_launch_mc.py ===\ncmd: {plan.cmd}\n\n")
+    log_handle.write(f"=== oyster_launch_mc.py ===\ncmd: {plan.cmd}\n")
+    if session_dir is not None:
+        log_handle.write(f"{ENV_SESSION_DIR}: {session_dir}\n")
+    log_handle.write("\n")
     log_handle.flush()
 
     proc = subprocess.Popen(
@@ -615,6 +704,7 @@ def launch_javaw(
         stdout=log_handle,
         stderr=subprocess.STDOUT,  # interleave so order is preserved
         creationflags=creation_flags if os.name == "nt" else 0,
+        env=env,
     )
     return proc
 
