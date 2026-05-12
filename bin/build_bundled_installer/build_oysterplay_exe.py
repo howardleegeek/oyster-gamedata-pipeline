@@ -137,6 +137,14 @@ def _construct_pyinstaller_args(
     # ImportError branch — diag uploader becomes dead code in prod.
     args.extend(["--hidden-import", "diag_uploader"])
 
+    # Audit D-P0-2 (rc17.0 Stream T): verify_prd_schema is imported
+    # lazily inside oyster_play._run_schema_validation_step() to gate
+    # the upload trigger on local PRD-schema validation. Same nested-
+    # def reason as diag_uploader above — if this line is missing,
+    # the bundled OysterPlay.exe fail-closes every session (rc=1
+    # "module unimportable"), silently dropping ALL diag uploads.
+    args.extend(["--hidden-import", "verify_prd_schema"])
+
     # Add bin/ to module search so PyInstaller finds the sibling.
     args.extend(["--paths", str(BIN_DIR)])
 
