@@ -650,6 +650,46 @@ def _find_latest_session_dir() -> Path | None:
         return None
 
 
+def _run_lint_step(session_dir: Path, report_path: Path | None = None) -> int:
+    """Audit H P1: run lint and return a truthful rc derived from the report.
+
+    Prior wrapper always returned 0, so ``lint=OK`` was logged even when
+    criteria had failed. Contract: rc=0 all-pass, rc=N for N failed
+    criteria (capped at 255), rc=2 when the report is missing/unparseable.
+    """
+    import json  # noqa: PLC0415
+
+    if report_path is None:
+        report_path = session_dir / "lint_v3_report.json"
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        from lint_v3_prd_grounded import main as _lint_main  # noqa: PLC0415
+    except ImportError as e:
+        logger.warning("lint wrapper: module unavailable (%s)", e)
+        return 2
+    try:
+        _lint_main([str(session_dir), "--output", str(report_path)])
+    except Exception as e:  # noqa: BLE001 — partial reports are still useful
+        logger.warning("lint wrapper: lint_main raised (%s)", e)
+    if not report_path.is_file():
+        logger.warning("lint wrapper: report missing at %s", report_path)
+        return 2
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        logger.warning("lint wrapper: report unparseable (%s)", e)
+        return 2
+    results = report.get("results") or report.get("criteria") or []
+    if not isinstance(results, list) or not results:
+        logger.warning("lint wrapper: report has no criteria results")
+        return 2
+    failed = sum(1 for r in results
+                 if isinstance(r, dict) and r.get("passed") is False)
+    total = len(results)
+    logger.info("lint result: %d/%d criteria passed", total - failed, total)
+    return 0 if failed == 0 else min(failed, 255)
+
+
 def _spawn_diag_uploader_thread() -> None:
     """rc16.11: launch run_layer4 in a daemon thread so the launcher
     main thread can return without blocking on a Tk dialog. Privacy
