@@ -148,6 +148,17 @@ jobs:
       - name: Install cargo-obs-build + fetch OBS runtime into dist/
         shell: pwsh
         working-directory: vendor/recorder
+        env:
+          # rc17.0.4 fix: cargo-obs-build queries GitHub's release API to
+          # locate the pinned OBS Studio release ZIP. Without GITHUB_TOKEN
+          # it issues an anonymous request and shares the runner's IP-bucketed
+          # 60/hr unauth limit with the rest of the world - rc17.0.3 hit a
+          # 403 here ("API rate limit exceeded for 52.160.149.129"). Passing
+          # the auto-provisioned workflow token bumps the budget to 5000/hr
+          # per repo, which is effectively unlimited for a release pipeline.
+          # cargo-obs-build reads GITHUB_TOKEN from env and switches to
+          # authenticated Bearer requests when present.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cargo install cargo-obs-build
           if ($LASTEXITCODE -ne 0) {
