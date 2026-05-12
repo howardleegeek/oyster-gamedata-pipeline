@@ -196,6 +196,34 @@ def detect_msi_afterburner() -> bool:
     return "msiafterburner.exe" in procs or "rtss.exe" in procs
 
 
+def detect_game_dvr_enabled() -> bool:
+    """Return True if Windows Game DVR is enabled. Game DVR uses DXGI
+    Desktop Duplication which can conflict with our recorder on AMD GPUs."""
+    if not _is_windows():
+        return False
+    try:
+        import winreg  # noqa: PLC0415
+    except ImportError:
+        return False
+    # Check 1: HKCU\Software\Microsoft\GameBar\AutoGameModeEnabled
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                            r"Software\Microsoft\GameBar") as k:
+            val, _ = winreg.QueryValueEx(k, "AutoGameModeEnabled")
+            if val == 1:
+                return True
+    except (OSError, FileNotFoundError):
+        pass
+    # Check 2: HKLM policy
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                            r"SOFTWARE\Policies\Microsoft\Windows\GameDVR") as k:
+            val, _ = winreg.QueryValueEx(k, "AllowGameDVR")
+            return val == 1
+    except (OSError, FileNotFoundError):
+        return False
+
+
 def detect_display_scaling() -> dict[int, float]:
     """Return {monitor_index: dpi_scale} where 1.0 == 100%.
 
@@ -273,6 +301,11 @@ _DETECTORS = (
      "inject into the game and can cause black frames. Close RTSS.",
      "检测到 MSI Afterburner / RTSS OSD 正在运行，会注入游戏并可能"
      "导致录制黑屏。请关闭 RTSS。", False),
+    ("game_dvr", "detect_game_dvr_enabled", "GAME_DVR_ENABLED", "warning",
+     "Windows Game DVR is enabled. May conflict with recorder on AMD GPUs. "
+     "Disable in Settings > Gaming > Game DVR.",
+     "Windows Game DVR 已启用。可能影响 AMD GPU 录制性能。"
+     "请在 Settings > Gaming > Game DVR 中禁用。", False),
 )
 
 
