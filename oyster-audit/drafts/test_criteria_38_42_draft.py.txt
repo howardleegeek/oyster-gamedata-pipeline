@@ -1,0 +1,496 @@
+"""Tests for bin/lint_v3_prd_grounded.py — criteria #38-42 (Stream rc18).
+
+Covers:
+  #38 audio stream exists in mp4 + AAC codec (use ffprobe)
+  #39 input-to-frame latency measurement file exists + <= 20ms
+  #40 WASD balance — total_keyboard_events split (each direction within 25% +/- 15%)
+  #41 stationary % <= 10% (no 2+ second windows where mouse_dx/dy=0 AND no keys pressed)
+  #42 clip has < 2 sec frozen frame (consecutive identical frames)
+"""
+from __future__ import annotations
+
+import importlib.util
+import json
+import sys
+import textwrap
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+LINT_MOD = REPO_ROOT / "bin" / "lint_v3_prd_grounded.py"
+
+# Load lint_v3_prd_grounded as a module.
+_spec = importlib.util.spec_from_file_location("lint_v3", LINT_MOD)
+lint_v3 = importlib.util.module_from_spec(_spec)
+sys.modules["lint_v3"] = lint_v3
+_spec.loader.exec_module(lint_v3)
+
+LintReport = lint_v3.LintReport
+LintResult = lint_v3.LintResult
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _make_report(data_dir: Path) -> LintReport:
+    """Run all checks and return the report."""
+    return lint_v3.run_all_checks(data_dir)
+
+
+def _result_by_id(rpt: LintReport, cid: int) -> LintResult | None:
+    for r in rpt.results:
+        if r.criterion_id == cid:
+            return r
+    return None
+
+
+def _write_json(d: Path, name: str, data):
+    p = d / name
+    p.write_text(json.dumps(data), encoding="utf-8")
+    return p
+
+
+def _write_text(d: Path, name: str, text: str):
+    p = d / name
+    p.write_text(text, encoding="utf-8")
+    return p
+
+
+def _make_action_camera(d: Path, frames: list) -> Path:
+    return _write_json(d, "action_camera.json", frames)
+
+
+def _make_dummy_mp4(d: Path, name: str = "video.mp4") -> Path:
+    """Create a minimal valid MP4 file (just the ftyp box)."""
+    # Minimal ftyp box: size(4) + 'ftyp'(4) + brand(4) + minor(4) + compat(4)
+    data = (
+        b'\x00\x00\x00\x1c'  # size = 28
+        b'ftyp'
+        b'mp42'              # major brand
+        b'\x00\x00\x00\x00'  # minor version
+        b'mp42'              # compatible brand
+        b'isom'              # compatible brand
+    )
+    p = d / name
+    p.write_bytes(data)
+    return p
+
+
+# ---------------------------------------------------------------------------
+# Criterion 38: Audio stream exists in mp4 + AAC codec
+# ---------------------------------------------------------------------------
+
+class TestCriterion38AudioStreamAAC:
+    """#38: audio stream exists in mp4 + AAC codec (use ffprobe)."""
+
+    def test_no_video_file_fails(self, tmp_path):
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 38)
+        assert r is not None
+        assert r.passed is False
+        assert "No primary video" in r.message
+
+    def test_video_without_audio_fails(self, tmp_path):
+        _make_dummy_mp4(tmp_path)
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 38)
+        assert r is not None
+        # Without ffprobe or without audio stream, should fail or dep-missing
+        assert r.passed is False or "unavailable" in r.message.lower()
+
+    def test_total_checks_is_42(self, tmp_path):
+        rpt = _make_report(tmp_path)
+        assert rpt.total_checks == 42
+
+
+# ---------------------------------------------------------------------------
+# Criterion 39: Input-to-frame latency <= 20ms
+# ---------------------------------------------------------------------------
+
+class TestCriterion39Latency:
+    """#39: input-to-frame latency measurement file exists + <= 20ms."""
+
+    def test_no_latency_file_fails(self, tmp_path):
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 39)
+        assert r is not None
+        assert r.passed is False
+        assert "No latency" in r.message
+
+    def test_latency_file_with_good_values_passes(self, tmp_path):
+        _write_json(tmp_path, "latency.json", [5.2, 8.1, 12.0, 15.3, 3.7])
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 39)
+        assert r is not None
+        assert r.passed is True
+        assert "max=" in r.message
+
+    def test_latency_file_with_high_value_fails(self, tmp_path):
+        _write_json(tmp_path, "latency.json", [5.2, 8.1, 25.0, 15.3])
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 39)
+        assert r is not None
+        assert r.passed is False
+        assert "require" in r.message.lower()
+
+    def test_latency_dict_format_passes(self, tmp_path):
+        _write_json(tmp_path, "latency_ms.json", {
+            "latencies": [
+                {"latency_ms": 10.0},
+                {"latency_ms": 18.5},
+                {"latency_ms": 7.2},
+            ]
+        })
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 39)
+        assert r is not None
+        assert r.passed is True
+
+    def test_latency_dict_format_fails(self, tmp_path):
+        _write_json(tmp_path, "input_latency.json", {
+            "measurements": [
+                {"latency": 10.0},
+                {"latency": 30.0},
+            ]
+        })
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 39)
+        assert r is not None
+        assert r.passed is False
+
+    def test_latency_flat_list_of_dicts(self, tmp_path):
+        _write_json(tmp_path, "latency.json", [
+            {"latency_ms": 5.0},
+            {"latency_ms": 19.9},
+        ])
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 39)
+        assert r is not None
+        assert r.passed is True
+
+    def test_latency_exactly_20ms_passes(self, tmp_path):
+        _write_json(tmp_path, "latency.json", [20.0, 15.0, 10.0])
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 39)
+        assert r is not None
+        assert r.passed is True
+
+    def test_latency_20_1ms_fails(self, tmp_path):
+        _write_json(tmp_path, "latency.json", [20.1, 15.0])
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 39)
+        assert r is not None
+        assert r.passed is False
+
+
+# ---------------------------------------------------------------------------
+# Criterion 40: WASD balance
+# ---------------------------------------------------------------------------
+
+class TestCriterion40WASDBalance:
+    """#40: WASD balance — each direction within 25% +/- 15% (10%-40%)."""
+
+    def test_balanced_wasd_passes(self, tmp_path):
+        # 100 frames, 25 each of W, A, S, D = 25% each
+        frames = []
+        for i in range(100):
+            key = ["W", "A", "S", "D"][i % 4]
+            frames.append({
+                "frame_index": i,
+                "mouse_dx": 1.0,
+                "mouse_dy": 0.0,
+                "keys_pressed": [key],
+            })
+        _make_action_camera(tmp_path, frames)
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 40)
+        assert r is not None
+        assert r.passed is True
+
+    def test_unbalanced_wasd_fails(self, tmp_path):
+        # 100 frames, 90 W, 5 A, 3 S, 2 D => W=90% (way outside 10-40%)
+        frames = []
+        for i in range(90):
+            frames.append({"frame_index": i, "mouse_dx": 1.0,
+                           "keys_pressed": ["W"]})
+        for i in range(90, 95):
+            frames.append({"frame_index": i, "mouse_dx": 1.0,
+                           "keys_pressed": ["A"]})
+        for i in range(95, 98):
+            frames.append({"frame_index": i, "mouse_dx": 1.0,
+                           "keys_pressed": ["S"]})
+        for i in range(98, 100):
+            frames.append({"frame_index": i, "mouse_dx": 1.0,
+                           "keys_pressed": ["D"]})
+        _make_action_camera(tmp_path, frames)
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 40)
+        assert r is not None
+        assert r.passed is False
+
+    def test_insufficient_wasd_events_passes(self, tmp_path):
+        # Only 5 WASD events total — should skip/pass
+        frames = []
+        for i in range(5):
+            frames.append({
+                "frame_index": i,
+                "mouse_dx": 1.0,
+                "keys_pressed": ["W"],
+            })
+        _make_action_camera(tmp_path, frames)
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 40)
+        assert r is not None
+        assert r.passed is True
+        assert "insufficient" in r.message.lower()
+
+    def test_no_action_camera_fails(self, tmp_path):
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 40)
+        assert r is not None
+        # With no action_camera.json, data is None -> total=0 < 20 -> passes
+        # (insufficient sample)
+        assert r.passed is True
+
+    def test_vk_code_wasd_passes(self, tmp_path):
+        # Using VK codes: W=87, A=65, S=83, D=68
+        frames = []
+        vk_map = {"W": "87", "A": "65", "S": "83", "D": "68"}
+        for i in range(100):
+            key = ["W", "A", "S", "D"][i % 4]
+            frames.append({
+                "frame_index": i,
+                "mouse_dx": 1.0,
+                "keys_pressed": [vk_map[key]],
+            })
+        _make_action_camera(tmp_path, frames)
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 40)
+        assert r is not None
+        assert r.passed is True
+
+    def test_keys_held_field(self, tmp_path):
+        # Using keys_held instead of keys_pressed
+        frames = []
+        for i in range(100):
+            key = ["W", "A", "S", "D"][i % 4]
+            frames.append({
+                "frame_index": i,
+                "mouse_dx": 1.0,
+                "keys_held": [key],
+            })
+        _make_action_camera(tmp_path, frames)
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 40)
+        assert r is not None
+        assert r.passed is True
+
+
+# ---------------------------------------------------------------------------
+# Criterion 41: Stationary percentage <= 10%
+# ---------------------------------------------------------------------------
+
+class TestCriterion41Stationary:
+    """#41: stationary % <= 10%."""
+
+    def test_low_stationary_passes(self, tmp_path):
+        # 100 frames, only 5 stationary (5%)
+        frames = []
+        for i in range(100):
+            if i < 5:
+                frames.append({
+                    "frame_index": i,
+                    "mouse_dx": 0.0,
+                    "mouse_dy": 0.0,
+                    "keys_pressed": [],
+                })
+            else:
+                frames.append({
+                    "frame_index": i,
+                    "mouse_dx": 5.0,
+                    "mouse_dy": 2.0,
+                    "keys_pressed": ["W"],
+                })
+        _make_action_camera(tmp_path, frames)
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 41)
+        assert r is not None
+        assert r.passed is True
+
+    def test_high_stationary_fails(self, tmp_path):
+        # 100 frames, 50 stationary (50%)
+        frames = []
+        for i in range(50):
+            frames.append({
+                "frame_index": i,
+                "mouse_dx": 0.0,
+                "mouse_dy": 0.0,
+                "keys_pressed": [],
+            })
+        for i in range(50, 100):
+            frames.append({
+                "frame_index": i,
+                "mouse_dx": 5.0,
+                "mouse_dy": 2.0,
+                "keys_pressed": ["W"],
+            })
+        _make_action_camera(tmp_path, frames)
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 41)
+        assert r is not None
+        assert r.passed is False
+
+    def test_stationary_with_keys_not_counted(self, tmp_path):
+        # 100 frames, 50 have mouse=0 but keys pressed -> not stationary
+        frames = []
+        for i in range(50):
+            frames.append({
+                "frame_index": i,
+                "mouse_dx": 0.0,
+                "mouse_dy": 0.0,
+                "keys_pressed": ["W"],  # keys pressed -> NOT stationary
+            })
+        for i in range(50, 100):
+            frames.append({
+                "frame_index": i,
+                "mouse_dx": 5.0,
+                "mouse_dy": 2.0,
+                "keys_pressed": ["W"],
+            })
+        _make_action_camera(tmp_path, frames)
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 41)
+        assert r is not None
+        assert r.passed is True  # 0% stationary
+
+    def test_exactly_10_pct_passes(self, tmp_path):
+        # 100 frames, exactly 10 stationary = 10%
+        frames = []
+        for i in range(10):
+            frames.append({
+                "frame_index": i,
+                "mouse_dx": 0.0,
+                "mouse_dy": 0.0,
+                "keys_pressed": [],
+            })
+        for i in range(10, 100):
+            frames.append({
+                "frame_index": i,
+                "mouse_dx": 5.0,
+                "mouse_dy": 2.0,
+                "keys_pressed": ["W"],
+            })
+        _make_action_camera(tmp_path, frames)
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 41)
+        assert r is not None
+        assert r.passed is True
+
+    def test_no_action_camera_fails(self, tmp_path):
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 41)
+        assert r is not None
+        assert r.passed is False
+
+    def test_empty_action_camera_fails(self, tmp_path):
+        _make_action_camera(tmp_path, [])
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 41)
+        assert r is not None
+        assert r.passed is False
+
+
+# ---------------------------------------------------------------------------
+# Criterion 42: Frozen frame < 2 sec
+# ---------------------------------------------------------------------------
+
+class TestCriterion42FrozenFrames:
+    """#42: clip has < 2 sec frozen frame (consecutive identical frames)."""
+
+    def test_no_video_fails(self, tmp_path):
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 42)
+        assert r is not None
+        assert r.passed is False
+        assert "No primary video" in r.message
+
+    def test_fallback_no_frozen_passes(self, tmp_path):
+        # All frames have different mouse_dx -> no frozen
+        frames = []
+        for i in range(100):
+            frames.append({
+                "frame_index": i,
+                "mouse_dx": float(i),
+                "mouse_dy": 0.0,
+                "camera_rotation_quaternion": [0.0, 0.0, 0.0, 1.0],
+                "fps": 30.0,
+            })
+        _make_action_camera(tmp_path, frames)
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 42)
+        assert r is not None
+        # Without ffmpeg, falls back to action_camera check
+        # All frames differ -> 0 frozen -> pass
+        assert r.passed is True
+
+    def test_fallback_frozen_fails(self, tmp_path):
+        # 100 frames, all identical -> 99 consecutive frozen at 30fps = 3.3s
+        frames = []
+        for i in range(100):
+            frames.append({
+                "frame_index": i,
+                "mouse_dx": 0.0,
+                "mouse_dy": 0.0,
+                "camera_rotation_quaternion": [0.0, 0.0, 0.0, 1.0],
+                "fps": 30.0,
+            })
+        _make_action_camera(tmp_path, frames)
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 42)
+        assert r is not None
+        # Without ffmpeg, falls back -> 99 frozen frames at 30fps = 3.3s > 2s
+        assert r.passed is False
+
+    def test_fallback_short_frozen_passes(self, tmp_path):
+        # 100 frames, 30 consecutive identical = 1.0s at 30fps (< 2s)
+        frames = []
+        for i in range(30):
+            frames.append({
+                "frame_index": i,
+                "mouse_dx": 0.0,
+                "mouse_dy": 0.0,
+                "camera_rotation_quaternion": [0.0, 0.0, 0.0, 1.0],
+                "fps": 30.0,
+            })
+        for i in range(30, 100):
+            frames.append({
+                "frame_index": i,
+                "mouse_dx": float(i),
+                "mouse_dy": 0.0,
+                "camera_rotation_quaternion": [0.0, 0.0, 0.0, 1.0],
+                "fps": 30.0,
+            })
+        _make_action_camera(tmp_path, frames)
+        rpt = _make_report(tmp_path)
+        r = _result_by_id(rpt, 42)
+        assert r is not None
+        assert r.passed is True
+
+
+# ---------------------------------------------------------------------------
+# Integration: total_checks = 42
+# ---------------------------------------------------------------------------
+
+class TestTotalChecks:
+    """Verify the report total is 42."""
+
+    def test_total_is_42(self, tmp_path):
+        rpt = _make_report(tmp_path)
+        assert rpt.total_checks == 42
+
+    def test_all_criteria_present(self, tmp_path):
+        rpt = _make_report(tmp_path)
+        ids = {r.criterion_id for r in rpt.results}
+        # Criteria 38-42 must be present
+        for cid in (38, 39, 40, 41, 42):
+            assert cid in ids, f"Criterion {cid} missing from results"

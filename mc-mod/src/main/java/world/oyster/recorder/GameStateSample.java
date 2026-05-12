@@ -11,6 +11,7 @@ package world.oyster.recorder;
  *
  * <p>All angles in degrees; all distances in blocks (= metres in MC's
  * {@code metric_scale=1.0} convention); timestamps in ms-since-epoch.
+ * Velocity is in m/s (blocks per second).
  */
 public record GameStateSample(
     long tick,
@@ -46,6 +47,14 @@ public record GameStateSample(
         appendKv(sb, "velocity_x", velocityX);      sb.append(',');
         appendKv(sb, "velocity_y", velocityY);      sb.append(',');
         appendKv(sb, "velocity_z", velocityZ);      sb.append(',');
+        // Add camera_velocity fields (same as velocity for first-person MC)
+        appendKv(sb, "camera_velocity_x", velocityX); sb.append(',');
+        appendKv(sb, "camera_velocity_y", velocityY); sb.append(',');
+        appendKv(sb, "camera_velocity_z", velocityZ); sb.append(',');
+        // Add player_velocity fields (same as velocity for first-person MC)
+        appendKv(sb, "player_velocity_x", velocityX); sb.append(',');
+        appendKv(sb, "player_velocity_y", velocityY); sb.append(',');
+        appendKv(sb, "player_velocity_z", velocityZ); sb.append(',');
         appendKv(sb, "on_ground", onGround);        sb.append(',');
         appendKv(sb, "sneaking", sneaking);         sb.append(',');
         appendKv(sb, "sprinting", sprinting);       sb.append(',');

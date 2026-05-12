@@ -53,6 +53,32 @@ except ImportError:  # pragma: no cover — defensive: dialog text never crashes
     def _t(en: str, zh: str) -> str:  # type: ignore[no-redef]
         return en
 
+
+# --------------------------------------------------------------------------
+# rc17.4-form — operator metadata form (first-launch + per-session)
+# --------------------------------------------------------------------------
+
+try:
+    from oyster_launcher_form import (  # type: ignore[import-not-found]
+        apply_config_to_env,
+        config_exists,
+        load_config,
+        prompt_route_type,
+        save_config,
+        show_first_launch_form,
+    )
+except ImportError:
+    # When run from repo, bin/ may not be on sys.path yet.
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from oyster_launcher_form import (  # type: ignore[no-redef]
+        apply_config_to_env,
+        config_exists,
+        load_config,
+        prompt_route_type,
+        save_config,
+        show_first_launch_form,
+    )
+
 logger = logging.getLogger("oyster_play")
 
 
@@ -1132,6 +1158,49 @@ def run_smoke_test() -> int:
 # --------------------------------------------------------------------------
 
 
+
+# --------------------------------------------------------------------------
+# rc17.4-form — operator config: first-launch + per-session route prompt
+# --------------------------------------------------------------------------
+
+
+def _apply_operator_config() -> None:
+    """Handle first-launch form + per-session route_type prompt.
+
+    1. If operator_config.json does not exist, show the first-launch form.
+    2. Load config and apply OYSTER_* env vars.
+    3. Prompt for per-session route_type (overrides saved default).
+    """
+    # Step 1: first-launch form if config missing
+    if not config_exists():
+        logger.info("rc17.4-form: no operator config found — showing setup form")
+        cfg = show_first_launch_form()
+        if cfg is None:
+            logger.warning(
+                "rc17.4-form: first-launch form cancelled or unavailable. "
+                "Continuing without operator metadata."
+            )
+            return
+        if not save_config(cfg):
+            logger.error("rc17.4-form: failed to save operator config")
+            return
+        logger.info("rc17.4-form: operator config saved")
+
+    # Step 2: load config and apply env vars
+    cfg = load_config()
+    if cfg is None:
+        logger.warning("rc17.4-form: could not load operator config")
+        return
+    apply_config_to_env(cfg)
+
+    # Step 3: per-session route_type prompt
+    last_route = cfg.get("route_type", "1")
+    session_route = prompt_route_type(last_used=str(last_route))
+    if session_route is not None:
+        os.environ["OYSTER_ROUTE_TYPE"] = str(session_route)
+        logger.info("rc17.4-form: OYSTER_ROUTE_TYPE=%s", session_route)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Oyster single-button consumer launcher",
@@ -1176,6 +1245,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Desktop shortcut: {path}")
             return 0
         return 1
+
+
+    # ------------------------------------------------------------------
+    # rc17.4-form — operator metadata: first-launch form + per-session
+    # route_type prompt. Runs BEFORE spawn_recorder so env vars are set.
+    # ------------------------------------------------------------------
+    if not args.dry_run and not args.smoke_test:
+        _apply_operator_config()
 
     sess = run_session(
         install_root_path=root,

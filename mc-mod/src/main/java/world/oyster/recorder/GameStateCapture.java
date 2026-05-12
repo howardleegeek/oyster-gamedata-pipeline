@@ -46,6 +46,11 @@ public final class GameStateCapture {
         float pitch = player.getPitch();    // -90..90,   negative = up
         Vec3d look = player.getRotationVec(1.0F);  // unit vector (look direction)
         Vec3d vel = player.getVelocity();   // blocks per tick
+        
+        // Convert velocity from blocks/tick to m/s (20 ticks per second)
+        double velocityX = vel.x * 20.0;
+        double velocityY = vel.y * 20.0;
+        double velocityZ = vel.z * 20.0;
 
         // Game-mode + dimension.
         String dimension = world.getRegistryKey().getValue().toString();
@@ -63,7 +68,7 @@ public final class GameStateCapture {
             pos.x, pos.y, pos.z,
             yaw, pitch,
             look.x, look.y, look.z,
-            vel.x, vel.y, vel.z,
+            velocityX, velocityY, velocityZ,
             player.isOnGround(),
             player.isSneaking(),
             player.isSprinting(),
