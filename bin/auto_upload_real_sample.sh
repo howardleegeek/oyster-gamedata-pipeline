@@ -78,15 +78,35 @@ TESTER_ID="${TESTER_ID:0:64}"  # trim to a reasonable upper bound
 
 # 4. Hand off to the python CLI. It owns idempotency, signed-URL minting,
 #    and per-backend specifics.
-log "uploading $INPUT_TAR via backend=$BACKEND (size=$((SIZE / 1024 / 1024)) MB, tester=$TESTER_ID)"
-RESULT=$("$PY_BIN" "${REPO_DIR}/bin/upload_tarball.py" "$INPUT_TAR" \
-    --tester-id "$TESTER_ID" \
-    --d5-verdict "REAL" \
-    --backend "$BACKEND" 2>>"$LOG")
-RC=$?
+#
+# Howard 2026-05-13 (Gap #8): when BACKEND=vercel-signed (or UPLOAD_BASE_URL is
+# set), route through the direct-to-Supabase signed-URL client instead of the
+# legacy backend dispatcher. The legacy `/api/upload-tarball` route now returns
+# 410 Gone; any pipeline still calling upload_tarball.py against an HTTP backend
+# will fail loudly. The signed-URL path requires --duration-seconds, which we
+# don't get from the tarball, so callers must export UPLOAD_DURATION_SECONDS.
+if [[ "$BACKEND" == "vercel-signed" || -n "${UPLOAD_BASE_URL:-}" ]]; then
+    if [[ -z "${UPLOAD_DURATION_SECONDS:-}" ]]; then
+        log "ERROR: vercel-signed backend requires UPLOAD_DURATION_SECONDS in env"
+        exit 1
+    fi
+    log "uploading $INPUT_TAR via vercel-signed (size=$((SIZE / 1024 / 1024)) MB, tester=$TESTER_ID)"
+    RESULT=$("$PY_BIN" "${REPO_DIR}/bin/upload_tarball_signed.py" "$INPUT_TAR" \
+        --tester-id "$TESTER_ID" \
+        --duration-seconds "$UPLOAD_DURATION_SECONDS" \
+        --base-url "$UPLOAD_BASE_URL" 2>>"$LOG")
+    RC=$?
+else
+    log "uploading $INPUT_TAR via backend=$BACKEND (size=$((SIZE / 1024 / 1024)) MB, tester=$TESTER_ID)"
+    RESULT=$("$PY_BIN" "${REPO_DIR}/bin/upload_tarball.py" "$INPUT_TAR" \
+        --tester-id "$TESTER_ID" \
+        --d5-verdict "REAL" \
+        --backend "$BACKEND" 2>>"$LOG")
+    RC=$?
+fi
 
 if [[ $RC -ne 0 ]]; then
-    log "upload_tarball.py failed (rc=$RC)"
+    log "upload step failed (rc=$RC, backend=$BACKEND)"
     exit 3
 fi
 
