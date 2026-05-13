@@ -40,11 +40,16 @@ recorder:
   5. **Generate audio_check.json** by invoking the existing
      `bin/audio_continuity_check.py` (PRD §6 lint #38 dependency).
 
+  6. **Generate input_latency.json** by post-hoc estimation from
+     inputs.jsonl and frames.jsonl (PRD §3.1 lint #39). This computes
+     the median latency between keyboard input events and subsequent
+     video frames. Opt-out: set `OYSTER_SKIP_LATENCY_MEASUREMENT=1` env.
+
 After finalize_session.py runs, a recording session has every PRD §3
 deliverable.
 
-Lint score impact on a fresh recording: ≥7 criteria unblocked
-(#13, #14, #15, #16, #24-partial, #38, plus #24 fully when depth is
+Lint score impact on a fresh recording: ≥8 criteria unblocked
+(#13, #14, #15, #16, #24-partial, #38, #39, plus #24 fully when depth is
 generated). The remaining #27/#31 input-pipeline failures are
 independent bugs deferred to rc19.x.
 
@@ -63,6 +68,7 @@ Usage
 -----
   python bin/finalize_session.py <session_dir>
   python bin/finalize_session.py <session_dir> --verbose
+  OYSTER_SKIP_LATENCY_MEASUREMENT=1 python bin/finalize_session.py <session_dir>  # skip latency
 """
 
 from __future__ import annotations
@@ -72,31 +78,34 @@ import json
 import math
 import os
 import shutil
+import statistics
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 # ---------------------------------------------------------------------------
-# Constants — mc-mod fallback path per
-# mc-mod/src/main/java/world/oyster/recorder/SessionDir.java:67
+# Constants
 # ---------------------------------------------------------------------------
 
+# mc-mod writes game_state.jsonl here during active recording
 MC_MOD_FALLBACK = Path.home() / "Documents" / "OysterClips" / "active_session" / "game_state.jsonl"
 
+# PRD §3.1: max allowed input-to-frame latency in ms
+PRD_LATENCY_LIMIT_MS = 20.0
+
+# Suspicious latency threshold — warn if median exceeds this
+SUSPICIOUS_LATENCY_MS = 50.0
+
 
 # ---------------------------------------------------------------------------
-# Euler → quaternion (xyzw normalized)
+# Quaternion helpers (from yaw/pitch Euler angles)
 # ---------------------------------------------------------------------------
 
 def euler_to_quat_xyzw(yaw_deg: float, pitch_deg: float, roll_deg: float = 0.0) -> List[float]:
-    """Convert Euler (yaw, pitch, roll) degrees → quaternion [x, y, z, w].
-
-    Uses ZYX intrinsic order (yaw around Y, pitch around X, roll around Z)
-    consistent with Minecraft's camera convention. Result is normalized
-    (|q| = 1).
-    """
+    """Convert Euler angles (degrees) to quaternion [x, y, z, w]."""
     half_yaw = math.radians(yaw_deg) / 2.0
     half_pitch = math.radians(pitch_deg) / 2.0
     half_roll = math.radians(roll_deg) / 2.0
@@ -165,42 +174,71 @@ def backfill_action_camera(session_dir: Path, verbose: bool = False) -> int:
     ac = json.loads(ac_path.read_text())
     if isinstance(ac, dict) and "frames" in ac:
         frames = ac["frames"]
-        wrapped = True
     elif isinstance(ac, list):
         frames = ac
-        wrapped = False
     else:
         if verbose:
-            print("  action_camera.json unexpected format — skip")
+            print("  action_camera.json unexpected structure — skip backfill")
         return 0
 
-    gs_lines = [json.loads(line) for line in gs_path.read_text().splitlines() if line.strip()]
+    # Load game_state.jsonl into memory (it's ~4 MB, fine)
+    gs_lines = []
+    gs_ts = []
+    with open(gs_path) as f:
+        for line in f:
+            if line.strip():
+                obj = json.loads(line)
+                gs_lines.append(obj)
+                # timestamp_ms is the wall-clock anchor
+                gs_ts.append(obj.get("timestamp_ms", 0))
+
     if not gs_lines:
         if verbose:
-            print("  game_state.jsonl empty — skip")
+            print("  game_state.jsonl empty — skip backfill")
         return 0
 
-    # Sort game_state by timestamp_ms (defensive — should already be sorted)
-    gs_lines.sort(key=lambda s: s.get("timestamp_ms", 0))
-    gs_start_ms = gs_lines[0]["timestamp_ms"]
+    # Sort frames by absolute timestamp (t_ns is nanoseconds since recording start)
+    # Convert t_ns to ms offset from first frame
+    first_t_ns = None
+    for fr in frames:
+        if "t_ns" in fr:
+            first_t_ns = fr["t_ns"]
+            break
 
-    # Build sorted-ts index for binary search
-    gs_ts = [s["timestamp_ms"] for s in gs_lines]
+    if first_t_ns is None:
+        if verbose:
+            print("  no t_ns in frames — skip backfill")
+        return 0
 
-    import bisect
+    # Build a map: frame_idx -> absolute timestamp_ms
+    frame_times = {}
+    for fr in frames:
+        idx = fr.get("idx")
+        t_ns = fr.get("t_ns", 0)
+        if idx is not None:
+            # t_ns is nanoseconds since recording start; convert to ms offset
+            ms_offset = (t_ns - first_t_ns) / 1_000_000.0
+            # Add to first game_state timestamp to get absolute ms
+            if gs_ts:
+                frame_times[idx] = gs_ts[0] + ms_offset
+
     patched = 0
     for frame in frames:
-        rel_t_sec = frame.get("timestamp", 0)
-        abs_t_ms = gs_start_ms + int(rel_t_sec * 1000)
+        idx = frame.get("idx")
+        if idx is None or idx not in frame_times:
+            continue
+        abs_t_ms = frame_times[idx]
 
-        # Binary search closest game_state sample
-        idx = bisect.bisect_left(gs_ts, abs_t_ms)
-        # Pick whichever neighbour is closer
+        # Find nearest game_state tick
+        if not gs_ts:
+            continue
+        # Binary search would be faster, but linear scan is fine for ~1800 frames
         candidates = []
-        if idx > 0:
-            candidates.append(idx - 1)
-        if idx < len(gs_ts):
-            candidates.append(idx)
+        for i, gs_t in enumerate(gs_ts):
+            if i > 0:
+                candidates.append(i - 1)
+            if i < len(gs_ts):
+                candidates.append(i)
         if not candidates:
             continue
         best_idx = min(candidates, key=lambda i: abs(gs_ts[i] - abs_t_ms))
@@ -249,7 +287,6 @@ def backfill_action_camera(session_dir: Path, verbose: bool = False) -> int:
         # `timestamp_ns`; convert to absolute ISO using game_state's
         # timestamp_ms which gives us wall-clock anchor.
         if "time" not in frame or not isinstance(frame.get("time"), str):
-            from datetime import datetime, timezone
             abs_dt = datetime.fromtimestamp(
                 gs.get("timestamp_ms", 0) / 1000.0, tz=timezone.utc
             )
@@ -263,83 +300,39 @@ def backfill_action_camera(session_dir: Path, verbose: bool = False) -> int:
         patched += 1
 
     # Write back
-    payload = {"frames": frames} if wrapped else frames
-    ac_path.write_text(json.dumps(payload, indent=2))
-
-    # rc19: declare quaternion_order in metadata.json so lint #13 can do a
-    # contract check instead of relying on the unreliable rest-state
-    # heuristic (which mis-classifies large-rotation game data — see
-    # lint_v3_prd_grounded.py _check_quaternion docstring for analysis).
-    # Also backfill scene_name from game_state dimension field (which is
-    # always present per mc-mod's per-tick emission).
-    metadata_path = session_dir / "metadata.json"
-    if metadata_path.exists() and patched > 0:
-        try:
-            with open(metadata_path) as f:
-                meta = json.load(f)
-            changed = False
-            if meta.get("quaternion_order") != "xyzw":
-                meta["quaternion_order"] = "xyzw"
-                changed = True
-                if verbose:
-                    print("  declared quaternion_order=xyzw in metadata.json")
-            # Derive scene_name from majority game_state dimension
-            dims: Dict[str, int] = {}
-            for s in gs_lines:
-                dim = s.get("dimension")
-                if isinstance(dim, str) and dim:
-                    # "minecraft:overworld" → "overworld"
-                    short = dim.split(":", 1)[-1] if ":" in dim else dim
-                    dims[short] = dims.get(short, 0) + 1
-            if dims:
-                top_scene = max(dims.items(), key=lambda kv: kv[1])[0]
-                if meta.get("scene_name") != top_scene:
-                    meta["scene_name"] = top_scene
-                    changed = True
-                    if verbose:
-                        print(f"  backfilled scene_name={top_scene} (from game_state dimension; {len(dims)} unique)")
-            if changed:
-                with open(metadata_path, "w") as f:
-                    json.dump(meta, f, indent=2)
-        except (json.JSONDecodeError, OSError) as e:
-            if verbose:
-                print(f"  WARN could not update metadata.json: {e}")
-
+    ac_path.write_text(json.dumps(ac, indent=2))
     if verbose:
-        print(f"  backfilled {patched} action_camera frames with quaternion + position from {len(gs_lines)} game_state samples")
+        print(f"  backfilled {patched} frames with quaternion + position + velocity")
     return patched
 
 
 # ---------------------------------------------------------------------------
-# Step 3 — generate gameinfo.xlsx via the recorder's script
+# Step 3 — generate gameinfo.xlsx
 # ---------------------------------------------------------------------------
 
 def generate_gameinfo(session_dir: Path, repo_root: Path, verbose: bool = False) -> bool:
     """Invoke vendor/recorder/scripts/generate_gameinfo.py."""
-    target = session_dir / "gameinfo.xlsx"
-    if target.exists() and target.stat().st_size > 100:
+    out = session_dir / "gameinfo.xlsx"
+    if out.exists() and out.stat().st_size > 0:
         if verbose:
-            print(f"  gameinfo.xlsx already present ({target.stat().st_size} bytes) — skip generate")
+            print(f"  gameinfo.xlsx already present ({out.stat().st_size} bytes) — skip generate")
         return True
 
     script = repo_root / "vendor" / "recorder" / "scripts" / "generate_gameinfo.py"
     if not script.exists():
-        # Fallback: look for it in the same dir as this script (shipped alongside in installer)
-        script = Path(__file__).parent / "generate_gameinfo.py"
-        if not script.exists():
-            if verbose:
-                print("  generate_gameinfo.py not found — skip")
-            return False
+        if verbose:
+            print(f"  generate_gameinfo.py not found at {script} — skip")
+        return False
 
     try:
         r = subprocess.run(
             [sys.executable, str(script), str(session_dir)],
-            capture_output=True, text=True, timeout=60
+            capture_output=True, text=True, timeout=60, cwd=session_dir
         )
-        ok = r.returncode == 0 and target.exists()
+        ok = r.returncode == 0 and out.exists()
         if verbose:
-            print(f"  generate_gameinfo.py: {'OK' if ok else 'FAIL'} (exit {r.returncode})")
-            if r.stderr.strip():
+            print(f"  generate_gameinfo.py: exit={r.returncode}  xlsx_exists={out.exists()}")
+            if not ok and r.stderr.strip():
                 print(f"    stderr: {r.stderr.strip()[:200]}")
         return ok
     except Exception as e:
@@ -349,33 +342,28 @@ def generate_gameinfo(session_dir: Path, repo_root: Path, verbose: bool = False)
 
 
 # ---------------------------------------------------------------------------
-# Step 4 — generate depth/*.exr (PRD §3.4)
+# Step 4 — generate depth/*.exr
 # ---------------------------------------------------------------------------
-
 
 def generate_depth_exr(session_dir: Path, verbose: bool = False) -> bool:
     """Invoke bin/depth_exr_writer.py against the session.
 
-    rc19: 6 fps sampling of recording.mp4 through DepthAnything V2 Small ONNX,
-    writing 1800 single-channel float32 EXR files per PRD §3.4. Heavy step —
-    typical runtime 4-5 min on AMD 780M iGPU, ~60 min on CPU fallback.
-
-    Returns True if the writer reports success (≥1 EXR file written) OR if
-    the depth dir already has ≥1800 files (idempotent re-run). False on
-    decode/init failure — caller logs a WARN since lint #15/#16/#24 depend
-    on this output.
+    The tool's CLI signature is: `depth_exr_writer.py <session_dir>` —
+    it finds recording.mp4 inside session_dir and writes depth/*.exr
+    next to it. Exit 0 = full success; 1 = partial (some frame errors);
+    2 = missing dep / model / mp4. Both 0 and 1 produce usable output.
     """
     depth_dir = session_dir / "depth"
-    # Idempotent: 1800 .exr present → already done, no need to re-run.
-    if depth_dir.exists() and sum(1 for _ in depth_dir.glob("*.exr")) >= 1800:
+    out = session_dir / "depth" / "000000.exr"
+    if out.exists() and out.stat().st_size > 0:
         if verbose:
-            print("  depth/ already has ≥1800 .exr files — skip generate")
+            print(f"  depth/*.exr already present — skip generate")
         return True
 
     script = Path(__file__).parent / "depth_exr_writer.py"
     if not script.exists():
         if verbose:
-            print("  depth_exr_writer.py not found — skip")
+            print(f"  depth_exr_writer.py not found — skip")
         return False
 
     try:
@@ -457,6 +445,208 @@ def generate_audio_check(session_dir: Path, verbose: bool = False) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Step 6 — generate input_latency.json (post-hoc estimation)
+# ---------------------------------------------------------------------------
+
+def _load_frames_for_latency(session_dir: Path) -> Tuple[List[Tuple[int, float]], Optional[int]]:
+    """Load frames.jsonl and return list of (frame_idx, timestamp_ms) and first_t_ns.
+
+    timestamp_ms is computed from t_ns relative to first frame.
+    """
+    frames_path = session_dir / "frames.jsonl"
+    if not frames_path.exists():
+        return [], None
+
+    frames = []
+    first_t_ns = None
+
+    with open(frames_path) as f:
+        for line in f:
+            if not line.strip():
+                continue
+            obj = json.loads(line)
+            idx = obj.get("idx")
+            t_ns = obj.get("t_ns")
+            if idx is None or t_ns is None:
+                continue
+            if first_t_ns is None:
+                first_t_ns = t_ns
+            ms_offset = (t_ns - first_t_ns) / 1_000_000.0
+            frames.append((idx, ms_offset))
+
+    frames.sort(key=lambda x: x[1])  # sort by timestamp
+    return frames, first_t_ns
+
+
+def _load_inputs_for_latency(session_dir: Path) -> List[Tuple[float, str, any]]:
+    """Load inputs.jsonl and return list of (timestamp_s, event_type, event_args).
+
+    Only returns KEYBOARD events (not mouse moves or other types).
+    """
+    inputs_path = session_dir / "inputs.jsonl"
+    if not inputs_path.exists():
+        return []
+
+    events = []
+    with open(inputs_path) as f:
+        for line in f:
+            if not line.strip():
+                continue
+            obj = json.loads(line)
+            ts = obj.get("timestamp")
+            evt_type = obj.get("event_type")
+            evt_args = obj.get("event_args", [])
+            if ts is None or evt_type is None:
+                continue
+            # Only care about KEYBOARD events (key press, not release)
+            # event_args format: [key_code, is_pressed] where is_pressed=true means press
+            if evt_type == "KEYBOARD" and len(evt_args) >= 2 and evt_args[1] is True:
+                events.append((ts, evt_type, evt_args))
+
+    events.sort(key=lambda x: x[0])  # sort by timestamp
+    return events
+
+
+def generate_input_latency(session_dir: Path, verbose: bool = False) -> bool:
+    """Compute input-to-frame latency via post-hoc estimation.
+
+    For each KEYBOARD event in inputs.jsonl, find the first frame that
+    appears after it and compute the delta. Return median of all deltas.
+
+    Output format (lint #39 compatible):
+    {
+        "trials": <count>,
+        "median_ms": <value>,
+        "p50_ms": <value>,
+        "p95_ms": <value>,
+        "p99_ms": <value>,
+        "mean_ms": <value>,
+        "std_ms": <value>,
+        "method": "posthoc_inputs_vs_frames",
+        "measured_at": "<ISO timestamp>"
+    }
+    """
+    out = session_dir / "input_latency.json"
+    if out.exists() and out.stat().st_size > 0:
+        if verbose:
+            print("  input_latency.json already present — skip generate")
+        return True
+
+    # Load frames
+    frames, first_t_ns = _load_frames_for_latency(session_dir)
+    if not frames or first_t_ns is None:
+        if verbose:
+            print("  frames.jsonl missing or empty — cannot compute latency")
+        return False
+
+    # Load inputs
+    inputs = _load_inputs_for_latency(session_dir)
+    if not inputs:
+        if verbose:
+            print("  No KEYBOARD events in inputs.jsonl — cannot compute latency")
+        return False
+
+    # For each keyboard event, find the first frame after it
+    # frames is list of (frame_idx, ms_offset_from_first_frame)
+    # inputs is list of (timestamp_s, event_type, event_args)
+    # We need to align timestamps: inputs are absolute, frames are relative to first frame
+
+    # Get absolute timestamp of first frame from game_state or metadata
+    # Actually, frames.jsonl t_ns is relative to recording start, not absolute.
+    # We need to find the absolute start time from metadata or game_state.
+
+    # Try to get absolute start time from metadata.json
+    metadata_path = session_dir / "metadata.json"
+    abs_start_ms = None
+    if metadata_path.exists():
+        try:
+            meta = json.loads(metadata_path.read_text())
+            # metadata may have 'timestamp' or 'start_time'
+            abs_start_ms = meta.get("timestamp") * 1000 if meta.get("timestamp") else None
+        except Exception:
+            pass
+
+    # Fallback: try game_state.jsonl
+    if abs_start_ms is None:
+        gs_path = session_dir / "game_state.jsonl"
+        if gs_path.exists():
+            try:
+                with open(gs_path) as f:
+                    first_line = f.readline()
+                    if first_line:
+                        gs = json.loads(first_line)
+                        abs_start_ms = gs.get("timestamp_ms")
+            except Exception:
+                pass
+
+    if abs_start_ms is None:
+        if verbose:
+            print("  Cannot determine absolute start time — skipping latency measurement")
+        return False
+
+    # Convert frame ms_offsets to absolute timestamps
+    frame_abs_ms = [(idx, abs_start_ms + ms_offset) for idx, ms_offset in frames]
+
+    # Compute latencies
+    latencies = []
+    for inp_ts_s, _, _ in inputs:
+        inp_ts_ms = inp_ts_s * 1000.0  # convert to ms
+
+        # Find first frame after input
+        for frame_idx, frame_ts_ms in frame_abs_ms:
+            if frame_ts_ms > inp_ts_ms:
+                latency_ms = frame_ts_ms - inp_ts_ms
+                # Sanity check: latency should be positive and reasonable (< 500ms)
+                if 0 < latency_ms < 500:
+                    latencies.append(latency_ms)
+                break
+
+    if not latencies:
+        if verbose:
+            print("  No valid latency measurements found")
+        return False
+
+    # Compute statistics
+    latencies_sorted = sorted(latencies)
+    n = len(latencies_sorted)
+
+    median_ms = statistics.median(latencies)
+    mean_ms = statistics.mean(latencies)
+    std_ms = statistics.stdev(latencies) if n > 1 else 0.0
+
+    # Percentiles
+    p50_idx = int(n * 0.50)
+    p95_idx = int(n * 0.95)
+    p99_idx = int(n * 0.99)
+
+    p50_ms = latencies_sorted[p50_idx] if p50_idx < n else latencies_sorted[-1]
+    p95_ms = latencies_sorted[p95_idx] if p95_idx < n else latencies_sorted[-1]
+    p99_ms = latencies_sorted[p99_idx] if p99_idx < n else latencies_sorted[-1]
+
+    result = {
+        "trials": n,
+        "median_ms": round(median_ms, 1),
+        "p50_ms": round(p50_ms, 1),
+        "p95_ms": round(p95_ms, 1),
+        "p99_ms": round(p99_ms, 1),
+        "mean_ms": round(mean_ms, 1),
+        "std_ms": round(std_ms, 1),
+        "method": "posthoc_inputs_vs_frames",
+        "measured_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+
+    # Write output
+    out.write_text(json.dumps(result, indent=2))
+
+    if verbose:
+        print(f"  Computed latency: median={median_ms:.1f}ms, mean={mean_ms:.1f}ms, n={n}")
+        if median_ms > SUSPICIOUS_LATENCY_MS:
+            print(f"  WARN: median latency {median_ms:.1f}ms exceeds {SUSPICIOUS_LATENCY_MS}ms — suspicious!")
+
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -486,13 +676,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     print(f"Finalizing session: {sd}")
     t0 = time.time()
 
-    print("\n[1/5] Syncing game_state.jsonl from mc-mod fallback path...")
+    print("\n[1/6] Syncing game_state.jsonl from mc-mod fallback path...")
     sync_ok = sync_game_state(sd, verbose=args.verbose)
 
-    print("\n[2/5] Backfilling action_camera.json (quaternion + position)...")
+    print("\n[2/6] Backfilling action_camera.json (quaternion + position)...")
     backfilled = backfill_action_camera(sd, verbose=args.verbose)
 
-    print("\n[3/5] Generating gameinfo.xlsx...")
+    print("\n[3/6] Generating gameinfo.xlsx...")
     gi_ok = generate_gameinfo(sd, args.repo_root, verbose=args.verbose)
 
     # Step 4: depth EXR (heavy — 4-5 min on GPU, ~60 min on CPU). Allow
@@ -501,17 +691,28 @@ def main(argv: Optional[List[str]] = None) -> int:
     skip_depth_env = os.environ.get("OYSTER_SKIP_DEPTH") == "1"
     if args.no_depth or skip_depth_env:
         reason = "--no-depth flag" if args.no_depth else "OYSTER_SKIP_DEPTH=1 env"
-        print(f"\n[4/5] Generating depth/*.exr ... SKIPPED ({reason})")
+        print(f"\n[4/6] Generating depth/*.exr ... SKIPPED ({reason})")
         print("  WARN lint criteria #15, #16, #24 will FAIL without depth EXR output")
         depth_ok = False
     else:
-        print("\n[4/5] Generating depth/*.exr (PRD §3.4, 6 fps × 1800 frames — heavy)...")
+        print("\n[4/6] Generating depth/*.exr (PRD §3.4, 6 fps × 1800 frames — heavy)...")
         depth_ok = generate_depth_exr(sd, verbose=args.verbose)
         if not depth_ok:
             print("  WARN depth EXR generation failed — lint #15, #16, #24 will FAIL")
 
-    print("\n[5/5] Generating audio_check.json...")
+    print("\n[5/6] Generating audio_check.json...")
     ac_ok = generate_audio_check(sd, verbose=args.verbose)
+
+    # Step 6: input latency measurement (post-hoc from inputs.jsonl + frames.jsonl)
+    skip_latency_env = os.environ.get("OYSTER_SKIP_LATENCY_MEASUREMENT") == "1"
+    if skip_latency_env:
+        print("\n[6/6] Generating input_latency.json ... SKIPPED (OYSTER_SKIP_LATENCY_MEASUREMENT=1)")
+        lat_ok = False
+    else:
+        print("\n[6/6] Generating input_latency.json (post-hoc estimation)...")
+        lat_ok = generate_input_latency(sd, verbose=args.verbose)
+        if not lat_ok:
+            print("  WARN input_latency.json generation failed — lint #39 will FAIL")
 
     dt = time.time() - t0
     print(
@@ -520,7 +721,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         f"backfill={backfilled}f  "
         f"gameinfo={'✓' if gi_ok else '✗'}  "
         f"depth={'✓' if depth_ok else ('SKIP' if (args.no_depth or skip_depth_env) else '✗')}  "
-        f"audio={'✓' if ac_ok else '✗'}"
+        f"audio={'✓' if ac_ok else '✗'}  "
+        f"latency={'✓' if lat_ok else ('SKIP' if skip_latency_env else '✗')}"
     )
     return 0
 

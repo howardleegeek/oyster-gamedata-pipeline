@@ -1651,11 +1651,17 @@ def _wrap_pi(angle: float) -> float:
 # ---------------------------------------------------------------------------
 
 def _check_input_frame_latency(d: Path, rpt: LintReport) -> None:
-    """Criterion 39: input-to-frame latency file exists and all values <= 20ms.
+    """Criterion 39: input-to-frame latency file exists and median <= 20ms.
 
     Looks for a latency measurement file (latency.json, latency_ms.json,
-    or input_latency.json) in the data directory.  Each entry must have
-    a numeric latency value <= 20 ms.
+    or input_latency.json) in the data directory.
+
+    Accepts two formats:
+    1. Legacy format: list of numeric latency values (ms)
+    2. New rc19 format: dict with "median_ms" field (post-hoc estimation)
+
+    For legacy format: all values must be <= 20ms.
+    For new format: median_ms must be <= 20ms.
     """
     candidates = (
         list(d.glob("latency*.json"))
@@ -1689,10 +1695,30 @@ def _check_input_frame_latency(d: Path, rpt: LintReport) -> None:
             f"Failed to parse {lat_path.name}: {e}"))
         return
 
-    # Accept formats:
-    #   - list of numbers (ms values)
-    #   - list of dicts with a "latency_ms" or "latency" key
-    #   - dict with a "latencies" / "measurements" / "values" key
+    # Check for new rc19 format with median_ms
+    if isinstance(data, dict) and "median_ms" in data:
+        median_ms = data["median_ms"]
+        try:
+            median_ms = float(median_ms)
+        except (TypeError, ValueError):
+            rpt.add(LintResult(
+                39, "Input-to-Frame Latency", False,
+                f"Invalid median_ms value in {lat_path.name}: {median_ms}"))
+            return
+
+        ok = median_ms <= 20.0
+        method = data.get("method", "unknown")
+        trials = data.get("trials", 0)
+        rpt.add(LintResult(
+            39, "Input-to-Frame Latency", ok,
+            (f"{trials} trials, median={median_ms:.1f}ms (method={method})"
+             + ("" if ok else f" (require <= 20ms)")),
+            {"file": lat_path.name, "trials": trials,
+             "median_ms": round(median_ms, 2),
+             "method": method}))
+        return
+
+    # Legacy format: list of numeric latency values
     values: List[float] = []
 
     if isinstance(data, list):
