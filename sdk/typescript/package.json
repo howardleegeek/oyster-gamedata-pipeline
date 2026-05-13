@@ -1,0 +1,50 @@
+{
+  "name": "@oysterworld/gamedata-sdk",
+  "version": "0.1.0",
+  "description": "Buyer-facing TypeScript SDK for the Oyster GameData buyer-spec v1 tarball format.",
+  "license": "UNLICENSED",
+  "author": "Oysterworld INC <howard.linra@gmail.com>",
+  "homepage": "https://github.com/howardleegeek/oyster-gamedata-pipeline",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./schema": {
+      "types": "./dist/schema.d.ts",
+      "import": "./dist/schema.mjs",
+      "require": "./dist/schema.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "bun test",
+    "test:vitest": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "world-model",
+    "game-data",
+    "ai-training",
+    "buyer-sdk",
+    "oysterworld"
+  ],
+  "peerDependencies": {},
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
+  }
+}
