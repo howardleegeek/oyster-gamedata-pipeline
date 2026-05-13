@@ -151,11 +151,26 @@ def test_config_from_env_reads_both_vars() -> None:
     assert cfg.is_configured is True
 
 
-def test_config_default_is_warn_only() -> None:
+def test_config_default_is_fail_closed() -> None:
+    """QA1 finding #2 fix (BUG-15): the default for ``UPLOAD_REQUIRE_TOKEN``
+    is now ``True`` (fail-closed). A fresh deploy that has not explicitly
+    set the env var enforces the HMAC gate. Operators must opt-out via
+    ``UPLOAD_REQUIRE_TOKEN=false|0|no`` during the v0.26.x migration."""
     cfg = UploadAuthConfig.from_env({})
     assert cfg.secret == ""
-    assert cfg.require_token is False
+    assert cfg.require_token is True, (
+        "Default must be True (fail-closed) to fix BUG-15 — see the "
+        "QA1 bug report 2026-05-13 for context."
+    )
     assert cfg.is_configured is False
+
+
+def test_config_legacy_opt_out_explicit_false() -> None:
+    """Operators may opt out of the gate explicitly during the v0.26.x
+    migration. Accept the canonical lowercase forms ``false``/``0``/``no``."""
+    for v in ("false", "FALSE", "False", "0", "no", "NO"):
+        cfg = UploadAuthConfig.from_env({"UPLOAD_REQUIRE_TOKEN": v})
+        assert cfg.require_token is False, f"opt-out failed for {v!r}"
 
 
 def test_config_require_token_is_case_insensitive() -> None:
