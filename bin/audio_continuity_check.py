@@ -6,7 +6,8 @@ Requirements:
 1. ffprobe -show_streams session_dir/recording.mp4 — verify audio stream exists (AAC)
 2. Sample audio at 1Hz, compute dBFS per sample
 3. Flag if > 2s contiguous below -60 dB (silence) → suggests dropout
-4. Output JSON to session_dir/audio_check.json with overall pass/fail
+4. Detect completely silent recordings (no audio source configured)
+5. Output JSON to session_dir/audio_check.json with overall pass/fail
 
 Usage:
     python3 bin/audio_continuity_check.py /path/to/session_dir
@@ -34,6 +35,7 @@ logger = logging.getLogger(__name__)
 SILENCE_THRESHOLD_DB = -60.0  # dBFS threshold for silence
 MAX_CONTIGUOUS_SILENCE_SECONDS = 2.0  # Maximum allowed contiguous silence
 SAMPLE_RATE_HZ = 1  # Sample at 1Hz for dBFS analysis
+COMPLETELY_SILENT_RATIO = 0.90  # If >90% of recording is silent, flag as "no audio source"
 
 
 def _ensure_ffprobe() -> bool:
@@ -266,9 +268,15 @@ def analyze_audio_continuity(dbfs_values: List[float]) -> Dict[str, Any]:
     problematic_gaps = [gap for gap in silent_gaps if gap["duration_seconds"] > MAX_CONTIGUOUS_SILENCE_SECONDS]
     max_gap_duration = max((gap["duration_seconds"] for gap in silent_gaps), default=0.0)
     
+    # NEW: Detect completely silent recording (no audio source configured)
+    # If >90% of the recording is silent, this is likely an OBS config issue
+    total_duration = len(dbfs_values)
+    silence_ratio = total_silence_seconds / total_duration if total_duration > 0 else 0.0
+    is_completely_silent = silence_ratio >= COMPLETELY_SILENT_RATIO
+    
     return {
-        "pass": len(problematic_gaps) == 0,
-        "reason": "No problematic silent gaps" if len(problematic_gaps) == 0 else f"Found {len(problematic_gaps)} silent gaps > {MAX_CONTIGUOUS_SILENCE_SECONDS}s",
+        "pass": len(problematic_gaps) == 0 and not is_completely_silent,
+        "reason": _build_reason(is_completely_silent, problematic_gaps, silence_ratio),
         "silent_gaps": silent_gaps,
         "problematic_gaps": problematic_gaps,
         "max_contiguous_silence": max_gap_duration,
@@ -276,12 +284,26 @@ def analyze_audio_continuity(dbfs_values: List[float]) -> Dict[str, Any]:
         "threshold_dbfs": SILENCE_THRESHOLD_DB,
         "max_allowed_gap_seconds": MAX_CONTIGUOUS_SILENCE_SECONDS,
         "sample_count": len(dbfs_values),
+        "silence_ratio": round(silence_ratio, 4),
+        "is_completely_silent": is_completely_silent,
         "dbfs_summary": {
             "min": min(dbfs_values) if dbfs_values else None,
             "max": max(dbfs_values) if dbfs_values else None,
             "avg": sum(dbfs_values) / len(dbfs_values) if dbfs_values else None,
         }
     }
+
+
+def _build_reason(is_completely_silent: bool, problematic_gaps: List[Dict], silence_ratio: float) -> str:
+    """Build human-readable reason string."""
+    if is_completely_silent:
+        return (
+            f"Recording is {silence_ratio*100:.0f}% silent — likely no audio source configured in OBS. "
+            f"Check OBS audio sources (Desktop Audio / Microphone) on this machine."
+        )
+    if len(problematic_gaps) == 0:
+        return "No problematic silent gaps"
+    return f"Found {len(problematic_gaps)} silent gaps > {MAX_CONTIGUOUS_SILENCE_SECONDS}s"
 
 
 def main() -> int:
@@ -372,6 +394,11 @@ def main() -> int:
                 logger.info(f"Audio continuity check PASSED: {analysis['reason']}")
             else:
                 logger.warning(f"Audio continuity check FAILED: {analysis['reason']}")
+                if analysis.get("is_completely_silent"):
+                    logger.warning(
+                        "  → This appears to be a completely silent recording. "
+                        "Check OBS audio source configuration on this machine."
+                    )
                 for gap in analysis["problematic_gaps"]:
                     logger.warning(f"  Silent gap: {gap['start_second']}s to {gap['end_second']}s ({gap['duration_seconds']:.1f}s)")
     
@@ -389,7 +416,7 @@ def main() -> int:
     if not audio_exists:
         return 2  # Error: no audio stream
     elif "analysis" in result and not result["analysis"]["pass"]:
-        return 1  # Failed: problematic silent gaps
+        return 1  # Failed: problematic silent gaps or completely silent
     else:
         return 0  # Success
 
