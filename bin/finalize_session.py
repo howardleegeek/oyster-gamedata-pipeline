@@ -27,15 +27,26 @@ recorder:
      `vendor/recorder/scripts/generate_gameinfo.py` (PRD §3.3, 14
      fields).
 
-  4. **Generate audio_check.json** by invoking the existing
+  4. **Generate depth/*.exr (PRD §3.4)** by invoking the new
+     `bin/depth_exr_writer.py` — 6 fps sampling of recording.mp4 through
+     DepthAnything V2 Small ONNX (via onnxruntime-directml). Produces
+     1800 single-channel float32 EXR files named `000000.exr` ..
+     `001799.exr` in `session_dir/depth/`. Opt-out: pass `--no-depth`
+     to finalize_session OR set `OYSTER_SKIP_DEPTH=1` env var to skip
+     (e.g. for fast finalize during development). Skipping is flagged
+     with WARN because lint criteria #15, #16, and #24 depend on this
+     output existing.
+
+  5. **Generate audio_check.json** by invoking the existing
      `bin/audio_continuity_check.py` (PRD §6 lint #38 dependency).
 
 After finalize_session.py runs, a recording session has every PRD §3
-deliverable that doesn't require depth EXR re-enablement (rc19 work).
+deliverable.
 
-Lint score impact on a fresh recording: ≥4 criteria unblocked
-(#13, #14, #24-partial, #38). The remaining #15/#16 depth + #27/#31
-input-pipeline failures are independent bugs deferred to rc19.
+Lint score impact on a fresh recording: ≥7 criteria unblocked
+(#13, #14, #15, #16, #24-partial, #38, plus #24 fully when depth is
+generated). The remaining #27/#31 input-pipeline failures are
+independent bugs deferred to rc19.x.
 
 Why post-record (not in-recorder)
 ---------------------------------
@@ -59,13 +70,13 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import shutil
 import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-
+from typing import Dict, List, Optional
 
 # ---------------------------------------------------------------------------
 # Constants — mc-mod fallback path per
@@ -144,11 +155,11 @@ def backfill_action_camera(session_dir: Path, verbose: bool = False) -> int:
 
     if not ac_path.exists():
         if verbose:
-            print(f"  action_camera.json missing — skip backfill")
+            print("  action_camera.json missing — skip backfill")
         return 0
     if not gs_path.exists():
         if verbose:
-            print(f"  game_state.jsonl missing — skip backfill")
+            print("  game_state.jsonl missing — skip backfill")
         return 0
 
     ac = json.loads(ac_path.read_text())
@@ -160,13 +171,13 @@ def backfill_action_camera(session_dir: Path, verbose: bool = False) -> int:
         wrapped = False
     else:
         if verbose:
-            print(f"  action_camera.json unexpected format — skip")
+            print("  action_camera.json unexpected format — skip")
         return 0
 
     gs_lines = [json.loads(line) for line in gs_path.read_text().splitlines() if line.strip()]
     if not gs_lines:
         if verbose:
-            print(f"  game_state.jsonl empty — skip")
+            print("  game_state.jsonl empty — skip")
         return 0
 
     # Sort game_state by timestamp_ms (defensive — should already be sorted)
@@ -254,7 +265,7 @@ def backfill_action_camera(session_dir: Path, verbose: bool = False) -> int:
                 meta["quaternion_order"] = "xyzw"
                 changed = True
                 if verbose:
-                    print(f"  declared quaternion_order=xyzw in metadata.json")
+                    print("  declared quaternion_order=xyzw in metadata.json")
             # Derive scene_name from majority game_state dimension
             dims: Dict[str, int] = {}
             for s in gs_lines:
@@ -300,7 +311,7 @@ def generate_gameinfo(session_dir: Path, repo_root: Path, verbose: bool = False)
         script = Path(__file__).parent / "generate_gameinfo.py"
         if not script.exists():
             if verbose:
-                print(f"  generate_gameinfo.py not found — skip")
+                print("  generate_gameinfo.py not found — skip")
             return False
 
     try:
@@ -321,7 +332,71 @@ def generate_gameinfo(session_dir: Path, repo_root: Path, verbose: bool = False)
 
 
 # ---------------------------------------------------------------------------
-# Step 4 — generate audio_check.json
+# Step 4 — generate depth/*.exr (PRD §3.4)
+# ---------------------------------------------------------------------------
+
+
+def generate_depth_exr(session_dir: Path, verbose: bool = False) -> bool:
+    """Invoke bin/depth_exr_writer.py against the session.
+
+    rc19: 6 fps sampling of recording.mp4 through DepthAnything V2 Small ONNX,
+    writing 1800 single-channel float32 EXR files per PRD §3.4. Heavy step —
+    typical runtime 4-5 min on AMD 780M iGPU, ~60 min on CPU fallback.
+
+    Returns True if the writer reports success (≥1 EXR file written) OR if
+    the depth dir already has ≥1800 files (idempotent re-run). False on
+    decode/init failure — caller logs a WARN since lint #15/#16/#24 depend
+    on this output.
+    """
+    depth_dir = session_dir / "depth"
+    # Idempotent: 1800 .exr present → already done, no need to re-run.
+    if depth_dir.exists() and sum(1 for _ in depth_dir.glob("*.exr")) >= 1800:
+        if verbose:
+            print("  depth/ already has ≥1800 .exr files — skip generate")
+        return True
+
+    script = Path(__file__).parent / "depth_exr_writer.py"
+    if not script.exists():
+        if verbose:
+            print("  depth_exr_writer.py not found — skip")
+        return False
+
+    try:
+        # Depth inference is the slowest finalize step. 30-min timeout covers
+        # CPU-only fallback (~60 min worst case; we hard-stop at 30 to keep
+        # finalize from blocking shipment forever — partial output is
+        # preferable).
+        cmd = [sys.executable, str(script), str(session_dir)]
+        if verbose:
+            cmd.append("--verbose")
+        r = subprocess.run(
+            cmd,
+            capture_output=True, text=True, timeout=1800,
+        )
+        # Exit 0 = full success; 1 = partial (some frame errors but kept).
+        # Both produce usable output. 2 = missing dep / model / mp4.
+        ok = r.returncode in (0, 1) and depth_dir.exists() and any(depth_dir.glob("*.exr"))
+        if verbose:
+            print(f"  depth_exr_writer.py: exit={r.returncode}  ok={ok}")
+            if r.stderr.strip():
+                # Surface the writer's own log lines (it uses logging which
+                # routes to stderr by default).
+                tail = "\n    ".join(r.stderr.strip().splitlines()[-10:])
+                print(f"    stderr tail:\n    {tail}")
+        return ok
+    except subprocess.TimeoutExpired:
+        if verbose:
+            print("  depth_exr_writer.py timed out after 30 min — partial output may exist")
+        # Check if we got partial output despite the timeout
+        return depth_dir.exists() and any(depth_dir.glob("*.exr"))
+    except Exception as e:
+        if verbose:
+            print(f"  depth_exr_writer.py exception: {e}")
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Step 5 — generate audio_check.json
 # ---------------------------------------------------------------------------
 
 def generate_audio_check(session_dir: Path, verbose: bool = False) -> bool:
@@ -336,13 +411,13 @@ def generate_audio_check(session_dir: Path, verbose: bool = False) -> bool:
     out = session_dir / "audio_check.json"
     if out.exists() and out.stat().st_size > 0:
         if verbose:
-            print(f"  audio_check.json already present — skip generate")
+            print("  audio_check.json already present — skip generate")
         return True
 
     script = Path(__file__).parent / "audio_continuity_check.py"
     if not script.exists():
         if verbose:
-            print(f"  audio_continuity_check.py not found — skip")
+            print("  audio_continuity_check.py not found — skip")
         return False
 
     try:
@@ -378,6 +453,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         default=Path(__file__).resolve().parent.parent,
         help="Repo root (so we can find vendor/recorder/scripts/)",
     )
+    parser.add_argument(
+        "--no-depth",
+        action="store_true",
+        help="Skip depth EXR generation (PRD §3.4) — fast finalize for "
+             "development/testing only. Lint #15/#16/#24 will fail without it.",
+    )
     args = parser.parse_args(argv)
 
     sd = args.session_dir
@@ -388,20 +469,42 @@ def main(argv: Optional[List[str]] = None) -> int:
     print(f"Finalizing session: {sd}")
     t0 = time.time()
 
-    print("\n[1/4] Syncing game_state.jsonl from mc-mod fallback path...")
+    print("\n[1/5] Syncing game_state.jsonl from mc-mod fallback path...")
     sync_ok = sync_game_state(sd, verbose=args.verbose)
 
-    print("\n[2/4] Backfilling action_camera.json (quaternion + position)...")
+    print("\n[2/5] Backfilling action_camera.json (quaternion + position)...")
     backfilled = backfill_action_camera(sd, verbose=args.verbose)
 
-    print("\n[3/4] Generating gameinfo.xlsx...")
+    print("\n[3/5] Generating gameinfo.xlsx...")
     gi_ok = generate_gameinfo(sd, args.repo_root, verbose=args.verbose)
 
-    print("\n[4/4] Generating audio_check.json...")
+    # Step 4: depth EXR (heavy — 4-5 min on GPU, ~60 min on CPU). Allow
+    # skip via --no-depth flag OR OYSTER_SKIP_DEPTH=1 env var so testers
+    # iterating finalize don't pay the inference cost on every cycle.
+    skip_depth_env = os.environ.get("OYSTER_SKIP_DEPTH") == "1"
+    if args.no_depth or skip_depth_env:
+        reason = "--no-depth flag" if args.no_depth else "OYSTER_SKIP_DEPTH=1 env"
+        print(f"\n[4/5] Generating depth/*.exr ... SKIPPED ({reason})")
+        print("  WARN lint criteria #15, #16, #24 will FAIL without depth EXR output")
+        depth_ok = False
+    else:
+        print("\n[4/5] Generating depth/*.exr (PRD §3.4, 6 fps × 1800 frames — heavy)...")
+        depth_ok = generate_depth_exr(sd, verbose=args.verbose)
+        if not depth_ok:
+            print("  WARN depth EXR generation failed — lint #15, #16, #24 will FAIL")
+
+    print("\n[5/5] Generating audio_check.json...")
     ac_ok = generate_audio_check(sd, verbose=args.verbose)
 
     dt = time.time() - t0
-    print(f"\nDone in {dt:.1f}s — sync={'✓' if sync_ok else '✗'}  backfill={backfilled}f  gameinfo={'✓' if gi_ok else '✗'}  audio={'✓' if ac_ok else '✗'}")
+    print(
+        f"\nDone in {dt:.1f}s — "
+        f"sync={'✓' if sync_ok else '✗'}  "
+        f"backfill={backfilled}f  "
+        f"gameinfo={'✓' if gi_ok else '✗'}  "
+        f"depth={'✓' if depth_ok else ('SKIP' if (args.no_depth or skip_depth_env) else '✗')}  "
+        f"audio={'✓' if ac_ok else '✗'}"
+    )
     return 0
 
 
