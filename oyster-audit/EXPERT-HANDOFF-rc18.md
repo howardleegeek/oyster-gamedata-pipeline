@@ -50,6 +50,41 @@ So events arrive at the Win32 WM_INPUT layer, `GetRawInputData` returns them suc
 
 **Expert question**: in `kbm_capture.rs`, is there an HWND filter that needs an "any non-recorder window" fallback when the detected game's HWND is 0? Or is there a thread-pumping issue (LL hooks need a message pump on the install thread)?
 
+**Update — full chain traced statically (2026-05-12 evening)**:
+
+The hook → JSONL pipeline has been fully mapped. Events ARE arriving at the tokio thread but get dropped in one of TWO chokepoints:
+
+```
+LL hook (kbm_capture.rs:350)            ─[bumps wm_input_total=957]→
+HOOK_EVENT_TX.send                      → hook_rx
+hook_rx drained by run_queue            (lib.rs:124 closure does `input_tx.blocking_send(event)`)
+input_rx.recv()                         (tokio_thread.rs:224, in tokio::select!)
+        │
+        ▼  [CHOKE POINT A]
+debouncer.debounce(e)                   (tokio_thread.rs:232 — if returns false, `continue;` drops event)
+        │
+        ▼
+state.on_input(e).await                 (tokio_thread.rs:1070)
+        │
+        ▼
+self.recorder.seen_input(e).await       (recorder.rs:296)
+        │
+        ▼  [CHOKE POINT B]
+InputEventType::from_input_event(e)?    (if returns Err, `?` propagates; tokio_thread logs
+                                         "Failed to seen input" then continues — event dropped)
+        │
+        ▼
+recording.input_stream().send(...)      (would write to inputs.jsonl)
+```
+
+**`seen_input` itself is clean** — no HWND filter, no extra logic. The drop is upstream:
+
+- **Choke A — `EventDebouncer::debounce`** (`src/system/raw_input_debouncer.rs`): if this returns `false` for normal events (over-aggressive bounce window or a recent refactor that mishandles WM_KEYDOWN/UP transitions), ALL 957 events get `continue`-ed away. Look at the debounce algorithm and the window/threshold.
+
+- **Choke B — `InputEventType::from_input_event`** (`src/output_types/mod.rs` or similar): if this returns `Err` for a specific Event variant that's the common case, every event errors → logged → dropped. Look for any unhandled match arm or recent enum-variant addition.
+
+**Verification quickest path**: `grep -nE 'pub fn from_input_event' src/output_types/` to see the conversion match — if there's a `_ => bail!(...)` catchall hit by a common variant, that's Choke B. Otherwise inspect debouncer state.
+
 ---
 
 ### Bug 2 — mc-mod IPC path mismatch 🟡 MEDIUM (workaround shipped in rc18.0.5)
