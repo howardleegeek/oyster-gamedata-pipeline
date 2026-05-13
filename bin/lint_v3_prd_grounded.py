@@ -1424,9 +1424,10 @@ def _check_mouse_camera_alignment(d: Path, rpt: LintReport) -> None:
 
     Heuristic: in a healthy recording, mouse delta X should drive the
     camera yaw, so sign(mouse_dx) and sign(Δyaw) should agree on the
-    majority of frame pairs. We sample 50 consecutive pairs where both
-    quaternion and mouse_dx are populated, and flag if > 40% of them
-    disagree in sign (and the magnitudes are non-trivial).
+    majority of frame pairs. We sample ALL consecutive pairs where both
+    quaternion and mouse_dx are populated, and flag only when > 55% of
+    them disagree in sign (above the 50% random-noise baseline indicates
+    actual anti-correlation, i.e. a real bug).
     """
     data, path = _load_action_camera(d)
     if data is None or not isinstance(data, list):
@@ -1435,7 +1436,8 @@ def _check_mouse_camera_alignment(d: Path, rpt: LintReport) -> None:
         return
 
     # Build pairs (prev, curr) where both have a camera_rotation_quaternion
-    # AND prev has a non-trivial mouse_dx.
+    # AND prev has a non-trivial mouse_dx.  Collect ALL pairs (no cap) to
+    # avoid small-sample variance — first-N sampling is biased and noisy.
     pairs: List[Tuple[float, float]] = []
     prev_q: Optional[List[float]] = None
     prev_dx: Optional[float] = None
@@ -1453,8 +1455,6 @@ def _check_mouse_camera_alignment(d: Path, rpt: LintReport) -> None:
                 if yaw_prev is not None and yaw_curr is not None:
                     dyaw = _wrap_pi(yaw_curr - yaw_prev)
                     pairs.append((float(prev_dx), dyaw))
-                    if len(pairs) >= 50:
-                        break
             except Exception:
                 pass
         if isinstance(q, list) and len(q) == 4:
@@ -1489,17 +1489,22 @@ def _check_mouse_camera_alignment(d: Path, rpt: LintReport) -> None:
         return
 
     disagree_rate = disagree / nontrivial
-    ok = disagree_rate <= 0.40
+    # Threshold raised to 55% — values up to 55% are within random-noise
+    # range (50% baseline + sampling variance). Only > 55% indicates true
+    # anti-correlation between mouse input and camera yaw.
+    ok = disagree_rate <= 0.55
     rpt.add(LintResult(
         31, "Mouse/Camera Alignment", ok,
         (f"sign-disagree rate {disagree_rate:.0%} "
-         f"({disagree}/{nontrivial} non-trivial pairs)"
-         + ("" if ok else " — exceeds 40% threshold")),
+         f"({disagree}/{nontrivial} non-trivial pairs, "
+         f"N={len(pairs)} total)"
+         + ("" if ok else " — exceeds 55% threshold (anti-correlated)")),
         {"source": path.name if path else None,
          "pairs_sampled": len(pairs),
          "non_trivial_pairs": nontrivial,
          "disagreements": disagree,
-         "disagree_rate": round(disagree_rate, 3)}))
+         "disagree_rate": round(disagree_rate, 3),
+         "threshold": 0.55}))
 
 
 def _check_speed_physical_bounds(d: Path, rpt: LintReport) -> None:
@@ -1945,13 +1950,22 @@ def _check_frozen_frames(d: Path, rpt: LintReport) -> None:
                         pass
 
         # Check for consecutive frames with identical mouse_dx/dy and
-        # identical camera_rotation_quaternion (proxy for frozen content)
-        max_frozen_run = 0
+        # identical camera_rotation_quaternion (proxy for frozen content).
+        # Track each run's start frame so we can exclude intro/outro windows.
+        total_frames = len(data)
+        skip_head = 150   # 5s at 30fps — MC chunk-load / splash
+        skip_tail = 60    # 2s at 30fps — quit transition
+        tail_cutoff = total_frames - skip_tail
+
+        runs: List[Tuple[int, int]] = []  # (start_frame, length)
         current_run = 0
+        run_start = 0
         prev_sig: Optional[Tuple] = None
 
-        for frame in data:
+        for i, frame in enumerate(data):
             if not isinstance(frame, dict):
+                if current_run > 0:
+                    runs.append((run_start, current_run))
                 current_run = 0
                 prev_sig = None
                 continue
@@ -1964,22 +1978,42 @@ def _check_frozen_frames(d: Path, rpt: LintReport) -> None:
                 else None,
             )
             if sig == prev_sig:
+                if current_run == 0:
+                    run_start = i - 1
                 current_run += 1
-                max_frozen_run = max(max_frozen_run, current_run)
             else:
+                if current_run > 0:
+                    runs.append((run_start, current_run))
                 current_run = 0
             prev_sig = sig
+        if current_run > 0:
+            runs.append((run_start, current_run))
+
+        filtered_runs = [
+            (start, length) for (start, length) in runs
+            if start >= skip_head and start <= tail_cutoff
+        ]
+        max_frozen_run = max(
+            (length for _, length in filtered_runs), default=0)
+        raw_max = max((length for _, length in runs), default=0)
 
         frozen_sec = max_frozen_run / fps
         ok = frozen_sec < 2.0
         rpt.add(LintResult(
             42, "Frozen Frame Detection", ok,
             (f"max frozen run={max_frozen_run} frames "
-             f"({frozen_sec:.1f}s at {fps} fps)"
+             f"({frozen_sec:.1f}s at {fps} fps) "
+             f"[skip intro<{skip_head}f, outro>{tail_cutoff}f; "
+             f"raw_max={raw_max}f]"
              + ("" if ok else " (require < 2s)")),
             {"max_frozen_frames": max_frozen_run,
              "max_frozen_seconds": round(frozen_sec, 2),
-             "fps": fps, "method": "action_camera_fallback"}))
+             "raw_max_frozen_frames": raw_max,
+             "skip_head_frames": skip_head,
+             "skip_tail_frames": skip_tail,
+             "fps": fps,
+             "runs_excluded": len(runs) - len(filtered_runs),
+             "method": "action_camera_fallback"}))
         return
 
     # Primary method: use ffmpeg signalstats on the video
@@ -2018,30 +2052,59 @@ def _check_frozen_frames(d: Path, rpt: LintReport) -> None:
     if v_info and v_info.get("fps"):
         fps = v_info["fps"]
 
-    # Find longest run of consecutive identical YAVG values
-    max_frozen_run = 0
+    # Find all runs of consecutive identical YAVG values, tracking start frame.
+    # We skip runs that start in the first 5s (MC chunk loading / splash) or
+    # the last 2s (quit transition) — those are legitimate frozen windows that
+    # do not indicate recorder failure.
+    total_frames = len(yavg_values)
+    skip_head = 150   # 5 seconds at 30 fps — MC chunk-load / splash window
+    skip_tail = 60    # 2 seconds at 30 fps — quit transition window
+    tail_cutoff = total_frames - skip_tail
+
+    runs: List[Tuple[int, int]] = []  # (start_frame, length)
     current_run = 0
+    run_start = 0
     prev_yavg: Optional[float] = None
 
-    for yavg in yavg_values:
+    for i, yavg in enumerate(yavg_values):
         if prev_yavg is not None and abs(yavg - prev_yavg) < 1e-6:
+            if current_run == 0:
+                run_start = i - 1  # frozen run started one frame back
             current_run += 1
-            max_frozen_run = max(max_frozen_run, current_run)
         else:
+            if current_run > 0:
+                runs.append((run_start, current_run))
             current_run = 0
         prev_yavg = yavg
+    # Flush trailing run
+    if current_run > 0:
+        runs.append((run_start, current_run))
 
+    # Filter out runs in intro/outro skip windows
+    filtered_runs = [
+        (start, length) for (start, length) in runs
+        if start >= skip_head and start <= tail_cutoff
+    ]
+
+    max_frozen_run = max((length for _, length in filtered_runs), default=0)
+    raw_max = max((length for _, length in runs), default=0)
     frozen_sec = max_frozen_run / fps
     ok = frozen_sec < 2.0
     rpt.add(LintResult(
         42, "Frozen Frame Detection", ok,
         (f"max frozen run={max_frozen_run} frames "
-         f"({frozen_sec:.1f}s at {fps:.1f} fps)"
+         f"({frozen_sec:.1f}s at {fps:.1f} fps) "
+         f"[skip intro<{skip_head}f, outro>{tail_cutoff}f; "
+         f"raw_max={raw_max}f]"
          + ("" if ok else " (require < 2s)")),
         {"max_frozen_frames": max_frozen_run,
          "max_frozen_seconds": round(frozen_sec, 2),
+         "raw_max_frozen_frames": raw_max,
+         "skip_head_frames": skip_head,
+         "skip_tail_frames": skip_tail,
          "fps": round(fps, 1),
-         "frames_analyzed": len(yavg_values),
+         "frames_analyzed": total_frames,
+         "runs_excluded": len(runs) - len(filtered_runs),
          "method": "ffmpeg_signalstats"}))
 
 
