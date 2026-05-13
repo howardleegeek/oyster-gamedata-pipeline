@@ -6,10 +6,13 @@ import sys
 import tempfile
 import unittest
 
-# Ensure bin/ is importable
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "bin"))
+# Ensure project root is on sys.path so we can import the bin/ package.
+# The previous join("..", "bin") resolved to tests/bin/, which does not
+# contain gameinfo_xlsx_validator.py — only the test for it.  Walk up to
+# the repo root and import via the `bin` package instead.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from gameinfo_xlsx_validator import EXPECTED_SHEETS, REQUIRED_FIELDS, validate_xlsx
+from bin.gameinfo_xlsx_validator import EXPECTED_SHEETS, REQUIRED_FIELDS, validate_xlsx
 
 
 def _write_xlsx(path: str, sheets: dict) -> None:
