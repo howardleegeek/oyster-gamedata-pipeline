@@ -77,3 +77,63 @@ The Engineer subagent's Bug 1 deep-dive analyzed the CORRECT-lineage file (paren
 ## Wakeup
 
 I scheduled a wakeup for ~25 min from now to check state again. If you're back before then, you'll see this doc + the todo list summarizes everything.
+
+---
+
+## UPDATE — Recovery Option A executed (2026-05-13 ~00:20 PDT)
+
+You said "继续推进" so I picked the fastest defensible path: **Option A — rebase the keyboard wake fix onto the Wave-1-proven `7bd4d8c` lineage and ship as rc19.0.0**.
+
+### What just shipped (in the last 30 min)
+
+| Step | What | Where |
+|---|---|---|
+| 1 | Cloned submodule fresh at `7bd4d8c`, verified PUMP_THREAD_ID/HOOK_WAKE_MSG/mouse_ll_proc all in scope | `/tmp/rc18-kbd-v2/submodule` |
+| 2 | Applied 12-line keyboard wake patch — mirrored exactly off the 5 existing mouse wake sites | `kbm_capture.rs:434-450` |
+| 3 | Committed + pushed submodule branch `stream-rc19.0.0-kbd-wake` at `a717fcc` | `gamedata-recorder.git` |
+| 4 | Cherry-picked 3 missing rc19 Python chunks onto parent (lint 38-43, depth EXR, time/fps) — clean, no conflicts | `oyster-gamedata-pipeline.git` |
+| 5 | Bumped parent submodule pointer `c4814d5 → a717fcc` | parent commit `2c42f2f` |
+| 6 | Created `stream-rc19.0.0` branch + tagged `recorder-v0.28.0-rc19.0.0`, pushed both | origin |
+| 7 | CI fired — 4 builds queued: Rust EXE, Python EXE, Bundled Installer, MC Fabric Mod | github actions |
+
+### Why this should compile this time
+
+The previous rc18.0.6 failure was a **wrong-lineage** error: I patched on `866983e` (stream-rc17.4-depth) which had refactored away the BG-rescue infrastructure. The compile errored on `PUMP_THREAD_ID`, `HOOK_WAKE_MSG`, and `PostThreadMessageW` being out of scope.
+
+On `7bd4d8c` I just verified all three symbols ARE in scope:
+- `PostThreadMessageW` imported at line 59
+- `PUMP_THREAD_ID` defined at line 312
+- `HOOK_WAKE_MSG` defined at line 319
+- 5 existing mouse wake sites at lines 521/546/569/592/611 work — so the keyboard one structurally identical to them will also work
+
+### What's now on rc19.0.0
+
+**Submodule (Rust):**
+- `a717fcc` keyboard wake fix (Bug 1)
+
+**Parent (Python):**
+- rc19.0.0-a lint #13 contract check via `metadata.quaternion_order`
+- rc19.0.0-b velocity + scene backfill from `game_state.jsonl`
+- rc19.0.0-c time ISO + per-frame `fps=30`
+- C1 lint criteria #38-43 (38 total)
+- C3 depth EXR writer (cv2 + DA-V2 Small @ 6fps)
+
+**mc-mod (Java):**
+- rc18.0.8 weather + time_of_day per tick
+
+### Expected outcome when CI green
+
+- rc18.0.6 was 25/33 (75.8%) baseline
+- rc19-a + rc19-b validated to 27/33 (81.8%) on existing fixtures
+- rc19.0.0 projected: **30-32/33** if Bug 1 fix actually fills `inputs.jsonl` on minipc1 (was 957→0 before)
+- PRD §3.2 field coverage: 14/20 → **19/20 (95%)**
+
+### What's still risky
+
+- I have NOT validated cargo compile locally (libobs-wrapper on mac is awkward). CI is the verification.
+- If Rust EXE build fails again at ~11 min, the next move is the Engineer subagent's deep-dive diff between `7bd4d8c` ad `866983e` to find what else the BG-rescue migration touched
+- rc18.0.7 mouse hook install (Engineer's `afe0790` on broken lineage) is still in limbo. If rc19.0.0 ships, can be re-attempted next as rc19.0.1 on this same lineage.
+
+### Next wakeup
+
+Scheduled for ~20 min from now to check CI status. If green, I'll attempt to download the installer artifact URL and stage it for minipc1 deploy.
