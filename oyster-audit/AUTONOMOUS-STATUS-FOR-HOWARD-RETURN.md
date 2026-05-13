@@ -187,3 +187,58 @@ Investigate compile failure first via Engineer subagent deep-diff on `7bd4d8c` v
 | rc18.0.5 baseline (no input pipeline) | 25/33 (75.8%) |
 | rc19.0.0 (keyboard only fixed) | 27-29/33 (likely 28) |
 | rc19.0.1 (keyboard + mouse fixed) | 30-32/33 |
+
+---
+
+## UPDATE 3 — rc19.0.0 Rust EXE COMPILE SUCCESS (2026-05-13 ~00:33 PDT)
+
+✅ **The wake patch compiles cleanly on Wave-1 lineage.** The structural fix is validated.
+
+Step-level proof from CI job 25784493248:
+- ✅ Setup Rust toolchain
+- ✅ Cache cargo registry + target
+- ✅ **Build Rust application (release): completed success** (~12 min)
+- ✅ Create dist directory
+- ✅ Install cargo-obs-build + fetch OBS runtime
+- ✅ Copy Rust binary as OysterRecorder.exe
+- ✅ Copy OBS FFmpeg mux helper
+- ✅ Upload Rust recorder artifact
+
+This rules out the "wrong-lineage" failure mode that doomed rc18.0.6. The PUMP_THREAD_ID / HOOK_WAKE_MSG / PostThreadMessageW symbols are resolved correctly on `7bd4d8c` lineage.
+
+Followed up immediately by tagging **rc19.0.1** (mouse install) — same lineage + 48 more lines of symmetric WH_MOUSE_LL install code. Builds firing in parallel.
+
+### Current CI matrix
+
+| Tag | Rust EXE | Python EXE | Bundled Installer | MC Mod |
+|---|---|---|---|---|
+| **rc19.0.0** | ✅ success | ✅ success | 🟡 bundling | ✅ success |
+| **rc19.0.1** | 🟡 building | 🟡 building | 🟡 bundling | ✅ success |
+
+ETA: rc19.0.0 installer in ~15 min; rc19.0.1 installer in ~30 min.
+
+### Deploy command (ready when you are)
+
+I fixed a naming bug in `bin/minipc_v028_install.sh` (was looking for `OysterRecorder-Setup-...exe` but CI produces `GameDataRecorder-Setup-...exe`). Default now correct.
+
+When you return, one of these is the right deploy command:
+
+```bash
+# PREFERRED: rc19.0.1 (both keyboard + mouse hooks installed — full Bug 1 fix)
+RELEASE_TAG=recorder-v0.28.0-rc19.0.1 bash /Users/howardli/Downloads/oyster-agent-runner/bin/minipc_v028_install.sh
+
+# FALLBACK: rc19.0.0 (only keyboard wake fixed)
+RELEASE_TAG=recorder-v0.28.0-rc19.0.0 bash /Users/howardli/Downloads/oyster-agent-runner/bin/minipc_v028_install.sh
+```
+
+### Branches & SHAs on origin
+
+**Submodule (gamedata-recorder):**
+- `stream-rc19.0.0-kbd-wake` at `a717fcc` — keyboard wake fix on Wave-1
+- `stream-rc19.0.1-mouse-install` at `6e5ddf2` — adds mouse hook install
+
+**Parent (oyster-gamedata-pipeline):**
+- `stream-rc19.0.0` at `11d349b` — rc19.0.0 ship branch + status docs
+- `stream-rc19.0.1` at `d02f8f1` — rc19.0.1 ship branch + deploy fix
+- Tag `recorder-v0.28.0-rc19.0.0` → submodule `a717fcc`
+- Tag `recorder-v0.28.0-rc19.0.1` → submodule `6e5ddf2`
