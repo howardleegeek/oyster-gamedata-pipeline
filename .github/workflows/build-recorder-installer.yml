@@ -719,6 +719,249 @@ jobs:
           Write-Host "Rust recorder staged at bundle/recorder/ (${size_mb} MB)"
 
       # ---------------------------------------------------------------------
+      # 11c. rc19.0.2 — bundle standalone Python post-processing tooling
+      # ---------------------------------------------------------------------
+      # Howard's rc19.0.1 test (PRD lint 28/38) showed that 4 of 10 failures
+      # were because the installer shipped ONLY the Rust recorder + JRE + MC
+      # + mc-mod, and NOT the standalone Python finalize tools needed to
+      # generate gameinfo.xlsx, depth/*.exr, audio_check.json, and
+      # input_latency.json. The PyInstaller onedir bundle from step 11 has
+      # these scripts INSIDE the EXE freeze, but they can't be invoked
+      # post-record as standalone tools (no exposed CLI surface, dependencies
+      # are bundled inside the PyInstaller sys.path).
+      #
+      # rc19.0.2 fix: ship the 4 finalize scripts + their helpers + the
+      # Python deps they need + the DepthAnything V2 ONNX model as a SECOND
+      # bundle at {app}/bin/, {app}/python-deps/, {app}/depth_models/,
+      # callable via {app}/run_finalize.bat <session_dir>.
+      #
+      # Lint criteria unblocked by shipping these:
+      #   #15  depth/*.exr present       — depth_exr_writer.py
+      #   #16  depth/*.exr count >= 1800 — depth_exr_writer.py @6 fps
+      #   #24  directory structure       — gameinfo.xlsx + depth/ created
+      #   #39  input latency json        — measure_input_latency.py
+      # plus #38 audio_check.json via audio_continuity_check.py.
+      #
+      # Out of scope for S01 (this step): auto-running finalize on game
+      # process exit. That's S04's job. S01 only SHIPS the tools so they're
+      # reachable from {app}\run_finalize.bat <session_dir> and any future
+      # automation hook.
+      - name: rc19.0.2 - Copy standalone Python finalize scripts to bundle/bin/
+        shell: pwsh
+        run: |
+          # The four PRD finalize tools plus the helpers finalize_session.py
+          # invokes via subprocess. We copy from bin/ in the SAME commit
+          # we're building from (not a fresh clone of another repo) - the
+          # oyster-agent-runner Python source lives in this repo's bin/.
+          #
+          # finalize_session.py invokes (as subprocess via sys.executable):
+          #   - generate_gameinfo.py        (alias for generate_gameinfo_xlsx.py)
+          #   - depth_exr_writer.py
+          #   - audio_continuity_check.py
+          # so all three helpers must be staged alongside the 4 PRD tools.
+          New-Item -ItemType Directory -Force -Path 'bundle/bin' | Out-Null
+          # Primary 4 PRD finalize entrypoints
+          $primary = @(
+            'finalize_session.py',
+            'lint_v3_prd_grounded.py',
+            'depth_exr_writer.py',
+            'measure_input_latency.py'
+          )
+          # Helpers finalize_session.py shells out to
+          $helpers = @(
+            'audio_continuity_check.py'
+          )
+          foreach ($f in $primary + $helpers) {
+            $src = "bin/$f"
+            if (-not (Test-Path $src)) {
+              Write-Error "rc19.0.2 invariant violated: $src missing from repo bin/"
+              exit 1
+            }
+            Copy-Item $src -Destination "bundle/bin/$f" -Force
+          }
+          # finalize_session.py looks for `generate_gameinfo.py` (without
+          # the _xlsx suffix) next to itself as a fallback. Ship the real
+          # file under both names so the subprocess invocation resolves.
+          Copy-Item 'bin/generate_gameinfo_xlsx.py' `
+                    -Destination 'bundle/bin/generate_gameinfo.py' -Force
+          Copy-Item 'bin/generate_gameinfo_xlsx.py' `
+                    -Destination 'bundle/bin/generate_gameinfo_xlsx.py' -Force
+          $count = (Get-ChildItem 'bundle/bin' -Filter '*.py').Count
+          Write-Host "Staged $count Python scripts in bundle/bin/"
+          Get-ChildItem 'bundle/bin' | Sort-Object Name | ForEach-Object {
+            $kb = [math]::Round($_.Length / 1KB, 1)
+            Write-Host "  ${kb} KB  $($_.Name)"
+          }
+
+      - name: rc19.0.2 - Pip install Python runtime deps to bundle/python-deps/
+        shell: pwsh
+        run: |
+          # PEP 668 isolated install via --target. At runtime, run_finalize.bat
+          # sets PYTHONPATH=python-deps; before invoking python.exe so the
+          # scripts find their deps without polluting the user's site-packages.
+          #
+          # We pin opencv-python-headless (NOT opencv-python) - the headless
+          # variant ships no GUI deps (no Qt, no GTK), so we save ~80 MB and
+          # avoid the libGL.so.1 runtime issue that hits headless servers.
+          # The Rust recorder owns the screen capture path; cv2 here only
+          # decodes recording.mp4 frame-by-frame for depth inference.
+          #
+          # onnxruntime-directml gives AMD/Intel/NVIDIA iGPU acceleration on
+          # Windows; on machines without DX12 the runtime falls back to CPU.
+          # We do NOT install torch / torch-directml here - depth_exr_writer.py
+          # uses pure ONNX Runtime, not PyTorch, for the V2-Small model.
+          #
+          # openpyxl is the preferred xlsx writer for gameinfo.xlsx; the
+          # script has a stdlib zipfile+XML fallback but openpyxl is faster
+          # and produces cleaner output. Ship the dep, take the fast path.
+          #
+          # mss = synthetic-input latency screen-capture for input_latency.json.
+          New-Item -ItemType Directory -Force -Path 'bundle/python-deps' | Out-Null
+          python -m pip install --target=bundle/python-deps --no-warn-script-location `
+            "opencv-python-headless==4.10.0.84" `
+            "onnxruntime-directml==1.20.1" `
+            "openpyxl==3.1.5" `
+            "OpenEXR==3.3.2" `
+            "Imath==0.0.2" `
+            "numpy==1.26.4" `
+            "mss==9.0.2"
+          # Sanity-import each one to verify the install resolved (catches the
+          # case where a wheel pulled the wrong abi3 tag for Python 3.12 and
+          # the install "succeeded" but the .pyd is unloadable).
+          $env:PYTHONPATH = (Resolve-Path 'bundle/python-deps').Path
+          python -c "import cv2, onnxruntime, openpyxl, OpenEXR, Imath, numpy, mss; print('python-deps OK:', cv2.__version__, onnxruntime.__version__, openpyxl.__version__, numpy.__version__)"
+          $size_mb = [math]::Round((Get-ChildItem -Recurse bundle/python-deps | Measure-Object -Property Length -Sum).Sum / 1MB, 1)
+          Write-Host "bundle/python-deps/ staged (${size_mb} MB)"
+
+      - name: rc19.0.2 - Download DepthAnything V2 Small ONNX to bundle/depth_models/
+        shell: pwsh
+        run: |
+          # depth_exr_writer.py's resolve_model_path() searches in order:
+          #   1. --model-path CLI arg
+          #   2. OYSTER_DEPTH_MODEL_PATH env var
+          #   3. <install_root>/depth_models/depth_anything_v2_small.onnx
+          #   4. %LOCALAPPDATA%/OysterRecorder/depth_models/
+          # where _install_root() = Path(__file__).parent.parent. Since
+          # finalize_session.py + depth_exr_writer.py will be installed to
+          # {app}\bin\, install_root resolves to {app}, so the model must
+          # land at {app}\depth_models\depth_anything_v2_small.onnx exactly.
+          #
+          # Source: onnx-community/Depth-Anything-V2-Small on HuggingFace,
+          # file onnx/model.onnx (~99 MB, ViT-S backbone). This is the
+          # canonical ONNX export referenced in depth_exr_writer.py
+          # line 248. hf_hub_download handles LFS pointer redirection
+          # automatically; direct curl would fetch the LFS pointer text
+          # instead of the binary.
+          New-Item -ItemType Directory -Force -Path 'bundle/depth_models' | Out-Null
+          python -c "from huggingface_hub import hf_hub_download; p = hf_hub_download(repo_id='onnx-community/Depth-Anything-V2-Small', filename='onnx/model.onnx', revision='main', local_dir='hf_onnx_cache'); print('Downloaded to', p)"
+          # hf_hub_download stages to hf_onnx_cache/onnx/model.onnx; copy to
+          # the exact filename depth_exr_writer.py expects.
+          $src = 'hf_onnx_cache/onnx/model.onnx'
+          if (-not (Test-Path $src)) {
+            Write-Error "DA-V2 ONNX model not downloaded - $src missing"
+            exit 1
+          }
+          Copy-Item $src -Destination 'bundle/depth_models/depth_anything_v2_small.onnx' -Force
+          $size_mb = [math]::Round((Get-Item 'bundle/depth_models/depth_anything_v2_small.onnx').Length / 1MB, 1)
+          if ($size_mb -lt 50) {
+            Write-Error "DA-V2 ONNX model too small (${size_mb} MB < 50 MB) - likely an LFS pointer not the real weights"
+            exit 1
+          }
+          Write-Host "bundle/depth_models/depth_anything_v2_small.onnx staged (${size_mb} MB)"
+
+      - name: rc19.0.2 - Generate bundle/run_finalize.bat wrapper
+        shell: pwsh
+        run: |
+          # User-facing entry point. After install, a session can be
+          # post-processed by either:
+          #   1. Running `%LOCALAPPDATA%\GameData Recorder\run_finalize.bat
+          #      <session_dir>` interactively, OR
+          #   2. Being invoked programmatically by S04's auto-run hook
+          #      (game-process-exit) - same args, same surface.
+          #
+          # We deliberately do NOT bundle a Python interpreter - the user is
+          # expected to have system Python 3.11+ on PATH. If it's missing,
+          # the .bat exits with a clear pip-style error. Bundling embedded
+          # Python adds ~30 MB and a maintenance burden; minipc1 already has
+          # 3.11 and the next-gen consumer rigs will too.
+          #
+          # PYTHONPATH is set to {app}\python-deps so the staged wheels are
+          # importable without polluting site-packages. SET (not SETX) keeps
+          # the env var scoped to the .bat session.
+          #
+          # NOTE: we do NOT use a PowerShell @'...'@ here-string because
+          # YAML's block-scalar indentation collides with here-string's
+          # requirement that the closing '@ marker sits at column 0 — those
+          # two constraints can't both be satisfied. Instead we build the
+          # batch content as a PowerShell string array and join with CRLF,
+          # which is column-independent and reads cleanly under `run: |`.
+          $batLines = @(
+            '@echo off',
+            'setlocal enableextensions',
+            'rem -------------------------------------------------------------------------',
+            'rem run_finalize.bat - rc19.0.2 PRD finalize entrypoint',
+            'rem',
+            'rem Usage:',
+            'rem   run_finalize.bat <session_dir>',
+            'rem   run_finalize.bat "C:\path\with spaces\session_2026-05-13"',
+            'rem',
+            'rem Effect (per bin\finalize_session.py):',
+            'rem   - syncs game_state.jsonl from ~/Documents/OysterClips/active_session/',
+            'rem   - backfills action_camera.json with quaternion + position + offset',
+            'rem   - generates gameinfo.xlsx       (PRD #24, openpyxl)',
+            'rem   - generates depth\*.exr         (PRD #15/#16, DA-V2 Small ONNX)',
+            'rem   - generates audio_check.json    (PRD #38)',
+            'rem',
+            'rem Exit codes:',
+            'rem   0  finalize succeeded; all PRD section 3 deliverables present',
+            'rem   1  finalize partial; some step failed (check stderr)',
+            'rem   2  no session_dir argument given',
+            'rem   3  python.exe not found on PATH',
+            'rem -------------------------------------------------------------------------',
+            '',
+            'if "%~1"=="" (',
+            '  echo Usage: run_finalize.bat ^<session_dir^>',
+            '  exit /b 2',
+            ')',
+            '',
+            'rem Locate ourselves so paths are absolute regardless of caller cwd.',
+            'set "APP_ROOT=%~dp0"',
+            'if "%APP_ROOT:~-1%"=="\" set "APP_ROOT=%APP_ROOT:~0,-1%"',
+            '',
+            'set "PYTHONPATH=%APP_ROOT%\python-deps"',
+            'set "OYSTER_DEPTH_MODEL_PATH=%APP_ROOT%\depth_models\depth_anything_v2_small.onnx"',
+            '',
+            'where python.exe >nul 2>&1',
+            'if errorlevel 1 (',
+            '  echo ERROR: python.exe not found on PATH. Install Python 3.11+ from python.org and re-run.',
+            '  exit /b 3',
+            ')',
+            '',
+            'rem finalize_session.py CLI: <session_dir> (positional) + --verbose + --repo-root.',
+            'rem --repo-root tells the script where to look for vendor/recorder/scripts/;',
+            'rem we pass APP_ROOT so the fallback "alongside this script" path resolves',
+            'rem to {app}\bin\generate_gameinfo.py (the alias we shipped).',
+            'python.exe "%APP_ROOT%\bin\finalize_session.py" "%~1" --verbose --repo-root "%APP_ROOT%"',
+            'exit /b %ERRORLEVEL%'
+          )
+          # Inno Setup [Files] preserves whatever line endings the source
+          # file has - write CRLF so cmd.exe is happy on machines without
+          # autocrlf conversion in their git config.
+          $bat = ($batLines -join "`r`n") + "`r`n"
+          [System.IO.File]::WriteAllText(
+            (Join-Path (Get-Location) 'bundle/run_finalize.bat'),
+            $bat,
+            [System.Text.Encoding]::ASCII
+          )
+          if (-not (Test-Path 'bundle/run_finalize.bat')) {
+            Write-Error "Failed to write bundle/run_finalize.bat"
+            exit 1
+          }
+          $bytes = (Get-Item 'bundle/run_finalize.bat').Length
+          Write-Host "bundle/run_finalize.bat written (${bytes} bytes)"
+          Get-Content 'bundle/run_finalize.bat' -TotalCount 5
+
+      # ---------------------------------------------------------------------
       # 12. Stage the full bundle layout that installer.iss expects
       # ---------------------------------------------------------------------
       # The exact paths come from bin/build_bundled_installer/installer.iss
@@ -729,6 +972,10 @@ jobs:
       #   Source: "{#BundleRoot}\recorder\*"             -> bundle/recorder/                (Rust PRIMARY, rc16)
       #   Source: "{#BundleRoot}\OysterPlay.exe"         -> bundle/OysterPlay.exe
       #   Source: "{#BundleRoot}\manifest.json"          -> bundle/manifest.json
+      #   Source: "{#BundleRoot}\bin\*"                  -> bundle/bin/                    (rc19.0.2)
+      #   Source: "{#BundleRoot}\python-deps\*"          -> bundle/python-deps/            (rc19.0.2)
+      #   Source: "{#BundleRoot}\depth_models\*"         -> bundle/depth_models/           (rc19.0.2)
+      #   Source: "{#BundleRoot}\run_finalize.bat"       -> bundle/run_finalize.bat        (rc19.0.2)
       - name: Compose bundle/ layout
         shell: pwsh
         run: |
@@ -746,7 +993,17 @@ jobs:
             'bundle/OysterPlay.exe',
             'bundle/OysterRecorder-onedir/OysterRecorder-onedir.exe',
             'bundle/recorder/OysterRecorder.exe',
-            'bundle/recorder/obs-ffmpeg-mux.exe'
+            'bundle/recorder/obs-ffmpeg-mux.exe',
+            # rc19.0.2 - standalone Python finalize tooling
+            'bundle/bin/finalize_session.py',
+            'bundle/bin/lint_v3_prd_grounded.py',
+            'bundle/bin/depth_exr_writer.py',
+            'bundle/bin/measure_input_latency.py',
+            'bundle/bin/audio_continuity_check.py',
+            'bundle/bin/generate_gameinfo.py',
+            'bundle/python-deps',
+            'bundle/depth_models/depth_anything_v2_small.onnx',
+            'bundle/run_finalize.bat'
           )
           foreach ($p in $required) {
             if (-not (Test-Path $p)) {
@@ -838,13 +1095,22 @@ jobs:
             Write-Error "Installer is too small (${size_mb} MiB < 400 MiB) — JRE / MC bundle may be missing"
             exit 1
           }
-          if ($bytes -gt (1000 * 1MB)) {
-            # rc7 target is ~800 MB (rc6 was ~460 MB before bundling MC
-            # asset objects). 1000 MB ceiling absorbs the ~390 MB of
-            # objects + minor mod / weight bloat without falsely failing
-            # a healthy build. Mirrors build_all.ps1's gate — keep both
-            # in sync when re-tuning.
-            Write-Error "Installer is too large (${size_mb} MiB > 1000 MiB) — investigate Solid compression"
+          if ($bytes -gt (1300 * 1MB)) {
+            # rc7 target was ~800 MB (rc6 was ~460 MB before bundling MC
+            # asset objects). rc19.0.2 raises ceiling to 1300 MB to absorb
+            # the new standalone Python finalize tooling bundle:
+            #   * bundle/bin/         ~ 200 KB  (6 .py scripts)
+            #   * bundle/python-deps/ ~150 MB   (cv2, onnxruntime-directml,
+            #                                    openpyxl, OpenEXR, numpy,
+            #                                    mss + transitive deps)
+            #   * bundle/depth_models ~ 99 MB   (DA-V2 Small ONNX)
+            #   * run_finalize.bat    ~  2 KB
+            # Total added: ~250 MB pre-compression. Solid LZMA2 typically
+            # compresses Python wheels ~50% and the ONNX model ~30%, so the
+            # installer .exe should grow by ~130-150 MB net (rc19.0.1 was
+            # ~860 MB so rc19.0.2 target is ~1.0-1.05 GB). Mirrors
+            # build_all.ps1's gate - keep both in sync when re-tuning.
+            Write-Error "Installer is too large (${size_mb} MiB > 1300 MiB) - investigate Solid compression"
             exit 1
           }
 
