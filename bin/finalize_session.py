@@ -243,6 +243,23 @@ def backfill_action_camera(session_dir: Path, verbose: bool = False) -> int:
         # else fill it from |velocity|. Keeps backwards compat with rc17.x.
         if frame.get("speed", 0.0) == 0.0:
             frame["speed"] = speed_mag
+
+        # rc19-c: PRD §3.2 requires `time` as ISO ms format and `fps` per
+        # frame. The recorder writes `timestamp` (relative seconds) and
+        # `timestamp_ns`; convert to absolute ISO using game_state's
+        # timestamp_ms which gives us wall-clock anchor.
+        if "time" not in frame or not isinstance(frame.get("time"), str):
+            from datetime import datetime, timezone
+            abs_dt = datetime.fromtimestamp(
+                gs.get("timestamp_ms", 0) / 1000.0, tz=timezone.utc
+            )
+            frame["time"] = abs_dt.strftime("%Y-%m-%d %H:%M:%S.") + \
+                            f"{abs_dt.microsecond // 1000:03d}"
+        # rc19-c: per-frame fps field — PRD §3.2 wants 30.0 explicit, even
+        # though recorder writes session-average fps in metadata.
+        if frame.get("fps") is None or frame.get("fps") == 0:
+            frame["fps"] = 30.0
+
         patched += 1
 
     # Write back
