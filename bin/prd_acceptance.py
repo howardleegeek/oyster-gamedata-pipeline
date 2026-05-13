@@ -564,8 +564,41 @@ def main() -> int:
         timestamp=datetime.now()
     )
     
+    # rc18.0.5 (Howard 2026-05-12 "继续补充"): run finalize_session.py BEFORE
+    # any tests / lint so action_camera.json has quaternion + position backfilled
+    # from game_state.jsonl, gameinfo.xlsx exists, and audio_check.json is
+    # generated. Without this step, fresh recordings show:
+    #   * action_camera quaternion/position fields NULL (recorder writes them
+    #     before mc-mod's game_state.jsonl is in the session dir)
+    #   * gameinfo.xlsx missing entirely
+    #   * audio_check.json missing → lint #38 fails on "file not found"
+    # finalize_session.py is idempotent — safe to re-run.
+    finalize_path = bin_dir / "finalize_session.py"
+    if finalize_path.exists():
+        print(f"\nRunning finalize_session.py (rc18.0.5 pre-lint finalization)...")
+        try:
+            fin_result = subprocess.run(
+                [sys.executable, str(finalize_path), str(args.session_dir),
+                 "--verbose" if args.verbose else ""],
+                capture_output=True, text=True, timeout=300,
+            )
+            if args.verbose:
+                print(fin_result.stdout)
+                if fin_result.returncode != 0:
+                    print(f"  finalize exit={fin_result.returncode}", file=sys.stderr)
+                    if fin_result.stderr.strip():
+                        print(f"  stderr: {fin_result.stderr.strip()[:300]}", file=sys.stderr)
+            else:
+                # Just print the "Done in X.Xs — ..." summary line
+                for line in fin_result.stdout.splitlines():
+                    if line.startswith("Done in"):
+                        print(f"  {line}")
+                        break
+        except Exception as e:
+            print(f"  finalize_session.py exception (continuing): {e}", file=sys.stderr)
+
     # Run PRD tests
-    print(f"Running {len(test_files)} PRD tests on {args.session_dir}...")
+    print(f"\nRunning {len(test_files)} PRD tests on {args.session_dir}...")
     for i, test_file in enumerate(test_files, 1):
         if args.verbose:
             print(f"[{i}/{len(test_files)}] Running {test_file.name}...")
