@@ -576,7 +576,42 @@ def main() -> int:
         if args.verbose:
             status = "✅ PASS" if test_result.passed else "❌ FAIL"
             print(f"  {status} ({test_result.duration_seconds:.1f}s)")
-    
+
+    # rc18.0.4 (Howard 2026-05-12 PRD §6 lint #38 fix): run
+    # audio_continuity_check.py against the session BEFORE lint_v3 so that
+    # the lint criterion #38 ("Audio Continuity") has its audio_check.json
+    # input. Without this step, #38 fails with "audio_check.json not found"
+    # even when the recording's audio stream is perfectly fine.
+    print(f"\nRunning audio_continuity_check.py (pre-lint #38 dependency)...")
+    audio_check_path = bin_dir / "audio_continuity_check.py"
+    if audio_check_path.exists():
+        try:
+            import time as _t
+            _t0 = _t.time()
+            video_files = (list(args.session_dir.glob("recording.mp4"))
+                           + list(args.session_dir.glob("video.mp4")))
+            if video_files:
+                primary_video = video_files[0]
+                out_json = args.session_dir / "audio_check.json"
+                cmd = [sys.executable, str(audio_check_path),
+                       str(primary_video), "--output", str(out_json)]
+                ac_result = subprocess.run(cmd, capture_output=True,
+                                           text=True, timeout=180,
+                                           cwd=args.session_dir)
+                _dt = _t.time() - _t0
+                status = "✅ PASS" if ac_result.returncode == 0 else "⚠️ skip"
+                if args.verbose:
+                    print(f"  {status} ({_dt:.1f}s) -> {out_json.name}")
+            else:
+                if args.verbose:
+                    print("  ⚠️ skip — no recording.mp4 / video.mp4 in session")
+        except Exception as e:
+            if args.verbose:
+                print(f"  ⚠️ skip — exception: {e}")
+    else:
+        if args.verbose:
+            print(f"  ⚠️ skip — {audio_check_path.name} not present")
+
     # Run lint
     print(f"\nRunning lint_v3_prd_grounded.py...")
     lint_result = run_lint_v3(args.session_dir, args.lint_timeout)

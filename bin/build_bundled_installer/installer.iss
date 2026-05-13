@@ -375,6 +375,17 @@ Name: "{group}\\Open Recordings Folder"; \
     WorkingDir: "{localappdata}\\GameData Recorder"; \
     Comment: "Browse recorded gameplay sessions"
 
+; rc18.0.4 (Howard 2026-05-12 "测试时 mc-mod 没加载"): explicit Start Menu
+; shortcut to the bundled-MC launcher. Users who launch Minecraft via the
+; Mojang Launcher get a profile WITHOUT our mc-mod installed, so
+; gameinfo.xlsx + game_state.jsonl don't generate. The supported path is
+; launch_mc.bat → bundled mc-instance/ → mc-mod loads → IPC data writes
+; correctly. This shortcut makes the right path discoverable.
+Name: "{group}\\Launch Minecraft (Recorded)"; \
+    Filename: "{app}\\launch_mc.bat"; \
+    WorkingDir: "{app}"; \
+    Comment: "Launch bundled Minecraft 1.21.4 with recorder mod loaded (the supported workflow for full PRD compliance)"
+
 Name: "{group}\\Uninstall {#AppName}"; \
     Filename: "{uninstallexe}"; \
     WorkingDir: "{app}"
