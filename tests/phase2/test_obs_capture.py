@@ -5,6 +5,8 @@ import hashlib
 import os
 import sys
 
+import pytest
+
 # Ensure obs_capture.py is importable
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -35,28 +37,46 @@ def test_OBSSpectatorCapture_custom_init():
 
 
 def test_obs_websocket_v5_auth_challenge_format():
-    """When password set, helper produces correct base64+SHA256 (mock challenge salt)."""
+    """When password set, helper produces correct OBS-WebSocket v5 auth hash.
+
+    Reference algorithm (per obs-websocket protocol spec):
+        secret = base64(SHA256(password + salt))
+        auth   = base64(SHA256(secret + challenge))
+
+    The shipped helper is ``OBSSpectatorCapture._auth_hash(challenge, salt)``;
+    the older test signature used ``_auth_challenge_response(salt)`` which only
+    matched a half-step of the algorithm — verify the real two-step hash here.
+    """
     cap = obs_capture.OBSSpectatorCapture(password="mypassword")
-    challenge_salt = "mock_salt_123"
-    expected = base64.b64encode(
-        hashlib.sha256(("mypassword" + challenge_salt).encode("utf-8")).digest()
+    salt = "mock_salt_123"
+    challenge = "mock_challenge_456"
+    secret = base64.b64encode(
+        hashlib.sha256(("mypassword" + salt).encode("utf-8")).digest()
     ).decode("ascii")
-    result = cap._auth_challenge_response(challenge_salt)
+    expected = base64.b64encode(
+        hashlib.sha256((secret + challenge).encode("utf-8")).digest()
+    ).decode("ascii")
+    result = cap._auth_hash(challenge, salt)
     assert result == expected
 
 
 def test_connect_returns_false_when_websocket_lib_missing(monkeypatch):
-    """Monkey-patch importlib so websocket-client import fails, assert connect() returns False."""
-    import importlib
+    """Connect surfaces a False return value when the websockets lib is absent.
 
-    original_import_module = importlib.import_module
+    The shipped ``connect()`` is an ``async def`` (the implementation is built
+    on ``websockets`` which is async-only). Running it inside ``asyncio.run``
+    keeps the test sync-shaped while honoring the real coroutine contract.
+    """
+    import asyncio
 
-    def fake_import_module(name, *args, **kwargs):
-        if name == "websocket":
-            raise ImportError("No module named 'websocket'")
-        return original_import_module(name, *args, **kwargs)
+    # ``_import_websockets`` caches the resolved module on the module global.
+    # Reset it so the patched import path is exercised on this run.
+    monkeypatch.setattr(obs_capture, "_websockets", None, raising=False)
 
-    monkeypatch.setattr(importlib, "import_module", fake_import_module)
+    def fake_import_websockets():
+        raise ImportError("websockets library not installed (simulated)")
+
+    monkeypatch.setattr(obs_capture, "_import_websockets", fake_import_websockets)
 
     cap = obs_capture.OBSSpectatorCapture()
-    assert cap.connect() is False
+    assert asyncio.run(cap.connect()) is False
