@@ -130,7 +130,13 @@ describe('validateLocalTarball (real .tar.gz)', () => {
     const report = await validateLocalTarball(SAMPLE);
     expect(report.systeminfo?.gameProcessName).toBe('minecraft.exe');
     expect(report.summary.total).toBeGreaterThan(0);
-    // The synthetic sample may not pass *all* criteria but structure should be OK.
+    // The released sample tarball must pass every structural+schema check.
+    // Logs the failing criteria so flaky CI failures are debuggable.
+    if (!report.passed) {
+      for (const r of report.results.filter((x) => !x.passed)) {
+        console.error(`  [FAIL ${r.id}] ${r.name}: ${r.message}`, r.details ?? '');
+      }
+    }
     expect(report.passed).toBe(true);
   }, 120_000);
 });
