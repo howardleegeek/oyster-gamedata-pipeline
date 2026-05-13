@@ -30,8 +30,27 @@ import { totalCents } from '../../../lib/format';
 
 export const dynamic = 'force-dynamic';
 
+// QA1 finding #4 fix: enforce uniqueness on tarball_ids at the schema level.
+// Without this, a client (or a buggy cart UI) can submit
+// `tarball_ids: [X, X, X]` and:
+//   1. Catalog lookup happily resolves each instance to the same item.
+//   2. Stripe creates 3 line items, charging the buyer 3× for one download.
+//   3. Webhook inserts only 1 `purchases` row (unique on
+//      `(buyer_id, tarball_id, stripe_session_id)`), so the buyer paid for
+//      3 but got 1 download → credit theft.
+//
+// Defense-in-depth: even with the cart cookie + cart_items table doing
+// dedup, the API boundary MUST enforce it. We refine here, AND dedup again
+// server-side just before catalog resolution.
 const Body = z.object({
-  tarball_ids: z.array(z.string().uuid()).min(1).max(20),
+  tarball_ids: z
+    .array(z.string().uuid())
+    .min(1)
+    .max(20)
+    .refine((ids) => new Set(ids).size === ids.length, {
+      message:
+        'tarball_ids must be unique — each tarball can only be purchased once per checkout session',
+    }),
   license_type: z.enum(['research', 'commercial']),
 });
 
@@ -69,7 +88,12 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
-  const { tarball_ids, license_type } = parsed.data;
+  const { license_type } = parsed.data;
+  // QA1 finding #4 fix: redundant server-side dedup. The schema `.refine`
+  // already rejects duplicates with 400, but if a future refactor loosens
+  // the schema, we want this layer to still catch it. Order is preserved
+  // (Set iteration is insertion order in modern JS).
+  const tarball_ids = Array.from(new Set(parsed.data.tarball_ids));
 
   // Resolve the cart items against the catalog.
   let catalog: Awaited<ReturnType<typeof fetchCatalog>>['rows'];
