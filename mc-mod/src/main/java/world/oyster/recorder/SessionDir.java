@@ -37,4 +37,17 @@ public final class SessionDir {
         return Paths.get(home, "Documents", "OysterClips",
             "active_session", "game_state.jsonl");
     }
+
+    /**
+     * Returns the canonical depth/ directory the real-depth shader writes
+     * EXR sidecars to. Same parent as {@link #outputPath()} so the recorder
+     * picks them up at tarball-pack time alongside game_state.jsonl.
+     *
+     * <p>Format: {@code ~/Documents/OysterClips/active_session/depth/}.
+     */
+    public static Path depthDir() {
+        String home = System.getProperty("user.home");
+        return Paths.get(home, "Documents", "OysterClips",
+            "active_session", "depth");
+    }
 }

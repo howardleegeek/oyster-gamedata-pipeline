@@ -5,6 +5,9 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import world.oyster.recorder.depth.RealDepthExporter;
+import world.oyster.recorder.depth.RecorderPreferences;
+
 /**
  * Oyster Recorder Mod — Fabric ClientModInitializer.
  *
@@ -36,6 +39,14 @@ public class OysterRecorderMod implements ClientModInitializer {
     /** Single global capture state; OK for client-side singleton mod. */
     private GameStateCapture capture;
 
+    /**
+     * G198 real-depth exporter — opt-in via
+     * {@code ~/Documents/OysterClips/preferences.json} flag
+     * {@code enable_real_depth_shader=true}. When inactive the recorder's
+     * existing DepthAnything V2 fallback runs unmodified.
+     */
+    private RealDepthExporter depthExporter;
+
     @Override
     public void onInitializeClient() {
         LOGGER.info("Oyster Recorder mod loading — will stream real game state to {}",
@@ -57,6 +68,18 @@ public class OysterRecorderMod implements ClientModInitializer {
                 LOGGER.warn("Tick capture failed (non-fatal): {}", e.getMessage());
             }
         });
+
+        // G198: real-depth shader path. Loads preferences from the same
+        // OysterClips/ directory; defaults to disabled so DA-V2 stays the
+        // canonical pipeline until vendors explicitly opt-in.
+        try {
+            RecorderPreferences prefs = RecorderPreferences.loadDefault();
+            this.depthExporter = new RealDepthExporter(prefs, SessionDir.depthDir());
+            this.depthExporter.start();
+        } catch (Throwable t) {
+            LOGGER.warn("RealDepthExporter init failed; DA-V2 fallback remains active: {}",
+                t.toString());
+        }
 
         LOGGER.info("Oyster Recorder mod ready — tick listener registered");
     }
