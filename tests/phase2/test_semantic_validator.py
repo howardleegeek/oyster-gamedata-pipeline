@@ -4,9 +4,24 @@ Tests for semantic_validator.py
 
 import json
 import os
+import sys
 import tempfile
+from pathlib import Path
 
 from semantic_validator import validate_action_camera_semantics
+
+# Absolute path to the CLI script — the CLI subprocess tests below shell out
+# to ``python3 <script> ...`` which only works when given a real on-disk path.
+# Resolving from this file keeps the test runnable regardless of CWD (pytest,
+# tox, CI runners, manual invocation, etc.).
+_SCRIPT_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "src"
+    / "oyster_agent_runner"
+    / "phase2"
+    / "semantic_validator.py"
+)
+_PY = sys.executable or "python3"
 
 
 def create_valid_record(frame_num: int) -> dict:
@@ -143,20 +158,23 @@ def test_fails_on_bad_quaternion():
 
 
 def test_cli_valid_file():
-    """Test CLI with valid JSON file."""
-    records = [create_valid_record(i) for i in range(10)]
+    """Test CLI with valid JSON file.
+
+    Needs a full 100 records so the WASD distribution lands inside tolerance
+    (``create_valid_record`` cycles ``W*40 + A*20 + S*20 + D*20`` per 100 frames;
+    only sampling the first 10 yields 100% W which the validator rejects).
+    """
+    records = [create_valid_record(i) for i in range(100)]
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         json.dump(records, f)
         temp_file = f.name
 
     try:
-        # Run the CLI
-        os.system(f"python3 semantic_validator.py {temp_file} > /dev/null 2>&1")
-        # Check exit code (should be 0 for valid)
-        exit_code = os.system(f"python3 semantic_validator.py {temp_file} > /dev/null 2>&1")
+        # Run the CLI via its absolute path so the test is CWD-independent.
+        exit_code = os.system(f"{_PY} {_SCRIPT_PATH} {temp_file} > /dev/null 2>&1")
         assert exit_code == 0, f"Expected exit code 0, got {exit_code}"
-        print("✓ test_cli_valid_file passed")
+        print("test_cli_valid_file passed")
     finally:
         os.unlink(temp_file)
 
@@ -168,11 +186,11 @@ def test_cli_invalid_file():
         temp_file = f.name
 
     try:
-        # Run the CLI
-        exit_code = os.system(f"python3 semantic_validator.py {temp_file} > /dev/null 2>&1")
+        # Run the CLI via its absolute path so the test is CWD-independent.
+        exit_code = os.system(f"{_PY} {_SCRIPT_PATH} {temp_file} > /dev/null 2>&1")
         # Should exit with non-zero code
         assert exit_code != 0, "Expected non-zero exit code for invalid JSON"
-        print("✓ test_cli_invalid_file passed")
+        print("test_cli_invalid_file passed")
     finally:
         os.unlink(temp_file)
 
