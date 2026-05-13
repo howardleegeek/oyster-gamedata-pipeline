@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.1.0-rc9] - 2026-05-13
+
 ### Minecraft Phase 1 — CoT + metadata + inputs trajectory pipeline
 - `mineflayer/bot.js` — Node.js subprocess implementing the
   Mineflayer half of the JSON-line stdio protocol (`hello`, `spawn`,
@@ -36,10 +38,18 @@
 - `docs/PHASE1_RUNBOOK.md` — operator-facing runbook covering Paper
   server install, npm install, the run command, expected output sizes,
   cost estimates, troubleshooting.
-- 37 new tests (all mock-based, no Minecraft server required for CI):
-  Mineflayer protocol parser, env lifecycle with fake subprocess,
-  `ClaudeThinkingProvider` with mocked SDK responses, runner thinking-
-  event emission semantics, multi-stream writer, run-mc CLI integration.
+- `bin/smoke_phase1.sh` — automated Phase 1 §6 smoke test (detects
+  java/node/npm, downloads pinned Paper 1.20.4 build 499, runs the four
+  Phase 1 outputs end-to-end). Skips informationally when host tools are
+  absent (exit 0). `--dry-run` flag walks plumbing without launching
+  Paper, used by CI.
+- 42 new tests (all mock-based, no Minecraft server required for CI):
+  Mineflayer protocol parser (17 tests in `test_minecraft_env_protocol`),
+  env lifecycle with fake subprocess, `ClaudeThinkingProvider` with
+  mocked SDK responses (11 tests), runner thinking-event emission
+  semantics (4 tests), multi-stream writer (6 tests), Phase 1 smoke
+  script (4 tests). Total project test count post-rc9: 962 collected
+  (917 passing, 32 unrelated environmental failures, 12 skipped).
 
 Phase 1 deliberately omits the video stream (`video.mp4` +
 `frames.jsonl`) — that lands in Phase 2 with the OBS spectator pipeline.
