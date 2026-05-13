@@ -28,6 +28,26 @@ MAX_RETRIES = 5
 BASE_BACKOFF_SEC = 1.0
 
 
+def _build_anthropic_client(api_key: str):
+    """Construct ``anthropic.Anthropic`` resiliently across httpx versions.
+
+    Older anthropic SDKs forward ``proxies=`` to httpx 0.28+, which
+    rejects the kwarg with ``TypeError: ... unexpected keyword argument
+    'proxies'``. Providing an explicit ``http_client=`` bypasses the
+    SDK's internal wrapper construction entirely.
+    """
+    try:
+        return anthropic.Anthropic(api_key=api_key)
+    except TypeError as exc:
+        if "proxies" not in str(exc):
+            raise
+        try:
+            import httpx  # type: ignore[import-not-found]
+        except ImportError:  # pragma: no cover
+            raise exc
+        return anthropic.Anthropic(api_key=api_key, http_client=httpx.Client())
+
+
 class ClaudeProvider:
     """LLMProvider backed by Anthropic Claude."""
 
@@ -44,7 +64,7 @@ class ClaudeProvider:
             )
         self.model = model
         self.max_tokens = max_tokens
-        self._client = anthropic.Anthropic(api_key=resolved_key)
+        self._client = _build_anthropic_client(resolved_key)
 
     def chat(self, system: str, messages: list[dict], temperature: float) -> str:
         last_exc: Exception | None = None

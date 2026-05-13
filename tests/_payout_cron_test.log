@@ -22,3 +22,15 @@
 2026-05-07 22:48:49,210 [INFO] skip 00000000-0000-0000-0000-000000000002 — no Stripe account or payouts disabled (unpaid=2400)
 2026-05-07 22:48:49,210 [DEBUG] skip 00000000-0000-0000-0000-000000000003 — unpaid 100 < threshold 2000
 2026-05-07 22:48:49,210 [INFO] payout_cron complete: 1 paid (4800 cents), 0 failed
+2026-05-13 16:25:29,559 [INFO] payout_cron starting [supabase=mock,stripe=mock,dry-run] run_date=2026-05-13
+2026-05-13 16:25:29,559 [INFO] Loaded 3 tester balances from Supabase
+2026-05-13 16:25:29,559 [INFO] [dry-run] would transfer 4800 cents to acct_mock_alice (key=payout-00000000-0000-0000-0000-000000000001-2026-05-13)
+2026-05-13 16:25:29,559 [INFO] skip 00000000-0000-0000-0000-000000000002 — no Stripe account or payouts disabled (unpaid=2400)
+2026-05-13 16:25:29,559 [DEBUG] skip 00000000-0000-0000-0000-000000000003 — unpaid 100 < threshold 2000
+2026-05-13 16:25:29,559 [INFO] payout_cron complete: 1 paid (4800 cents), 0 failed
+2026-05-13 16:25:48,863 [INFO] payout_cron starting [supabase=mock,stripe=mock,dry-run] run_date=2026-05-13
+2026-05-13 16:25:48,863 [INFO] Loaded 3 tester balances from Supabase
+2026-05-13 16:25:48,863 [INFO] [dry-run] would transfer 4800 cents to acct_mock_alice (key=payout-00000000-0000-0000-0000-000000000001-2026-05-13)
+2026-05-13 16:25:48,863 [INFO] skip 00000000-0000-0000-0000-000000000002 — no Stripe account or payouts disabled (unpaid=2400)
+2026-05-13 16:25:48,863 [DEBUG] skip 00000000-0000-0000-0000-000000000003 — unpaid 100 < threshold 2000
+2026-05-13 16:25:48,863 [INFO] payout_cron complete: 1 paid (4800 cents), 0 failed
