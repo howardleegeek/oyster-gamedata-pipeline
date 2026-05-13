@@ -668,9 +668,30 @@ def _check_quaternion(d: Path, rpt: LintReport) -> None:
 
     Scans action_camera.json (preferred) for camera_rotation_quaternion
     and player_rotation_quaternion. Verifies:
-      #13 xyzw ordering via rest-state heuristic on aggregate
+      #13 xyzw ordering via metadata declaration (rc19) or rest-state
+          heuristic fallback (rc17.x)
       #14 L2 norm ∈ [0.99, 1.01] per quaternion
+
+    rc19 contract-check upgrade: the rest-state heuristic ("last element
+    is largest abs → xyzw") is unreliable on game data where rotation
+    spans > 180° — cos(half_yaw) swings as wide as sin(half_yaw) so the
+    scalar w doesn't dominate. Verified on Howard's session: structurally
+    correct xyzw data got 90/292 xyzw votes vs 202/292 wxyz votes. The
+    real fix is contract: if metadata.json declares
+    quaternion_order="xyzw", trust the producer. Heuristic only as
+    fallback when field missing (rc18.x and older recordings).
     """
+    # rc19: contract-first quaternion order check
+    metadata_path = d / "metadata.json"
+    declared_order: Optional[str] = None
+    if metadata_path.exists():
+        try:
+            with open(metadata_path) as f:
+                meta = json.load(f)
+            declared_order = meta.get("quaternion_order")
+        except (json.JSONDecodeError, OSError):
+            pass
+
     data, path = _load_action_camera(d)
     if data is None:
         rpt.add(LintResult(13, "Quaternion xyzw Order", False,
@@ -739,20 +760,39 @@ def _check_quaternion(d: Path, rpt: LintReport) -> None:
              "frames_scanned": len(data)}))
         return
 
-    # Order verdict: majority vote, treating ties or pure-identity-only as a
-    # FAIL because we couldn't disambiguate.
-    order_ok = (xyzw_votes > 0 and xyzw_votes >= wxyz_votes
-                and not shape_issues)
-    rpt.add(LintResult(
-        13, "Quaternion xyzw Order", order_ok,
-        (f"xyzw confirmed ({xyzw_votes} vs {wxyz_votes} votes, "
-         f"{seen} quaternions)"
-         if order_ok
-         else f"xyzw votes={xyzw_votes} wxyz votes={wxyz_votes} "
-              f"shape_issues={len(shape_issues)}"),
-        {"source": path.name if path else None,
-         "xyzw_votes": xyzw_votes, "wxyz_votes": wxyz_votes,
-         "shape_issues": shape_issues[:5]}))
+    # rc19: contract-first verdict — if metadata declares xyzw, trust the
+    # producer. The heuristic below remains as fallback for older recordings
+    # that don't declare an order in metadata.
+    if declared_order == "xyzw" and not shape_issues:
+        rpt.add(LintResult(
+            13, "Quaternion xyzw Order", True,
+            f"xyzw declared in metadata.json ({seen} quaternions, "
+            f"{len(shape_issues)} shape issues)",
+            {"source": path.name if path else None,
+             "verdict_source": "metadata.quaternion_order",
+             "declared_order": declared_order,
+             "shape_issues": shape_issues[:5]}))
+    else:
+        # Order verdict (legacy fallback): majority vote, treating ties or
+        # pure-identity-only as a FAIL because we couldn't disambiguate.
+        order_ok = (xyzw_votes > 0 and xyzw_votes >= wxyz_votes
+                    and not shape_issues)
+        reason = (
+            f"xyzw confirmed by heuristic ({xyzw_votes} vs {wxyz_votes} "
+            f"votes, {seen} quaternions)"
+            if order_ok
+            else (f"xyzw votes={xyzw_votes} wxyz votes={wxyz_votes} "
+                  f"shape_issues={len(shape_issues)} — heuristic "
+                  f"unreliable on large-rotation data; producer should "
+                  f"declare quaternion_order in metadata.json")
+        )
+        rpt.add(LintResult(
+            13, "Quaternion xyzw Order", order_ok, reason,
+            {"source": path.name if path else None,
+             "verdict_source": "heuristic_fallback",
+             "declared_order": declared_order,
+             "xyzw_votes": xyzw_votes, "wxyz_votes": wxyz_votes,
+             "shape_issues": shape_issues[:5]}))
 
     rpt.add(LintResult(
         14, "Quaternion Normalization", not norm_issues,

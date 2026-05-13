@@ -217,6 +217,25 @@ def backfill_action_camera(session_dir: Path, verbose: bool = False) -> int:
     payload = {"frames": frames} if wrapped else frames
     ac_path.write_text(json.dumps(payload, indent=2))
 
+    # rc19: declare quaternion_order in metadata.json so lint #13 can do a
+    # contract check instead of relying on the unreliable rest-state
+    # heuristic (which mis-classifies large-rotation game data — see
+    # lint_v3_prd_grounded.py _check_quaternion docstring for analysis).
+    metadata_path = session_dir / "metadata.json"
+    if metadata_path.exists() and patched > 0:
+        try:
+            with open(metadata_path) as f:
+                meta = json.load(f)
+            if meta.get("quaternion_order") != "xyzw":
+                meta["quaternion_order"] = "xyzw"
+                with open(metadata_path, "w") as f:
+                    json.dump(meta, f, indent=2)
+                if verbose:
+                    print(f"  declared quaternion_order=xyzw in metadata.json")
+        except (json.JSONDecodeError, OSError) as e:
+            if verbose:
+                print(f"  WARN could not update metadata.json: {e}")
+
     if verbose:
         print(f"  backfilled {patched} action_camera frames with quaternion + position from {len(gs_lines)} game_state samples")
     return patched
