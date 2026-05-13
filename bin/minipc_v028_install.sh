@@ -22,8 +22,13 @@ RELEASE_TAG="${RELEASE_TAG:-recorder-v0.28.0-rc2}"
 REPO="howardleegeek/oyster-gamedata-pipeline"
 SSH_TARGET="${SSH_TARGET:-minipc-bwdxs}"
 
-INSTALLER_NAME="OysterRecorder-Setup-${RELEASE_TAG}.exe"
-MANIFEST_NAME="SHA-256-manifest.txt"
+# Asset name matches the CI bundled-installer workflow output, which uses
+# `GameDataRecorder-Setup-${TAG}.exe` (the customer-facing brand). Was
+# incorrectly hardcoded to `OysterRecorder-Setup-...` previously and would
+# have failed asset lookup for rc18.0.5+ releases (verified 2026-05-13 on
+# rc19.0.0 mid-CI). Env override is supported via INSTALLER_NAME=...
+INSTALLER_NAME="${INSTALLER_NAME:-GameDataRecorder-Setup-${RELEASE_TAG}.exe}"
+MANIFEST_NAME="${MANIFEST_NAME:-SHA-256-manifest.txt}"
 
 say() { printf '\033[1;36m[install]\033[0m %s\n' "$*"; }
 die() { printf '\033[1;31m[FAIL]\033[0m %s\n' "$*" >&2; exit 1; }
