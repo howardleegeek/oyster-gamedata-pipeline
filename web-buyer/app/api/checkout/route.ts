@@ -131,6 +131,45 @@ export async function POST(req: NextRequest) {
   ).toString();
   const cancelUrl = new URL(env.stripeCancelPath, env.siteUrl).toString();
 
+  // QA1 finding #3 fix (BUG-10): Stripe metadata values are capped at 500
+  // chars. With UUID (36) + comma (1) = 37 chars/id, naively joining all
+  // tarball_ids into a single `metadata.tarball_ids` field overflows at 14+
+  // items. Stripe API 400s the session create call → buyer can't check out.
+  //
+  // We chunk the IDs across `tarball_ids_1`, `tarball_ids_2`, ... fields
+  // (each ≤ TARBALL_IDS_PER_CHUNK ids → ≤ 481 chars value, well under 500).
+  // The webhook iterates over all `tarball_ids_*` keys to reconstruct the
+  // full list. Cap of 20 → at most 2 chunks → 3 keys including a count =
+  // well under Stripe's 50-key metadata limit.
+  //
+  // We also keep a single-source `tarball_ids_count` so the webhook can
+  // detect a mismatch (e.g. Stripe silently dropped a metadata field).
+  const TARBALL_IDS_PER_CHUNK = 13; // 13*37 = 481 ≤ 500
+  const idChunks: string[] = [];
+  for (let i = 0; i < tarball_ids.length; i += TARBALL_IDS_PER_CHUNK) {
+    idChunks.push(tarball_ids.slice(i, i + TARBALL_IDS_PER_CHUNK).join(','));
+  }
+  const idMetadata: Record<string, string> = {
+    tarball_ids_count: String(tarball_ids.length),
+    tarball_ids_chunk_count: String(idChunks.length),
+  };
+  idChunks.forEach((chunk, idx) => {
+    idMetadata[`tarball_ids_${idx + 1}`] = chunk;
+  });
+  // Defence-in-depth: assert no value exceeds Stripe's 500-char cap before
+  // we hand off to Stripe. Cheaper to 502 here than to chase a Stripe 400.
+  for (const [k, v] of Object.entries(idMetadata)) {
+    if (v.length > 500) {
+      return NextResponse.json(
+        {
+          error: 'Internal metadata over-limit',
+          details: `metadata.${k} is ${v.length} chars (Stripe cap: 500)`,
+        },
+        { status: 500 },
+      );
+    }
+  }
+
   try {
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
@@ -156,7 +195,7 @@ export async function POST(req: NextRequest) {
       metadata: {
         buyer_id: buyerId,
         license_type,
-        tarball_ids: tarball_ids.join(','),
+        ...idMetadata,
       },
       payment_intent_data: {
         metadata: {
