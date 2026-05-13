@@ -353,6 +353,103 @@ Source: "{#BundleRoot}\\manifest.json"; \
     DestName: "manifest.json"; \
     Flags: ignoreversion
 
+; --- (6) rc19.0.2 — Standalone Python finalize tooling --------------------
+; Howard's rc19.0.1 PRD lint score was 28/38, with 4 failures (#15, #16,
+; #24, #39) caused by the installer NOT shipping the standalone Python
+; post-processing tools. The Python recorder onedir bundle in section (3)
+; has finalize_session.py + helpers frozen INSIDE the PyInstaller EXE, but
+; there's no exposed CLI surface to invoke them on an already-recorded
+; session. Section (6) below ships them as a SECOND, independently-callable
+; bundle at {app}\bin\ + {app}\python-deps\ + {app}\depth_models\,
+; reachable via {app}\run_finalize.bat <session_dir>.
+;
+; What's in the bundle (staged in bundle/ by the
+; "rc19.0.2 - ..." workflow steps before ISCC runs):
+;
+;   {app}\bin\
+;     finalize_session.py          — orchestrator (PRD §3 deliverable gen)
+;     lint_v3_prd_grounded.py      — PRD 38-criteria lint
+;     depth_exr_writer.py          — 6 fps DA-V2 Small ONNX → EXR depth
+;     measure_input_latency.py     — synthetic-key end-to-end latency probe
+;     audio_continuity_check.py    — PRD #38 audio analysis (subprocess'd
+;                                    by finalize_session.py)
+;     generate_gameinfo.py         — alias for generate_gameinfo_xlsx
+;                                    (subprocess'd by finalize_session.py)
+;     generate_gameinfo_xlsx.py    — actual gameinfo.xlsx writer
+;
+;   {app}\python-deps\             — pip-installed-with-target wheels:
+;                                    cv2 (opencv-python-headless), ort
+;                                    (onnxruntime-directml), openpyxl,
+;                                    OpenEXR, Imath, numpy, mss + their
+;                                    transitive deps. ~150 MB on disk.
+;
+;   {app}\depth_models\
+;     depth_anything_v2_small.onnx — DA-V2 ViT-S export, ~99 MB. Fixed
+;                                    filename — depth_exr_writer.py's
+;                                    resolve_model_path() searches
+;                                    <install_root>/depth_models/<this
+;                                    exact name>. _install_root() returns
+;                                    Path(__file__).parent.parent, so when
+;                                    the script lives at {app}\bin\, the
+;                                    model is found at {app}\depth_models\.
+;
+;   {app}\run_finalize.bat         — wrapper that sets PYTHONPATH +
+;                                    OYSTER_DEPTH_MODEL_PATH and invokes
+;                                    python.exe finalize_session.py.
+;                                    User-facing entry point; also the
+;                                    contract S04 will call on game-exit.
+;
+; Iron-law constraints:
+;
+;   * NO bundled Python interpreter. system Python 3.11+ is assumed on
+;     PATH (minipc1 has it; consumer Windows installers from python.org
+;     add to PATH by default). run_finalize.bat exits with `errorlevel 3`
+;     if python.exe is missing, with a clear install hint. Bundling an
+;     embedded Python adds ~30 MB plus a maintenance burden we have not
+;     opted into yet.
+;
+;   * NO auto-run hook here. This section ONLY SHIPS the tools.
+;     Spec S04 owns the post-recording auto-invocation contract that calls
+;     run_finalize.bat <session_dir> when the game process terminates.
+;
+;   * NO modifications to finalize_session.py logic. S05's contract is
+;     frozen; we only ship its source + helpers + deps unchanged.
+;
+;   * ignoreversion on every Source line — Python source files are
+;     versionless (no VS_VERSION_INFO resource), so Inno's default of
+;     "skip if dest is newer" would never trigger an upgrade.
+;
+;   * recursesubdirs + createallsubdirs on python-deps and depth_models
+;     because pip stages packages in nested per-package subdirs and we
+;     ship the model in its own subdir for clean uninstall symmetry.
+
+; --- (6a) Standalone Python finalize scripts ------------------------------
+; ~200 KB total. All six .py files live flat under bundle/bin/.
+Source: "{#BundleRoot}\\bin\\*.py"; \
+    DestDir: "{app}\\bin"; \
+    Flags: ignoreversion
+
+; --- (6b) Pip-staged Python runtime dependencies --------------------------
+; ~150 MB pre-compression. pip's --target produces a flat namespace at
+; bundle/python-deps/<pkg>/... that PYTHONPATH=<this> makes importable.
+Source: "{#BundleRoot}\\python-deps\\*"; \
+    DestDir: "{app}\\python-deps"; \
+    Flags: ignoreversion recursesubdirs createallsubdirs
+
+; --- (6c) DepthAnything V2 Small ONNX weights -----------------------------
+; ~99 MB. Filename MUST be depth_anything_v2_small.onnx — depth_exr_writer's
+; resolve_model_path() searches for this exact name (see line 140 of
+; depth_exr_writer.py: DEFAULT_MODEL_FILENAME = "depth_anything_v2_small.onnx").
+Source: "{#BundleRoot}\\depth_models\\depth_anything_v2_small.onnx"; \
+    DestDir: "{app}\\depth_models"; \
+    Flags: ignoreversion
+
+; --- (6d) Finalize wrapper batch -----------------------------------------
+; ~2 KB. User-facing CLI: `run_finalize.bat <session_dir>`.
+Source: "{#BundleRoot}\\run_finalize.bat"; \
+    DestDir: "{app}"; \
+    Flags: ignoreversion
+
 [Icons]
 ; ---- Start-menu group (always created) ------------------------------------
 Name: "{group}\\{#AppShortcutLbl}"; \
@@ -430,6 +527,14 @@ Filename: "{app}\\{#AppExeName}"; \
 ; bit the installer placed under {app} disappears on uninstall.
 Type: filesandordirs; Name: "{app}\\logs"
 Type: filesandordirs; Name: "{app}\\runtime"
+; rc19.0.2 (Stream S01): clear out python-deps + depth_models on uninstall.
+; pip's --target install writes __pycache__/ directories on first import,
+; and onnxruntime caches compiled model graphs next to the .onnx file —
+; both happen at user-run time, AFTER install, so Inno's default of "only
+; remove files the installer wrote" leaves orphans on disk. Explicit
+; filesandordirs sweep guarantees clean uninstall.
+Type: filesandordirs; Name: "{app}\\python-deps"
+Type: filesandordirs; Name: "{app}\\depth_models"
 ; Note: we deliberately do NOT delete {app}\mc-instance\saves on uninstall.
 ; Player worlds are user data — preserve them. (Same convention Mojang
 ; Launcher uses for %APPDATA%\.minecraft\saves.)
