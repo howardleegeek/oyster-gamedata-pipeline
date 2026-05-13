@@ -1039,14 +1039,22 @@ def _check_metadata(d: Path, rpt: LintReport) -> None:
     """Criterion 22: Metadata completeness per PRD page 3.
 
     Required fields: gameProcessName, width, height, recordDpi.
+
+    rc19.0.2 fix: PRD page 7 (and our own structure check #24) names the
+    canonical recorder artifact as ``systeminfo.json``; ``metadata.json``
+    is documented in #24 as an accepted alias. #22 previously only globbed
+    for ``metadata*.json`` and reported "No metadata*.json found" against
+    a fully-spec-compliant ``systeminfo.json`` sitting right next to it.
+    That's a lint false-positive — fix by globbing both names.
     """
-    metadata_files = list(d.glob("metadata*.json"))
+    metadata_files = list(d.glob("systeminfo*.json")) + list(d.glob("metadata*.json"))
     if not metadata_files:
-        metadata_files = list(d.glob("**/metadata*.json"))[:10]
+        metadata_files = (list(d.glob("**/systeminfo*.json"))[:10]
+                          + list(d.glob("**/metadata*.json"))[:10])
 
     if not metadata_files:
         rpt.add(LintResult(22, "Metadata Completeness", False,
-                           "No metadata*.json found"))
+                           "No systeminfo*.json or metadata*.json found"))
         return
 
     missing: List[Tuple[str, str]] = []
