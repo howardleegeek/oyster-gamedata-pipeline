@@ -683,16 +683,23 @@ def _check_quaternion(d: Path, rpt: LintReport) -> None:
     quaternion_order="xyzw", trust the producer. Heuristic only as
     fallback when field missing (rc18.x and older recordings).
     """
-    # rc19: contract-first quaternion order check
-    metadata_path = d / "metadata.json"
+    # rc19: contract-first quaternion order check.
+    # rc19.0.2 follow-up: also accept systeminfo.json (the recorder's
+    # actual filename — see #22 / #24 alias precedent). Previously only
+    # metadata.json was inspected, so producer-declared xyzw order was
+    # silently ignored on the canonical sample shape.
     declared_order: Optional[str] = None
-    if metadata_path.exists():
-        try:
-            with open(metadata_path) as f:
-                meta = json.load(f)
-            declared_order = meta.get("quaternion_order")
-        except (json.JSONDecodeError, OSError):
-            pass
+    for name in ("metadata.json", "systeminfo.json"):
+        metadata_path = d / name
+        if metadata_path.exists():
+            try:
+                with open(metadata_path) as f:
+                    meta = json.load(f)
+                declared_order = meta.get("quaternion_order")
+                if declared_order is not None:
+                    break
+            except (json.JSONDecodeError, OSError):
+                pass
 
     data, path = _load_action_camera(d)
     if data is None:

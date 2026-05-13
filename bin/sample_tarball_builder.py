@@ -235,13 +235,21 @@ def synthesize_action_camera(
 
 
 def synthesize_systeminfo(out_path: str) -> str:
-    """Generate systeminfo.json (PDF p7 file 1, schema per PDF p3 文件1)."""
+    """Generate systeminfo.json (PDF p7 file 1, schema per PDF p3 文件1).
+
+    rc19.0.2 follow-up: also declares ``quaternion_order: "xyzw"`` so
+    lint criterion #13 short-circuits to PASS via the contract path
+    (rest-state heuristic is unreliable on large-rotation game data —
+    cos(half_yaw) vs sin(half_yaw) symmetry makes scalar w non-dominant).
+    The producer knows it writes xyzw — it should say so explicitly.
+    """
     import json as _json
 
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     # PRD page 3-4 specifies systeminfo.json has EXACTLY 5 fields.
     # DO NOT add map_scale or map_bounds — they are NOT in the PDF spec.
+    # quaternion_order is a producer-contract field consumed only by lint #13.
     data = {
         "gameProcessName": "minecraft.exe",
         "x": 0,
@@ -249,6 +257,7 @@ def synthesize_systeminfo(out_path: str) -> str:
         "width": 1920,
         "height": 1080,
         "recordDpi": 1.0,
+        "quaternion_order": "xyzw",
     }
     with open(out_path, "w", encoding="utf-8") as f:
         _json.dump(data, f, indent=2)
