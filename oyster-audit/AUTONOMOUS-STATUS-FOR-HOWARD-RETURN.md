@@ -137,3 +137,53 @@ On `7bd4d8c` I just verified all three symbols ARE in scope:
 ### Next wakeup
 
 Scheduled for ~20 min from now to check CI status. If green, I'll attempt to download the installer artifact URL and stage it for minipc1 deploy.
+
+---
+
+## UPDATE 2 — rc19.0.1 mouse install pre-staged (2026-05-13 ~00:30 PDT)
+
+While rc19.0.0 CI was churning, I inspected `afe0790` (Engineer's rc18.0.7 mouse-install patch on broken lineage) and **found a critical discovery**:
+
+> mouse_ll_proc was DEFINED with correct wake posts at all 5 send sites, but `SetWindowsHookExW(WH_MOUSE_LL, ...)` was never actually called. Only WH_KEYBOARD_LL was installed.
+
+This means rc19.0.0 (keyboard wake) only fixes **half** of Bug 1. On Howard's minipc1 (AMD Radeon 780M, tier-3 LL hook fallback):
+- Keyboard: rc19.0.0 wake fix → events should now flow ✓
+- Mouse: still dead, because hook never installed ✗
+
+### Pre-staged on origin (NOT tagged yet)
+
+Submodule branch `stream-rc19.0.1-mouse-install` at `6e5ddf2`:
+- Re-implemented `afe0790`'s logical change on Wave-1-proven `a717fcc` base
+- Added `mouse_hook: Option<HHOOK>` struct field (line 653)
+- Mirrored keyboard install pattern with WH_MOUSE_LL + mouse_ll_proc
+- Graceful degradation: if mouse install fails but keyboard succeeds, log warn + continue (keyboard-only)
+- Drop unhooks both — symmetric cleanup
+- Net diff: +48/-10 lines
+
+### Ship plan IF rc19.0.0 green
+
+Single sequence to fire rc19.0.1:
+```bash
+cd /Users/howardli/Downloads/oyster-agent-runner
+git checkout stream-rc19.0.0
+cd vendor/recorder && git fetch origin && git checkout 6e5ddf2 && cd ../..
+git add vendor/recorder
+git commit -m "fix(rc19.0.1): submodule -> 6e5ddf2 (mouse hook install)"
+git tag -a recorder-v0.28.0-rc19.0.1 -m "..."
+git push origin stream-rc19.0.0
+git push origin recorder-v0.28.0-rc19.0.1
+```
+
+### Ship plan IF rc19.0.0 red
+
+DO NOT ship rc19.0.1. It inherits the same submodule base (`a717fcc` derives from `7bd4d8c` + 12 lines). If `a717fcc` doesn't compile, `6e5ddf2` won't either — would just burn another CI cycle.
+
+Investigate compile failure first via Engineer subagent deep-diff on `7bd4d8c` vs `866983e`.
+
+### Updated lint score projection
+
+| Recording state | Lint score |
+|---|---|
+| rc18.0.5 baseline (no input pipeline) | 25/33 (75.8%) |
+| rc19.0.0 (keyboard only fixed) | 27-29/33 (likely 28) |
+| rc19.0.1 (keyboard + mouse fixed) | 30-32/33 |
