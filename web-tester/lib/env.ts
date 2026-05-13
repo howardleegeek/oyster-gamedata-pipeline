@@ -10,12 +10,28 @@
 
 export const env = {
   // Supabase (browser-safe)
-  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
+  // Honor both the repo-original NEXT_PUBLIC_SUPABASE_URL and the task-spec
+  // SUPABASE_URL alias. Repo-original wins because that's what every deploy
+  // already has set.
+  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '',
   supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
 
-  // Supabase (server-only)
-  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
+  // Supabase (server-only). Two acceptable names for the service-role key
+  // and the bucket — keep the legacy names canonical, treat the spec names
+  // (SUPABASE_SERVICE_KEY / SUPABASE_BUCKET) as aliases for new deploys.
+  supabaseServiceRoleKey:
+    process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_KEY ?? '',
+  /** Read bucket for legacy tarballs that were uploaded through Next.js. */
   tarballBucket: process.env.SUPABASE_TARBALL_BUCKET ?? 'tarballs',
+  /** Bucket where the recorder PUTs directly via signed URLs (Gap #8). */
+  tarballUploadBucket:
+    process.env.SUPABASE_TARBALL_UPLOAD_BUCKET ?? process.env.SUPABASE_BUCKET ?? 'tarball-uploads',
+  /** Signed-URL expiry. 15 min = enough to start the upload, short enough
+   *  to limit blast radius if the URL leaks. */
+  signedUploadUrlTtlSeconds: parseInt(
+    process.env.SUPABASE_SIGNED_UPLOAD_URL_TTL_SECONDS ?? '900',
+    10,
+  ),
 
   // App
   siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000',
