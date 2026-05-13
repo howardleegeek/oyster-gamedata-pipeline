@@ -137,14 +137,28 @@ with testers.
 
 ---
 
-## 🔴 6. Upload-tarball auth: open to anyone with a UUID
+## 🟡 6. Upload-tarball auth: open to anyone with a UUID — **server-side fix landed 2026-05-13**
 
-**Symptom:** `/api/upload-tarball` accepts any well-formed `tester_id`
-without proving the caller is that tester. The `.exe` filename embeds a
-tester UUID, but anyone who learns / guesses a UUID could POST junk that
-gets attributed to that tester (charging us per-hour up to the rate-limit
-ceiling). The rate limiter caps blast radius to 30 tarballs/hour/tester,
-but doesn't fix the structural gap.
+**Server-side status (closed):** HMAC verify is wired into
+`/api/upload-tarball` (commit `feat(auth): HMAC verify…`). Tokens are
+issued by `/api/tester/auth` and embedded in the `.exe` filename via
+`/api/download/[testerId]`. Backwards-compatible warn-only fallback is
+active by default; `UPLOAD_REQUIRE_TOKEN=true` flips the 401 gate on.
+See `PRODUCTION_LAUNCH_SOP.md` → "Upload HMAC token setup" for rollout.
+
+**Remaining work for full closure:** ship recorder v0.27.0 that reads
+the 16-hex token prefix from its own `.exe` filename (or from
+`OYSTER_UPLOAD_TOKEN`) and adds `X-Upload-Token: <token>` to every POST
+to `/api/upload-tarball`. Once all active testers are on v0.27.0+, flip
+`UPLOAD_REQUIRE_TOKEN=true` on the Vercel project.
+
+**Original symptom (preserved for context):** `/api/upload-tarball`
+accepts any well-formed `tester_id` without proving the caller is that
+tester. The `.exe` filename embeds a tester UUID, but anyone who learns
+/ guesses a UUID could POST junk that gets attributed to that tester
+(charging us per-hour up to the rate-limit ceiling). The rate limiter
+caps blast radius to 30 tarballs/hour/tester, but doesn't fix the
+structural gap.
 
 **Why it shipped this way:** The recorder is a Windows .exe running
 without an interactive auth flow. Cookie-based session auth doesn't
