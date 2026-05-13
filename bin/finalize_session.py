@@ -203,6 +203,16 @@ def backfill_action_camera(session_dir: Path, verbose: bool = False) -> int:
         # Position
         pos = [gs.get("x", 0.0), gs.get("y", 0.0), gs.get("z", 0.0)]
 
+        # rc19: velocity from game_state (m/s per rc17.4-velocity commit that
+        # multiplied MC's blocks/tick by 20). PRD §3.2 requires camera_speed +
+        # player_speed; without this they stay 0-stuck and lint §3.2 14/20
+        # passes are capped at what schema-only achieves.
+        vel = [
+            gs.get("velocity_x", 0.0),
+            gs.get("velocity_y", 0.0),
+            gs.get("velocity_z", 0.0),
+        ]
+
         # Patch frame — these were NULL when recorder wrote the file
         frame["camera_rotation_quaternion"] = quat
         frame["player_rotation_quaternion"] = quat
@@ -211,6 +221,17 @@ def backfill_action_camera(session_dir: Path, verbose: bool = False) -> int:
         frame["player_position"] = pos
         frame["rotation_oula"] = [0.0, pitch, yaw]  # [roll, pitch, yaw] in MC convention
         frame["Follow_Offset"] = [0.0, 0.0, 0.0]  # first-person → camera at player
+        # rc19: velocity fields per PRD §3.2 (camera_speed + player_speed both
+        # in m/s; for first-person MC they're identical since camera is at
+        # player position with no offset).
+        frame["camera_speed"] = vel
+        frame["player_speed"] = vel
+        # scalar |v| in m/s for fields that historically held a magnitude
+        speed_mag = (vel[0] ** 2 + vel[1] ** 2 + vel[2] ** 2) ** 0.5
+        # Don't overwrite if the recorder already set a non-zero scalar speed;
+        # else fill it from |velocity|. Keeps backwards compat with rc17.x.
+        if frame.get("speed", 0.0) == 0.0:
+            frame["speed"] = speed_mag
         patched += 1
 
     # Write back
@@ -221,17 +242,37 @@ def backfill_action_camera(session_dir: Path, verbose: bool = False) -> int:
     # contract check instead of relying on the unreliable rest-state
     # heuristic (which mis-classifies large-rotation game data — see
     # lint_v3_prd_grounded.py _check_quaternion docstring for analysis).
+    # Also backfill scene_name from game_state dimension field (which is
+    # always present per mc-mod's per-tick emission).
     metadata_path = session_dir / "metadata.json"
     if metadata_path.exists() and patched > 0:
         try:
             with open(metadata_path) as f:
                 meta = json.load(f)
+            changed = False
             if meta.get("quaternion_order") != "xyzw":
                 meta["quaternion_order"] = "xyzw"
-                with open(metadata_path, "w") as f:
-                    json.dump(meta, f, indent=2)
+                changed = True
                 if verbose:
                     print(f"  declared quaternion_order=xyzw in metadata.json")
+            # Derive scene_name from majority game_state dimension
+            dims: Dict[str, int] = {}
+            for s in gs_lines:
+                dim = s.get("dimension")
+                if isinstance(dim, str) and dim:
+                    # "minecraft:overworld" → "overworld"
+                    short = dim.split(":", 1)[-1] if ":" in dim else dim
+                    dims[short] = dims.get(short, 0) + 1
+            if dims:
+                top_scene = max(dims.items(), key=lambda kv: kv[1])[0]
+                if meta.get("scene_name") != top_scene:
+                    meta["scene_name"] = top_scene
+                    changed = True
+                    if verbose:
+                        print(f"  backfilled scene_name={top_scene} (from game_state dimension; {len(dims)} unique)")
+            if changed:
+                with open(metadata_path, "w") as f:
+                    json.dump(meta, f, indent=2)
         except (json.JSONDecodeError, OSError) as e:
             if verbose:
                 print(f"  WARN could not update metadata.json: {e}")
