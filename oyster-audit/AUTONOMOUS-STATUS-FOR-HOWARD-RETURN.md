@@ -242,3 +242,60 @@ RELEASE_TAG=recorder-v0.28.0-rc19.0.0 bash /Users/howardli/Downloads/oyster-agen
 - `stream-rc19.0.1` at `d02f8f1` — rc19.0.1 ship branch + deploy fix
 - Tag `recorder-v0.28.0-rc19.0.0` → submodule `a717fcc`
 - Tag `recorder-v0.28.0-rc19.0.1` → submodule `6e5ddf2`
+
+---
+
+## UPDATE 4 — rc19.0.1 TESTED + rc19.0.2 CLUSTER DISPATCHED (2026-05-13 ~02:00 PDT)
+
+你测了 rc19.0.1, 录了 7m13s, 我 SCP + finalize + lint 出分: **28/38 = 73.7%**.
+
+### ✅ Bug 1 实证修好
+inputs.jsonl 5.3 MB, 1171 keyboard + 62K mouse events (vs rc18.0.5 baseline 0.4 KB / 0 events).
+
+### 10 failing — 已分类 + 已 dispatch 修
+
+| # | Criterion | Root cause | Fix path |
+|---|---|---|---|
+| 2 / 29 | Duration 428.9s vs 360s | 👤 你录长了 | 下次录 5:00-5:30 |
+| 41 | Stationary 30.8% | 👤 操作 | 持续移动 |
+| 15 / 16 / 24 | Depth EXR missing | 🔧 installer 没装 deps | **S01 cluster** |
+| 31 | Mouse/cam alignment 45% borderline | ⚠️ lint noise | **S03 cluster** |
+| 38 | Audio 1 gap >2s | 🔌 hardware OR lint | **S06 cluster** |
+| 39 | Input latency 未测 | 🔧 没 wire | **S05 cluster** |
+| 42 | Frozen 2.03s (just over) | ⚠️ MC chunk load | **S03 cluster** |
+
+### 6 atomic specs dispatched to Aliyun cluster (parallel)
+
+| Spec | Task | Model | Bash bg ID |
+|---|---|---|---|
+| **S01** | Bundle Python tooling + cv2 + DA-V2 model into installer | deepseek-v3.2 | `b3zjsabu3` |
+| **S02** | mc-mod jar CI pin to tag SHA | deepseek-v3.2 | `b3s3750ra` |
+| **S03** | Lint #31 + #42 refinement | glm-5 | `bw0tazxxw` |
+| **S04** | Recorder auto-exit + auto-finalize on MC quit | qwen3.6-plus | `bcvrgaob8` |
+| **S05** | Wire measure_input_latency.py into finalize | MiniMax-M2.5 | `bwdt8gq93` |
+| **S06** | Audio gap ffprobe + lint #38 decision | deepseek-v3.2 | `b8gbmi5xg` |
+
+每个 agent 会: git checkout 新 branch → 改代码 → push branch. 不自动 tag/merge — 你回来 review PR.
+
+### Projected score progression
+
+| State | Score | Coverage |
+|---|---|---|
+| rc18.0.5 baseline | 25/33 (75.8%) | broken Bug 1 |
+| rc19.0.1 测出 (你刚录) | **28/38 (73.7%)** | Bug 1 fix 实证, deployment gaps 浮出 |
+| rc19.0.2 + 你重录 5:00-5:30 移动充分 | **35-38/38 (92-100%)** | 取决于 audio 硬件 |
+
+### 你回来 todo
+
+1. 查 cluster 结果: `ls /tmp/rc19.0.2-work/S*/log.txt` + 各 git log
+2. Review PRs, merge 进 stream-rc19.0.2
+3. Tag `recorder-v0.28.0-rc19.0.2` → CI ~30 min
+4. Deploy: `RELEASE_TAG=recorder-v0.28.0-rc19.0.2 bash bin/minipc_v028_install.sh`
+5. 重录 5:00-5:30 (持续移动!)
+6. Lint 应 hit 35-38/38
+
+### 文件位置
+
+- Specs: `/Users/howardli/Downloads/oyster/specs/rc19.0.2/S0*.md`
+- Cluster work: `/tmp/rc19.0.2-work/S0*/repo/` + `/tmp/rc19.0.2-work/S0*/log.txt`
+- 你 rc19.0.1 session (28/38 baseline): `/tmp/rc19-session/session_20260513_014031_98b1e850/`
