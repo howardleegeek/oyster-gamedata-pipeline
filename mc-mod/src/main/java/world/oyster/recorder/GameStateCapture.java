@@ -60,6 +60,30 @@ public final class GameStateCapture {
                 ? client.interactionManager.getCurrentGameMode()
                 : GameMode.SURVIVAL);
 
+        // Weather: thunder > rain > clear (thunder implies rain in MC; check it first).
+        String weather;
+        if (world.isThundering()) {
+            weather = "thunder";
+        } else if (world.isRaining()) {
+            weather = "rain";
+        } else {
+            weather = "clear";
+        }
+
+        // Time-of-day bucket from MC day-time (0..23999 ticks per MC day).
+        long timeOfDayTicks = world.getTimeOfDay() % 24000L;
+        if (timeOfDayTicks < 0L) timeOfDayTicks += 24000L;  // guard negative mod
+        String timeOfDay;
+        if (timeOfDayTicks < 6000L) {
+            timeOfDay = "dawn";   // 0..5999    (morning)
+        } else if (timeOfDayTicks < 12000L) {
+            timeOfDay = "day";    // 6000..11999 (midday)
+        } else if (timeOfDayTicks < 18000L) {
+            timeOfDay = "dusk";   // 12000..17999 (evening)
+        } else {
+            timeOfDay = "night";  // 18000..23999
+        }
+
         long now = System.currentTimeMillis();
 
         GameStateSample sample = new GameStateSample(
@@ -73,6 +97,8 @@ public final class GameStateCapture {
             player.isSneaking(),
             player.isSprinting(),
             dimension,
+            weather,
+            timeOfDay,
             gameMode.name()
         );
 

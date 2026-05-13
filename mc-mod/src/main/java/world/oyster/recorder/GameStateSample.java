@@ -24,6 +24,8 @@ public record GameStateSample(
     boolean sneaking,
     boolean sprinting,
     String dimension,
+    String weather,
+    String timeOfDay,
     String gameMode
 ) {
     /**
@@ -59,6 +61,8 @@ public record GameStateSample(
         appendKv(sb, "sneaking", sneaking);         sb.append(',');
         appendKv(sb, "sprinting", sprinting);       sb.append(',');
         appendKvStr(sb, "dimension", dimension);    sb.append(',');
+        appendKvStr(sb, "weather", weather);         sb.append(',');
+        appendKvStr(sb, "time_of_day", timeOfDay);   sb.append(',');
         appendKvStr(sb, "game_mode", gameMode);
         sb.append('}');
         return sb.toString();
