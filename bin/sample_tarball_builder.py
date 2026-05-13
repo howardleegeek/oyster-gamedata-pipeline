@@ -291,14 +291,18 @@ def synthesize_depth_dir(out_dir: str, count: int = 1800) -> int:
         )
 
     # Fix #2 + #3: real 1920x1080 depth (was 16x16 stub, ~310 bytes per file).
-    # Fix #11: ZIP_COMPRESSION reduces uncompressed 8MB/frame → ~500KB-1MB
-    # depending on depth complexity. With 1800 frames at default,
-    # uncompressed sample tarball was 7.3 GB (unusable). Compressed ZIP
-    # brings it to ~1-2 GB (still big but tractable).
+    # Fix #11: PXR24_COMPRESSION (lossy 24-bit float per pixel) reduces
+    # uncompressed 8MB/frame → ~200KB. Previously used ZIP_COMPRESSION which
+    # on the per-frame radial-sin variation pattern produced ~4MB per file —
+    # 1800 × 4MB = 7.2 GB total, unshippable as a sample. PXR24 brings the
+    # full 1800-frame sample to ~360MB while preserving enough precision to
+    # pass lint #15 (invalid-pixel ratio threshold 5% — Z values rounded to
+    # 24-bit float are still > 0 and finite, only the 50-pixel central hole
+    # remains as the engineered invalid region).
     W, H = 1920, 1080
     header = OpenEXR.Header(W, H)
     header["channels"] = {"Z": Imath.Channel(Imath.PixelType(Imath.PixelType.FLOAT))}
-    header["compression"] = Imath.Compression(Imath.Compression.ZIP_COMPRESSION)
+    header["compression"] = Imath.Compression(Imath.Compression.PXR24_COMPRESSION)
 
     # Pre-compute a synthetic depth field once (ramp + circular feature) so
     # each frame writes 8 MB of REAL float32 Z values, not constant fill.
