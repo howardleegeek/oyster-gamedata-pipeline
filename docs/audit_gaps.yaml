@@ -283,10 +283,11 @@ gaps:
   title: bin/scene_diversity_scorer.py
   purpose: Compute Habitat-style scene diversity metric (pixel histogram clustering
     across video frames) — flags vendor monotone-scene clips
-  status: dispatched
+  status: completed
   priority: P1
   lines_estimate: 180
   dispatched_at: '2026-05-03 23:27:59'
+  completed_at: '2026-05-03 23:33:00'
 - id: G035
   title: bin/clip_validator_strict.py
   purpose: Stricter clip-level validator — cross-checks audio mute/silent / black-frame
@@ -2613,5 +2614,5 @@ gaps:
   dispatched_at: '2026-05-05 20:31:12'
 harness_lock:
   host: Howards-MacBook-Air-4.local
-  pid: 89343
-  last_heartbeat: '2026-05-06T16:29:02Z'
+  pid: 65866
+  last_heartbeat: '2026-05-14T23:50:35Z'
