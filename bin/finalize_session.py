@@ -100,32 +100,72 @@ PRD_LATENCY_LIMIT_MS = 20.0
 # Suspicious latency threshold — warn if median exceeds this
 SUSPICIOUS_LATENCY_MS = 50.0
 
+# rc19.0.3 coord-system constants — L1 oracle:
+# vendor/enrichment/docs/COORDINATE_SYSTEMS_GUIDE.md:55
+# Minecraft runs the world simulation at 20 ticks/sec and 1 block = 1 m,
+# so game_state velocity in blocks/tick × 20 = m/s (PRD §3.2 unit).
+MC_TICKS_PER_SECOND = 20.0
+# Minecraft vanilla entity gravity ≈ 32 m/s² (NOT Earth's 9.8) — emitted
+# into gameinfo.xlsx so the buyer's physics layer uses the right constant.
+MC_WORLD_GRAVITY_MPS2 = 32.0
+
 
 # ---------------------------------------------------------------------------
 # Quaternion helpers (from yaw/pitch Euler angles)
 # ---------------------------------------------------------------------------
 
+def _axis_quat(axis: str, angle_rad: float) -> Tuple[float, float, float, float]:
+    """Unit quaternion (x, y, z, w) for a rotation about a principal axis."""
+    h = angle_rad / 2.0
+    s, c = math.sin(h), math.cos(h)
+    if axis == "x":
+        return (s, 0.0, 0.0, c)
+    if axis == "y":
+        return (0.0, s, 0.0, c)
+    return (0.0, 0.0, s, c)  # "z"
+
+
+def _quat_mul(a: Tuple[float, float, float, float],
+              b: Tuple[float, float, float, float]) -> Tuple[float, float, float, float]:
+    """Hamilton product of two XYZW quaternions: a ⊗ b."""
+    ax, ay, az, aw = a
+    bx, by, bz, bw = b
+    return (
+        aw * bx + ax * bw + ay * bz - az * by,
+        aw * by - ax * bz + ay * bw + az * bx,
+        aw * bz + ax * by - ay * bx + az * bw,
+        aw * bw - ax * bx - ay * by - az * bz,
+    )
+
+
 def euler_to_quat_xyzw(yaw_deg: float, pitch_deg: float, roll_deg: float = 0.0) -> List[float]:
-    """Convert Euler angles (degrees) to quaternion [x, y, z, w]."""
-    half_yaw = math.radians(yaw_deg) / 2.0
-    half_pitch = math.radians(pitch_deg) / 2.0
-    half_roll = math.radians(roll_deg) / 2.0
+    """Convert Euler angles (degrees) to an XYZW quaternion — BUYER-SPEC convention.
 
-    cy = math.cos(half_yaw); sy = math.sin(half_yaw)
-    cp = math.cos(half_pitch); sp = math.sin(half_pitch)
-    cr = math.cos(half_roll); sr = math.sin(half_roll)
+    rc19.0.3: rewritten to match the buyer-pipeline oracle exactly.
+    Source of truth: vendor/enrichment/src/oyster_enrichment/quaternion_utils.py
+    (the buyer-accepted module). Per its docstring, buyer_spec is:
+      - pitch = rotation about +X
+      - yaw   = rotation about +Y   (Y-up frame — the OLD local code wrongly
+                                     rotated yaw about +Z; that produced
+                                     wrong-convention quaternions)
+      - roll  = rotation about +Z
+      - application order Y-X-Z extrinsic → q = q_roll ⊗ q_pitch ⊗ q_yaw
 
-    qw = cr * cp * cy + sr * sp * sy
-    qx = sr * cp * cy - cr * sp * sy
-    qy = cr * sp * cy + sr * cp * sy
-    qz = cr * cp * sy - sr * sp * cy
+    A self-contained reimplementation (cannot import vendor/enrichment — it
+    is a submodule, not bundled into the recorder installer). Verified
+    against the oracle by tests/bin/test_finalize_coord_physics.py.
+    """
+    qy = _axis_quat("y", math.radians(yaw_deg))
+    qp = _axis_quat("x", math.radians(pitch_deg))
+    qr = _axis_quat("z", math.radians(roll_deg))
+    # Y-X-Z extrinsic: q = q_roll ⊗ q_pitch ⊗ q_yaw
+    qx, qyy, qz, qw = _quat_mul(qr, _quat_mul(qp, qy))
 
-    # Normalize defensively against floating-point drift
-    n = math.sqrt(qx * qx + qy * qy + qz * qz + qw * qw)
+    n = math.sqrt(qx * qx + qyy * qyy + qz * qz + qw * qw)
     if n > 0:
-        qx /= n; qy /= n; qz /= n; qw /= n
+        qx /= n; qyy /= n; qz /= n; qw /= n
 
-    return [qx, qy, qz, qw]
+    return [qx, qyy, qz, qw]
 
 
 # ---------------------------------------------------------------------------
@@ -315,22 +355,33 @@ def backfill_action_camera(session_dir: Path, verbose: bool = False) -> int:
 
         gs = nearest_gs(abs_t_ms)
 
-        # Quaternion from yaw/pitch
+        # Quaternion from yaw/pitch.
+        # rc19.0.3 coord-system fix — L1 oracle:
+        #   vendor/enrichment/docs/COORDINATE_SYSTEMS_GUIDE.md:55
+        #   "Minecraft (Mineflayer): right-handed, Y-up ... Negate yaw to
+        #    swap CW/CCW [to reach the buyer's left-handed frame]."
+        # MC is right-handed; buyer spec is left-handed (X=right, Y=up,
+        # Z=front). The handedness flip is carried by negating yaw — the
+        # position axes need no negation because MC's +Z (south) already
+        # maps to the buyer's +Z (front).
         yaw = gs.get("yaw_deg", 0.0)
         pitch = gs.get("pitch_deg", 0.0)
-        quat = euler_to_quat_xyzw(yaw, pitch)
+        quat = euler_to_quat_xyzw(-yaw, pitch)
 
-        # Position
+        # Position — MC (x, y, z) maps directly to buyer (x, y, z); 1
+        # block = 1 m so metric_scale = 1.0, no axis negation (per oracle).
         pos = [gs.get("x", 0.0), gs.get("y", 0.0), gs.get("z", 0.0)]
 
-        # rc19: velocity from game_state (m/s per rc17.4-velocity commit that
-        # multiplied MC's blocks/tick by 20). PRD §3.2 requires camera_speed +
-        # player_speed; without this they stay 0-stuck and lint §3.2 14/20
-        # passes are capped at what schema-only achieves.
+        # rc19.0.3 velocity unit fix — game_state.jsonl carries MC's raw
+        # velocity in blocks/tick. PRD §3.2 wants m/s. MC runs at 20
+        # ticks/sec and 1 block = 1 m, so blocks/tick × 20 = m/s. The
+        # earlier "rc17.4 multiplied by 20" comment was aspirational —
+        # the code never actually did it (confirmed: walking-speed
+        # physics test measured ~0.2 m/s before this fix).
         vel = [
-            gs.get("velocity_x", 0.0),
-            gs.get("velocity_y", 0.0),
-            gs.get("velocity_z", 0.0),
+            gs.get("velocity_x", 0.0) * MC_TICKS_PER_SECOND,
+            gs.get("velocity_y", 0.0) * MC_TICKS_PER_SECOND,
+            gs.get("velocity_z", 0.0) * MC_TICKS_PER_SECOND,
         ]
 
         # Patch frame — these were NULL when recorder wrote the file
@@ -339,7 +390,7 @@ def backfill_action_camera(session_dir: Path, verbose: bool = False) -> int:
         frame["rotation_quaternion"] = quat
         frame["camera_position"] = pos
         frame["player_position"] = pos
-        frame["rotation_oula"] = [0.0, pitch, yaw]  # [roll, pitch, yaw] in MC convention
+        frame["rotation_oula"] = [0.0, pitch, -yaw]  # [roll, pitch, yaw], yaw negated for buyer LH frame (rc19.0.3)
         frame["Follow_Offset"] = [0.0, 0.0, 0.0]  # first-person → camera at player
         # rc19: velocity fields per PRD §3.2 (camera_speed + player_speed both
         # in m/s; for first-person MC they're identical since camera is at
@@ -394,6 +445,10 @@ def generate_gameinfo(session_dir: Path, repo_root: Path, verbose: bool = False)
     if out.exists() and out.stat().st_size > 0:
         if verbose:
             print(f"  gameinfo.xlsx already present ({out.stat().st_size} bytes) — skip generate")
+        # rc19.0.3: still run the coord/gravity augmentation — it's
+        # idempotent, and a pre-existing xlsx from an older finalize run
+        # won't have the rc19.0.3 fields.
+        _augment_gameinfo_coords(out, verbose=verbose)
         return True
 
     script = repo_root / "vendor" / "recorder" / "scripts" / "generate_gameinfo.py"
@@ -412,11 +467,64 @@ def generate_gameinfo(session_dir: Path, repo_root: Path, verbose: bool = False)
             print(f"  generate_gameinfo.py: exit={r.returncode}  xlsx_exists={out.exists()}")
             if not ok and r.stderr.strip():
                 print(f"    stderr: {r.stderr.strip()[:200]}")
+        if ok:
+            # rc19.0.3: append the coord-system / units / gravity fields the
+            # vendor script doesn't know about. Done here (not in the
+            # submodule script) to keep the submodule untouched.
+            _augment_gameinfo_coords(out, verbose=verbose)
         return ok
     except Exception as e:
         if verbose:
             print(f"  generate_gameinfo.py exception: {e}")
         return False
+
+
+def _augment_gameinfo_coords(xlsx_path: Path, verbose: bool = False) -> None:
+    """Append rc19.0.3 coord-system / units / gravity rows to gameinfo.xlsx.
+
+    The vendor generate_gameinfo.py emits the PRD §3.3 14 fields but not
+    the physics/coordinate metadata the buyer's training pipeline needs.
+    We append key-value rows (idempotent — skipped if already present).
+
+    Constants come from the L1 oracle
+    (vendor/enrichment/docs/COORDINATE_SYSTEMS_GUIDE.md:55).
+    """
+    try:
+        import openpyxl  # noqa: PLC0415
+    except ImportError:
+        if verbose:
+            print("  _augment_gameinfo_coords: openpyxl missing — skip augmentation")
+        return
+
+    extra_rows = [
+        ("world_gravity_mps2", MC_WORLD_GRAVITY_MPS2),
+        ("coord_system", "left_handed_X_right_Y_up_Z_forward"),
+        ("velocity_unit", "m/s"),
+        ("mc_blocks_to_meters", 1.0),
+        ("mc_ticks_per_second", MC_TICKS_PER_SECOND),
+    ]
+    try:
+        wb = openpyxl.load_workbook(xlsx_path)
+        ws = wb.active
+        existing = set()
+        for row in ws.iter_rows(values_only=True):
+            for cell in row:
+                if cell is not None:
+                    existing.add(str(cell).strip().lower())
+        appended = 0
+        for key, val in extra_rows:
+            if key.lower() in existing:
+                continue
+            ws.append([key, val])
+            appended += 1
+        if appended:
+            wb.save(xlsx_path)
+        wb.close()
+        if verbose:
+            print(f"  _augment_gameinfo_coords: appended {appended} coord/units/gravity rows")
+    except Exception as e:
+        if verbose:
+            print(f"  _augment_gameinfo_coords exception: {e}")
 
 
 # ---------------------------------------------------------------------------
