@@ -516,6 +516,26 @@ jobs:
           # Build the Fabric mod for all 9 supported MC versions from the
           # source checked out at this tag's commit. This guarantees the
           # jar matches the exact source at this tag — no stale artifacts.
+          #
+          # rc19.0.2.1 (Howard 2026-05-13): Howard's minipc1 ran a session
+          # against the rc19.0.2 installer and the recorded
+          # game_state.jsonl came back with 18 fields (no weather, no
+          # time_of_day). Root cause analysis: the inline build below
+          # was using gradle's per-task build cache + incremental compile
+          # avoidance, so when MC_VERSION rotated between iterations, the
+          # *Java compile output* could be reused from a previous iteration's
+          # cache snapshot (build/classes/java/main/ persists across
+          # iterations because we Push/Pop into mc-mod with the SAME working
+          # tree). That kept the compiled GameStateSample.class from the
+          # FIRST iteration's javac output if loom's task graph thought
+          # nothing changed. Adding --no-build-cache disables Gradle's
+          # remote-and-local build cache, and --rerun-tasks force-reruns
+          # every task ignoring up-to-date checks. Combined with an explicit
+          # `clean` before each MC version build, the only build/libs jar
+          # this iteration produces is from a fresh javac pass over the
+          # checked-out source. (Loom's mapping-jar caches in ~/.gradle/loom
+          # remain cached — those are version-pinned per MC_VERSION and are
+          # safe to reuse; we only invalidate THIS project's output.)
           $mcVersions = @(
             '1.20.1', '1.20.2', '1.20.4', '1.20.6',
             '1.21.1', '1.21.2', '1.21.3', '1.21.4', '1.21.5'
@@ -531,7 +551,21 @@ jobs:
                 Write-Host "Bootstrapping gradle wrapper..."
                 gradle wrapper --gradle-version 8.10
               }
-              ./gradlew build --no-daemon -q
+              # rc19.0.2.1 fail-loud: clean+rerun every task, never reuse
+              # cached compile output across MC versions. -q would hide the
+              # diagnostic prints if anything goes sideways; we keep default
+              # verbosity for the rebuild path. --no-daemon prevents
+              # daemon-pinned classloader state from leaking across iterations.
+              ./gradlew clean --no-daemon
+              if ($LASTEXITCODE -ne 0) {
+                Write-Error "gradle clean failed for MC $mcVer"
+                exit 1
+              }
+              ./gradlew build --no-daemon --no-build-cache --rerun-tasks
+              if ($LASTEXITCODE -ne 0) {
+                Write-Error "gradle build failed for MC $mcVer"
+                exit 1
+              }
               $jar = Get-ChildItem build/libs -Filter "oyster-recorder-mod-*-mc${mcVer}.jar" `
                        | Where-Object { $_.Name -notmatch 'sources' -and $_.Name -notmatch 'javadoc' } `
                        | Select-Object -First 1
@@ -553,84 +587,226 @@ jobs:
             exit 1
           }
 
-      - name: Verify mc-mod jar constructor signature (must have 19 params)
+      - name: Verify mc-mod jar constructor signature (must include weather + timeOfDay)
         shell: pwsh
         run: |
-          # rc19.0.2 fail-loud gate: verify the 1.21.4 mod jar's
-          # GameStateSample.class has the 19-parameter constructor
-          # (weather + timeOfDay fields added in rc18.0.8).
-          # If this fails, the jar is STALE and must not ship.
-          $jar1214 = Get-ChildItem 'mod-jars' -Filter '*-mc1.21.4.jar' `
-                       | Where-Object { $_.Name -notmatch 'sources' -and $_.Name -notmatch 'javadoc' } `
-                       | Select-Object -First 1
-          if (-not $jar1214) {
-            Write-Error "No 1.21.4 mod jar found for verification"
+          # rc19.0.2.1 (Howard 2026-05-13): rc19.0.2 shipped with this
+          # verification PASSING but the recorded game_state.jsonl on
+          # minipc1 still had 18 fields. Root cause: the previous regex
+          # `'Ljava/lang/String;' x4` matched four `String` descriptors
+          # ANYWHERE in the bytecode — including unrelated methods such
+          # as `toJsonLine()`, `appendKvStr()`, accessor methods,
+          # `toString()`, and the constant pool. With weather/timeOfDay
+          # strings present in the constant pool from record-accessor
+          # method names alone, the old check could pass against an
+          # 18-field constructor whose only Strings were dimension/gameMode.
+          # We now verify the canonical constructor's descriptor
+          # specifically, by extracting the `<init>` method's
+          # NameAndType descriptor from the constant pool. ALL 9 mod
+          # jars are verified — not just 1.21.4 — because they all
+          # build from the same Java source.
+          #
+          # Iron-law: this gate is INFORMATIONAL ONLY when the source
+          # changes (you'd update the expected counts here in the same
+          # commit). It's STRUCTURAL when the build path is suspect
+          # (stale jar / cache / wrong source) — it catches exactly
+          # the regression we shipped in rc19.0.2.
+          $allJars = Get-ChildItem 'mod-jars' -Filter '*.jar' `
+                       | Where-Object { $_.Name -notmatch 'sources' -and $_.Name -notmatch 'javadoc' }
+          if ($allJars.Count -lt 9) {
+            Write-Error "Expected 9 mod jars to verify, found $($allJars.Count)"
             exit 1
           }
-          Write-Host "Verifying $($jar1214.Name)..."
+          # Expected record field count: 20 (see comment at original site
+          # for the breakdown). Two of those 20 are the weather + timeOfDay
+          # additions in rc18.0.8 that distinguish the new schema from
+          # the old 18-field schema.
+          $expectedFieldCount = 20
+          $expectedWeatherIdx = 17  # 0-indexed: weather is the 18th field
+          $expectedTimeOfDayIdx = 18 # 0-indexed: timeOfDay is the 19th field
 
-          # Extract GameStateSample.class to a temp dir
-          $tmpDir = Join-Path $env:TEMP "mcmod-verify-$([guid]::NewGuid())"
-          New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
-          $classPath = 'world/oyster/recorder/GameStateSample.class'
-          Expand-Archive -Path $jar1214.FullName -DestinationPath $tmpDir -Force
-          $classFile = Join-Path $tmpDir $classPath
-          if (-not (Test-Path $classFile)) {
-            Write-Error "GameStateSample.class not found in jar"
-            exit 1
-          }
+          foreach ($jar in $allJars) {
+            Write-Host "Verifying $($jar.Name)..."
+            $tmpDir = Join-Path $env:TEMP "mcmod-verify-$([guid]::NewGuid())"
+            New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
+            try {
+              # Extract just the class we care about. Use shell-out to PowerShell's
+              # zip handling — Expand-Archive copies the entire jar; we only
+              # need a single class file.
+              Expand-Archive -Path $jar.FullName -DestinationPath $tmpDir -Force
+              $classFile = Join-Path $tmpDir 'world/oyster/recorder/GameStateSample.class'
+              if (-not (Test-Path $classFile)) {
+                Write-Error "FAIL: GameStateSample.class not found in $($jar.Name)"
+                exit 1
+              }
 
-          # Check 1: "weather" and "timeOfDay" strings must be present
-          $bytes = [System.IO.File]::ReadAllBytes($classFile)
-          $text = [System.Text.Encoding]::UTF8.GetString($bytes)
-          if ($text -notmatch 'weather') {
-            Write-Error "FAIL: 'weather' string NOT found in GameStateSample.class — STALE JAR DETECTED"
-            exit 1
-          }
-          if ($text -notmatch 'timeOfDay') {
-            Write-Error "FAIL: 'timeOfDay' string NOT found in GameStateSample.class — STALE JAR DETECTED"
-            exit 1
-          }
-          Write-Host "  weather string: FOUND"
-          Write-Host "  timeOfDay string: FOUND"
+              # Strict bytecode check: parse the constant pool, find the
+              # canonical `<init>` method's descriptor, and assert it has
+              # the exact field-count and String positions we expect.
+              #
+              # ClassFile structure (JVM spec §4.1):
+              #   u4 magic = 0xCAFEBABE
+              #   u2 minor_version
+              #   u2 major_version
+              #   u2 constant_pool_count
+              #   cp_info constant_pool[constant_pool_count - 1]
+              # We scan the constant pool for CONSTANT_Utf8 entries
+              # (tag = 1) that match `<init>` descriptors. The descriptor
+              # format `(JJDDDFFDDDDDDDZZZLjava/lang/String;...)V` has a
+              # well-defined parser: count each parameter type token.
+              $bytes = [System.IO.File]::ReadAllBytes($classFile)
+              if ($bytes.Length -lt 10 -or $bytes[0] -ne 0xCA -or $bytes[1] -ne 0xFE `
+                  -or $bytes[2] -ne 0xBA -or $bytes[3] -ne 0xBE) {
+                Write-Error "FAIL: $($jar.Name) GameStateSample.class missing CAFEBABE magic"
+                exit 1
+              }
+              # Constant pool count = u2 at offset 8 (after magic + minor + major)
+              $cpCount = ([int]$bytes[8] -shl 8) -bor [int]$bytes[9]
+              $offset = 10
+              $utf8Entries = New-Object 'System.Collections.Generic.List[string]'
+              # constant_pool is 1-indexed in the JVM spec; we walk 1..(cpCount-1)
+              $idx = 1
+              while ($idx -lt $cpCount) {
+                $tag = [int]$bytes[$offset]
+                $offset++
+                switch ($tag) {
+                  1 {  # CONSTANT_Utf8
+                    $len = ([int]$bytes[$offset] -shl 8) -bor [int]$bytes[$offset+1]
+                    $offset += 2
+                    $str = [System.Text.Encoding]::UTF8.GetString($bytes, $offset, $len)
+                    $utf8Entries.Add($str)
+                    $offset += $len
+                  }
+                  7  { $offset += 2 }   # CONSTANT_Class
+                  8  { $offset += 2 }   # CONSTANT_String
+                  9  { $offset += 4 }   # CONSTANT_Fieldref
+                  10 { $offset += 4 }   # CONSTANT_Methodref
+                  11 { $offset += 4 }   # CONSTANT_InterfaceMethodref
+                  12 { $offset += 4 }   # CONSTANT_NameAndType
+                  15 { $offset += 3 }   # CONSTANT_MethodHandle
+                  16 { $offset += 2 }   # CONSTANT_MethodType
+                  17 { $offset += 4 }   # CONSTANT_Dynamic
+                  18 { $offset += 4 }   # CONSTANT_InvokeDynamic
+                  19 { $offset += 2 }   # CONSTANT_Module
+                  20 { $offset += 2 }   # CONSTANT_Package
+                  3  { $offset += 4 }   # CONSTANT_Integer
+                  4  { $offset += 4 }   # CONSTANT_Float
+                  5  { $offset += 8; $idx++ } # CONSTANT_Long (takes 2 cp slots)
+                  6  { $offset += 8; $idx++ } # CONSTANT_Double (takes 2 cp slots)
+                  default {
+                    Write-Error "FAIL: $($jar.Name) unknown constant_pool tag $tag at idx $idx (offset $offset)"
+                    exit 1
+                  }
+                }
+                $idx++
+              }
 
-          # Check 2: constructor must have 19 params (record canonical ctor)
-          # The record's canonical constructor signature in bytecode has
-          # all 19 fields as parameters. We verify by counting the
-          # descriptor params in the <init> method.
-          # A 19-param record constructor descriptor looks like:
-          # (JJDDDDFFDDDDDDZZZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
-          # We check for the presence of the weather/timeOfDay field descriptors
-          # in the constructor signature.
-          $has19Params = $false
-          # The record has these types in order:
-          # long, long, double, double, double, float, float,
-          # double, double, double, double, double, double,
-          # boolean, boolean, boolean,
-          # String (dimension), String (weather), String (timeOfDay), String (gameMode)
-          # That's 20 params total (tick + timestampMs + 3 pos + 2 angles + 3 look + 3 vel + 3 bool + 4 string = 20)
-          # Wait — let me recount from the source:
-          # tick(long), timestampMs(long), x(double), y(double), z(double),
-          # yawDeg(float), pitchDeg(float),
-          # lookX(double), lookY(double), lookZ(double),
-          # velocityX(double), velocityY(double), velocityZ(double),
-          # onGround(boolean), sneaking(boolean), sprinting(boolean),
-          # dimension(String), weather(String), timeOfDay(String), gameMode(String)
-          # = 20 fields. The spec says "19 params" but the actual record has 20.
-          # We verify by checking that BOTH weather AND timeOfDay String params
-          # are present in the constructor descriptor.
-          if ($text -match 'Ljava/lang/String;.*Ljava/lang/String;.*Ljava/lang/String;.*Ljava/lang/String;') {
-            $has19Params = $true
-          }
-          if (-not $has19Params) {
-            Write-Error "FAIL: GameStateSample.class constructor does not have expected String params — STALE JAR DETECTED"
-            exit 1
-          }
-          Write-Host "  Constructor signature: VERIFIED (has weather + timeOfDay String params)"
-          Write-Host "  GameStateSample.class verification PASSED — jar is NOT stale"
+              # Find the canonical record constructor descriptor. A record's
+              # canonical ctor is the only `<init>` whose descriptor matches
+              # the field type list. We look for any utf8 entry beginning
+              # with `(` and ending with `)V` that ALSO contains both
+              # `dimension`'s placement and the weather+timeOfDay positions.
+              # Easier: parse every `(....)V` descriptor and pick the one
+              # with the maximum parameter count (the canonical record ctor
+              # in a Fabric mod jar dominates all other `<init>` overloads,
+              # which are at most 1-2 params).
+              $ctorDescriptors = $utf8Entries | Where-Object {
+                $_ -match '^\(.*\)V$'
+              }
+              if ($ctorDescriptors.Count -lt 1) {
+                Write-Error "FAIL: $($jar.Name) no (...)V descriptors found in constant pool"
+                exit 1
+              }
 
-          # Cleanup
-          Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
+              # Parse a JVM method descriptor's parameter list into a token array.
+              # Tokens: B C D F I J S Z (primitives), L<name>; (objects), [<token> (arrays).
+              function Get-DescriptorParams([string]$desc) {
+                $params = @()
+                $body = $desc.Substring(1, $desc.LastIndexOf(')') - 1)
+                $i = 0
+                while ($i -lt $body.Length) {
+                  $ch = $body[$i]
+                  if ($ch -eq 'L') {
+                    $semi = $body.IndexOf(';', $i)
+                    if ($semi -lt 0) { return $null }
+                    $params += $body.Substring($i, $semi - $i + 1)
+                    $i = $semi + 1
+                  } elseif ($ch -eq '[') {
+                    $j = $i
+                    while ($j -lt $body.Length -and $body[$j] -eq '[') { $j++ }
+                    if ($body[$j] -eq 'L') {
+                      $semi = $body.IndexOf(';', $j)
+                      if ($semi -lt 0) { return $null }
+                      $params += $body.Substring($i, $semi - $i + 1)
+                      $i = $semi + 1
+                    } else {
+                      $params += $body.Substring($i, $j - $i + 1)
+                      $i = $j + 1
+                    }
+                  } elseif ('BCDFIJSZV'.IndexOf($ch) -ge 0) {
+                    $params += [string]$ch
+                    $i++
+                  } else {
+                    return $null  # malformed
+                  }
+                }
+                return ,$params
+              }
+
+              # Find the (...)V descriptor with the largest param count — that's the canonical ctor.
+              $maxParams = -1
+              $canonicalParams = $null
+              $canonicalDesc = $null
+              foreach ($d in $ctorDescriptors) {
+                $p = Get-DescriptorParams $d
+                if ($p -eq $null) { continue }
+                if ($p.Count -gt $maxParams) {
+                  $maxParams = $p.Count
+                  $canonicalParams = $p
+                  $canonicalDesc = $d
+                }
+              }
+              if ($canonicalParams -eq $null) {
+                Write-Error "FAIL: $($jar.Name) could not parse any constructor descriptor"
+                exit 1
+              }
+
+              if ($canonicalParams.Count -ne $expectedFieldCount) {
+                Write-Error "FAIL: $($jar.Name) canonical <init> has $($canonicalParams.Count) params, expected $expectedFieldCount"
+                Write-Error "       descriptor: $canonicalDesc"
+                Write-Error "       This is the EXACT regression rc19.0.2 shipped (stale 18-param jar)."
+                exit 1
+              }
+              if ($canonicalParams[$expectedWeatherIdx] -ne 'Ljava/lang/String;') {
+                Write-Error "FAIL: $($jar.Name) param[$expectedWeatherIdx] (weather) = '$($canonicalParams[$expectedWeatherIdx])', expected 'Ljava/lang/String;'"
+                exit 1
+              }
+              if ($canonicalParams[$expectedTimeOfDayIdx] -ne 'Ljava/lang/String;') {
+                Write-Error "FAIL: $($jar.Name) param[$expectedTimeOfDayIdx] (timeOfDay) = '$($canonicalParams[$expectedTimeOfDayIdx])', expected 'Ljava/lang/String;'"
+                exit 1
+              }
+              # weather + timeOfDay field NAMES must also appear in the
+              # constant pool (record field names are stored as Utf8 entries
+              # for the canonical accessor methods). If a stale build
+              # somehow has the right ctor shape but wrong field names, this
+              # catches it.
+              if (-not $utf8Entries.Contains('weather')) {
+                Write-Error "FAIL: $($jar.Name) constant pool missing 'weather' Utf8 entry"
+                exit 1
+              }
+              if (-not $utf8Entries.Contains('timeOfDay')) {
+                Write-Error "FAIL: $($jar.Name) constant pool missing 'timeOfDay' Utf8 entry"
+                exit 1
+              }
+              Write-Host "  OK: canonical <init> = $canonicalDesc"
+              Write-Host "  OK: param count = $($canonicalParams.Count) (expected $expectedFieldCount)"
+              Write-Host "  OK: weather (param[$expectedWeatherIdx]) + timeOfDay (param[$expectedTimeOfDayIdx]) are String"
+              Write-Host "  OK: 'weather' + 'timeOfDay' Utf8 entries present in constant pool"
+            } finally {
+              Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
+            }
+          }
+          Write-Host "All $($allJars.Count) mod jars VERIFIED — none is stale, all have weather + timeOfDay fields"
 
       - name: Stage mod jars (all 9 into bundle + release-extras)
         shell: pwsh
@@ -1169,6 +1345,105 @@ jobs:
           Write-Host "Wrote $manifestPath with $($entries.Count) entries"
 
       # ---------------------------------------------------------------------
+      # 13b. rc19.0.2.1 — Pre-Inno-Setup verify bundle contents
+      # ---------------------------------------------------------------------
+      # Belt-and-braces gate that mirrors every [Files] block in
+      # bin/build_bundled_installer/installer.iss. If ANY of these is
+      # missing at this point, Inno Setup may silently skip it (an empty
+      # source-glob produces zero [Files] entries with no compile error)
+      # and we'd ship an incomplete installer. The earlier "Compose
+      # bundle/ layout" step already checks most of these — this step
+      # is intentionally redundant so any future addition to installer.iss
+      # gets a corresponding entry HERE, keeping the .iss + workflow in
+      # lockstep. Fail loud, fail early.
+      #
+      # rc19.0.2 shipped without `bundle/python-deps/` and `bundle/run_finalize.bat`
+      # making it into the install root on minipc1, even though the
+      # workflow's bundle staging steps logged success. Two defensive
+      # additions in this PR: this PRE-compile audit, and a POST-compile
+      # innoextract sweep (see 14b below) that confirms the .exe actually
+      # contains the files we expect.
+      - name: rc19.0.2.1 - Pre-Inno-Setup verify bundle contents
+        shell: pwsh
+        run: |
+          # Each entry maps 1:1 to a Source: line in installer.iss [Files].
+          # Directories use Test-Path AND a non-empty content check —
+          # Inno's `Source: "...\\*"` flag silently expands to nothing on
+          # an empty source dir, which is the EXACT failure mode of
+          # rc19.0.2's python-deps drop.
+          $requiredFiles = @(
+            'bundle/jre/bin/javaw.exe',
+            'bundle/mc-instance/versions/1.21.4/1.21.4.jar',
+            'bundle/mc-instance/versions/fabric-loader-0.16.10-1.21.4/fabric-loader-0.16.10-1.21.4.json',
+            'bundle/mc-instance/mods/fabric-api.jar',
+            'bundle/OysterRecorder-onedir/OysterRecorder-onedir.exe',
+            'bundle/recorder/OysterRecorder.exe',
+            'bundle/recorder/obs-ffmpeg-mux.exe',
+            'bundle/OysterPlay.exe',
+            'bundle/manifest.json',
+            # rc19.0.2 — standalone Python finalize tooling (S01)
+            'bundle/bin/finalize_session.py',
+            'bundle/bin/lint_v3_prd_grounded.py',
+            'bundle/bin/depth_exr_writer.py',
+            'bundle/bin/measure_input_latency.py',
+            'bundle/bin/audio_continuity_check.py',
+            'bundle/bin/generate_gameinfo.py',
+            'bundle/bin/generate_gameinfo_xlsx.py',
+            'bundle/depth_models/depth_anything_v2_small.onnx',
+            'bundle/run_finalize.bat'
+          )
+          $requiredDirs = @(
+            # Each dir MUST contain at least one file; Inno's recursesubdirs
+            # glob silently no-ops on empty trees.
+            @{ path = 'bundle/python-deps'; minFiles = 100 },  # ~5996 in practice
+            @{ path = 'bundle/python-deps/numpy'; minFiles = 5 },
+            @{ path = 'bundle/python-deps/cv2'; minFiles = 1 },
+            @{ path = 'bundle/python-deps/onnxruntime'; minFiles = 1 },
+            @{ path = 'bundle/python-deps/openpyxl'; minFiles = 1 },
+            @{ path = 'bundle/mc-instance/mods'; minFiles = 9 },  # 9 MC versions + fabric-api
+            @{ path = 'bundle/depth_models'; minFiles = 1 },
+            @{ path = 'bundle/bin'; minFiles = 7 },
+            @{ path = 'bundle/jre'; minFiles = 50 }
+          )
+          $missing = New-Object 'System.Collections.Generic.List[string]'
+          foreach ($p in $requiredFiles) {
+            if (-not (Test-Path $p -PathType Leaf)) {
+              $missing.Add("FILE MISSING: $p")
+            } else {
+              Write-Host "OK: $p"
+            }
+          }
+          foreach ($d in $requiredDirs) {
+            if (-not (Test-Path $d.path -PathType Container)) {
+              $missing.Add("DIR MISSING: $($d.path)")
+              continue
+            }
+            $count = (Get-ChildItem -Recurse -File $d.path -ErrorAction SilentlyContinue).Count
+            if ($count -lt $d.minFiles) {
+              $missing.Add("DIR TOO SMALL: $($d.path) has $count files, expected >= $($d.minFiles)")
+            } else {
+              Write-Host "OK: $($d.path) ($count files)"
+            }
+          }
+          if ($missing.Count -gt 0) {
+            Write-Host ""
+            Write-Host "=== PRE-INNO-SETUP VERIFY FAILED ===" -ForegroundColor Red
+            foreach ($m in $missing) { Write-Error $m }
+            Write-Host ""
+            Write-Host "=== bundle/ tree at failure ==="
+            if (Test-Path bundle) {
+              Get-ChildItem -Recurse bundle -Depth 2 -ErrorAction SilentlyContinue `
+                | Select-Object -First 60 `
+                | ForEach-Object { Write-Host "  $($_.FullName)" }
+            } else {
+              Write-Host "  (bundle/ directory does not exist)"
+            }
+            exit 1
+          }
+          Write-Host ""
+          Write-Host "Pre-Inno-Setup verify PASSED: bundle/ has every input declared in installer.iss [Files]"
+
+      # ---------------------------------------------------------------------
       # 14. R05D — Inno Setup compile installer.iss
       # ---------------------------------------------------------------------
       # installer.iss declares:
@@ -1233,6 +1508,158 @@ jobs:
             Write-Error "Installer is too large (${size_mb} MiB > 1300 MiB) - investigate Solid compression"
             exit 1
           }
+
+      # ---------------------------------------------------------------------
+      # 14b. rc19.0.2.1 — Post-Inno-Setup verify installer contents
+      # ---------------------------------------------------------------------
+      # Even with installer.iss [Files] correctly declared AND the pre-compile
+      # verify confirming bundle/ has every input, there's a thin wedge where
+      # Inno Setup could silently drop a file: a `Source: dir\\*` with the
+      # `recursesubdirs` flag is interpreted PER-RUN by ISCC, and bug reports
+      # from past Inno Setup versions show edge cases where a subdir with
+      # specific path lengths or special characters gets skipped. We close
+      # that wedge by unpacking the compiled .exe with innoextract and
+      # asserting every file we EXPECTED to ship is actually IN the
+      # installer image.
+      #
+      # innoextract is a third-party tool that reads Inno Setup setup data
+      # directly without running the installer. It's available via
+      # chocolatey on windows-latest. We use it because:
+      #   * 7-Zip can extract some Inno Setup .exes but coverage is spotty
+      #     for newer LZMA2/ultra64 + solid compressed bundles.
+      #   * innoextract specifically targets Inno Setup format, all versions.
+      #   * Zero side effects — no registry writes, no real install.
+      - name: rc19.0.2.1 - Install innoextract via Chocolatey
+        shell: pwsh
+        run: |
+          choco install innoextract -y --no-progress
+          $ie = Get-Command innoextract.exe -ErrorAction SilentlyContinue
+          if (-not $ie) {
+            # Fallback search if choco didn't put it on PATH
+            $candidates = @(
+              "$env:ProgramData\chocolatey\bin\innoextract.exe",
+              "$env:ChocolateyInstall\bin\innoextract.exe",
+              "$env:ProgramFiles\innoextract\innoextract.exe"
+            )
+            $ie = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+            if (-not $ie) {
+              Write-Error "innoextract not found after choco install"
+              exit 1
+            }
+            $ieDir = Split-Path -Parent $ie
+            "$ieDir" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+          }
+          innoextract.exe --version | Select-Object -First 1
+
+      - name: rc19.0.2.1 - Post-Inno-Setup verify installer contains all expected files
+        shell: pwsh
+        run: |
+          $installer = "dist/GameDataRecorder-Setup-$env:RELEASE_TAG.exe"
+          if (-not (Test-Path $installer)) {
+            Write-Error "Installer not found at $installer"
+            exit 1
+          }
+          # Unpack to a sibling dir. --silent suppresses per-file output,
+          # --gog keeps the original layout (close to what Inno Setup will
+          # actually deploy to {app}\). innoextract drops files under
+          # `app\` by default — that's the install root.
+          $extractDir = "dist/installer-unpacked"
+          if (Test-Path $extractDir) {
+            Remove-Item -Recurse -Force $extractDir
+          }
+          New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
+          Write-Host "Unpacking $installer to $extractDir ..."
+          innoextract.exe --silent --output-dir $extractDir $installer
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "innoextract failed with exit $LASTEXITCODE"
+            exit 1
+          }
+          # innoextract drops files under <extractDir>/app/{relpath} — that
+          # `app` segment corresponds to {app} in installer.iss. We assert
+          # the post-install layout matches what installer.iss [Files] +
+          # [Icons] expect at runtime.
+          $unpackedAppRoot = Join-Path $extractDir 'app'
+          if (-not (Test-Path $unpackedAppRoot -PathType Container)) {
+            Write-Error "Expected unpacked app dir at $unpackedAppRoot — innoextract layout changed?"
+            Write-Host "=== $extractDir contents ==="
+            Get-ChildItem $extractDir -Recurse -Depth 1 | Format-Table FullName
+            exit 1
+          }
+          # rc19.0.2.1: the EXACT regression we shipped — python-deps,
+          # depth_models, run_finalize.bat — gets a dedicated post-compile
+          # assertion. Each entry is a file/dir that MUST exist under
+          # <unpackedAppRoot>/<relpath>; for dirs we also assert min file count.
+          $required = @(
+            @{ kind = 'file'; path = 'jre/bin/javaw.exe' },
+            @{ kind = 'file'; path = 'mc-instance/versions/1.21.4/1.21.4.jar' },
+            @{ kind = 'file'; path = 'mc-instance/versions/fabric-loader-0.16.10-1.21.4/fabric-loader-0.16.10-1.21.4.json' },
+            @{ kind = 'file'; path = 'mc-instance/mods/fabric-api.jar' },
+            @{ kind = 'file'; path = 'OysterPlay.exe' },
+            @{ kind = 'file'; path = 'manifest.json' },
+            @{ kind = 'file'; path = 'recorder/OysterRecorder.exe' },
+            @{ kind = 'file'; path = 'recorder/obs-ffmpeg-mux.exe' },
+            # rc19.0.2 S01 — standalone Python finalize tooling
+            @{ kind = 'file'; path = 'bin/finalize_session.py' },
+            @{ kind = 'file'; path = 'bin/lint_v3_prd_grounded.py' },
+            @{ kind = 'file'; path = 'bin/depth_exr_writer.py' },
+            @{ kind = 'file'; path = 'bin/measure_input_latency.py' },
+            @{ kind = 'file'; path = 'bin/audio_continuity_check.py' },
+            @{ kind = 'file'; path = 'bin/generate_gameinfo.py' },
+            @{ kind = 'file'; path = 'bin/generate_gameinfo_xlsx.py' },
+            @{ kind = 'file'; path = 'depth_models/depth_anything_v2_small.onnx' },
+            @{ kind = 'file'; path = 'run_finalize.bat' },
+            @{ kind = 'dir';  path = 'python-deps'; minFiles = 100 },
+            @{ kind = 'dir';  path = 'python-deps/numpy'; minFiles = 5 },
+            @{ kind = 'dir';  path = 'python-deps/cv2'; minFiles = 1 },
+            @{ kind = 'dir';  path = 'python-deps/onnxruntime'; minFiles = 1 },
+            @{ kind = 'dir';  path = 'python-deps/openpyxl'; minFiles = 1 },
+            @{ kind = 'dir';  path = 'depth_models'; minFiles = 1 },
+            @{ kind = 'dir';  path = 'bin'; minFiles = 7 },
+            @{ kind = 'dir';  path = 'jre'; minFiles = 50 }
+          )
+          $missing = New-Object 'System.Collections.Generic.List[string]'
+          foreach ($r in $required) {
+            $full = Join-Path $unpackedAppRoot $r.path
+            if ($r.kind -eq 'file') {
+              if (-not (Test-Path $full -PathType Leaf)) {
+                $missing.Add("FILE MISSING IN INSTALLER: $($r.path)")
+              } else {
+                $kb = [math]::Round((Get-Item $full).Length / 1KB, 1)
+                Write-Host "OK: $($r.path) (${kb} KB)"
+              }
+            } else {  # dir
+              if (-not (Test-Path $full -PathType Container)) {
+                $missing.Add("DIR MISSING IN INSTALLER: $($r.path)")
+                continue
+              }
+              $cnt = (Get-ChildItem -Recurse -File $full -ErrorAction SilentlyContinue).Count
+              if ($cnt -lt $r.minFiles) {
+                $missing.Add("DIR TOO SMALL IN INSTALLER: $($r.path) has $cnt files, expected >= $($r.minFiles)")
+              } else {
+                Write-Host "OK: $($r.path)/ ($cnt files)"
+              }
+            }
+          }
+          if ($missing.Count -gt 0) {
+            Write-Host ""
+            Write-Host "=== POST-INNO-SETUP VERIFY FAILED ===" -ForegroundColor Red
+            Write-Host "rc19.0.2 shipped with EXACTLY this kind of silent omission."
+            Write-Host "If you see this, the installer .exe is INCOMPLETE — DO NOT release."
+            Write-Host ""
+            foreach ($m in $missing) { Write-Error $m }
+            Write-Host ""
+            Write-Host "=== unpacked installer tree (top 80) ==="
+            Get-ChildItem -Recurse $unpackedAppRoot -Depth 2 -ErrorAction SilentlyContinue `
+              | Select-Object -First 80 `
+              | ForEach-Object { Write-Host "  $($_.FullName.Substring($unpackedAppRoot.Length))" }
+            exit 1
+          }
+          $totalFiles = (Get-ChildItem -Recurse -File $unpackedAppRoot).Count
+          Write-Host ""
+          Write-Host "Post-Inno-Setup verify PASSED: installer contains $totalFiles files, all expected paths present."
+          # Reclaim the ~3 GB the unpacked tree consumed so the runner has
+          # disk for the SHA / upload steps.
+          Remove-Item -Recurse -Force $extractDir
 
       # ---------------------------------------------------------------------
       # 15. SHA-256 the final installer + emit SHA-256-manifest.txt
