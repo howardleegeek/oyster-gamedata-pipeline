@@ -22,10 +22,20 @@ jobs:
     steps:
       - name: Detect skip marker in commit message
         id: detect
+        env:
+          # Pass the untrusted commit message through env, NOT inline ${{ }}
+          # interpolation. Inline interpolation splices the raw message into
+          # the shell script text before bash parses it, so a commit message
+          # containing backticks or $(...) becomes command substitution and
+          # executes on the runner (script injection -> exit 127 under
+          # set -euo pipefail, or arbitrary code execution). As an env var it
+          # is ordinary data that bash never re-parses. This is GitHub's
+          # documented safe pattern for untrusted workflow inputs.
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
         run: |
           set -euo pipefail
 
-          COMMIT_MSG="${{ github.event.head_commit.message }}"
+          # COMMIT_MSG is a real env var in scope here -- no script injection.
           SKIP="false"
           REASON=""
 
