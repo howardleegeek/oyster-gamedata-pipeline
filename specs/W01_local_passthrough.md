@@ -20,7 +20,7 @@ executor: codex-aliyun
 ## 约束
 
 - **数据准确铁律 (Howard 2026-05-08)**: 所有输出必须是 real probe results,
-  不允许编造 .env keys, fake URLs, 假 smoke responses. bootstrap 必须真跑,
+  不允许编造 .env keys、编造 URL、伪造 smoke responses. bootstrap 必须真跑,
   smoke 必须真探活, doc 必须引用真实端口和路径. 违反 = iron-law 违反.
 - 模块化: 不要超过 3 个新文件 + 1 个 README 修改. 已识别的 4 个 deliverable
   恰好够用.
