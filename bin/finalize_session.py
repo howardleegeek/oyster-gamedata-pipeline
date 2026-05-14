@@ -74,6 +74,7 @@ Usage
 from __future__ import annotations
 
 import argparse
+import bisect
 import json
 import math
 import os
@@ -154,10 +155,66 @@ def sync_game_state(session_dir: Path, verbose: bool = False) -> bool:
 # Step 2 — backfill action_camera.json with quaternion + position
 # ---------------------------------------------------------------------------
 
+def _get_frame_t_ns(frame: dict) -> Optional[int]:
+    """Return the frame's recording-relative timestamp in nanoseconds.
+
+    rc19 recorder writes `timestamp_ns` (preferred) and `timestamp` (seconds,
+    float). Older recordings used `t_ns`. We accept all three so this function
+    works against rc17.x, rc18.x, and rc19+ session dirs without coupling to
+    the recorder build that emitted them.
+    """
+    t_ns = frame.get("timestamp_ns")
+    if t_ns is not None:
+        return int(t_ns)
+    t_ns = frame.get("t_ns")
+    if t_ns is not None:
+        return int(t_ns)
+    ts = frame.get("timestamp")
+    if ts is not None:
+        try:
+            return int(float(ts) * 1_000_000_000)
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def _get_frame_index(frame: dict) -> Optional[int]:
+    """Return the frame's integer index.
+
+    rc19 recorder writes `frame_index` (preferred) and `frame_number`. Older
+    recordings used `idx`. Accept all three.
+    """
+    for key in ("frame_index", "idx", "frame_number"):
+        v = frame.get(key)
+        if v is not None:
+            try:
+                return int(v)
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
 def backfill_action_camera(session_dir: Path, verbose: bool = False) -> int:
     """Patch action_camera.json frames with quaternion + position from game_state.
 
     Returns count of frames patched.
+
+    Timestamp alignment
+    -------------------
+    The recorder writes action_camera frames with `timestamp_ns` (nanoseconds
+    since recording start, monotonic). mc-mod writes game_state ticks with
+    `timestamp_ms` (Unix-epoch wall clock). We anchor frame[0].timestamp_ns
+    to game_state[0].timestamp_ms and convert every other frame to an
+    absolute ms value relative to that anchor, then binary-search the
+    game_state tick array for nearest neighbor.
+
+    Naming compatibility
+    --------------------
+    Frame key names changed between recorder builds:
+      rc17.x / rc18.x : `idx`,         `t_ns`
+      rc19+           : `frame_index`, `timestamp_ns` (also `timestamp` seconds)
+    `_get_frame_t_ns` and `_get_frame_index` accept both so finalize works
+    against any session dir on disk.
     """
     ac_path = session_dir / "action_camera.json"
     gs_path = session_dir / "game_state.jsonl"
@@ -181,68 +238,82 @@ def backfill_action_camera(session_dir: Path, verbose: bool = False) -> int:
             print("  action_camera.json unexpected structure — skip backfill")
         return 0
 
-    # Load game_state.jsonl into memory (it's ~4 MB, fine)
-    gs_lines = []
-    gs_ts = []
+    if not frames:
+        if verbose:
+            print("  action_camera.json contains no frames — skip backfill")
+        return 0
+
+    # Load game_state.jsonl into memory (it's ~4 MB, fine).
+    gs_lines: List[dict] = []
+    gs_ts: List[int] = []
     with open(gs_path) as f:
         for line in f:
-            if line.strip():
+            line = line.strip()
+            if not line:
+                continue
+            try:
                 obj = json.loads(line)
-                gs_lines.append(obj)
-                # timestamp_ms is the wall-clock anchor
-                gs_ts.append(obj.get("timestamp_ms", 0))
+            except json.JSONDecodeError:
+                # Skip a corrupt mid-stream line rather than aborting backfill
+                # — mc-mod can leave a half-written final line if Minecraft
+                # was killed mid-flush.
+                continue
+            ts = obj.get("timestamp_ms")
+            if ts is None:
+                continue
+            gs_lines.append(obj)
+            gs_ts.append(int(ts))
 
     if not gs_lines:
         if verbose:
             print("  game_state.jsonl empty — skip backfill")
         return 0
 
-    # Sort frames by absolute timestamp (t_ns is nanoseconds since recording start)
-    # Convert t_ns to ms offset from first frame
-    first_t_ns = None
+    # game_state ticks are written in order, but make absolutely sure we're
+    # sorted by timestamp_ms so binary search is correct.
+    if any(gs_ts[i] > gs_ts[i + 1] for i in range(len(gs_ts) - 1)):
+        order = sorted(range(len(gs_ts)), key=lambda i: gs_ts[i])
+        gs_ts = [gs_ts[i] for i in order]
+        gs_lines = [gs_lines[i] for i in order]
+
+    # Anchor: action_camera frame[0].timestamp_ns ~= game_state[0].timestamp_ms
+    # (both stamped at recording start). We use frame[0]'s timestamp_ns as the
+    # zero point; absolute_ms(frame) = gs_ts[0] + (frame.timestamp_ns - first_t_ns) / 1e6
+    first_t_ns: Optional[int] = None
     for fr in frames:
-        if "t_ns" in fr:
-            first_t_ns = fr["t_ns"]
+        t = _get_frame_t_ns(fr)
+        if t is not None:
+            first_t_ns = t
             break
 
     if first_t_ns is None:
         if verbose:
-            print("  no t_ns in frames — skip backfill")
+            print("  no timestamp_ns/t_ns/timestamp in frames — skip backfill")
         return 0
 
-    # Build a map: frame_idx -> absolute timestamp_ms
-    frame_times = {}
-    for fr in frames:
-        idx = fr.get("idx")
-        t_ns = fr.get("t_ns", 0)
-        if idx is not None:
-            # t_ns is nanoseconds since recording start; convert to ms offset
-            ms_offset = (t_ns - first_t_ns) / 1_000_000.0
-            # Add to first game_state timestamp to get absolute ms
-            if gs_ts:
-                frame_times[idx] = gs_ts[0] + ms_offset
+    anchor_ms = gs_ts[0]
+
+    def nearest_gs(abs_t_ms: float) -> dict:
+        """Binary-search nearest game_state tick to abs_t_ms (wall-clock ms)."""
+        # bisect returns the insertion point; nearest neighbor is one of
+        # (pos-1, pos). O(log N) per frame vs the previous O(N).
+        pos = bisect.bisect_left(gs_ts, abs_t_ms)
+        if pos == 0:
+            return gs_lines[0]
+        if pos >= len(gs_ts):
+            return gs_lines[-1]
+        before = gs_ts[pos - 1]
+        after = gs_ts[pos]
+        return gs_lines[pos - 1] if (abs_t_ms - before) <= (after - abs_t_ms) else gs_lines[pos]
 
     patched = 0
     for frame in frames:
-        idx = frame.get("idx")
-        if idx is None or idx not in frame_times:
+        t_ns = _get_frame_t_ns(frame)
+        if t_ns is None:
             continue
-        abs_t_ms = frame_times[idx]
+        abs_t_ms = anchor_ms + (t_ns - first_t_ns) / 1_000_000.0
 
-        # Find nearest game_state tick
-        if not gs_ts:
-            continue
-        # Binary search would be faster, but linear scan is fine for ~1800 frames
-        candidates = []
-        for i, gs_t in enumerate(gs_ts):
-            if i > 0:
-                candidates.append(i - 1)
-            if i < len(gs_ts):
-                candidates.append(i)
-        if not candidates:
-            continue
-        best_idx = min(candidates, key=lambda i: abs(gs_ts[i] - abs_t_ms))
-        gs = gs_lines[best_idx]
+        gs = nearest_gs(abs_t_ms)
 
         # Quaternion from yaw/pitch
         yaw = gs.get("yaw_deg", 0.0)
@@ -281,6 +352,13 @@ def backfill_action_camera(session_dir: Path, verbose: bool = False) -> int:
         # else fill it from |velocity|. Keeps backwards compat with rc17.x.
         if frame.get("speed", 0.0) == 0.0:
             frame["speed"] = speed_mag
+
+        # rc19.0.2.1: scene_name from game_state.dimension (PRD §3.2 wants
+        # the scene tag per frame for cross-scene routing analysis). Empty
+        # dimension → leave existing scene_name if any.
+        dimension = gs.get("dimension")
+        if dimension:
+            frame["scene_name"] = dimension
 
         # rc19-c: PRD §3.2 requires `time` as ISO ms format and `fps` per
         # frame. The recorder writes `timestamp` (relative seconds) and
