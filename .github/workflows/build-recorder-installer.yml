@@ -1522,36 +1522,19 @@ jobs:
       # asserting every file we EXPECTED to ship is actually IN the
       # installer image.
       #
-      # innoextract is a third-party tool that reads Inno Setup setup data
-      # directly without running the installer. It's available via
-      # chocolatey on windows-latest. We use it because:
-      #   * 7-Zip can extract some Inno Setup .exes but coverage is spotty
-      #     for newer LZMA2/ultra64 + solid compressed bundles.
-      #   * innoextract specifically targets Inno Setup format, all versions.
-      #   * Zero side effects — no registry writes, no real install.
-      - name: rc19.0.2.1 - Install innoextract via Chocolatey
-        shell: pwsh
-        run: |
-          choco install innoextract -y --no-progress
-          $ie = Get-Command innoextract.exe -ErrorAction SilentlyContinue
-          if (-not $ie) {
-            # Fallback search if choco didn't put it on PATH
-            $candidates = @(
-              "$env:ProgramData\chocolatey\bin\innoextract.exe",
-              "$env:ChocolateyInstall\bin\innoextract.exe",
-              "$env:ProgramFiles\innoextract\innoextract.exe"
-            )
-            $ie = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-            if (-not $ie) {
-              Write-Error "innoextract not found after choco install"
-              exit 1
-            }
-            $ieDir = Split-Path -Parent $ie
-            "$ieDir" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
-          }
-          innoextract.exe --version | Select-Object -First 1
-
-      - name: rc19.0.2.1 - Post-Inno-Setup verify installer contains all expected files
+      # We verify by RUNNING the installer silently into a throwaway dir.
+      # The installer is self-extracting, so this is the only
+      # format-version-proof method — and it's exactly the path the end
+      # user runs, so we test real deployment.
+      #
+      # rc19.0.2.2: replaced innoextract. innoextract is a third-party
+      # reverse-engineering tool that LAGS behind official Inno Setup
+      # releases — on rc19.0.2.1 it failed with "Unexpected setup loader
+      # revision: 2 / Could not determine setup data version" against a
+      # perfectly valid installer (false negative, blocked the release).
+      # `Setup.exe /VERYSILENT` is documented + stable across all Inno
+      # Setup 5.x/6.x versions.
+      - name: rc19.0.2.2 - Post-Inno-Setup verify installer contains all expected files
         shell: pwsh
         run: |
           $installer = "dist/GameDataRecorder-Setup-$env:RELEASE_TAG.exe"
@@ -1559,30 +1542,32 @@ jobs:
             Write-Error "Installer not found at $installer"
             exit 1
           }
-          # Unpack to a sibling dir. --silent suppresses per-file output,
-          # --gog keeps the original layout (close to what Inno Setup will
-          # actually deploy to {app}\). innoextract drops files under
-          # `app\` by default — that's the install root.
-          $extractDir = "dist/installer-unpacked"
-          if (Test-Path $extractDir) {
-            Remove-Item -Recurse -Force $extractDir
+          # Run the installer silently into a throwaway dir.
+          #   /VERYSILENT        — no UI at all
+          #   /SUPPRESSMSGBOXES  — auto-answer any prompts
+          #   /DIR=...           — target install dir
+          #   /LOG=...           — capture install log for diagnostics
+          #   /NOICONS           — skip Start Menu / desktop shortcuts in CI
+          $unpackedAppRoot = Join-Path $env:RUNNER_TEMP 'verify-install'
+          $installLog = Join-Path $env:RUNNER_TEMP 'verify-install.log'
+          if (Test-Path $unpackedAppRoot) {
+            Remove-Item -Recurse -Force $unpackedAppRoot
           }
-          New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
-          Write-Host "Unpacking $installer to $extractDir ..."
-          innoextract.exe --silent --output-dir $extractDir $installer
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "innoextract failed with exit $LASTEXITCODE"
+          New-Item -ItemType Directory -Force -Path $unpackedAppRoot | Out-Null
+          Write-Host "Running $installer /VERYSILENT into $unpackedAppRoot ..."
+          $proc = Start-Process -FilePath $installer `
+            -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/DIR=$unpackedAppRoot","/LOG=$installLog","/NOICONS" `
+            -Wait -PassThru
+          if ($proc.ExitCode -ne 0) {
+            Write-Error "Installer exited with code $($proc.ExitCode)"
+            if (Test-Path $installLog) {
+              Write-Host "=== install log (tail 40) ==="
+              Get-Content $installLog -Tail 40
+            }
             exit 1
           }
-          # innoextract drops files under <extractDir>/app/{relpath} — that
-          # `app` segment corresponds to {app} in installer.iss. We assert
-          # the post-install layout matches what installer.iss [Files] +
-          # [Icons] expect at runtime.
-          $unpackedAppRoot = Join-Path $extractDir 'app'
           if (-not (Test-Path $unpackedAppRoot -PathType Container)) {
-            Write-Error "Expected unpacked app dir at $unpackedAppRoot — innoextract layout changed?"
-            Write-Host "=== $extractDir contents ==="
-            Get-ChildItem $extractDir -Recurse -Depth 1 | Format-Table FullName
+            Write-Error "Install dir $unpackedAppRoot does not exist after /VERYSILENT install"
             exit 1
           }
           # rc19.0.2.1: the EXACT regression we shipped — python-deps,
@@ -1656,10 +1641,10 @@ jobs:
           }
           $totalFiles = (Get-ChildItem -Recurse -File $unpackedAppRoot).Count
           Write-Host ""
-          Write-Host "Post-Inno-Setup verify PASSED: installer contains $totalFiles files, all expected paths present."
-          # Reclaim the ~3 GB the unpacked tree consumed so the runner has
+          Write-Host "Post-Inno-Setup verify PASSED: installer self-extracts $totalFiles files, all expected paths present."
+          # Reclaim the ~3 GB the install tree consumed so the runner has
           # disk for the SHA / upload steps.
-          Remove-Item -Recurse -Force $extractDir
+          Remove-Item -Recurse -Force $unpackedAppRoot
 
       # ---------------------------------------------------------------------
       # 15. SHA-256 the final installer + emit SHA-256-manifest.txt
