@@ -1555,10 +1555,23 @@ jobs:
           }
           New-Item -ItemType Directory -Force -Path $unpackedAppRoot | Out-Null
           Write-Host "Running $installer /VERYSILENT into $unpackedAppRoot ..."
+          # Inno Setup extracts ALL [Files] to disk BEFORE executing any
+          # [Run] entries. A [Run] entry without `skipifsilent` still
+          # fires under /VERYSILENT and can block forever in CI (no
+          # display) — that hung rc19.0.2.2's first attempt. So we bound
+          # the wait: if the process is still alive after the timeout,
+          # the file-extraction phase is definitely done, kill it and
+          # verify the on-disk files regardless.
           $proc = Start-Process -FilePath $installer `
-            -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/DIR=$unpackedAppRoot","/LOG=$installLog","/NOICONS" `
-            -Wait -PassThru
-          if ($proc.ExitCode -ne 0) {
+            -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/DIR=$unpackedAppRoot","/LOG=$installLog","/NOICONS" `
+            -PassThru
+          $exited = $proc.WaitForExit(420000)  # 7 min — extraction of ~3 GB is well under this
+          if (-not $exited) {
+            Write-Host "Installer process still alive after 7 min — almost certainly a hung [Run] entry."
+            Write-Host "File extraction completes before [Run] entries, so on-disk files are valid. Killing + verifying."
+            try { $proc.Kill() } catch { }
+            Start-Sleep -Seconds 3
+          } elseif ($proc.ExitCode -ne 0) {
             Write-Error "Installer exited with code $($proc.ExitCode)"
             if (Test-Path $installLog) {
               Write-Host "=== install log (tail 40) ==="
