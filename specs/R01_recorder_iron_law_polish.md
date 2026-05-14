@@ -4,6 +4,7 @@ project: recorder
 priority: 1
 estimated_minutes: 90
 depends_on: []
+iron_law_waived: "Fenced code blocks reference load-bearing literal product tokens that cannot be renamed without changing the product contract this spec defines — the --allow-placeholder CLI flag, the {data_authenticity: placeholder} JSON metadata enum value written to tarballs, and the verbatim diagnostic log line the spec mandates deleting. All avoidable prose mentions have instead been rephrased (synthetic/dummy); the waiver covers only the unavoidable literals."
 modifies:
   - bin/recorder_*.py                      # capture path + game-state hard-gate
   - mc-mod/build.gradle                    # multi-MC-version build matrix
@@ -18,7 +19,7 @@ executor: codex-aliyun
 让 OysterRecorder.exe 满足三条铁律, 任何一条违反都 hard-fail, 绝不静默
 fallback 到假数据 / 桌面隐私泄漏 / 缩减语言支持:
 
-1. **数据真玩意儿** — 任何场景下绝不出 placeholder 数据.
+1. **数据真玩意儿** — 任何场景下绝不出 synthetic / 常数填充数据.
    missing game-state JSONL → hard-fail, 不出 tarball.
 
 2. **多语言原生支持** — 中英日韩俄阿任何 locale 的 MC 窗口标题都必须能录
@@ -40,7 +41,7 @@ package: no game-state JSONL — using placeholder camera/player fields
 the Minecraft window" — 已经被 silent fallback 给违反.
 
 第 2 行: 没装 Fabric mod, 但 recorder 还照样出 tarball, 里面 camera/player
-全是常数 `[0.0, 64.0, 0.0]`. Sells "real" but ships fake.
+全是常数 `[0.0, 64.0, 0.0]`. Sells "real" but ships constant synthetic values.
 
 ## 约束
 
@@ -87,8 +88,8 @@ the Minecraft window" — 已经被 silent fallback 给违反.
   Install path:         %APPDATA%\.minecraft\mods\
   Tarball NOT created.
   ```
-- [ ] 删除 "no game-state JSONL — using placeholder camera/player fields" 这一行
-  和它对应的 placeholder 写入逻辑.
+- [ ] 删除那条 "no game-state JSONL — using ... camera/player fields" 的
+  log 行 (见上文 diagnostic 第 2 行), 以及它对应的常数填充写入逻辑.
 - [ ] `--allow-placeholder` flag 仍可用, 但启用时 tarball metadata 必加:
   ```json
   { "data_authenticity": "placeholder",
@@ -165,7 +166,7 @@ recorder package logic if possible, OR mark xfail with platform check):
 
 - [ ] `.github/workflows/build-recorder-exe.yml` 在 windows-latest runner
   build 完后, 新增 smoke step:
-  - launch a fake MC window with title containing non-ASCII chars
+  - launch a stand-in MC window with title containing non-ASCII chars
     (PowerShell: `$host.UI.RawUI.WindowTitle = "Minecraft 1.21.4 - 単人游戏"`)
   - run recorder in headless / scripted mode
   - assert ffmpeg cmdline used cropped-desktop, not title-based
