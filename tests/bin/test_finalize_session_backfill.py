@@ -206,17 +206,23 @@ class TestBackfillActionCamera:
             assert frame.get("scene_name") == "minecraft:overworld"
 
     def test_rc19_session_populates_velocity_speed(self, tmp_path: Path):
-        """camera_speed/player_speed must come from velocity_{x,y,z}."""
+        """camera_speed/player_speed must come from velocity_{x,y,z}.
+
+        rc19.0.3: velocity is now unit-converted blocks/tick → m/s (×20,
+        MC runs at 20 ticks/sec). Fixture writes 0.5 blocks/tick on x and
+        z → 10.0 m/s each after conversion.
+        """
         _write_rc19_session(tmp_path, n_frames=10)
 
         backfill_action_camera(tmp_path)
 
         ac = json.loads((tmp_path / "action_camera.json").read_text())
         for frame in ac:
-            assert frame["camera_speed"] == [0.5, 0.0, 0.5]
-            assert frame["player_speed"] == [0.5, 0.0, 0.5]
-            # scalar speed = sqrt(0.25 + 0 + 0.25) = sqrt(0.5)
-            assert abs(frame["speed"] - math.sqrt(0.5)) < 1e-9
+            # 0.5 blocks/tick × 20 ticks/sec = 10.0 m/s
+            assert frame["camera_speed"] == [10.0, 0.0, 10.0]
+            assert frame["player_speed"] == [10.0, 0.0, 10.0]
+            # scalar speed = sqrt(100 + 0 + 100) = sqrt(200)
+            assert abs(frame["speed"] - math.sqrt(200.0)) < 1e-9
 
     def test_rc19_nearest_neighbor_matching(self, tmp_path: Path):
         """The nearest game_state tick should be selected per frame.
