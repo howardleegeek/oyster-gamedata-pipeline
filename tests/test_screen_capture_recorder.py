@@ -12,6 +12,7 @@ import pytest
 
 # Skip the entire module if mss isn't available (e.g. headless Linux CI).
 pytest.importorskip("mss", reason="mss not installable on headless CI runners")
+pytest.importorskip("imageio", reason="imageio not installed")
 
 from bin.screen_capture_recorder import record_screen_region  # noqa: E402
 

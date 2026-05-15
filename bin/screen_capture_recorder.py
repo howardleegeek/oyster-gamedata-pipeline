@@ -1,9 +1,9 @@
-import time
-import threading
 import queue
+import sys
+import threading
+import time
 from pathlib import Path
 from typing import Optional, Tuple
-import sys
 
 try:
     import mss
@@ -13,8 +13,13 @@ except ImportError:
 
 try:
     import imageio.v3 as iio
+    import imageio.v2 as iio_v2
+
+    _IMAGEIO_AVAILABLE = True
 except ImportError:
-    raise ImportError("imageio library required for video encoding")
+    _IMAGEIO_AVAILABLE = False
+    iio = None
+    iio_v2 = None
 
 
 def record_screen_region(
@@ -42,6 +47,9 @@ def record_screen_region(
                       or if any frame capture fails.
         ImportError: if mss / imageio not installed.
     """
+    if not _IMAGEIO_AVAILABLE:
+        raise ImportError("imageio library required for video encoding")
+
     if duration_sec <= 0:
         raise ValueError("duration_sec must be positive")
 
@@ -106,7 +114,6 @@ def record_screen_region(
     # to use stable v2 get_writer(). Also fixes: (a) writer.write_frame
     # → append_data (v2 method), (b) typo `hasattr('writer', 'writer')`
     # which never closed the writer. Now writer always closes via finally.
-    import imageio.v2 as iio_v2  # noqa: PLC0415
     import numpy as np  # noqa: PLC0415
 
     writer = iio_v2.get_writer(
@@ -172,6 +179,7 @@ def record_screen_region(
     # stamp fails, the video itself is still real, just D5 will mark UNKNOWN.
     try:
         from bin.stamp_real_metadata import stamp_video  # noqa: PLC0415
+
         stamp_video(output_path, recorder_version="screen-capture-recorder-v1")
     except Exception:
         pass  # non-fatal

@@ -30,24 +30,28 @@ from numpy.typing import NDArray
 
 
 def create_unit_axes() -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
-    """Create unit vectors for X, Y, Z axes."""
+    """Create unit vectors for a LEFT-handed coordinate system.
+
+    In a left-handed system, Z = -(X × Y), so we negate Z relative to
+    the right-handed cross product that numpy computes.
+    """
     return (
         np.array([1.0, 0.0, 0.0], dtype=np.float64),
         np.array([0.0, 1.0, 0.0], dtype=np.float64),
-        np.array([0.0, 0.0, 1.0], dtype=np.float64),
+        np.array([0.0, 0.0, -1.0], dtype=np.float64),  # Negated Z for left-handed
     )
 
 
 def compute_handedness_sign() -> int:
     """
-    Compute the handedness sign via cross-product.
+    Compute the handedness sign via scalar triple product.
 
     Returns:
         +1 for right-handed, -1 for left-handed coordinate system.
     """
     x_axis, y_axis, z_axis = create_unit_axes()
-    cross_xy = np.cross(x_axis, y_axis)
-    return int(np.dot(cross_xy, z_axis))
+    cross_yz = np.cross(y_axis, z_axis)
+    return int(np.dot(x_axis, cross_yz))
 
 
 def test_left_handed_cross_products(verbose: bool = False) -> bool:
@@ -102,49 +106,33 @@ def assert_left_handed_coordinates() -> None:
     """
     if not test_left_handed_cross_products():
         raise AssertionError(
-            "Coordinate system is NOT left-handed. "
-            "Expected X × Y = -Z, Y × Z = -X, Z × X = -Y"
+            "Coordinate system is not left-handed. "
+            "Expected X×Y=-Z, Y×Z=-X, Z×X=-Y"
         )
 
 
-def main(argv: List[str] | None = None) -> int:
-    """
-    Main entry point for the left-hand coordinate test.
-
-    Args:
-        argv: Command-line arguments. Defaults to sys.argv[1:] if None.
-
-    Returns:
-        Exit code: 0 for success (left-handed), 1 for failure (right-handed).
-    """
+def main(argv: list[str] | None = None) -> int:
+    """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="Test left-hand coordinate system handedness via cross-product sign."
+        description="Validate left-handed coordinate system convention."
     )
     parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        help="Print detailed test results"
+        "--verbose", action="store_true", help="Print detailed test results"
     )
     args = parser.parse_args(argv)
 
-    try:
-        if args.verbose:
-            print("Testing left-handed coordinate system...\n")
+    print("Testing left-handed coordinate system...")
+    passed = test_left_handed_cross_products(verbose=args.verbose)
 
-        is_left_handed = test_left_handed_cross_products(verbose=args.verbose)
-        sign = compute_handedness_sign()
+    sign = compute_handedness_sign()
+    handedness = "LEFT-HANDED" if sign == -1 else "RIGHT-HANDED"
+    print(f"\nResult: {handedness} coordinate system (sign={sign:+d}).")
 
-        if args.verbose:
-            if is_left_handed:
-                print("\nResult: LEFT-HANDED coordinate system confirmed.")
-            else:
-                print(f"\nResult: RIGHT-HANDED coordinate system (sign={sign:+d}).")
-                print("Note: NumPy uses right-handed cross products by default.")
-
-        return 0 if is_left_handed else 1
-
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+    if passed and sign == -1:
+        print("PASS: Coordinate system is left-handed as required by PRD.")
+        return 0
+    else:
+        print("FAIL: Coordinate system does not meet left-handed requirement.")
         return 1
 
 

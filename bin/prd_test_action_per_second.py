@@ -79,6 +79,11 @@ def load_actions_from_file(filepath: Path) -> list[float]:
     """
     Load action rates from a JSON or text file.
 
+    Supports three formats:
+    1. JSON list of numbers: [1.0, 2.0, 3.0]
+    2. action_camera.json: List of action records with timestamps
+    3. Plain text: one value per line
+
     Args:
         filepath: Path to the input file.
 
@@ -97,72 +102,128 @@ def load_actions_from_file(filepath: Path) -> list[float]:
     if filepath.suffix == ".json":
         data = json.loads(content)
         if isinstance(data, list):
-            return [float(x) for x in data]
-        raise ValueError("JSON file must contain a list of numbers")
+            # Check if it's a list of numbers (direct format)
+            if data and isinstance(data[0], (int, float)):
+                return [float(x) for x in data]
+            # Check if it's action_camera.json format (list of objects with timestamps)
+            if data and isinstance(data[0], dict) and "timestamp" in data[0]:
+                return _extract_action_rates_from_action_camera(data)
+        raise ValueError("JSON file must contain a list of numbers or action_camera.json format")
 
     # Plain text: one value per line
     return [float(line.strip()) for line in content.splitlines() if line.strip()]
 
 
-def main(argv: list[str] | None = None) -> int:
+def _extract_action_rates_from_action_camera(records: list[dict]) -> list[float]:
     """
-    Main entry point for the actions-per-second quality tester.
+    Extract action rates from action_camera.json format.
+
+    Calculates actions-per-second by measuring time deltas between consecutive
+    action records. Each record represents one action frame.
 
     Args:
-        argv: Command-line arguments (defaults to sys.argv[1:]).
+        records: List of action records with 'timestamp' field.
 
     Returns:
-        Exit code: 0 for acceptable quality, 1 for low-quality, 2 for errors.
+        List of action rates (actions per second) calculated from time deltas.
+    """
+    if len(records) < 2:
+        raise ValueError("action_camera.json must contain at least 2 records to calculate action rates")
+
+    # Sort by timestamp to ensure correct order
+    sorted_records = sorted(records, key=lambda r: r.get("timestamp", 0))
+
+    action_rates = []
+    for i in range(1, len(sorted_records)):
+        prev_ts = sorted_records[i - 1].get("timestamp", 0)
+        curr_ts = sorted_records[i].get("timestamp", 0)
+        delta_t = curr_ts - prev_ts
+
+        if delta_t > 0:
+            # 1 action per delta_t seconds = actions per second
+            action_rates.append(1.0 / delta_t)
+
+    if not action_rates:
+        raise ValueError("Could not calculate action rates from action_camera.json")
+
+    return action_rates
+
+
+def main(argv: list[str] | None = None) -> int:
+    """
+    Main entry point for the actions-per-second quality test.
+
+    Args:
+        argv: Command line arguments (defaults to sys.argv).
+
+    Returns:
+        Exit code: 0 if quality is acceptable, 1 otherwise.
     """
     parser = argparse.ArgumentParser(
         description="Test median actions-per-second against PRD quality thresholds."
     )
     parser.add_argument(
         "-i", "--input",
-        type=Path,
         help="Input file containing action rates (JSON or text, one per line)",
+        type=Path
     )
     parser.add_argument(
         "-a", "--actions",
-        type=float,
         nargs="+",
-        help="Action rates directly on command line",
+        type=float,
+        help="Action rates directly on command line"
     )
     parser.add_argument(
         "-j", "--json-output",
         action="store_true",
-        help="Output results as JSON",
+        help="Output results as JSON"
     )
 
     args = parser.parse_args(argv)
 
-    try:
-        if args.input:
+    # Get action rates from input source
+    if args.input:
+        try:
             actions = load_actions_from_file(args.input)
-        elif args.actions:
-            actions = args.actions
-        else:
-            parser.error("Either --input or --actions must be provided")
-
-        if not actions:
-            print("Error: No action rates provided", file=sys.stderr)
+        except Exception as e:
+            if args.json_output:
+                print(json.dumps({"error": str(e)}))
+            else:
+                print(f"Error: {e}", file=sys.stderr)
             return 2
+    elif args.actions:
+        actions = args.actions
+    else:
+        parser.print_help()
+        return 1
 
+    # Analyze quality
+    try:
         result = analyze_capture_quality(actions)
-
+    except ValueError as e:
         if args.json_output:
-            print(json.dumps(result, indent=2))
+            print(json.dumps({"error": str(e)}))
         else:
-            print(f"Median APS: {result['median_actions_per_second']}")
-            print(f"Range: [{result['min_actions_per_second']}, {result['max_actions_per_second']}]")
-            print(f"Samples: {result['sample_count']}")
-            print(f"Quality: {result['quality_status']}")
-
-        return 0 if result["in_range"] else 1
-
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+            print(f"Error: {e}", file=sys.stderr)
         return 2
+
+    # Output results
+    if args.json_output:
+        print(json.dumps(result, indent=2))
+    else:
+        print(f"Median actions per second: {result['median_actions_per_second']}")
+        print(f"Range: [{result['min_actions_per_second']}, {result['max_actions_per_second']}]")
+        print(f"Sample count: {result['sample_count']}")
+        print(f"Quality status: {result['quality_status']}")
+
+        if not result['in_range']:
+            print(f"\nFAILED: Median {result['median_actions_per_second']} is outside acceptable range [{MIN_ACTIONS_PER_SECOND}, {MAX_ACTIONS_PER_SECOND}]")
+            return 1
+        else:
+            print(f"\nPASSED: Median {result['median_actions_per_second']} is within acceptable range")
+            return 0
+
+    return 0 if result['in_range'] else 1
 
 
 if __name__ == "__main__":
