@@ -49,11 +49,16 @@ def _heuristic_ocr(image) -> str:
     arr = np_mod.array(gray)
     h, w = arr.shape
     tokens: list[str] = []
+    center = arr[int(h * 0.3) : int(h * 0.7), :]
+    center_mean = float(np_mod.mean(center))
     for band, label in [
         (arr[: int(h * 0.08), :], "TOP_BAR"),
         (arr[int(h * 0.92):, :], "BOTTOM_BAR"),
     ]:
-        if float(np_mod.std(band)) < 15:
+        band_std = float(np_mod.std(band))
+        band_mean = float(np_mod.mean(band))
+        # Only flag as UI bar if it's uniform AND differs from center
+        if band_std < 15 and abs(band_mean - center_mean) > 20:
             tokens.append(label)
     edges_x = np_mod.abs(np_mod.diff(arr.astype(np_mod.float32), axis=1))
     if float(np_mod.mean(edges_x > 30)) > 0.12:
@@ -98,7 +103,7 @@ def _extract_frames(video_path: str, num_frames: int) -> Iterable:
     pattern = os.path.join(tmpdir, "frame_%04d.png")
     cmd = [
         "ffmpeg", "-y", "-i", video_path,
-        "-vf", "fps=1/10,scale=640:-1",
+        "-vf", "fps=1,scale=640:-1",
         "-frames:v", str(num_frames), "-q:v", "2", pattern,
     ]
     try:
