@@ -13,12 +13,23 @@ Exit codes:
 
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 from typing import List, Tuple
 
 import numpy as np
+
+
+def check_ffprobe_available() -> bool:
+    """
+    Check if ffprobe is available in the system PATH.
+    
+    Returns:
+        True if ffprobe is available, False otherwise.
+    """
+    return shutil.which("ffprobe") is not None
 
 
 def get_audio_packets(video_path: Path, stream_index: int) -> List[float]:
@@ -45,7 +56,14 @@ def get_audio_packets(video_path: Path, stream_index: int) -> List[float]:
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
-        raise RuntimeError(f"ffprobe failed: {result.stderr}")
+        # Provide detailed error information
+        error_msg = result.stderr.strip()
+        if not error_msg:
+            error_msg = "no error output"
+        raise RuntimeError(
+            f"ffprobe failed with code {result.returncode}: {error_msg}. "
+            f"Command: {' '.join(cmd)}"
+        )
 
     data = json.loads(result.stdout)
     timestamps = []
@@ -75,7 +93,14 @@ def get_audio_streams(video_path: Path) -> List[int]:
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
-        raise RuntimeError(f"ffprobe failed: {result.stderr}")
+        # Provide detailed error information
+        error_msg = result.stderr.strip()
+        if not error_msg:
+            error_msg = "no error output"
+        raise RuntimeError(
+            f"ffprobe failed with code {result.returncode}: {error_msg}. "
+            f"Command: {' '.join(cmd)}"
+        )
 
     data = json.loads(result.stdout)
     return [
@@ -113,17 +138,9 @@ def check_continuity(
 
 
 def main(argv: List[str] = None) -> int:
-    """
-    Main entry point for audio continuity test.
-
-    Args:
-        argv: Command-line arguments (defaults to sys.argv[1:]).
-
-    Returns:
-        Exit code: 0 for pass, 1 for gaps detected, 2 for error.
-    """
+    """CLI entry point."""
     parser = argparse.ArgumentParser(
-        description="Check video audio track continuity (no gaps > 50ms)."
+        description="Check audio continuity in video files."
     )
     parser.add_argument(
         "video", type=Path, help="Path to video file to analyze."
@@ -136,6 +153,15 @@ def main(argv: List[str] = None) -> int:
 
     if not args.video.exists():
         print(f"Error: File not found: {args.video}", file=sys.stderr)
+        return 2
+
+    # Check if ffprobe is available
+    if not check_ffprobe_available():
+        print(
+            "Error: ffprobe not found in PATH. "
+            "Please install ffmpeg/ffprobe to run this test.",
+            file=sys.stderr
+        )
         return 2
 
     try:
