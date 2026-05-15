@@ -168,6 +168,15 @@ class TestInferBatch:
 
     def test_infer_batch_skips_when_torch_missing(self, monkeypatch, tmp_path):
         """Test that missing torch raises RuntimeError."""
+        try:
+            import torch
+        except ImportError:
+            pass
+        else:
+            pytest.skip(
+                "Cannot test missing torch scenario when torch is installed (triton conflict)"
+            )
+
         sys.path.insert(0, str(Path(__file__).parent.parent.parent / "bin"))
 
         rgb_dir = tmp_path / "rgb"
@@ -297,6 +306,15 @@ class TestLazyLoad:
 
     def test_lazy_load_missing_torch(self, monkeypatch):
         """Test that lazy_load_depth_pipeline raises error when torch missing."""
+        try:
+            import torch
+        except ImportError:
+            pass
+        else:
+            pytest.skip(
+                "Cannot test missing torch scenario when torch is installed (triton conflict)"
+            )
+
         sys.path.insert(0, str(Path(__file__).parent.parent.parent / "bin"))
 
         # Remove torch from modules
