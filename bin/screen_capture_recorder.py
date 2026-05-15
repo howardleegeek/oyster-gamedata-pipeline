@@ -13,11 +13,13 @@ except ImportError:
 
 try:
     import imageio.v3 as iio
+    import imageio.v2 as iio_v2
 
     _IMAGEIO_AVAILABLE = True
 except ImportError:
     _IMAGEIO_AVAILABLE = False
     iio = None
+    iio_v2 = None
 
 
 def record_screen_region(
@@ -45,6 +47,9 @@ def record_screen_region(
                       or if any frame capture fails.
         ImportError: if mss / imageio not installed.
     """
+    if not _IMAGEIO_AVAILABLE:
+        raise ImportError("imageio library required for video encoding")
+
     if duration_sec <= 0:
         raise ValueError("duration_sec must be positive")
 
@@ -109,7 +114,6 @@ def record_screen_region(
     # to use stable v2 get_writer(). Also fixes: (a) writer.write_frame
     # → append_data (v2 method), (b) typo `hasattr('writer', 'writer')`
     # which never closed the writer. Now writer always closes via finally.
-    import imageio.v2 as iio_v2  # noqa: PLC0415
     import numpy as np  # noqa: PLC0415
 
     writer = iio_v2.get_writer(
