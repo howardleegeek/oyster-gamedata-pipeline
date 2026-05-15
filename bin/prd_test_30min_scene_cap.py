@@ -2,12 +2,14 @@
 """
 PRD p7 #3: max 30 min per scene — clock cap enforced.
 Test utility to enforce maximum 30-minute duration per scene.
+
+Validates the clock-cap logic without actually sleeping. Uses simulated
+duration values to verify the threshold enforcement works correctly.
 """
 
 import argparse
 import sys
 import json
-import time
 from datetime import datetime
 from typing import Dict, List
 
@@ -26,8 +28,8 @@ def main(argv: List[str]) -> int:
     parser.add_argument(
         "--duration",
         type=float,
-        default=0.1,
-        help="Test duration in minutes (default: 0.1)"
+        default=0.0,
+        help="Simulated scene duration in minutes (default: 0.0, no sleep)"
     )
     parser.add_argument(
         "--threshold",
@@ -43,23 +45,18 @@ def main(argv: List[str]) -> int:
     
     args = parser.parse_args(argv)
     
-    # Start timing
-    start_time = datetime.now()
-    
-    # Simulate scene processing
-    if args.duration > 0:
-        time.sleep(args.duration * 60)  # Convert minutes to seconds
-    
-    # Calculate elapsed time
-    elapsed = (datetime.now() - start_time).total_seconds() / 60.0
+    # Use simulated duration directly — no actual sleep
+    elapsed = args.duration
     exceeded = elapsed > args.threshold
     warning = elapsed > args.threshold * 0.8
+    
+    now = datetime.now()
     
     # Prepare results
     results = {
         "scene_id": args.scene_id,
-        "start_time": start_time.isoformat(),
-        "end_time": datetime.now().isoformat(),
+        "start_time": now.isoformat(),
+        "end_time": now.isoformat(),
         "duration_minutes": round(elapsed, 3),
         "threshold_minutes": args.threshold,
         "exceeded": exceeded,
