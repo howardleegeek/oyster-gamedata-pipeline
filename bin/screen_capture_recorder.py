@@ -1,9 +1,9 @@
-import time
-import threading
 import queue
+import sys
+import threading
+import time
 from pathlib import Path
 from typing import Optional, Tuple
-import sys
 
 try:
     import mss
@@ -13,8 +13,11 @@ except ImportError:
 
 try:
     import imageio.v3 as iio
+
+    _IMAGEIO_AVAILABLE = True
 except ImportError:
-    raise ImportError("imageio library required for video encoding")
+    _IMAGEIO_AVAILABLE = False
+    iio = None
 
 
 def record_screen_region(
@@ -172,6 +175,7 @@ def record_screen_region(
     # stamp fails, the video itself is still real, just D5 will mark UNKNOWN.
     try:
         from bin.stamp_real_metadata import stamp_video  # noqa: PLC0415
+
         stamp_video(output_path, recorder_version="screen-capture-recorder-v1")
     except Exception:
         pass  # non-fatal
