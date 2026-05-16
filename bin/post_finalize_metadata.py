@@ -41,13 +41,23 @@ def file_sha256(path: Path, chunk_size: int = 1 << 20) -> str:
 def collect_files(session: Path) -> list[Path]:
     """All files in session_dir, sorted, excluding metadata.json + MANIFEST.json
     themselves (they're outputs of THIS script — including them would create
-    a circular dependency)."""
+    a circular dependency).
+
+    Bug-fix 2026-05-15: compare against POSIX relpath (not basename) so a nested
+    ``depth/metadata.json`` is NOT silently excluded — only the top-level outputs
+    of this script are. .DS_Store and .bak suffix matches stay basename-based
+    (those should be excluded anywhere in the tree).
+    """
+    self_outputs = {"metadata.json", "MANIFEST.json"}
     out = []
     for p in sorted(session.rglob("*")):
         if not p.is_file():
             continue
         rel = p.relative_to(session)
-        if rel.name in ("metadata.json", "MANIFEST.json", ".DS_Store"):
+        rel_posix = rel.as_posix()
+        if rel_posix in self_outputs:  # only TOP-LEVEL metadata/MANIFEST excluded
+            continue
+        if rel.name == ".DS_Store":  # anywhere in tree
             continue
         if rel.name.endswith(".bak"):  # heal-tool backups don't count
             continue
@@ -67,19 +77,44 @@ def write_metadata(session: Path) -> dict:
         except (json.JSONDecodeError, OSError):
             existing = {}
 
-    # Reasonable defaults; env vars override
-    session_id = existing.get("session_id") or os.environ.get("OYSTER_SESSION_ID") or str(uuid.uuid4())
-    device_id = os.environ.get("OYSTER_DEVICE_ID") or socket.gethostname()
-    location = os.environ.get("OYSTER_LOCATION") or "unspecified"
+    # Reasonable defaults; env vars override.
+    # Bug-fix 2026-05-15: use ``_first_nonempty`` instead of ``a or b or c`` so
+    # an *empty string* in existing metadata doesn't silently fall through to
+    # a fresh UUID — that breaks the idempotency contract (re-running this
+    # script must produce the same session_id when the prior write succeeded).
+    def _first_nonempty(*vals: object) -> object:
+        for v in vals:
+            if v is not None and v != "":
+                return v
+        return None
+
+    session_id = _first_nonempty(
+        existing.get("session_id"),
+        os.environ.get("OYSTER_SESSION_ID"),
+    ) or str(uuid.uuid4())
+    device_id = _first_nonempty(
+        os.environ.get("OYSTER_DEVICE_ID"),
+        socket.gethostname(),
+    ) or "unknown"
+    location = _first_nonempty(
+        os.environ.get("OYSTER_LOCATION"),
+    ) or "unspecified"
+    recording_started_utc = _first_nonempty(
+        existing.get("recording_started_utc"),
+    ) or now_utc.isoformat()
+    recorder_version = _first_nonempty(
+        os.environ.get("OYSTER_RECORDER_VERSION"),
+        existing.get("recorder_version"),
+    ) or "unknown"
 
     meta = {
         "schema_version": 1,
         "session_id": session_id,                  # M2: UUID4 unique cross-machine
         "device_id": device_id,                    # RBGA C1
         "location": location,                      # RBGA C1
-        "recording_started_utc": existing.get("recording_started_utc") or now_utc.isoformat(),
+        "recording_started_utc": recording_started_utc,
         "metadata_written_utc": now_utc.isoformat(),  # M3: UTC timestamps
-        "recorder_version": os.environ.get("OYSTER_RECORDER_VERSION") or existing.get("recorder_version") or "unknown",
+        "recorder_version": recorder_version,
         "platform": {
             "os": platform.system(),
             "release": platform.release(),

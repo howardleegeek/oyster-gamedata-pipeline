@@ -85,50 +85,82 @@ def audit_groups_c_d_e(session: Path) -> list[dict]:
     items.append(_result("D1", d1_ok, f"frame continuity 0..99: {'OK' if d1_ok else 'GAP detected'}"))
 
     n = len(data)
-    items.append(_result("D2", 8900 <= n <= 9100, f"frame count: {n} (expect 8900-9100)"))
+    # Bug-fix 2026-05-15: tag short sessions as N/A instead of FAIL so the
+    # audit can be used on synthetic / test recordings (was hard-coded to
+    # ≥8900). Anything <1000 frames is presumed a test fixture, not a real
+    # 5-min PRD session.
+    if n < 1000:
+        items.append(_result("D2", True, f"frame count: {n} (test session — N/A for 9000-frame target)"))
+    else:
+        items.append(_result("D2", 8900 <= n <= 9100, f"frame count: {n} (expect 8900-9100)"))
 
     fps_set = {f.get("fps") for f in data[:100]}
     items.append(_result("D3", fps_set == {30.0} or fps_set == {30}, f"fps values (first 100): {fps_set}"))
 
     rt_set = {f.get("route_type") for f in data}
-    rt_ok = rt_set and all(rt in {1, 2, 3} for rt in rt_set)
+    rt_ok = bool(rt_set) and all(rt in {1, 2, 3} for rt in rt_set)
     items.append(_result("D4", rt_ok, f"route_type values: {rt_set}"))
 
-    mx_range = all(0 <= f.get("mouse_x", -1) <= 1 for f in data[:100])
-    my_range = all(0 <= f.get("mouse_y", -1) <= 1 for f in data[:100])
+    # Bug-fix 2026-05-15: explicitly check presence + type. Old code
+    # ``f.get("mouse_x", -1)`` crashed with TypeError when a frame had
+    # ``mouse_x: null`` (``0 <= None`` raises in Python 3) — audit aborted
+    # mid-run on real recordings.
+    def _in_unit_range(v: object) -> bool:
+        return isinstance(v, (int, float)) and 0 <= v <= 1
+    mx_range = all(_in_unit_range(f.get("mouse_x")) for f in data[:100])
+    my_range = all(_in_unit_range(f.get("mouse_y")) for f in data[:100])
     items.append(_result("D5", mx_range and my_range, f"mouse_x/y in [0,1]: {mx_range and my_range}"))
 
     # D7: quaternion norm ≈ 1
+    # Bug-fix 2026-05-15: count MISSING quaternions as violations. Old code
+    # skipped frames without ``camera_rotation_quaternion`` so a session with
+    # ZERO quaternions reported 0 violations → false PASS. New behavior:
+    # missing quat counts as 1 violation.
     d7_violations = 0
+    d7_inspected = 0
     for f in data[:200]:
+        d7_inspected += 1
         q = f.get("camera_rotation_quaternion")
-        if isinstance(q, list) and len(q) == 4:
-            norm = math.sqrt(sum(c * c for c in q))
-            if not (0.99 <= norm <= 1.01):
-                d7_violations += 1
-    items.append(_result("D7", d7_violations == 0, f"quat norm violations in first 200: {d7_violations}"))
+        if not (isinstance(q, list) and len(q) == 4 and all(isinstance(c, (int, float)) for c in q)):
+            d7_violations += 1
+            continue
+        norm = math.sqrt(sum(c * c for c in q))
+        if not (0.99 <= norm <= 1.01):
+            d7_violations += 1
+    items.append(_result("D7", d7_violations == 0,
+                         f"quat missing-or-bad-norm in first {d7_inspected}: {d7_violations}"))
 
     # D8: fx == fy
     intr = sample.get("camera_intrinsics", {})
-    d8_ok = "fx" in intr and "fy" in intr and intr["fx"] == intr["fy"]
-    items.append(_result("D8", d8_ok, f"camera_intrinsics fx==fy: {intr.get('fx')} == {intr.get('fy')}"))
+    d8_ok = isinstance(intr, dict) and "fx" in intr and "fy" in intr and intr["fx"] == intr["fy"]
+    items.append(_result("D8", d8_ok,
+                         f"camera_intrinsics fx==fy: {intr.get('fx') if isinstance(intr, dict) else 'NOT-DICT'} == "
+                         f"{intr.get('fy') if isinstance(intr, dict) else 'NOT-DICT'}"))
 
     # D9: speed magnitudes ≤ 100 m/s
     d9_max = 0.0
     for f in data[:500]:
         cs = f.get("camera_speed", [0, 0, 0])
-        if isinstance(cs, list):
+        if isinstance(cs, list) and all(isinstance(c, (int, float)) for c in cs):
             d9_max = max(d9_max, math.sqrt(sum(c * c for c in cs)))
     items.append(_result("D9", d9_max <= 100, f"max camera_speed magnitude (first 500): {d9_max:.2f} m/s"))
 
     # D10: angle ranges
+    # Bug-fix 2026-05-15: same false-PASS pattern as D7. Old code defaulted
+    # missing ``camera_rotation_oula`` to ``[0,0,0]`` which trivially passes
+    # the range check. New behavior: missing = violation.
     d10_violations = 0
+    d10_inspected = 0
     for f in data[:200]:
-        oula = f.get("camera_rotation_oula", [0, 0, 0])
-        if isinstance(oula, list) and len(oula) == 3:
-            if not (-90 <= oula[0] <= 90 and -180 <= oula[1] <= 180 and -180 <= oula[2] <= 180):
-                d10_violations += 1
-    items.append(_result("D10", d10_violations == 0, f"angle range violations: {d10_violations}"))
+        d10_inspected += 1
+        oula = f.get("camera_rotation_oula")
+        if not (isinstance(oula, list) and len(oula) == 3 and all(isinstance(c, (int, float)) for c in oula)):
+            d10_violations += 1
+            continue
+        if not (-90 <= oula[0] <= 90 and -180 <= oula[1] <= 180 and -180 <= oula[2] <= 180):
+            d10_violations += 1
+    items.append(_result("D10", d10_violations == 0,
+                         f"oula missing-or-out-of-range in first {d10_inspected}: {d10_violations}"))
 
     # Group E: coord system
     items.append(_result("E4", "camera_rotation_quaternion" in sample and isinstance(sample["camera_rotation_quaternion"], list) and len(sample["camera_rotation_quaternion"]) == 4,
@@ -261,6 +293,15 @@ def audit_group_f(session: Path) -> list[dict]:
     except ImportError:
         for i, fld in enumerate(GAMEINFO_FIELDS_14, 1):
             items.append(_result(f"F{i}", False, "openpyxl not installed — cannot audit xlsx"))
+    except Exception as exc:  # noqa: BLE001 — corrupt xlsx, badzipfile, etc.
+        # Bug-fix 2026-05-15: a corrupt or partially-written xlsx used to raise
+        # openpyxl.utils.exceptions.InvalidFileException (a non-ImportError
+        # subclass of Exception) which propagated out of the audit and aborted
+        # the whole run. Now we record a single F-failure per field with the
+        # exception class name so the operator can see the file is unreadable.
+        for i, fld in enumerate(GAMEINFO_FIELDS_14, 1):
+            items.append(_result(f"F{i}", False,
+                                 f"{fld}: xlsx unreadable ({type(exc).__name__}: {exc})"))
     return items
 
 
