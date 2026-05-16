@@ -922,10 +922,21 @@ def extract_audio_flac(session_dir: Path, verbose: bool = False) -> bool:
     embedded in mp4) so buyer-side QC + model training can ingest audio
     without re-muxing the entire video.
 
-    Idempotent: skip if audio.flac already exists and is non-empty. No-ops
-    if recording.mp4 is missing. Returns True on success / skip; False on
-    real failure. Bug-fix vs. prior absence: this step was 0% implemented
-    until 2026-05-15; closes MECE U2 / RBGA-B2.
+    Idempotent: skip if audio.flac already exists and is non-empty.
+
+    Return contract:
+      * True  — audio.flac is on disk and non-empty (either we just wrote
+                it OR a prior run did and we skipped)
+      * False — extraction failed, OR recording.mp4 is missing so there's
+                nothing to extract from. From the audit's perspective
+                "missing audio.flac" is the only thing that matters, and
+                both cases produce that state.
+
+    Bug-fix 2026-05-16 (autoresearch finding): clarified return semantics
+    — prior docstring said "True on success/skip" but missing mp4 returned
+    False, which is "neither success nor skip". Treating missing-mp4 as a
+    failure mode is correct (you can't extract from nothing), so the code
+    is right; only the docstring needed to spell out both False cases.
     """
     out = session_dir / "audio.flac"
     if out.exists() and out.stat().st_size > 0:
@@ -936,7 +947,7 @@ def extract_audio_flac(session_dir: Path, verbose: bool = False) -> bool:
     mp4 = session_dir / "recording.mp4"
     if not mp4.exists():
         if verbose:
-            print("  recording.mp4 missing — skip audio.flac extract")
+            print("  recording.mp4 missing — cannot extract audio.flac (returning False)")
         return False
 
     # -vn: no video.  -c:a flac: re-encode to lossless flac.
