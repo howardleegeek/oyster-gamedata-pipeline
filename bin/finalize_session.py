@@ -435,6 +435,108 @@ def backfill_action_camera(session_dir: Path, verbose: bool = False) -> int:
     return patched
 
 
+def compute_mouse_look_vector(session_dir: Path, verbose: bool = False) -> int:
+    """MECE A24 / RBGA-A6 — replace screen-cursor mouse_x/y with cumulative
+    look-vector normalized to [0,1].
+
+    In Minecraft the cursor is locked to screen center, so raw mouse_x/y
+    coordinates are useless for ML (all ~0.5). What matters is camera
+    direction. We accumulate mouse_dx/dy deltas with Minecraft default
+    sensitivity (0.15° per count), wrap yaw to [0,360), clamp pitch to
+    [-90, 90], then normalize:
+
+        mouse_x = (yaw_deg mod 360) / 360        # [0,1] wraps cleanly
+        mouse_y = (pitch_deg + 90) / 180         # 0 = looking straight down, 1 = up
+
+    Idempotent: looks for sentinel ``look_vector_applied: true`` at root of
+    action_camera.json (or first frame's marker). Re-running is a no-op.
+
+    Returns count of frames rewritten. Backs original up to .bak first.
+    """
+    ac_path = session_dir / "action_camera.json"
+    if not ac_path.exists():
+        if verbose:
+            print("  action_camera.json missing — skip look-vector")
+        return 0
+
+    try:
+        data = json.loads(ac_path.read_text())
+    except json.JSONDecodeError as e:
+        if verbose:
+            print(f"  action_camera.json parse error: {e}")
+        return 0
+
+    if isinstance(data, dict) and "frames" in data:
+        frames = data["frames"]
+        is_wrapped = True
+        if data.get("look_vector_applied"):
+            if verbose:
+                print("  look-vector already applied — skip (idempotent)")
+            return 0
+    elif isinstance(data, list):
+        frames = data
+        is_wrapped = False
+        if frames and isinstance(frames[0], dict) and frames[0].get("_look_vector_applied"):
+            if verbose:
+                print("  look-vector already applied — skip (idempotent)")
+            return 0
+    else:
+        if verbose:
+            print("  action_camera.json unexpected structure — skip look-vector")
+        return 0
+
+    if not frames:
+        return 0
+
+    # Backup before rewriting (matches heal-tool convention).
+    bak = ac_path.with_suffix(".json.bak")
+    if not bak.exists():
+        bak.write_text(ac_path.read_text())
+
+    # Minecraft default mouse sensitivity in degrees per raw mouse count.
+    # 0.15 is the empirical mid-slider value; sensitivity setting scales
+    # this 1×–4×. Without the operator's exact slider we use the default.
+    MC_DEG_PER_COUNT = 0.15
+
+    yaw_deg = 0.0
+    pitch_deg = 0.0
+    rewritten = 0
+    for f in frames:
+        if not isinstance(f, dict):
+            continue
+        dx = f.get("mouse_dx")
+        dy = f.get("mouse_dy")
+        if isinstance(dx, (int, float)):
+            yaw_deg += float(dx) * MC_DEG_PER_COUNT
+        if isinstance(dy, (int, float)):
+            # MC convention: positive dy means looking down (mouse moved
+            # forward physically = camera tilts up in some games but DOWN
+            # in MC's stock camera). Sign matches the PRD coord doc.
+            pitch_deg += float(dy) * MC_DEG_PER_COUNT
+            if pitch_deg > 90.0:
+                pitch_deg = 90.0
+            elif pitch_deg < -90.0:
+                pitch_deg = -90.0
+        yaw_wrapped = yaw_deg % 360.0
+        if yaw_wrapped < 0:
+            yaw_wrapped += 360.0
+        f["mouse_x"] = yaw_wrapped / 360.0
+        f["mouse_y"] = (pitch_deg + 90.0) / 180.0
+        rewritten += 1
+
+    # Idempotency sentinel: drop on list-form first frame OR dict-form root.
+    if is_wrapped:
+        data["look_vector_applied"] = True
+    elif frames:
+        frames[0]["_look_vector_applied"] = True
+
+    ac_path.write_text(json.dumps(data, indent=2))
+    if verbose:
+        print(f"  look-vector applied to {rewritten} frames (final yaw={yaw_deg:.1f}° "
+              f"pitch={pitch_deg:.1f}°), backup at {bak.name}")
+    return rewritten
+
+
 # ---------------------------------------------------------------------------
 # Step 3 — generate gameinfo.xlsx
 # ---------------------------------------------------------------------------
@@ -918,6 +1020,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     print("\n[2/6] Backfilling action_camera.json (quaternion + position)...")
     backfilled = backfill_action_camera(sd, verbose=args.verbose)
+    # MECE A24 / RBGA-A6 — replace screen-cursor mouse_x/y with cumulative
+    # look-vector accumulated from mouse_dx/dy. Idempotent.
+    look_rewritten = compute_mouse_look_vector(sd, verbose=args.verbose)
 
     print("\n[3/6] Generating gameinfo.xlsx...")
     gi_ok = generate_gameinfo(sd, args.repo_root, verbose=args.verbose)
