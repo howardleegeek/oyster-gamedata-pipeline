@@ -82,6 +82,12 @@ class SimpleToolProvider:
             self.register(t)
 
     def register(self, tool: Tool) -> None:
+        """Register a tool, overwriting any existing tool with the same name.
+
+        Args:
+            tool: The Tool instance to register. Its `name` attribute is used
+                as the key for lookup and deduplication.
+        """
         self._tools[tool.name] = tool
 
     def list_tools(self) -> list[Tool]:
