@@ -630,6 +630,57 @@ def generate_audio_check(session_dir: Path, verbose: bool = False) -> bool:
         return False
 
 
+def extract_audio_flac(session_dir: Path, verbose: bool = False) -> bool:
+    """MECE U2 — extract recording.mp4 audio track to a separate audio.flac.
+
+    PRD §3 / RBGA-B2 wants audio available as an independent file (not just
+    embedded in mp4) so buyer-side QC + model training can ingest audio
+    without re-muxing the entire video.
+
+    Idempotent: skip if audio.flac already exists and is non-empty. No-ops
+    if recording.mp4 is missing. Returns True on success / skip; False on
+    real failure. Bug-fix vs. prior absence: this step was 0% implemented
+    until 2026-05-15; closes MECE U2 / RBGA-B2.
+    """
+    out = session_dir / "audio.flac"
+    if out.exists() and out.stat().st_size > 0:
+        if verbose:
+            print(f"  audio.flac already present ({out.stat().st_size} bytes) — skip")
+        return True
+
+    mp4 = session_dir / "recording.mp4"
+    if not mp4.exists():
+        if verbose:
+            print("  recording.mp4 missing — skip audio.flac extract")
+        return False
+
+    # -vn: no video.  -c:a flac: re-encode to lossless flac.
+    # -compression_level 5 is ffmpeg default; keeps extract under ~30 sec
+    # on a 5-min recording. We do NOT use -c:a copy because mp4 carries
+    # AAC and the wire format we want IS flac (lossless).
+    try:
+        r = subprocess.run(
+            ["ffmpeg", "-y", "-v", "error", "-i", str(mp4),
+             "-vn", "-c:a", "flac", "-compression_level", "5", str(out)],
+            capture_output=True, text=True, timeout=120
+        )
+        ok = r.returncode == 0 and out.exists() and out.stat().st_size > 0
+        if verbose:
+            size_mb = out.stat().st_size / 1e6 if out.exists() else 0
+            print(f"  audio.flac: exit={r.returncode}  size={size_mb:.1f}MB")
+            if not ok and r.stderr.strip():
+                print(f"    stderr: {r.stderr.strip()[:200]}")
+        return ok
+    except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+        if verbose:
+            print(f"  ffmpeg unavailable or timed out: {e}")
+        return False
+    except Exception as e:
+        if verbose:
+            print(f"  extract_audio_flac exception: {e}")
+        return False
+
+
 # ---------------------------------------------------------------------------
 # Step 6 — generate input_latency.json (post-hoc estimation)
 # ---------------------------------------------------------------------------
@@ -886,8 +937,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         if not depth_ok:
             print("  WARN depth EXR generation failed — lint #15, #16, #24 will FAIL")
 
-    print("\n[5/6] Generating audio_check.json...")
+    print("\n[5/6] Generating audio_check.json + audio.flac (MECE U2)...")
     ac_ok = generate_audio_check(sd, verbose=args.verbose)
+    # MECE U2 / RBGA-B2 — extract audio track as standalone flac.
+    flac_ok = extract_audio_flac(sd, verbose=args.verbose)
+    if not flac_ok:
+        print("  WARN audio.flac extract failed — MECE U2 will FAIL")
 
     # Step 6: input latency measurement (post-hoc from inputs.jsonl + frames.jsonl)
     skip_latency_env = os.environ.get("OYSTER_SKIP_LATENCY_MEASUREMENT") == "1"
