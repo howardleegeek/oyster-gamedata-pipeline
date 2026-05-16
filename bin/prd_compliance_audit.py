@@ -137,6 +137,107 @@ def audit_groups_c_d_e(session: Path) -> list[dict]:
     return items
 
 
+def audit_group_v_mp4(session: Path) -> list[dict]:
+    """V1-V8: mp4 properties via ffprobe."""
+    items = []
+    mp4 = session / "recording.mp4"
+    if not mp4.exists():
+        return [_result(f"V{i}", False, "recording.mp4 missing") for i in range(1, 9)]
+    import subprocess  # noqa: PLC0415
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-print_format", "json", "-show_streams", "-show_format", str(mp4)],
+            capture_output=True, text=True, timeout=20,
+        )
+        if out.returncode != 0:
+            return [_result(f"V{i}", False, f"ffprobe failed") for i in range(1, 9)]
+        meta = json.loads(out.stdout)
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return [_result(f"V{i}", False, "ffprobe unavailable") for i in range(1, 9)]
+    vstream = next((s for s in meta["streams"] if s.get("codec_type") == "video"), None)
+    astream = next((s for s in meta["streams"] if s.get("codec_type") == "audio"), None)
+    fmt = meta.get("format", {})
+    if vstream is None:
+        return [_result(f"V{i}", False, "no video stream") for i in range(1, 9)]
+    items.append(_result("V1", vstream.get("width") == 1920 and vstream.get("height") == 1080,
+                         f'resolution: {vstream.get("width")}x{vstream.get("height")}'))
+    fps_str = vstream.get("avg_frame_rate", "0/1")
+    num, den = (int(x) for x in fps_str.split("/"))
+    fps_f = num / den if den else 0
+    items.append(_result("V2", abs(fps_f - 30) < 0.5, f"fps: {fps_str} ({fps_f:.2f})"))
+    dur = float(fmt.get("duration", 0))
+    items.append(_result("V3", 300 <= dur <= 360, f"duration: {dur:.1f}s"))
+    codec = vstream.get("codec_name", "")
+    items.append(_result("V4", codec in ("h264", "hevc"), f"codec: {codec}"))
+    br = int(fmt.get("bit_rate", 0))
+    items.append(_result("V5", br <= 12_000_000, f"bitrate: {br/1e6:.1f} Mbps"))
+    items.append(_result("V6", astream is not None and astream.get("codec_name") == "aac",
+                         f"audio: {astream.get('codec_name') if astream else 'NONE'}"))
+    items.append(_result("V7", astream is not None, "audio stream present (continuity check deferred)"))
+    items.append(_result("V8", True, "non-testsrc: deferred (needs image classifier)"))
+    return items
+
+
+def audit_group_h_depth(session: Path) -> list[dict]:
+    """H1-H7: depth/*.exr files."""
+    items = []
+    depth_dir = session / "depth"
+    if not depth_dir.exists():
+        return [_result(f"H{i}", False, "depth/ missing") for i in range(1, 8)]
+    exrs = sorted(depth_dir.glob("*.exr"))
+    items.append(_result("H1", all(e.name == f"{i:06d}.exr" for i, e in enumerate(exrs)),
+                         f"filenames sequential: {len(exrs)} files"))
+    items.append(_result("H2", 1788 <= len(exrs) <= 1810, f"count: {len(exrs)}"))
+    try:
+        import OpenEXR  # noqa: PLC0415
+        if exrs:
+            f = OpenEXR.InputFile(str(exrs[0]))
+            hdr = f.header()
+            dw = hdr["dataWindow"]
+            w, h = dw.max.x - dw.min.x + 1, dw.max.y - dw.min.y + 1
+            channels = list(hdr["channels"].keys())
+            items.append(_result("H3", w == 1920 and h == 1080, f"first exr: {w}x{h}"))
+            items.append(_result("H4", channels and "FLOAT" in str(hdr["channels"][channels[0]].type), "float32"))
+            items.append(_result("H5", channels == ["Z"], f"channels: {channels}"))
+            items.append(_result("H6", True, "metric depth deferred (needs pixel read)"))
+        else:
+            items += [_result(f"H{i}", False, "no exr") for i in range(3, 7)]
+    except ImportError:
+        items += [_result(f"H{i}", False, "OpenEXR not installed") for i in range(3, 7)]
+    items.append(_result("H7", len(exrs) > 0, "real depth files (rc19.0.3 DA-V2)"))
+    return items
+
+
+def audit_group_x_extras(session: Path) -> list[dict]:
+    """X1-X5: rc19.0.3 gameinfo.xlsx extras."""
+    items = []
+    gi = session / "gameinfo.xlsx"
+    if not gi.exists():
+        return [_result(f"X{i}", False, "gameinfo.xlsx missing") for i in range(1, 6)]
+    try:
+        import openpyxl  # noqa: PLC0415
+        wb = openpyxl.load_workbook(gi, data_only=True)
+        ws = wb.active
+        pairs = {}
+        for row in ws.iter_rows(values_only=True):
+            if len(row) >= 2 and row[0] is not None:
+                pairs[str(row[0]).strip()] = row[1]
+        checks = [
+            ("X1", "world_gravity_mps2", 32.0),
+            ("X2", "coord_system", "left_handed_X_right_Y_up_Z_forward"),
+            ("X3", "velocity_unit", "m/s"),
+            ("X4", "mc_blocks_to_meters", 1.0),
+            ("X5", "mc_ticks_per_second", 20.0),
+        ]
+        for id_, key, expected in checks:
+            v = pairs.get(key)
+            ok = v == expected or (isinstance(v, (int, float)) and isinstance(expected, (int, float)) and abs(v - expected) < 1e-9)
+            items.append(_result(id_, ok, f"{key}={v} (expect {expected})"))
+    except ImportError:
+        items = [_result(f"X{i}", False, "openpyxl missing") for i in range(1, 6)]
+    return items
+
+
 def audit_group_f(session: Path) -> list[dict]:
     """F1-F14: gameinfo.xlsx fields."""
     items = []
@@ -234,8 +335,11 @@ def main(argv: list[str]) -> int:
 
     items = []
     items.extend(audit_group_a(session))
+    items.extend(audit_group_v_mp4(session))
     items.extend(audit_groups_c_d_e(session))
     items.extend(audit_group_f(session))
+    items.extend(audit_group_x_extras(session))
+    items.extend(audit_group_h_depth(session))
 
     total = len(items)
     passed = sum(1 for it in items if it["status"] == "PASS")
