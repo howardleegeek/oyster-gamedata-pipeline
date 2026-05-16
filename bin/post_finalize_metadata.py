@@ -26,6 +26,56 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
+def _detect_recorder_version(session: Path) -> str | None:
+    """MECE M5 — detect recorder version from Cargo.toml.
+
+    Tries (in priority):
+      1. ``<session>/recorder_version.txt`` — recorder may drop this at session start
+      2. ``vendor/recorder/Cargo.toml`` (pipeline vendored copy)
+      3. Walk up from ``__file__`` to find any Cargo.toml with a [package] version
+    Returns None on total failure (caller falls back to env or "unknown").
+    """
+    # 1. recorder-dropped sentinel
+    rv_file = session / "recorder_version.txt"
+    if rv_file.is_file():
+        try:
+            v = rv_file.read_text(encoding="utf-8").strip()
+            if v:
+                return v
+        except OSError:
+            pass
+    # 2. vendor/recorder/Cargo.toml — typical pipeline layout
+    candidates = [
+        Path(__file__).resolve().parent.parent / "vendor" / "recorder" / "Cargo.toml",
+        Path(__file__).resolve().parent.parent.parent / "gamedata-recorder" / "Cargo.toml",
+    ]
+    # Scan top-level [package] and [workspace.package] sections for a literal
+    # ``version = "X.Y.Z"`` line. We pin to those exact section headers so we
+    # don't accidentally pick up a dependency's version (deps live under
+    # [dependencies] and [target.*.dependencies], NOT under *.package).
+    target_sections = {"[package]", "[workspace.package]"}
+    for cargo in candidates:
+        if not cargo.is_file():
+            continue
+        try:
+            in_target = False
+            for line in cargo.read_text(encoding="utf-8").splitlines():
+                s = line.strip()
+                if s.startswith("[") and s.endswith("]"):
+                    in_target = s in target_sections
+                    continue
+                if not in_target:
+                    continue
+                if s.startswith("version") and "=" in s:
+                    val = s.split("=", 1)[1].strip().strip('"').strip("'")
+                    # Skip ``version.workspace = true`` and ``version = { ... }``
+                    if val and not val.startswith("{") and val != "true":
+                        return val
+        except OSError:
+            continue
+    return None
+
+
 def file_sha256(path: Path, chunk_size: int = 1 << 20) -> str:
     """Stream sha256 of one file (handles 1 GB mp4 without loading into RAM)."""
     h = hashlib.sha256()
@@ -105,6 +155,7 @@ def write_metadata(session: Path) -> dict:
     recorder_version = _first_nonempty(
         os.environ.get("OYSTER_RECORDER_VERSION"),
         existing.get("recorder_version"),
+        _detect_recorder_version(session),  # MECE M5 — Cargo.toml auto-detect
     ) or "unknown"
 
     meta = {
