@@ -305,6 +305,106 @@ def audit_group_f(session: Path) -> list[dict]:
     return items
 
 
+def audit_group_m_metadata(session: Path) -> list[dict]:
+    """M1-M5: metadata.json content checks + MANIFEST.json (closes M-group gap)."""
+    items = []
+    mpath = session / "metadata.json"
+    if not mpath.exists():
+        return [_result(f"M{i}", False, "metadata.json missing") for i in range(1, 5)] + \
+               [_result("F8-manifest", False, "MANIFEST.json check skipped (no metadata)")]
+    try:
+        meta = json.loads(mpath.read_text())
+    except (json.JSONDecodeError, OSError) as e:
+        return [_result(f"M{i}", False, f"metadata.json parse error: {e}") for i in range(1, 5)]
+
+    # M1: session_id present + UUID4 shape
+    sid = meta.get("session_id", "")
+    import re  # noqa: PLC0415
+    uuid4_re = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+    items.append(_result("M1", bool(uuid4_re.match(sid)), f"session_id={sid[:12]}... uuid4={bool(uuid4_re.match(sid))}"))
+    # M2: device_id non-empty + non-sentinel
+    did = meta.get("device_id", "")
+    items.append(_result("M2", bool(did) and did != "unknown", f"device_id={did!r}"))
+    # M3: UTC timestamps (ends with +00:00 or Z)
+    rec_started = meta.get("recording_started_utc", "") or ""
+    written = meta.get("metadata_written_utc", "") or ""
+    utc_ok = (rec_started.endswith("+00:00") or rec_started.endswith("Z")) and \
+             (written.endswith("+00:00") or written.endswith("Z"))
+    items.append(_result("M3", utc_ok, f"UTC timestamps: started={rec_started[-6:]!r} written={written[-6:]!r}"))
+    # M5: recorder_version present + not "unknown"
+    rv = meta.get("recorder_version", "")
+    items.append(_result("M5", bool(rv) and rv != "unknown", f"recorder_version={rv!r}"))
+    # F8 / M4: MANIFEST.json with sha256
+    manpath = session / "MANIFEST.json"
+    if not manpath.exists():
+        items.append(_result("F8-manifest", False, "MANIFEST.json missing"))
+    else:
+        try:
+            man = json.loads(manpath.read_text())
+            file_count = man.get("file_count", 0)
+            entries = man.get("files", {})
+            has_sha = all(isinstance(v, dict) and "sha256" in v for v in entries.values())
+            items.append(_result("F8-manifest",
+                                 file_count > 0 and has_sha,
+                                 f"MANIFEST.json: {file_count} files, sha256-each={has_sha}"))
+        except (json.JSONDecodeError, OSError) as e:
+            items.append(_result("F8-manifest", False, f"MANIFEST.json parse error: {e}"))
+    return items
+
+
+def audit_group_u_audio(session: Path) -> list[dict]:
+    """U2 (audio.flac) + U-side audio_check.json contents (closes U-group gap)."""
+    items = []
+    # U2: audio.flac present + non-empty
+    flac = session / "audio.flac"
+    items.append(_result("U2", flac.exists() and flac.stat().st_size > 0,
+                         f"audio.flac: {flac.stat().st_size if flac.exists() else 'missing'} bytes"))
+    # U-aux: audio_check.json present (we already produce it via finalize step [5/6])
+    ac_path = session / "audio_check.json"
+    items.append(_result("U-aux", ac_path.exists() and ac_path.stat().st_size > 0,
+                         f"audio_check.json: {'present' if ac_path.exists() else 'missing'}"))
+    return items
+
+
+def audit_group_g15_operator(session: Path) -> list[dict]:
+    """G15: operator_id must NOT be the sentinel or a known default."""
+    items = []
+    gi_path = session / "gameinfo.xlsx"
+    if not gi_path.exists():
+        items.append(_result("G15", False, "gameinfo.xlsx missing — cannot check operator_id"))
+        return items
+    try:
+        import openpyxl  # noqa: PLC0415
+        wb = openpyxl.load_workbook(gi_path, data_only=True)
+        ws = wb.active
+        # Find the cell labeled 'operator_id' and read the value next to it.
+        rows = list(ws.iter_rows(values_only=True))
+        operator_id = None
+        for row in rows:
+            for i, c in enumerate(row):
+                if isinstance(c, str) and c.strip() == "operator_id":
+                    # value is the cell right of label OR below (depending on xlsx layout)
+                    if i + 1 < len(row):
+                        operator_id = row[i + 1]
+                    break
+            if operator_id is not None:
+                break
+        # 2-row layout: header row then data row
+        if operator_id is None and len(rows) >= 2:
+            header = rows[0]
+            data = rows[1]
+            for i, h in enumerate(header):
+                if isinstance(h, str) and h.strip() == "operator_id":
+                    operator_id = data[i] if i < len(data) else None
+                    break
+        bad_values = {"operator-MISSING-CONFIG", "vendor-001-op-A", "", None, "DataPilot"}
+        ok = operator_id not in bad_values and bool(operator_id)
+        items.append(_result("G15", ok, f"operator_id={operator_id!r}"))
+    except Exception as exc:  # noqa: BLE001
+        items.append(_result("G15", False, f"xlsx unreadable: {type(exc).__name__}"))
+    return items
+
+
 # ── Self-healing transforms ──────────────────────────────────────────────
 # Each transform attempts to convert legacy/wrong-named output into
 # PRD-compliant form. Idempotent: running --fix twice produces the same
@@ -381,6 +481,10 @@ def main(argv: list[str]) -> int:
     items.extend(audit_group_f(session))
     items.extend(audit_group_x_extras(session))
     items.extend(audit_group_h_depth(session))
+    # 2026-05-16 — extended coverage: metadata + audio + operator_id checks
+    items.extend(audit_group_m_metadata(session))
+    items.extend(audit_group_u_audio(session))
+    items.extend(audit_group_g15_operator(session))
 
     total = len(items)
     passed = sum(1 for it in items if it["status"] == "PASS")
