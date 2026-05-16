@@ -93,111 +93,89 @@ def get_test_arguments(test_name: str, session_dir: Path) -> List[str]:
         "prd_test_wasd_balance": ["inputs.jsonl", "action_camera.json", "frames.jsonl"],
     }
     
-    # Tests that need specific directories
-    directory_tests = {
-        "prd_test_depth_6fps_alignment": {
-            "video_dir": ["rgb", "."],  # Look for video in rgb dir or session root
-            "depth_dir": ["depth"]
-        }
-    }
-    
-    # Tests that take --input or --data-dir arguments
-    input_arg_tests = {
-        "prd_test_action_per_second": {"arg": "--input", "files": ["action_camera.json", "frames.jsonl", "inputs.jsonl"]},
-        "prd_test_metric_units_meters": {"arg": "--input", "files": ["action_camera.json", "frames.jsonl"]},
-        "prd_test_route_type_distribution": {"arg": "--data-dir", "files": ["."]},  # Session dir itself
-    }
-    
-    # Self-contained tests (no arguments needed)
-    self_contained_tests = [
-        "prd_test_240_clip_cap",
-        "prd_test_30min_scene_cap", 
-        "prd_test_depth_invalid_marker",
-        "prd_test_left_hand_coordinates",
-        "prd_test_speed_units_mps",
-        "prd_test_stationary_threshold",
+    # Tests that take --data-dir argument
+    data_dir_tests = [
+        "prd_test_route_type_distribution",
+        "prd_test_depth_6fps_alignment",
     ]
     
-    # Handle video tests
+    # Tests that take --clips-file argument
+    clips_file_tests = []
+    
+    # Tests that take --video-dir and --depth-dir arguments
+    depth_alignment_test = "prd_test_depth_6fps_alignment"
+    
     if test_name in video_tests:
-        video_files = list(session_dir.glob("*.mp4")) + list(session_dir.glob("video.*"))
-        if video_files:
-            args.append(str(video_files[0]))
-            if test_name == "prd_test_video_no_ui":
-                args.extend(["--frames", "5"])  # Sample fewer frames for speed
+        # Find video file in session directory
+        for video_name in ["video.mp4", "recording.mp4", "game.mp4"]:
+            video_path = session_dir / video_name
+            if video_path.exists():
+                args.append(str(video_path))
+                break
         else:
-            raise FileNotFoundError(f"No video file found in {session_dir}")
+            # Fall back to video.mp4 even if it doesn't exist (test will handle error)
+            args.append(str(session_dir / "video.mp4"))
     
-    # Handle file tests
     elif test_name in file_tests:
-        found = False
-        for pattern in file_tests[test_name]:
-            files = list(session_dir.glob(pattern))
-            if files:
-                args.append(str(files[0]))
-                found = True
+        # Find first matching file
+        for filename in file_tests[test_name]:
+            file_path = session_dir / filename
+            if file_path.exists():
+                args.append(str(file_path))
                 break
-        
-        if not found:
-            # Try to find any JSON file
-            json_files = list(session_dir.glob("*.json"))
-            if json_files:
-                args.append(str(json_files[0]))
-                found = True
-        
-        if not found:
-            raise FileNotFoundError(f"No input file found for {test_name} in {session_dir}")
-    
-    # Handle directory tests
-    elif test_name in directory_tests:
-        test_config = directory_tests[test_name]
-        for dir_arg, dir_options in test_config.items():
-            found_dir = None
-            for dir_option in dir_options:
-                dir_path = session_dir / dir_option
-                if dir_path.exists() and dir_path.is_dir():
-                    found_dir = dir_path
-                    break
-            
-            if found_dir:
-                args.extend([f"--{dir_arg.replace('_', '-')}", str(found_dir)])
-            else:
-                # Fall back to session directory or expected subdirectory
-                # For video_dir, fall back to session directory
-                if dir_arg == "video_dir":
-                    fallback_dir = session_dir
-                else:
-                    # For depth_dir, fall back to session_dir/depth (even if it doesn't exist)
-                    # This allows the test to run and handle the missing directory gracefully
-                    fallback_dir = session_dir / dir_options[0]  # First option, e.g., "depth"
-                args.extend([f"--{dir_arg.replace('_', '-')}", str(fallback_dir)])
-    
-    # Handle input argument tests
-    elif test_name in input_arg_tests:
-        test_config = input_arg_tests[test_name]
-        arg_name = test_config["arg"]
-        
-        found_file = None
-        for file_pattern in test_config["files"]:
-            if file_pattern == ".":
-                # Special case: use session directory itself
-                found_file = session_dir
-                break
-            
-            files = list(session_dir.glob(file_pattern))
-            if files:
-                found_file = files[0]
-                break
-        
-        if found_file:
-            args.extend([arg_name, str(found_file)])
         else:
-            raise FileNotFoundError(f"No input file found for {test_name} in {session_dir}")
+            # Fall back to first option even if it doesn't exist
+            args.append(str(session_dir / file_tests[test_name][0]))
     
-    # Handle self-contained tests
-    elif test_name in self_contained_tests:
-        # No arguments needed
-        pass
+    elif test_name in data_dir_tests:
+        # These tests take --data-dir argument
+        args.extend(["--data-dir", str(session_dir)])
+    
+    elif test_name in clips_file_tests:
+        # These tests take --clips-file argument
+        clips_file = session_dir / "clips.json"
+        if clips_file.exists():
+            args.extend(["--clips-file", str(clips_file)])
+        else:
+            args.extend(["--clips-file", str(clips_file)])  # Will fail gracefully
+    
+    elif test_name == depth_alignment_test:
+        # This test needs --video-dir and --depth-dir
+        video_dir = session_dir / "video_frames"
+        depth_dir = session_dir / "depth"
+        args.extend(["--video-dir", str(video_dir)])
+        args.extend(["--depth-dir", str(depth_dir)])
+    
+    elif test_name == "prd_test_240_clip_cap":
+        # Takes --clips-dir argument
+        args.extend(["--clips-dir", str(session_dir)])
+    
+    elif test_name == "prd_test_30min_scene_cap":
+        # Takes --scene-dir argument
+        args.extend(["--scene-dir", str(session_dir)])
+    
+    elif test_name == "prd_test_action_per_second":
+        # Takes --inputs-file argument
+        inputs_file = session_dir / "inputs.jsonl"
+        if not inputs_file.exists():
+            inputs_file = session_dir / "action_camera.json"
+        args.extend(["--inputs-file", str(inputs_file)])
+    
+    elif test_name == "prd_test_speed_units_mps":
+        # Takes --speeds-file argument
+        args.extend(["--speeds-file", str(session_dir / "speeds.json")])
+    
+    elif test_name == "prd_test_stationary_threshold":
+        # Takes --positions-file argument
+        args.extend(["--positions-file", str(session_dir / "positions.json")])
+    
+    elif test_name == "prd_test_left_hand_coordinates":
+        # Takes --coords-file argument
+        args.extend(["--coords-file", str(session_dir / "coordinates.json")])
+    
+    elif test_name == "prd_test_metric_units_meters":
+        # Takes --camera-file argument
+        args.extend(["--camera-file", str(session_dir / "action_camera.json")])
     
     else:
         # Default: try to pass session directory as argument
@@ -282,7 +260,7 @@ def run_lint(session_dir: Path, timeout: int = 60) -> TestResult:
     
     try:
         result = subprocess.run(
-            [sys.executable, str(lint_path), str(session_dir), "--strict=false"],
+            [sys.executable, str(lint_path), str(session_dir)],
             capture_output=True,
             text=True,
             timeout=timeout,
@@ -341,170 +319,170 @@ def generate_markdown_report(report: AcceptanceReport, output_path: Path) -> Non
         f.write("|------|--------|----------|-----------|\n")
         
         # Add test results
-        for test_result in report.test_results:
-            status = "✅ PASS" if test_result.passed else "❌ FAIL"
-            f.write(f"| `{test_result.test_name}` | {status} | {test_result.duration_seconds:.1f}s | {test_result.exit_code} |\n")
+        for result in report.test_results:
+            status = "✅ PASS" if result.passed else "❌ FAIL"
+            f.write(f"| `{result.test_name}` | {status} | {result.duration_seconds:.1f}s | {result.exit_code} |\n")
         
         # Add lint result
         if report.lint_result:
             status = "✅ PASS" if report.lint_result.passed else "❌ FAIL"
             f.write(f"| `{report.lint_result.test_name}` | {status} | {report.lint_result.duration_seconds:.1f}s | {report.lint_result.exit_code} |\n")
         
-        f.write("\n")
-        
-        # Customer-shareable summary
-        f.write("## Customer-Shareable Summary\n\n")
+        f.write("\n## Customer-Shareable Summary\n\n")
         f.write(f"**Overall Acceptance:** {report.pass_percentage:.1f}%\n\n")
         
-        f.write("### Test Results\n\n")
-        
         # Passing tests
-        passing_tests = [r for r in report.test_results if r.passed]
-        if passing_tests:
-            f.write("**✅ Passing Tests:**\n")
-            for test_result in passing_tests:
-                f.write(f"- `{test_result.test_name}`\n")
-            f.write("\n")
+        passing = [r for r in report.test_results if r.passed]
+        if report.lint_result and report.lint_result.passed:
+            passing.append(report.lint_result)
+        
+        if passing:
+            f.write("### ✅ Passing Tests\n\n")
+            for result in passing:
+                f.write(f"- `{result.test_name}`\n")
         
         # Failing tests
-        failing_tests = [r for r in report.test_results if not r.passed]
-        if failing_tests:
-            f.write("**❌ Failing Tests:**\n")
-            for test_result in failing_tests:
-                f.write(f"- `{test_result.test_name}`\n")
-                if test_result.error:
-                    f.write(f"  - Error: {test_result.error}\n")
-                elif test_result.stderr:
-                    # Try to extract first line of stderr as error summary
-                    first_line = test_result.stderr.split('\n')[0].strip()
-                    if first_line:
-                        f.write(f"  - Error: {first_line}\n")
-            f.write("\n")
+        failing = [r for r in report.test_results if not r.passed]
+        if report.lint_result and not report.lint_result.passed:
+            failing.append(report.lint_result)
         
-        # Lint result
-        if report.lint_result:
-            f.write("### PRD Lint Results\n\n")
-            if report.lint_result.passed:
-                f.write("✅ **PRD Lint: PASSED**\n")
-            else:
-                f.write("❌ **PRD Lint: FAILED**\n")
-                if report.lint_result.error:
-                    f.write(f"- Error: {report.lint_result.error}\n")
-                elif report.lint_result.stderr:
-                    first_line = report.lint_result.stderr.split('\n')[0].strip()
-                    if first_line:
-                        f.write(f"- Error: {first_line}\n")
-            f.write("\n")
+        if failing:
+            f.write("\n### ❌ Failing Tests\n\n")
+            for result in failing:
+                f.write(f"- `{result.test_name}`\n")
+                if result.error:
+                    f.write(f"  - Error: {result.error}\n")
+                elif result.stderr:
+                    # Include first line of stderr
+                    first_line = result.stderr.split("\n")[0][:100]
+                    f.write(f"  - Error: {first_line}\n")
         
-        # Detailed results
-        f.write("## Detailed Results\n\n")
-        
-        for test_result in report.test_results:
-            f.write(f"### `{test_result.test_name}`\n\n")
-            f.write(f"- **Status:** {'✅ PASS' if test_result.passed else '❌ FAIL'}\n")
-            f.write(f"- **Exit Code:** {test_result.exit_code}\n")
-            f.write(f"- **Duration:** {test_result.duration_seconds:.1f}s\n")
-            f.write(f"- **Test Path:** `{test_result.test_path}`\n")
-            
-            if test_result.stdout:
-                f.write("- **Output:**\n```\n")
-                f.write(test_result.stdout)
-                f.write("\n```\n")
-            
-            if test_result.error:
-                f.write(f"- **Error:** {test_result.error}\n")
-            
-            f.write("\n")
-        
-        # Lint detailed result
-        if report.lint_result:
-            f.write(f"### `{report.lint_result.test_name}`\n\n")
-            f.write(f"- **Status:** {'✅ PASS' if report.lint_result.passed else '❌ FAIL'}\n")
-            f.write(f"- **Exit Code:** {report.lint_result.exit_code}\n")
-            f.write(f"- **Duration:** {report.lint_result.duration_seconds:.1f}s\n")
-            f.write(f"- **Test Path:** `{report.lint_result.test_path}`\n")
-            
-            if report.lint_result.stdout:
-                f.write("- **Output:**\n```\n")
-                f.write(report.lint_result.stdout)
-                f.write("\n```\n")
-            
-            if report.lint_result.error:
-                f.write(f"- **Error:** {report.lint_result.error}\n")
-            
-            f.write("\n")
+        f.write("\n---\n\n")
+        f.write("*Generated by prd_acceptance.py*\n")
 
 
-# ---------------------------------------------------------------------------
-# Main entry point
-# ---------------------------------------------------------------------------
+def generate_json_report(report: AcceptanceReport, output_path: Path) -> None:
+    """Generate a JSON report from acceptance test results."""
+    data = {
+        "session_dir": str(report.session_dir),
+        "timestamp": report.timestamp.isoformat(),
+        "overall_score": report.pass_percentage,
+        "passed_tests": report.passed_tests,
+        "total_tests": report.total_tests,
+        "test_results": [
+            {
+                "test_name": r.test_name,
+                "passed": r.passed,
+                "exit_code": r.exit_code,
+                "duration_seconds": r.duration_seconds,
+                "error": r.error,
+            }
+            for r in report.test_results
+        ],
+        "lint_result": None,
+    }
+    
+    if report.lint_result:
+        data["lint_result"] = {
+            "test_name": report.lint_result.test_name,
+            "passed": report.lint_result.passed,
+            "exit_code": report.lint_result.exit_code,
+            "duration_seconds": report.lint_result.duration_seconds,
+            "error": report.lint_result.error,
+        }
+    
+    with open(output_path, "w") as f:
+        json.dump(data, f, indent=2)
 
-def main() -> int:
-    """Main entry point for the PRD acceptance test runner."""
-    parser = argparse.ArgumentParser(description="Run PRD acceptance tests on a session directory.")
-    parser.add_argument("session_dir", type=Path, help="Session directory to test")
-    parser.add_argument("--output", "-o", type=Path, default=Path("PRD-ACCEPTANCE-REPORT.md"),
-                       help="Output report path (default: PRD-ACCEPTANCE-REPORT.md)")
-    parser.add_argument("--timeout", "-t", type=int, default=30,
-                       help="Timeout per test in seconds (default: 30)")
-    parser.add_argument("--lint-timeout", type=int, default=60,
-                       help="Timeout for lint in seconds (default: 60)")
-    parser.add_argument("--skip-lint", action="store_true",
-                       help="Skip running the PRD lint")
-    args = parser.parse_args()
-    
-    # Validate session directory
-    if not args.session_dir.exists():
-        print(f"Error: Session directory not found: {args.session_dir}", file=sys.stderr)
-        return 1
-    
-    if not args.session_dir.is_dir():
-        print(f"Error: Not a directory: {args.session_dir}", file=sys.stderr)
-        return 1
-    
-    print(f"\nRunning PRD acceptance tests on {args.session_dir}...\n")
-    
-    # Find all PRD tests
+
+def run_acceptance_tests(session_dir: Path, timeout: int = 30) -> AcceptanceReport:
+    """Run all PRD acceptance tests on a session directory."""
     bin_dir = Path(__file__).parent
-    test_paths = find_prd_tests(bin_dir)
     
-    if not test_paths:
-        print("Error: No PRD tests found in bin/ directory", file=sys.stderr)
-        return 1
-    
-    print(f"Found {len(test_paths)} PRD tests\n")
-    
-    # Run all tests
-    test_results = []
-    for test_path in test_paths:
-        test_name = test_path.stem
-        print(f"Running {test_name}...", end=" ", flush=True)
-        result = run_test(test_path, args.session_dir, args.timeout)
-        test_results.append(result)
-        print("✅" if result.passed else "❌")
-    
-    # Run lint (unless skipped)
-    lint_result = None
-    if not args.skip_lint:
-        print(f"\nRunning lint_v3_prd_grounded...", end=" ", flush=True)
-        lint_result = run_lint(args.session_dir, args.lint_timeout)
-        print("✅" if lint_result.passed else "❌")
-    
-    # Create report
     report = AcceptanceReport(
-        session_dir=args.session_dir,
+        session_dir=session_dir,
         timestamp=datetime.now(),
-        test_results=test_results,
-        lint_result=lint_result
     )
     
+    # Find and run all PRD tests
+    test_files = find_prd_tests(bin_dir)
+    
+    print(f"Running {len(test_files)} PRD tests on {session_dir}...")
+    
+    for test_file in test_files:
+        print(f"  Running {test_file.name}...", end=" ", flush=True)
+        result = run_test(test_file, session_dir, timeout=timeout)
+        report.test_results.append(result)
+        status = "PASS" if result.passed else "FAIL"
+        print(status)
+    
+    # Run lint
+    print("Running lint_v3_prd_grounded...", end=" ", flush=True)
+    lint_result = run_lint(session_dir, timeout=timeout * 2)
+    report.lint_result = lint_result
+    status = "PASS" if lint_result.passed else "FAIL"
+    print(status)
+    
+    return report
+
+
+def main(argv: List[str] = None) -> int:
+    """Main entry point."""
+    parser = argparse.ArgumentParser(
+        description="Run PRD acceptance tests on a session directory"
+    )
+    parser.add_argument(
+        "session_dir",
+        type=Path,
+        help="Path to session directory to test"
+    )
+    parser.add_argument(
+        "--output", "-o",
+        type=Path,
+        default=None,
+        help="Output report path (default: session_dir/PRD-ACCEPTANCE-REPORT.md)"
+    )
+    parser.add_argument(
+        "--json",
+        type=Path,
+        default=None,
+        help="Also output JSON report to this path"
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=30,
+        help="Timeout in seconds for each test (default: 30)"
+    )
+    
+    args = parser.parse_args(argv)
+    
+    if not args.session_dir.exists():
+        print(f"Error: Session directory not found: {args.session_dir}")
+        return 1
+    
+    # Run tests
+    report = run_acceptance_tests(args.session_dir, timeout=args.timeout)
+    
     # Generate report
-    generate_markdown_report(report, args.output)
+    output_path = args.output or (args.session_dir / "PRD-ACCEPTANCE-REPORT.md")
+    generate_markdown_report(report, output_path)
+    print(f"\nReport written to: {output_path}")
     
-    print(f"\nReport written to: {args.output}")
-    print(f"Summary: {report.passed_tests}/{report.total_tests} tests passed ({report.pass_percentage:.1f}%)")
+    if args.json:
+        generate_json_report(report, args.json)
+        print(f"JSON report written to: {args.json}")
     
-    return 0 if report.passed_tests == report.total_tests else 1
+    # Print summary
+    print(f"\n{'='*60}")
+    print(f"PRD Acceptance Test Summary")
+    print(f"{'='*60}")
+    print(f"Session: {args.session_dir}")
+    print(f"Tests: {report.passed_tests}/{report.total_tests} passed ({report.pass_percentage:.1f}%)")
+    print(f"{'='*60}")
+    
+    # Return non-zero if any tests failed
+    return 0 if report.failed_tests == 0 else 1
 
 
 if __name__ == "__main__":
