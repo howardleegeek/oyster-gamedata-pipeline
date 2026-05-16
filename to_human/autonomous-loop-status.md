@@ -23,3 +23,7 @@
 ## Round 6 @ 2026-05-16T02:24:37Z
 - Picked: Fix prd_test_camera_intrinsics_pinhole.py — test `test_fisheye_key_rejected` expected validator to reject `"fisheye"` key in intrinsics dict, but bin script only checked for k1/k2/k3 and "distortion" keys. Added explicit `"fisheye" in intrinsics` check. All 26 tests now pass.
 - Result: committed 9623955
+
+## Round 7 @ 2026-05-16T03:00:00Z
+- Picked: Add test coverage for prd_test_systeminfo_required.py — the script had no test file while the PRD acceptance runner expects it to exist. Created 13 unit tests covering load_systeminfo(), validate_required_keys(), and CLI interface.
+- Result: committed f8c823e
