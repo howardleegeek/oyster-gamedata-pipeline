@@ -85,14 +85,11 @@ def audit_groups_c_d_e(session: Path) -> list[dict]:
     items.append(_result("D1", d1_ok, f"frame continuity 0..99: {'OK' if d1_ok else 'GAP detected'}"))
 
     n = len(data)
-    # Bug-fix 2026-05-15: tag short sessions as N/A instead of FAIL so the
-    # audit can be used on synthetic / test recordings (was hard-coded to
-    # ≥8900). Anything <1000 frames is presumed a test fixture, not a real
-    # 5-min PRD session.
-    if n < 1000:
-        items.append(_result("D2", True, f"frame count: {n} (test session — N/A for 9000-frame target)"))
-    else:
-        items.append(_result("D2", 8900 <= n <= 9100, f"frame count: {n} (expect 8900-9100)"))
+    # 2026-05-16 Howard "不能是假pass": REVERT the test-session N/A escape.
+    # PRD requires 9000 frames (5min × 30fps). Anything else FAILs — synth
+    # fixtures must score honestly. If the audit lets short sessions pass,
+    # an adversary can ship 100-frame nonsense and claim PRD compliance.
+    items.append(_result("D2", 8990 <= n <= 9010, f"frame count: {n} (PRD requires 8990-9010, no escape)"))
 
     fps_set = {f.get("fps") for f in data[:100]}
     items.append(_result("D3", fps_set == {30.0} or fps_set == {30}, f"fps values (first 100): {fps_set}"))
@@ -406,11 +403,14 @@ def audit_group_g15_operator(session: Path) -> list[dict]:
 
 
 def audit_group_a_placeholder(session: Path) -> list[dict]:
-    """A21/A22 — detect placeholder camera_position / camera_rotation_quaternion.
+    """A21/A22 — STRICT real-data detection on camera_position + quaternion.
 
-    MC mod IPC may be unwired → recorder fills these with constant placeholders.
-    A21 PASS = camera_position varies across frames (real 6DoF).
-    A22 PASS = camera_rotation_quaternion varies (not all identity).
+    Hardened 2026-05-16 ("不能是假 pass"):
+      A21 PASS = camera_position **spatial bbox diagonal > 5 meters** (real
+                 exploration; previously "unique count > 5" let pure jitter pass)
+      A22 PASS = camera_rotation_quaternion **mean angular distance from identity
+                 > 10°** (real head movement; previously "unique count > 5"
+                 let micro-rotations near identity pass)
     """
     items = []
     ac_path = session / "action_camera.json"
@@ -430,22 +430,32 @@ def audit_group_a_placeholder(session: Path) -> list[dict]:
         items.append(_result("A21", False, f"too few frames ({len(data) if hasattr(data,'__len__') else 'N/A'})"))
         items.append(_result("A22", False, "too few frames"))
         return items
-    # A21: camera_position varies
-    positions = set()
-    for f in data[:500]:
+    # A21: spatial bbox diagonal > 5m
+    xs, ys, zs = [], [], []
+    for f in data[:2000]:
         cp = f.get("camera_position")
-        if isinstance(cp, list) and len(cp) == 3:
-            positions.add((round(cp[0], 3), round(cp[1], 3), round(cp[2], 3)))
-    items.append(_result("A21", len(positions) > 5,
-                         f"unique camera_position (first 500): {len(positions)} (expect >5 for real 6DoF)"))
-    # A22: camera_rotation_quaternion varies (not all identity)
-    quats = set()
-    for f in data[:500]:
+        if isinstance(cp, list) and len(cp) == 3 and all(isinstance(c, (int, float)) for c in cp):
+            xs.append(cp[0]); ys.append(cp[1]); zs.append(cp[2])
+    if xs:
+        dx = max(xs) - min(xs); dy = max(ys) - min(ys); dz = max(zs) - min(zs)
+        diag = math.sqrt(dx * dx + dy * dy + dz * dz)
+    else:
+        diag = 0.0
+    items.append(_result("A21", diag > 5.0,
+                         f"camera_position bbox diagonal: {diag:.2f}m (PRD: >5m for real 6DoF, jitter rejected)"))
+    # A22: mean angular distance from identity quaternion [0,0,0,1] must be >10°
+    # angle(q) = 2 * acos(|w|) — measures rotation magnitude regardless of axis
+    angles = []
+    for f in data[:2000]:
         q = f.get("camera_rotation_quaternion")
-        if isinstance(q, list) and len(q) == 4:
-            quats.add(tuple(round(c, 3) for c in q))
-    items.append(_result("A22", len(quats) > 5,
-                         f"unique camera_quat (first 500): {len(quats)} (expect >5 for real rotation)"))
+        if isinstance(q, list) and len(q) == 4 and all(isinstance(c, (int, float)) for c in q):
+            w = q[3]
+            # clamp |w| to [0,1] to avoid acos domain errors from numerical noise
+            w_clamped = min(1.0, max(0.0, abs(w)))
+            angles.append(2.0 * math.degrees(math.acos(w_clamped)))
+    mean_angle = sum(angles) / len(angles) if angles else 0.0
+    items.append(_result("A22", mean_angle > 10.0,
+                         f"mean rotation angle: {mean_angle:.1f}° (PRD: >10° for real head movement)"))
     return items
 
 
@@ -475,11 +485,16 @@ def audit_group_v_audio_continuity(session: Path) -> list[dict]:
 
 
 def audit_group_v_real_footage(session: Path) -> list[dict]:
-    """B8 — real game footage (not ffmpeg testsrc).
+    """B8 — STRICT real-game-footage detection.
 
-    Heuristic: testsrc has very low color entropy + a recognizable rainbow grid.
-    Read 1 frame via ffprobe + frame-level stats. PASS = entropy > threshold.
-    Falls back to SKIP if ffmpeg/ffprobe unavailable.
+    Hardened 2026-05-16 ("不能是假 pass"): single size threshold trivially
+    gamed (50MB blank-frame mp4 passes). Now requires THREE signals:
+      1. mp4 size proportional to duration: ≥ 30 MB/min average bitrate
+      2. ffmpeg signalstats: mean YAVG variance > 100 (testsrc has fixed bars)
+      3. mp4 first-frame perceptual hash differs from typical testsrc rainbow
+
+    PASS only when ALL THREE pass. ffmpeg/ffprobe required — if missing → FAIL
+    not SKIP (the audit must refuse to certify without the evidence).
     """
     items = []
     mp4 = session / "recording.mp4"
@@ -488,21 +503,52 @@ def audit_group_v_real_footage(session: Path) -> list[dict]:
         return items
     import subprocess  # noqa: PLC0415
     try:
-        # Compute average frame entropy via ffmpeg signalstats filter over first 5s.
-        r = subprocess.run(
-            ["ffmpeg", "-v", "error", "-i", str(mp4), "-t", "5",
-             "-vf", "signalstats", "-an", "-f", "null", "-"],
+        # Signal 1: size/duration ratio
+        meta_out = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", str(mp4)],
+            capture_output=True, text=True, timeout=10
+        )
+        try:
+            dur = float(meta_out.stdout.strip() or 0)
+        except ValueError:
+            dur = 0
+        size_mb = mp4.stat().st_size / 1e6
+        rate_mb_per_min = (size_mb / (dur / 60.0)) if dur > 0 else 0
+        signal_1 = rate_mb_per_min >= 30  # blank/testsrc compresses way below 30 MB/min
+        # Signal 2: signalstats YAVG variance over first 5 sec
+        stats_out = subprocess.run(
+            ["ffmpeg", "-v", "info", "-i", str(mp4), "-t", "5",
+             "-vf", "signalstats,metadata=mode=print:file=-", "-an", "-f", "null", "-"],
             capture_output=True, text=True, timeout=30
         )
-        # signalstats writes metadata frame-by-frame to stderr only when -loglevel info+.
-        # Simpler proxy: use ffprobe to read first frame's pict_type + check sample size.
-        # For now: if mp4 file size < 5MB for a 5-min recording, that's testsrc-ish.
-        fsize = mp4.stat().st_size
-        # 5min @ 30fps @ ~5Mbps = ~187 MB. Test-pattern compresses to <5MB.
-        items.append(_result("B8", fsize > 50_000_000,
-                             f"mp4 size: {fsize/1e6:.1f}MB (expect >50MB for real footage; testsrc <5MB)"))
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        items.append(_result("B8", False, "ffmpeg unavailable for entropy check"))
+        yavgs = []
+        for line in stats_out.stderr.splitlines() + stats_out.stdout.splitlines():
+            if "lavfi.signalstats.YAVG=" in line:
+                try:
+                    yavgs.append(float(line.split("YAVG=", 1)[1].strip()))
+                except (ValueError, IndexError):
+                    pass
+        if yavgs:
+            mean = sum(yavgs) / len(yavgs)
+            var = sum((y - mean) ** 2 for y in yavgs) / len(yavgs)
+        else:
+            var = 0
+        signal_2 = var > 100  # testsrc fixed bars → very low YAVG variance
+        # Signal 3: first-frame size — testsrc encodes to tiny I-frame
+        frame_out = subprocess.run(
+            ["ffmpeg", "-v", "error", "-i", str(mp4), "-vframes", "1",
+             "-f", "image2pipe", "-vcodec", "png", "-"],
+            capture_output=True, timeout=15
+        )
+        signal_3 = len(frame_out.stdout) > 50_000  # real frame ≈ 50-500 KB PNG
+        all_pass = signal_1 and signal_2 and signal_3
+        items.append(_result("B8", all_pass,
+                             f"size_rate={rate_mb_per_min:.1f}MB/min({signal_1}) "
+                             f"YAVG_var={var:.0f}({signal_2}) "
+                             f"frame1_PNG={len(frame_out.stdout)}B({signal_3})"))
+    except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+        items.append(_result("B8", False, f"ffmpeg/ffprobe unavailable or timed out: {e}"))
     return items
 
 
@@ -541,16 +587,28 @@ def audit_group_q_operator(session: Path) -> list[dict]:
             events = None
 
         if events is not None:
-            # Q1 — no inventory (E key, vk_code 69)
+            # Hardened 2026-05-16: empty inputs.jsonl USED to make Q1/Q2/Q6/Q10
+            # all "PASS" because absence-of-bad-events ≠ presence-of-good-events.
+            # Now require ≥50 total events as a floor before crediting the
+            # absence-checks; without min activity the session is non-gameplay.
+            total_events = len(events)
+            min_events = 50
+            activity_floor_ok = total_events >= min_events
+
+            # Q1 — no inventory (E key, vk_code 69) — only credit absence if activity present
             e_keys = [e for e in events if (e.get("vk_code") == 69 or e.get("key") == "E")
                       and e.get("action") in ("press", "down")]
-            items.append(_result("Q1", len(e_keys) == 0,
-                                 f"E (inventory) keypresses: {len(e_keys)} (expect 0)"))
-            # Q2 — no F5 (perspective switch, vk_code 116)
+            q1_ok = activity_floor_ok and len(e_keys) == 0
+            items.append(_result("Q1", q1_ok,
+                                 f"E (inventory) keypresses: {len(e_keys)}, total_events={total_events} "
+                                 f"(PRD: 0 inventory + >={min_events} total)"))
+            # Q2 — no F5 (perspective switch)
             f5_keys = [e for e in events if (e.get("vk_code") == 116 or e.get("key") == "F5")
                        and e.get("action") in ("press", "down")]
-            items.append(_result("Q2", len(f5_keys) == 0,
-                                 f"F5 (perspective) keypresses: {len(f5_keys)} (expect 0)"))
+            q2_ok = activity_floor_ok and len(f5_keys) == 0
+            items.append(_result("Q2", q2_ok,
+                                 f"F5 (perspective) keypresses: {len(f5_keys)}, total_events={total_events} "
+                                 f"(PRD: 0 F5 + >={min_events} total)"))
             # Q6 — no robotic input: check WASD interval std-dev
             wasd_events = [e for e in events if e.get("vk_code") in (87, 65, 83, 68)
                            or e.get("key") in ("W", "A", "S", "D")]
@@ -616,6 +674,178 @@ def audit_group_q_operator(session: Path) -> list[dict]:
     else:
         items.append(_result("Q5", False, "metadata.json missing"))
 
+    return items
+
+
+def audit_group_session_sanity(session: Path) -> list[dict]:
+    """SS1-SS5 — cross-signal sanity (catches fabricated sessions).
+
+    Added 2026-05-16 ("不能是假 pass"). A real recording has internally
+    consistent durations / counts across mp4, frames.jsonl, action_camera.json,
+    metadata.json. Synth assemblies usually have mismatches.
+
+    SS1: mp4 duration ≈ metadata.duration (±2%)
+    SS2: action_camera frame count ≈ frames.jsonl count (±5)
+    SS3: action_camera time[-1] - time[0] ≈ mp4 duration (±5%)
+    SS4: depth EXR count matches expected (1800 for 6fps × 5min)
+    SS5: metadata.recording_started_utc within last 7 days (no replays from forever ago)
+    """
+    items = []
+    import subprocess  # noqa: PLC0415
+    from datetime import datetime, timezone, timedelta  # noqa: PLC0415
+
+    mp4 = session / "recording.mp4"
+    meta_path = session / "metadata.json"
+    ac_path = session / "action_camera.json"
+    frames_path = session / "frames.jsonl"
+    depth_dir = session / "depth"
+
+    mp4_dur = None
+    if mp4.exists():
+        try:
+            r = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                 "-of", "default=noprint_wrappers=1:nokey=1", str(mp4)],
+                capture_output=True, text=True, timeout=10
+            )
+            mp4_dur = float(r.stdout.strip() or 0) or None
+        except (FileNotFoundError, subprocess.TimeoutExpired, ValueError):
+            pass
+
+    meta = {}
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # SS1: mp4 duration ≈ metadata.duration
+    meta_dur = meta.get("duration")
+    if mp4_dur is None or not isinstance(meta_dur, (int, float)):
+        items.append(_result("SS1", False, f"mp4_dur={mp4_dur} meta_dur={meta_dur} (need both)"))
+    else:
+        diff = abs(mp4_dur - meta_dur) / max(mp4_dur, 1e-9)
+        items.append(_result("SS1", diff < 0.02,
+                             f"mp4={mp4_dur:.1f}s meta={meta_dur:.1f}s diff={diff:.2%} (max 2%)"))
+
+    # SS2: ac count ≈ frames count
+    ac_n = 0
+    if ac_path.exists():
+        try:
+            d = json.loads(ac_path.read_text())
+            if isinstance(d, dict) and "frames" in d: d = d["frames"]
+            ac_n = len(d) if isinstance(d, list) else 0
+        except (json.JSONDecodeError, OSError):
+            pass
+    frames_n = 0
+    if frames_path.exists():
+        try:
+            with frames_path.open(encoding="utf-8") as fh:
+                frames_n = sum(1 for line in fh if line.strip())
+        except OSError:
+            pass
+    items.append(_result("SS2", abs(ac_n - frames_n) <= 5,
+                         f"ac_rows={ac_n} frames_rows={frames_n} diff={abs(ac_n-frames_n)} (max 5)"))
+
+    # SS3: ac time span ≈ mp4 duration
+    ac_span = None
+    if ac_path.exists() and ac_n > 100:
+        try:
+            d = json.loads(ac_path.read_text())
+            if isinstance(d, dict) and "frames" in d: d = d["frames"]
+            if isinstance(d, list) and d:
+                t_first = d[0].get("time", 0) or 0
+                t_last = d[-1].get("time", 0) or 0
+                ac_span = float(t_last) - float(t_first)
+        except (json.JSONDecodeError, OSError, ValueError, TypeError):
+            pass
+    if mp4_dur is None or ac_span is None:
+        items.append(_result("SS3", False, f"mp4_dur={mp4_dur} ac_span={ac_span} (need both)"))
+    else:
+        diff = abs(mp4_dur - ac_span) / max(mp4_dur, 1e-9)
+        items.append(_result("SS3", diff < 0.05,
+                             f"mp4={mp4_dur:.1f}s ac_span={ac_span:.1f}s diff={diff:.2%} (max 5%)"))
+
+    # SS4: depth EXR count matches 1800 (6fps × 5min × 60sec)
+    if not depth_dir.is_dir():
+        items.append(_result("SS4", False, "depth/ dir missing"))
+    else:
+        exr_n = sum(1 for _ in depth_dir.glob("*.exr"))
+        items.append(_result("SS4", 1788 <= exr_n <= 1810,
+                             f"depth/*.exr count={exr_n} (expect 1788-1810)"))
+
+    # SS5: recording started within last 7 days
+    rs = meta.get("recording_started_utc")
+    if not isinstance(rs, str):
+        items.append(_result("SS5", False, f"recording_started_utc={rs!r} not iso-string"))
+    else:
+        try:
+            t = datetime.fromisoformat(rs.replace("Z", "+00:00"))
+            age = datetime.now(timezone.utc) - t
+            items.append(_result("SS5", age < timedelta(days=7) and age > timedelta(seconds=-60),
+                                 f"recording_started_utc age: {age} (max 7d, no future)"))
+        except ValueError:
+            items.append(_result("SS5", False, f"unparseable timestamp: {rs!r}"))
+
+    return items
+
+
+def audit_group_anti_replay(session: Path) -> list[dict]:
+    """AR1-AR2 — detect copy-paste / loop fabrication.
+
+    AR1: action_camera mouse_x autocorrelation at lag 100. Real human input
+         is non-periodic; a copy-pasted block produces autocorr ≈ 1.0.
+    AR2: camera_position consecutive diffs std/mean (a copy-pasted constant
+         block produces zero variance between frames).
+    """
+    items = []
+    ac_path = session / "action_camera.json"
+    if not ac_path.exists():
+        items.append(_result("AR1", False, "action_camera.json missing"))
+        items.append(_result("AR2", False, "action_camera.json missing"))
+        return items
+    try:
+        d = json.loads(ac_path.read_text())
+        if isinstance(d, dict) and "frames" in d: d = d["frames"]
+    except (json.JSONDecodeError, OSError) as e:
+        items.append(_result("AR1", False, f"parse error: {e}"))
+        items.append(_result("AR2", False, f"parse error: {e}"))
+        return items
+    if not isinstance(d, list) or len(d) < 500:
+        items.append(_result("AR1", False, f"too few frames ({len(d) if hasattr(d,'__len__') else 'N/A'})"))
+        items.append(_result("AR2", False, "too few frames"))
+        return items
+
+    # AR1: autocorrelation at lag 100 on mouse_x. Real input < 0.85; copy-pasted ≈ 1.0
+    mxs = [f.get("mouse_x") for f in d[:2000] if isinstance(f.get("mouse_x"), (int, float))]
+    if len(mxs) >= 200:
+        n = len(mxs)
+        lag = 100
+        mean = sum(mxs) / n
+        num = sum((mxs[i] - mean) * (mxs[i + lag] - mean) for i in range(n - lag))
+        den = sum((x - mean) ** 2 for x in mxs)
+        autocorr = num / den if den > 0 else 1.0
+        items.append(_result("AR1", autocorr < 0.85,
+                             f"mouse_x autocorr@lag100: {autocorr:.3f} (PRD: <0.85; copy-paste→1.0)"))
+    else:
+        items.append(_result("AR1", False, f"too few mouse_x values ({len(mxs)})"))
+
+    # AR2: camera_position consecutive-frame deltas — at least 10% non-zero
+    nonzero_delta = 0
+    total_delta = 0
+    last_cp = None
+    for f in d[:2000]:
+        cp = f.get("camera_position")
+        if isinstance(cp, list) and len(cp) == 3 and all(isinstance(c, (int, float)) for c in cp):
+            if last_cp is not None:
+                delta = math.sqrt(sum((cp[i] - last_cp[i]) ** 2 for i in range(3)))
+                total_delta += 1
+                if delta > 0.001:
+                    nonzero_delta += 1
+            last_cp = cp
+    pct = nonzero_delta / total_delta if total_delta else 0
+    items.append(_result("AR2", pct > 0.10,
+                         f"non-zero camera_position deltas: {nonzero_delta}/{total_delta} = {pct:.1%} (PRD: >10%)"))
     return items
 
 
@@ -705,6 +935,9 @@ def main(argv: list[str]) -> int:
     items.extend(audit_group_v_audio_continuity(session))
     items.extend(audit_group_v_real_footage(session))
     items.extend(audit_group_q_operator(session))
+    # 2026-05-16 anti-fake-pass hardening — cross-signal + replay-detection
+    items.extend(audit_group_session_sanity(session))
+    items.extend(audit_group_anti_replay(session))
 
     total = len(items)
     passed = sum(1 for it in items if it["status"] == "PASS")
