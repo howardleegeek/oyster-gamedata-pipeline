@@ -537,6 +537,189 @@ def compute_mouse_look_vector(session_dir: Path, verbose: bool = False) -> int:
     return rewritten
 
 
+def resample_action_camera_to_frames(session_dir: Path, verbose: bool = False) -> int:
+    """MECE A23 / RBGA-A5 — produce one action_camera row per VIDEO frame.
+
+    PRD expects ~9000 rows for a 5-min × 30fps recording (one per frame).
+    The recorder used to write one row per INPUT EVENT (variable count,
+    typically 1000-3000 rows depending on player activity). This step
+    nearest-neighbor samples the input-event stream onto the video frame
+    grid so downstream ML training has fixed-cadence data.
+
+    Algorithm:
+      1. Load frame timestamps from frames.jsonl
+      2. For each frame_index N at time T_N, find action_camera row whose
+         timestamp is nearest T_N (binary search)
+      3. Copy that row, override frame=N, time=T_N/1e9, fps=30
+      4. Emit list of N rows (~9000 for 5min recording)
+
+    Skips entirely (no-op + return 0) when:
+      * frames.jsonl missing (rc17.x sessions, test fixtures)
+      * action_camera already has frame_aligned_applied sentinel (idempotent)
+      * action_camera and frames within ±5 rows of each other (already aligned)
+      * frames count < 100 (test fixture — don't resample test data)
+
+    Backup goes to action_camera.json.bak.a23 — distinct from .bak (used by
+    A24 look-vector) so we can recover from either step independently.
+
+    Returns count of rows written (0 = skipped, ≥1 = resampled).
+    """
+    import bisect  # noqa: PLC0415
+
+    ac_path = session_dir / "action_camera.json"
+    frames_path = session_dir / "frames.jsonl"
+
+    if not ac_path.exists():
+        if verbose:
+            print("  action_camera.json missing — skip resample")
+        return 0
+    if not frames_path.exists():
+        if verbose:
+            print("  frames.jsonl missing — skip resample (cannot determine frame grid)")
+        return 0
+
+    # Load frame timestamps from frames.jsonl
+    frame_grid: List[Tuple[int, int]] = []  # (frame_index, t_ns)
+    try:
+        with frames_path.open(encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                t = _get_frame_t_ns(obj)
+                idx = _get_frame_index(obj)
+                if t is not None and idx is not None:
+                    frame_grid.append((idx, t))
+    except OSError as e:
+        if verbose:
+            print(f"  frames.jsonl read error: {e} — skip resample")
+        return 0
+
+    if not frame_grid:
+        if verbose:
+            print("  frames.jsonl has no parseable rows — skip resample")
+        return 0
+
+    if len(frame_grid) < 100:
+        if verbose:
+            print(f"  frames.jsonl has only {len(frame_grid)} rows "
+                  f"(test fixture, not 5-min recording) — skip resample")
+        return 0
+
+    # Sort frame_grid by frame_index (recorder should already write in order
+    # but defensive sort is cheap on 9000 rows).
+    frame_grid.sort(key=lambda fi: fi[0])
+
+    # Load action_camera
+    try:
+        data = json.loads(ac_path.read_text())
+    except json.JSONDecodeError as e:
+        if verbose:
+            print(f"  action_camera.json parse error: {e}")
+        return 0
+
+    if isinstance(data, dict) and "frames" in data:
+        ac_rows = data["frames"]
+        is_wrapped = True
+        if data.get("frame_aligned_applied"):
+            if verbose:
+                print("  frame-align already applied — skip (idempotent)")
+            return 0
+    elif isinstance(data, list):
+        ac_rows = data
+        is_wrapped = False
+        if ac_rows and isinstance(ac_rows[0], dict) and ac_rows[0].get("_frame_aligned_applied"):
+            if verbose:
+                print("  frame-align already applied — skip (idempotent)")
+            return 0
+    else:
+        if verbose:
+            print("  action_camera.json unexpected structure — skip resample")
+        return 0
+
+    if not ac_rows:
+        return 0
+
+    # If already approximately aligned (same length as frame_grid ± 5), skip.
+    # This handles re-runs across recorder versions where the recorder
+    # itself produces 9000-row output natively.
+    if abs(len(ac_rows) - len(frame_grid)) <= 5:
+        if verbose:
+            print(f"  action_camera already aligned ({len(ac_rows)} rows vs "
+                  f"{len(frame_grid)} frames) — skip resample")
+        # Still write the sentinel so future runs skip cleanly.
+        if is_wrapped:
+            data["frame_aligned_applied"] = True
+            ac_path.write_text(json.dumps(data, indent=2))
+        else:
+            ac_rows[0]["_frame_aligned_applied"] = True
+            ac_path.write_text(json.dumps(ac_rows, indent=2))
+        return 0
+
+    # Build sorted timestamp array for binary search. Each row may use
+    # `timestamp_ns`, `t_ns`, or `time` (seconds) — _get_frame_t_ns
+    # already handles all three.
+    ac_with_ts: List[Tuple[int, dict]] = []
+    for row in ac_rows:
+        if not isinstance(row, dict):
+            continue
+        t = _get_frame_t_ns(row)
+        if t is None:
+            continue
+        ac_with_ts.append((t, row))
+    ac_with_ts.sort(key=lambda kv: kv[0])
+
+    if not ac_with_ts:
+        if verbose:
+            print("  action_camera has no parseable timestamps — skip resample")
+        return 0
+
+    ac_times = [kv[0] for kv in ac_with_ts]
+    ac_data = [kv[1] for kv in ac_with_ts]
+
+    # Sample: for each frame_grid timestamp, find nearest action_camera row.
+    output: List[dict] = []
+    for frame_idx, frame_t in frame_grid:
+        pos = bisect.bisect_left(ac_times, frame_t)
+        if pos == 0:
+            nearest = ac_data[0]
+        elif pos >= len(ac_times):
+            nearest = ac_data[-1]
+        else:
+            before_dt = frame_t - ac_times[pos - 1]
+            after_dt = ac_times[pos] - frame_t
+            nearest = ac_data[pos - 1] if before_dt <= after_dt else ac_data[pos]
+        new_row = dict(nearest)  # shallow copy is fine — we only override scalars
+        new_row["frame"] = frame_idx
+        new_row["time"] = frame_t / 1e9
+        new_row["fps"] = 30.0
+        output.append(new_row)
+
+    # Backup original before overwrite (distinct from A24's .bak).
+    bak = ac_path.with_suffix(".json.bak.a23")
+    if not bak.exists():
+        bak.write_text(ac_path.read_text())
+
+    # Idempotency sentinel — drop on root (wrapped form) or first row (list form).
+    if is_wrapped:
+        data["frames"] = output
+        data["frame_aligned_applied"] = True
+        ac_path.write_text(json.dumps(data, indent=2))
+    else:
+        if output:
+            output[0]["_frame_aligned_applied"] = True
+        ac_path.write_text(json.dumps(output, indent=2))
+
+    if verbose:
+        print(f"  resampled action_camera: {len(ac_rows)} input rows → "
+              f"{len(output)} frame-aligned rows, backup at {bak.name}")
+    return len(output)
+
+
 # ---------------------------------------------------------------------------
 # Step 3 — generate gameinfo.xlsx
 # ---------------------------------------------------------------------------
@@ -1023,6 +1206,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     # MECE A24 / RBGA-A6 — replace screen-cursor mouse_x/y with cumulative
     # look-vector accumulated from mouse_dx/dy. Idempotent.
     look_rewritten = compute_mouse_look_vector(sd, verbose=args.verbose)
+    # MECE A23 / RBGA-A5 — resample to one row per video frame (~9000 for
+    # 5-min recording). Runs AFTER A24 so look-vector is on the per-event
+    # data BEFORE sampling — keeps cumulative yaw/pitch monotone.
+    aligned_rows = resample_action_camera_to_frames(sd, verbose=args.verbose)
 
     print("\n[3/6] Generating gameinfo.xlsx...")
     gi_ok = generate_gameinfo(sd, args.repo_root, verbose=args.verbose)
