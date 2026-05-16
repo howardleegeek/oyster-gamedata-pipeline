@@ -19,3 +19,7 @@
 ## Round 5 @ 2026-05-15T21:00:00Z
 - Picked: Fix prd_test_metric_units_meters.py to support action_camera.json list format — test was expecting camera_position at root level but action_camera.json has it inside each record. Added support for both formats with default radius fallback.
 - Result: committed 6a60c28
+
+## Round 6 @ 2026-05-16T02:24:37Z
+- Picked: Fix prd_test_camera_intrinsics_pinhole.py — test `test_fisheye_key_rejected` expected validator to reject `"fisheye"` key in intrinsics dict, but bin script only checked for k1/k2/k3 and "distortion" keys. Added explicit `"fisheye" in intrinsics` check. All 26 tests now pass.
+- Result: committed 9623955
