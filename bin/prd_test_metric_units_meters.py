@@ -3,6 +3,9 @@
 PRD p3 #5: positions in meters — sanity-bound camera_position within world cube radius.
 
 Validates camera positions in metric units are within world cube bounds.
+Supports both:
+- Single record format: {"camera_position": [...], "world_cube_radius": 10.0}
+- action_camera.json format: [{"camera_position": [...]}, ...]
 """
 
 import argparse
@@ -11,14 +14,32 @@ import sys
 import math
 from typing import Any, Dict, List, Tuple
 
+DEFAULT_WORLD_CUBE_RADIUS = 10.0  # Default 10m radius if not specified
 
-def parse_camera_data(data: Dict[str, Any]) -> Tuple[List[float], float]:
-    """Parse camera position and world cube radius from input data."""
-    if "camera_position" not in data:
-        raise ValueError("Missing required field: camera_position")
-    if "world_cube_radius" not in data:
-        raise ValueError("Missing required field: world_cube_radius")
-    pos, radius = data["camera_position"], data["world_cube_radius"]
+
+def parse_camera_data(data: Dict[str, Any], default_radius: float = DEFAULT_WORLD_CUBE_RADIUS) -> Tuple[List[float], float]:
+    """Parse camera position and world cube radius from input data.
+    
+    Supports both single-record format and action_camera.json list format.
+    """
+    # Handle list format (action_camera.json)
+    if isinstance(data, list):
+        if not data:
+            raise ValueError("Empty list provided")
+        # Use first record's camera_position
+        first_record = data[0]
+        if "camera_position" not in first_record:
+            raise ValueError("Missing required field: camera_position")
+        pos = first_record["camera_position"]
+        # Use default radius for list format
+        radius = default_radius
+    else:
+        # Single record format
+        if "camera_position" not in data:
+            raise ValueError("Missing required field: camera_position")
+        pos = data["camera_position"]
+        radius = data.get("world_cube_radius", default_radius)
+
     if not isinstance(pos, list) or len(pos) != 3:
         raise ValueError("camera_position must be a list of 3 numbers [x, y, z]")
     for i, v in enumerate(pos):
@@ -51,6 +72,8 @@ def main(argv: List[str]) -> int:
     parser.add_argument("--input", "-i", help="Input JSON file (stdin if omitted)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     parser.add_argument("--strict", action="store_true", help="Require cube bounds")
+    parser.add_argument("--radius", "-r", type=float, default=DEFAULT_WORLD_CUBE_RADIUS,
+                        help=f"World cube radius in meters (default: {DEFAULT_WORLD_CUBE_RADIUS})")
     try:
         args = parser.parse_args(argv[1:])
         if args.input:
@@ -58,7 +81,7 @@ def main(argv: List[str]) -> int:
                 data = json.load(f)
         else:
             data = json.load(sys.stdin)
-        position, radius = parse_camera_data(data)
+        position, radius = parse_camera_data(data, args.radius)
         result = check_bounds(position, radius)
         if args.strict:
             x, y, z = position
@@ -71,15 +94,12 @@ def main(argv: List[str]) -> int:
             output = {"valid": result["within_bounds"], "status": result["status"],
                       "distance_meters": result["distance_from_origin"]}
         print(json.dumps(output, indent=2))
-        return 0 if result["status"] == "VALID" else 1
-    except json.JSONDecodeError as e:
-        print(f"Error: Invalid JSON: {e}", file=sys.stderr)
-        return 2
-    except (FileNotFoundError, ValueError) as e:
+        return 0 if result["within_bounds"] else 1
+    except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 2
-    except Exception as e:
-        print(f"Unexpected error: {e}", file=sys.stderr)
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
         return 2
 
 
