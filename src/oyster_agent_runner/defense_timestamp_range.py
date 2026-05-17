@@ -5,6 +5,8 @@ G101 · Defense Timestamp Range Module
 Blue team defense for G086: enforce timestamps within 2024-01-01 to 2030-01-01 range.
 """
 
+from __future__ import annotations
+
 import argparse
 import sys
 from datetime import datetime
@@ -38,8 +40,26 @@ def parse_timestamp(ts_str: str) -> datetime | None:
     return None
 
 
-def process_timestamps(timestamps: list) -> tuple[list, int]:
-    """Process timestamps, returning (clamped_list, invalid_count)."""
+def process_timestamps(
+    timestamps: list[datetime],
+) -> tuple[list[datetime], int]:
+    """Validate and clamp a batch of timestamps to the allowed range.
+
+    Each timestamp is checked against the valid range
+    (``MIN_TIMESTAMP`` to ``MAX_TIMESTAMP``).  Timestamps outside the
+    range are clamped to the nearest boundary and counted as invalid.
+
+    Args:
+        timestamps: A list of ``datetime`` objects to validate and clamp.
+
+    Returns:
+        A tuple of ``(clamped_list, invalid_count)`` where:
+
+        - ``clamped_list``: A new list of ``datetime`` objects, each
+          clamped to ``[MIN_TIMESTAMP, MAX_TIMESTAMP]``.
+        - ``invalid_count``: The number of input timestamps that fell
+          outside the valid range before clamping.
+    """
     processed, invalid_count = [], 0
     for ts in timestamps:
         if not validate_timestamp(ts):
