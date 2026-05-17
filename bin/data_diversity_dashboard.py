@@ -127,6 +127,18 @@ def _render_text(name: str, hists: Dict, n: int) -> str:
 
 
 def generate_text_report(cohorts: Dict[str, List[Dict]]) -> str:
+    """Generate a text-based diversity report for all cohorts.
+
+    For each cohort, computes histograms across route_type, biome,
+    time_of_day, and action_entropy dimensions, then renders them
+    as ASCII bar charts.
+
+    Args:
+        cohorts: Mapping of cohort name to list of record dicts.
+
+    Returns:
+        A formatted string containing the text report for all cohorts.
+    """
     return "\n".join(_render_text(n, _compute_hists(r), len(r)) for n, r in sorted(cohorts.items()))
 
 
