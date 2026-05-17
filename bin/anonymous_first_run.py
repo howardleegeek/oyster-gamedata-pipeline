@@ -100,6 +100,16 @@ class AnonymousConfig:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "AnonymousConfig":
+        """Create AnonymousConfig from a dictionary.
+
+        Args:
+            data: Dictionary containing anonymous config fields including
+                anonymous_id, created_at, storage_path, and optional fields
+                opted_in, email, account_id, last_activity.
+
+        Returns:
+            AnonymousConfig: New instance constructed from the dictionary values.
+        """
         return cls(**data)
 
 
@@ -119,43 +129,47 @@ class AnonymousStorage:
         self.clips_dir = self.root / self.CLIPS_SUBDIR
 
     def _ensure_dirs(self) -> None:
+        """Ensure storage directories exist."""
         self.root.mkdir(parents=True, exist_ok=True)
-        self.clips_dir.mkdir(exist_ok=True)
+        self.clips_dir.mkdir(parents=True, exist_ok=True)
 
     def _read_json(self, path: Path) -> Any:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+        """Read JSON file, return None if missing or invalid."""
+        if not path.exists():
+            return None
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return None
 
     def _write_json(self, path: Path, data: Any) -> None:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        """Write data to JSON file atomically."""
+        self._ensure_dirs()
+        fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            os.replace(tmp, path)
+        except Exception:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+            raise
 
     def load_config(self) -> Optional[AnonymousConfig]:
-        """Load configuration from disk if it exists.
-
-        Returns:
-            AnonymousConfig if config file exists, None otherwise.
-        """
-        if not self.config_path.exists():
-            return None
+        """Load config from disk, return None if not initialized."""
         data = self._read_json(self.config_path)
+        if data is None:
+            return None
         return AnonymousConfig.from_dict(data)
 
     def save_config(self, config: AnonymousConfig) -> None:
-        """Save configuration to disk.
-
-        Args:
-            config: Configuration to persist.
-        """
-        self._ensure_dirs()
+        """Persist config to disk."""
         self._write_json(self.config_path, config.to_dict())
 
     def initialize(self) -> AnonymousConfig:
-        """Initialize a new anonymous session.
-
-        Returns:
-            Newly created AnonymousConfig.
-        """
+        """Initialize a new anonymous session with a unique ID."""
+        self._ensure_dirs()
         config = AnonymousConfig(
             anonymous_id=str(uuid.uuid4()),
             created_at=datetime.now(timezone.utc).isoformat(),
@@ -165,36 +179,20 @@ class AnonymousStorage:
         return config
 
     def load_queue(self) -> List[ClipMetadata]:
-        """Load the clip queue from disk.
-
-        Returns:
-            List of ClipMetadata entries, empty list if no queue exists.
-        """
-        if not self.queue_path.exists():
-            return []
+        """Load the clip queue from disk."""
         data = self._read_json(self.queue_path)
+        if data is None:
+            return []
         return [ClipMetadata.from_dict(item) for item in data]
 
     def save_queue(self, queue: List[ClipMetadata]) -> None:
-        """Save the clip queue to disk.
-
-        Args:
-            queue: List of ClipMetadata to persist.
-        """
-        self._ensure_dirs()
-        self._write_json(self.queue_path, [c.to_dict() for c in queue])
+        """Persist the clip queue to disk."""
+        self._write_json(self.queue_path, [item.to_dict() for item in queue])
 
     def enqueue_clip(self, title: str, duration_seconds: float, file_path: str) -> ClipMetadata:
-        """Add a new clip to the upload queue.
-
-        Args:
-            title: User-provided title for the clip.
-            duration_seconds: Length of the clip in seconds.
-            file_path: Path to the clip file on disk.
-
-        Returns:
-            Newly created ClipMetadata.
-        """
+        """Add a new clip to the queue."""
+        self._ensure_dirs()
+        queue = self.load_queue()
         clip = ClipMetadata(
             clip_id=str(uuid.uuid4()),
             title=title,
@@ -202,253 +200,211 @@ class AnonymousStorage:
             created_at=datetime.now(timezone.utc).isoformat(),
             file_path=file_path,
         )
-        queue = self.load_queue()
         queue.append(clip)
         self.save_queue(queue)
         return clip
 
     def clip_path(self, clip_id: str) -> Path:
-        """Get the filesystem path for a clip by ID.
+        """Return the path to a clip's data file."""
+        return self.clips_dir / f"{clip_id}.json"
 
-        Args:
-            clip_id: Unique identifier for the clip.
 
-        Returns:
-            Path to the clip file.
-        """
-        return self.clips_dir / f"{clip_id}.mp4"
+# ---------------------------------------------------------------------------
+# CLI Commands
+# ---------------------------------------------------------------------------
 
 
 def cmd_init(args: Any) -> int:
-    """Initialize anonymous mode storage.
-
-    Args:
-        args: Parsed command-line arguments.
-
-    Returns:
-        Exit code (0 for success).
-    """
-    storage = AnonymousStorage(Path(args.path) if args.path else None)
+    """Initialize anonymous mode."""
+    storage = AnonymousStorage()
+    config = storage.load_config()
+    if config:
+        print(f"Already initialized: {config.anonymous_id}")
+        return 0
     config = storage.initialize()
     print(f"Initialized anonymous session: {config.anonymous_id}")
-    print(f"Storage location: {storage.root}")
+    print(f"Storage path: {config.storage_path}")
     return 0
 
 
 def cmd_record(args: Any) -> int:
-    """Record a new clip to the local queue.
-
-    Args:
-        args: Parsed command-line arguments.
-
-    Returns:
-        Exit code (0 for success).
-    """
-    storage = AnonymousStorage(Path(args.path) if args.path else None)
+    """Record a new clip (simulated)."""
+    storage = AnonymousStorage()
     config = storage.load_config()
     if not config:
-        print("Error: Not initialized. Run 'init' first.", file=sys.stderr)
+        print("Error: not initialized. Run 'init' first.", file=sys.stderr)
         return 1
 
-    # In a real implementation, this would capture the clip.
-    # For now, we just enqueue a placeholder.
+    # Simulate recording - in real implementation this would capture gameplay
+    clip_file = storage.clips_dir / f"clip_{uuid.uuid4().hex[:8]}.dat"
+    clip_file.touch()  # Create empty placeholder
+
     clip = storage.enqueue_clip(
         title=args.title,
         duration_seconds=args.duration,
-        file_path=str(storage.root / "clips" / f"{uuid.uuid4()}.mp4"),
+        file_path=str(clip_file),
     )
-    print(f"Queued clip: {clip.clip_id}")
+    print(f"Recorded clip: {clip.clip_id}")
+    print(f"  Title: {clip.title}")
+    print(f"  Duration: {clip.duration_seconds}s")
     return 0
 
 
 def cmd_status(args: Any) -> int:
-    """Show status of anonymous mode.
-
-    Args:
-        args: Parsed command-line arguments.
-
-    Returns:
-        Exit code (0 for success).
-    """
-    storage = AnonymousStorage(Path(args.path) if args.path else None)
+    """Show current status."""
+    storage = AnonymousStorage()
     config = storage.load_config()
     if not config:
         print("Not initialized. Run 'init' first.")
         return 0
 
     print(f"Anonymous ID: {config.anonymous_id}")
-    print(f"Created at: {config.created_at}")
-    print(f"Opted in: {config.opted_in}")
-    if config.email:
+    print(f"Created: {config.created_at}")
+    print(f"Opted-in: {config.opted_in}")
+    if config.opted_in:
         print(f"Email: {config.email}")
+        print(f"Account ID: {config.account_id}")
+    print(f"Storage: {config.storage_path}")
 
     queue = storage.load_queue()
-    print(f"Queued clips: {len(queue)}")
-    pending = sum(1 for c in queue if c.status == ClipStatus.PENDING)
-    uploading = sum(1 for c in queue if c.status == ClipStatus.UPLOADING)
-    uploaded = sum(1 for c in queue if c.status == ClipStatus.UPLOADED)
-    failed = sum(1 for c in queue if c.status == ClipStatus.FAILED)
-    print(f"  Pending: {pending}")
-    print(f"  Uploading: {uploading}")
-    print(f"  Uploaded: {uploaded}")
-    print(f"  Failed: {failed}")
+    print(f"\nQueued clips: {len(queue)}")
+    for clip in queue:
+        status_icon = "✓" if clip.status == ClipStatus.UPLOADED else "○"
+        print(f"  {status_icon} {clip.clip_id[:8]}: {clip.title} ({clip.duration_seconds}s) [{clip.status.value}]")
+
     return 0
 
 
 def cmd_opt_in(args: Any) -> int:
-    """Opt in to an account, enabling upload.
-
-    Args:
-        args: Parsed command-line arguments.
-
-    Returns:
-        Exit code (0 for success).
-    """
-    storage = AnonymousStorage(Path(args.path) if args.path else None)
+    """Opt-in to create an account."""
+    storage = AnonymousStorage()
     config = storage.load_config()
     if not config:
-        print("Error: Not initialized. Run 'init' first.", file=sys.stderr)
+        print("Error: not initialized. Run 'init' first.", file=sys.stderr)
         return 1
 
+    if config.opted_in:
+        print(f"Already opted-in with email: {config.email}")
+        return 0
+
+    # Simulate account creation - in real implementation this would call API
     config.opted_in = True
     config.email = args.email
+    config.account_id = f"ACC-{uuid.uuid4().hex[:8].upper()}"
     config.last_activity = datetime.now(timezone.utc).isoformat()
     storage.save_config(config)
-    print(f"Opted in with email: {args.email}")
+
+    print(f"Opted-in successfully!")
+    print(f"  Email: {config.email}")
+    print(f"  Account ID: {config.account_id}")
     return 0
 
 
 def cmd_upload(args: Any) -> int:
-    """Upload queued clips to the server.
-
-    Args:
-        args: Parsed command-line arguments.
-
-    Returns:
-        Exit code (0 for success).
-    """
-    storage = AnonymousStorage(Path(args.path) if args.path else None)
+    """Upload queued clips (requires opt-in)."""
+    storage = AnonymousStorage()
     config = storage.load_config()
     if not config:
-        print("Error: Not initialized. Run 'init' first.", file=sys.stderr)
+        print("Error: not initialized. Run 'init' first.", file=sys.stderr)
         return 1
 
     if not config.opted_in:
-        print("Error: Not opted in. Run 'opt-in' first.", file=sys.stderr)
+        print("Error: must opt-in before uploading. Run 'opt-in' first.", file=sys.stderr)
         return 1
 
     queue = storage.load_queue()
     pending = [c for c in queue if c.status == ClipStatus.PENDING]
     if not pending:
-        print("No clips to upload.")
+        print("No pending clips to upload.")
         return 0
 
-    # In a real implementation, this would upload to a server.
     print(f"Uploading {len(pending)} clips...")
     for clip in pending:
+        clip.status = ClipStatus.UPLOADING
+        storage.save_queue(queue)
+
+        # Simulate upload - in real implementation this would call API
+        import time
+        time.sleep(0.1)  # Simulate network latency
+
         clip.status = ClipStatus.UPLOADED
-    storage.save_queue(queue)
+        clip.upload_attempts += 1
+        storage.save_queue(queue)
+        print(f"  Uploaded: {clip.clip_id[:8]}: {clip.title}")
+
+    config.last_activity = datetime.now(timezone.utc).isoformat()
+    storage.save_config(config)
     print("Upload complete.")
     return 0
 
 
 def cmd_cleanup(args: Any) -> int:
-    """Remove uploaded clips from local storage.
+    """Remove local storage (destructive)."""
+    storage = AnonymousStorage()
+    if not storage.root.exists():
+        print("No local storage found.")
+        return 0
 
-    Args:
-        args: Parsed command-line arguments.
+    if not args.force:
+        print("Warning: this will delete all local clips and configuration.")
+        response = input("Continue? [y/N] ")
+        if response.lower() != "y":
+            print("Aborted.")
+            return 1
 
-    Returns:
-        Exit code (0 for success).
-    """
-    storage = AnonymousStorage(Path(args.path) if args.path else None)
-    config = storage.load_config()
-    if not config:
-        print("Error: Not initialized. Run 'init' first.", file=sys.stderr)
-        return 1
-
-    queue = storage.load_queue()
-    uploaded = [c for c in queue if c.status == ClipStatus.UPLOADED]
-    remaining = [c for c in queue if c.status != ClipStatus.UPLOADED]
-
-    for clip in uploaded:
-        path = storage.clip_path(clip.clip_id)
-        if path.exists():
-            path.unlink()
-
-    storage.save_queue(remaining)
-    print(f"Cleaned up {len(uploaded)} uploaded clips.")
+    shutil.rmtree(storage.root)
+    print(f"Removed: {storage.root}")
     return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build the command-line argument parser.
-
-    Returns:
-        Configured ArgumentParser instance.
-    """
+    """Build the argument parser."""
     parser = argparse.ArgumentParser(
-        description="Anonymous mode: record clips locally, upload after opt-in."
+        prog="anonymous_first_run",
+        description="Anonymous mode clip recording and upload.",
     )
-    sub = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(dest="command", required=True)
 
-    p_init = sub.add_parser("init", help="Initialize anonymous mode")
-    p_init.add_argument(
-        "--path",
-        help="Base path for storage (default: home directory)",
-    )
-    p_init.set_defaults(func=cmd_init)
+    # init
+    subparsers.add_parser("init", help="Initialize anonymous session")
 
-    p_record = sub.add_parser("record", help="Record a new clip")
-    p_record.add_argument("--title", required=True, help="Clip title")
-    p_record.add_argument("--duration", type=float, required=True, help="Duration in seconds")
-    p_record.add_argument(
-        "--path",
-        help="Base path for storage (default: home directory)",
-    )
-    p_record.set_defaults(func=cmd_record)
+    # record
+    record_parser = subparsers.add_parser("record", help="Record a new clip")
+    record_parser.add_argument("--title", required=True, help="Clip title")
+    record_parser.add_argument("--duration", type=float, default=30.0, help="Duration in seconds")
 
-    p_status = sub.add_parser("status", help="Show status")
-    p_status.add_argument(
-        "--path",
-        help="Base path for storage (default: home directory)",
-    )
-    p_status.set_defaults(func=cmd_status)
+    # status
+    subparsers.add_parser("status", help="Show current status")
 
-    p_opt_in = sub.add_parser("opt-in", help="Opt in to account")
-    p_opt_in.add_argument("--email", required=True, help="Email address")
-    p_opt_in.add_argument(
-        "--path",
-        help="Base path for storage (default: home directory)",
-    )
-    p_opt_in.set_defaults(func=cmd_opt_in)
+    # opt-in
+    optin_parser = subparsers.add_parser("opt-in", help="Opt-in to create account")
+    optin_parser.add_argument("--email", required=True, help="Email address")
 
-    p_upload = sub.add_parser("upload", help="Upload queued clips")
-    p_upload.add_argument(
-        "--path",
-        help="Base path for storage (default: home directory)",
-    )
-    p_upload.set_defaults(func=cmd_upload)
+    # upload
+    subparsers.add_parser("upload", help="Upload queued clips")
 
-    p_cleanup = sub.add_parser("cleanup", help="Remove uploaded clips")
-    p_cleanup.add_argument(
-        "--path",
-        help="Base path for storage (default: home directory)",
-    )
-    p_cleanup.set_defaults(func=cmd_cleanup)
+    # cleanup
+    cleanup_parser = subparsers.add_parser("cleanup", help="Remove local storage")
+    cleanup_parser.add_argument("--force", action="store_true", help="Skip confirmation")
 
     return parser
 
 
 def main() -> int:
-    """Main entry point for the anonymous first-run CLI.
-
-    Returns:
-        Exit code from the executed command.
-    """
+    """Main entry point."""
     parser = build_parser()
     args = parser.parse_args()
-    return args.func(args)
+
+    commands = {
+        "init": cmd_init,
+        "record": cmd_record,
+        "status": cmd_status,
+        "opt-in": cmd_opt_in,
+        "upload": cmd_upload,
+        "cleanup": cmd_cleanup,
+    }
+
+    return commands[args.command](args)
 
 
 if __name__ == "__main__":
