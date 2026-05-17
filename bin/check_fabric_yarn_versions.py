@@ -133,7 +133,7 @@ def parse_current_matrix(workflow_path):
     return versions, None
 
 
-def determine_java_release(mc_version):
+def determine_java_release(mc_version: str) -> int:
     """Heuristic for Java release based on MC version.
 
     MC < 1.20.5 requires Java 17. MC 1.20.5+ requires Java 21.
