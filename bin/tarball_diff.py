@@ -51,7 +51,18 @@ def count_action_camera_records(directory: str) -> int:
     return count
 
 
-def get_video_duration(directory):
+def get_video_duration(directory: str) -> float:
+    """Sum the total video duration (seconds) from JSON records in a directory.
+
+    Recursively walks the directory tree, reads all .json files, and sums
+    the 'duration' field from any dict items found.
+
+    Args:
+        directory: Path to the root directory to scan recursively.
+
+    Returns:
+        The total duration in seconds across all matching records.
+    """
     total = 0.0
     for root, _, files in os.walk(directory):
         for f in files:
