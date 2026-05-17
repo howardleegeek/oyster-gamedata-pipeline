@@ -4,10 +4,22 @@
 import argparse
 import sys
 from pathlib import Path
+from typing import Union
 
 
-def check_magic_byte(filepath):
-    """Check if file has EXR magic byte 0x762f3101."""
+def check_magic_byte(filepath: Union[str, Path]) -> bool:
+    """Check if file has EXR magic byte 0x762f3101.
+
+    Opens the file in binary mode and reads the first 4 bytes to verify
+    they match the OpenEXR magic number.
+
+    Args:
+        filepath: Path to the file to check. Can be a string or Path object.
+
+    Returns:
+        True if the file starts with the EXR magic byte, False otherwise
+        (including if the file cannot be read or is too short).
+    """
     try:
         with open(filepath, 'rb') as f:
             return f.read(4) == b'\x76\x2f\x31\x01'
