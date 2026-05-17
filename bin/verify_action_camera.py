@@ -278,6 +278,16 @@ def check_layer5_cross_tool(data: dict[str, Any], clip_dir: Path) -> tuple[bool,
 # ---- Main --------------------------------------------------------------------
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse command line arguments for the action camera verification tool.
+
+    Args:
+        argv: Command line arguments (defaults to sys.argv[1:]).
+
+    Returns:
+        argparse.Namespace: Parsed arguments with attributes:
+            - clip_dir (Path): Path to clip directory containing action_camera.json
+            - layer (str): Comma-separated list of layers to run (default: "1,2,3,4,5")
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("clip_dir", type=Path, help="Path to clip directory containing action_camera.json")
     parser.add_argument("--layer", default="1,2,3,4,5", help="Comma-separated list of layers to run (default: all)")
