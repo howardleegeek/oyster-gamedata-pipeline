@@ -8,10 +8,23 @@ import math
 import os
 import statistics
 import sys
+from typing import Any, Dict
 
 
-def aggregate(log_dir: str, output_md: str) -> dict:
-    """Read iter_*.json files, compute metrics, write markdown report."""
+def aggregate(log_dir: str, output_md: str) -> Dict[str, Any]:
+    """Read iter_*.json files, compute metrics, write markdown report.
+
+    Args:
+        log_dir: Directory containing iter_*.json files to aggregate.
+        output_md: Path to write the markdown report.
+
+    Returns:
+        Dictionary containing aggregated metrics including iter_count,
+        pass_count, fail_count, timing statistics, and drift analysis.
+
+    Raises:
+        FileNotFoundError: If no iter_*.json files are found in log_dir.
+    """
     pattern = os.path.join(log_dir, "iter_*.json")
     files = sorted(glob.glob(pattern))
     if not files:
@@ -79,7 +92,7 @@ def aggregate(log_dir: str, output_md: str) -> dict:
     lines.append(f"| Capture seconds (mean) | {capture_mean:.1f} |")
     lines.append(f"| Adapt seconds (mean) | {adapt_mean:.1f} |")
     lines.append(f"| Distinct record counts | {distinct_records} |")
-    lines.append(f"| Distinct total_seconds | {distinct_total} |")
+    lines.append(f"| Distinct total seconds | {distinct_total} |")
     lines.append(f"| Cumulative compute (min) | {cumulative_compute_min:.1f} |")
 
     lines.append("\n## Distribution histogram (1s buckets)\n")
