@@ -22,6 +22,8 @@ import re
 import sys
 import urllib.request
 import urllib.error
+from typing import List, Optional, Tuple
+
 
 FABRIC_META = "https://meta.fabricmc.net/v2"
 FABRIC_MAVEN = "https://maven.fabricmc.net"
@@ -92,7 +94,7 @@ def get_latest_fabric_api(mc_version, all_fabric_versions):
     return matches[-1], None
 
 
-def fetch_all_fabric_api_versions():
+def fetch_all_fabric_api_versions() -> Tuple[Optional[List[str]], Optional[str]]:
     """Parse maven-metadata.xml and return list of all version strings."""
     xml, err = fetch_text(FABRIC_API_MAVEN_METADATA)
     if err:
