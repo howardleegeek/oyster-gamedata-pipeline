@@ -91,6 +91,11 @@ class AnonymousConfig:
     last_activity: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
+        """Convert this configuration to a dictionary for serialization.
+
+        Returns:
+            Dict[str, Any]: Dictionary representation of the config.
+        """
         return asdict(self)
 
     @classmethod
