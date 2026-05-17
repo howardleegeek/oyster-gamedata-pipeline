@@ -644,14 +644,17 @@ def audit_group_q_operator(session: Path) -> list[dict]:
             else:
                 items.append(_result("Q10", False, "no WASD events"))
 
-    # Q3 — no death/respawn (game_state.jsonl)
+    # Q3 — Howard policy update 2026-05-16: **DEATH IS ALLOWED**, not a bug.
+    # Real human gameplay includes dying. The check now just verifies that
+    # game_state.jsonl exists + is non-empty (= mod was capturing). Death
+    # events (when mod schema adds event_type) will be informational, not
+    # disqualifying. Sessions with deaths PASS Q3 the same as deathless ones.
     if gs_path.exists():
         try:
             with gs_path.open(encoding="utf-8") as fh:
                 gs_lines = sum(1 for line in fh if line.strip())
-                # actual death detection needs schema; here we just check non-empty
                 items.append(_result("Q3", gs_lines > 0,
-                                     f"game_state.jsonl entries: {gs_lines} (operator must avoid deaths)"))
+                                     f"game_state.jsonl entries: {gs_lines} (death OK — Howard policy 2026-05-16)"))
         except OSError as e:
             items.append(_result("Q3", False, f"game_state read error: {e}"))
     else:

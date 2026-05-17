@@ -158,7 +158,15 @@ def write_metadata(session: Path) -> dict:
         _detect_recorder_version(session),  # MECE M5 — Cargo.toml auto-detect
     ) or "unknown"
 
-    meta = {
+    # Bug-fix 2026-05-16: MERGE into existing metadata instead of overwriting.
+    # Previously this function destroyed recorder-generated fields like
+    # hardware_specs, input_stats, recorder_extra, start_timestamp, average_fps,
+    # capture_resolution, wall_clock_start/end, input_capture_diagnostics — all
+    # gone after one post_finalize run. Audit items M-group + C-group + Q-group
+    # then failed because the recorder's rich data was nuked.
+    # Fix: start from `existing` and overlay only the M2/M3/RBGA-C1 required fields.
+    meta = dict(existing)  # preserve everything the recorder wrote
+    meta.update({
         "schema_version": 1,
         "session_id": session_id,                  # M2: UUID4 unique cross-machine
         "device_id": device_id,                    # RBGA C1
@@ -166,11 +174,14 @@ def write_metadata(session: Path) -> dict:
         "recording_started_utc": recording_started_utc,
         "metadata_written_utc": now_utc.isoformat(),  # M3: UTC timestamps
         "recorder_version": recorder_version,
-        "platform": {
-            "os": platform.system(),
-            "release": platform.release(),
-            "python": platform.python_version(),
-        },
+    })
+    # Platform sub-dict: also merge to preserve any recorder-side platform info
+    existing_platform = meta.get("platform") if isinstance(meta.get("platform"), dict) else {}
+    meta["platform"] = {
+        **existing_platform,
+        "os": platform.system(),
+        "release": platform.release(),
+        "python": platform.python_version(),
     }
     mpath.write_text(json.dumps(meta, indent=2, sort_keys=True))
     return meta
