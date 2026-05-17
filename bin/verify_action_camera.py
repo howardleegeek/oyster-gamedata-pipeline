@@ -105,6 +105,15 @@ def quat_to_euler_zyx(q: tuple[float, float, float, float]) -> tuple[float, floa
 
 
 def quat_dot(a: tuple[float, ...], b: tuple[float, ...]) -> float:
+    """Compute the dot product of two quaternions.
+
+    Args:
+        a: First quaternion as a tuple of (x, y, z, w) components.
+        b: Second quaternion as a tuple of (x, y, z, w) components.
+
+    Returns:
+        The scalar dot product of the two quaternions.
+    """
     return sum(x * y for x, y in zip(a, b))
 
 
