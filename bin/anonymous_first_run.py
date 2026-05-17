@@ -157,6 +157,11 @@ class AnonymousStorage:
         return cfg
 
     def load_queue(self) -> List[ClipMetadata]:
+        """Load the clip queue from disk.
+
+        Returns:
+            List of ClipMetadata objects, empty list if queue file doesn't exist.
+        """
         if not self.queue_path.exists():
             return []
         raw = self._read_json(self.queue_path)
