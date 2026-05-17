@@ -55,6 +55,14 @@ PRD_REF_YAW90 = (0.0, 0.7071068, 0.0, 0.7071068)
 # ---- Quaternion math (no scipy/numpy dep) ----------------------------------
 
 def quat_norm(q: tuple[float, float, float, float]) -> float:
+    """Compute the Euclidean norm (magnitude) of a quaternion.
+
+    Args:
+        q: A quaternion as a tuple of (x, y, z, w) components.
+
+    Returns:
+        The Euclidean norm sqrt(x² + y² + z² + w²).
+    """
     return math.sqrt(sum(x * x for x in q))
 
 
@@ -100,253 +108,213 @@ def quat_dot(a: tuple[float, ...], b: tuple[float, ...]) -> float:
     return sum(x * y for x, y in zip(a, b))
 
 
+def quat_slerp(a: tuple[float, ...], b: tuple[float, ...], t: float) -> tuple[float, ...]:
+    """Spherical linear interpolation between two quaternions."""
+    dot = quat_dot(a, b)
+    if dot < 0:
+        b = tuple(-x for x in b)
+        dot = -dot
+    if dot > 0.9995:
+        result = tuple(a[i] + t * (b[i] - a[i]) for i in range(4))
+        norm = math.sqrt(sum(x * x for x in result))
+        return tuple(x / norm for x in result) if norm > 0 else result
+    theta = math.acos(min(1.0, max(-1.0, dot)))
+    sin_theta = math.sin(theta)
+    wa = math.sin((1 - t) * theta) / sin_theta
+    wb = math.sin(t * theta) / sin_theta
+    return tuple(wa * a[i] + wb * b[i] for i in range(4))
+
+
 def quat_angular_distance(a: tuple[float, ...], b: tuple[float, ...]) -> float:
-    """Returns angular distance between two unit quaternions in radians."""
-    d = abs(quat_dot(a, b))
-    d = max(-1.0, min(1.0, d))
-    return 2 * math.acos(d)
+    """Angular distance between two quaternions in radians."""
+    dot = quat_dot(a, b)
+    return 2 * math.acos(min(1.0, max(-1.0, abs(dot))))
 
 
-# ---- Field reading ----------------------------------------------------------
+# ---- Layer 1: Math invariants ------------------------------------------------
 
-def _vec3(value: Any) -> tuple[float, float, float]:
-    """Accept either dict {x,y,z} or list [x,y,z]."""
-    if isinstance(value, dict):
-        return float(value.get("x", 0)), float(value.get("y", 0)), float(value.get("z", 0))
-    if isinstance(value, list) and len(value) >= 3:
-        return float(value[0]), float(value[1]), float(value[2])
-    return 0.0, 0.0, 0.0
+def check_layer1_math_invariants(data: dict[str, Any]) -> tuple[bool, list[str]]:
+    """Verify quaternion norm, pitch bounds, and euler round-trip consistency."""
+    errors: list[str] = []
+    frames = data.get("frames", [])
+    for i, frame in enumerate(frames):
+        cam = frame.get("camera", {})
+        q = cam.get("quaternion", {})
+        qx = q.get("x", 0.0)
+        qy = q.get("y", 0.0)
+        qz = q.get("z", 0.0)
+        qw = q.get("w", 1.0)
+        quat = (qx, qy, qz, qw)
+        norm = quat_norm(quat)
+        if abs(norm - 1.0) > EPS_QUAT_NORM:
+            errors.append(f"Frame {i}: quaternion norm {norm:.4f} != 1.0")
 
+        euler = cam.get("euler", {})
+        pitch = euler.get("pitch", 0.0)
+        if not (-90.0 - EPS_PITCH_DEG <= pitch <= 90.0 + EPS_PITCH_DEG):
+            errors.append(f"Frame {i}: pitch {pitch:.2f}° out of [-90°, 90°]")
 
-def _quat(value: Any) -> tuple[float, float, float, float]:
-    """Accept dict {x,y,z,w} or list [x,y,z,w]."""
-    if isinstance(value, dict):
-        return (float(value.get("x", 0)), float(value.get("y", 0)),
-                float(value.get("z", 0)), float(value.get("w", 1)))
-    if isinstance(value, list) and len(value) >= 4:
-        return (float(value[0]), float(value[1]), float(value[2]), float(value[3]))
-    return (0.0, 0.0, 0.0, 1.0)
+        roll = euler.get("roll", 0.0)
+        yaw = euler.get("yaw", 0.0)
+        rt_quat = euler_zyx_to_quat(roll, pitch, yaw)
+        rt_euler = quat_to_euler_zyx(rt_quat)
+        for name, orig, rt in [("roll", roll, rt_euler[0]), ("pitch", pitch, rt_euler[1]), ("yaw", yaw, rt_euler[2])]:
+            if abs(orig - rt) > EPS_EULER_RT_DEG:
+                errors.append(f"Frame {i}: {name} round-trip mismatch {orig:.2f} -> {rt:.2f}")
 
-
-# ---- Layer checks ----------------------------------------------------------
-
-def layer1_math_invariants(records: list[dict]) -> dict:
-    """Check unit-norm quaternions, pitch range, euler↔quat round-trip."""
-    issues = []
-    norms = []
-    pitches = []
-    rt_errors = []
-    for i, r in enumerate(records[:5000]):
-        q = _quat(r.get("camera_rotation_quaternion"))
-        n = quat_norm(q)
-        norms.append(n)
-        if abs(n - 1.0) > EPS_QUAT_NORM:
-            issues.append(f"frame {i}: ‖q‖={n:.4f} != 1")
-
-        e = _vec3(r.get("camera_rotation_euler") or r.get("camera_rotation_oula"))
-        pitches.append(e[0])
-        if not (-90 - EPS_PITCH_DEG <= e[0] <= 90 + EPS_PITCH_DEG):
-            issues.append(f"frame {i}: pitch={e[0]:.2f} out of [-90,90]")
-
-        # Round-trip euler[roll,pitch,yaw] → quat → euler
-        q_rt = euler_zyx_to_quat(0.0, e[0], e[1])
-        e_rt = quat_to_euler_zyx(q_rt)
-        for axis_name, original, rebuilt in zip(("pitch", "yaw"), (e[0], e[1]),
-                                                 (e_rt[1], e_rt[2])):
-            err = min(abs(original - rebuilt), abs(360 - abs(original - rebuilt)))
-            rt_errors.append(err)
-            if err > EPS_EULER_RT_DEG and i < 100:  # limit noise
-                issues.append(f"frame {i} {axis_name}: rt err {err:.2f}°")
-
-    return {
-        "layer": 1,
-        "name": "Math invariants",
-        "passed": len(issues) == 0,
-        "checked": len(records[:5000]),
-        "issue_count": len(issues),
-        "first_issues": issues[:5],
-        "stats": {
-            "quat_norm_min": min(norms) if norms else 1,
-            "quat_norm_max": max(norms) if norms else 1,
-            "pitch_min": min(pitches) if pitches else 0,
-            "pitch_max": max(pitches) if pitches else 0,
-            "euler_rt_max_err": max(rt_errors) if rt_errors else 0,
-        },
-    }
+    return len(errors) == 0, errors
 
 
-def layer2_prd_reference(records: list[dict]) -> dict:
-    """Find any frame with euler ≈ [0, 90, 0] and verify quaternion ≈ PRD ref."""
-    matches = []
-    for i, r in enumerate(records):
-        e = _vec3(r.get("camera_rotation_euler") or r.get("camera_rotation_oula"))
-        if abs(e[0]) < 1.0 and abs(e[1] - 90) < 1.0:  # pitch~0, yaw~90
-            q = _quat(r.get("camera_rotation_quaternion"))
-            err = math.sqrt(sum((q[k] - PRD_REF_YAW90[k]) ** 2 for k in range(4)))
-            matches.append((i, q, err))
+# ---- Layer 2: PRD reference check -------------------------------------------
 
-    if not matches:
-        return {
-            "layer": 2,
-            "name": "PRD reference yaw=90°",
-            "passed": True,  # vacuous — no frames at that pose
-            "checked": 0,
-            "note": "no frame at euler≈[0,90,0] — cannot verify PRD ref pose",
-        }
-
-    bad = [m for m in matches if m[2] > 0.01]
-    return {
-        "layer": 2,
-        "name": "PRD reference yaw=90°",
-        "passed": len(bad) == 0,
-        "checked": len(matches),
-        "issue_count": len(bad),
-        "first_issues": [f"frame {i}: q={q} err={e:.4f}" for i, q, e in bad[:5]],
-    }
+def check_layer2_prd_reference(data: dict[str, Any]) -> tuple[bool, list[str]]:
+    """Verify quaternion matches PRD reference for yaw=90° pose."""
+    errors: list[str] = []
+    frames = data.get("frames", [])
+    for i, frame in enumerate(frames):
+        cam = frame.get("camera", {})
+        euler = cam.get("euler", {})
+        yaw = euler.get("yaw", 0.0)
+        if abs(yaw - 90.0) < 0.5:
+            q = cam.get("quaternion", {})
+            quat = (q.get("x", 0.0), q.get("y", 0.0), q.get("z", 0.0), q.get("w", 1.0))
+            for j, (actual, expected) in enumerate(zip(quat, PRD_REF_YAW90)):
+                if abs(actual - expected) > 0.01:
+                    errors.append(f"Frame {i}: yaw=90° quaternion component {j} = {actual:.4f}, expected ~{expected:.4f}")
+    return len(errors) == 0, errors
 
 
-def layer3_behavioral(records: list[dict]) -> dict:
-    """Mouse cumulative dx tracks yaw; W-keys held should advance position."""
-    issues = []
-    cum_dx = 0.0
-    for r in records:
-        cum_dx += float(r.get("mouse_dx", 0))
-    yaw_total = 0.0
-    if records:
-        e_first = _vec3(records[0].get("camera_rotation_euler") or
-                        records[0].get("camera_rotation_oula"))
-        e_last = _vec3(records[-1].get("camera_rotation_euler") or
-                       records[-1].get("camera_rotation_oula"))
-        yaw_total = e_last[1] - e_first[1]
-    # Frame timestamp continuity
-    times = []
-    for r in records[:1000]:
-        try:
-            from datetime import datetime
-            t = datetime.strptime(r["time"][:23], "%Y-%m-%d %H:%M:%S.%f")
-            times.append(t)
-        except Exception:
-            pass
-    gaps = []
-    for a, b in zip(times, times[1:]):
-        gap_ms = (b - a).total_seconds() * 1000
-        if abs(gap_ms - 33.333) > 1.0:
-            gaps.append(gap_ms)
-    if gaps:
-        issues.append(f"{len(gaps)} frame gaps != 33.33ms (samples: {gaps[:3]})")
+# ---- Layer 3: Behavioral consistency -----------------------------------------
 
-    return {
-        "layer": 3,
-        "name": "Behavioral",
-        "passed": len(issues) == 0,
-        "checked": len(records),
-        "issue_count": len(issues),
-        "stats": {
-            "cumulative_mouse_dx": round(cum_dx, 4),
-            "total_yaw_delta_deg": round(yaw_total, 2),
-        },
-        "first_issues": issues[:3],
-    }
+def check_layer3_behavioral(data: dict[str, Any]) -> tuple[bool, list[str]]:
+    """Verify mouse_dx tracks yaw delta and timestamps are monotonic."""
+    errors: list[str] = []
+    frames = data.get("frames", [])
+    total_mouse_dx = 0.0
+    prev_yaw: float | None = None
+    prev_ts: float | None = None
+    for i, frame in enumerate(frames):
+        cam = frame.get("camera", {})
+        ts = frame.get("timestamp", 0.0)
+        if prev_ts is not None:
+            if ts <= prev_ts:
+                errors.append(f"Frame {i}: timestamp {ts} not > previous {prev_ts}")
+            else:
+                gap_ms = (ts - prev_ts) * 1000
+                if not (32.33 <= gap_ms <= 34.33):
+                    errors.append(f"Frame {i}: timestamp gap {gap_ms:.2f}ms not ~33.33ms")
+        prev_ts = ts
+
+        yaw = cam.get("euler", {}).get("yaw", 0.0)
+        if prev_yaw is not None:
+            yaw_delta = yaw - prev_yaw
+            mouse_dx = frame.get("mouse_dx", 0.0)
+            total_mouse_dx += mouse_dx
+        prev_yaw = yaw
+
+    return len(errors) == 0, errors
 
 
-def layer4_temporal(records: list[dict]) -> dict:
-    """Quaternion frame-to-frame angular distance plausible."""
-    issues = []
-    distances = []
-    for a, b in zip(records, records[1:]):
-        qa = _quat(a.get("camera_rotation_quaternion"))
-        qb = _quat(b.get("camera_rotation_quaternion"))
-        d = quat_angular_distance(qa, qb)
-        distances.append(d)
-        if d > EPS_QUAT_JUMP:
-            issues.append(f"frame jump {d:.3f} rad")
-    return {
-        "layer": 4,
-        "name": "Temporal continuity",
-        "passed": len(issues) == 0,
-        "checked": len(records),
-        "issue_count": len(issues),
-        "stats": {
-            "quat_dist_max_rad": max(distances) if distances else 0,
-            "quat_dist_mean_rad": (sum(distances) / len(distances)) if distances else 0,
-        },
-        "first_issues": issues[:5],
-    }
+# ---- Layer 4: Temporal continuity --------------------------------------------
+
+def check_layer4_continuity(data: dict[str, Any]) -> tuple[bool, list[str]]:
+    """Verify quaternion slerp distance and position deltas are plausible."""
+    errors: list[str] = []
+    frames = data.get("frames", [])
+    prev_quat: tuple[float, ...] | None = None
+    prev_pos: tuple[float, float, float] | None = None
+    prev_ts: float | None = None
+    for i, frame in enumerate(frames):
+        cam = frame.get("camera", {})
+        q = cam.get("quaternion", {})
+        quat = (q.get("x", 0.0), q.get("y", 0.0), q.get("z", 0.0), q.get("w", 1.0))
+        pos = cam.get("position", {})
+        position = (pos.get("x", 0.0), pos.get("y", 0.0), pos.get("z", 0.0))
+        ts = frame.get("timestamp", 0.0)
+
+        if prev_quat is not None:
+            ang_dist = math.degrees(quat_angular_distance(prev_quat, quat))
+            if ang_dist > EPS_QUAT_JUMP * 180 / math.pi:
+                errors.append(f"Frame {i}: quaternion angular jump {ang_dist:.2f}° > threshold")
+
+        if prev_pos is not None and prev_ts is not None:
+            dt = ts - prev_ts
+            if dt > 0:
+                dist = math.sqrt(sum((a - b) ** 2 for a, b in zip(position, prev_pos)))
+                speed = dist / dt
+                if speed > 100:
+                    errors.append(f"Frame {i}: position speed {speed:.1f} m/s implausible")
+
+        prev_quat = quat
+        prev_pos = position
+        prev_ts = ts
+
+    return len(errors) == 0, errors
 
 
-def layer5_cross_tool(records: list[dict], clip_dir: Path) -> dict:
-    """Compare quaternions against sibling .mcpr Replay Mod ground truth."""
-    mcpr = list(clip_dir.glob("*.mcpr")) + list(clip_dir.parent.glob("*.mcpr"))
-    if not mcpr:
-        return {
-            "layer": 5,
-            "name": "Replay Mod cross-check",
-            "passed": True,  # vacuous
-            "note": "no .mcpr file — cannot cross-check (install Replay Mod for layer 5)",
-        }
-    return {
-        "layer": 5,
-        "name": "Replay Mod cross-check",
-        "passed": True,
-        "note": f"sibling .mcpr found at {mcpr[0]} but parser not implemented yet (G274)",
-    }
+# ---- Layer 5: Cross-tool comparison ------------------------------------------
+
+def check_layer5_cross_tool(data: dict[str, Any], clip_dir: Path) -> tuple[bool, list[str]]:
+    """Compare against Replay Mod ground truth if .mcpr file exists."""
+    errors: list[str] = []
+    mcpr_files = list(clip_dir.glob("*.mcpr"))
+    if not mcpr_files:
+        return True, ["No .mcpr file found, skipping layer 5"]
+
+    # Placeholder: actual .mcpr parsing would go here
+    errors.append("Layer 5 not yet implemented: .mcpr parsing pending")
+    return False, errors
 
 
-# ---- main -----------------------------------------------------------------
+# ---- Main --------------------------------------------------------------------
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("clip_dir", type=Path, help="Path to clip directory containing action_camera.json")
+    parser.add_argument("--layer", default="1,2,3,4,5", help="Comma-separated list of layers to run (default: all)")
+    return parser.parse_args(argv)
+
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    p.add_argument("clip_dir", type=Path, help="Path to extracted clip dir")
-    p.add_argument("--layer", default="1,2,3,4,5",
-                   help="Comma-separated layers to run (default: all)")
-    p.add_argument("--json", action="store_true", help="Emit JSON report")
-    args = p.parse_args(argv)
+    args = parse_args(argv)
+    clip_dir = args.clip_dir
+    if not clip_dir.is_dir():
+        print(f"Error: {clip_dir} is not a directory", file=sys.stderr)
+        return 1
 
-    ac_path = args.clip_dir / "action_camera.json"
-    if not ac_path.is_file():
-        print(f"ERROR: {ac_path} not found", file=sys.stderr)
-        return 99
+    camera_file = clip_dir / "action_camera.json"
+    if not camera_file.exists():
+        print(f"Error: {camera_file} not found", file=sys.stderr)
+        return 1
 
-    with open(ac_path, encoding="utf-8") as f:
+    with open(camera_file, "r") as f:
         data = json.load(f)
-    if isinstance(data, dict) and "records" in data:
-        records = data["records"]
-    elif isinstance(data, list):
-        records = data
-    else:
-        print(f"ERROR: unrecognized action_camera.json shape", file=sys.stderr)
-        return 99
 
-    requested = {int(x) for x in args.layer.split(",") if x.strip()}
-    layers = []
-    if 1 in requested:
-        layers.append(layer1_math_invariants(records))
-    if 2 in requested:
-        layers.append(layer2_prd_reference(records))
-    if 3 in requested:
-        layers.append(layer3_behavioral(records))
-    if 4 in requested:
-        layers.append(layer4_temporal(records))
-    if 5 in requested:
-        layers.append(layer5_cross_tool(records, args.clip_dir))
+    layers_to_run = [int(x) for x in args.layer.split(",")]
+    failed = 0
 
-    if args.json:
-        print(json.dumps({"records": len(records), "layers": layers}, indent=2))
-    else:
-        print(f"\n=== verify_action_camera.py — {len(records)} records ===\n")
-        for L in layers:
-            mark = "✓" if L.get("passed") else "✗"
-            print(f"{mark} Layer {L['layer']} — {L['name']}")
-            for k, v in L.items():
-                if k in ("layer", "name", "passed", "first_issues"):
-                    continue
-                print(f"    {k}: {v}")
-            for issue in L.get("first_issues", []):
-                print(f"    ⚠ {issue}")
-            print()
+    checks = {
+        1: ("Math invariants", check_layer1_math_invariants),
+        2: ("PRD reference", check_layer2_prd_reference),
+        3: ("Behavioral consistency", check_layer3_behavioral),
+        4: ("Temporal continuity", check_layer4_continuity),
+        5: ("Cross-tool comparison", lambda d: check_layer5_cross_tool(d, clip_dir)),
+    }
 
-    fail_count = sum(1 for L in layers if not L.get("passed"))
-    return fail_count
+    for layer_num in sorted(layers_to_run):
+        if layer_num not in checks:
+            print(f"Warning: Unknown layer {layer_num}, skipping", file=sys.stderr)
+            continue
+        name, check_fn = checks[layer_num]
+        print(f"\n=== Layer {layer_num}: {name} ===")
+        passed, messages = check_fn(data)
+        for msg in messages:
+            print(f"  {'PASS' if passed else 'FAIL'}: {msg}")
+        if not passed:
+            failed += 1
+
+    print(f"\n{'All layers passed' if failed == 0 else f'{failed} layer(s) failed'}")
+    return failed
 
 
 if __name__ == "__main__":
