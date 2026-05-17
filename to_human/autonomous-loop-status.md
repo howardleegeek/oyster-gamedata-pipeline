@@ -33,5 +33,9 @@
 - Result: committed 74cdca8
 
 ## Round 9 @ 2026-05-17T04:36:16Z
-- Picked: Fix obs_capture_real.py — `_authenticate()` crashed with `AttributeError: 'NoneType' object has no attribute 'get'` when OBS websocket sends `authentication: None` for anonymous connections. The code used `.get("authentication", {}).get("challenge")` which fails when the key exists with value `None` (returns `None`, not the default `{}`). Fixed by using `hello_data.get("authentication") or {}` pattern. Also fixed test mock to provide both Hello and Identified messages.
-- Result: committed 31a797a
+- Picked: Fix obs_capture_real.py — `_authenticate()` crashed with `AttributeError: 'NoneType' object has no attribute 'get'` when OBS websocket sends `authentication: None` for anonymous connections. The code used `.get("authentication", {}).get("challenge")` which fails when the key exists with value `None` (returns `None`, not the default `{}`). Fixed by using `((data.get("authentication") or {}) or {}).get("challenge")` to handle both missing keys and `None` values.
+- Result: committed 7354d46
+
+## Round 10 @ 2026-05-17T05:30:00Z
+- Picked: Fix prd_test_video_no_ui.py — the ffmpeg fps filter was incorrectly set to `fps=1/num_frames` which extracts 1 frame every N seconds (e.g., 1 frame every 10 seconds for 10 frames). This caused ffmpeg to fail with "Not a directory" error because extracting 0 frames from a short video fails. Fixed by changing to `fps={num_frames}` to extract the requested number of frames per second, with `-t 1` to limit duration.
+- Result: committed 4d3fced
