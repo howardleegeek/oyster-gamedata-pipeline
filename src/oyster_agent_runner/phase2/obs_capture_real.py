@@ -102,21 +102,29 @@ class OBSRecorder:
         return self._msg_id
 
     async def _send_request(self, request_type: str, params: dict | None = None) -> dict:
-        """Send a request and await the matching response."""
-        msg_id = self._next_id()
-        payload: dict = {
+        """Send a request to OBS and await the response.
+
+        Args:
+            request_type: OBS request type (e.g., "StartRecord").
+            params: Optional request parameters.
+
+        Returns:
+            Response data dict.
+
+        Raises:
+            RuntimeError: If OBS returns an error.
+        """
+        request_id = self._next_id()
+        payload = {
             "op": OP_REQUEST,
             "d": {
                 "requestType": request_type,
-                "requestId": str(msg_id),
+                "requestId": str(request_id),
+                **(params or {}),
             },
         }
-        if params:
-            payload["d"]["requestData"] = params
-
-        fut: asyncio.Future = asyncio.get_event_loop().create_future()
-        self._pending[msg_id] = fut
-
+        fut: asyncio.Future[dict] = asyncio.get_event_loop().create_future()
+        self._pending[request_id] = fut
         await self._ws.send(json.dumps(payload))
         response = await fut
         return response
@@ -134,8 +142,10 @@ class OBSRecorder:
 
         hello_data = hello.get("d", {})
         auth_required = hello_data.get("authRequired", False)
-        challenge = hello_data.get("authentication", {}).get("challenge", "")
-        salt = hello_data.get("authentication", {}).get("salt", "")
+        # Handle case where "authentication" is None (anonymous mode)
+        auth_info = hello_data.get("authentication") or {}
+        challenge = auth_info.get("challenge", "")
+        salt = auth_info.get("salt", "")
 
         # Step 2: send Identify (op 1)
         identify_data: dict = {}
@@ -160,123 +170,109 @@ class OBSRecorder:
         # Step 3: receive Identified (op 2)
         identified_raw = await self._ws.recv()
         identified = json.loads(identified_raw)
-        if identified.get("op") == OP_IDENTIFIED:
-            logger.info("OBS authentication successful.")
-        else:
-            raise ConnectionError(f"Authentication failed: {identified}")
+        assert identified.get("op") == OP_IDENTIFIED, f"Expected Identified, got {identified}"
 
-        # Start background listener for responses
-        self._listener_task = asyncio.create_task(self._response_listener())
-
-    async def _response_listener(self) -> None:
-        """Continuously read messages and resolve pending futures."""
-        try:
-            while True:
-                raw = await self._ws.recv()
-                msg = json.loads(raw)
-                op = msg.get("op")
-                data = msg.get("d", {})
-
-                if op == OP_REQUEST_RESPONSE:
-                    req_id = int(data.get("requestId", "0"))
-                    fut = self._pending.pop(req_id, None)
-                    if fut and not fut.done():
-                        if data.get("requestStatus", {}).get("result", False):
-                            fut.set_result(data.get("responseData", {}))
-                        else:
-                            fut.set_exception(
-                                RuntimeError(f"OBS request failed: {data.get('requestStatus', {})}")
-                            )
-                elif op == 9:  # Event
-                    logger.debug("OBS event: %s", data.get("eventType"))
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            logger.debug("Response listener exited: %s", exc)
-
-    async def start(self, output_path: str, profile: str = "spectator-1080p30") -> None:
-        """Start OBS recording.
+    async def start(self, output_path: str | None = None) -> None:
+        """Start recording.
 
         Args:
-            output_path: Desired output file path (OBS may override).
-            profile: OBS recording profile name.
-        """
-        await self._send_request("StartRecord")
-        logger.info("Recording started → %s", output_path)
-
-    async def wait_recording_active(self, timeout_sec: float = 5.0) -> None:
-        """Poll GetRecordStatus until outputActive is True.
-
-        Args:
-            timeout_sec: Maximum seconds to wait.
+            output_path: Optional custom output path. If not provided,
+                uses OBS's configured default.
 
         Raises:
-            TimeoutError: If recording does not become active in time.
+            RuntimeError: If recording fails to start.
         """
-        loop = asyncio.get_event_loop()
-        deadline = loop.time() + timeout_sec
-        while loop.time() < deadline:
-            status = await self.get_status()
-            if status.get("outputActive"):
-                return
-            await asyncio.sleep(0.2)
-        raise TimeoutError("Recording did not become active within timeout.")
+        if output_path:
+            await self._send_request("SetRecordDirectory", {"recordDirectory": output_path})
+        await self._send_request("StartRecord")
 
     async def stop(self) -> str:
-        """Stop OBS recording and return the final output filepath.
+        """Stop recording and return the output path.
 
         Returns:
-            The absolute path of the recorded file.
+            Path to the recorded file.
+
+        Raises:
+            RuntimeError: If OBS returns an error.
         """
-        result = await self._send_request("StopRecord")
-        output_path = result.get("outputPath", "")
-        logger.info("Recording stopped → %s", output_path)
-        return output_path
+        resp = await self._send_request("StopRecord")
+        return resp.get("outputPath", "")
 
     async def get_status(self) -> dict:
-        """Query current recording status.
+        """Get current recording status.
 
         Returns:
-            Dict with keys: recording (bool), paused (bool),
-            outputActive (bool), outputBytes (int), outputDuration (float).
+            Dict with keys: active (bool), paused (bool), timecode (str),
+            output_path (str).
         """
-        result = await self._send_request("GetRecordStatus")
-        return {
-            "recording": result.get("outputActive", False),
-            "paused": result.get("outputPaused", False),
-            "outputActive": result.get("outputActive", False),
-            "outputBytes": result.get("outputBytes", 0),
-            "outputDuration": result.get("outputDuration", 0.0),
-        }
+        resp = await self._send_request("GetRecordStatus")
+        return resp
+
+    async def wait_recording_active(self, timeout: float = 10.0) -> None:
+        """Wait until recording is active.
+
+        Args:
+            timeout: Max seconds to wait.
+
+        Raises:
+            TimeoutError: If recording doesn't start within timeout.
+        """
+        deadline = asyncio.get_event_loop().time() + timeout
+        while asyncio.get_event_loop().time() < deadline:
+            status = await self.get_status()
+            if status.get("outputActive", False):
+                return
+            await asyncio.sleep(0.1)
+        raise TimeoutError("Recording did not start within timeout")
+
+    async def _listen_for_responses(self) -> None:
+        """Background task to listen for request responses."""
+        try:
+            async for msg in self._ws:
+                data = json.loads(msg)
+                if data.get("op") == OP_REQUEST_RESPONSE:
+                    resp_data = data.get("d", {})
+                    req_id = int(resp_data.get("requestId", "0"))
+                    if req_id in self._pending:
+                        fut = self._pending.pop(req_id)
+                        if resp_data.get("requestStatus", {}).get("result", False):
+                            fut.set_result(resp_data.get("responseData", {}))
+                        else:
+                            fut.set_exception(
+                                RuntimeError(f"OBS error: {resp_data.get('requestStatus', {})}")
+                            )
+        except asyncio.CancelledError:
+            pass
+
+    async def __aenter__(self) -> "OBSRecorder":
+        """Enter async context."""
+        ws = _get_websockets()
+        self._ws = await ws.connect(self._uri)
+        await self._authenticate()
+        self._listener_task = asyncio.create_task(self._listen_for_responses())
+        return self
 
 
 async def record_spectator_clip(
     output_path: str,
     duration_sec: float,
-    host: str = "localhost",
-    port: int = 4455,
+    ws_host: str = "localhost",
+    ws_port: int = 4455,
     password: str = "",
 ) -> str:
-    """Convenience helper: record a spectator clip for a fixed duration.
-
-    Opens a recorder, starts recording, waits for it to become active,
-    sleeps for *duration_sec*, then stops and returns the output path.
+    """Record a spectator clip of the given duration.
 
     Args:
-        output_path: Desired output file path.
-        duration_sec: How long to record in seconds.
-        host: OBS websocket host.
-        port: OBS websocket port.
+        output_path: Path to save the recording.
+        duration_sec: Duration in seconds.
+        ws_host: OBS websocket host.
+        ws_port: OBS websocket port.
         password: OBS websocket password.
 
     Returns:
-        The final recorded file path.
-
-    Raises:
-        ConnectionError: If OBS is unreachable or auth fails.
-        TimeoutError: If recording does not start in time.
+        Path to the recorded file.
     """
-    async with OBSRecorder(ws_host=host, ws_port=port, password=password) as rec:
+    async with OBSRecorder(ws_host=ws_host, ws_port=ws_port, password=password) as rec:
         await rec.start(output_path)
         await rec.wait_recording_active()
         await asyncio.sleep(duration_sec)

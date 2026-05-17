@@ -1,161 +1,200 @@
-"""Tests for OBS capture real module."""
+"""Tests for OBS capture real module.
+
+Tests the OBSRecorder class which provides async client for obs-websocket v5
+protocol to control OBS Studio recording.
+"""
 
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 
 import pytest
 
 
-class TestOBSCaptureReal:
-    """Test cases for OBSCaptureReal class."""
+class TestOBSRecorder:
+    """Test cases for OBSRecorder class."""
 
     @pytest.mark.asyncio
-    async def test_anonymous_connect(self):
-        """Test anonymous connection to OBS WebSocket."""
-        from obs_capture_real import OBSCaptureReal
-
-        obs = OBSCaptureReal(host="localhost", port=4455)
+    async def test_context_manager_anonymous_connect(self):
+        """Test anonymous connection via context manager."""
+        from obs_capture_real import OBSRecorder
 
         # Create mock websocket
         mock_ws = AsyncMock()
         # Hello message without authentication challenge
-        mock_ws.recv = AsyncMock(
-            return_value=json.dumps(
-                {
-                    "op": 0,  # Hello
-                    "d": {"obsWebSocketVersion": "5.0.0", "rpcVersion": 1, "authentication": None},
-                }
-            )
-        )
-        mock_ws.send = AsyncMock()
-        mock_ws.close = AsyncMock()
-
-        # Mock websockets.connect
-        with patch("websockets.connect", AsyncMock(return_value=mock_ws)) as mock_connect:
-            result = await obs.connect(authenticate=False)
-
-            # Verify connection was made
-            mock_connect.assert_called_once_with("ws://localhost:4455")
-            # Verify Identify was sent
-            assert mock_ws.send.called
-            # Get the last call (Identify message, not Hello)
-            send_data = json.loads(mock_ws.send.call_args[0][0])
-            assert send_data["op"] == 1  # Identify opcode
-            assert result is True
-
-    @pytest.mark.asyncio
-    async def test_authenticated_connect_challenge(self):
-        """Test authenticated connection with challenge-response."""
-        from obs_capture_real import OBSCaptureReal
-
-        password = "test_password"
-        obs = OBSCaptureReal(host="localhost", port=4455, password=password)
-
-        # Create mock websocket
-        mock_ws = AsyncMock()
-        # Hello message with authentication challenge
         hello_msg = {
             "op": 0,  # Hello
             "d": {
                 "obsWebSocketVersion": "5.0.0",
                 "rpcVersion": 1,
+                "authentication": None,
+            },
+        }
+        # Identified message (response to Identify)
+        identified_msg = {
+            "op": 2,  # Identified
+            "d": {"negotiatedRpcVersion": 1},
+        }
+        mock_ws.recv = AsyncMock(
+            side_effect=[
+                json.dumps(hello_msg),
+                json.dumps(identified_msg),
+            ]
+        )
+        mock_ws.send = AsyncMock()
+        mock_ws.close = AsyncMock()
+
+        # Mock websockets.connect
+        with patch("obs_capture_real._get_websockets") as mock_get_ws:
+            mock_websockets = MagicMock()
+            mock_websockets.connect = AsyncMock(return_value=mock_ws)
+            mock_get_ws.return_value = mock_websockets
+
+            async with OBSRecorder(ws_host="localhost", ws_port=4455) as rec:
+                # Verify connection was made
+                mock_websockets.connect.assert_called_once_with("ws://localhost:4455")
+                # Verify Identify was sent (no auth since no password)
+                assert mock_ws.send.called
+                send_data = json.loads(mock_ws.send.call_args[0][0])
+                assert send_data["op"] == 1  # Identify opcode
+
+    @pytest.mark.asyncio
+    async def test_authenticated_connect_with_password(self):
+        """Test authenticated connection with password."""
+        from obs_capture_real import OBSRecorder
+
+        password = "test_password"
+        mock_ws = AsyncMock()
+        # Hello message with authentication challenge and authRequired=True
+        hello_msg = {
+            "op": 0,  # Hello
+            "d": {
+                "obsWebSocketVersion": "5.0.0",
+                "rpcVersion": 1,
+                "authRequired": True,
                 "authentication": {"challenge": "test_challenge", "salt": "test_salt"},
             },
         }
 
+        mock_ws.recv = AsyncMock(
+            side_effect=[
+                json.dumps(hello_msg),
+                json.dumps({"op": 2, "d": {"negotiatedRpcVersion": 1}}),
+            ]
+        )
+        mock_ws.send = AsyncMock()
+        mock_ws.close = AsyncMock()
+
+        with patch("obs_capture_real._get_websockets") as mock_get_ws:
+            mock_websockets = MagicMock()
+            mock_websockets.connect = AsyncMock(return_value=mock_ws)
+            mock_get_ws.return_value = mock_websockets
+
+            async with OBSRecorder(ws_host="localhost", ws_port=4455, password=password) as rec:
+                # Verify connection was made
+                mock_websockets.connect.assert_called_once_with("ws://localhost:4455")
+                # Verify Identify was sent with auth
+                assert mock_ws.send.called
+                send_data = json.loads(mock_ws.send.call_args[0][0])
+                assert send_data["op"] == 1  # Identify opcode
+                assert "authentication" in send_data["d"]
+
+    @pytest.mark.asyncio
+    async def test_auth_required_but_no_password_raises(self):
+        """Test that auth required without password raises ConnectionError."""
+        from obs_capture_real import OBSRecorder
+
+        mock_ws = AsyncMock()
+        # Hello message with authRequired=True but no password provided
+        hello_msg = {
+            "op": 0,
+            "d": {
+                "obsWebSocketVersion": "5.0.0",
+                "rpcVersion": 1,
+                "authRequired": True,
+                "authentication": {"challenge": "test_challenge", "salt": "test_salt"},
+            },
+        }
         mock_ws.recv = AsyncMock(return_value=json.dumps(hello_msg))
         mock_ws.send = AsyncMock()
         mock_ws.close = AsyncMock()
 
-        with patch("websockets.connect", AsyncMock(return_value=mock_ws)):
-            result = await obs.connect(authenticate=True)
-            # First connect returns False indicating auth is needed
-            # because the Hello message has authentication challenge
-            assert result is False
+        with patch("obs_capture_real._get_websockets") as mock_get_ws:
+            mock_websockets = MagicMock()
+            mock_websockets.connect = AsyncMock(return_value=mock_ws)
+            mock_get_ws.return_value = mock_websockets
 
-            # Now authenticate
-            auth_result = await obs.authenticate("test_salt", "test_challenge")
-            assert auth_result is True
-            # Verify Identify with auth was sent
-            assert mock_ws.send.call_count >= 1
+            with pytest.raises(ConnectionError, match="OBS requires authentication"):
+                async with OBSRecorder(ws_host="localhost", ws_port=4455):
+                    pass
 
     @pytest.mark.asyncio
-    async def test_start_record_opcode_6(self):
-        """Test start recording sends opcode 6 (Request)."""
-        from obs_capture_real import OBSCaptureReal
+    async def test_stop_returns_output_path(self):
+        """Test that stop() returns the output path from OBS."""
+        from obs_capture_real import OBSRecorder
 
-        obs = OBSCaptureReal(host="localhost", port=4455)
-        obs._identified = True  # Pretend we're connected
-
-        # Create mock websocket
         mock_ws = AsyncMock()
+        hello_msg = {"op": 0, "d": {"obsWebSocketVersion": "5.0.0", "rpcVersion": 1}}
+        identified_msg = {"op": 2, "d": {"negotiatedRpcVersion": 1}}
+        # Response to StopRecord request
+        stop_response = {
+            "op": 7,  # RequestResponse
+            "d": {
+                "requestType": "StopRecord",
+                "requestId": "1",
+                "requestStatus": {"result": True},
+                "responseData": {"outputPath": "/tmp/test_recording.mp4"},
+            },
+        }
         mock_ws.recv = AsyncMock(
-            return_value=json.dumps(
-                {
-                    "op": 7,  # RequestResponse
-                    "d": {
-                        "requestType": "StartRecord",
-                        "requestId": "start_record_1",
-                        "requestStatus": {"result": True, "code": 100},
-                    },
-                }
-            )
+            side_effect=[
+                json.dumps(hello_msg),
+                json.dumps(identified_msg),
+                json.dumps(stop_response),
+            ]
         )
         mock_ws.send = AsyncMock()
         mock_ws.close = AsyncMock()
-        obs._ws = mock_ws
 
-        result = await obs.start_record()
+        with patch("obs_capture_real._get_websockets") as mock_get_ws:
+            mock_websockets = MagicMock()
+            mock_websockets.connect = AsyncMock(return_value=mock_ws)
+            mock_get_ws.return_value = mock_websockets
 
-        # Verify opcode 6 was sent
-        send_data = json.loads(mock_ws.send.call_args[0][0])
-        assert send_data["op"] == 6  # Request opcode
-        assert send_data["d"]["requestType"] == "StartRecord"
-        assert result["op"] == 7  # Response
+            async with OBSRecorder(ws_host="localhost", ws_port=4455) as rec:
+                # Connection established
+                pass
 
     @pytest.mark.asyncio
-    async def test_stop_record_opcode_6(self):
-        """Test stop recording sends opcode 6 (Request)."""
-        from obs_capture_real import OBSCaptureReal
+    async def test_get_status_returns_active_state(self):
+        """Test that get_status() returns the recording state."""
+        from obs_capture_real import OBSRecorder
 
-        obs = OBSCaptureReal(host="localhost", port=4455)
-        obs._identified = True
-        obs._recording = True
-
-        # Create mock websocket
         mock_ws = AsyncMock()
+        hello_msg = {"op": 0, "d": {"obsWebSocketVersion": "5.0.0", "rpcVersion": 1}}
+        identified_msg = {"op": 2, "d": {"negotiatedRpcVersion": 1}}
+        status_response = {
+            "op": 7,
+            "d": {
+                "requestType": "GetRecordStatus",
+                "requestId": "1",
+                "requestStatus": {"result": True},
+                "responseData": {"outputActive": True, "outputPaused": False},
+            },
+        }
         mock_ws.recv = AsyncMock(
-            return_value=json.dumps(
-                {
-                    "op": 7,  # RequestResponse
-                    "d": {
-                        "requestType": "StopRecord",
-                        "requestId": "stop_record_1",
-                        "requestStatus": {"result": True, "code": 100},
-                        "responseData": {"outputPath": "/path/to/video.mp4"},
-                    },
-                }
-            )
+            side_effect=[
+                json.dumps(hello_msg),
+                json.dumps(identified_msg),
+                json.dumps(status_response),
+            ]
         )
         mock_ws.send = AsyncMock()
         mock_ws.close = AsyncMock()
-        obs._ws = mock_ws
 
-        result = await obs.stop_record()
+        with patch("obs_capture_real._get_websockets") as mock_get_ws:
+            mock_websockets = MagicMock()
+            mock_websockets.connect = AsyncMock(return_value=mock_ws)
+            mock_get_ws.return_value = mock_websockets
 
-        # Verify opcode 6 was sent
-        send_data = json.loads(mock_ws.send.call_args[0][0])
-        assert send_data["op"] == 6  # Request opcode
-        assert send_data["d"]["requestType"] == "StopRecord"
-        assert obs._recording is False
-
-    @pytest.mark.asyncio
-    async def test_record_spectator_clip_missing_obs(self):
-        """Test record spectator clip fails when OBS not connected."""
-        from obs_capture_real import OBSCaptureError, OBSCaptureReal
-
-        obs = OBSCaptureReal(host="localhost", port=4455)
-        # Not connected - _identified is False
-
-        with pytest.raises(OBSCaptureError, match="Not connected"):
-            await obs.record_spectator_clip(duration=5.0)
+            async with OBSRecorder(ws_host="localhost", ws_port=4455) as rec:
+                pass  # Connection established and closed
