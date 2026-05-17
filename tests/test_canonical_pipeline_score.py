@@ -44,8 +44,12 @@ BIN = REPO_ROOT / "bin"
 #  2026-05-16 23:30: raised to 101 (QM2 frame-index alias / QM6 Z channel /
 #                                   QM9 list-or-dict + JSON-array support /
 #                                   adapter action_camera_jsonl_path fix)
+#  2026-05-16 23:50: total raised to 105 (H8 added — depth source-kind honesty
+#                    marker per Howard PM directive: distinguish engine Z-buffer
+#                    from monocular DA-V2 fallback so buyer audit is honest).
+#                    Floor stays 101 because H8 is SKIP_honest on DA-V2 (not PASS).
 PASS_FLOOR = 101
-TOTAL_EXPECTED = 104
+TOTAL_EXPECTED = 105
 
 # The reference session lives on Howard's mac1 (and his partner's machine
 # once they scp it from minipc1). If absent, the live slice is skipped
