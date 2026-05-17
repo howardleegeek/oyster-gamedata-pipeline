@@ -62,7 +62,7 @@ def get_stable_game_versions() -> Tuple[Optional[List[str]], Optional[str]]:
     return stable, None
 
 
-def get_latest_yarn(mc_version):
+def get_latest_yarn(mc_version: str) -> Tuple[Optional[str], Optional[str]]:
     """Return latest yarn version string (e.g. '1.21.4+build.8') or None."""
     data, err = fetch_json(f"{FABRIC_META}/versions/yarn/{mc_version}")
     if err:
