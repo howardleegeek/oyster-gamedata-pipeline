@@ -133,6 +133,30 @@ def make_real_tarball(
     region: tuple[int, int, int, int],
     duration: float,
 ) -> dict[str, Any]:
+    """Replace placeholder video and depth in a buyer-spec tarball with real captures.
+    
+    Extracts the input tarball to a temporary staging directory, replaces
+    ``video.mp4`` with a real screen capture, regenerates depth EXR frames
+    via DepthAnything inference, recomputes SHA256 checksums, writes a
+    truthful README, and repacks into the output tarball.
+    
+    Args:
+        in_tarball: Path to the input tarball containing placeholder media.
+        out_tarball: Path where the rebuilt tarball with real captures will
+            be written.
+        region: A 4-tuple of ``(x, y, width, height)`` specifying the screen
+            capture region in pixels.
+        duration: Number of seconds to capture for the screen recording.
+    
+    Returns:
+        A dictionary with keys ``input``, ``output``, ``size_bytes``,
+        ``video``, and ``depth`` describing the result.
+    
+    Raises:
+        FileNotFoundError: If ``in_tarball`` does not exist.
+        RuntimeError: If the tarball has an unexpected layout, or if
+            video capture or depth inference produces unusable output.
+    """
     if not in_tarball.exists():
         raise FileNotFoundError(f"input tarball missing: {in_tarball}")
 
