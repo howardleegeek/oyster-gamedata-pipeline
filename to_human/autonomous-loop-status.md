@@ -27,3 +27,11 @@
 ## Round 7 @ 2026-05-16T03:00:00Z
 - Picked: Add test coverage for prd_test_systeminfo_required.py — the script had no test file while the PRD acceptance runner expects it to exist. Created 13 unit tests covering load_systeminfo(), validate_required_keys(), and CLI interface.
 - Result: committed f8c823e
+
+## Round 8 @ 2026-05-16T04:40:00Z
+- Picked: Fix prd_acceptance.py — the `run_lint()` function was passing `--strict=false` to lint_v3_prd_grounded.py, but argparse `store_true` doesn't accept values, causing the lint test to always fail with "ignored explicit argument 'false'". Removed the invalid argument (strict defaults to False). Also fixed test_prd_acceptance.py to check combined stdout+stderr for error messages.
+- Result: committed 74cdca8
+
+## Round 9 @ 2026-05-17T04:36:16Z
+- Picked: Fix obs_capture_real.py — `_authenticate()` crashed with `AttributeError: 'NoneType' object has no attribute 'get'` when OBS websocket sends `authentication: None` for anonymous connections. The code used `.get("authentication", {}).get("challenge")` which fails when the key exists with value `None` (returns `None`, not the default `{}`). Fixed by using `hello_data.get("authentication") or {}` pattern. Also fixed test mock to provide both Hello and Identified messages.
+- Result: committed 31a797a
