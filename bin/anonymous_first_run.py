@@ -138,6 +138,14 @@ class AnonymousStorage:
         return AnonymousConfig.from_dict(self._read_json(self.config_path))
 
     def save_config(self, cfg: AnonymousConfig) -> None:
+        """Save the anonymous session configuration to disk.
+
+        Updates the last_activity timestamp and persists the configuration
+        to the config file.
+
+        Args:
+            cfg: The AnonymousConfig object to save.
+        """
         cfg.last_activity = datetime.now(timezone.utc).isoformat()
         self._write_json(self.config_path, cfg.to_dict())
 
