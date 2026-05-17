@@ -91,6 +91,11 @@ class SimpleToolProvider:
         self._tools[tool.name] = tool
 
     def list_tools(self) -> list[Tool]:
+        """Return the list of registered tools in registration order.
+
+        Returns:
+            A list of Tool instances currently registered with this provider.
+        """
         return list(self._tools.values())
 
     def call(self, name: str, args: dict[str, Any]) -> Any:
