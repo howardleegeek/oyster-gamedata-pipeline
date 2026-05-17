@@ -107,7 +107,14 @@ def format_duration(seconds: float) -> str:
     return f"{seconds:.2f}s" if seconds < 60 else f"{int(seconds // 60)}m {seconds % 60:.2f}s"
 
 
-def main():
+def main() -> None:
+    """Compare two buyer-spec tarballs and print a markdown diff table.
+
+    Parses --left and --right tarball paths from the command line, extracts
+    both archives, and prints a markdown table comparing action_camera record
+    counts, depth file counts, and total video durations between the two
+    tarballs. Temporary extraction directories are cleaned up after comparison.
+    """
     parser = argparse.ArgumentParser(description="Compare two buyer-spec tarballs and print a markdown diff table.")
     parser.add_argument("--left", required=True, help="Path to the left (A) tarball")
     parser.add_argument("--right", required=True, help="Path to the right (B) tarball")
