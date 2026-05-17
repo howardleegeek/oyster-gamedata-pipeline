@@ -957,6 +957,12 @@ def main(argv: list[str]) -> int:
             input_latency_json_path=str(session / "input_latency.json"),
             metadata_path=str(session / "metadata.json"),
             depth_dir=str(session / "depth"),
+            # Bug-fix 2026-05-16: QM9 (camera-position range) needs this attribute
+            # to find action_camera output. Previously omitted, causing QM9 to
+            # always SKIP with "No camera position data found" even on perfectly
+            # valid sessions. Note: PRD writes action_camera.json (array), not
+            # .jsonl — QM module handles both since the 2026-05-16 patch.
+            action_camera_jsonl_path=str(session / "action_camera.json"),
         )
         items.extend(audit_quality_metrics.audit_group_quality(adapter))
     except (ImportError, Exception) as exc:  # noqa: BLE001

@@ -38,7 +38,13 @@ BIN = REPO_ROOT / "bin"
 
 # Tonight's measured floor. Increase ONLY when a verified improvement
 # lands. Decrease ONLY with Howard's explicit approval in the PR body.
-PASS_FLOOR = 98
+#
+# History:
+#  2026-05-16 22:00: initial 98 (DA-V2 depth pipeline)
+#  2026-05-16 23:30: raised to 101 (QM2 frame-index alias / QM6 Z channel /
+#                                   QM9 list-or-dict + JSON-array support /
+#                                   adapter action_camera_jsonl_path fix)
+PASS_FLOOR = 101
 TOTAL_EXPECTED = 104
 
 # The reference session lives on Howard's mac1 (and his partner's machine
