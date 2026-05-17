@@ -94,7 +94,16 @@ def count_depth_files(directory: str) -> int:
                if ".depth" in f.lower() or f.endswith(".depth") or "_depth" in f.lower())
 
 
-def format_duration(seconds):
+def format_duration(seconds: float) -> str:
+    """Format a duration in seconds into a human-readable string.
+
+    Args:
+        seconds: Duration in seconds. Values under 60 are shown as
+            X.XXs; values 60 or above are shown as Xm Y.YYs.
+
+    Returns:
+        A formatted string representing the duration.
+    """
     return f"{seconds:.2f}s" if seconds < 60 else f"{int(seconds // 60)}m {seconds % 60:.2f}s"
 
 
