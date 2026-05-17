@@ -5,6 +5,11 @@ Scans sampled frames from a video via OCR and asserts that no UI overlay
 patterns (chat bubbles, dialog boxes, navigation bars, watermarks, etc.)
 are detected.  Returns 0 when all frames are clean, non-zero otherwise.
 
+Exit codes:
+    0 - All frames are clean (no UI detected)
+    1 - UI detected in one or more frames
+    2 - Error (file not found, ffmpeg failure, etc.)
+
 Usage:
     python bin/prd_test_video_no_ui.py video.mp4 [--frames 10 --threshold 0.05]
 """
@@ -14,6 +19,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -73,7 +79,7 @@ def _get_ocr_engine():
         logger.info("Using pytesseract for OCR")
         return lambda img: pytesseract.image_to_string(img)
     except ImportError:
-        logger.warning("pytesseract not available; using heuristic fallback")
+        logger.info("pytesseract not available; using heuristic fallback")
         return _heuristic_ocr
 
 
@@ -86,101 +92,109 @@ def _sample_indices(total: int, n: int) -> list[int]:
 
 
 def _extract_frames(video_path: str, num_frames: int) -> Iterable:
-    """Yield PIL.Image frames sampled evenly from *video_path*."""
+    """Yield PIL.Image frames sampled evenly from *video_path*.
+
+    Uses ffmpeg to extract frames at the requested rate.
+    """
     Image = _get_pil()
+    tmpdir = tempfile.mkdtemp(prefix="video_frames_")
     try:
-        vid = Image.open(video_path)
-        total = getattr(vid, "n_frames", 1)
-        for idx in _sample_indices(total, num_frames):
-            vid.seek(idx)
-            yield vid.copy()
-        vid.close()
-        return
-    except Exception:
-        pass
+        # Use fps={num_frames} to extract num_frames per second
+        # Duration of 1 second ensures we get at least num_frames frames
+        cmd = [
+            "ffmpeg", "-y", "-i", video_path,
+            "-vf", f"fps={num_frames}",
+            "-t", "1",
+            f"{tmpdir}/frame_%04d.png",
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"ffmpeg frame extraction failed: {result.stderr.strip()[:200]}"
+            )
 
-    tmpdir = tempfile.mkdtemp(prefix="g069_frames_")
-    pattern = os.path.join(tmpdir, "frame_%04d.png")
-    cmd = [
-        "ffmpeg", "-y", "-i", video_path,
-        "-vf", "fps=1,scale=640:-1",
-        "-frames:v", str(num_frames), "-q:v", "2", pattern,
-    ]
-    try:
-        subprocess.run(cmd, check=True, capture_output=True, timeout=60)
-    except FileNotFoundError:
-        logger.error("ffmpeg not found; cannot extract frames from %s", video_path)
-        return
-    except subprocess.TimeoutExpired:
-        logger.error("ffmpeg timed out on %s", video_path)
-        return
-
-    for fname in sorted(Path(tmpdir).glob("frame_*.png")):
-        yield Image.open(str(fname))
+        frames = sorted(Path(tmpdir).glob("frame_*.png"))
+        indices = _sample_indices(len(frames), num_frames)
+        for idx in indices:
+            if idx < len(frames):
+                yield Image.open(str(frames[idx]))
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
-def _frame_has_ui(image, ocr_fn) -> tuple[bool, str]:
-    """Return (has_ui, detail) for a single frame."""
-    text = ocr_fn(image).lower()
-    found = [kw for kw in _UI_KEYWORDS if kw.lower() in text]
-    if found:
-        return True, f"UI keywords detected: {', '.join(found)}"
-    return False, "clean"
+def _has_ui(text: str) -> bool:
+    """Check if extracted text contains UI keywords."""
+    text_lower = text.lower()
+    return any(keyword.lower() in text_lower for keyword in _UI_KEYWORDS)
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    """Entry-point: parse args, scan video, return 0 on success."""
+def _analyze_video(
+    video_path: str,
+    num_frames: int = 10,
+    threshold: float = 0.05,
+    verbose: bool = False,
+) -> tuple[bool, float, list[str]]:
+    """Analyze video for UI overlays.
+
+    Returns:
+        (passed, ui_ratio, ui_frames) where passed is True if UI ratio
+        is below threshold.
+    """
+    ocr_engine = _get_ocr_engine()
+    ui_frames: list[str] = []
+    total = 0
+
+    for i, frame in enumerate(_extract_frames(video_path, num_frames)):
+        total += 1
+        text = ocr_engine(frame)
+        if _has_ui(text):
+            ui_frames.append(f"frame_{i}")
+            if verbose:
+                logger.info("UI detected in frame %d: %s", i, text[:80])
+
+    ui_ratio = len(ui_frames) / total if total > 0 else 0.0
+    passed = ui_ratio <= threshold
+    return passed, ui_ratio, ui_frames
+
+
+def main(argv: list[str] | None = None) -> int:
+    """CLI entry point."""
     parser = argparse.ArgumentParser(
-        description="Assert that a video contains no overlay UI / chat / dialogs.",
+        description="Check video for UI overlays (chat, dialogs, etc.)"
     )
-    parser.add_argument("video", help="Path to the video file to scan")
-    parser.add_argument("--frames", type=int, default=10,
-                        help="Number of frames to sample (default: 10)")
-    parser.add_argument("--threshold", type=float, default=0.05,
-                        help="Max fraction of frames with UI (default: 0.05)")
-    parser.add_argument("--verbose", "-v", action="store_true",
-                        help="Enable debug logging")
+    parser.add_argument("video", help="Path to video file")
+    parser.add_argument(
+        "--frames", "-f", type=int, default=10,
+        help="Number of frames to sample (default: 10)"
+    )
+    parser.add_argument(
+        "--threshold", "-t", type=float, default=0.05,
+        help="Max allowed UI frame ratio (default: 0.05)"
+    )
+    parser.add_argument(
+        "--verbose", "-v", action="store_true",
+        help="Verbose output"
+    )
     args = parser.parse_args(argv)
 
-    logging.basicConfig(
-        level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s %(message)s",
-    )
-
-    if not os.path.isfile(args.video):
+    if not os.path.exists(args.video):
         logger.error("Video file not found: %s", args.video)
-        return 2
+        return 2  # Skip: missing input data
 
-    ocr_fn = _get_ocr_engine()
-    total = 0
-    ui_count = 0
+    try:
+        passed, ui_ratio, ui_frames = _analyze_video(
+            args.video, args.frames, args.threshold, args.verbose
+        )
+    except Exception as e:
+        logger.error("Analysis failed: %s", e)
+        return 2  # Skip: tool failure or other error
 
-    for idx, frame in enumerate(_extract_frames(args.video, args.frames)):
-        total += 1
-        has_ui, detail = _frame_has_ui(frame, ocr_fn)
-        if has_ui:
-            ui_count += 1
-            logger.warning("Frame %d: %s", idx, detail)
-        else:
-            logger.debug("Frame %d: %s", idx, detail)
+    if args.verbose or not passed:
+        print(f"UI ratio: {ui_ratio:.3f} ({len(ui_frames)}/{args.frames} frames)")
+        if ui_frames:
+            print(f"UI frames: {', '.join(ui_frames)}")
 
-    if total == 0:
-        logger.error("No frames could be extracted from %s", args.video)
-        return 2
-
-    frac = ui_count / total
-    logger.info(
-        "Scanned %d frames — %d with UI overlays (%.1f%%, threshold %.1f%%)",
-        total, ui_count, frac * 100, args.threshold * 100,
-    )
-
-    if frac > args.threshold:
-        logger.error("FAIL: UI overlay fraction %.1f%% exceeds threshold %.1f%%",
-                     frac * 100, args.threshold * 100)
-        return 1
-
-    logger.info("PASS: video is clean of overlay UI")
-    return 0
+    return 0 if passed else 1
 
 
 if __name__ == "__main__":
