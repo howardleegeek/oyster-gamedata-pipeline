@@ -48,7 +48,14 @@ class InstallResult:
     mod_path: Path | None = None
     reason: str = ""
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, str | bool | None]:
+        """Convert this result to a JSON-serializable dictionary.
+
+        Returns:
+            A dict with keys ``installed`` (bool), ``mc_dir`` (str or None),
+            ``fabric_profile_dir`` (str or None), ``mod_path`` (str or None),
+            and ``reason`` (str).
+        """
         return {
             "installed": self.installed,
             "mc_dir": str(self.mc_dir) if self.mc_dir else None,
