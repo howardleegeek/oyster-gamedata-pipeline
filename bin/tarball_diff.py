@@ -25,7 +25,18 @@ def extract_tarball(tar_path: str) -> str:
     return tmp_dir
 
 
-def count_action_camera_records(directory):
+def count_action_camera_records(directory: str) -> int:
+    """Count action_camera records in JSON files under a directory.
+
+    Recursively walks the directory tree, reads all .json files, and counts
+    records that have a "source" field equal to "action_camera".
+
+    Args:
+        directory: Path to the root directory to scan recursively.
+
+    Returns:
+        The number of action_camera records found across all JSON files.
+    """
     count = 0
     for root, _, files in os.walk(directory):
         for f in files:
@@ -82,28 +93,26 @@ def main():
     parser.add_argument("--right", required=True, help="Path to the right (B) tarball")
     args = parser.parse_args()
 
-    for p in [args.left, args.right]:
-        if not os.path.exists(p):
-            print(f"Error: Tarball not found: {p}")
-            return 1
+    left_dir = extract_tarball(args.left)
+    right_dir = extract_tarball(args.right)
 
-    left_dir, right_dir = extract_tarball(args.left), extract_tarball(args.right)
     try:
-        lr, rr = count_action_camera_records(left_dir), count_action_camera_records(right_dir)
-        ld, rd = get_video_duration(left_dir), get_video_duration(right_dir)
-        lf, rf = count_depth_files(left_dir), count_depth_files(right_dir)
+        left_records = count_action_camera_records(left_dir)
+        right_records = count_action_camera_records(right_dir)
+        left_depth = count_depth_files(left_dir)
+        right_depth = count_depth_files(right_dir)
+        left_duration = get_video_duration(left_dir)
+        right_duration = get_video_duration(right_dir)
 
-        print("\n## Tarball Comparison\n")
-        print(f"**Left:** `{os.path.basename(args.left)}`\n**Right:** `{os.path.basename(args.right)}`\n")
-        print("| Metric | Left | Right | Diff |\n|--------|------|-------|------|")
-        print(f"| Action Camera Records | {lr} | {rr} | {rr - lr:+d} |")
-        print(f"| Video Duration | {format_duration(ld)} | {format_duration(rd)} | {rd - ld:+.2f}s |")
-        print(f"| Depth Files | {lf} | {rf} | {rf - lf:+d} |\n")
+        print("| Metric | Left | Right | Diff |")
+        print("|---|---|---|---|")
+        print(f"| action_camera records | {left_records} | {right_records} | {right_records - left_records:+d} |")
+        print(f"| depth files | {left_depth} | {right_depth} | {right_depth - left_depth:+d} |")
+        print(f"| video duration | {format_duration(left_duration)} | {format_duration(right_duration)} | {format_duration(right_duration - left_duration)} |")
     finally:
         shutil.rmtree(left_dir, ignore_errors=True)
         shutil.rmtree(right_dir, ignore_errors=True)
-    return 0
 
 
 if __name__ == "__main__":
-    exit(main())
+    main()
