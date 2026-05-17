@@ -78,3 +78,8 @@
 - File: bin/anonymous_first_run.py::ClipMetadata.to_dict/from_dict
 - Added: docstring=Y, type-hints=N (already had type hints)
 - Commit: 6f93191f0fbeea3fd329050ad872db4a8e0fdd50
+
+## Round @ 2026-05-17T17:53:18Z
+- File: bin/tarball_diff.py::main
+- Added: docstring=Y, type-hints=Y
+- Commit: f99d273f4616390f5b78d04548808566fcff8b7b
