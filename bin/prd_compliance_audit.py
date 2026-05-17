@@ -938,6 +938,29 @@ def main(argv: list[str]) -> int:
     # 2026-05-16 anti-fake-pass hardening — cross-signal + replay-detection
     items.extend(audit_group_session_sanity(session))
     items.extend(audit_group_anti_replay(session))
+    # 2026-05-16 quality-metrics — 10 buyer-spec-aligned dimensions (QM1-QM10)
+    # delivered by Aliyun cluster (deepseek-v3.2), 685 LOC, gate.sh PASS.
+    # Adapter: SimpleNamespace from session Path so QM module's attribute
+    # access (session.video_path etc.) works without changing the module.
+    try:
+        import audit_quality_metrics  # noqa: PLC0415
+        from types import SimpleNamespace  # noqa: PLC0415
+        adapter = SimpleNamespace(
+            video_path=str(session / "recording.mp4"),
+            audio_flac_path=str(session / "audio.flac"),
+            frames_jsonl_path=str(session / "frames.jsonl"),
+            inputs_jsonl_path=str(session / "inputs.jsonl"),
+            game_state_jsonl_path=str(session / "game_state.jsonl"),
+            input_latency_json_path=str(session / "input_latency.json"),
+            metadata_path=str(session / "metadata.json"),
+            depth_dir=str(session / "depth"),
+        )
+        items.extend(audit_quality_metrics.audit_group_quality(adapter))
+    except (ImportError, Exception) as exc:  # noqa: BLE001
+        # If QM module missing or crashes, emit a single sentinel FAIL so
+        # the audit stays honest about its own gaps.
+        items.append(_result("QM-error", False,
+                             f"audit_quality_metrics failed to load/run: {type(exc).__name__}: {exc}"))
 
     total = len(items)
     passed = sum(1 for it in items if it["status"] == "PASS")
