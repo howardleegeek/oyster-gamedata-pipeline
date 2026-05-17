@@ -64,3 +64,7 @@
 - File: bin/verify_action_camera.py::quat_norm
 - Added: docstring=Y, type-hints=N (already had type hints)
 - Commit: 4e4f1e490
+## Round @ 2026-05-17T12:33:41Z
+- File: bin/tarball_diff.py::get_video_duration
+- Added: docstring=Y, type-hints=Y
+- Commit: 49d368f862fc6f9ce495d67c0d02c28e8c3ea77a
