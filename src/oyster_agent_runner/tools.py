@@ -99,6 +99,18 @@ class SimpleToolProvider:
         return list(self._tools.values())
 
     def call(self, name: str, args: dict[str, Any]) -> Any:
+        """Invoke a registered tool by name with the given arguments.
+
+        Args:
+            name: The name of the tool to invoke. Must be a registered tool.
+            args: Dictionary of arguments to pass to the tool's handler.
+
+        Returns:
+            The return value from the tool's handler function.
+
+        Raises:
+            KeyError: If no tool with the given name is registered.
+        """
         if name not in self._tools:
             raise KeyError(f"tool not registered: {name!r}")
         tool = self._tools[name]
