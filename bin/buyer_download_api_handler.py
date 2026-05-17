@@ -166,6 +166,12 @@ class ClipStore:
         self._buyer_clips: Dict[str, List[str]] = defaultdict(list)
     
     def add_clip(self, buyer_id: str, clip: Clip) -> None:
+        """Add a clip to the buyer's clip list.
+
+        Args:
+            buyer_id: The unique identifier for the buyer.
+            clip: The Clip object to add.
+        """
         self._clips[clip.clip_id] = clip
         if clip.clip_id not in self._buyer_clips[buyer_id]:
             self._buyer_clips[buyer_id].append(clip.clip_id)
