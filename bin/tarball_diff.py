@@ -4,7 +4,21 @@
 import argparse, json, os, tarfile, tempfile, shutil
 
 
-def extract_tarball(tar_path):
+def extract_tarball(tar_path: str) -> str:
+    """Extract a .tar.gz archive into a temporary directory.
+
+    Creates a uniquely-named temporary directory, extracts the entire
+    contents of the given tarball into it, and returns the path to that
+    directory. The caller is responsible for cleaning up the temporary
+    directory when finished.
+
+    Args:
+        tar_path: Filesystem path to a .tar.gz archive.
+
+    Returns:
+        The absolute path to the temporary directory containing the
+        extracted archive contents.
+    """
     tmp_dir = tempfile.mkdtemp(prefix="tarball_diff_")
     with tarfile.open(tar_path, "r:gz") as tar:
         tar.extractall(tmp_dir)
