@@ -46,6 +46,12 @@ class Violation:
     artifact_param: str
 
     def format(self) -> str:
+        """Format violation as a human-readable error message.
+
+        Returns:
+            Formatted string with file path, line number, function name,
+            artifact parameter, and IL10 violation description.
+        """
         rel = self.file.relative_to(ROOT.parent)
         return (
             f"{rel}:{self.lineno}: function '{self.function}' has artifact "
