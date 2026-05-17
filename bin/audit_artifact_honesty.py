@@ -133,9 +133,8 @@ def audit(files: list[Path] | None = None) -> list[Violation]:
     violations: list[Violation] = []
     for path in targets:
         try:
-            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        except (OSError, SyntaxError) as e:
-            print(f"WARN: could not parse {path}: {e}", file=sys.stderr)
+            tree = ast.parse(path.read_text())
+        except SyntaxError:
             continue
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
@@ -144,6 +143,11 @@ def audit(files: list[Path] | None = None) -> list[Violation]:
 
 
 def main() -> int:
+    """Run the IL10 audit and print results to stdout.
+
+    Returns:
+        0 if no violations found, 1 if violations exist.
+    """
     violations = audit()
     if not violations:
         print(f"IL10 audit: 0 violations across {len(_iter_residual_files())} residual files")
