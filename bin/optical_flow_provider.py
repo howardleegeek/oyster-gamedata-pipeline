@@ -55,6 +55,12 @@ class FlowFrame:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialize flow frame data to a JSON-compatible dictionary.
+
+        Returns:
+            A dictionary containing the frame index, flow array shape,
+            and optional source/target frame paths as strings.
+        """
         return {
             "frame_idx": self.frame_idx,
             "flow_shape": list(self.flow.shape),
