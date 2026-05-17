@@ -168,14 +168,33 @@ class AnonymousStorage:
         return [ClipMetadata.from_dict(item) for item in raw]
 
     def save_queue(self, clips: List[ClipMetadata]) -> None:
+        """Save the clip queue to disk.
+
+        Args:
+            clips: List of ClipMetadata objects to save.
+        """
         self._write_json(self.queue_path, [c.to_dict() for c in clips])
 
     def enqueue_clip(self, clip: ClipMetadata) -> None:
+        """Add a clip to the end of the queue.
+
+        Args:
+            clip: ClipMetadata object to enqueue.
+        """
         queue = self.load_queue()
         queue.append(clip)
         self.save_queue(queue)
 
     def clip_path(self, clip_id: str, suffix: str = ".mp4") -> Path:
+        """Get the file path for a clip.
+
+        Args:
+            clip_id: Unique identifier for the clip.
+            suffix: File extension (default: ".mp4").
+
+        Returns:
+            Path to the clip file.
+        """
         return self.clips_dir / f"{clip_id}{suffix}"
 
 
