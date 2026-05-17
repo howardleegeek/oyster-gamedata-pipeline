@@ -84,6 +84,11 @@ class FlowSequence:
         return iter(self.frames)
 
     def add_frame(self, frame: FlowFrame) -> None:
+        """Add a FlowFrame to the sequence.
+
+        Args:
+            frame: The optical flow frame to append to the sequence.
+        """
         self.frames.append(frame)
 
 
