@@ -125,6 +125,14 @@ class AnonymousStorage:
         return self.config_path.exists()
 
     def load_config(self) -> AnonymousConfig:
+        """Load the anonymous session configuration from disk.
+
+        Returns:
+            AnonymousConfig: The loaded configuration.
+
+        Raises:
+            FileNotFoundError: If no configuration file exists.
+        """
         if not self.config_path.exists():
             raise FileNotFoundError(f"No config at {self.config_path}")
         return AnonymousConfig.from_dict(self._read_json(self.config_path))
