@@ -22,7 +22,7 @@ import re
 import sys
 import urllib.request
 import urllib.error
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Any
 
 
 FABRIC_META = "https://meta.fabricmc.net/v2"
@@ -33,7 +33,7 @@ FABRIC_API_MAVEN_METADATA = (
 DEFAULT_WORKFLOW = ".github/workflows/build-mc-mod.yml"
 
 
-def fetch_json(url):
+def fetch_json(url: str) -> Tuple[Optional[Any], Optional[str]]:
     """Fetch JSON from URL. Returns (data, None) or (None, error_string)."""
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "oyster-fabric-watcher/1.0"})
@@ -142,10 +142,13 @@ def determine_java_release(mc_version: str) -> int:
     MC 26.x+ uses Java 21.
     """
     parts = mc_version.split(".")
+    if not parts:
+        return 21
+
     try:
         major = int(parts[0])
-    except (ValueError, IndexError):
-        return 21  # safe default
+    except ValueError:
+        return 21
 
     if major >= 26:
         return 21
