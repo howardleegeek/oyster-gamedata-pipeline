@@ -41,7 +41,19 @@ def get_video_duration(directory):
     return total
 
 
-def count_depth_files(directory):
+def count_depth_files(directory: str) -> int:
+    """Count files whose names indicate they are depth-map outputs.
+
+    Scans the given directory tree and counts any file whose name contains
+    .depth (case-insensitive), ends with .depth, or contains
+    _depth.
+
+    Args:
+        directory: Path to the root directory to scan recursively.
+
+    Returns:
+        The number of files matching the depth-file naming convention.
+    """
     return sum(1 for root, _, files in os.walk(directory) for f in files
                if ".depth" in f.lower() or f.endswith(".depth") or "_depth" in f.lower())
 
