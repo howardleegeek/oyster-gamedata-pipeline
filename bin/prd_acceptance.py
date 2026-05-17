@@ -35,6 +35,7 @@ class TestResult:
     stderr: str = ""
     error: Optional[str] = None
     duration_seconds: float = 0.0
+    skipped: bool = False
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -51,6 +52,12 @@ class AcceptanceReport:
         return len(self.test_results) + (1 if self.lint_result else 0)
     
     @property
+    def skipped_tests(self) -> int:
+        test_skipped = sum(1 for r in self.test_results if r.skipped)
+        lint_skipped = 1 if self.lint_result and self.lint_result.skipped else 0
+        return test_skipped + lint_skipped
+    
+    @property
     def passed_tests(self) -> int:
         test_passed = sum(1 for r in self.test_results if r.passed)
         lint_passed = 1 if self.lint_result and self.lint_result.passed else 0
@@ -58,13 +65,19 @@ class AcceptanceReport:
     
     @property
     def failed_tests(self) -> int:
-        return self.total_tests - self.passed_tests
+        return self.total_tests - self.passed_tests - self.skipped_tests
+    
+    @property
+    def runnable_tests(self) -> int:
+        """Tests that were actually runnable (not skipped)."""
+        return self.total_tests - self.skipped_tests
     
     @property
     def pass_percentage(self) -> float:
-        if self.total_tests == 0:
+        """Pass percentage among runnable tests only."""
+        if self.runnable_tests == 0:
             return 0.0
-        return (self.passed_tests / self.total_tests) * 100
+        return (self.passed_tests / self.runnable_tests) * 100
 
 
 # ---------------------------------------------------------------------------
@@ -183,6 +196,25 @@ def get_test_arguments(test_name: str, session_dir: Path) -> List[str]:
     return args
 
 
+def _is_skip_worthy(exit_code: int, stdout: str, stderr: str) -> bool:
+    """Determine if an exit code 2 result should be marked as skipped.
+    
+    Exit code 2 means the test couldn't run due to missing data or
+    unavailable tools — not that the data failed validation.
+    """
+    if exit_code != 2:
+        return False
+    combined = stdout + stderr
+    skip_indicators = [
+        "not found", "no such file", "does not exist",
+        "not a directory", "no video frames", "no depth",
+        "no audio", "moov atom", "Invalid MP4",
+        "ffprobe failed", "ffmpeg", "not available",
+        "Directory not found",
+    ]
+    return any(indicator.lower() in combined.lower() for indicator in skip_indicators)
+
+
 def run_test(test_path: Path, session_dir: Path, timeout: int = 30) -> TestResult:
     """Run a single PRD test and return its result."""
     test_name = test_path.stem
@@ -204,9 +236,10 @@ def run_test(test_path: Path, session_dir: Path, timeout: int = 30) -> TestResul
         )
         duration = (datetime.now() - start_time).total_seconds()
         
-        # Determine if test passed (exit code 0) or failed (exit code 1)
-        # Exit code 2 is considered an error (not a test failure)
+        # Determine if test passed (exit code 0), failed (exit code 1),
+        # or skipped (exit code 2 = missing data / unavailable tools)
         passed = result.returncode == 0
+        skipped = _is_skip_worthy(result.returncode, result.stdout, result.stderr)
         
         # Extract error message if any
         error = None
@@ -229,7 +262,8 @@ def run_test(test_path: Path, session_dir: Path, timeout: int = 30) -> TestResul
             stdout=result.stdout,
             stderr=result.stderr,
             error=error,
-            duration_seconds=duration
+            duration_seconds=duration,
+            skipped=skipped,
         )
     except subprocess.TimeoutExpired:
         duration = (datetime.now() - start_time).total_seconds()
@@ -267,6 +301,8 @@ def run_lint(lint_path: Path, session_dir: Path, timeout: int = 30) -> TestResul
         )
         duration = (datetime.now() - start_time).total_seconds()
         
+        skipped = _is_skip_worthy(result.returncode, result.stdout, result.stderr)
+        
         return TestResult(
             test_name="lint_v3_prd_grounded",
             test_path=lint_path,
@@ -274,7 +310,8 @@ def run_lint(lint_path: Path, session_dir: Path, timeout: int = 30) -> TestResul
             exit_code=result.returncode,
             stdout=result.stdout,
             stderr=result.stderr,
-            duration_seconds=duration
+            duration_seconds=duration,
+            skipped=skipped,
         )
     except Exception as e:
         duration = (datetime.now() - start_time).total_seconds()
@@ -299,7 +336,10 @@ def generate_markdown_report(report: AcceptanceReport, output_path: Path) -> Non
         f.write("# PRD Acceptance Test Report\n\n")
         f.write(f"**Session Directory:** `{report.session_dir}`\n")
         f.write(f"**Report Generated:** {report.timestamp.isoformat()}\n")
-        f.write(f"**Overall Score:** {report.pass_percentage:.1f}% ({report.passed_tests}/{report.total_tests} tests passed)\n\n")
+        f.write(f"**Overall Score:** {report.pass_percentage:.1f}% ({report.passed_tests}/{report.runnable_tests} runnable tests passed")
+        if report.skipped_tests:
+            f.write(f", {report.skipped_tests} skipped")
+        f.write(")\n\n")
         
         f.write("## Summary\n\n")
         f.write("| Test | Status | Duration | Exit Code |\n")
@@ -307,12 +347,22 @@ def generate_markdown_report(report: AcceptanceReport, output_path: Path) -> Non
         
         # Add test results
         for result in report.test_results:
-            status = "✅ PASS" if result.passed else "❌ FAIL"
+            if result.skipped:
+                status = "⏭️ SKIP"
+            elif result.passed:
+                status = "✅ PASS"
+            else:
+                status = "❌ FAIL"
             f.write(f"| `{result.test_name}` | {status} | {result.duration_seconds:.1f}s | {result.exit_code} |\n")
         
         # Add lint result
         if report.lint_result:
-            status = "✅ PASS" if report.lint_result.passed else "❌ FAIL"
+            if report.lint_result.skipped:
+                status = "⏭️ SKIP"
+            elif report.lint_result.passed:
+                status = "✅ PASS"
+            else:
+                status = "❌ FAIL"
             f.write(f"| `{report.lint_result.test_name}` | {status} | {report.lint_result.duration_seconds:.1f}s | {report.lint_result.exit_code} |\n")
         
         f.write("\n## Customer-Shareable Summary\n\n")
@@ -328,9 +378,21 @@ def generate_markdown_report(report: AcceptanceReport, output_path: Path) -> Non
             for result in passing:
                 f.write(f"- `{result.test_name}`\n")
         
+        # Skipped tests
+        skipped = [r for r in report.test_results if r.skipped]
+        if report.lint_result and report.lint_result.skipped:
+            skipped.append(report.lint_result)
+        
+        if skipped:
+            f.write("\n### ⏭️ Skipped Tests (missing session data)\n\n")
+            for result in skipped:
+                f.write(f"- `{result.test_name}`\n")
+                if result.error:
+                    f.write(f"  - Reason: {result.error}\n")
+        
         # Failing tests
-        failing = [r for r in report.test_results if not r.passed]
-        if report.lint_result and not report.lint_result.passed:
+        failing = [r for r in report.test_results if not r.passed and not r.skipped]
+        if report.lint_result and not report.lint_result.passed and not report.lint_result.skipped:
             failing.append(report.lint_result)
         
         if failing:
@@ -349,7 +411,12 @@ def generate_markdown_report(report: AcceptanceReport, output_path: Path) -> Non
         # Detailed results for each test
         for result in report.test_results:
             f.write(f"### `{result.test_name}`\n\n")
-            f.write(f"- **Status:** {'✅ PASS' if result.passed else '❌ FAIL'}\n")
+            if result.skipped:
+                f.write(f"- **Status:** ⏭️ SKIP\n")
+            elif result.passed:
+                f.write(f"- **Status:** ✅ PASS\n")
+            else:
+                f.write(f"- **Status:** ❌ FAIL\n")
             f.write(f"- **Exit Code:** {result.exit_code}\n")
             f.write(f"- **Duration:** {result.duration_seconds:.1f}s\n")
             f.write(f"- **Test Path:** `{result.test_path}`\n")
@@ -357,32 +424,38 @@ def generate_markdown_report(report: AcceptanceReport, output_path: Path) -> Non
             if result.error:
                 f.write(f"- **Error:** {result.error}\n")
             
-            if result.stdout and not result.passed:
+            if result.stdout and not result.passed and not result.skipped:
                 # Show stdout for failed tests (might contain diagnostic info)
                 f.write(f"- **Output:**\n```\n{result.stdout[:500]}\n```\n")
         
+        # Lint detailed result
         if report.lint_result:
-            f.write(f"### `{report.lint_result.test_name}`\n\n")
-            f.write(f"- **Status:** {'✅ PASS' if report.lint_result.passed else '❌ FAIL'}\n")
-            f.write(f"- **Exit Code:** {report.lint_result.exit_code}\n")
-            f.write(f"- **Duration:** {report.lint_result.duration_seconds:.1f}s\n")
-            if report.lint_result.error:
-                f.write(f"- **Error:** {report.lint_result.error}\n")
-            elif report.lint_result.stderr:
-                f.write(f"- **Stderr:**\n```\n{report.lint_result.stderr[:500]}\n```\n")
+            r = report.lint_result
+            f.write(f"### `{r.test_name}`\n\n")
+            if r.skipped:
+                f.write(f"- **Status:** ⏭️ SKIP\n")
+            elif r.passed:
+                f.write(f"- **Status:** ✅ PASS\n")
+            else:
+                f.write(f"- **Status:** ❌ FAIL\n")
+            f.write(f"- **Exit Code:** {r.exit_code}\n")
+            f.write(f"- **Duration:** {r.duration_seconds:.1f}s\n")
+            f.write(f"- **Test Path:** `{r.test_path}`\n")
+            if r.error:
+                f.write(f"- **Error:** {r.error}\n")
 
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
-def main() -> int:
+def main(argv: List[str] = None) -> int:
     """Main entry point."""
     parser = argparse.ArgumentParser(description="Run PRD acceptance tests on a session directory")
     parser.add_argument("session_dir", type=Path, help="Session directory to test")
     parser.add_argument("--timeout", type=int, default=30, help="Timeout per test in seconds")
     parser.add_argument("--output", type=Path, help="Output report path (default: session_dir/PRD-ACCEPTANCE-REPORT.md)")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     
     session_dir = args.session_dir
     if not session_dir.exists():
@@ -410,22 +483,37 @@ def main() -> int:
         print(f"  Running {test_path.stem}...", end="", flush=True)
         result = run_test(test_path, session_dir, args.timeout)
         report.test_results.append(result)
-        print(f" {'PASS' if result.passed else 'FAIL'} ({result.duration_seconds:.1f}s)")
+        if result.skipped:
+            print(f" SKIP ({result.duration_seconds:.1f}s)")
+        elif result.passed:
+            print(f" PASS ({result.duration_seconds:.1f}s)")
+        else:
+            print(f" FAIL ({result.duration_seconds:.1f}s)")
     
     # Run lint
     print(f"Running {lint_path.stem}...", end="", flush=True)
     lint_result = run_lint(lint_path, session_dir, args.timeout)
     report.lint_result = lint_result
-    print(f" {'PASS' if lint_result.passed else 'FAIL'} ({lint_result.duration_seconds:.1f}s)")
+    if lint_result.skipped:
+        print(f" SKIP ({lint_result.duration_seconds:.1f}s)")
+    elif lint_result.passed:
+        print(f" PASS ({lint_result.duration_seconds:.1f}s)")
+    else:
+        print(f" FAIL ({lint_result.duration_seconds:.1f}s)")
     
     # Generate report
     output_path = args.output or session_dir / "PRD-ACCEPTANCE-REPORT.md"
     generate_markdown_report(report, output_path)
     
     print(f"\nReport written to: {output_path}")
-    print(f"Overall score: {report.pass_percentage:.1f}% ({report.passed_tests}/{report.total_tests} tests passed)")
+    print(f"Overall score: {report.pass_percentage:.1f}% ({report.passed_tests}/{report.runnable_tests} runnable tests passed")
+    if report.skipped_tests:
+        print(f"  Skipped: {report.skipped_tests} tests (missing session data)")
+    if report.failed_tests:
+        print(f"  Failed: {report.failed_tests} tests")
+    print(")")
     
-    # Return non-zero if any tests failed
+    # Return non-zero if any tests failed (skipped tests don't count)
     return 0 if report.failed_tests == 0 else 1
 
 
