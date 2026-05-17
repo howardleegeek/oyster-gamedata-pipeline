@@ -43,7 +43,7 @@ def fetch_json(url: str) -> Tuple[Optional[Any], Optional[str]]:
         return None, str(e)
 
 
-def fetch_text(url):
+def fetch_text(url: str) -> Tuple[Optional[str], Optional[str]]:
     """Fetch raw text from URL. Returns (text, None) or (None, error_string)."""
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "oyster-fabric-watcher/1.0"})
