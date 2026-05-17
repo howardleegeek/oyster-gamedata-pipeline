@@ -53,7 +53,7 @@ def fetch_text(url: str) -> Tuple[Optional[str], Optional[str]]:
         return None, str(e)
 
 
-def get_stable_game_versions():
+def get_stable_game_versions() -> Tuple[Optional[List[str]], Optional[str]]:
     """Return list of stable MC version strings, newest first."""
     data, err = fetch_json(f"{FABRIC_META}/versions/game")
     if err:
