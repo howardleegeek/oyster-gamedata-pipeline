@@ -155,6 +155,15 @@ FI_CASES: tuple[tuple[str, str, Callable[[dict], dict], str], ...] = (
 
 
 def main() -> int:
+    """Run the BFT adversarial fault-injection harness.
+
+    Iterates over all five fault-injection cases, mutates a baseline frame
+    for each case, and runs the mutated frame through V1/V2/V3 verifiers.
+    BFT consensus requires >=2 out of 3 verifiers to detect each fault.
+
+    Returns:
+        0 if all fault-injection cases pass BFT consensus, 1 otherwise.
+    """
     print("=" * 72)
     print("BFT ADVERSARIAL FAULT-INJECTION HARNESS")
     print("Verifiers: V1 Claude, V2 MiniMax, V3 Physics-Oracle (N=3, consensus>=2)")
