@@ -158,6 +158,22 @@ def _draw_bar(labels: List[str], counts: List[int], title: str, w: int = 400, h:
 
 
 def generate_image_dashboard(cohorts: Dict[str, List[Dict]], out_dir: Path) -> List[Path]:
+    """Generate image dashboard visualizations for each cohort.
+    
+    Creates PNG images showing histograms for route_type, biome, time_of_day, and action_entropy
+    dimensions for each cohort. Each image contains 4 subplots (2x2 grid) with a title showing
+    cohort name and record count.
+    
+    Args:
+        cohorts: Dictionary mapping cohort names to lists of record dictionaries.
+        out_dir: Directory where PNG files will be saved.
+        
+    Returns:
+        List of Path objects pointing to the generated PNG files.
+        
+    Raises:
+        RuntimeError: If PIL/Pillow library is not available.
+    """
     if not HAS_PIL or Image is None: raise RuntimeError("PIL required")
     out_dir.mkdir(parents=True, exist_ok=True); paths: List[Path] = []
     for name in sorted(cohorts):
