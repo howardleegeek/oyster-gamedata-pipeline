@@ -109,8 +109,8 @@ def test_read_route_type_from_action_camera(tmp_path):
     assert read_route_type_from_action_camera(non_existent_dir) is None
 
 
-@patch("batch_tracker.openpyxl")
-def test_read_route_type_from_gameinfo(mock_openpyxl, tmp_path):
+
+def test_read_route_type_from_gameinfo(tmp_path):
     """Test reading route_type from gameinfo.xlsx."""
     session_dir = tmp_path / "test_session"
     session_dir.mkdir()
@@ -120,6 +120,8 @@ def test_read_route_type_from_gameinfo(mock_openpyxl, tmp_path):
     mock_ws = MagicMock()
     mock_wb = MagicMock()
     mock_wb.active = mock_ws
+
+    mock_openpyxl = MagicMock()
     mock_openpyxl.load_workbook.return_value = mock_wb
 
     header_cells = [MagicMock(value="col1"), MagicMock(value="col2"), MagicMock(value="route_type")]
@@ -134,27 +136,18 @@ def test_read_route_type_from_gameinfo(mock_openpyxl, tmp_path):
 
     mock_ws.iter_rows.return_value = [MockRow()]
 
-    result = read_route_type_from_gameinfo(session_dir)
-    assert result == 3
+    with patch.dict("sys.modules", {"openpyxl": mock_openpyxl}):
+        result = read_route_type_from_gameinfo(session_dir)
+        assert result == 3
 
-    mock_cell.value = 2.0
-    result = read_route_type_from_gameinfo(session_dir)
-    assert result == 2
-
-    non_existent_dir = tmp_path / "non_existent"
-    non_existent_dir.mkdir()
-    result = read_route_type_from_action_camera(non_existent_dir)
-    assert result is None
-
-    mock_openpyxl.load_workbook.side_effect = ImportError("No module named 'openpyxl'")
-    result = read_route_type_from_gameinfo(session_dir)
-    assert result is None
+        mock_cell.value = 2.0
+        result = read_route_type_from_gameinfo(session_dir)
+        assert result == 2
 
     # Test with openpyxl not available
-    mock_openpyxl.load_workbook.side_effect = ImportError("No module named 'openpyxl'")
-    result = read_route_type_from_gameinfo(session_dir)
-    assert result is None
-
+    with patch.dict("sys.modules", {"openpyxl": None}):
+        result = read_route_type_from_gameinfo(session_dir)
+        assert result is None
 
 def test_get_route_type(tmp_path):
     """Test getting route_type with fallback logic."""
