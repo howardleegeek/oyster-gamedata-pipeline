@@ -84,19 +84,13 @@ def _run_ffmpeg(args: Sequence[str], timeout: float = 8.0) -> str:
         )
     except (OSError, subprocess.TimeoutExpired):
         return ""
-    return (proc.stdout or "") + (proc.stderr or "")
+    return (proc.stdout + proc.stderr).strip()
 
 
 def _ffmpeg_supports_wasapi() -> bool:
-    """Return True if ``ffmpeg -devices`` lists wasapi as a demuxer."""
-    out = _run_ffmpeg(["-hide_banner", "-devices"]).lower()
-    if not out:
-        return False
-    # ffmpeg lists devices as e.g. " D  wasapi  Windows Audio Session API".
-    for line in out.splitlines():
-        if " wasapi" in line or line.strip().startswith("wasapi"):
-            return True
-    return False
+    """Return True if ffmpeg lists 'wasapi' among its available input devices."""
+    out = _run_ffmpeg(["-hide_banner", "-devices"])
+    return "wasapi" in out.lower()
 
 
 def _list_dshow_audio_devices() -> List[str]:
@@ -234,6 +228,22 @@ def build_ffmpeg_args(plan: AudioCapturePlan) -> List[str]:
 
 
 def _cli(argv: Optional[Sequence[str]] = None) -> int:
+    """Command-line interface for audio capture planning.
+
+    Parses command-line arguments, generates an audio capture plan, and outputs
+    either human-readable text or JSON format.
+
+    Args:
+        argv: Command-line arguments (defaults to sys.argv[1:]).
+
+    Returns:
+        Always returns 0 (success). The recorder reads the output (JSON or text)
+        to determine the audio capture configuration.
+
+    Notes:
+        Exit code is always 0 — the recorder reads JSON and decides what to do
+        with a fallback plan. CI smoke tests check fields, not exit code.
+    """
     p = argparse.ArgumentParser(description="Plan ffmpeg audio capture (loopback first).")
     p.add_argument("--no-wasapi", action="store_true",
                    help="Skip wasapi probe (force dshow path; testing only).")
