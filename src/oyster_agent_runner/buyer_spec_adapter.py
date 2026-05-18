@@ -287,7 +287,16 @@ def _stdlib_euler_to_quat_xyzw(pitch_deg: float, yaw_deg: float, roll_deg: float
     qr = (0.0, 0.0, sr, cr)  # z-axis
 
     # Hamilton product q1 * q2 in XYZW.
-    def _mul(q1: tuple[float, float, float, float], q2: tuple[float, float, float, float]):
+    def _mul(q1: tuple[float, float, float, float], q2: tuple[float, float, float, float]) -> tuple[float, float, float, float]:
+        """Compute Hamilton product of two quaternions in XYZW order.
+        
+        Args:
+            q1: First quaternion as (x, y, z, w) tuple
+            q2: Second quaternion as (x, y, z, w) tuple
+            
+        Returns:
+            Hamilton product q1 * q2 as (x, y, z, w) tuple
+        """
         x1, y1, z1, w1 = q1
         x2, y2, z2, w2 = q2
         return (
