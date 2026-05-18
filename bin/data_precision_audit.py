@@ -368,9 +368,14 @@ def p4_coord_handedness(game_state: list) -> dict:
     if not game_state:
         return {"ok": False, "reason": "no game_state"}
 
-    # Find SUSTAINED falling runs: 3+ consecutive on_ground=False where
-    # velocity_y has reached its terminal-negative phase.
-    sustained_falling_v_y = []
+    # Bug-fix 2026-05-18: original "3+ consecutive airborne" filter still
+    # captured water-bobbing, slime-block bounces, scaffolding climbs, and the
+    # rising arc of long sprint-jumps. All produce V_y >= 0 even after 3+ ticks
+    # off-ground. Tighten to "deep fall": V_y < -0.3 (well past apex, gravity
+    # clearly dominating) AND >= 3 consecutive airborne. This is the regime
+    # where Y-up convention is unambiguously testable.
+    sustained_falling_v_y = []  # all airborne for reporting
+    deep_falling_v_y = []        # |V_y| > 0.3 AND negative AND airborne 3+
     consecutive_air = 0
     for d in game_state:
         on_ground = d.get("on_ground", True)
@@ -381,22 +386,37 @@ def p4_coord_handedness(game_state: list) -> dict:
         consecutive_air += 1
         if consecutive_air >= 3:
             sustained_falling_v_y.append(v_y)
+            if abs(v_y) > 0.3:  # deep enough into free fall (post-apex)
+                deep_falling_v_y.append(v_y)
 
     if len(sustained_falling_v_y) < 10:
         return {
             "ok": False,
             "reason": f"only {len(sustained_falling_v_y)} sustained-fall ticks (need ≥3 consecutive airborne)",
         }
-    negative_count = sum(1 for v in sustained_falling_v_y if v < 0)
-    pct_negative = 100 * negative_count / len(sustained_falling_v_y)
+    coarse_neg = sum(1 for v in sustained_falling_v_y if v < 0)
+    coarse_pct = 100 * coarse_neg / len(sustained_falling_v_y)
+
+    if len(deep_falling_v_y) < 5:
+        return {
+            "ok": True,
+            "sustained_fall_ticks": len(sustained_falling_v_y),
+            "deep_fall_ticks": len(deep_falling_v_y),
+            "coarse_pct_negative": round(coarse_pct, 1),
+            "verdict": "INCONCLUSIVE (<5 deep-fall samples — short/bobbing session)",
+        }
+    deep_neg = sum(1 for v in deep_falling_v_y if v < 0)
+    deep_pct = 100 * deep_neg / len(deep_falling_v_y)
     return {
         "ok": True,
         "sustained_fall_ticks": len(sustained_falling_v_y),
-        "velocity_y_negative_count": negative_count,
-        "pct_negative": round(pct_negative, 1),
+        "deep_fall_ticks": len(deep_falling_v_y),
+        "coarse_pct_negative_all_airborne": round(coarse_pct, 1),
+        "deep_pct_negative_postapex": round(deep_pct, 1),
         "verdict": (
-            "Y_UP convention CONFIRMED" if pct_negative > 80
-            else "INVERTED or mixed Y-axis sign (HANDEDNESS BUG)"
+            f"Y_UP convention CONFIRMED ({deep_pct:.0f}% negative on deep-fall ticks)" if deep_pct >= 95
+            else f"Y_UP probable but some sign-flip ({deep_pct:.0f}% — investigate)" if deep_pct >= 70
+            else f"INVERTED or mixed Y-axis sign (only {deep_pct:.0f}% negative on deep-fall)"
         ),
     }
 
