@@ -276,6 +276,143 @@ def step10_manifest_audit(sess: pathlib.Path, target_score: Optional[int] = None
     return passed
 
 
+def step11_input_latency(sess: pathlib.Path) -> None:
+    """v0.3.1 Howard PM gap #2 (real sync): integrate input_latency_telemetry
+    as canonical step. Closes QM5 SKIP on reference session.
+
+    Outputs `input_latency.json` with p50/p99 latencies (W press → velocity
+    change). Honest measurement, no synthesis."""
+    step("11/12 Compute real input→effect latency (input_latency.json)")
+    if not (sess / "inputs.jsonl").exists() or not (sess / "game_state.jsonl").exists():
+        print("  SKIP: missing inputs.jsonl or game_state.jsonl")
+        return
+    r = subprocess.run(
+        ["python3", str(BIN / "input_latency_telemetry.py"),
+         "--inputs", str(sess / "inputs.jsonl"),
+         "--game-state", str(sess / "game_state.jsonl"),
+         "--output", str(sess / "input_latency.json")],
+        capture_output=True, text=True, check=False,
+    )
+    if (sess / "input_latency.json").exists():
+        try:
+            data = json.loads((sess / "input_latency.json").read_text())
+            lat = data.get("latencies", []) if isinstance(data, dict) else data
+            if lat:
+                print(f"  input_latency.json: {len(lat)} samples")
+            else:
+                print("  input_latency.json: 0 samples (no W-press → velocity match)")
+        except Exception:
+            print("  input_latency.json: written but unreadable")
+    else:
+        print(f"  FAIL: input_latency.json not produced. stderr: {r.stderr[-200:]}")
+
+
+def step12_upload_gate_strict(sess: pathlib.Path) -> tuple[bool, list[str]]:
+    """v0.3.1 Howard PM directive: production upload gate.
+
+    Returns (allowed_to_upload, reasons_blocked). Strict mode enforces ALL of:
+      G1. Audit FAIL count == 0
+      G2. depth/.source kind == 'engine_zbuffer' (NOT monocular fallback)
+      G3. input_latency.json present with samples
+      G4. audio.flac exists AND > 50 KB (silence-compresses to ~30-50KB
+          for 5min; below = empty)
+      G5. action_camera.json has 9000 rows (matches mp4 frame budget)
+      G6. MANIFEST.json sha256 chain verifies (no tampering)
+
+    If any gate fails: refuse to claim production-ready. Honest about why."""
+    step("12/12 Upload gate (--strict): enforce production criteria")
+    blocked: list[str] = []
+
+    # G1: audit FAIL == 0
+    r = subprocess.run(
+        ["python3", str(BIN / "prd_compliance_audit.py"), str(sess), "--json"],
+        capture_output=True, text=True, check=False,
+    )
+    try:
+        data = json.loads(r.stdout) if r.stdout else {}
+        items = data.get("items", [])
+        fail_count = sum(1 for it in items if it.get("status") == "FAIL")
+        if fail_count > 0:
+            blocked.append(f"G1: audit has {fail_count} hard FAIL items (must be 0)")
+    except Exception as e:
+        blocked.append(f"G1: audit unparseable ({e})")
+
+    # G2: depth source kind
+    marker = sess / "depth" / ".source"
+    kind = "missing"
+    if marker.exists():
+        for ln in marker.read_text().splitlines():
+            if ln.startswith("kind:"):
+                kind = ln.split(":", 1)[1].strip()
+                break
+    if kind != "engine_zbuffer":
+        blocked.append(f"G2: depth source = '{kind}' (production requires 'engine_zbuffer'; "
+                       f"deploy patches/depth_zbuffer_capture.diff to mc-mod-fabric)")
+
+    # G3: input_latency.json present
+    il = sess / "input_latency.json"
+    if not il.exists():
+        blocked.append("G3: input_latency.json missing (run step 11 or check inputs.jsonl)")
+    else:
+        try:
+            lat_data = json.loads(il.read_text())
+            samples = lat_data.get("latencies", []) if isinstance(lat_data, dict) else lat_data
+            if not samples:
+                blocked.append("G3: input_latency.json has 0 samples (no W-press → velocity matches)")
+        except Exception:
+            blocked.append("G3: input_latency.json malformed")
+
+    # G4: audio non-silent (file > 50 KB for a 5-min session)
+    audio = sess / "audio.flac"
+    if not audio.exists():
+        blocked.append("G4: audio.flac missing")
+    elif audio.stat().st_size < 50 * 1024:
+        blocked.append(f"G4: audio.flac only {audio.stat().st_size} bytes "
+                       f"(< 50KB threshold = likely silent; enable mic via "
+                       f"patches/recorder_mic_consent.rs.diff)")
+
+    # G5: action_camera row count
+    ac = sess / "action_camera.json"
+    if not ac.exists():
+        blocked.append("G5: action_camera.json missing")
+    else:
+        try:
+            d = json.loads(ac.read_text())
+            n = len(d) if isinstance(d, list) else 0
+            if not (8990 <= n <= 9010):
+                blocked.append(f"G5: action_camera.json has {n} rows (need 8990-9010)")
+        except Exception:
+            blocked.append("G5: action_camera.json malformed")
+
+    # G6: MANIFEST sha256 chain
+    mp = sess / "MANIFEST.json"
+    if not mp.exists():
+        blocked.append("G6: MANIFEST.json missing")
+    else:
+        try:
+            manifest = json.loads(mp.read_text())
+            mismatches = 0
+            for name, info in (manifest.get("files") or {}).items():
+                fp = sess / name
+                if fp.exists():
+                    h = hashlib.sha256(fp.read_bytes()).hexdigest()
+                    if info.get("sha256") != h:
+                        mismatches += 1
+            if mismatches:
+                blocked.append(f"G6: MANIFEST has {mismatches} sha256 mismatches "
+                               f"(re-run step 10 to refresh, or investigate tampering)")
+        except Exception as e:
+            blocked.append(f"G6: MANIFEST verify failed ({e})")
+
+    if not blocked:
+        print("  ✓ ALL 6 upload gates PASS — session production-ready")
+        return True, []
+    print(f"  ✗ {len(blocked)} upload gate(s) BLOCK:")
+    for b in blocked:
+        print(f"    - {b}")
+    return False, blocked
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("session_dir", help="Path to session directory")
@@ -283,6 +420,9 @@ def main() -> int:
     ap.add_argument("--target-score", type=int, default=None, help="Exit 1 if PASS count < N")
     ap.add_argument("--skip-depth", action="store_true", help="Skip DA-V2 (saves ~10min)")
     ap.add_argument("--start-offset", type=int, default=180, help="ffmpeg -ss start (default: skip first 3min)")
+    ap.add_argument("--strict", action="store_true",
+                    help="Enforce v0.3.1 upload gate: 0 FAIL audit + engine_zbuffer depth + "
+                         "input_latency + audio non-silent + 9000 frames + MANIFEST verified")
     args = ap.parse_args()
 
     sess = pathlib.Path(args.session_dir).resolve()
@@ -300,9 +440,16 @@ def main() -> int:
     step8_depth(sess, skip=args.skip_depth)
     step9_patch_metadata(sess)
     score = step10_manifest_audit(sess, target_score=args.target_score)
+    step11_input_latency(sess)
+
+    strict_allowed = True
+    if args.strict:
+        strict_allowed, blocked = step12_upload_gate_strict(sess)
 
     if args.target_score is not None and score < args.target_score:
         return 1
+    if args.strict and not strict_allowed:
+        return 2  # production-gate failure: distinct exit code from --target-score
     return 0
 
 

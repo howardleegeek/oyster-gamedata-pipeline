@@ -121,19 +121,44 @@ def compute_latencies(inputs_path, game_state_path):
     matched_count = 0
 
     for event in read_jsonl_streaming(inputs_path):
-        # Only process keyboard events
-        if event.get("type") != "KEYBOARD":
+        # Bug-fix 2026-05-18: accept multiple schemas — canonical_pipeline.py
+        # step 4 produces `event_type` + `pressed` + `timestamp_ns` (the post-
+        # denormalize shape), but the script was written assuming `type` +
+        # `action` + `t_ns`. Support BOTH so v0.3.1 doesn't have 0 samples.
+        event_type = event.get("event_type") or event.get("type")
+        if event_type != "KEYBOARD":
             continue
 
+        # vk_code may be top-level (post-denorm) or inside event_args[0] (raw)
         vk_code = event.get("vk_code")
+        if vk_code is None:
+            ea = event.get("event_args")
+            if isinstance(ea, list) and len(ea) >= 1:
+                vk_code = ea[0]
         if vk_code not in WASD_MAP:
             continue
 
-        # Only process key-down events (not key-up)
-        if event.get("action") not in ("press", "down", 1):
+        # Press detection: support `pressed: True` (post-denorm), `action: press`
+        # (legacy), or `event_args[1]: True` (raw).
+        is_press = False
+        if event.get("pressed") is True:
+            is_press = True
+        elif event.get("action") in ("press", "down", 1):
+            is_press = True
+        else:
+            ea = event.get("event_args")
+            if isinstance(ea, list) and len(ea) >= 2 and ea[1] is True:
+                is_press = True
+        if not is_press:
             continue
 
-        input_t_ns = event.get("t_ns")
+        # Timestamp: support timestamp_ns (post-denorm), t_ns (legacy),
+        # or timestamp (seconds, raw recorder).
+        input_t_ns = event.get("timestamp_ns") or event.get("t_ns")
+        if input_t_ns is None:
+            ts = event.get("timestamp")
+            if isinstance(ts, (int, float)):
+                input_t_ns = int(ts * 1e9)
         if input_t_ns is None:
             skipped += 1
             continue
@@ -148,7 +173,15 @@ def compute_latencies(inputs_path, game_state_path):
         prev_velocity = None
 
         for tick in game_ticks:
-            tick_t_ns = tick.get("t_ns", 0)
+            # Bug-fix 2026-05-18: game_state.jsonl uses `timestamp_ms`, not `t_ns`.
+            # Accept either.
+            tick_t_ns = tick.get("t_ns")
+            if tick_t_ns is None:
+                ts_ms = tick.get("timestamp_ms")
+                if isinstance(ts_ms, (int, float)):
+                    tick_t_ns = int(ts_ms * 1_000_000)
+                else:
+                    tick_t_ns = 0
 
             # Skip ticks before the input event
             if tick_t_ns < input_t_ns:
