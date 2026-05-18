@@ -12,18 +12,17 @@ Tests the audio event track extractor:
 
 import json
 import os
+import shutil
 import sys
 import tempfile
-import shutil
 import unittest
-from pathlib import Path
 
 # Add bin/ to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "bin"))
 
 from extract_audio_event_track import (
-    count_audio_events,
     compute_snr_from_events,
+    count_audio_events,
     detect_voice_present,
 )
 
@@ -31,6 +30,7 @@ from extract_audio_event_track import (
 def hash_consent_text(text):
     """Compute SHA-256 hash of consent text."""
     import hashlib
+
     return hashlib.sha256(text.encode()).hexdigest()
 
 
@@ -56,9 +56,24 @@ class TestAudioEventTrack(unittest.TestCase):
     def test_count_audio_events(self):
         """Event counter correctly counts valid JSONL lines."""
         events = [
-            {"t_ns": 1000, "sound_id": "minecraft:entity.zombie.ambient", "volume": 0.8, "distance_from_player": 12.3},
-            {"t_ns": 2000, "sound_id": "minecraft:entity.creeper.primed", "volume": 0.5, "distance_from_player": 5.0},
-            {"t_ns": 3000, "sound_id": "minecraft:block.note_block.harp", "volume": 0.3, "distance_from_player": 2.1},
+            {
+                "t_ns": 1000,
+                "sound_id": "minecraft:entity.zombie.ambient",
+                "volume": 0.8,
+                "distance_from_player": 12.3,
+            },
+            {
+                "t_ns": 2000,
+                "sound_id": "minecraft:entity.creeper.primed",
+                "volume": 0.5,
+                "distance_from_player": 5.0,
+            },
+            {
+                "t_ns": 3000,
+                "sound_id": "minecraft:block.note_block.harp",
+                "volume": 0.3,
+                "distance_from_player": 2.1,
+            },
         ]
         self._write_events(events)
 
@@ -80,9 +95,9 @@ class TestAudioEventTrack(unittest.TestCase):
         """Malformed JSON lines are skipped."""
         with open(self.events_path, "w") as f:
             f.write('{"t_ns": 1000, "sound_id": "test", "volume": 0.5}\n')
-            f.write('this is not json\n')
+            f.write("this is not json\n")
             f.write('{"t_ns": 2000, "sound_id": "test2", "volume": 0.3}\n')
-            f.write('\n')  # empty line
+            f.write("\n")  # empty line
             f.write('{"t_ns": 3000, "sound_id": "test3", "volume": 0.7}\n')
 
         count = count_audio_events(self.events_path)
@@ -156,9 +171,24 @@ class TestAudioEventTrack(unittest.TestCase):
     def test_audio_check_json_schema(self):
         """Full extraction produces audio_check.json with correct schema."""
         events = [
-            {"t_ns": 1000, "sound_id": "minecraft:entity.zombie.ambient", "volume": 0.8, "distance_from_player": 12.3},
-            {"t_ns": 2000, "sound_id": "minecraft:entity.creeper.primed", "volume": 0.5, "distance_from_player": 5.0},
-            {"t_ns": 3000, "sound_id": "minecraft:block.note_block.harp", "volume": 0.3, "distance_from_player": 2.1},
+            {
+                "t_ns": 1000,
+                "sound_id": "minecraft:entity.zombie.ambient",
+                "volume": 0.8,
+                "distance_from_player": 12.3,
+            },
+            {
+                "t_ns": 2000,
+                "sound_id": "minecraft:entity.creeper.primed",
+                "volume": 0.5,
+                "distance_from_player": 5.0,
+            },
+            {
+                "t_ns": 3000,
+                "sound_id": "minecraft:block.note_block.harp",
+                "volume": 0.3,
+                "distance_from_player": 2.1,
+            },
         ]
         self._write_events(events)
 
@@ -187,8 +217,13 @@ class TestAudioEventTrack(unittest.TestCase):
 
         # All required fields present
         required_fields = [
-            "snr_db", "rms_db", "max_silence_gap_s",
-            "non_silent_fraction", "event_count", "voice_present", "method"
+            "snr_db",
+            "rms_db",
+            "max_silence_gap_s",
+            "non_silent_fraction",
+            "event_count",
+            "voice_present",
+            "method",
         ]
         for field in required_fields:
             self.assertIn(field, saved, f"Missing field: {field}")
@@ -215,10 +250,12 @@ class TestAudioEventTrack(unittest.TestCase):
             for i in range(20)
         ]
         # Add some noise events
-        events.extend([
-            {"t_ns": 100000 + i * 1000, "sound_id": f"minecraft:ambient_{i}", "volume": 0.05}
-            for i in range(5)
-        ])
+        events.extend(
+            [
+                {"t_ns": 100000 + i * 1000, "sound_id": f"minecraft:ambient_{i}", "volume": 0.05}
+                for i in range(5)
+            ]
+        )
         self._write_events(events)
 
         snr = compute_snr_from_events(self.events_path)

@@ -9,19 +9,18 @@ then verifies the client can:
   - Write .source marker with kind: server_da_v2
 """
 
-import os
-import sys
-import unittest
-import tempfile
-import shutil
-import tarfile
+import glob
 import io
+import os
+import shutil
 import struct
+import sys
+import tarfile
+import tempfile
 import threading
 import time
-import glob
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from pathlib import Path
+import unittest
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -218,7 +217,7 @@ class TestModalDepthClient(unittest.TestCase):
 
     def test_parse_tar_gz_response(self):
         """Test that the client can parse the tar.gz response."""
-        from bin.run_da_v2_depth_remote import upload_and_compute, extract_depth_exrs
+        from bin.run_da_v2_depth_remote import extract_depth_exrs, upload_and_compute
 
         dummy_video = b"\x00\x00\x00\x1cftypisom\x00\x00\x02\x00isomiso2mp41"
 
@@ -242,7 +241,7 @@ class TestModalDepthClient(unittest.TestCase):
 
     def test_exrs_in_correct_directory(self):
         """Test that EXRs are placed in the correct directory."""
-        from bin.run_da_v2_depth_remote import upload_and_compute, extract_depth_exrs
+        from bin.run_da_v2_depth_remote import extract_depth_exrs, upload_and_compute
 
         dummy_video = b"\x00\x00\x00\x1cftypisom\x00\x00\x02\x00isomiso2mp41"
 
@@ -262,8 +261,7 @@ class TestModalDepthClient(unittest.TestCase):
 
         # Verify no subdirectories were created
         subdirs = [
-            d for d in os.listdir(self.depth_dir)
-            if os.path.isdir(os.path.join(self.depth_dir, d))
+            d for d in os.listdir(self.depth_dir) if os.path.isdir(os.path.join(self.depth_dir, d))
         ]
         self.assertEqual(len(subdirs), 0, f"Unexpected subdirectories: {subdirs}")
 
@@ -287,8 +285,8 @@ class TestModalDepthClient(unittest.TestCase):
     def test_full_pipeline(self):
         """Test the full pipeline: upload -> parse -> extract -> marker."""
         from bin.run_da_v2_depth_remote import (
-            upload_and_compute,
             extract_depth_exrs,
+            upload_and_compute,
             write_source_marker,
         )
 

@@ -165,7 +165,7 @@ class ContinuousCaptureDaemon:
             if system == "Windows":
                 result = subprocess.run(
                     ['tasklist', '/FI', 'IMAGENAME eq javaw.exe'],
-                    capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW
+                    capture_output=True, text=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)
                 )
                 return "javaw.exe" in result.stdout
             elif system == "Darwin":  # macOS
@@ -191,7 +191,7 @@ class ContinuousCaptureDaemon:
             if system == "Windows":
                 result = subprocess.run(
                     ['tasklist', '/FI', 'IMAGENAME eq OysterRecorder.exe'],
-                    capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW
+                    capture_output=True, text=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)
                 )
                 return "OysterRecorder.exe" in result.stdout
             elif system == "Darwin":  # macOS

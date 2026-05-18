@@ -8,24 +8,23 @@ Tests:
   - Verify dedup (don't spam same alert every 60s; only re-alert if escalating)
 """
 
-import json
 import os
 import sys
-import time
 import tempfile
+import time
 import unittest
-from unittest.mock import patch, MagicMock
 from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
 
 # Add bin directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "bin"))
 
 from alert_dispatcher import (
     Alert,
+    AlertDispatcher,
     AlertSeverity,
     AlertStateManager,
     WebhookSender,
-    AlertDispatcher,
 )
 
 
@@ -498,6 +497,7 @@ class TestWebhookSender(unittest.TestCase):
     def test_slack_send_failure_queues(self, mock_post):
         """Slack send failure should queue the alert."""
         import requests
+
         mock_post.side_effect = requests.exceptions.RequestException("Network error")
 
         alert = Alert(

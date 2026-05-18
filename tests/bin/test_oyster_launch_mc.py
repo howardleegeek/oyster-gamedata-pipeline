@@ -4,6 +4,7 @@
 Focus: the 5 bug-fixes baked in must not regress. Each test maps to a
 numbered bug from the spec.
 """
+
 from __future__ import annotations
 
 import json
@@ -15,7 +16,6 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "bin"))
 import oyster_launch_mc as m
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -34,42 +34,50 @@ def fake_install(tmp_path: Path) -> Path:
     v_dir = versions / mc_ver
     v_dir.mkdir(parents=True)
     (v_dir / f"{mc_ver}.jar").write_bytes(b"fake-mc-jar")
-    (v_dir / f"{mc_ver}.json").write_text(json.dumps({
-        "id": mc_ver,
-        "type": "release",
-        "mainClass": "net.minecraft.client.main.Main",
-        "assetIndex": {"id": "19"},
-        "libraries": [
-            {"name": "com.mojang:logging:1.2.7"},
-            {"name": "org.lwjgl:lwjgl:3.3.3"},
-        ],
-        "arguments": {
-            "jvm": ["-Dvanillaonly=1"],
-            "game": ["--demo"],
-        },
-    }))
+    (v_dir / f"{mc_ver}.json").write_text(
+        json.dumps(
+            {
+                "id": mc_ver,
+                "type": "release",
+                "mainClass": "net.minecraft.client.main.Main",
+                "assetIndex": {"id": "19"},
+                "libraries": [
+                    {"name": "com.mojang:logging:1.2.7"},
+                    {"name": "org.lwjgl:lwjgl:3.3.3"},
+                ],
+                "arguments": {
+                    "jvm": ["-Dvanillaonly=1"],
+                    "game": ["--demo"],
+                },
+            }
+        )
+    )
 
     # Fabric leaf
     fab_name = m.FABRIC_PROFILE_NAME
     fab_dir = versions / fab_name
     fab_dir.mkdir(parents=True)
-    (fab_dir / f"{fab_name}.json").write_text(json.dumps({
-        "id": fab_name,
-        "inheritsFrom": mc_ver,
-        "type": "release",
-        "mainClass": m.EXPECTED_FABRIC_MAIN,
-        "libraries": [
-            {"name": "net.fabricmc:fabric-loader:0.16.10"},
-            {"name": "net.fabricmc:intermediary:1.21.4"},
-        ],
-        "arguments": {
-            "jvm": [
-                "-DFabricMcEmu=net.minecraft.client.main.Main",
-                "-Dlog4j2.formatMsgNoLookups=true",
-            ],
-            "game": [],
-        },
-    }))
+    (fab_dir / f"{fab_name}.json").write_text(
+        json.dumps(
+            {
+                "id": fab_name,
+                "inheritsFrom": mc_ver,
+                "type": "release",
+                "mainClass": m.EXPECTED_FABRIC_MAIN,
+                "libraries": [
+                    {"name": "net.fabricmc:fabric-loader:0.16.10"},
+                    {"name": "net.fabricmc:intermediary:1.21.4"},
+                ],
+                "arguments": {
+                    "jvm": [
+                        "-DFabricMcEmu=net.minecraft.client.main.Main",
+                        "-Dlog4j2.formatMsgNoLookups=true",
+                    ],
+                    "game": [],
+                },
+            }
+        )
+    )
 
     # JRE — file just has to exist
     java_bin = "javaw.exe" if os.name == "nt" else "java"
@@ -99,9 +107,7 @@ def test_resolve_profile_chain_leaf_jvm_args(fake_install: Path) -> None:
     leaf = m.fabric_profile_json(fake_install)
     resolved = m.resolve_profile_chain(leaf)
     assert "-DFabricMcEmu=net.minecraft.client.main.Main" in resolved.jvm_args
-    assert "-Dvanillaonly=1" not in resolved.jvm_args, (
-        "vanilla parent JVM args wrongly merged"
-    )
+    assert "-Dvanillaonly=1" not in resolved.jvm_args, "vanilla parent JVM args wrongly merged"
 
 
 def test_resolve_profile_chain_libraries_accumulate(fake_install: Path) -> None:
@@ -110,7 +116,7 @@ def test_resolve_profile_chain_libraries_accumulate(fake_install: Path) -> None:
     resolved = m.resolve_profile_chain(leaf)
     names = [lib["name"] for lib in resolved.libraries]
     assert "net.fabricmc:fabric-loader:0.16.10" in names  # leaf
-    assert "com.mojang:logging:1.2.7" in names           # vanilla parent
+    assert "com.mojang:logging:1.2.7" in names  # vanilla parent
 
 
 def test_resolve_profile_chain_asset_index(fake_install: Path) -> None:
@@ -128,10 +134,14 @@ def test_resolve_profile_chain_no_mainclass_fails(tmp_path: Path) -> None:
 
     parent_dir = tmp_path / "versions" / "parent"
     parent_dir.mkdir(parents=True)
-    (parent_dir / "parent.json").write_text(json.dumps({
-        "id": "parent",
-        "mainClass": "net.minecraft.client.main.Main",
-    }))
+    (parent_dir / "parent.json").write_text(
+        json.dumps(
+            {
+                "id": "parent",
+                "mainClass": "net.minecraft.client.main.Main",
+            }
+        )
+    )
 
     with pytest.raises(ValueError, match="no mainClass"):
         m.resolve_profile_chain(leaf_path)
@@ -143,12 +153,24 @@ def test_resolve_profile_chain_cycle_detected(tmp_path: Path) -> None:
     b = versions / "b"
     a.mkdir(parents=True)
     b.mkdir(parents=True)
-    (a / "a.json").write_text(json.dumps({
-        "id": "a", "mainClass": "X", "inheritsFrom": "b",
-    }))
-    (b / "b.json").write_text(json.dumps({
-        "id": "b", "mainClass": "Y", "inheritsFrom": "a",
-    }))
+    (a / "a.json").write_text(
+        json.dumps(
+            {
+                "id": "a",
+                "mainClass": "X",
+                "inheritsFrom": "b",
+            }
+        )
+    )
+    (b / "b.json").write_text(
+        json.dumps(
+            {
+                "id": "b",
+                "mainClass": "Y",
+                "inheritsFrom": "a",
+            }
+        )
+    )
     with pytest.raises(ValueError, match="cycle"):
         m.resolve_profile_chain(a / "a.json")
 
@@ -210,8 +232,7 @@ def test_wait_for_mc_ready_succeeds_on_marker(tmp_path: Path) -> None:
 def test_wait_for_mc_ready_times_out(tmp_path: Path) -> None:
     log = tmp_path / "latest.log"
     log.write_text("nothing here\n")
-    assert m.wait_for_mc_ready(log, timeout_sec=0.5,
-                               poll_interval_sec=0.05) is False
+    assert m.wait_for_mc_ready(log, timeout_sec=0.5, poll_interval_sec=0.05) is False
 
 
 def test_wait_for_mc_ready_finds_setting_user(tmp_path: Path) -> None:
@@ -242,11 +263,15 @@ def test_verify_install_missing(tmp_path: Path) -> None:
 
 
 def test_cli_dry_run_prints_knotclient(fake_install: Path, capsys) -> None:
-    rc = m.main([
-        "--install-root", str(fake_install),
-        "--dry-run",
-        "--username", "Howard",
-    ])
+    rc = m.main(
+        [
+            "--install-root",
+            str(fake_install),
+            "--dry-run",
+            "--username",
+            "Howard",
+        ]
+    )
     assert rc == 0
     out = capsys.readouterr().out
     assert "net.fabricmc.loader.impl.launch.knot.KnotClient" in out

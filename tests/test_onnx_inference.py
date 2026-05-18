@@ -6,15 +6,14 @@ Tests:
 2. Provider fallback (kill DirectML, fall to CPU)
 3. download_da_v2_onnx with mocked Aliyun + HF endpoints
 """
+
 import hashlib
 import json
-import os
 import pathlib
 import sys
 import tempfile
 import unittest
-from unittest import mock
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 
@@ -37,7 +36,6 @@ class TestONNXOutputEquivalence(unittest.TestCase):
         # Load processor and model for generating proper inputs
         cls.model_id = "depth-anything/Depth-Anything-V2-Small-hf"
         from transformers import AutoImageProcessor, AutoModelForDepthEstimation
-        import torch
 
         cls.processor = AutoImageProcessor.from_pretrained(cls.model_id)
         cls.pt_model = AutoModelForDepthEstimation.from_pretrained(cls.model_id)
@@ -46,9 +44,8 @@ class TestONNXOutputEquivalence(unittest.TestCase):
         # Create a deterministic test image
         np.random.seed(42)
         from PIL import Image
-        cls.test_img = Image.fromarray(
-            np.random.randint(0, 255, (518, 518, 3), dtype=np.uint8)
-        )
+
+        cls.test_img = Image.fromarray(np.random.randint(0, 255, (518, 518, 3), dtype=np.uint8))
 
         # Process through the image processor
         cls.inputs = cls.processor(images=cls.test_img, return_tensors="pt")
@@ -58,9 +55,7 @@ class TestONNXOutputEquivalence(unittest.TestCase):
         """ONNX model should load without errors."""
         import onnxruntime as ort
 
-        sess = ort.InferenceSession(
-            str(self.onnx_path), providers=["CPUExecutionProvider"]
-        )
+        sess = ort.InferenceSession(str(self.onnx_path), providers=["CPUExecutionProvider"])
         self.assertIsNotNone(sess)
         # Verify input/output names
         input_names = [inp.name for inp in sess.get_inputs()]
@@ -72,9 +67,7 @@ class TestONNXOutputEquivalence(unittest.TestCase):
         """ONNX inference should produce a valid depth map."""
         import onnxruntime as ort
 
-        sess = ort.InferenceSession(
-            str(self.onnx_path), providers=["CPUExecutionProvider"]
-        )
+        sess = ort.InferenceSession(str(self.onnx_path), providers=["CPUExecutionProvider"])
         outputs = sess.run(None, {"pixel_values": self.numpy_input})
         self.assertEqual(len(outputs), 1)
         depth = outputs[0]
@@ -87,9 +80,7 @@ class TestONNXOutputEquivalence(unittest.TestCase):
         """ONNX inference should be deterministic across runs."""
         import onnxruntime as ort
 
-        sess = ort.InferenceSession(
-            str(self.onnx_path), providers=["CPUExecutionProvider"]
-        )
+        sess = ort.InferenceSession(str(self.onnx_path), providers=["CPUExecutionProvider"])
         out1 = sess.run(None, {"pixel_values": self.numpy_input})[0]
         out2 = sess.run(None, {"pixel_values": self.numpy_input})[0]
         np.testing.assert_array_equal(out1, out2)
@@ -104,9 +95,7 @@ class TestONNXOutputEquivalence(unittest.TestCase):
         import torch
 
         # Run ONNX inference
-        sess = ort.InferenceSession(
-            str(self.onnx_path), providers=["CPUExecutionProvider"]
-        )
+        sess = ort.InferenceSession(str(self.onnx_path), providers=["CPUExecutionProvider"])
         ort_output = sess.run(None, {"pixel_values": self.numpy_input})[0]
         ort_depth = ort_output.squeeze()
 
@@ -215,7 +204,6 @@ class TestDownloadModel(unittest.TestCase):
         """When Aliyun times out, should fall back to HuggingFace."""
         from bin.download_da_v2_onnx import (
             download_from_aliyun,
-            download_from_hf,
         )
 
         # Aliyun fails
@@ -226,7 +214,7 @@ class TestDownloadModel(unittest.TestCase):
 
     def test_checksum_verification(self):
         """Should verify SHA-256 checksums against manifest."""
-        from bin.download_da_v2_onnx import sha256_file, verify_checksums
+        from bin.download_da_v2_onnx import verify_checksums
 
         # Create test files
         test_file = self.cache_dir / "test.bin"
@@ -234,31 +222,19 @@ class TestDownloadModel(unittest.TestCase):
         test_file.write_bytes(test_data)
 
         expected_hash = hashlib.sha256(test_data).hexdigest()
-        manifest = {
-            "files": {
-                "test.bin": {"sha256": expected_hash, "size_bytes": len(test_data)}
-            }
-        }
+        manifest = {"files": {"test.bin": {"sha256": expected_hash, "size_bytes": len(test_data)}}}
 
         self.assertTrue(verify_checksums(self.cache_dir, manifest))
 
         # Wrong checksum should fail
-        bad_manifest = {
-            "files": {
-                "test.bin": {"sha256": "0" * 64, "size_bytes": len(test_data)}
-            }
-        }
+        bad_manifest = {"files": {"test.bin": {"sha256": "0" * 64, "size_bytes": len(test_data)}}}
         self.assertFalse(verify_checksums(self.cache_dir, bad_manifest))
 
     def test_missing_file_fails_verification(self):
         """Missing files should fail verification."""
         from bin.download_da_v2_onnx import verify_checksums
 
-        manifest = {
-            "files": {
-                "nonexistent.onnx": {"sha256": "abc123", "size_bytes": 100}
-            }
-        }
+        manifest = {"files": {"nonexistent.onnx": {"sha256": "abc123", "size_bytes": 100}}}
         self.assertFalse(verify_checksums(self.cache_dir, manifest))
 
 
@@ -331,7 +307,9 @@ class TestCanonicalPipeline(unittest.TestCase):
             with patch("torch.backends.mps.is_available", return_value=True):
                 # Need to reload to clear cached import
                 import importlib
+
                 import canonical_pipeline
+
                 importlib.reload(canonical_pipeline)
 
                 backend = canonical_pipeline.detect_best_backend()
@@ -342,7 +320,9 @@ class TestCanonicalPipeline(unittest.TestCase):
         with patch("platform.system", return_value="Linux"):
             with patch.dict("sys.modules", {"torch": None, "onnxruntime": None}):
                 import importlib
+
                 import canonical_pipeline
+
                 importlib.reload(canonical_pipeline)
 
                 backend = canonical_pipeline.detect_best_backend()

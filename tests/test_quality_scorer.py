@@ -12,21 +12,22 @@ Verifies:
   7. Config loading works with defaults
 """
 
-import json
 import math
 import os
 import sys
-import tempfile
-from pathlib import Path
 
 import pytest
 
 # Add bin/ to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "bin"))
 
+from batch_quality_aggregate import (
+    aggregate_batch,
+)
 from quality_scorer import (
-    compute_quality_score,
     compute_percentile_rank,
+    compute_quality_score,
+    load_weights,
     score_action_diversity,
     score_antipattern_penalty,
     score_audit_norm,
@@ -35,19 +36,12 @@ from quality_scorer import (
     score_label_density,
     score_multimodal,
     score_session_with_percentile,
-    load_weights,
 )
-from batch_quality_aggregate import (
-    aggregate_batch,
-    assign_tier,
-    compute_percentile_ranks,
-    identify_outliers,
-)
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def perfect_session():
@@ -56,7 +50,7 @@ def perfect_session():
         "audit_score": 105.0,
         "key_counts": {"w": 100, "a": 100, "s": 100, "d": 100},
         "bbox_volumes": [1e6, 1e6, 1e6],
-        "angular_variances": [math.pi ** 2, math.pi ** 2, math.pi ** 2],
+        "angular_variances": [math.pi**2, math.pi**2, math.pi**2],
         "death_events": [
             {"death_time": 10, "recovery_time": 30},
             {"death_time": 100, "recovery_time": 120},
@@ -143,6 +137,7 @@ def typical_session():
 # Test 1: Determinism
 # ---------------------------------------------------------------------------
 
+
 class TestDeterminism:
     """Verify scorer is deterministic: same input → same score."""
 
@@ -170,13 +165,15 @@ class TestDeterminism:
         result1 = compute_quality_score(typical_session)
         result2 = compute_quality_score(typical_session)
         for key in result1["components"]:
-            assert result1["components"][key] == result2["components"][key], \
-                f"Component {key} is not deterministic"
+            assert (
+                result1["components"][key] == result2["components"][key]
+            ), f"Component {key} is not deterministic"
 
 
 # ---------------------------------------------------------------------------
 # Test 2: Percentile ranking stability
 # ---------------------------------------------------------------------------
+
 
 class TestPercentileStability:
     """Verify percentile ranking is stable across batch sizes."""
@@ -218,8 +215,7 @@ class TestPercentileStability:
         scores = [10.0, 20.0, 30.0, 40.0, 50.0]
         ranks = [compute_percentile_rank(scores, s) for s in scores]
         for i in range(len(ranks) - 1):
-            assert ranks[i] <= ranks[i + 1], \
-                f"Percentile not monotonic: {ranks[i]} > {ranks[i+1]}"
+            assert ranks[i] <= ranks[i + 1], f"Percentile not monotonic: {ranks[i]} > {ranks[i+1]}"
 
     def test_batch_aggregate_percentile_consistency(self):
         """Batch aggregate should produce consistent percentile ranks."""
@@ -240,6 +236,7 @@ class TestPercentileStability:
 # Test 3: No double-counting
 # ---------------------------------------------------------------------------
 
+
 class TestNoDoubleCounting:
     """Verify components don't double-count."""
 
@@ -255,7 +252,7 @@ class TestNoDoubleCounting:
             "angular_variances": [],
             "death_events": [
                 {"death_time": 10, "recovery_time": None},  # No recovery
-                {"death_time": 50, "recovery_time": 200},   # Recovery > 60s
+                {"death_time": 50, "recovery_time": 200},  # Recovery > 60s
             ],
             "labels": [],
             "session_duration": 600.0,
@@ -264,8 +261,9 @@ class TestNoDoubleCounting:
         }
         result = compute_quality_score(session)
         assert result["components"]["audit_norm"] > 0, "Audit norm should be high"
-        assert result["components"]["failure_recovery"] == 0.0, \
-            "Failure recovery should be 0 when no valid recoveries exist"
+        assert (
+            result["components"]["failure_recovery"] == 0.0
+        ), "Failure recovery should be 0 when no valid recoveries exist"
 
     def test_audit_and_failure_recovery_independent(self):
         """
@@ -288,9 +286,10 @@ class TestNoDoubleCounting:
         result_low_audit = compute_quality_score({**base_session, "audit_score": 10.0})
         result_high_audit = compute_quality_score({**base_session, "audit_score": 100.0})
 
-        assert result_low_audit["components"]["failure_recovery"] == \
-               result_high_audit["components"]["failure_recovery"], \
-               "Failure recovery should be independent of audit score"
+        assert (
+            result_low_audit["components"]["failure_recovery"]
+            == result_high_audit["components"]["failure_recovery"]
+        ), "Failure recovery should be independent of audit score"
 
     def test_action_diversity_independent_of_camera(self):
         """Action diversity should not depend on camera motion data."""
@@ -307,15 +306,18 @@ class TestNoDoubleCounting:
         }
 
         result_no_camera = compute_quality_score(session_base)
-        result_with_camera = compute_quality_score({
-            **session_base,
-            "bbox_volumes": [1e6],
-            "angular_variances": [math.pi ** 2],
-        })
+        result_with_camera = compute_quality_score(
+            {
+                **session_base,
+                "bbox_volumes": [1e6],
+                "angular_variances": [math.pi**2],
+            }
+        )
 
-        assert result_no_camera["components"]["action_diversity"] == \
-               result_with_camera["components"]["action_diversity"], \
-               "Action diversity should be independent of camera motion"
+        assert (
+            result_no_camera["components"]["action_diversity"]
+            == result_with_camera["components"]["action_diversity"]
+        ), "Action diversity should be independent of camera motion"
 
     def test_multimodal_independent_of_labels(self):
         """Multimodal score should not depend on label density."""
@@ -339,19 +341,23 @@ class TestNoDoubleCounting:
         }
 
         result_no_labels = compute_quality_score(session_base)
-        result_with_labels = compute_quality_score({
-            **session_base,
-            "labels": [{"id": i} for i in range(100)],
-        })
+        result_with_labels = compute_quality_score(
+            {
+                **session_base,
+                "labels": [{"id": i} for i in range(100)],
+            }
+        )
 
-        assert result_no_labels["components"]["multimodal"] == \
-               result_with_labels["components"]["multimodal"], \
-               "Multimodal should be independent of label density"
+        assert (
+            result_no_labels["components"]["multimodal"]
+            == result_with_labels["components"]["multimodal"]
+        ), "Multimodal should be independent of label density"
 
 
 # ---------------------------------------------------------------------------
 # Test 4: Component scorer validity
 # ---------------------------------------------------------------------------
+
 
 class TestComponentScorers:
     """Verify each component scorer produces valid outputs."""
@@ -385,7 +391,7 @@ class TestComponentScorers:
 
     def test_camera_motion_bounds(self):
         assert 0 <= score_camera_motion([], []) <= 15
-        assert 0 <= score_camera_motion([1e6], [math.pi ** 2]) <= 15
+        assert 0 <= score_camera_motion([1e6], [math.pi**2]) <= 15
 
     def test_camera_motion_empty(self):
         assert score_camera_motion([], []) == 0.0
@@ -420,15 +426,27 @@ class TestComponentScorers:
 
     def test_multimodal_bounds(self):
         assert 0 <= score_multimodal() <= 10
-        assert 0 <= score_multimodal(
-            has_depth=True, has_audio=True, has_game_state=True,
-            depth_alignment=1.0, audio_alignment=1.0, game_state_alignment=1.0,
-        ) <= 10
+        assert (
+            0
+            <= score_multimodal(
+                has_depth=True,
+                has_audio=True,
+                has_game_state=True,
+                depth_alignment=1.0,
+                audio_alignment=1.0,
+                game_state_alignment=1.0,
+            )
+            <= 10
+        )
 
     def test_multimodal_all_present_max(self):
         score = score_multimodal(
-            has_depth=True, has_audio=True, has_game_state=True,
-            depth_alignment=1.0, audio_alignment=1.0, game_state_alignment=1.0,
+            has_depth=True,
+            has_audio=True,
+            has_game_state=True,
+            depth_alignment=1.0,
+            audio_alignment=1.0,
+            game_state_alignment=1.0,
         )
         assert score == 10.0
 
@@ -465,6 +483,7 @@ class TestComponentScorers:
 # Test 5: Composite score bounds
 # ---------------------------------------------------------------------------
 
+
 class TestCompositeBounds:
     """Verify composite score is bounded [0, 100]."""
 
@@ -487,12 +506,18 @@ class TestCompositeBounds:
             "key_counts": {"w": 1000, "a": 1000, "s": 1000, "d": 1000},
             "bbox_volumes": [1e9, 1e9],
             "angular_variances": [1e9, 1e9],
-            "death_events": [{"death_time": i * 100, "recovery_time": i * 100 + 30} for i in range(10)],
+            "death_events": [
+                {"death_time": i * 100, "recovery_time": i * 100 + 30} for i in range(10)
+            ],
             "labels": [{"id": i} for i in range(1000)],
             "session_duration": 600.0,
             "multimodal": {
-                "has_depth": True, "has_audio": True, "has_game_state": True,
-                "depth_alignment": 1.0, "audio_alignment": 1.0, "game_state_alignment": 1.0,
+                "has_depth": True,
+                "has_audio": True,
+                "has_game_state": True,
+                "depth_alignment": 1.0,
+                "audio_alignment": 1.0,
+                "game_state_alignment": 1.0,
             },
             "antipatterns": {"idle_seconds": 0, "alt_tab_count": 0, "pause_menu_seconds": 0},
         }
@@ -524,6 +549,7 @@ class TestCompositeBounds:
 # Test 6: Components sum sanity
 # ---------------------------------------------------------------------------
 
+
 class TestComponentsSum:
     """Verify components sum approximately matches composite."""
 
@@ -541,6 +567,7 @@ class TestComponentsSum:
 # ---------------------------------------------------------------------------
 # Test 7: Config loading
 # ---------------------------------------------------------------------------
+
 
 class TestConfigLoading:
     """Verify config loading works."""
@@ -566,9 +593,17 @@ class TestConfigLoading:
             "tiers": {"top_tier": 0.95, "premium": 0.80, "standard": 0.60},
         }
         result = compute_quality_score(
-            {"audit_score": 105, "key_counts": {}, "bbox_volumes": [],
-             "angular_variances": [], "death_events": [], "labels": [],
-             "session_duration": 600, "multimodal": {}, "antipatterns": {}},
+            {
+                "audit_score": 105,
+                "key_counts": {},
+                "bbox_volumes": [],
+                "angular_variances": [],
+                "death_events": [],
+                "labels": [],
+                "session_duration": 600,
+                "multimodal": {},
+                "antipatterns": {},
+            },
             config=custom_config,
         )
         # With custom config, audit_norm max is 25
@@ -578,6 +613,7 @@ class TestConfigLoading:
 # ---------------------------------------------------------------------------
 # Test 8: Batch aggregate
 # ---------------------------------------------------------------------------
+
 
 class TestBatchAggregate:
     """Verify batch aggregation works correctly."""
@@ -612,17 +648,16 @@ class TestBatchAggregate:
         assert tiers["s1"] == "premium"
 
     def test_outlier_detection(self):
-        sessions = [
-            {"composite_score": 50.0, "session_id": f"s{i}"}
-            for i in range(20)
-        ]
+        sessions = [{"composite_score": 50.0, "session_id": f"s{i}"} for i in range(20)]
         # Add a clear outlier
         sessions.append({"composite_score": 5.0, "session_id": "outlier_low"})
         sessions.append({"composite_score": 99.0, "session_id": "outlier_high"})
 
         result = aggregate_batch(sessions)
-        assert "outlier_low" in result["outliers"]["low"] or \
-               "outlier_high" in result["outliers"]["high"]
+        assert (
+            "outlier_low" in result["outliers"]["low"]
+            or "outlier_high" in result["outliers"]["high"]
+        )
 
     def test_summary_statistics(self):
         sessions = [
@@ -638,6 +673,7 @@ class TestBatchAggregate:
 # ---------------------------------------------------------------------------
 # Test 9: Output format
 # ---------------------------------------------------------------------------
+
 
 class TestOutputFormat:
     """Verify output format matches spec."""
@@ -671,6 +707,7 @@ class TestOutputFormat:
 # Test 10: Edge cases
 # ---------------------------------------------------------------------------
 
+
 class TestEdgeCases:
     """Test edge cases and boundary conditions."""
 
@@ -702,13 +739,17 @@ class TestEdgeCases:
             "audit_score": 50.0,
             "key_counts": {"w": 10000, "a": 10000, "s": 10000, "d": 10000},
             "bbox_volumes": [1e6] * 1000,
-            "angular_variances": [math.pi ** 2] * 1000,
+            "angular_variances": [math.pi**2] * 1000,
             "death_events": [],
             "labels": [{"id": i} for i in range(500)],
             "session_duration": 36000.0,  # 10 hours
             "multimodal": {
-                "has_depth": True, "has_audio": True, "has_game_state": True,
-                "depth_alignment": 0.5, "audio_alignment": 0.5, "game_state_alignment": 0.5,
+                "has_depth": True,
+                "has_audio": True,
+                "has_game_state": True,
+                "depth_alignment": 0.5,
+                "audio_alignment": 0.5,
+                "game_state_alignment": 0.5,
             },
             "antipatterns": {"idle_seconds": 1000, "alt_tab_count": 2, "pause_menu_seconds": 500},
         }

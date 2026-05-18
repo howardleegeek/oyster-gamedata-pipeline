@@ -25,9 +25,9 @@ because tkinter isn't compiled into Python on the CI image, so we stub
 This is the same pattern ``tests/test_iron_law_no_fake_data.py`` uses for
 its window-capture helper coverage.
 """
+
 from __future__ import annotations
 
-import os
 import sys
 import types
 from pathlib import Path
@@ -59,7 +59,9 @@ def _install_tk_stubs() -> None:
     tk.Tk = type("Tk", (_Widget,), {"__init__": lambda self, *a, **kw: None})
     tk.Frame = tk.Label = tk.Button = tk.Checkbutton = _Widget
     tk.BooleanVar = type(
-        "BooleanVar", (), {"__init__": lambda self, value=False: None, "get": lambda self: False},
+        "BooleanVar",
+        (),
+        {"__init__": lambda self, value=False: None, "get": lambda self: False},
     )
     tk.messagebox = types.SimpleNamespace(showerror=lambda *a, **kw: None)
 
@@ -69,9 +71,7 @@ def _install_tk_stubs() -> None:
 
     sys.modules["tkinter"] = tk
     sys.modules["tkinter.ttk"] = ttk
-    sys.modules["tkinter.messagebox"] = types.SimpleNamespace(
-        showerror=lambda *a, **kw: None
-    )
+    sys.modules["tkinter.messagebox"] = types.SimpleNamespace(showerror=lambda *a, **kw: None)
 
 
 def _import_recorder_module() -> Any:
@@ -82,6 +82,7 @@ def _import_recorder_module() -> Any:
         # Force a fresh import so test ordering doesn't matter.
         del sys.modules["recorder_consumer_lite"]
     import recorder_consumer_lite as m  # type: ignore[import-not-found]
+
     return m
 
 
@@ -102,9 +103,9 @@ def test_real_documents_dir_mac_branch_returns_path(monkeypatch: pytest.MonkeyPa
     result = m._real_documents_dir()
 
     assert isinstance(result, Path), "must return a Path object"
-    assert result == Path.home() / "Documents", (
-        f"non-Windows branch must return ~/Documents, got {result}"
-    )
+    assert (
+        result == Path.home() / "Documents"
+    ), f"non-Windows branch must return ~/Documents, got {result}"
 
 
 # ---------------------------------------------------------------------------
@@ -196,9 +197,7 @@ def test_skip_depth_flag_breaks_loop_and_fires_initial_progress(
     fake_model.return_value = {"predicted_depth": _FakeTensor()}
 
     fake_reader = mock.MagicMock()
-    fake_reader.__iter__.return_value = iter(
-        [_fake_rgb_frame() for _ in range(50)]
-    )
+    fake_reader.__iter__.return_value = iter([_fake_rgb_frame() for _ in range(50)])
 
     written: list[int] = []
     progress_calls: list[tuple[int, int]] = []
@@ -230,9 +229,10 @@ def test_skip_depth_flag_breaks_loop_and_fires_initial_progress(
 
     # (a) Initial 0/total tick fired before any work.
     assert progress_calls, "progress_callback must fire at least once"
-    assert progress_calls[0] == (0, 50), (
-        f"first call must be (0, total_frames); got {progress_calls[0]}"
-    )
+    assert progress_calls[0] == (
+        0,
+        50,
+    ), f"first call must be (0, total_frames); got {progress_calls[0]}"
     # (b) Loop bailed early — manifest much smaller than the 50 input frames.
     assert len(manifest) <= 6, (
         f"should_skip must break the loop early; manifest had {len(manifest)} "
@@ -240,9 +240,7 @@ def test_skip_depth_flag_breaks_loop_and_fires_initial_progress(
     )
     # Partial EXR files are preserved on disk (caller decides what to do).
     surviving = sorted(p.name for p in out_dir.glob("*.exr"))
-    assert len(surviving) == len(manifest), (
-        "partial frames must remain on disk after a clean skip"
-    )
+    assert len(surviving) == len(manifest), "partial frames must remain on disk after a clean skip"
     # The function returned cleanly — no exception bubbled up.
     assert isinstance(manifest, dict)
 

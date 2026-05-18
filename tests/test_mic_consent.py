@@ -11,13 +11,9 @@ Tests that the Rust recorder's consent gating works correctly:
 
 import json
 import os
-import sys
-import tempfile
 import shutil
+import tempfile
 import unittest
-from unittest import mock
-from pathlib import Path
-
 
 # We test the consent logic by importing the relevant functions
 # Since the Rust code isn't compiled here, we test the Python-equivalent
@@ -42,6 +38,7 @@ CONSENT_TEXT_V1 = (
 def hash_consent_text(text):
     """Compute SHA-256 hash of consent text."""
     import hashlib
+
     return hashlib.sha256(text.encode()).hexdigest()
 
 
@@ -97,6 +94,7 @@ def resolve_consent(cli_mode, config_path, prompt_input=None):
 def write_consent_record(output_path, granted, device_id=None):
     """Write consent record to JSON file."""
     import datetime
+
     record = {
         "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
         "consent": "granted" if granted else "declined",

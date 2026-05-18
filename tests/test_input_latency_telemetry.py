@@ -13,20 +13,19 @@ Verifies:
 
 import json
 import os
+import shutil
 import sys
 import tempfile
-import shutil
 import unittest
-from pathlib import Path
 
 # Add bin/ to path so we can import the telemetry module
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "bin"))
 
 from input_latency_telemetry import (
+    VELOCITY_KEYS,
+    WASD_MAP,
     compute_latencies,
     write_output,
-    WASD_MAP,
-    VELOCITY_KEYS,
 )
 
 
@@ -75,8 +74,16 @@ class TestInputLatencyTelemetry(unittest.TestCase):
         # Game state: velocity_z changes 15ms after input
         game_ticks = [
             {"t_ns": base_t - 10_000_000, "velocity_x": 0.0, "velocity_z": 0.0},  # 10ms before
-            {"t_ns": base_t + 5_000_000, "velocity_x": 0.0, "velocity_z": 0.0},   # 5ms after (still 0)
-            {"t_ns": base_t + 15_000_000, "velocity_x": 0.0, "velocity_z": 4.2},   # 15ms after (changed!)
+            {
+                "t_ns": base_t + 5_000_000,
+                "velocity_x": 0.0,
+                "velocity_z": 0.0,
+            },  # 5ms after (still 0)
+            {
+                "t_ns": base_t + 15_000_000,
+                "velocity_x": 0.0,
+                "velocity_z": 4.2,
+            },  # 15ms after (changed!)
         ]
 
         create_synthetic_inputs(self.inputs_path, inputs)
@@ -93,15 +100,29 @@ class TestInputLatencyTelemetry(unittest.TestCase):
 
         inputs = [
             {"type": "KEYBOARD", "vk_code": 87, "action": "press", "t_ns": base_t},
-            {"type": "KEYBOARD", "vk_code": 65, "action": "press", "t_ns": base_t + 100_000_000},  # 100ms later
-            {"type": "KEYBOARD", "vk_code": 83, "action": "press", "t_ns": base_t + 200_000_000},  # 200ms later
+            {
+                "type": "KEYBOARD",
+                "vk_code": 65,
+                "action": "press",
+                "t_ns": base_t + 100_000_000,
+            },  # 100ms later
+            {
+                "type": "KEYBOARD",
+                "vk_code": 83,
+                "action": "press",
+                "t_ns": base_t + 200_000_000,
+            },  # 200ms later
         ]
 
         game_ticks = [
             {"t_ns": base_t - 1_000_000, "velocity_x": 0.0, "velocity_z": 0.0},
-            {"t_ns": base_t + 12_000_000, "velocity_x": 0.0, "velocity_z": 4.0},   # W effect: 12ms
+            {"t_ns": base_t + 12_000_000, "velocity_x": 0.0, "velocity_z": 4.0},  # W effect: 12ms
             {"t_ns": base_t + 112_000_000, "velocity_x": -3.5, "velocity_z": 4.0},  # A effect: 12ms
-            {"t_ns": base_t + 218_000_000, "velocity_x": -3.5, "velocity_z": -4.0}, # S effect: 18ms
+            {
+                "t_ns": base_t + 218_000_000,
+                "velocity_x": -3.5,
+                "velocity_z": -4.0,
+            },  # S effect: 18ms
         ]
 
         create_synthetic_inputs(self.inputs_path, inputs)
@@ -119,10 +140,30 @@ class TestInputLatencyTelemetry(unittest.TestCase):
         base_t = 1_000_000_000_000
 
         inputs = [
-            {"type": "KEYBOARD", "vk_code": 87, "action": "press", "t_ns": base_t},    # W - should count
-            {"type": "KEYBOARD", "vk_code": 32, "action": "press", "t_ns": base_t + 10_000_000},  # Space - ignore
-            {"type": "KEYBOARD", "vk_code": 27, "action": "press", "t_ns": base_t + 20_000_000},  # Esc - ignore
-            {"type": "MOUSE", "vk_code": 1, "action": "press", "t_ns": base_t + 30_000_000},      # Mouse - ignore
+            {
+                "type": "KEYBOARD",
+                "vk_code": 87,
+                "action": "press",
+                "t_ns": base_t,
+            },  # W - should count
+            {
+                "type": "KEYBOARD",
+                "vk_code": 32,
+                "action": "press",
+                "t_ns": base_t + 10_000_000,
+            },  # Space - ignore
+            {
+                "type": "KEYBOARD",
+                "vk_code": 27,
+                "action": "press",
+                "t_ns": base_t + 20_000_000,
+            },  # Esc - ignore
+            {
+                "type": "MOUSE",
+                "vk_code": 1,
+                "action": "press",
+                "t_ns": base_t + 30_000_000,
+            },  # Mouse - ignore
         ]
 
         game_ticks = [
@@ -173,18 +214,22 @@ class TestInputLatencyTelemetry(unittest.TestCase):
             latency_ms = 5 + (i % 26)  # 5-30ms range
             latency_ns = int(latency_ms * 1_000_000)
 
-            inputs.append({
-                "type": "KEYBOARD",
-                "vk_code": vk_codes[i % 4],
-                "action": "press",
-                "t_ns": input_t,
-            })
+            inputs.append(
+                {
+                    "type": "KEYBOARD",
+                    "vk_code": vk_codes[i % 4],
+                    "action": "press",
+                    "t_ns": input_t,
+                }
+            )
 
-            game_ticks.append({
-                "t_ns": input_t + latency_ns,
-                "velocity_x": float(i % 2) * 3.0,
-                "velocity_z": float((i + 1) % 2) * 4.0,
-            })
+            game_ticks.append(
+                {
+                    "t_ns": input_t + latency_ns,
+                    "velocity_x": float(i % 2) * 3.0,
+                    "velocity_z": float((i + 1) % 2) * 4.0,
+                }
+            )
 
         create_synthetic_inputs(self.inputs_path, inputs)
         create_synthetic_game_state(self.game_state_path, game_ticks)
@@ -242,9 +287,12 @@ class TestInputLatencyTelemetry(unittest.TestCase):
     def test_empty_inputs(self):
         """Empty input file produces empty latencies list."""
         create_synthetic_inputs(self.inputs_path, [])
-        create_synthetic_game_state(self.game_state_path, [
-            {"t_ns": 1000, "velocity_x": 0.0, "velocity_z": 0.0},
-        ])
+        create_synthetic_game_state(
+            self.game_state_path,
+            [
+                {"t_ns": 1000, "velocity_x": 0.0, "velocity_z": 0.0},
+            ],
+        )
 
         latencies = compute_latencies(self.inputs_path, self.game_state_path)
         self.assertEqual(latencies, [])
@@ -270,10 +318,10 @@ class TestInputLatencyTelemetry(unittest.TestCase):
 
     def test_wasd_map_correctness(self):
         """WASD_MAP has correct key codes."""
-        self.assertEqual(WASD_MAP[87], "forward")   # W
-        self.assertEqual(WASD_MAP[65], "left")      # A
+        self.assertEqual(WASD_MAP[87], "forward")  # W
+        self.assertEqual(WASD_MAP[65], "left")  # A
         self.assertEqual(WASD_MAP[83], "backward")  # S
-        self.assertEqual(WASD_MAP[68], "right")     # D
+        self.assertEqual(WASD_MAP[68], "right")  # D
 
     def test_velocity_keys_mapping(self):
         """VELOCITY_KEYS maps directions to correct velocity components."""

@@ -5,7 +5,6 @@ Test CI workflow validity.
 Verifies that the yaml is parseable and checks for common typos.
 """
 
-import os
 import re
 from pathlib import Path
 
@@ -13,6 +12,7 @@ import pytest
 
 try:
     import yaml
+
     HAS_YAML = True
 except ImportError:
     HAS_YAML = False
@@ -78,10 +78,10 @@ class TestCIWorkflowValidity:
         """Test that pipeline-ci.yml has all required jobs."""
         with open(pipeline_ci_path) as f:
             content = yaml.safe_load(f)
-        
+
         jobs = content.get("jobs", {})
         required_jobs = ["lint", "test", "security", "audit-smoke"]
-        
+
         for job_name in required_jobs:
             assert job_name in jobs, f"Pipeline CI missing required job: {job_name}"
 
@@ -90,7 +90,7 @@ class TestCIWorkflowValidity:
         """Test that pipeline-ci.yml uses actions/checkout."""
         with open(pipeline_ci_path) as f:
             content = f.read()
-        
+
         assert "actions/checkout" in content, "Pipeline CI should use actions/checkout"
 
     @pytest.mark.skipif(not HAS_YAML, reason="PyYAML not installed")
@@ -98,7 +98,7 @@ class TestCIWorkflowValidity:
         """Test that pipeline-ci.yml uses pytest."""
         with open(pipeline_ci_path) as f:
             content = f.read()
-        
+
         assert "pytest" in content, "Pipeline CI should use pytest"
 
     @pytest.mark.skipif(not HAS_YAML, reason="PyYAML not installed")
@@ -106,7 +106,7 @@ class TestCIWorkflowValidity:
         """Test that pipeline-ci.yml uses bandit for security scanning."""
         with open(pipeline_ci_path) as f:
             content = f.read()
-        
+
         assert "bandit" in content, "Pipeline CI should use bandit for security scanning"
 
     @pytest.mark.skipif(not HAS_YAML, reason="PyYAML not installed")
@@ -114,7 +114,7 @@ class TestCIWorkflowValidity:
         """Test that pipeline-ci.yml uses ruff for linting."""
         with open(pipeline_ci_path) as f:
             content = f.read()
-        
+
         assert "ruff" in content, "Pipeline CI should use ruff for linting"
 
     @pytest.mark.skipif(not HAS_YAML, reason="PyYAML not installed")
@@ -122,7 +122,7 @@ class TestCIWorkflowValidity:
         """Test that pipeline-ci.yml triggers on push."""
         with open(pipeline_ci_path) as f:
             content = yaml.safe_load(f)
-        
+
         on_config = content.get("on", {})
         assert "push" in on_config, "Pipeline CI should trigger on push"
 
@@ -131,7 +131,7 @@ class TestCIWorkflowValidity:
         """Test that pipeline-ci.yml triggers on pull requests."""
         with open(pipeline_ci_path) as f:
             content = yaml.safe_load(f)
-        
+
         on_config = content.get("on", {})
         assert "pull_request" in on_config, "Pipeline CI should trigger on pull requests"
 
@@ -140,7 +140,7 @@ class TestCIWorkflowValidity:
         """Test that recorder-ci.yml has build jobs for multiple platforms."""
         with open(recorder_ci_path) as f:
             content = yaml.safe_load(f)
-        
+
         jobs = content.get("jobs", {})
         assert "build-linux" in jobs, "Recorder CI should have build-linux job"
         assert "build-windows" in jobs, "Recorder CI should have build-windows job"
@@ -150,7 +150,7 @@ class TestCIWorkflowValidity:
         """Test that recorder-ci.yml uses cargo for Rust builds."""
         with open(recorder_ci_path) as f:
             content = f.read()
-        
+
         assert "cargo build" in content, "Recorder CI should use cargo build"
         assert "cargo test" in content, "Recorder CI should use cargo test"
 
@@ -158,16 +158,16 @@ class TestCIWorkflowValidity:
         """Test for common typos in pipeline-ci.yml."""
         with open(pipeline_ci_path) as f:
             content = f.read()
-        
+
         # Check for common typos (using word boundaries to avoid false positives)
         typo_patterns = [
-            (r'\bactons\b', 'actions'),
-            (r'\bchekout\b', 'checkout'),
-            (r'\bpyton\b', 'python'),
-            (r'\bpipytest\b', 'pytest'),
-            (r'\bbandid\b', 'bandit'),
+            (r"\bactons\b", "actions"),
+            (r"\bchekout\b", "checkout"),
+            (r"\bpyton\b", "python"),
+            (r"\bpipytest\b", "pytest"),
+            (r"\bbandid\b", "bandit"),
         ]
-        
+
         for pattern, correct in typo_patterns:
             match = re.search(pattern, content, re.IGNORECASE)
             assert match is None, f"Possible typo '{match.group()}' found (should be '{correct}')"
@@ -176,15 +176,15 @@ class TestCIWorkflowValidity:
         """Test for common typos in recorder-ci.yml."""
         with open(recorder_ci_path) as f:
             content = f.read()
-        
+
         # Check for common typos (using word boundaries)
         typo_patterns = [
-            (r'\bactons\b', 'actions'),
-            (r'\bchekout\b', 'checkout'),
-            (r'\bcrago\b', 'cargo'),
-            (r'\bcust\b', 'rust'),
+            (r"\bactons\b", "actions"),
+            (r"\bchekout\b", "checkout"),
+            (r"\bcrago\b", "cargo"),
+            (r"\bcust\b", "rust"),
         ]
-        
+
         for pattern, correct in typo_patterns:
             match = re.search(pattern, content, re.IGNORECASE)
             assert match is None, f"Possible typo '{match.group()}' found (should be '{correct}')"
@@ -197,12 +197,12 @@ class TestCIWorkflowValidity:
     def test_build_minimal_session_is_executable_python(self):
         """Test that build_minimal_session.py is valid Python."""
         script_path = Path(__file__).parent / "fixtures" / "build_minimal_session.py"
-        
+
         with open(script_path) as f:
             content = f.read()
-        
+
         # This will raise SyntaxError if invalid
-        compile(content, script_path, 'exec')
+        compile(content, script_path, "exec")
 
 
 if __name__ == "__main__":

@@ -24,6 +24,7 @@ to take us to 99), update ``PASS_FLOOR`` here in the same PR that contains
 the improvement. Lowering the floor REQUIRES Howard's explicit approval
 in the PR description.
 """
+
 from __future__ import annotations
 
 import json
@@ -69,8 +70,7 @@ def _run_audit(session_dir: pathlib.Path) -> dict:
     )
     if not proc.stdout:
         pytest.fail(
-            f"audit script produced no stdout. stderr (last 500 chars):\n"
-            f"{proc.stderr[-500:]}"
+            f"audit script produced no stdout. stderr (last 500 chars):\n" f"{proc.stderr[-500:]}"
         )
     return json.loads(proc.stdout)
 
@@ -88,6 +88,7 @@ def _tally(audit_json: dict) -> dict[str, int]:
 # ---------------------------------------------------------------------------
 # FAST SLICE — always runs (validates plumbing, not real data)
 # ---------------------------------------------------------------------------
+
 
 def test_audit_script_is_importable():
     """Catches: someone deletes/breaks bin/prd_compliance_audit.py shebang."""
@@ -159,15 +160,18 @@ def test_post_finalize_merges_existing_metadata(tmp_path: pathlib.Path):
     )
 
     # Spot-check that nested fields survive too
-    assert after.get("hardware_specs", {}).get("cpu", {}).get("cores") == 16, \
-        "MERGE REGRESSION: hardware_specs.cpu nested field was lost"
-    assert after.get("input_stats", {}).get("wasd_apm") == 20.21, \
-        "MERGE REGRESSION: input_stats nested field was lost"
+    assert (
+        after.get("hardware_specs", {}).get("cpu", {}).get("cores") == 16
+    ), "MERGE REGRESSION: hardware_specs.cpu nested field was lost"
+    assert (
+        after.get("input_stats", {}).get("wasd_apm") == 20.21
+    ), "MERGE REGRESSION: input_stats nested field was lost"
 
 
 # ---------------------------------------------------------------------------
 # LIVE SLICE — only runs when reference session is on disk
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.skipif(
     not REFERENCE_SESSION.is_dir(),
