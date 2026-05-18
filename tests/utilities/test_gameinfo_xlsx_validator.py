@@ -6,10 +6,20 @@ import sys
 import tempfile
 import unittest
 
+import pytest
+
 # Ensure bin/ is importable (go up two levels from tests/utilities/ to root, then into bin/)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "bin"))
 
 from gameinfo_xlsx_validator import EXPECTED_SHEETS, REQUIRED_FIELDS, validate_xlsx
+
+# Check if openpyxl is available for xlsx tests
+try:
+    import openpyxl  # noqa: F401
+
+    HAS_OPENPYXL = True
+except ImportError:
+    HAS_OPENPYXL = False
 
 
 def _write_xlsx(path: str, sheets: dict) -> None:
@@ -32,6 +42,7 @@ def _write_xlsx(path: str, sheets: dict) -> None:
     wb.close()
 
 
+@unittest.skipIf(not HAS_OPENPYXL, "openpyxl not installed; pip install openpyxl")
 class TestValidateXlsx(unittest.TestCase):
 
     def setUp(self):
