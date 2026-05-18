@@ -120,7 +120,7 @@ def compute_part_size(file_size: int, desired_size: int = DEFAULT_PART_SIZE) -> 
     return (file_size + MAX_PARTS - 1) // MAX_PARTS
 
 
-def get_s3_client():
+def get_s3_client() -> Any:
     """Get S3 client using environment credentials."""
     boto3, _ = _import_boto3()
     return boto3.client("s3")
