@@ -429,6 +429,20 @@ def _position_from_obs(obs: dict[str, Any]) -> tuple[float, float, float] | None
 
 
 def _coerce_xyz(pos: Any) -> tuple[float, float, float] | None:
+    """Extract (x, y, z) coordinates from a position representation.
+    
+    Accepts either a dict with keys "x", "y", "z" or a list with at least
+    3 elements. Returns None if the input cannot be converted to three
+    floats.
+    
+    Args:
+        pos: Either a dict with "x", "y", "z" keys or a list with at least
+            3 elements. Values can be any type convertible to float.
+            
+    Returns:
+        A tuple of three floats (x, y, z) if conversion succeeds,
+        otherwise None.
+    """
     if isinstance(pos, dict):
         try:
             return float(pos["x"]), float(pos["y"]), float(pos["z"])
