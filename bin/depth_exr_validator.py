@@ -27,8 +27,19 @@ def check_magic_byte(filepath: Union[str, Path]) -> bool:
         return False
 
 
-def check_structural(filepath):
-    """Lazy-import OpenEXR and perform structural check."""
+def check_structural(filepath: Union[str, Path]) -> bool:
+    """Lazy-import OpenEXR and perform structural check.
+
+    Attempts to open the EXR file using the OpenEXR library and verifies
+    that the file has valid header information with channel data.
+
+    Args:
+        filepath: Path to the EXR file to validate. Can be a string or Path object.
+
+    Returns:
+        True if the file passes structural validation, False if validation fails.
+        Returns True if OpenEXR is not installed (structural check skipped).
+    """
     try:
         import OpenEXR
         with OpenEXR.InputFile(str(filepath)) as exr_file:
@@ -42,7 +53,7 @@ def check_structural(filepath):
         return False
 
 
-def validate_exr_files(depth_dir):
+def validate_exr_files(depth_dir: Union[str, Path]) -> dict:
     """Walk depth directory and validate all .exr files."""
     depth_path = Path(depth_dir)
     if not depth_path.exists():
