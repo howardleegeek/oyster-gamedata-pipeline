@@ -164,6 +164,15 @@ def interpolate_horizon(chunk: ActionChunk, target_horizon: int) -> ActionChunk:
 
 
 def load_npy_actions(path: str) -> np.ndarray:
+    """Load action data from a NumPy .npy file.
+
+    Args:
+        path: Filesystem path to the .npy file containing action arrays.
+
+    Returns:
+        A NumPy array loaded from the file, with pickle loading disabled
+        for safety.
+    """
     return np.load(path, allow_pickle=False)
 
 
