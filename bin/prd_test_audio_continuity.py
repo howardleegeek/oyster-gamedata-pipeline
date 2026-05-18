@@ -19,7 +19,16 @@ import sys
 from pathlib import Path
 from typing import List, Tuple
 
-import numpy as np
+# Try to import numpy, but handle the case where it's not installed
+try:
+    import numpy as np
+    HAS_NUMPY = True
+except ImportError:
+    HAS_NUMPY = False
+    # Create a dummy np module for type checking
+    class DummyNP:
+        pass
+    np = DummyNP()
 
 
 def check_ffprobe_available() -> bool:
@@ -48,7 +57,7 @@ def get_audio_packets(video_path: Path, stream_index: int) -> List[float]:
     """
     cmd = [
         "ffprobe",
-        "-v", "quiet",
+        "-v", "error",
         "-select_streams", str(stream_index),
         "-show_entries", "packet=pts_time",
         "-of", "json",
@@ -60,6 +69,15 @@ def get_audio_packets(video_path: Path, stream_index: int) -> List[float]:
         error_msg = result.stderr.strip()
         if not error_msg:
             error_msg = "no error output"
+        
+        # Check for specific "moov atom not found" error
+        if "moov atom not found" in error_msg.lower():
+            raise RuntimeError(
+                f"Invalid MP4 file: moov atom (metadata) not found. "
+                f"This usually means the file is incomplete or corrupted. "
+                f"File: {video_path}"
+            )
+        
         raise RuntimeError(
             f"ffprobe failed with code {result.returncode}: {error_msg}. "
             f"Command: {' '.join(cmd)}"
@@ -86,7 +104,7 @@ def get_audio_streams(video_path: Path) -> List[int]:
     """
     cmd = [
         "ffprobe",
-        "-v", "quiet",
+        "-v", "error",
         "-show_entries", "stream=index,codec_type",
         "-of", "json",
         str(video_path),
@@ -97,48 +115,75 @@ def get_audio_streams(video_path: Path) -> List[int]:
         error_msg = result.stderr.strip()
         if not error_msg:
             error_msg = "no error output"
+        
+        # Check for specific "moov atom not found" error
+        if "moov atom not found" in error_msg.lower():
+            raise RuntimeError(
+                f"Invalid MP4 file: moov atom (metadata) not found. "
+                f"This usually means the file is incomplete or corrupted. "
+                f"File: {video_path}"
+            )
+        
         raise RuntimeError(
             f"ffprobe failed with code {result.returncode}: {error_msg}. "
             f"Command: {' '.join(cmd)}"
         )
 
     data = json.loads(result.stdout)
-    return [
-        s["index"] for s in data.get("streams", [])
-        if s.get("codec_type") == "audio"
-    ]
+    streams = []
+    for stream in data.get("streams", []):
+        if stream.get("codec_type") == "audio":
+            streams.append(int(stream.get("index", 0)))
+    return streams
 
 
 def check_continuity(
-    timestamps: List[float], threshold_ms: float = 50.0
+    timestamps: List[float], threshold_ms: float
 ) -> List[Tuple[float, float, float]]:
     """
-    Check for gaps in audio packet timestamps.
+    Check audio packet timestamps for gaps exceeding threshold.
 
     Args:
         timestamps: Sorted list of packet timestamps in seconds.
         threshold_ms: Maximum allowed gap in milliseconds.
 
     Returns:
-        List of tuples (gap_start, gap_end, gap_duration_ms) for gaps
-        exceeding the threshold.
+        List of (gap_start, gap_end, gap_duration_ms) tuples for gaps
+        exceeding threshold.
     """
     if len(timestamps) < 2:
         return []
 
-    arr = np.array(timestamps)
-    diffs = np.diff(arr)
-    threshold_sec = threshold_ms / 1000.0
-
+    threshold_s = threshold_ms / 1000.0
     gaps = []
-    for i, diff in enumerate(diffs):
-        if diff > threshold_sec:
-            gaps.append((arr[i], arr[i + 1], diff * 1000.0))
+
+    for i in range(1, len(timestamps)):
+        gap = timestamps[i] - timestamps[i - 1]
+        if gap > threshold_s:
+            gaps.append((timestamps[i - 1], timestamps[i], gap * 1000.0))
+
     return gaps
 
 
 def main(argv: List[str] = None) -> int:
-    """CLI entry point."""
+    """
+    Main entry point for audio continuity test.
+
+    Args:
+        argv: Command line arguments (defaults to sys.argv[1:]).
+
+    Returns:
+        Exit code as described in module docstring.
+    """
+    # Check if numpy is available
+    if not HAS_NUMPY:
+        print(
+            "Error: numpy is not installed. "
+            "Please install numpy to run this test (pip install numpy).",
+            file=sys.stderr
+        )
+        return 2
+
     parser = argparse.ArgumentParser(
         description="Check audio continuity in video files."
     )
@@ -146,8 +191,11 @@ def main(argv: List[str] = None) -> int:
         "video", type=Path, help="Path to video file to analyze."
     )
     parser.add_argument(
-        "-t", "--threshold", type=float, default=50.0,
-        help="Maximum allowed gap in milliseconds (default: 50)."
+        "-t",
+        "--threshold",
+        type=float,
+        default=50.0,
+        help="Maximum allowed gap in milliseconds (default: 50).",
     )
     args = parser.parse_args(argv)
 
