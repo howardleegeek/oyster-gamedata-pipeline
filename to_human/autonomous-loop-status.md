@@ -47,3 +47,11 @@
 ## Round 12 @ 2026-05-18T05:30:00Z
 - Picked: Fix prd_test_route_type_distribution.py — test is failing in PRD acceptance report with no error message shown. Need to investigate and fix.
 - Result: committed 6f03f23
+
+## Round 13 @ 2026-05-18T15:54:44Z
+- Picked: Fix tests/utilities/test_gameinfo_xlsx_validator.py — 5 tests failed with ModuleNotFoundError for openpyxl. Added HAS_OPENPYXL check and @unittest.skipIf decorator to skip tests gracefully when openpyxl is not installed, matching the pattern used in other test files in this repo.
+- Result: committed 72e1889
+
+## Round 14 @ 2026-05-18T16:30:00Z
+- Picked: Add test coverage for bin/prd_test_action_per_second.py — the script had no test file. Created 30 unit tests covering CLI interface, median calculation, quality threshold validation, file loading (JSON list, plain text, action_camera.json format, camera data dict), timestamp field detection, and camera data detection.
+- Result: committed 56ff375
