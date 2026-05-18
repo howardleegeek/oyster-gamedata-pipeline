@@ -4,6 +4,7 @@ PRD p4 #5: Depth EXR 6fps alignment with 30fps video — frame index ratio 5:1 e
 """
 
 import argparse
+import os
 import re
 import sys
 from pathlib import Path
@@ -21,8 +22,16 @@ def natural_sort_key(path: Path) -> Tuple[int, ...]:
 
 def find_frames(directory: Path, exts: List[str]) -> List[Path]:
     """Find all frame files with given extensions."""
+    if not directory.exists():
+        raise FileNotFoundError(f"Directory not found: {directory}")
     if not directory.is_dir():
-        raise NotADirectoryError(f"Not a directory: {directory}")
+        # Check what it actually is
+        if directory.is_file():
+            raise NotADirectoryError(f"Path exists as a file, not a directory: {directory}")
+        elif directory.is_symlink():
+            raise NotADirectoryError(f"Path exists as a symlink, not a directory: {directory}")
+        else:
+            raise NotADirectoryError(f"Path exists but is not a directory: {directory}")
     files = []
     for ext in exts:
         files.extend(directory.glob(f"*{ext}"))
@@ -78,10 +87,55 @@ def main(argv: List[str] = None) -> int:
         ok, msg = validate_alignment(args.video_dir, args.depth_dir, args.verbose)
         print(msg)
         return 0 if ok else 1
-    except (FileNotFoundError, NotADirectoryError, ValueError) as e:
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 2
+    except NotADirectoryError as e:
+        # NotADirectoryError doesn't show the full message when printed, so we need to handle it specially
+        # Try to determine which path caused the error
+        error_path = None
+        error_msg = str(e)
+        
+        # Check if the error message contains a path that matches either of our arguments
+        for path in [args.video_dir, args.depth_dir]:
+            if str(path) in error_msg:
+                error_path = path
+                break
+        
+        # If we couldn't determine which path, check each one
+        if error_path is None:
+            for path in [args.video_dir, args.depth_dir]:
+                if path.exists():
+                    if path.is_file():
+                        print(f"Error: Path exists as a file, not a directory: {path}", file=sys.stderr)
+                        return 2
+                    elif path.is_symlink():
+                        print(f"Error: Path exists as a symlink, not a directory: {path}", file=sys.stderr)
+                        return 2
+                    elif not path.is_dir():
+                        print(f"Error: Path exists but is not a directory: {path}", file=sys.stderr)
+                        return 2
+        
+        # If we still don't know, print the original error
+        if error_path is None:
+            print(f"Error: {e}", file=sys.stderr)
+            return 2
+        
+        # We found the problematic path
+        if error_path.exists():
+            if error_path.is_file():
+                print(f"Error: Path exists as a file, not a directory: {error_path}", file=sys.stderr)
+            elif error_path.is_symlink():
+                print(f"Error: Path exists as a symlink, not a directory: {error_path}", file=sys.stderr)
+            else:
+                print(f"Error: Path exists but is not a directory: {error_path}", file=sys.stderr)
+        else:
+            print(f"Error: {e}", file=sys.stderr)
+        return 2
+    except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 2
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())
