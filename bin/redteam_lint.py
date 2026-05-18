@@ -71,7 +71,12 @@ def repack(bundle: Path) -> Path:
 
 
 # --------------------------------------------------------------------------- attacks
-def attack_drop_systeminfo(b: Path):
+def attack_drop_systeminfo(b: Path) -> None:
+    """Remove the systeminfo.json file from the given directory.
+
+    Args:
+        b: Path to the directory containing systeminfo.json.
+    """
     (b / "systeminfo.json").unlink()
 
 
