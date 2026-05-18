@@ -237,8 +237,12 @@ class TestHarness:
             "results": self.results,
         }
     
-    def print_summary(self):
-        """Print summary."""
+    def print_summary(self) -> None:
+        """Print a formatted summary of test results to stdout.
+
+        Retrieves the test report and displays environment counts,
+        pass/fail statistics, and any failed environment names.
+        """
         r = self.get_report()
         
         print("\n" + "=" * 50)
