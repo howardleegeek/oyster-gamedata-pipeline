@@ -1,8 +1,69 @@
 # GameData Recorder — Partner Onboarding SOP
 
-**Status as of 2026-05-16 22:30 PDT:** rc19.x release push. PRD compliance audit: **89 / 104 PASS** on real Howard-played session (`session_20260516_213817_d137a341`). DepthAnything V2 inference running in background to flip the remaining 9 depth fails → target **98+ / 104**.
+**Status as of 2026-05-18 (post v0.3.0 release):** PRD compliance audit: **101 / 105 PASS** on real Howard-played session. 16 SPECs landed via Aliyun cluster (~20K LOC) covering Phase 1+2+3 of the productionization roadmap. GitHub release: https://github.com/howardleegeek/oyster-gamedata-pipeline/releases/tag/v0.3.0.
 
 You're joining mid-sprint. This doc gets you productive in 2 hours and tells you the iron laws to not violate.
+
+---
+
+## 0. v0.3.0 What just shipped (read this first if you've onboarded before)
+
+Tonight's cluster sprint expanded the repo from ~5 files (canonical_pipeline + audit + DA-V2 depth) to a **full productionization scaffold**:
+
+| Area | New files | What it does |
+|---|---|---|
+| **Quality auditors (3 layers)** | `bin/prd_compliance_audit.py` (existing, updated) + `bin/adversarial_quality_check.py` (NEW) + `bin/data_precision_audit.py` (NEW) | PRD coverage / cross-source agreement / signal precision |
+| **Depth (3 backends)** | `bin/run_da_v2_depth.py` (PyTorch local) + `bin/run_da_v2_depth_onnx.py` (ONNX/DirectML, any Win GPU) + `bin/run_da_v2_depth_remote.py` (Modal serverless A10G) | Drop-in equivalents; pick by env |
+| **Recorder ops** | `bin/preflight_recorder.{py,ps1}` + `bin/recorder_watchdog.py` + `bin/continuous_capture_daemon.py` + `bin/daemon_control.py` + `bin/recorder_rate_limiter.py` + `bin/disk_health_check.py` + `bin/auto_archive_old_uploaded.py` | Pre-record sanity + record-time watchdog + auto-loop + rate-limit |
+| **Route + batch** | `bin/route_planner.py` + `bin/batch_dashboard.py` + `bin/batch_quality_aggregate.py` + `bin/quality_scorer.py` + `bin/launcher_integration.py` | Scene quota, DataMIL-style quality ranking, dashboard |
+| **Backend services** | `server/marketplace_api.py` + `server/payout_engine.py` + `server/stripe_connect.py` + `server/paypal_payouts.py` + `server/oauth.py` + `server/auth_middleware.py` + `server/s3_presigned_url.py` + `server/modal_depth_app.py` | REST API + Stripe/PayPal payouts + OAuth + S3 upload + Modal endpoint |
+| **Frontend** | `dashboard/server.py` + `dashboard/app.py` + `dashboard/login_page.py` + `dashboard/monitor_panel.py` + `dashboard/Dockerfile` + `deploy.sh` | FastAPI + Streamlit buyer/contributor UI |
+| **Provenance + privacy** | `oyster_provenance/{manifest,merkle,sign,anchor,verify}.py` (25 pytest passing) + `bin/pii_auditor.py` + `bin/pii_redactor.py` + `bin/right_to_delete.py` + `consent/eula_v3.2.md` | Merkle + ed25519 + Bitcoin anchor + GDPR/BIPA |
+| **Monitoring + i18n** | `bin/oyster_monitor.py` + `bin/alert_dispatcher.py` + `config/monitor_thresholds.yaml` + `docs/ONBOARDING.{zh-CN,ja-JP}.md` + `docs/glossary.md` + `bin/i18n_lint.py` | Slack/Discord alerts + 中/日 onboarding |
+| **CI + build** | `.github/workflows/pipeline-ci.yml` + `recorder-ci.yml` + `tests/fixtures/build_minimal_session.py` + `scripts/mod_build_orchestrator.sh` + `scripts/mod_build_dockerfile` + `bin/export_da_v2_to_onnx.py` + `bin/download_da_v2_onnx.py` | GitHub Actions on every push + mod build container |
+| **Mod patches** | `patches/depth_zbuffer_capture.diff` + `patches/mod_mic_capture.diff` + `patches/recorder_mic_consent.rs.diff` + `bin/zbuffer_to_exr.py` + `bin/input_latency_telemetry.py` + `bin/extract_audio_event_track.py` | Fabric mod additions (engine Z-buffer + audio + consent) |
+
+**Day-1 quickstart for new tools** (run from repo root after cloning):
+
+```bash
+# 1. Pipeline (the canonical one-command audit)
+python3 bin/canonical_pipeline.py <session_dir> --operator-id <you> --target-score 101
+# Expected output: AUDIT: PASS=101 FAIL=0 SKIP=4 TOTAL=105
+
+# 2. Three layers of quality audit (run after canonical_pipeline)
+python3 bin/prd_compliance_audit.py <session_dir> --json                    # PRD spec coverage (105 items)
+python3 bin/adversarial_quality_check.py <session_dir>                       # Cross-source independent measurement
+python3 bin/data_precision_audit.py <session_dir>                            # P1-P7 signal precision
+
+# 3. Regression test (mutation-verified PASS_FLOOR=101)
+python3 -m pytest tests/test_canonical_pipeline_score.py -v
+
+# 4. Provenance verify a session (offline buyer-side CLI)
+python3 oyster_provenance/verify.py <session_dir>
+
+# 5. Run dashboard locally
+cd dashboard && pip install -r requirements.txt && python3 server.py &
+streamlit run app.py
+```
+
+**Where to look for**:
+
+| You want to... | Open |
+|---|---|
+| Understand audit logic | `bin/prd_compliance_audit.py` (start at `def main`) |
+| Add a new audit check | `bin/prd_compliance_audit.py` + append regression test |
+| Fix the canonical pipeline | `bin/canonical_pipeline.py` (10 steps, idempotent) |
+| Add depth backend | `bin/run_da_v2_depth_*.py` (3 examples) |
+| Productionize recorder | `bin/preflight_recorder.py` + `bin/recorder_watchdog.py` + `bin/continuous_capture_daemon.py` |
+| Buyer API | `server/marketplace_api.py` |
+| Payout flow | `server/payout_engine.py` |
+| OAuth | `server/oauth.py` + `server/auth_middleware.py` |
+| Provenance / signing | `oyster_provenance/*.py` |
+| PII / privacy | `bin/pii_auditor.py` + `bin/right_to_delete.py` |
+| CI | `.github/workflows/pipeline-ci.yml` |
+| 中文 onboarding | `docs/ONBOARDING.zh-CN.md` |
+
+See `CHANGELOG.md` for the full v0.3.0 detail (known gaps documented honestly).
 
 ---
 
@@ -10,11 +71,12 @@ You're joining mid-sprint. This doc gets you productive in 2 hours and tells you
 
 **What we're building**: A Windows desktop daemon that records gameplay (video + game state + inputs + depth) and uploads to S3 for AI world-model training. Forked from OWL Control (Rust/OBS-embedded recorder). Consumer-grade: install → play → get paid.
 
-**Current state**:
-- Client (Rust + Java Fabric mod): `~/Downloads/gamedata-recorder/` — rc19.0.2 in CI
-- Pipeline (Python): `~/Downloads/oyster-gamedata-pipeline/` — audit + transform tools
-- Backend (FastAPI MVP): `~/Downloads/gamedata-recorder/backend/`
-- v2.6.0 PRD spec defines **104 audit items** the output must satisfy
+**Current state** (post v0.3.0, 2026-05-18):
+- Client (Rust + Java Fabric mod): `~/Downloads/gamedata-recorder/` — rc19.x in flight
+- Pipeline (Python): `~/Downloads/oyster-gamedata-pipeline/` v0.3.0 released
+- Backend (this repo, `server/`): marketplace API + payouts + OAuth + Modal depth
+- v2.6.0 PRD spec defines **105 audit items** (was 104; H8 depth-source honesty marker added v0.3.0)
+- Reference session locks at **101/105 PASS, 0 FAIL, 4 honest SKIP**
 
 **Your role**: Partner-level engineer focused on **local development with Codex**. You write code on the pipeline (Python) and the recorder (Rust/Java) directly. Cluster dispatches (Aliyun) stay with Howard — you don't need cluster credentials. We coordinate via git + shared filesystem.
 
@@ -388,15 +450,17 @@ python3 bin/prd_compliance_audit.py "$SESS" --json | \
 - ⏳ Mod schema RFC dispatched (`/tmp/cluster-2026-05-17-4/`) for event_type + session_id + session_end
 - ⏳ B/C/D RFCs written for auto-arm + Win32 ARM click + depth-hook (not yet dispatched)
 
-**Your first real tasks** (all local, all unblock 89/104 → 100+, all 1-2 hours each with Codex):
+**Your first real tasks** (all v0.3.0 → v0.3.1 work, all local, all 1-3 hours with Codex):
 
-1. **Fix `bin/post_finalize_metadata.py` to MERGE not OVERWRITE** — the current script strips the recorder's rich metadata (hardware_specs, input_stats, recorder_extra) down to 401 bytes. It should `dict.update()` into existing metadata, not replace. There's a session at `/tmp/real-session-howardplay-1778993817/` to test against. This bug costs us ~10 audit items per run.
+1. **Fix P5 velocity-unit mismatch in `bin/transform_game_state_to_action_camera.py`** — `bin/data_precision_audit.py` flags action_camera ships `blocks/tick` (max 0.33) despite metadata claiming `m/s`. Fix: multiply velocity by `MC_TICKS_PER_SECOND=20.0`. Verify max horizontal speed lands at ~5.6 m/s (vanilla MC sprint). Add regression in `tests/test_canonical_pipeline_score.py`.
 
-2. **Add `--include-prd-extras` flag to `bin/generate_gameinfo_xlsx.py`** — when set, append the 5 X-group rows (`world_gravity_mps2=32.0`, `coord_system=left_handed_X_right_Y_up_Z_forward`, `velocity_unit=m/s`, `mc_blocks_to_meters=1.0`, `mc_ticks_per_second=20.0`). Currently has to be done manually via openpyxl snippet — see Section 8 step 6.
+2. **Investigate P4 coord-handedness 67% negative on falling** — `data_precision_audit.py` shows only 67% of falling ticks (`on_ground=False`) have negative `velocity_y`. Should be ~100% in left-handed-X-right-Y-up convention. Either: (a) `on_ground` detection is unreliable on cliff edges (likely cause), or (b) real sign-flip bug. Add a sub-second free-fall episode probe to discriminate. Document conclusion in `docs/coord_system_audit.md`.
 
-3. **Write `bin/canonical_pipeline.py`** — a single script that runs Section 8's 10 steps in correct order, idempotent, with `--target-score N` flag that fails loudly if final audit < N. Replaces the manual shell pipeline.
+3. **Add CHANGELOG validator to CI** — `.github/workflows/pipeline-ci.yml` should fail if a PR adds files but doesn't update CHANGELOG.md. Pattern: `git diff origin/main --name-only | grep -qv CHANGELOG.md || echo "needs entry"`. Lock in our v0.3.0 release discipline.
 
-4. **Promote `/tmp/run_da_v2_depth.py` into `bin/run_da_v2_depth.py`** — currently it lives in `/tmp/` (where Claude wrote it ad-hoc). Move it to `bin/`, add it to the canonical pipeline as step 8, write a test.
+4. **Write `tests/test_data_precision_invariants.py`** — pin the P1-P7 expected ranges as regression tests against the reference session. Mutation-verify: artificially break one signal (e.g., zero out velocities), confirm test fails. This becomes the L4 quality lock complementing the existing PRD-coverage L4 lock.
+
+5. **Productize `oyster-verify` CLI** — `oyster_provenance/verify.py` works as a Python module but needs a console script entry point. Add `[project.scripts] oyster-verify = "oyster_provenance.verify:main"` to `pyproject.toml`. Now buyers can `pip install` and verify offline with one command.
 
 Pick whichever excites you. Open a PR per task. Howard reviews + merges.
 
