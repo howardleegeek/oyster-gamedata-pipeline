@@ -33,9 +33,8 @@
 - Result: committed 74cdca8
 
 ## Round 9 @ 2026-05-17T04:36:16Z
-- Picked: Fix obs_capture_real.py — `_authenticate()` crashed with `AttributeError: 'NoneType' object has no attribute 'get'` when OBS websocket sends `authentication: None` for anonymous connections. The code used `.get("authentication", {}).get("challenge")` which fails when the key exists with value `None` (returns `None`, not the default `{}`). Fixed by using `((data.get("authentication") or {}) or {}).get("challenge")` to handle both missing keys and `None` values.
-- Result: committed 7354d46
+- Picked: Fix obs_capture_real.py — `_authenticate()` crashed with `AttributeError: 'NoneType' object has no attribute 'get'` when OBS websocket sends `authentication: None` for anonymous connections. The code used `.get("authentication", {}).get("challenge")` which fails when the key exists with value `None` (returns `None`, not the default `{}`). Fixed by using 
 
-## Round 10 @ 2026-05-17T05:30:00Z
-- Picked: Fix prd_test_video_no_ui.py — the ffmpeg fps filter was incorrectly set to `fps=1/num_frames` which extracts 1 frame every N seconds (e.g., 1 frame every 10 seconds for 10 frames). This caused ffmpeg to fail with "Not a directory" error because extracting 0 frames from a short video fails. Fixed by changing to `fps={num_frames}` to extract the requested number of frames per second, with `-t 1` to limit duration.
-- Result: committed 4d3fced
+## Round 10 @ 2026-05-18T00:30:00Z
+- Picked: Fix tests/phase2/test_semantic_validator.py — `test_cli_valid_file` and `test_cli_invalid_file` used `os.system("python3 semantic_validator.py ...")` which fails because the script is at `src/oyster_agent_runner/phase2/semantic_validator.py`, not in the current working directory. Fixed by using `subprocess.run()` with the correct absolute path to the script.
+- Result: committed 71d1e74
