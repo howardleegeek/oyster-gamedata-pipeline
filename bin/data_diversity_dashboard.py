@@ -187,6 +187,18 @@ def generate_image_dashboard(cohorts: Dict[str, List[Dict]], out_dir: Path) -> L
 
 
 def generate_excel_report(cohorts: Dict[str, List[Dict]], out_path: Path) -> Path:
+    """Generate an Excel workbook with per-cohort diversity histograms.
+
+    Args:
+        cohorts: Mapping from cohort name to list of records for that cohort.
+        out_path: Path where the Excel file will be saved.
+
+    Returns:
+        Path to the saved Excel file.
+
+    Raises:
+        RuntimeError: If openpyxl is not available.
+    """
     if not HAS_OPENPYXL or openpyxl is None: raise RuntimeError("openpyxl required")
     wb = openpyxl.Workbook()
     hf = Font(bold=True, color="FFFFFF"); hfill = PatternFill(start_color="4C72B0", end_color="4C72B0", fill_type="solid")
