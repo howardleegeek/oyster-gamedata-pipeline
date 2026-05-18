@@ -3,6 +3,7 @@
 
 import argparse, json, socket, struct, sys
 
+
 def encode_varint(value: int) -> bytes:
     """Encode integer as Minecraft VarInt."""
     result = bytearray()
@@ -13,8 +14,19 @@ def encode_varint(value: int) -> bytes:
         if not value: break
     return bytes(result)
 
-def decode_varint(sock):
-    """Decode Minecraft VarInt from socket."""
+
+def decode_varint(sock) -> int:
+    """Decode Minecraft VarInt from socket.
+
+    Args:
+        sock: A socket object with recv() method.
+
+    Returns:
+        The decoded integer value.
+
+    Raises:
+        IndexError: If socket returns empty data.
+    """
     result, shift = 0, 0
     while True:
         b = sock.recv(1)[0]
@@ -23,8 +35,20 @@ def decode_varint(sock):
         shift += 7
     return result
 
-def check_server(host, port):
-    """Check if Paper server is up and running version 1.20.4."""
+
+def check_server(host: str, port: int) -> int:
+    """Check if Paper server is up and running version 1.20.4.
+
+    Performs a TCP handshake with the Minecraft server, sends a status
+    request, and verifies the server version matches 1.20.4.
+
+    Args:
+        host: Server hostname or IP address.
+        port: Server port number.
+
+    Returns:
+        0 if server is up and version matches, 1 otherwise.
+    """
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(5.0)
@@ -55,12 +79,14 @@ def check_server(host, port):
         print(f"Error: {e}")
         return 1
 
-def main():
+
+def main() -> None:
     parser = argparse.ArgumentParser(description="Paper server health probe")
     parser.add_argument("--host", default="localhost", help="Server host")
     parser.add_argument("--port", type=int, default=25565, help="Server port")
     args = parser.parse_args()
     sys.exit(check_server(args.host, args.port))
+
 
 if __name__ == "__main__":
     main()
