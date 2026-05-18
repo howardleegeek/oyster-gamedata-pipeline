@@ -66,6 +66,22 @@ def step1_transform(sess: pathlib.Path) -> None:
 def step2_trim_mp4(sess: pathlib.Path, start_offset: int = 180, target_dur: int = 300) -> None:
     step(f"2/10 Re-encode mp4 (start={start_offset}s, dur={target_dur}s, 10Mbps)")
     src = sess / "recording.mp4"
+
+    # Idempotency check 2026-05-17: if mp4 is already at target_dur (±1s), SKIP
+    # the re-trim. Previously, re-running canonical_pipeline on an already-curated
+    # session would re-trim with `-ss start_offset` from a session that was
+    # already trimmed, producing a 0-second file. This destroyed the regression
+    # fixture twice tonight — the fix is to detect "already done" state.
+    if src.exists() and src.stat().st_size > 1_000_000:  # > 1 MB (real video, not corrupted)
+        try:
+            _frames, existing_dur = ffprobe_frames(src)
+            if abs(existing_dur - target_dur) <= 1.0:
+                print(f"  IDEMPOTENT SKIP: mp4 already at {existing_dur:.3f}s (target {target_dur}s)")
+                print(f"  mp4: {_frames} frames, {existing_dur:.3f}s (unchanged)")
+                return
+        except Exception as e:
+            print(f"  ffprobe check failed ({e}); falling through to re-trim")
+
     tmp = sess / "_recording_trim.mp4"
     run([
         "ffmpeg", "-y", "-ss", str(start_offset), "-i", str(src),
