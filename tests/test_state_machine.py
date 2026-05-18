@@ -6,7 +6,7 @@ Test the state machine transitions for the continuous capture daemon
 import json
 import sys
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -100,17 +100,24 @@ class TestStateMachine(unittest.TestCase):
             self.daemon.logger.info.assert_called_with("Recording session session_test")
 
     def test_recording_to_finalizing_transition(self):
-        """Test transition from RECORDING to FINALIZING when Minecraft stops"""
+        """Test transition from RECORDING to FINALIZING when Minecraft stops.
+
+        Note: `_transition_to(FINALIZING)` chains forward when `_run_finalize`
+        succeeds — FINALIZING → UPLOADING → COOLDOWN. So we can't assert the
+        end state is FINALIZING; we assert the FINALIZING-entry log fired.
+        """
         self.daemon.state = DaemonState.RECORDING
         self.daemon.session_id = "session_test"
 
-        with patch.object(self.daemon, "_is_minecraft_running", return_value=False):
-            # Mock the transition that happens in _transition_to
-            with patch.object(self.daemon, "_run_finalize", return_value=True):
-                self.daemon._transition_to(DaemonState.FINALIZING)
+        with (
+            patch.object(self.daemon, "_is_minecraft_running", return_value=False),
+            patch.object(self.daemon, "_run_finalize", return_value=True),
+            patch.object(self.daemon, "_queue_upload", return_value=True),
+            patch.object(self.daemon, "_cleanup_session", return_value=True),
+        ):
+            self.daemon._transition_to(DaemonState.FINALIZING)
 
-                self.assertEqual(self.daemon.state, DaemonState.FINALIZING)
-                self.daemon.logger.info.assert_called_with("Finalizing session session_test")
+            self.daemon.logger.info.assert_any_call("Finalizing session session_test")
 
     def test_finalizing_to_uploading_transition(self):
         """Test transition from FINALIZING to UPLOADING when finalize succeeds"""
@@ -124,18 +131,26 @@ class TestStateMachine(unittest.TestCase):
             pass
 
     def test_uploading_to_cooldown_transition(self):
-        """Test transition from UPLOADING to COOLDOWN when upload queues"""
-        self.daemon.state = DaemonState.UPLOADING
+        """Test transition from UPLOADING to COOLDOWN when upload queues.
+
+        The session counter is incremented inside the UPLOADING branch of
+        `_transition_to`, then the daemon chains itself to COOLDOWN. So
+        we need to enter UPLOADING (not COOLDOWN directly) for the
+        counter increment to fire.
+        """
+        self.daemon.state = DaemonState.FINALIZING  # pre-UPLOADING
         self.daemon.session_id = "session_test"
         self.daemon.total_sessions_today = 0
 
-        with patch.object(self.daemon, "_queue_upload", return_value=True):
-            with patch.object(self.daemon, "_cleanup_session", return_value=True):
-                self.daemon._transition_to(DaemonState.COOLDOWN)
+        with (
+            patch.object(self.daemon, "_queue_upload", return_value=True),
+            patch.object(self.daemon, "_cleanup_session", return_value=True),
+        ):
+            self.daemon._transition_to(DaemonState.UPLOADING)
 
-                self.assertEqual(self.daemon.state, DaemonState.COOLDOWN)
-                self.assertEqual(self.daemon.total_sessions_today, 1)
-                self.assertIsNotNone(self.daemon.cooldown_until)
+            self.assertEqual(self.daemon.state, DaemonState.COOLDOWN)
+            self.assertEqual(self.daemon.total_sessions_today, 1)
+            self.assertIsNotNone(self.daemon.cooldown_until)
 
     def test_cooldown_to_idle_transition(self):
         """Test transition from COOLDOWN to IDLE after cooldown period"""
@@ -156,24 +171,37 @@ class TestStateMachine(unittest.TestCase):
         self.assertEqual(self.daemon.state, DaemonState.ARMED)
 
     def test_finalize_failure_handling(self):
-        """Test handling when finalize fails"""
-        self.daemon.state = DaemonState.FINALIZING
+        """Test handling when finalize fails.
+
+        The "Finalize failed" error log lives inside the FINALIZING branch
+        of `_transition_to`. We must enter FINALIZING (with `_run_finalize`
+        returning False), and the daemon will then self-chain to COOLDOWN.
+        """
+        self.daemon.state = DaemonState.RECORDING
+        self.daemon.session_id = "session_test"
 
         with patch.object(self.daemon, "_run_finalize", return_value=False):
-            self.daemon._transition_to(DaemonState.COOLDOWN)
+            self.daemon._transition_to(DaemonState.FINALIZING)
 
             self.assertEqual(self.daemon.state, DaemonState.COOLDOWN)
-            self.daemon.logger.error.assert_called_with("Finalize failed, going to COOLDOWN")
+            self.daemon.logger.error.assert_any_call("Finalize failed, going to COOLDOWN")
 
     def test_upload_failure_handling(self):
-        """Test handling when upload fails"""
-        self.daemon.state = DaemonState.UPLOADING
+        """Test handling when upload fails.
+
+        The "Upload queue failed" error log lives inside the UPLOADING
+        branch of `_transition_to`. We must enter UPLOADING (with
+        `_queue_upload` returning False), and the daemon will then
+        self-chain to COOLDOWN.
+        """
+        self.daemon.state = DaemonState.FINALIZING
+        self.daemon.session_id = "session_test"
 
         with patch.object(self.daemon, "_queue_upload", return_value=False):
-            self.daemon._transition_to(DaemonState.COOLDOWN)
+            self.daemon._transition_to(DaemonState.UPLOADING)
 
             self.assertEqual(self.daemon.state, DaemonState.COOLDOWN)
-            self.daemon.logger.error.assert_called_with("Upload queue failed, going to COOLDOWN")
+            self.daemon.logger.error.assert_any_call("Upload queue failed, going to COOLDOWN")
 
     def test_state_persistence(self):
         """Test that state is properly saved and loaded"""
@@ -200,7 +228,12 @@ class TestStateMachine(unittest.TestCase):
         self.assertEqual(data["total_uptime_hours"], 12.5)
 
     def test_low_disk_space_pause(self):
-        """Test that daemon pauses when disk space is low"""
+        """Test that daemon pauses when disk space is low.
+
+        `_log_heartbeat()` is gated on a 1-hour interval; the disk check
+        only runs inside that hourly branch. So we backdate `last_heartbeat`
+        to force the branch.
+        """
         # Mock low disk space
         with patch("psutil.disk_usage") as mock_disk_usage:
             mock_usage = Mock()
@@ -210,6 +243,8 @@ class TestStateMachine(unittest.TestCase):
             # Create new daemon with low disk space
             daemon = ContinuousCaptureDaemon()
             daemon.logger = Mock()
+            # Force the hourly heartbeat branch (where disk check lives) to fire
+            daemon.last_heartbeat = datetime.now() - timedelta(hours=2)
 
             # Run heartbeat check
             daemon._log_heartbeat()
@@ -307,9 +342,6 @@ class TestStateMachine(unittest.TestCase):
             is_running = self.daemon._is_recorder_running()
             self.assertTrue(is_running)
 
-
-# Import timedelta for heartbeat test
-from datetime import timedelta
 
 if __name__ == "__main__":
     unittest.main()
