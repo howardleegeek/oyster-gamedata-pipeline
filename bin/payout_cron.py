@@ -195,6 +195,23 @@ class MockStripeClient:
 
 
 def make_stripe_client(*, allow_mock: bool = False) -> StripeClient | MockStripeClient:
+    """Create a Stripe API client (live or mock) based on environment.
+
+    Reads STRIPE_SECRET_KEY from the environment. If it starts with 'sk_',
+    returns a live StripeClient. Otherwise, returns a MockStripeClient only
+    when allow_mock is True; otherwise raises RuntimeError.
+
+    Args:
+        allow_mock: If True, allow falling back to MockStripeClient when
+            STRIPE_SECRET_KEY is not a valid live key. Defaults to False.
+
+    Returns:
+        A StripeClient (live) or MockStripeClient (test) instance.
+
+    Raises:
+        RuntimeError: If STRIPE_SECRET_KEY is missing/invalid and allow_mock
+            is False.
+    """
     secret = os.environ.get("STRIPE_SECRET_KEY", "")
     if secret.startswith("sk_"):
         return StripeClient(secret)
