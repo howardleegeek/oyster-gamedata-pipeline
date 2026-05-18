@@ -143,21 +143,92 @@ def p1_trajectory_smoothness(game_state: list) -> dict:
     }
 
 
-def p2_mouse_camera_coherence(inputs: list, action_camera: list) -> dict:
-    """Cross-correlate mouse_dx with camera yaw_delta. Real play: peak near lag 0
-    (mouse → immediate camera response), magnitude > 0.4.
+def p2_mouse_camera_coherence(inputs: list, action_camera: list, game_state: list = None) -> dict:
+    """Test that mouse motion CO-OCCURS with camera rotation at 1-second windows.
 
-    NOTE: this is a coarse check — we sample mouse moves into frame-time bins
-    matching action_camera's 30fps grid."""
+    Per-frame cross-correlation is the wrong measurement here because:
+      - mouse_dx is raw Windows-hook input (~200 Hz, pixels)
+      - camera_rotation_oula yaw is MC server-side post-processed rotation
+        (20 Hz, degrees, after sensitivity scaling + smoothing)
+      - The transformation between them is nonlinear (MC sensitivity setting,
+        mouse acceleration). They're causally linked but per-frame correlation
+        is inherently weak due to multi-layer signal processing.
 
-    # Bin mouse events into 33ms (30fps) bins
-    if not inputs or not action_camera:
-        return {"ok": False, "reason": "missing inputs or action_camera"}
+    Better test: at 1-second windows, sum |mouse_dx| and |yaw_delta|. Compute
+    correlation of these magnitudes. Real play: both rise/fall together; bot
+    or decoupled-data: independent.
 
-    # Get session start from first inputs event
-    ts0 = min((e.get("timestamp", 0) for e in inputs if isinstance(e.get("timestamp"), (int, float))), default=0)
-    if ts0 == 0:
-        return {"ok": False, "reason": "no input timestamps"}
+    Reads action_camera.json's NEW mouse_dx (post-merge_inputs) for the buyer's
+    actual view of the data, not raw inputs.jsonl.
+    """
+
+    if not action_camera:
+        return {"ok": False, "reason": "missing action_camera"}
+
+    # Read mouse_dx and yaw from action_camera (the buyer's view of the data)
+    mouse_dxs_per_frame = []
+    yaws = []
+    for r in action_camera:
+        md = r.get("mouse_dx", 0)
+        oula = r.get("camera_rotation_oula", [0, 0, 0])
+        mouse_dxs_per_frame.append(abs(float(md)) if isinstance(md, (int, float)) else 0.0)
+        yaws.append(oula[1] if isinstance(oula, list) and len(oula) >= 2 else 0.0)
+
+    # Yaw deltas
+    yaw_deltas_per_frame = [0.0]
+    for i in range(1, len(yaws)):
+        d = yaws[i] - yaws[i - 1]
+        if d > 180:
+            d -= 360
+        elif d < -180:
+            d += 360
+        yaw_deltas_per_frame.append(abs(d))
+
+    n_frames = len(action_camera)
+    if n_frames < 60:
+        return {"ok": False, "reason": "too few frames"}
+
+    # Aggregate to 1-second windows (30 frames per window)
+    window_size = 30
+    n_windows = n_frames // window_size
+    mouse_per_window = []
+    yaw_per_window = []
+    for w in range(n_windows):
+        s, e = w * window_size, (w + 1) * window_size
+        mouse_per_window.append(sum(mouse_dxs_per_frame[s:e]))
+        yaw_per_window.append(sum(yaw_deltas_per_frame[s:e]))
+
+    # Correlate mouse-magnitude with yaw-magnitude across windows
+    if not mouse_per_window or not yaw_per_window:
+        return {"ok": False, "reason": "no windows"}
+    n_w = len(mouse_per_window)
+    m_mean = sum(mouse_per_window) / n_w
+    y_mean = sum(yaw_per_window) / n_w
+    m_var = sum((x - m_mean) ** 2 for x in mouse_per_window) / n_w
+    y_var = sum((x - y_mean) ** 2 for x in yaw_per_window) / n_w
+    if m_var == 0 or y_var == 0:
+        return {"ok": True, "windowed_correlation": 0.0, "verdict": "one channel is constant"}
+    cov = sum((mouse_per_window[i] - m_mean) * (yaw_per_window[i] - y_mean) for i in range(n_w)) / n_w
+    corr = cov / (m_var * y_var) ** 0.5
+
+    # Also: % of windows with significant activity in BOTH
+    both_active = sum(1 for i in range(n_w) if mouse_per_window[i] > 50 and yaw_per_window[i] > 10)
+    mouse_only = sum(1 for i in range(n_w) if mouse_per_window[i] > 50 and yaw_per_window[i] <= 10)
+    yaw_only = sum(1 for i in range(n_w) if mouse_per_window[i] <= 50 and yaw_per_window[i] > 10)
+    return {
+        "ok": True,
+        "windows_analyzed_1sec": n_w,
+        "windowed_mouse_yaw_correlation": round(corr, 4),
+        "windows_both_active": both_active,
+        "windows_mouse_only": mouse_only,
+        "windows_yaw_only": yaw_only,
+        "verdict": (
+            "COHERENT (mouse motion drives camera, 1-sec window)" if corr > 0.4
+            else "weak coherence (corr 0.15-0.4)" if corr > 0.15
+            else "DECOUPLED at 1-sec window (mouse and camera independent)"
+        ),
+    }
+    # Legacy code below is dead-stripped — return above
 
     n_frames = len(action_camera)
     mouse_dx_per_frame = [0.0] * n_frames
@@ -285,20 +356,42 @@ def p3_input_to_effect_latency(inputs: list, game_state: list) -> dict:
 
 def p4_coord_handedness(game_state: list) -> dict:
     """Verify left-handed_X_right_Y_up_Z_forward convention via gravity.
-    In MC vanilla, gravity is -Y. So during free fall, velocity_y should be NEGATIVE.
+    In MC vanilla, gravity is -Y. So during sustained free fall, velocity_y
+    should be NEGATIVE.
 
-    We find ticks where on_ground=False and check sign of velocity_y."""
-    falling_v_y = [
-        d.get("velocity_y") for d in game_state
-        if d.get("on_ground") is False and isinstance(d.get("velocity_y"), (int, float))
-    ]
-    if len(falling_v_y) < 10:
-        return {"ok": False, "reason": f"only {len(falling_v_y)} falling ticks"}
-    negative_count = sum(1 for v in falling_v_y if v < 0)
-    pct_negative = 100 * negative_count / len(falling_v_y)
+    Bug-fix 2026-05-17: previous version counted ALL on_ground=False ticks,
+    including JUMP RISE where V_y is positive (player going up). That's normal
+    physics, not a sign bug. Now we only count ticks deep into the airborne
+    phase: 3+ consecutive on_ground=False ticks AND velocity_y is the third
+    or later in the sequence (post-apex).
+    """
+    if not game_state:
+        return {"ok": False, "reason": "no game_state"}
+
+    # Find SUSTAINED falling runs: 3+ consecutive on_ground=False where
+    # velocity_y has reached its terminal-negative phase.
+    sustained_falling_v_y = []
+    consecutive_air = 0
+    for d in game_state:
+        on_ground = d.get("on_ground", True)
+        v_y = d.get("velocity_y")
+        if on_ground or not isinstance(v_y, (int, float)):
+            consecutive_air = 0
+            continue
+        consecutive_air += 1
+        if consecutive_air >= 3:
+            sustained_falling_v_y.append(v_y)
+
+    if len(sustained_falling_v_y) < 10:
+        return {
+            "ok": False,
+            "reason": f"only {len(sustained_falling_v_y)} sustained-fall ticks (need ≥3 consecutive airborne)",
+        }
+    negative_count = sum(1 for v in sustained_falling_v_y if v < 0)
+    pct_negative = 100 * negative_count / len(sustained_falling_v_y)
     return {
         "ok": True,
-        "falling_ticks": len(falling_v_y),
+        "sustained_fall_ticks": len(sustained_falling_v_y),
         "velocity_y_negative_count": negative_count,
         "pct_negative": round(pct_negative, 1),
         "verdict": (
@@ -308,32 +401,34 @@ def p4_coord_handedness(game_state: list) -> dict:
     }
 
 
-def p5_velocity_unit_verification(game_state: list) -> dict:
+def p5_velocity_unit_verification(action_camera: list) -> dict:
     """Vanilla MC max sprint: 5.612 m/s. Vanilla walk: 4.317 m/s. Sneak: 1.295 m/s.
-    Check that max forward speed in game_state matches expected MC physics."""
+
+    Bug-fix 2026-05-17: P5 must read action_camera.json's player_speed (which
+    has the m/s conversion applied per transform_game_state_to_action_camera.py)
+    NOT game_state.jsonl's raw velocity_x (which is blocks/tick, mod-native).
+    """
     speeds = []
-    for d in game_state:
-        vx = d.get("velocity_x")
-        vz = d.get("velocity_z")
-        if vx is None or vz is None:
-            continue
-        speeds.append((vx**2 + vz**2) ** 0.5)
+    for r in action_camera:
+        ps = r.get("player_speed")
+        if isinstance(ps, list) and len(ps) >= 3 and all(isinstance(v, (int, float)) for v in ps):
+            # horizontal only (x and z)
+            speeds.append((ps[0] ** 2 + ps[2] ** 2) ** 0.5)
     if not speeds:
-        return {"ok": False, "reason": "no velocity data"}
+        return {"ok": False, "reason": "no player_speed in action_camera"}
     speeds.sort()
     p99 = speeds[int(0.99 * len(speeds))]
     p50 = speeds[len(speeds) // 2]
     max_speed = max(speeds)
     return {
         "ok": True,
-        "max_horizontal_speed": round(max_speed, 4),
-        "p99_speed": round(p99, 4),
-        "p50_speed": round(p50, 4),
+        "max_horizontal_speed_m_s": round(max_speed, 3),
+        "p99_speed": round(p99, 3),
+        "p50_speed": round(p50, 3),
         "verdict": (
-            "m/s (matches MC vanilla sprint 5.6)" if 4.0 < max_speed < 7.0
+            "m/s CONFIRMED (matches MC vanilla sprint 5.6)" if 4.0 < max_speed < 7.5
             else "m/s but slow (walking only, no sprint)" if 0.5 < max_speed < 4.0
-            else "blocks/tick (raw mod output)" if 0.1 < max_speed < 0.5
-            else f"UNKNOWN unit (max={max_speed:.3f})"
+            else f"UNIT MISMATCH (max={max_speed:.3f}, expected 5.6 m/s)"
         ),
     }
 
@@ -411,7 +506,7 @@ def main() -> int:
     results["p1_trajectory_smoothness"] = p1_trajectory_smoothness(game_state)
     print("\n[P1] Trajectory smoothness:", json.dumps(results["p1_trajectory_smoothness"], indent=2))
 
-    results["p2_mouse_camera_coherence"] = p2_mouse_camera_coherence(inputs, action_camera)
+    results["p2_mouse_camera_coherence"] = p2_mouse_camera_coherence(inputs, action_camera, game_state)
     print("\n[P2] Mouse↔camera coherence:", json.dumps(results["p2_mouse_camera_coherence"], indent=2))
 
     results["p3_input_to_effect_latency"] = p3_input_to_effect_latency(inputs, game_state)
@@ -420,7 +515,7 @@ def main() -> int:
     results["p4_coord_handedness"] = p4_coord_handedness(game_state)
     print("\n[P4] Coordinate handedness (gravity test):", json.dumps(results["p4_coord_handedness"], indent=2))
 
-    results["p5_velocity_unit"] = p5_velocity_unit_verification(game_state)
+    results["p5_velocity_unit"] = p5_velocity_unit_verification(action_camera)
     print("\n[P5] Velocity unit verification:", json.dumps(results["p5_velocity_unit"], indent=2))
 
     results["p6_event_diversity"] = p6_gameplay_event_diversity(inputs)

@@ -198,12 +198,27 @@ def resample_to_video_grid(ticks: list[dict], target_count: int = 9000) -> list[
     return output
 
 
-def merge_inputs(action_camera_rows: list[dict], inputs_path: Path) -> int:
+def merge_inputs(action_camera_rows: list[dict], inputs_path: Path, session_start_unix: float = None) -> int:
     """Overlay mouse_dx/dy + keyCode from inputs.jsonl onto action_camera rows.
 
-    Returns count of rows updated. inputs.jsonl format expected:
-      {"timestamp_ns": ..., "event": "mouse_move", "dx": ..., "dy": ...}
-      {"timestamp_ns": ..., "event": "key_press", "vk_code": ...}
+    Bug-fix 2026-05-17 (precision audit P2): previous implementation had TWO
+    bugs that caused mouse_dx to be all-zero in action_camera.json output:
+      1. Field name: looked for nearest.get("dx") but recorder writes
+         {event_type: "MOUSE_MOVE", event_args: [dx, dy]}. Now handles BOTH
+         the denormalized-form (top-level mouse_dx/mouse_dy after canonical
+         pipeline step4) AND the raw-form (event_args list).
+      2. Time reference frame: action_camera row["time"] is 0..300s relative
+         to session start; events have absolute Unix epoch timestamps. They
+         must be brought to the same reference frame before nearest-lookup.
+         Use session_start_unix (game_state[0].timestamp_ms / 1e3) as the
+         anchor.
+
+    Returns count of rows updated.
+
+    inputs.jsonl format (recorder, post-denormalize):
+      {"timestamp": <unix>, "timestamp_ns": <unix*1e9>, "event_type": "MOUSE_MOVE",
+       "event_args": [dx, dy], "mouse_dx": <dx>, "mouse_dy": <dy>}
+      {"timestamp": <unix>, "event_type": "KEYBOARD", "vk_code": 87, "pressed": true}
     """
     if not inputs_path.exists():
         return 0
@@ -219,24 +234,99 @@ def merge_inputs(action_camera_rows: list[dict], inputs_path: Path) -> int:
                 continue
     if not events:
         return 0
-    # Sort by timestamp, then for each action_camera row find nearest mouse_move
-    events.sort(key=lambda e: e.get("timestamp_ns", 0))
+
+    # Establish session_start anchor if not provided. Falls back to first
+    # input event timestamp (less accurate — may include pre-game lifecycle).
+    if session_start_unix is None:
+        # Use first MOUSE_MOVE or KEYBOARD event (skip lifecycle markers)
+        gameplay = [e for e in events if e.get("event_type") in ("MOUSE_MOVE", "KEYBOARD", "MOUSE_BUTTON")]
+        if gameplay:
+            session_start_unix = min(e.get("timestamp", 0) for e in gameplay if isinstance(e.get("timestamp"), (int, float)))
+        else:
+            return 0
+
+    # Index MOUSE_MOVE events by their session-relative time (seconds)
+    mouse_events_by_t = []  # list of (t_rel_seconds, dx, dy)
+    keyboard_events_by_t = []  # list of (t_rel_seconds, vk_code, pressed)
+    for ev in events:
+        et = ev.get("event_type")
+        ts = ev.get("timestamp")
+        if not isinstance(ts, (int, float)):
+            continue
+        t_rel = ts - session_start_unix
+        if t_rel < 0:
+            continue  # skip pre-session events
+        if et == "MOUSE_MOVE":
+            # Try denormalized field first, fall back to event_args
+            dx = ev.get("mouse_dx")
+            dy = ev.get("mouse_dy")
+            if dx is None or dy is None:
+                ea = ev.get("event_args")
+                if isinstance(ea, list) and len(ea) >= 2:
+                    dx = ea[0]
+                    dy = ea[1]
+            if isinstance(dx, (int, float)) and isinstance(dy, (int, float)):
+                mouse_events_by_t.append((t_rel, float(dx), float(dy)))
+        elif et == "KEYBOARD":
+            vk = ev.get("vk_code")
+            pressed = ev.get("pressed")
+            if vk is None:
+                ea = ev.get("event_args")
+                if isinstance(ea, list) and len(ea) >= 2:
+                    vk = ea[0]
+                    pressed = ea[1]
+            if isinstance(vk, int) and pressed:
+                keyboard_events_by_t.append((t_rel, vk, True))
+
+    if not mouse_events_by_t and not keyboard_events_by_t:
+        return 0
+
+    # Sort once
+    mouse_events_by_t.sort(key=lambda x: x[0])
+    keyboard_events_by_t.sort(key=lambda x: x[0])
+
+    # For each action_camera row, accumulate mouse_dx/dy in the 33ms window
+    # (one frame at 30fps) and pick the most recent keyboard press if any.
+    frame_dur = 1.0 / 30.0
     updated = 0
+    m_idx = 0
+    k_idx = 0
     for row in action_camera_rows:
-        t_target_ns = int(row["time"] * 1e9)
-        # binary search nearest mouse_move
-        nearest = None
-        nearest_dt = float("inf")
-        for ev in events:
-            t = ev.get("timestamp_ns", 0)
-            if abs(t - t_target_ns) < nearest_dt:
-                nearest_dt = abs(t - t_target_ns)
-                nearest = ev
-        if nearest:
-            row["mouse_dx"] = float(nearest.get("dx", 0.0))
-            row["mouse_dy"] = float(nearest.get("dy", 0.0))
-            row["keyCode"] = int(nearest.get("vk_code", 0))
+        t = row.get("time", 0.0)
+        if not isinstance(t, (int, float)):
+            continue
+        t_start = t
+        t_end = t + frame_dur
+
+        # Sum mouse_dx/dy in [t_start, t_end)
+        sum_dx = 0.0
+        sum_dy = 0.0
+        # Advance m_idx forward past events earlier than t_start
+        while m_idx < len(mouse_events_by_t) and mouse_events_by_t[m_idx][0] < t_start:
+            m_idx += 1
+        # Sum events in [t_start, t_end)
+        j = m_idx
+        while j < len(mouse_events_by_t) and mouse_events_by_t[j][0] < t_end:
+            sum_dx += mouse_events_by_t[j][1]
+            sum_dy += mouse_events_by_t[j][2]
+            j += 1
+
+        if sum_dx != 0.0 or sum_dy != 0.0:
+            row["mouse_dx"] = sum_dx
+            row["mouse_dy"] = sum_dy
             updated += 1
+
+        # Find most recent keyboard press within [t_start, t_end)
+        while k_idx < len(keyboard_events_by_t) and keyboard_events_by_t[k_idx][0] < t_start:
+            k_idx += 1
+        j = k_idx
+        last_vk = 0
+        while j < len(keyboard_events_by_t) and keyboard_events_by_t[j][0] < t_end:
+            last_vk = keyboard_events_by_t[j][1]
+            j += 1
+        if last_vk:
+            row["keyCode"] = last_vk
+
     return updated
 
 
@@ -278,8 +368,14 @@ def main(argv: list[str]) -> int:
     # Optional: merge inputs.jsonl
     inputs_path = session / "inputs.jsonl"
     if inputs_path.exists():
-        n = merge_inputs(rows, inputs_path)
-        print(f"[transform] merged {n} input events")
+        # Anchor the input-time reference to game_state[0] so action_camera
+        # row times (0..300s) align with input event timestamps (Unix epoch).
+        # Bug-fix 2026-05-17 — without this anchor, mouse_dx was zero in every
+        # action_camera row because the nearest-event lookup compared
+        # time=0..300 (relative) against timestamp=~1778e9 (absolute Unix).
+        session_start_unix = ticks[0].get("timestamp_ms", 0) / 1000.0
+        n = merge_inputs(rows, inputs_path, session_start_unix=session_start_unix)
+        print(f"[transform] merged {n} input events (anchored to game_state t0={session_start_unix:.3f})")
 
     # Write action_camera.json
     out_path = session / "action_camera.json"
