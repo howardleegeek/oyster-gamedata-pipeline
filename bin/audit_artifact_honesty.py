@@ -122,6 +122,12 @@ def _audit_function(path: Path, node: ast.FunctionDef) -> list[Violation]:
 
 
 def _iter_residual_files() -> list[Path]:
+    """Iterate over all residual Python files under SCAN_DIRS.
+
+    Yields:
+        Path objects for each .py file (excluding __init__.py) found in
+        the configured scan directories.
+    """
     files: list[Path] = []
     for d in SCAN_DIRS:
         if not d.is_dir():
