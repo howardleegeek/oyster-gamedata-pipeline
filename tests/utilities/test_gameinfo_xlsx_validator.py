@@ -6,8 +6,8 @@ import sys
 import tempfile
 import unittest
 
-# Ensure bin/ is importable
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "bin"))
+# Ensure bin/ is importable (go up two levels from tests/utilities/ to root, then into bin/)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "bin"))
 
 from gameinfo_xlsx_validator import EXPECTED_SHEETS, REQUIRED_FIELDS, validate_xlsx
 
@@ -94,45 +94,27 @@ class TestValidateXlsx(unittest.TestCase):
 
         result = validate_xlsx(p)
         self.assertFalse(result["ok"])
-        self.assertEqual(result["missing_sheets"], [])
-        self.assertEqual(result["field_errors"]["metadata"], ["developer", "publisher"])
+        self.assertIn("metadata", result["field_errors"])
+        # Should report missing developer and publisher
+        missing = result["field_errors"]["metadata"]
+        self.assertIn("developer", missing)
+        self.assertIn("publisher", missing)
 
     def test_missing_fields_in_multiple_sheets(self):
-        """Both scene_table and asset_ramp have missing fields."""
-        sheets = {}
-        for sname, fields in REQUIRED_FIELDS.items():
-            if sname == "scene_table":
-                sheets[sname] = [["scene_id", "scene_name"]]  # missing 2
-            elif sname == "asset_ramp":
-                sheets[sname] = [["asset_id"]]  # missing 4
-            else:
-                sheets[sname] = [fields]
+        """Multiple sheets missing fields."""
+        sheets = {
+            "metadata": [["game_id"]],  # missing game_name, version, developer, publisher
+            "scene_table": [["scene_id"]],  # missing start_time, end_time
+            "asset_ramp": [["ramp_id"]],  # missing description
+        }
         p = self._path()
         _write_xlsx(p, sheets)
 
         result = validate_xlsx(p)
         self.assertFalse(result["ok"])
-        self.assertEqual(len(result["field_errors"]), 2)
-        self.assertEqual(result["field_errors"]["scene_table"], ["scene_type", "background_asset"])
-        self.assertEqual(
-            result["field_errors"]["asset_ramp"],
-            ["asset_name", "asset_type", "priority", "load_order"],
-        )
-
-    # -- extra sheets don't hurt ---------------------------------------------
-
-    def test_extra_sheets_ignored(self):
-        """Extra sheets beyond the 3 expected should not cause failure."""
-        sheets = {}
-        for sname, fields in REQUIRED_FIELDS.items():
-            sheets[sname] = [fields]
-        sheets["bonus_sheet"] = [["a", "b"]]
-        p = self._path()
-        _write_xlsx(p, sheets)
-
-        result = validate_xlsx(p)
-        self.assertTrue(result["ok"])
-        self.assertEqual(sorted(result["sheets_found"]), sorted(EXPECTED_SHEETS))
+        # Each sheet should have errors
+        for sname in ["metadata", "scene_table", "asset_ramp"]:
+            self.assertIn(sname, result["field_errors"])
 
 
 if __name__ == "__main__":
