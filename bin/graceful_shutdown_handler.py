@@ -63,7 +63,14 @@ class GracefulShutdownHandler:
         logger.info("Signal %s received", signum)
         self.shutdown()
     
-    def shutdown(self):
+    def shutdown(self) -> None:
+        """Perform orderly teardown of the shutdown handler.
+
+        Flushes in-flight writes, closes open tarballs, persists queue
+        state, and writes a restart-resume checkpoint. Idempotent:
+        subsequent calls after the first are no-ops. Terminates the
+        process via sys.exit(0) on completion.
+        """
         if self._shutdown.is_set():
             return
         self._shutdown.set()
