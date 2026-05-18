@@ -225,6 +225,15 @@ def generate_excel_report(cohorts: Dict[str, List[Dict]], out_path: Path) -> Pat
 
 
 def generate_summary_json(cohorts: Dict[str, List[Dict]], out_path: Path) -> Path:
+    """Generate a JSON summary of per-cohort diversity histograms.
+
+    Args:
+        cohorts: Mapping of cohort name to list of record dicts.
+        out_path: File path where the summary JSON will be written.
+
+    Returns:
+        The path to the written summary JSON file.
+    """
     summary: Dict[str, Any] = {"generated_at": datetime.datetime.utcnow().isoformat() + "Z",
                                "num_cohorts": len(cohorts), "cohorts": {}}
     for name in sorted(cohorts):
