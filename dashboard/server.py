@@ -469,6 +469,16 @@ async def get_my_payouts(
     }
 
 
+# Bug-fix 2026-05-17: Pydantic model must be defined BEFORE the function that
+# uses it as a type hint. server.py doesn't `from __future__ import annotations`,
+# so type hints are evaluated eagerly. Originally defined at line 500, hoisted
+# here so request_rerecord's RerecordRequest annotation resolves at module
+# import time. Test collection (test_dashboard_api.py) was breaking with
+# NameError before this fix.
+class RerecordRequest(BaseModel):
+    reason: str
+
+
 @app.post("/api/sessions/{session_id}/rerecord")
 async def request_rerecord(
     session_id: str,
@@ -479,26 +489,22 @@ async def request_rerecord(
     session = MOCK_SESSIONS.get(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    
+
     if session["contributor_id"] != user.user_id:
         raise HTTPException(status_code=403, detail="Access denied")
-    
+
     if session["status"] != "rejected":
         raise HTTPException(status_code=400, detail="Can only request re-record for rejected sessions")
-    
+
     session["rerecord_requested"] = True
     session["rerecord_reason"] = request.reason
     session["rerecord_requested_at"] = datetime.utcnow().isoformat()
-    
+
     return {
         "status": "rerecord_requested",
         "session_id": session_id,
         "reason": request.reason
     }
-
-
-class RerecordRequest(BaseModel):
-    reason: str
 
 
 # Bulk download endpoint
