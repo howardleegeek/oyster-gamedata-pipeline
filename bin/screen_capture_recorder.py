@@ -65,7 +65,22 @@ def record_screen_region(
     frames_captured = 0
     capture_errors = []
 
-    def capture_worker():
+    def capture_worker() -> None:
+        """Worker thread function that captures screen frames.
+        
+        This function runs in a separate thread and continuously captures
+        screen frames at the specified FPS until `stop_event` is set.
+        
+        Captured frames are placed into `frame_queue` as (frame, timestamp) tuples.
+        The `frames_captured` counter is incremented for each successful capture.
+        Any exceptions during capture are appended to `capture_errors` list.
+        
+        The function uses mss library for screen capture and maintains
+        precise timing to achieve the target frame rate.
+        
+        Raises:
+            RuntimeError: If frame capture fails or mss.grab() returns None.
+        """
         nonlocal frames_captured
         try:
             with mss.mss() as sct:
