@@ -3,7 +3,7 @@
 
 import argparse, json, socket, struct, sys
 
-def encode_varint(value):
+def encode_varint(value: int) -> bytes:
     """Encode integer as Minecraft VarInt."""
     result = bytearray()
     while True:
