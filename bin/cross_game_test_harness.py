@@ -27,7 +27,16 @@ class TestHarness:
         self.results = []
         self.start = datetime.now()
     
-    def log(self, msg: str, level: str = "INFO"):
+    def log(self, msg: str, level: str = "INFO") -> None:
+        """Print a timestamped log message to stderr.
+
+        Only prints when verbose mode is enabled or the level is
+        ERROR/WARNING.
+
+        Args:
+            msg: The log message text.
+            level: Log severity level. Defaults to "INFO".
+        """
         if self.verbose or level in ("ERROR", "WARNING"):
             ts = datetime.now().strftime("%H:%M:%S")
             print(f"[{ts}] [{level}] {msg}", file=sys.stderr)
