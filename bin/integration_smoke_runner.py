@@ -24,7 +24,15 @@ def run_cmd(cmd, cwd=None):
         return False, "", str(e)
 
 
-def main():
+def main() -> None:
+    """Run e2e smoke test and semantic validator on output directory.
+
+    Executes two sequential validation steps:
+    1. Runs e2e_smoke.sh from the placeholders directory
+    2. Runs semantic_validator on the generated buyer output directory
+
+    Exits with code 0 on success, non-zero on failure.
+    """
     parser = argparse.ArgumentParser(description="Run e2e smoke + semantic validator")
     parser.add_argument("--placeholders", required=True, help="Path to placeholders dir")
     parser.add_argument("--output", required=True, help="Path to output dir")
