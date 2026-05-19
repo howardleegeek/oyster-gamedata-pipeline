@@ -103,7 +103,12 @@ def report(buyer_dir: str) -> dict:
     }
 
 
-def main():
+def main() -> None:
+    """Entry point for data quality report CLI.
+
+    Parses command-line arguments, runs the report, and outputs JSON metrics.
+    Exits with code 0 on PASS, 1 on FAIL or error.
+    """
     parser = argparse.ArgumentParser(
         description="Analyze buyer directory for data quality metrics"
     )
