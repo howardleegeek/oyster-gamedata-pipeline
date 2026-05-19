@@ -84,7 +84,7 @@ def preprocess_for_depth(image: Image.Image, target_size: int = 518) -> "torch.T
     return img_tensor
 
 
-def run_inference(model, image: Image.Image) -> np.ndarray:
+def run_inference(model: "torch.nn.Module", image: Image.Image) -> np.ndarray:
     """Run depth inference on input image."""
     torch = lazy_import_torch()
     tensor = preprocess_for_depth(image)
