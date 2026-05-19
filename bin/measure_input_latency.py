@@ -46,17 +46,17 @@ try:
     import mss
     import mss.tools
 except ImportError:
-    sys.exit("ERROR: mss is required. Install with: pip install mss")
+    raise ImportError("mss is required. Install with: pip install mss")
 
 try:
     import numpy as np
 except ImportError:
-    sys.exit("ERROR: numpy is required. Install with: pip install numpy")
+    raise ImportError("numpy is required. Install with: pip install numpy")
 
 try:
     from PIL import Image
 except ImportError:
-    sys.exit("ERROR: Pillow is required. Install with: pip install Pillow")
+    raise ImportError("Pillow is required. Install with: pip install Pillow")
 
 # ---------------------------------------------------------------------------
 # Constants
