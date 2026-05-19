@@ -19,6 +19,7 @@ Steps (per ONBOARDING.md Section 8):
 Usage:
     python3 bin/canonical_pipeline.py <session_dir> --operator-id <id> [--target-score N]
 """
+
 import argparse
 import datetime as dt
 import hashlib
@@ -44,10 +45,22 @@ def run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
 
 def ffprobe_frames(mp4: pathlib.Path) -> tuple[int, float]:
     r = subprocess.run(
-        ["ffprobe", "-v", "error", "-select_streams", "v:0",
-         "-count_packets", "-show_entries", "stream=nb_read_packets,duration",
-         "-of", "default=noprint_wrappers=1", str(mp4)],
-        capture_output=True, text=True, check=True,
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-count_packets",
+            "-show_entries",
+            "stream=nb_read_packets,duration",
+            "-of",
+            "default=noprint_wrappers=1",
+            str(mp4),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
     )
     frames, dur = 0, 0.0
     for line in r.stdout.splitlines():
@@ -76,18 +89,36 @@ def step2_trim_mp4(sess: pathlib.Path, start_offset: int = 180, target_dur: int 
         try:
             _frames, existing_dur = ffprobe_frames(src)
             if abs(existing_dur - target_dur) <= 1.0:
-                print(f"  IDEMPOTENT SKIP: mp4 already at {existing_dur:.3f}s (target {target_dur}s)")
+                print(
+                    f"  IDEMPOTENT SKIP: mp4 already at {existing_dur:.3f}s (target {target_dur}s)"
+                )
                 print(f"  mp4: {_frames} frames, {existing_dur:.3f}s (unchanged)")
                 return
         except Exception as e:
             print(f"  ffprobe check failed ({e}); falling through to re-trim")
 
     tmp = sess / "_recording_trim.mp4"
-    run([
-        "ffmpeg", "-y", "-ss", str(start_offset), "-i", str(src),
-        "-t", str(target_dur), "-c:v", "libx264", "-preset", "ultrafast",
-        "-b:v", "10M", "-c:a", "copy", str(tmp),
-    ])
+    run(
+        [
+            "ffmpeg",
+            "-y",
+            "-ss",
+            str(start_offset),
+            "-i",
+            str(src),
+            "-t",
+            str(target_dur),
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-b:v",
+            "10M",
+            "-c:a",
+            "copy",
+            str(tmp),
+        ]
+    )
     tmp.replace(src)
     frames, dur = ffprobe_frames(src)
     print(f"  mp4: {frames} frames, {dur:.3f}s")
@@ -95,10 +126,18 @@ def step2_trim_mp4(sess: pathlib.Path, start_offset: int = 180, target_dur: int 
 
 def step3_extract_audio(sess: pathlib.Path) -> None:
     step("3/10 Extract audio.flac from mp4")
-    run([
-        "ffmpeg", "-y", "-i", str(sess / "recording.mp4"),
-        "-vn", "-c:a", "flac", str(sess / "audio.flac"),
-    ])
+    run(
+        [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(sess / "recording.mp4"),
+            "-vn",
+            "-c:a",
+            "flac",
+            str(sess / "audio.flac"),
+        ]
+    )
 
 
 def step4_denormalize_inputs(sess: pathlib.Path) -> None:
@@ -133,30 +172,64 @@ def step4_denormalize_inputs(sess: pathlib.Path) -> None:
 
 def step5_companion_files(sess: pathlib.Path, operator_id: str) -> None:
     step("5/10 Generate systeminfo.json + gameinfo.xlsx")
-    run([
-        "python3", str(BIN / "generate_systeminfo_json.py"),
-        "--output", str(sess / "systeminfo.json"),
-        "--game-process-name", "javaw.exe",
-        "--width", "1920", "--height", "1080", "--record-dpi", "1.0",
-    ])
-    run([
-        "python3", str(BIN / "generate_gameinfo_xlsx.py"),
-        "--output", str(sess / "gameinfo.xlsx"),
-        "--game-name", "Minecraft", "--game-version", "1.21.4 Fabric",
-        "--platform", "PC-Windows", "--scene-name", "Overworld_NewWorld",
-        "--weather", "Clear", "--time-of-day", "Night",
-        "--character-name", "Player", "--character-class", "Survival",
-        "--operator-id", operator_id,
-        "--recording-date", dt.date.today().isoformat(),
-        "--total-frames", "9000", "--video-duration-sec", "300",
-        "--route-type", "2",
-        "--notes", f"canonical_pipeline run {dt.datetime.now().isoformat()}",
-    ])
+    run(
+        [
+            "python3",
+            str(BIN / "generate_systeminfo_json.py"),
+            "--output",
+            str(sess / "systeminfo.json"),
+            "--game-process-name",
+            "javaw.exe",
+            "--width",
+            "1920",
+            "--height",
+            "1080",
+            "--record-dpi",
+            "1.0",
+        ]
+    )
+    run(
+        [
+            "python3",
+            str(BIN / "generate_gameinfo_xlsx.py"),
+            "--output",
+            str(sess / "gameinfo.xlsx"),
+            "--game-name",
+            "Minecraft",
+            "--game-version",
+            "1.21.4 Fabric",
+            "--platform",
+            "PC-Windows",
+            "--scene-name",
+            "Overworld_NewWorld",
+            "--weather",
+            "Clear",
+            "--time-of-day",
+            "Night",
+            "--character-name",
+            "Player",
+            "--character-class",
+            "Survival",
+            "--operator-id",
+            operator_id,
+            "--recording-date",
+            dt.date.today().isoformat(),
+            "--total-frames",
+            "9000",
+            "--video-duration-sec",
+            "300",
+            "--route-type",
+            "2",
+            "--notes",
+            f"canonical_pipeline run {dt.datetime.now().isoformat()}",
+        ]
+    )
 
 
 def step6_append_x_extras(sess: pathlib.Path) -> None:
     step("6/10 Append X1-X5 PRD physics constants to gameinfo.xlsx")
     import openpyxl  # type: ignore
+
     wb = openpyxl.load_workbook(sess / "gameinfo.xlsx")
     ws = wb.active
     pairs = {}
@@ -185,10 +258,18 @@ def step7_synth_frames(sess: pathlib.Path, n_frames: int = 9000) -> None:
     with (sess / "frames.jsonl").open("w") as f:
         for i in range(n_frames):
             t_ns = int(i * 1e9 / 30)
-            f.write(json.dumps({
-                "idx": i, "t_ns": t_ns, "frame": i,
-                "time": t_ns / 1e9, "fps": 30.0,
-            }) + "\n")
+            f.write(
+                json.dumps(
+                    {
+                        "idx": i,
+                        "t_ns": t_ns,
+                        "frame": i,
+                        "time": t_ns / 1e9,
+                        "fps": 30.0,
+                    }
+                )
+                + "\n"
+            )
 
 
 def step8_depth(sess: pathlib.Path, skip: bool = False) -> None:
@@ -200,17 +281,30 @@ def step8_depth(sess: pathlib.Path, skip: bool = False) -> None:
     depth_dir = sess / "depth"
     if not frames_dir.exists():
         frames_dir.mkdir(parents=True, exist_ok=True)
-        run([
-            "ffmpeg", "-y", "-i", str(sess / "recording.mp4"),
-            "-vf", "fps=6,scale=518:518", "-frames:v", "1800",
-            str(frames_dir / "%06d.png"),
-        ])
+        run(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                str(sess / "recording.mp4"),
+                "-vf",
+                "fps=6,scale=518:518",
+                "-frames:v",
+                "1800",
+                str(frames_dir / "%06d.png"),
+            ]
+        )
     if not depth_dir.exists() or len(list(depth_dir.glob("*.exr"))) < 1788:
-        run([
-            "python3", str(BIN / "run_da_v2_depth.py"),
-            "--frames-dir", str(frames_dir),
-            "--depth-dir", str(depth_dir),
-        ])
+        run(
+            [
+                "python3",
+                str(BIN / "run_da_v2_depth.py"),
+                "--frames-dir",
+                str(frames_dir),
+                "--depth-dir",
+                str(depth_dir),
+            ]
+        )
 
 
 def step9_patch_metadata(sess: pathlib.Path, duration: float = 300.0, frames: int = 9000) -> None:
@@ -252,7 +346,8 @@ def step10_manifest_audit(sess: pathlib.Path, target_score: Optional[int] = None
     # Final audit
     r = subprocess.run(
         ["python3", str(BIN / "prd_compliance_audit.py"), str(sess), "--json"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     if not r.stdout:
         print("  AUDIT ERROR:", r.stderr[-500:])
@@ -262,7 +357,9 @@ def step10_manifest_audit(sess: pathlib.Path, target_score: Optional[int] = None
     counts: dict[str, int] = {}
     for it in items:
         counts[it.get("status", "U")] = counts.get(it.get("status", "U"), 0) + 1
-    print(f"  AUDIT: PASS={counts.get('PASS', 0)} FAIL={counts.get('FAIL', 0)} SKIP={counts.get('SKIP', 0)} TOTAL={sum(counts.values())}")
+    print(
+        f"  AUDIT: PASS={counts.get('PASS', 0)} FAIL={counts.get('FAIL', 0)} SKIP={counts.get('SKIP', 0)} TOTAL={sum(counts.values())}"
+    )
     fails = [it for it in items if it.get("status") == "FAIL"]
     if fails:
         print("  REMAINING FAILS:")
@@ -287,11 +384,19 @@ def step11_input_latency(sess: pathlib.Path) -> None:
         print("  SKIP: missing inputs.jsonl or game_state.jsonl")
         return
     r = subprocess.run(
-        ["python3", str(BIN / "input_latency_telemetry.py"),
-         "--inputs", str(sess / "inputs.jsonl"),
-         "--game-state", str(sess / "game_state.jsonl"),
-         "--output", str(sess / "input_latency.json")],
-        capture_output=True, text=True, check=False,
+        [
+            "python3",
+            str(BIN / "input_latency_telemetry.py"),
+            "--inputs",
+            str(sess / "inputs.jsonl"),
+            "--game-state",
+            str(sess / "game_state.jsonl"),
+            "--output",
+            str(sess / "input_latency.json"),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
     )
     if (sess / "input_latency.json").exists():
         try:
@@ -326,7 +431,9 @@ def step12_upload_gate_strict(sess: pathlib.Path) -> tuple[bool, list[str]]:
     # G1: audit FAIL == 0
     r = subprocess.run(
         ["python3", str(BIN / "prd_compliance_audit.py"), str(sess), "--json"],
-        capture_output=True, text=True, check=False,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     try:
         data = json.loads(r.stdout) if r.stdout else {}
@@ -346,8 +453,10 @@ def step12_upload_gate_strict(sess: pathlib.Path) -> tuple[bool, list[str]]:
                 kind = ln.split(":", 1)[1].strip()
                 break
     if kind != "engine_zbuffer":
-        blocked.append(f"G2: depth source = '{kind}' (production requires 'engine_zbuffer'; "
-                       f"deploy patches/depth_zbuffer_capture.diff to mc-mod-fabric)")
+        blocked.append(
+            f"G2: depth source = '{kind}' (production requires 'engine_zbuffer'; "
+            f"deploy patches/depth_zbuffer_capture.diff to mc-mod-fabric)"
+        )
 
     # G3: input_latency.json present
     il = sess / "input_latency.json"
@@ -358,7 +467,9 @@ def step12_upload_gate_strict(sess: pathlib.Path) -> tuple[bool, list[str]]:
             lat_data = json.loads(il.read_text())
             samples = lat_data.get("latencies", []) if isinstance(lat_data, dict) else lat_data
             if not samples:
-                blocked.append("G3: input_latency.json has 0 samples (no W-press → velocity matches)")
+                blocked.append(
+                    "G3: input_latency.json has 0 samples (no W-press → velocity matches)"
+                )
         except Exception:
             blocked.append("G3: input_latency.json malformed")
 
@@ -367,9 +478,11 @@ def step12_upload_gate_strict(sess: pathlib.Path) -> tuple[bool, list[str]]:
     if not audio.exists():
         blocked.append("G4: audio.flac missing")
     elif audio.stat().st_size < 50 * 1024:
-        blocked.append(f"G4: audio.flac only {audio.stat().st_size} bytes "
-                       f"(< 50KB threshold = likely silent; enable mic via "
-                       f"patches/recorder_mic_consent.rs.diff)")
+        blocked.append(
+            f"G4: audio.flac only {audio.stat().st_size} bytes "
+            f"(< 50KB threshold = likely silent; enable mic via "
+            f"patches/recorder_mic_consent.rs.diff)"
+        )
 
     # G5: action_camera row count
     ac = sess / "action_camera.json"
@@ -399,13 +512,60 @@ def step12_upload_gate_strict(sess: pathlib.Path) -> tuple[bool, list[str]]:
                     if info.get("sha256") != h:
                         mismatches += 1
             if mismatches:
-                blocked.append(f"G6: MANIFEST has {mismatches} sha256 mismatches "
-                               f"(re-run step 10 to refresh, or investigate tampering)")
+                blocked.append(
+                    f"G6: MANIFEST has {mismatches} sha256 mismatches "
+                    f"(re-run step 10 to refresh, or investigate tampering)"
+                )
         except Exception as e:
             blocked.append(f"G6: MANIFEST verify failed ({e})")
 
+    # G7-G9: enforce today's standalone audit gates (v0.4.0 wire-in).
+    # Each gate is a separate CLI; we call it with --json and parse the
+    # verdict. A gate that crashes or returns unexpected JSON is treated
+    # as BLOCK (don't ship if we can't audit).
+    _bin = pathlib.Path(__file__).parent
+    for gate_id, script, ok_verdicts, why in [
+        (
+            "G7",
+            "sync_tolerance_gate.py",
+            {"PASS_STRICT", "PASS_OK", "PASS_TOLERABLE"},
+            "frame↔tick alignment must be ≥99% within 100ms",
+        ),
+        (
+            "G8",
+            "video_quality_gate.py",
+            {"PASS"},
+            "video must be hevc 1920x1080 60fps ≥8Mbps yuv420p ≥60s",
+        ),
+        (
+            "G9",
+            "video_artifact_scanner.py",
+            {"PASS", "PASS_DEGRADED", "SKIP"},
+            "video freeze+stutter ratio must be < 1%",
+        ),
+    ]:
+        try:
+            proc = subprocess.run(
+                [sys.executable, str(_bin / script), str(sess), "--json"],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=180,
+            )
+            if proc.returncode != 0 and proc.returncode != 1:
+                blocked.append(
+                    f"{gate_id}: {script} crashed (exit {proc.returncode}): " f"{proc.stderr[:200]}"
+                )
+                continue
+            data = json.loads(proc.stdout.strip().split("\n")[-1])
+            verdict = data.get("verdict", "UNKNOWN")
+            if verdict not in ok_verdicts:
+                blocked.append(f"{gate_id}: {script} verdict={verdict} ({why})")
+        except (json.JSONDecodeError, subprocess.TimeoutExpired, OSError) as e:
+            blocked.append(f"{gate_id}: {script} could not be evaluated ({e})")
+
     if not blocked:
-        print("  ✓ ALL 6 upload gates PASS — session production-ready")
+        print("  ✓ ALL 9 upload gates PASS — session production-ready")
         return True, []
     print(f"  ✗ {len(blocked)} upload gate(s) BLOCK:")
     for b in blocked:
@@ -414,15 +574,22 @@ def step12_upload_gate_strict(sess: pathlib.Path) -> tuple[bool, list[str]]:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("session_dir", help="Path to session directory")
     ap.add_argument("--operator-id", default=os.environ.get("OYSTER_OPERATOR_ID", "unknown"))
     ap.add_argument("--target-score", type=int, default=None, help="Exit 1 if PASS count < N")
     ap.add_argument("--skip-depth", action="store_true", help="Skip DA-V2 (saves ~10min)")
-    ap.add_argument("--start-offset", type=int, default=180, help="ffmpeg -ss start (default: skip first 3min)")
-    ap.add_argument("--strict", action="store_true",
-                    help="Enforce v0.3.1 upload gate: 0 FAIL audit + engine_zbuffer depth + "
-                         "input_latency + audio non-silent + 9000 frames + MANIFEST verified")
+    ap.add_argument(
+        "--start-offset", type=int, default=180, help="ffmpeg -ss start (default: skip first 3min)"
+    )
+    ap.add_argument(
+        "--strict",
+        action="store_true",
+        help="Enforce v0.3.1 upload gate: 0 FAIL audit + engine_zbuffer depth + "
+        "input_latency + audio non-silent + 9000 frames + MANIFEST verified",
+    )
     args = ap.parse_args()
 
     sess = pathlib.Path(args.session_dir).resolve()
