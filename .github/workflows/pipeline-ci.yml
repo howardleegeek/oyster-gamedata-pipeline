@@ -49,6 +49,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: '3.11' }
+      - name: Install ffmpeg for audit fixtures
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: pip install -e ".[test,exr]"
       - run: |
           # Build a synthetic minimal session, run audit, assert sane output

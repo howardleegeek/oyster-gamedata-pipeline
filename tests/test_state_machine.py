@@ -65,10 +65,13 @@ class TestStateMachine(unittest.TestCase):
         if self.heartbeat_log.exists():
             self.heartbeat_log.unlink()
         if self.active_session_dir.exists():
-            for item in self.active_session_dir.iterdir():
-                if item.is_file():
-                    item.unlink()
-            self.active_session_dir.rmdir()
+            # Use shutil.rmtree so we handle nested subdirs (some tests
+            # populate active_session/<session_id>/* before teardown).
+            # The old item-by-item loop with rmdir() failed on CI with
+            # "Directory not empty" when the daemon spawned subdirs.
+            import shutil
+
+            shutil.rmtree(self.active_session_dir, ignore_errors=True)
 
     def test_initial_state(self):
         """Test daemon starts in IDLE state"""
