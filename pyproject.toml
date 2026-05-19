@@ -50,6 +50,9 @@ test = [
     "uvicorn>=0.27",       # OAuth callback server runtime (C3)
     "httpx>=0.27",         # OAuth token exchange (C3)
     "click>=8.1",          # OAuth CLI (C3)
+    "requests>=2.31",      # test_alert_dispatcher (pre-existing CI gap)
+    "pyjwt>=2.8",          # test_oauth_flow (pre-existing CI gap)
+    "starlette>=0.36",     # fastapi peer dep — explicit for older test_dashboard_api fixtures
 ]
 exr = ["OpenEXR>=3.0", "numpy>=1.26"]
 xlsx = ["openpyxl>=3.1"]
