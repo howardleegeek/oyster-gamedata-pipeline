@@ -106,7 +106,15 @@ def _fi02_keycode_W_to_88(rec: dict) -> dict:
     return rec
 
 
-def _fi03_fps_30_to_25(rec: dict) -> dict:
+def _fi03_fps_30_to_25(rec: dict[str, Any]) -> dict[str, Any]:
+    """Fault injection: change fps from 30.0 to 25.0.
+
+    Args:
+        rec: A baseline frame record dictionary to mutate.
+
+    Returns:
+        A deep copy of *rec* with the 'fps' field set to 25.0.
+    """
     rec = copy.deepcopy(rec)
     rec["fps"] = 25.0
     return rec
