@@ -40,6 +40,12 @@ class ConsentEntry:
         self.signature = signature
     
     def to_dict(self) -> Dict[str, Any]:
+        """Convert consent entry to a dictionary representation.
+
+        Returns:
+            Dict containing user_id, game, timestamp, opt_in_version,
+            and signature fields.
+        """
         return {
             "user_id": self.user_id,
             "game": self.game,
@@ -101,143 +107,152 @@ class ConsentLogSigned:
     def _save_key(self) -> None:
         self.key_file.parent.mkdir(parents=True, exist_ok=True)
         self.key_file.write_text(base64.b64encode(self.secret_key).decode())
-        self.key_file.chmod(0o600)
     
     def _ensure_log_file(self) -> None:
-        self.log_file.parent.mkdir(parents=True, exist_ok=True)
         if not self.log_file.exists():
-            self._write_entries([])
+            self.log_file.parent.mkdir(parents=True, exist_ok=True)
+            self.log_file.write_text("")
     
-    def _compute_signature(self, entry: ConsentEntry) -> str:
+    def _compute_hmac(self, entry: "ConsentEntry") -> str:
         """Compute HMAC-SHA256 signature for a consent entry."""
-        canonical = f"{entry.user_id}|{entry.game}|{entry.timestamp}|{entry.opt_in_version}"
+        message = json.dumps(entry.to_dict(), sort_keys=True)
         signature = hmac.new(
-            self.secret_key, canonical.encode("utf-8"), hashlib.sha256
-        ).digest()
-        return base64.b64encode(signature).decode()
+            self.secret_key, message.encode(), hashlib.sha256
+        ).hexdigest()
+        return signature
     
-    def _read_entries(self) -> List[ConsentEntry]:
-        try:
-            data = json.loads(self.log_file.read_text())
-            return [ConsentEntry.from_dict(e) for e in data.get("entries", [])]
-        except json.JSONDecodeError as e:
-            raise ConsentLogError(f"Invalid log file format: {e}")
-    
-    def _write_entries(self, entries: List[ConsentEntry]) -> None:
-        data = {
-            "version": "1.0",
-            "created": datetime.now(timezone.utc).isoformat(),
-            "entries": [e.to_dict() for e in entries]
-        }
-        self.log_file.write_text(json.dumps(data, indent=2))
-    
-    def add_entry(
-        self,
-        user_id: str,
-        game: str,
-        opt_in_version: str = "1.0",
-        timestamp: Optional[str] = None
-    ) -> ConsentEntry:
-        """Add a new signed consent entry to the log."""
+    def add_entry(self, user_id: str, game: str, opt_in_version: str = "1.0") -> ConsentEntry:
+        """Add a new consent entry to the log with HMAC signature."""
         entry = ConsentEntry(
-            user_id=user_id, game=game, timestamp=timestamp, opt_in_version=opt_in_version
+            user_id=user_id,
+            game=game,
+            opt_in_version=opt_in_version
         )
-        entry.signature = self._compute_signature(entry)
-        entries = self._read_entries()
-        entries.append(entry)
-        self._write_entries(entries)
+        entry.signature = self._compute_hmac(entry)
+        
+        # Append to log file
+        with open(self.log_file, "a") as f:
+            f.write(json.dumps(entry.to_dict()) + "\n")
+        
         return entry
     
     def verify_entry(self, entry: ConsentEntry) -> bool:
-        """Verify the signature of a consent entry."""
+        """Verify HMAC signature of a consent entry."""
         if not entry.signature:
             return False
-        expected = self._compute_signature(entry)
-        return hmac.compare_digest(entry.signature, expected)
+        expected_signature = self._compute_hmac(entry)
+        return hmac.compare_digest(entry.signature, expected_signature)
     
-    def verify_all(self) -> Tuple[int, List[ConsentEntry]]:
-        """Verify all entries. Returns (valid_count, list of invalid entries)."""
-        entries = self._read_entries()
-        invalid = [e for e in entries if not self.verify_entry(e)]
-        return len(entries) - len(invalid), invalid
+    def load_entries(self) -> List[ConsentEntry]:
+        """Load and verify all consent entries from the log file."""
+        entries = []
+        if not self.log_file.exists():
+            return entries
+        
+        with open(self.log_file, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                    entry = ConsentEntry.from_dict(data)
+                    if self.verify_entry(entry):
+                        entries.append(entry)
+                except (json.JSONDecodeError, KeyError):
+                    continue
+        return entries
     
-    def get_entries_by_user(self, user_id: str) -> List[ConsentEntry]:
-        return [e for e in self._read_entries() if e.user_id == user_id]
-    
-    def get_entries_by_game(self, game: str) -> List[ConsentEntry]:
-        return [e for e in self._read_entries() if e.game == game]
+    def get_entries_for_user(self, user_id: str) -> List[ConsentEntry]:
+        """Get all consent entries for a specific user."""
+        return [e for e in self.load_entries() if e.user_id == user_id]
 
 
-def main(argv: Optional[List[str]] = None) -> int:
-    """Main entry point for the consent log CLI."""
+def parse_args(argv: List[str]) -> argparse.Namespace:
+    """Parse command-line arguments for consent log operations."""
     parser = argparse.ArgumentParser(
-        description="Manage HMAC-signed consent logs for GDPR/CCPA/COPPA compliance"
+        description="G221 Consent Log Signed — HMAC-signed consent entries"
     )
-    parser.add_argument("-l", "--log-file", default="consent_log.json", help="Log file path")
-    parser.add_argument("-k", "--key-file", help="Secret key file path")
+    subparsers = parser.add_subparsers(dest="command", help="Commands")
     
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    # add command
+    add_parser = subparsers.add_parser("add", help="Add a consent entry")
+    add_parser.add_argument("--user-id", required=True, help="User ID")
+    add_parser.add_argument("--game", required=True, help="Game name")
+    add_parser.add_argument("--opt-in-version", default="1.0", help="Opt-in version")
+    add_parser.add_argument("--log-file", default="data/consent.log", help="Log file path")
+    add_parser.add_argument("--key-file", help="Key file path")
     
-    add_parser = subparsers.add_parser("add", help="Add a new consent entry")
-    add_parser.add_argument("-u", "--user-id", required=True, help="User ID")
-    add_parser.add_argument("-g", "--game", required=True, help="Game identifier")
-    add_parser.add_argument("-v", "--version", default="1.0", help="Opt-in version")
+    # verify command
+    verify_parser = subparsers.add_parser("verify", help="Verify a consent entry")
+    verify_parser.add_argument("--user-id", required=True, help="User ID")
+    verify_parser.add_argument("--game", required=True, help="Game name")
+    verify_parser.add_argument("--timestamp", help="Timestamp")
+    verify_parser.add_argument("--opt-in-version", default="1.0", help="Opt-in version")
+    verify_parser.add_argument("--signature", required=True, help="HMAC signature")
+    verify_parser.add_argument("--key-file", help="Key file path")
     
-    subparsers.add_parser("verify", help="Verify all log entries")
+    # list command
+    list_parser = subparsers.add_parser("list", help="List consent entries")
+    list_parser.add_argument("--user-id", help="Filter by user ID")
+    list_parser.add_argument("--log-file", default="data/consent.log", help="Log file path")
+    list_parser.add_argument("--key-file", help="Key file path")
     
-    list_parser = subparsers.add_parser("list", help="List log entries")
-    list_parser.add_argument("-u", "--user-id", help="Filter by user ID")
-    list_parser.add_argument("-g", "--game", help="Filter by game")
-    
-    args = parser.parse_args(argv)
-    
-    try:
-        log = ConsentLogSigned(
-            log_file=args.log_file,
-            key_file=getattr(args, "key_file", None)
-        )
-        
-        if args.command == "add":
-            entry = log.add_entry(
-                user_id=args.user_id, game=args.game, opt_in_version=args.version
-            )
-            print(f"Added consent entry:")
-            print(f"  User: {entry.user_id}")
-            print(f"  Game: {entry.game}")
-            print(f"  Timestamp: {entry.timestamp}")
-            print(f"  Version: {entry.opt_in_version}")
-            print(f"  Signature: {entry.signature[:16]}...")
-            return 0
-        
-        elif args.command == "verify":
-            valid_count, invalid = log.verify_all()
-            print(f"Verified {valid_count} valid entries")
-            if invalid:
-                print(f"WARNING: {len(invalid)} invalid entries found!")
-                for e in invalid:
-                    print(f"  - {e.user_id}/{e.game} at {e.timestamp}")
-                return 1
-            return 0
-        
-        elif args.command == "list":
-            entries = log._read_entries()
-            if args.user_id:
-                entries = [e for e in entries if e.user_id == args.user_id]
-            if args.game:
-                entries = [e for e in entries if e.game == args.game]
-            for e in entries:
-                sig_status = "✓" if log.verify_entry(e) else "✗"
-                print(f"{sig_status} {e.timestamp} | {e.user_id} | {e.game} | v{e.opt_in_version}")
-            return 0
-        
-    except ConsentLogError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 1
-    except Exception as e:
-        print(f"Unexpected error: {e}", file=sys.stderr)
-        return 2
-    
+    return parser.parse_args(argv)
+
+
+def cmd_add(args: argparse.Namespace) -> int:
+    """Handle 'add' command."""
+    log = ConsentLogSigned(args.log_file, key_file=args.key_file)
+    entry = log.add_entry(args.user_id, args.game, args.opt_in_version)
+    print(f"Added consent entry: {entry.to_dict()}")
     return 0
+
+
+def cmd_verify(args: argparse.Namespace) -> int:
+    """Handle 'verify' command."""
+    log = ConsentLogSigned(args.log_file, key_file=args.key_file)
+    entry = ConsentEntry(
+        user_id=args.user_id,
+        game=args.game,
+        timestamp=args.timestamp,
+        opt_in_version=args.opt_in_version,
+        signature=args.signature
+    )
+    if log.verify_entry(entry):
+        print("Signature VERIFIED")
+        return 0
+    else:
+        print("Signature INVALID")
+        return 1
+
+
+def cmd_list(args: argparse.Namespace) -> int:
+    """Handle 'list' command."""
+    log = ConsentLogSigned(args.log_file, key_file=args.key_file)
+    entries = log.load_entries()
+    
+    if args.user_id:
+        entries = [e for e in entries if e.user_id == args.user_id]
+    
+    for entry in entries:
+        print(json.dumps(entry.to_dict()))
+    return 0
+
+
+def main() -> int:
+    """Main entry point for consent log CLI."""
+    args = parse_args(sys.argv[1:])
+    
+    if args.command == "add":
+        return cmd_add(args)
+    elif args.command == "verify":
+        return cmd_verify(args)
+    elif args.command == "list":
+        return cmd_list(args)
+    else:
+        print("Error: No command specified. Use --help for usage.")
+        return 1
 
 
 if __name__ == "__main__":
