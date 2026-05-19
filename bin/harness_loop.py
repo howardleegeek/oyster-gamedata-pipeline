@@ -369,6 +369,16 @@ def dispatch(gap: dict) -> bool:
 
 # ----------------------------------------------------------------- collection
 def is_completed(gap_id: str) -> bool:
+    """Check if a dispatched gap task has completed.
+
+    Queries the remote mac-2 agent log for the completion marker.
+
+    Args:
+        gap_id: The unique identifier of the gap task to check.
+
+    Returns:
+        True if the agent log contains the completion marker, False otherwise.
+    """
     res = ssh_run(f"grep -q 'TASK RESULT: completed' {MAC2_WORK}/{gap_id}/agent.log && echo YES || echo NO")
     return "YES" in res.stdout
 
