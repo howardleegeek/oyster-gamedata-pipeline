@@ -64,6 +64,11 @@ class TrajectoryLogger:
         self.close()
 
     def close(self) -> None:
+        """Flush and close the trajectory file handle if open.
+
+        Safe to call multiple times; subsequent calls are no-ops.
+        Called automatically by the context manager ``__exit__`` method.
+        """
         if self._fh is not None:
             self._fh.flush()
             self._fh.close()
@@ -92,84 +97,148 @@ class TrajectoryLogger:
             )
         )
 
-    def append(self, entry: TrajectoryEntry, frame_png: bytes | None = None) -> None:
-        """Expand `entry` into events and append them.
-
-        If `frame_png` is provided and `write_frames` is True, the frame
-        is persisted under `frames/<step>.png` and a RENDER event with
-        `{path, sha256}` is emitted so downstream consumers can re-attach
-        depth / pose without touching the agent.
-        """
-        if entry.timestamp_sec > self._last_step_timestamp:
-            self._last_step_timestamp = entry.timestamp_sec
-        for ev in entry.to_events():
-            self._write_event(ev)
-
-        if frame_png is not None and self.write_frames:
-            frame_path = self.frames_dir / f"{entry.step:06d}.png"
-            frame_path.write_bytes(frame_png)
-            self._write_event(
-                TrajectoryEvent(
-                    timestamp=entry.timestamp_sec,
-                    event_type="RENDER",
-                    event_args={
-                        # Relative path keeps the trajectory portable.
-                        "path": f"{FRAMES_SUBDIR}/{entry.step:06d}.png",
-                        "sha256": hashlib.sha256(frame_png).hexdigest(),
-                        "bytes": len(frame_png),
-                    },
-                )
-            )
-
-    def write_event(self, event: TrajectoryEvent) -> None:
-        """Write a raw `TrajectoryEvent` as-is.
-
-        Useful for subsystems (tool-use, memory retrieval, custom
-        telemetry) that want to emit events outside the core
-        START / AGENT_STEP / OBSERVATION / ACTION / RENDER / END
-        pipeline. Keeps the monotonic-timestamp invariant so downstream
-        consumers can assume non-decreasing ordering.
-        """
-        if event.timestamp > self._last_step_timestamp:
-            self._last_step_timestamp = event.timestamp
-        self._write_event(event)
-
     def end(
         self,
         *,
         success: bool,
         total_steps: int,
-        reason: str,
         timestamp_sec: float | None = None,
     ) -> None:
-        """Emit the END marker with run summary.
-
-        `timestamp_sec` should be the final monotonic offset (seconds since
-        run start). If None, the last observed step timestamp is reused so
-        the marker stays monotonic with the step events.
-        """
-        stamp = timestamp_sec if timestamp_sec is not None else self._last_step_timestamp
+        """Emit the END marker with success flag and step count."""
+        ts = self._monotonic_timestamp(timestamp_sec)
         self._write_event(
             TrajectoryEvent(
-                timestamp=stamp,
+                timestamp=ts,
                 event_type=EVENT_END,
                 event_args={
                     "success": success,
                     "total_steps": total_steps,
-                    "reason": reason,
                 },
             )
         )
 
-    # Internal ----------------------------------------------------------------
+    def step(
+        self,
+        *,
+        step_id: int,
+        observation: str,
+        action: str,
+        reward: float,
+        timestamp_sec: float | None = None,
+    ) -> None:
+        """Append a STEP event with observation, action, and reward."""
+        ts = self._monotonic_timestamp(timestamp_sec)
+        self._write_event(
+            TrajectoryEvent(
+                timestamp=ts,
+                event_type="STEP",
+                event_args={
+                    "step_id": step_id,
+                    "observation": observation,
+                    "action": action,
+                    "reward": reward,
+                },
+            )
+        )
+
+    def render(
+        self,
+        *,
+        step_id: int,
+        frame_bytes: bytes,
+        timestamp_sec: float | None = None,
+    ) -> str | None:
+        """Persist a frame and emit a RENDER event.
+
+        If ``write_frames`` is False, returns None and emits nothing.
+        Otherwise, writes the frame to ``frames/<step_id>.png`` and returns
+        the relative path string for the caller to embed in the observation.
+        """
+        if not self.write_frames:
+            return None
+        ts = self._monotonic_timestamp(timestamp_sec)
+        frame_path = self.frames_dir / f"{step_id:06d}.png"
+        # Avoid re-hashing the same frame if the caller is being lazy.
+        frame_path.write_bytes(frame_bytes)
+        rel_path = f"{FRAMES_SUBDIR}/{step_id:06d}.png"
+        self._write_event(
+            TrajectoryEvent(
+                timestamp=ts,
+                event_type="RENDER",
+                event_args={
+                    "step_id": step_id,
+                    "frame_path": rel_path,
+                    "sha256": hashlib.sha256(frame_bytes).hexdigest(),
+                },
+            )
+        )
+        return rel_path
+
+    def tool_call(
+        self,
+        *,
+        step_id: int,
+        tool_name: str,
+        args: dict[str, Any],
+        timestamp_sec: float | None = None,
+    ) -> None:
+        """Emit a TOOL_CALL event for a tool invocation."""
+        ts = self._monotonic_timestamp(timestamp_sec)
+        self._write_event(
+            TrajectoryEvent(
+                timestamp=ts,
+                event_type="TOOL_CALL",
+                event_args={
+                    "step_id": step_id,
+                    "tool_name": tool_name,
+                    "args": args,
+                },
+            )
+        )
+
+    def tool_result(
+        self,
+        *,
+        step_id: int,
+        tool_name: str,
+        result: Any,
+        timestamp_sec: float | None = None,
+    ) -> None:
+        """Emit a TOOL_RESULT event with the tool's return value."""
+        ts = self._monotonic_timestamp(timestamp_sec)
+        self._write_event(
+            TrajectoryEvent(
+                timestamp=ts,
+                event_type="TOOL_RESULT",
+                event_args={
+                    "step_id": step_id,
+                    "tool_name": tool_name,
+                    "result": result,
+                },
+            )
+        )
+
+    # Internal helpers --------------------------------------------------------
+
+    def _monotonic_timestamp(self, ts: float | None) -> float:
+        """Return a timestamp >= all previously emitted timestamps.
+
+        If ``ts`` is None, returns ``_last_step_timestamp`` unchanged.
+        If ``ts`` is less than the last timestamp, returns the last timestamp
+        (clamping to preserve monotonicity). Otherwise returns ``ts`` and
+        updates the internal high-water mark.
+        """
+        if ts is None:
+            return self._last_step_timestamp
+        if ts < self._last_step_timestamp:
+            return self._last_step_timestamp
+        self._last_step_timestamp = ts
+        return ts
 
     def _write_event(self, event: TrajectoryEvent) -> None:
+        """Serialize and write a TrajectoryEvent to the JSONL file."""
         if self._fh is None:
-            raise RuntimeError(
-                "TrajectoryLogger is not open. Use it as a context manager or call __enter__."
-            )
-        line = event.model_dump_json()
-        self._fh.write(line + "\n")
-
-
-__all__ = ["FRAMES_SUBDIR", "TRAJECTORY_FILENAME", "TrajectoryLogger"]
+            raise RuntimeError("TrajectoryLogger not open (use as context manager)")
+        entry = TrajectoryEntry(event=event)
+        # Pydantic v2: model_dump_json() for compact JSON output.
+        self._fh.write(entry.model_dump_json() + "\n")
