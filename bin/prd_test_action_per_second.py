@@ -75,14 +75,77 @@ def analyze_capture_quality(actions: list[float]) -> dict[str, Any]:
     }
 
 
+def _has_timestamp_field(records: list[dict]) -> bool:
+    """Check if a list of records has a timestamp-like field."""
+    if not records:
+        return False
+    first = records[0]
+    if not isinstance(first, dict):
+        return False
+    return any(k in first for k in ("timestamp", "time", "frame"))
+
+
+def _is_camera_data_dict(data: dict) -> bool:
+    """Check if a dict looks like camera data (not action records)."""
+    camera_keys = {"camera_position", "intrinsics", "world_cube_radius"}
+    return bool(camera_keys & set(data.keys()))
+
+
+def _extract_action_rates_from_action_camera(records: list[dict]) -> list[float]:
+    """
+    Extract action rates from action_camera.json format.
+
+    Calculates actions-per-second by measuring time deltas between consecutive
+    action records. Each record represents one action frame.
+
+    Args:
+        records: List of action records with 'timestamp' or 'time' field.
+
+    Returns:
+        List of action rates (actions per second) calculated from time deltas.
+    """
+    if len(records) < 2:
+        raise ValueError("action_camera.json must contain at least 2 records to calculate action rates")
+
+    # Detect which timestamp field is used
+    first = records[0]
+    if "timestamp" in first:
+        ts_key = "timestamp"
+    elif "time" in first:
+        ts_key = "time"
+    elif "frame" in first:
+        ts_key = "frame"
+    else:
+        raise ValueError("No timestamp field found in action_camera records")
+
+    # Sort by timestamp to ensure correct order
+    sorted_records = sorted(records, key=lambda r: r.get(ts_key, 0))
+
+    action_rates = []
+    for i in range(1, len(sorted_records)):
+        prev_ts = sorted_records[i - 1].get(ts_key, 0)
+        curr_ts = sorted_records[i].get(ts_key, 0)
+        delta_t = curr_ts - prev_ts
+
+        if delta_t > 0:
+            # 1 action per delta_t seconds = actions per second
+            action_rates.append(1.0 / delta_t)
+
+    if not action_rates:
+        raise ValueError("Could not calculate action rates from action_camera.json")
+
+    return action_rates
+
+
 def load_actions_from_file(filepath: Path) -> list[float]:
     """
     Load action rates from a JSON or text file.
 
-    Supports three formats:
+    Supports four formats:
     1. JSON list of numbers: [1.0, 2.0, 3.0]
     2. action_camera.json: List of action records with timestamps
-    3. Plain text: one value per line
+    3. Camera data dict: {"camera_position": ..., "world_cube_radius": ...} → returns []
+    4. Plain text: one value per line
 
     Args:
         filepath: Path to the input file.
@@ -106,47 +169,16 @@ def load_actions_from_file(filepath: Path) -> list[float]:
             if data and isinstance(data[0], (int, float)):
                 return [float(x) for x in data]
             # Check if it's action_camera.json format (list of objects with timestamps)
-            if data and isinstance(data[0], dict) and "timestamp" in data[0]:
+            if data and isinstance(data[0], dict) and _has_timestamp_field(data):
                 return _extract_action_rates_from_action_camera(data)
+        elif isinstance(data, dict):
+            # Camera data dict — not actionable, return empty
+            if _is_camera_data_dict(data):
+                return []
         raise ValueError("JSON file must contain a list of numbers or action_camera.json format")
 
     # Plain text: one value per line
     return [float(line.strip()) for line in content.splitlines() if line.strip()]
-
-
-def _extract_action_rates_from_action_camera(records: list[dict]) -> list[float]:
-    """
-    Extract action rates from action_camera.json format.
-
-    Calculates actions-per-second by measuring time deltas between consecutive
-    action records. Each record represents one action frame.
-
-    Args:
-        records: List of action records with 'timestamp' field.
-
-    Returns:
-        List of action rates (actions per second) calculated from time deltas.
-    """
-    if len(records) < 2:
-        raise ValueError("action_camera.json must contain at least 2 records to calculate action rates")
-
-    # Sort by timestamp to ensure correct order
-    sorted_records = sorted(records, key=lambda r: r.get("timestamp", 0))
-
-    action_rates = []
-    for i in range(1, len(sorted_records)):
-        prev_ts = sorted_records[i - 1].get("timestamp", 0)
-        curr_ts = sorted_records[i].get("timestamp", 0)
-        delta_t = curr_ts - prev_ts
-
-        if delta_t > 0:
-            # 1 action per delta_t seconds = actions per second
-            action_rates.append(1.0 / delta_t)
-
-    if not action_rates:
-        raise ValueError("Could not calculate action rates from action_camera.json")
-
-    return action_rates
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -160,70 +192,59 @@ def main(argv: list[str] | None = None) -> int:
         Exit code: 0 if quality is acceptable, 1 otherwise.
     """
     parser = argparse.ArgumentParser(
-        description="Test median actions-per-second against PRD quality thresholds."
+        description="Validate median actions-per-second is within 0.5 to 5.0 range"
     )
     parser.add_argument(
-        "-i", "--input",
-        help="Input file containing action rates (JSON or text, one per line)",
-        type=Path
+        "-a", "--actions", nargs="+", type=float,
+        help="Direct list of action rates to validate"
     )
     parser.add_argument(
-        "-a", "--actions",
-        nargs="+",
-        type=float,
-        help="Action rates directly on command line"
+        "-i", "--input", type=Path,
+        help="Path to JSON or text file containing action rates"
     )
     parser.add_argument(
-        "-j", "--json-output",
-        action="store_true",
+        "-j", "--json", action="store_true",
         help="Output results as JSON"
     )
 
-    args = parser.parse_args(argv)
-
-    # Get action rates from input source
-    if args.input:
-        try:
-            actions = load_actions_from_file(args.input)
-        except Exception as e:
-            if args.json_output:
-                print(json.dumps({"error": str(e)}))
-            else:
-                print(f"Error: {e}", file=sys.stderr)
-            return 2
-    elif args.actions:
-        actions = args.actions
-    else:
-        parser.print_help()
+    # Check for no args before parse (parser.error exits with code 2)
+    check_argv = argv if argv is not None else sys.argv[1:]
+    if not check_argv:
+        print("Error: Either --actions or --input is required", file=sys.stderr)
         return 1
 
-    # Analyze quality
+    args = parser.parse_args(check_argv)
+
+    if not args.actions and not args.input:
+        print("Error: Either --actions or --input is required", file=sys.stderr)
+        return 1
+
     try:
+        if args.actions:
+            actions = args.actions
+        else:
+            actions = load_actions_from_file(args.input)
+
+        if not actions:
+            print("No actions to analyze")
+            return 2
+
         result = analyze_capture_quality(actions)
-    except ValueError as e:
-        if args.json_output:
-            print(json.dumps({"error": str(e)}))
+
+        if args.json:
+            print(json.dumps(result))
         else:
-            print(f"Error: {e}", file=sys.stderr)
+            print(f"Median actions/sec: {result['median_actions_per_second']}")
+            print(f"Range: [{result['min_actions_per_second']}, {result['max_actions_per_second']}]")
+            print(f"Sample count: {result['sample_count']}")
+            print(f"Quality: {result['quality_status']}")
+            print(f"Status: {'PASSED' if result['in_range'] else 'FAILED'}")
+
+        return 0 if result["in_range"] else 1
+
+    except (FileNotFoundError, ValueError) as e:
+        print(f"Error: {e}", file=sys.stderr)
         return 2
-
-    # Output results
-    if args.json_output:
-        print(json.dumps(result, indent=2))
-    else:
-        print(f"Median actions per second: {result['median_actions_per_second']}")
-        print(f"Range: [{result['min_actions_per_second']}, {result['max_actions_per_second']}]")
-        print(f"Sample count: {result['sample_count']}")
-        print(f"Quality status: {result['quality_status']}")
-
-        if not result['in_range']:
-            print(f"\nFAILED: Median {result['median_actions_per_second']} is outside acceptable range [{MIN_ACTIONS_PER_SECOND}, {MAX_ACTIONS_PER_SECOND}]")
-            return 1
-        else:
-            print(f"\nPASSED: Median {result['median_actions_per_second']} is within acceptable range")
-            return 0
-
-    return 0 if result['in_range'] else 1
 
 
 if __name__ == "__main__":
