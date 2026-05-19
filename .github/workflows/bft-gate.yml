@@ -1,0 +1,40 @@
+name: BFT Adversarial Detection Gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  bft-gate:
+    name: BFT Adversarial Detection Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Run BFT detection gate
+        id: gate
+        run: |
+          python -m bin.ci.bft_detection_gate | tee gate_output.txt
+
+      - name: Post scorecard to job summary
+        if: always()
+        run: |
+          {
+            echo "## BFT Adversarial Detection Scorecard"
+            echo ""
+            echo '```'
+            cat gate_output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

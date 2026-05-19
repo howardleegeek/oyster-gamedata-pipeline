@@ -1,0 +1,90 @@
+{
+  "_comment_1": "Build-time pin for the bundled JRE + Minecraft + Fabric. The fetch_*.py",
+  "_comment_2": "scripts read this file at build time and HARD-FAIL on SHA-256 mismatch.",
+  "_comment_3": "Bumping anything means editing this JSON — never edit constants in code.",
+  "_comment_4": "JRE pin lives at root level for backward compat with fetch_jre.py;",
+  "_comment_5": "MC + Fabric pins live under mc_pin / fabric_pin namespaces.",
+  "schema_version": 1,
+  "vendor": "eclipse-temurin",
+  "release_tag": "jdk-21.0.11+10",
+  "version": {
+    "full": "21.0.11+10-LTS",
+    "semver": "21.0.11+10.0.LTS",
+    "major": 21,
+    "minor": 0,
+    "security": 11,
+    "build": 10,
+    "lts": true
+  },
+  "platform": {
+    "os": "windows",
+    "arch": "x64",
+    "image_type": "jre"
+  },
+  "source": {
+    "filename": "OpenJDK21U-jre_x64_windows_hotspot_21.0.11_10.zip",
+    "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.11%2B10/OpenJDK21U-jre_x64_windows_hotspot_21.0.11_10.zip",
+    "sha256": "be26677aaa20b39a62edcaab4c8857a8b76673b0f45abc0b6143b142b62717e4",
+    "sha256_url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.11%2B10/OpenJDK21U-jre_x64_windows_hotspot_21.0.11_10.zip.sha256.txt",
+    "size_bytes": 49005708
+  },
+  "post_extract_required_files": [
+    "bin/javaw.exe",
+    "bin/java.exe",
+    "release"
+  ],
+
+  "_comment_mc_1": "Vanilla Minecraft Java Edition pin. fetch_minecraft.py uses the",
+  "_comment_mc_2": "version_manifest_url to discover 1.21.4's per-version manifest URL,",
+  "_comment_mc_3": "then re-verifies SHA-1 of every artifact against Mojang's own pins.",
+  "_comment_mc_4": "We do NOT pin client.jar's SHA here — Mojang's manifest IS the pin,",
+  "_comment_mc_5": "and we hard-fail if Mojang changes 1.21.4 (immutable per Mojang policy).",
+  "mc_pin": {
+    "schema_version": 1,
+    "vendor": "mojang",
+    "version_id": "1.21.4",
+    "asset_index_id": "19",
+    "platform": {
+      "os": "windows",
+      "arch": "x64"
+    },
+    "version_manifest_url": "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json",
+    "_comment_post_fetch_objects_1": "rc7: asset OBJECTS sampled below verify",
+    "_comment_post_fetch_objects_2": "the parallel fetch landed real bytes on disk.",
+    "_comment_post_fetch_objects_3": "Mojang's index 19 is immutable (per-policy),",
+    "_comment_post_fetch_objects_4": "so these hashes are stable across re-runs.",
+    "_comment_post_fetch_objects_5": "5 samples from 5 categories (icons / lang /",
+    "_comment_post_fetch_objects_6": "sounds.json / .ogg) — full 4035-object set is",
+    "_comment_post_fetch_objects_7": "verified inline by fetch_minecraft.py via SHA-1.",
+    "post_fetch_required_files": [
+      "versions/1.21.4/1.21.4.jar",
+      "versions/1.21.4/1.21.4.json",
+      "assets/indexes/19.json",
+      "versions/1.21.4/natives/lwjgl.dll",
+      "versions/1.21.4/natives/glfw.dll",
+      "versions/1.21.4/natives/lwjgl_opengl.dll",
+      "assets/objects/5f/5ff04807c356f1beed0b86ccf659b44b9983e3fa",
+      "assets/objects/af/af96f55a90eaf11b327f1b5f8834a051027dc506",
+      "assets/objects/04/046b51113a9c1b83b385549a54b53bef94636015",
+      "assets/objects/10/1058cf72714c48b154e7883cb9d7ec918e0816b3",
+      "assets/objects/01/017ae089137bae959bf9035c2484bca0f0eb004f"
+    ]
+  },
+
+  "_comment_fabric_1": "Fabric loader pin for MC 1.21.4. fetch_fabric.py uses the profile_url",
+  "_comment_fabric_2": "to fetch the launcher profile JSON, then downloads its 8 libraries from",
+  "_comment_fabric_3": "Maven and re-verifies SHA-1 against Fabric's own pins in the profile.",
+  "fabric_pin": {
+    "schema_version": 1,
+    "vendor": "fabricmc",
+    "loader_version": "0.16.10",
+    "minecraft_version": "1.21.4",
+    "profile_url": "https://meta.fabricmc.net/v2/versions/loader/1.21.4/0.16.10/profile/json",
+    "expected_main_class": "net.fabricmc.loader.impl.launch.knot.KnotClient",
+    "expected_libraries_count": 8,
+    "post_fetch_required_files": [
+      "versions/fabric-loader-0.16.10-1.21.4/fabric-loader-0.16.10-1.21.4.json",
+      "mods/fabric-api.jar"
+    ]
+  }
+}

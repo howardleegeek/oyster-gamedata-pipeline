@@ -1,0 +1,146 @@
+name: Build MC Fabric Mod
+
+on:
+  push:
+    paths:
+      - 'mc-mod/**'
+      - '.github/workflows/build-mc-mod.yml'
+  pull_request:
+    paths:
+      - 'mc-mod/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    # D19 multi-MC-version build matrix. Each cell builds the same Java
+    # source against version-specific yarn mappings + fabric-api, producing
+    # a separately-named jar so D17's .exe auto-installer can pick the one
+    # matching the user's MC install. fail-fast: false → one cell breaking
+    # doesn't kill the others (e.g. fabric-api version drift in 1.20.x
+    # shouldn't block a 1.21.x release).
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # R01 (2026-05-08): expanded to all 9 stable MC versions.
+        # Coordinates verified against meta.fabricmc.net + maven.fabricmc.net.
+        mc_version:
+          - "1.20.1"
+          - "1.20.2"
+          - "1.20.4"
+          - "1.20.6"
+          - "1.21.1"
+          - "1.21.2"
+          - "1.21.3"
+          - "1.21.4"
+          - "1.21.5"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        # Loom requires Java 21 at build time even for MC 1.20.x targets.
+        # The mod's source/target Java release is set in build.gradle per
+        # matrix row.
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Bootstrap gradlew if missing
+        working-directory: mc-mod
+        run: |
+          if [ ! -f gradlew ]; then
+            gradle wrapper --gradle-version 8.10
+          fi
+
+      - name: Build mod for MC ${{ matrix.mc_version }}
+        working-directory: mc-mod
+        env:
+          MC_VERSION: ${{ matrix.mc_version }}
+        run: |
+          ./gradlew build --no-daemon --info
+
+      - name: Verify mod jar (MC ${{ matrix.mc_version }})
+        working-directory: mc-mod
+        env:
+          MC_VERSION: ${{ matrix.mc_version }}
+        run: |
+          ls -lh build/libs/
+          jar=$(ls build/libs/oyster-recorder-mod-*-mc${MC_VERSION}.jar | grep -v sources | head -1)
+          if [ -z "$jar" ]; then
+            echo "::error::No mod jar produced for MC ${MC_VERSION}"
+            exit 1
+          fi
+          # Sanity: jar contains fabric.mod.json with the right MC dep.
+          unzip -p "$jar" fabric.mod.json | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)
+          mc_dep = d.get('depends', {}).get('minecraft', '')
+          expected = '~${MC_VERSION}'
+          assert mc_dep == expected, f'mc dep mismatch: got {mc_dep!r}, want {expected!r}'
+          print(f'fabric.mod.json depends.minecraft = {mc_dep} ✓')
+          "
+          echo "Mod jar OK: $(basename "$jar") ($(du -h "$jar" | cut -f1))"
+
+      - name: Upload as workflow artifact (MC ${{ matrix.mc_version }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: oyster-recorder-mod-mc${{ matrix.mc_version }}
+          path: mc-mod/build/libs/oyster-recorder-mod-*-mc${{ matrix.mc_version }}.jar
+          if-no-files-found: error
+
+  # R01: snapshot best-effort lane. Tries the latest MC snapshot but
+  # failure does NOT block the release (continue-on-error: true).
+  build-snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Bootstrap gradlew if missing
+        working-directory: mc-mod
+        run: |
+          if [ ! -f gradlew ]; then
+            gradle wrapper --gradle-version 8.10
+          fi
+
+      - name: Fetch latest MC snapshot version
+        id: snapshot
+        run: |
+          SNAP=$(curl -s https://meta.fabricmc.net/v2/versions/game | python3 -c "
+          import json,sys
+          versions = json.load(sys.stdin)
+          snaps = [v['version'] for v in versions if not v.get('stable', False)]
+          print(snaps[0] if snaps else '')
+          ")
+          echo "version=$SNAP" >> "$GITHUB_OUTPUT"
+          echo "Detected latest snapshot: $SNAP"
+
+      - name: Build mod for snapshot ${{ steps.snapshot.outputs.version }}
+        if: steps.snapshot.outputs.version != ''
+        working-directory: mc-mod
+        env:
+          MC_VERSION: ${{ steps.snapshot.outputs.version }}
+        run: |
+          echo "::notice::Attempting best-effort snapshot build for MC $MC_VERSION"
+          ./gradlew build --no-daemon --info || echo "::warning::Snapshot $MC_VERSION not yet supported — this is expected"

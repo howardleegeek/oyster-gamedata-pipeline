@@ -1,0 +1,194 @@
+name: Fabric Yarn Watcher
+
+# R02: Daily check for new MC versions with shipped yarn mappings + fabric-api.
+# When upstream catches up, auto-creates a PR to extend the build matrix.
+# Iron law: never adds a version without real API evidence.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # daily 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-and-pr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Check for new Fabric yarn versions
+        id: check
+        run: |
+          OUTPUT=$(python3 bin/check_fabric_yarn_versions.py)
+          echo "$OUTPUT"
+          echo "result<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$OUTPUT" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+          # Check if there are versions to add
+          COUNT=$(echo "$OUTPUT" | python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d.get('available_to_add',[])))")
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+
+      - name: Extend build matrix and create PR
+        if: steps.check.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHECK_RESULT: ${{ steps.check.outputs.result }}
+        run: |
+          set -euo pipefail
+
+          # Write check result to a temp file to avoid shell escaping issues
+          echo "$CHECK_RESULT" > /tmp/check_result.json
+
+          # For each new version, update build-mc-mod.yml and build.gradle
+          python3 - <<'PYEOF'
+          import json, sys, re
+
+          with open("/tmp/check_result.json") as f:
+              data = json.load(f)
+
+          versions = data.get("available_to_add", [])
+          if not versions:
+              print("No versions to add")
+              sys.exit(0)
+
+          # Read current workflow
+          with open(".github/workflows/build-mc-mod.yml", "r") as f:
+              workflow = f.read()
+
+          # Read current build.gradle
+          with open("mc-mod/build.gradle", "r") as f:
+              gradle = f.read()
+
+          added = []
+          for v in versions:
+              mc = v["mc_version"]
+              yarn = v["yarn"]
+              fapi = v["fabric_api"]
+              loader = v["loader"]
+              java_rel = v["java_release"]
+
+              # Skip if already in workflow
+              if f'"{mc}"' in workflow:
+                  print(f"Skipping {mc} — already in workflow")
+                  continue
+
+              # Add to workflow mc_version list: find last entry and append after
+              last_entry = workflow.rfind('          - "')
+              if last_entry == -1:
+                  print(f"ERROR: Cannot find insertion point in workflow for {mc}")
+                  continue
+              line_end = workflow.index("\n", last_entry)
+              workflow = workflow[:line_end+1] + f'          - "{mc}"\n' + workflow[line_end+1:]
+
+              # Add to build.gradle MC_MATRIX before closing ]
+              gradle_entry = (
+                  f'    "{mc}": [\n'
+                  f'        yarn:        "{yarn}",\n'
+                  f'        fabricApi:   "{fapi}",\n'
+                  f'        loader:      "{loader}",\n'
+                  f'        javaRelease: {java_rel},\n'
+                  f'        dependsExpr: "~{mc}",\n'
+                  f'    ],\n'
+              )
+              close_bracket = gradle.rfind("]", 0, gradle.find("def mcVersion"))
+              if close_bracket == -1:
+                  print(f"ERROR: Cannot find MC_MATRIX closing bracket for {mc}")
+                  continue
+              gradle = gradle[:close_bracket] + gradle_entry + gradle[close_bracket:]
+              added.append(mc)
+
+          if not added:
+              print("No new versions added")
+              sys.exit(0)
+
+          with open(".github/workflows/build-mc-mod.yml", "w") as f:
+              f.write(workflow)
+
+          with open("mc-mod/build.gradle", "w") as f:
+              f.write(gradle)
+
+          print(f"Added versions: {added}")
+          with open("/tmp/added_versions.txt", "w") as f:
+              f.write(",".join(added))
+
+          # Build PR body
+          lines = ["## Auto-extend build matrix\n"]
+          lines.append("New MC versions with **both** yarn mappings and fabric-api available:\n")
+          for v in versions:
+              mc = v["mc_version"]
+              if mc not in added:
+                  continue
+              lines.append(f"- **MC {mc}**")
+              lines.append(f"  - Yarn: `{v['yarn']}` (from meta.fabricmc.net)")
+              lines.append(f"  - Fabric API: `{v['fabric_api']}` (from maven.fabricmc.net)")
+              lines.append(f"  - Loader: `{v['loader']}`")
+              lines.append(f"  - Java: {v['java_release']}")
+              lines.append("")
+          lines.append("## Evidence\n")
+          lines.append("All coordinates verified against live Fabric meta + Maven APIs.")
+          lines.append("No versions were invented.\n")
+          lines.append("## Test plan\n")
+          lines.append("- [ ] CI build passes for all matrix versions (including new ones)")
+          lines.append("- [ ] New jar artifacts are produced and uploaded\n")
+          lines.append("Generated by R02 Fabric Yarn Watcher")
+          with open("/tmp/pr_body.txt", "w") as f:
+              f.write("\n".join(lines))
+          PYEOF
+
+          # Check if any changes were made
+          if [ ! -f /tmp/added_versions.txt ]; then
+            echo "No versions to add after filtering"
+            exit 0
+          fi
+
+          ADDED=$(cat /tmp/added_versions.txt)
+          if [ -z "$ADDED" ]; then
+            echo "No versions added"
+            exit 0
+          fi
+
+          # Create branch and PR
+          FIRST_VERSION=$(echo "$ADDED" | cut -d',' -f1)
+          BRANCH="auto/extend-matrix-mc-${FIRST_VERSION}"
+          DATE=$(date -u +%Y-%m-%d)
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add .github/workflows/build-mc-mod.yml mc-mod/build.gradle
+          git commit -m "chore(mc-mod): auto-extend matrix to MC ${ADDED} (Fabric yarn shipped ${DATE})"
+          git push -u origin "$BRANCH"
+
+          PR_BODY=$(cat /tmp/pr_body.txt)
+          gh pr create \
+            --title "chore(mc-mod): auto-extend matrix to MC ${FIRST_VERSION} (Fabric yarn shipped ${DATE})" \
+            --body "$PR_BODY" \
+            --label "auto-extend,mc-mod" \
+            --base main
+
+      - name: No new versions
+        if: steps.check.outputs.count == '0'
+        env:
+          CHECK_OUTPUT: ${{ steps.check.outputs.result }}
+        run: |
+          echo "No new MC versions ready to add. Current skip reasons:"
+          echo "$CHECK_OUTPUT" | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)
+          skips = d.get('skip_reason', {})
+          for v, reason in skips.items():
+              print(f'  {v}: {reason}')
+          if not skips:
+              print('  (none — all available versions already in matrix)')
+          "

@@ -1,0 +1,251 @@
+name: Build Recorder EXE
+
+on:
+  push:
+    tags:
+      - 'recorder-v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Howard 2026-05-07: bundle DepthAnything V2 inference into .exe
+          # so testers' recordings include REAL depth (no placeholder).
+          # CPU-only torch keeps the .exe smaller (~1 GB vs ~3 GB CUDA).
+          pip install pyinstaller pynput pillow numpy pyyaml
+          pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
+          pip install transformers imageio[ffmpeg] OpenEXR Imath huggingface_hub
+
+      - name: Pre-download DepthAnything V2 weights
+        # Bundle the model offline so testers don't need internet on first
+        # run. ViT-S is ~100 MB on disk after download.
+        run: |
+          python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='depth-anything/Depth-Anything-V2-Small-hf', local_dir='hf_cache/depth-anything-v2-small-hf')"
+          dir hf_cache
+
+      - name: Download ffmpeg release build (Windows x64, GPL static)
+        run: |
+          $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+          Invoke-WebRequest -Uri $url -OutFile ffmpeg.zip
+          Expand-Archive -Path ffmpeg.zip -DestinationPath ffmpeg-extracted
+          $ffmpegBin = Get-ChildItem -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
+          Copy-Item $ffmpegBin.FullName -Destination ffmpeg.exe
+          Get-Item ffmpeg.exe | Format-List Length, FullName
+
+      - name: Download Fabric installer jar (D17)
+        # Howard 2026-05-07 (D17): bundle the Fabric loader installer so the
+        # recorder can auto-install Fabric + drop the Oyster mod into the
+        # user's MC on first launch. No runtime download — fully offline.
+        run: |
+          $url = "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.0.1/fabric-installer-1.0.1.jar"
+          Invoke-WebRequest -Uri $url -OutFile fabric-installer.jar
+          Get-Item fabric-installer.jar | Format-List Length, FullName
+
+      - name: Setup Java 21 for mc-mod build (D15+D16)
+        # Howard 2026-05-07: Minecraft 1.21.4 + Fabric Loom strictly require
+        # Java 21 — the runner's default Java 17 trips a clear error from
+        # Fabric Loom at gradle configure time. setup-java pins to Temurin
+        # 21 same as the standalone build-mc-mod.yml workflow does.
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Build Oyster MC mod (D15+D16)
+        # Bootstrap gradle wrapper directly via the gradle binary that
+        # setup-gradle/setup-java install — no chocolatey dance, no version
+        # pinning surprises. Choosing 8.10 explicitly because Fabric Loom
+        # 1.8.x is tested against gradle 8.x; 9.x is too new and still
+        # surfacing edge cases.
+        working-directory: mc-mod
+        run: |
+          # Bootstrap a gradlew wrapper using the gradle that setup-java
+          # places on PATH (Adoptium ships gradle ~8 with the JDK).
+          if (-not (Test-Path gradlew.bat)) {
+            $gradleZip = "https://services.gradle.org/distributions/gradle-8.10-bin.zip"
+            Invoke-WebRequest -Uri $gradleZip -OutFile gradle.zip
+            Expand-Archive -Path gradle.zip -DestinationPath gradle-tmp -Force
+            $env:PATH = "$pwd\gradle-tmp\gradle-8.10\bin;$env:PATH"
+            gradle wrapper --gradle-version 8.10
+          }
+          .\gradlew.bat build --no-daemon --info
+          $jar = Get-ChildItem -Path build/libs/oyster-recorder-mod-*.jar `
+                 | Where-Object { $_.Name -notmatch 'sources' } `
+                 | Select-Object -First 1
+          if (-not $jar) {
+            Write-Error "mc-mod build failed — no jar produced"
+            exit 1
+          }
+          Copy-Item $jar.FullName -Destination ../oyster-recorder-mod.jar
+          Get-Item ../oyster-recorder-mod.jar | Format-List Length, FullName
+
+      - name: Build single-file recorder .exe (PyInstaller)
+        # --runtime-tmpdir : redirect PyInstaller's --onefile runtime
+        #     extraction from %TEMP%\_MEI<rand>\ to a stable per-user
+        #     LOCALAPPDATA path. Defender / third-party AV scan %TEMP%
+        #     aggressively and frequently quarantine the just-extracted
+        #     python311.dll mid-load, causing the classic
+        #     "Failed to load Python DLL: ...python311.dll" crash.
+        #     LOCALAPPDATA is excluded from most aggressive AV heuristics
+        #     and reusing the same dir across launches lets AV mark it
+        #     trusted after first scan.
+        # The literal string '%LOCALAPPDATA%' is preserved by PyInstaller
+        # (no shell expansion at build time) — Windows expands it at
+        # runtime when the .exe is launched. Confirmed by PyInstaller
+        # docs (https://pyinstaller.org/en/stable/usage.html).
+        run: |
+          pyinstaller --onefile --windowed `
+            --name OysterRecorder `
+            --runtime-tmpdir "%LOCALAPPDATA%\OysterRecorder\runtime" `
+            --add-binary "ffmpeg.exe;." `
+            --add-data "bin/lint_v3_prd_grounded.py;." `
+            --add-data "bin/generate_systeminfo_json.py;." `
+            --add-data "bin/generate_gameinfo_xlsx.py;." `
+            --add-data "bin/depth_anything_v2_inference.py;." `
+            --add-data "bin/install_fabric_loader.py;." `
+            --add-data "bin/game_state_overlay.py;." `
+            --add-data "fabric-installer.jar;." `
+            --add-data "oyster-recorder-mod.jar;." `
+            --add-data "hf_cache;hf_cache" `
+            --paths bin `
+            --collect-all tkinter `
+            --collect-all pynput `
+            --collect-all numpy `
+            --collect-all PIL `
+            --collect-all yaml `
+            --collect-all torch `
+            --collect-all transformers `
+            --collect-all OpenEXR `
+            --collect-all Imath `
+            --collect-all imageio `
+            --collect-all imageio_ffmpeg `
+            --hidden-import pynput.keyboard._win32 `
+            --hidden-import pynput.mouse._win32 `
+            --hidden-import lint_v3_prd_grounded `
+            --hidden-import generate_systeminfo_json `
+            --hidden-import generate_gameinfo_xlsx `
+            --hidden-import depth_anything_v2_inference `
+            --hidden-import install_fabric_loader `
+            --hidden-import game_state_overlay `
+            --hidden-import PIL.Image `
+            bin/recorder_consumer_lite.py
+
+      - name: Build --onedir fallback (zip distribution)
+        # Some testers report "Failed to load Python DLL" with the
+        # --onefile build because Defender / third-party AV scans
+        # the just-extracted python311.dll mid-load. --onedir avoids
+        # the %TEMP% extraction entirely — all DLLs ship inside a
+        # folder next to OysterRecorder.exe and load directly.
+        # Tester unzips once, double-clicks the .exe inside the folder.
+        run: |
+          pyinstaller --onedir --windowed `
+            --name OysterRecorder-onedir `
+            --add-binary "ffmpeg.exe;." `
+            --add-data "bin/lint_v3_prd_grounded.py;." `
+            --add-data "bin/generate_systeminfo_json.py;." `
+            --add-data "bin/generate_gameinfo_xlsx.py;." `
+            --add-data "bin/depth_anything_v2_inference.py;." `
+            --add-data "bin/install_fabric_loader.py;." `
+            --add-data "bin/game_state_overlay.py;." `
+            --add-data "fabric-installer.jar;." `
+            --add-data "oyster-recorder-mod.jar;." `
+            --add-data "hf_cache;hf_cache" `
+            --paths bin `
+            --collect-all tkinter `
+            --collect-all pynput `
+            --collect-all numpy `
+            --collect-all PIL `
+            --collect-all yaml `
+            --collect-all torch `
+            --collect-all transformers `
+            --collect-all OpenEXR `
+            --collect-all Imath `
+            --collect-all imageio `
+            --collect-all imageio_ffmpeg `
+            --hidden-import pynput.keyboard._win32 `
+            --hidden-import pynput.mouse._win32 `
+            --hidden-import lint_v3_prd_grounded `
+            --hidden-import generate_systeminfo_json `
+            --hidden-import generate_gameinfo_xlsx `
+            --hidden-import depth_anything_v2_inference `
+            --hidden-import install_fabric_loader `
+            --hidden-import game_state_overlay `
+            --hidden-import PIL.Image `
+            bin/recorder_consumer_lite.py
+          # Zip the onedir output for distribution.
+          Compress-Archive -Path dist/OysterRecorder-onedir/* `
+            -DestinationPath dist/OysterRecorder-onedir.zip `
+            -CompressionLevel Fastest
+
+      - name: Verify build output
+        run: |
+          dir dist
+          if (-not (Test-Path dist/OysterRecorder.exe)) {
+            Write-Error "Recorder --onefile build artifact missing"
+            exit 1
+          }
+          if (-not (Test-Path dist/OysterRecorder-onedir.zip)) {
+            Write-Error "Recorder --onedir zip fallback missing"
+            exit 1
+          }
+          $size_mb_exe = (Get-Item dist/OysterRecorder.exe).Length / 1MB
+          $size_mb_zip = (Get-Item dist/OysterRecorder-onedir.zip).Length / 1MB
+          Write-Host "Recorder --onefile .exe: $size_mb_exe MB"
+          Write-Host "Recorder --onedir .zip:  $size_mb_zip MB"
+
+      - name: Upload as workflow artifact (always)
+        uses: actions/upload-artifact@v4
+        with:
+          name: OysterRecorder-windows
+          path: |
+            dist/OysterRecorder.exe
+            dist/OysterRecorder-onedir.zip
+          if-no-files-found: error
+
+      - name: Attach to GitHub Release (tag push only)
+        if: startsWith(github.ref, 'refs/tags/recorder-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/OysterRecorder.exe
+            dist/OysterRecorder-onedir.zip
+          generate_release_notes: true
+          body: |
+            # Oyster 录制器 (Lite stop-gap MVP)
+
+            **测试人员**: 双击就开始用，无需任何设置。
+
+            ## 怎么用
+
+            1. 下载下面 **Assets** 里的 `OysterRecorder.exe`
+            2. 双击它。如果 Windows 弹蓝色"保护你的电脑"，点
+               **更多信息 → 仍要运行**
+            3. 看到中文窗口"等待 Minecraft 启动…"
+            4. **打开 Minecraft 玩游戏** (不用碰录制器窗口)
+            5. 自动检测 MC 启动 → 红色"正在录制"
+            6. 玩 5+ 分钟，正常退出 Minecraft
+            7. 自动停止 → 绿色"录制完成"
+            8. 文件保存到 Documents\OysterClips\clip-*.mp4
+
+            **就这样**。没有按钮要点，没有快捷键，没有设置。
+
+            ## 这是 stop-gap MVP，目前只录视频
+
+            正式版 Rust recorder ship 后会输出 5 文件 PRD-tarball
+            (video + systeminfo + action_camera + gameinfo + depth/*.exr)。
+            本版仅产出 .mp4 视频，让测试人员先跑通"录制流程"。

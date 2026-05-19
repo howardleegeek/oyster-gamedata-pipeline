@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+# swarm_controller.sh — overnight self-perpetuating loop
+# Howard 2026-05-06: full pre-auth granted, "不停跑"
+#
+# Every iteration (60s):
+#   1. Check 4 Paper instances are alive; restart any that died
+#   2. Count active bots per instance; spawn replacements up to 4 each
+#   3. Detect completed tarballs in /tmp; auto-process via D4 + D5
+#   4. Every 30 iter (~30min): cleanup old /tmp tarballs > 24h
+
+set -uo pipefail
+
+REPO=/Users/howardli/Downloads/oyster-agent-runner
+VENV_PY=${REPO}/.venv/bin/python
+LOG=/tmp/swarm.log
+
+PAPER_JAR=/tmp/oyster_paper_mac1/paper.jar
+PAPER1_DIR=/tmp/oyster_paper_d3
+PAPER2_DIR=/tmp/oyster_paper_mac1_p2
+PAPER3_DIR=/tmp/oyster_paper_mac1_p3
+
+TASKS=(
+    MC-tutorial-001
+    MC-tutorial-002-shelter
+    MC-tutorial-003-tool-tree
+    MC-mine-001-coal
+    MC-build-001-bridge
+    MC-craft-001-furnace-and-bake
+)
+
+log() { echo "[$(date +%H:%M:%S)] $*" | tee -a "$LOG"; }
+
+ensure_paper() {
+    local PORT=$1; local DIR=$2; local XMX=$3
+    if ! lsof -iTCP:$PORT -sTCP:LISTEN >/dev/null 2>&1; then
+        log "  Paper:$PORT DOWN — restarting"
+        bash $REPO/bin/paper_server_start.sh \
+            --paper-jar $PAPER_JAR \
+            --server-dir $DIR \
+            --port $PORT \
+            --xmx $XMX \
+            --view-distance 4 >> $LOG 2>&1
+    fi
+}
+
+count_bots_in() {
+    local LOG_FILE=$1
+    if [ -f "$LOG_FILE" ]; then
+        local JOINED=$(grep -c "joined the game" "$LOG_FILE" 2>/dev/null || echo 0)
+        local LEFT=$(grep -c "left the game" "$LOG_FILE" 2>/dev/null || echo 0)
+        echo $((JOINED - LEFT))
+    else
+        echo 0
+    fi
+}
+
+spawn_bot_on() {
+    local PORT=$1
+    local TASK=${TASKS[$RANDOM % ${#TASKS[@]}]}
+    local USER="op_swarm_$(date +%s%N | tail -c 7)"
+    cd $REPO
+    nohup bash bin/buyer_spec_pipeline.sh \
+        --task tasks/${TASK}.json \
+        --output /tmp/swarm_${USER}.tar.gz \
+        --max-steps 1500 \
+        --server localhost:${PORT} \
+        --bot-username "$USER" \
+        --provider scripted \
+        > /tmp/pipe_${USER}.log 2>&1 &
+    log "  spawned $USER on :$PORT task=$TASK PID=$!"
+}
+
+process_completed_tarball() {
+    local TAR=$1
+    local STAMP=$(date +%H%M%S)
+    local OUT=/tmp/swarm_real_${STAMP}.tar.gz
+    log "  D4 processing: $TAR → $OUT (15-30min CPU)"
+    cd $REPO
+    PYTHONPATH=. $VENV_PY bin/buyer_tarball_make_real.py \
+        --in-tarball "$TAR" \
+        --out-tarball "$OUT" \
+        --capture-region "0,0,1280,720" \
+        --capture-duration 30 >> $LOG 2>&1
+    if [ $? -eq 0 ] && [ -f "$OUT" ]; then
+        log "  D5 validating: $OUT"
+        $VENV_PY bin/tarball_authenticity_check.py "$OUT" >> $LOG 2>&1
+        log "  result: $(ls -lh $OUT | awk '{print $5}')"
+        # Mark source tarball processed
+        mv "$TAR" "${TAR}.processed" 2>/dev/null
+    else
+        log "  D4/D5 failed for $TAR"
+    fi
+}
+
+cleanup_tmp() {
+    log "  cleanup: removing tarballs older than 24h"
+    find /tmp -maxdepth 1 -name "swarm_*.tar.gz*" -mtime +1 -delete 2>>$LOG
+    find /tmp -maxdepth 1 -name "oyster_*.tar.gz*" -mtime +1 -delete 2>>$LOG
+}
+
+log "=== swarm controller START ==="
+ITER=0
+
+while true; do
+    ITER=$((ITER + 1))
+    log "--- iter $ITER ---"
+
+    # 1. ensure Papers alive
+    ensure_paper 25565 $PAPER1_DIR 4G
+    ensure_paper 25566 $PAPER2_DIR 3G
+    ensure_paper 25567 $PAPER3_DIR 2G
+
+    # 2. count bots, spawn if under target=3 each
+    P1_BOTS=$(count_bots_in $PAPER1_DIR/paper_boot.log)
+    P2_BOTS=$(count_bots_in $PAPER2_DIR/paper_boot.log)
+    P3_BOTS=$(count_bots_in $PAPER3_DIR/paper_boot.log)
+    log "  bot counts: P1=$P1_BOTS P2=$P2_BOTS P3=$P3_BOTS"
+
+    if [ "$P1_BOTS" -lt 3 ]; then spawn_bot_on 25565; fi
+    if [ "$P2_BOTS" -lt 3 ]; then spawn_bot_on 25566; fi
+    if [ "$P3_BOTS" -lt 3 ]; then spawn_bot_on 25567; fi
+
+    # 3. process completed tarballs (every 5 iter ≈ 5min)
+    if [ $((ITER % 5)) -eq 0 ]; then
+        for TAR in /tmp/swarm_op_swarm_*.tar.gz /tmp/overnight_op_*.tar.gz /tmp/oyster_op_*.tar.gz; do
+            [ -f "$TAR" ] || continue
+            # only process tarballs > 1MB (real ones)
+            SIZE=$(stat -f %z "$TAR" 2>/dev/null || stat -c %s "$TAR" 2>/dev/null || echo 0)
+            if [ "$SIZE" -gt 1000000 ]; then
+                process_completed_tarball "$TAR"
+                break  # one at a time so we don't overload CPU
+            fi
+        done
+    fi
+
+    # 4. cleanup every 30 iter (~30min)
+    if [ $((ITER % 30)) -eq 0 ]; then
+        cleanup_tmp
+    fi
+
+    sleep 60
+done

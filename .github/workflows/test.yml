@@ -1,0 +1,74 @@
+name: Test
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths-ignore:
+      # See ci.yml for rationale — heartbeat-only audit_gaps.yaml updates
+      # from harness_loop.py iter every 30s. Don't burn CI minutes on them.
+      - 'docs/audit_gaps.yaml'
+      - '**.md'
+      - 'autoresearch_logs/**'
+      - 'qa_workdir/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip and .venv
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            .venv
+          # cache key v2 — busts stale venvs that pre-date ruff/black being in test extras
+          key: ${{ runner.os }}-pip-venv-v2-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-venv-v2-
+
+      - name: Install dependencies
+        run: |
+          rm -rf .venv
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -e ".[test,exr]"
+          pip install ruff black pytest pytest-cov
+
+      - name: Lint with ruff
+        run: |
+          source .venv/bin/activate
+          ruff check src/ tests/
+
+      - name: Check formatting with black
+        run: |
+          source .venv/bin/activate
+          black --check src/ tests/
+
+      - name: Run tests
+        # Howard 2026-05-07: Cap each pytest invocation at 12 minutes wall
+        # clock — round-3 had a test hang for 42m+ before manual cancel,
+        # burning runner minutes. -x stops on first failure; --timeout=120
+        # stops on first 2-min hang. timeout-minutes is the GHA-level
+        # safety net.
+        timeout-minutes: 12
+        run: |
+          source .venv/bin/activate
+          pip install pytest-timeout
+          pytest tests/ -q --no-header -x --timeout=120
+
+      - name: Run tests with coverage
+        timeout-minutes: 12
+        run: |
+          source .venv/bin/activate
+          pytest tests/ -q --no-header -x --timeout=120 --cov=oyster_agent_runner --cov-report=term

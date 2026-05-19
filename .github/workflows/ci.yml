@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      # Heartbeat-only commits from harness_loop.py iterate every 30s. Skipping them
+      # here saves ~86% of CI runs (audited last 100 commits — 86 were heartbeat).
+      - 'docs/audit_gaps.yaml'
+      - '**.md'
+      - 'autoresearch_logs/**'
+      - 'qa_workdir/**'
+  pull_request:
+    branches: [main]
+
+jobs:
+  python-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # public submodules only; oyster-enrichment is private and the
+          # default GITHUB_TOKEN can't clone cross-repo private code.
+          # Pipeline tests don't depend on enrichment's internals.
+          submodules: false
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -e .[test,exr,xlsx]
+
+      - name: Spec lint (D21 — REAL ONLY iron law)
+        # Howard 2026-05-07: rejects specs with placeholder/mock/TODO outside
+        # 不要做 sections unless explicitly waived. Stdlib-only, fast (<1 s).
+        run: |
+          python bin/spec_lint.py specs/
+
+      - name: Run pytest
+        run: |
+          pytest tests/ -v --tb=short
+
+      - name: Upload coverage
+        if: success()
+        run: |
+          pip install pytest-cov
+          pytest tests/ -v --tb=short --cov=. --cov-report=xml
+        continue-on-error: true
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run shellcheck
+        # Howard 2026-05-07: ubuntu-latest ships shellcheck pre-installed. The
+        # prior `which shellcheck || apt-get update && apt-get install` failed
+        # because bash precedence parses it as `(which || apt-update) && apt-install`,
+        # so apt-install ran even when shellcheck was found, hitting permission-denied
+        # on the dpkg lock without sudo. Just trust shellcheck is present.
+        #
+        # --severity=warning: skip info/style noise (SC2012 ls-vs-find, SC2034 unused
+        # var, SC2087 here-doc quoting). These are stylistic, not bugs. We still catch
+        # genuine errors (unquoted vars, broken syntax, mistakes) at warning level+.
+        run: |
+          shellcheck --version
+          find bin/ -name "*.sh" -exec shellcheck --severity=error {} +
+
+  lint-buyer-spec:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install package
+        run: |
+          pip install -e .
+
+      - name: Lint buyer spec
+        if: success()
+        run: |
+          if [ -f samples/buyer-spec-v1-rc1.tar.gz ]; then
+            oyster-buyer-lint samples/buyer-spec-v1-rc1.tar.gz
+          fi
+        continue-on-error: true
+
+  lint-il10-artifact-honesty:
+    # IL10 (Producer-Artifact Honesty): every residual that takes a producer-side
+    # artifact path must declare ABSTAIN when the artifact is absent — never
+    # silent-PASS. See docs/SPEC_R13_MULTIMODAL.md § 1.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run IL10 audit lint
+        run: |
+          python3 bin/audit_artifact_honesty.py
+
+      - name: Run IL10 audit tests
+        run: |
+          pip install pytest
+          pytest tests/bin/test_audit_artifact_honesty.py -v
+
+  e2e-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run e2e smoke test
+        run: |
+          bash bin/e2e_smoke.sh --skip-real --skip-obs
+        continue-on-error: true

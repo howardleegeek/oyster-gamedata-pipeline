@@ -1,0 +1,107 @@
+name: Build QA Validator EXE
+
+# Builds bin/qa_validator_gui.py into a single Windows .exe via PyInstaller.
+# Triggered on tags `qa-validator-v*` (auto-attaches to GitHub Release) or
+# manually via workflow_dispatch (artifact only). Non-programmer testers
+# download the .exe from the release page and double-click it — no Python,
+# no pip, no terminal.
+
+on:
+  push:
+    tags:
+      - 'qa-validator-v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed for softprops/action-gh-release to attach asset
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller pillow numpy pyyaml
+
+      - name: Build windowed .exe (PyInstaller)
+        # --onefile           : single .exe, no __pycache__ side files
+        # --windowed          : no console window flashes (it's a GUI)
+        # --name              : output filename
+        # --paths bin         : let PyInstaller resolve `import lint_v3_prd_grounded`
+        # --collect-all       : bundle ALL submodules + DLLs of these packages.
+        #                       Stronger than --hidden-import; required for
+        #                       numpy MKL DLLs and PIL C extensions, which
+        #                       were missed by the v0.1.0 build and caused
+        #                       silent startup-flash with no error visible.
+        # --hidden-import     : keep belt-and-suspenders for lint module +
+        #                       PIL.Image (some versions need it explicitly)
+        # --add-data          : also bundle the .py source so module is findable
+        run: |
+          pyinstaller --onefile --windowed `
+            --name OysterClipValidator `
+            --paths bin `
+            --collect-all numpy `
+            --collect-all PIL `
+            --collect-all yaml `
+            --collect-all tkinter `
+            --hidden-import lint_v3_prd_grounded `
+            --hidden-import PIL.Image `
+            --add-data "bin/lint_v3_prd_grounded.py;." `
+            bin/qa_validator_gui.py
+
+      - name: Verify build output
+        run: |
+          dir dist
+          if (-not (Test-Path dist/OysterClipValidator.exe)) {
+            Write-Error "Build artifact missing"
+            exit 1
+          }
+
+      - name: Upload as workflow artifact (always)
+        uses: actions/upload-artifact@v4
+        with:
+          name: OysterClipValidator-windows
+          path: dist/OysterClipValidator.exe
+          if-no-files-found: error
+
+      - name: Attach to GitHub Release (tag push only)
+        if: startsWith(github.ref, 'refs/tags/qa-validator-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/OysterClipValidator.exe
+          generate_release_notes: true
+          body: |
+            # Oyster Clip 验证器
+
+            给**测试人员**用：双击就出 GUI，选一个 clip 文件，立刻看绿色或红色结果。
+
+            ## 测试人员的 3 步
+
+            1. 下载下面 **Assets** 里的 `OysterClipValidator.exe`
+            2. 双击它。如果 Windows 弹蓝色 "保护你的电脑"，点
+               **更多信息 → 仍要运行**（.exe 没签名，这一步未来会去掉）
+            3. 点蓝色按钮 **"选择 clip 文件…"**，选你录的 `.tar.gz`
+               → 立刻显示绿色 ✓ 通过 24/24 或红色 ✗ 失败 N/24
+
+            **就这样。** 没有"先点 Run 再看结果"两步走，没有英文术语，
+            没有需要看的命令行。
+
+            ## 如果是红色"失败"
+
+            点窗口底部 **"查看详情"** 链接，会展开一个面板列出 24 项检查
+            里到底哪几项 fail 了 — 截图发给工程师就行，不需要测试人员自己看懂。
+
+            ## 工程师本地复现
+
+            ```
+            python3 bin/lint_v3_prd_grounded.py <extracted-clip-dir>
+            ```

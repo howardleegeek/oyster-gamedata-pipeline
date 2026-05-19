@@ -1,0 +1,129 @@
+name: Deploy Web Buyer (Vercel)
+
+# Buyer marketplace portal — Next.js 14 app under web-buyer/.
+# Triggers ONLY when files inside web-buyer/ change on main, so a tester-only
+# or repo-root commit doesn't redeploy the buyer portal (and vice versa).
+#
+# Two execution paths, controlled by which secret set is configured:
+#   1. Vercel CLI (preferred) — uses VERCEL_TOKEN + VERCEL_ORG_ID +
+#      VERCEL_PROJECT_ID_BUYER. Builds on the runner, ships .vercel/output to
+#      Vercel as a prebuilt deployment, returns the canonical *.vercel.app URL.
+#   2. Deploy hook fallback — POSTs to VERCEL_BUYER_DEPLOY_HOOK so Vercel
+#      builds from the GitHub integration. Use if you don't want a CLI token.
+#
+# Either secret set yields a real production deployment — no stubs.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web-buyer/**'
+      - '.github/workflows/deploy-web-buyer.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-web-buyer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build and deploy web-buyer
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web-buyer
+    permissions:
+      contents: read
+      statuses: write
+      pull-requests: write
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_BUYER }}
+      VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_BUYER_DEPLOY_HOOK }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web-buyer/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            echo "::warning::No package-lock.json — using npm install (non-reproducible)"
+            npm install
+          fi
+
+      - name: Lint (advisory)
+        run: npm run lint || echo "::warning::lint reported issues (non-blocking)"
+        continue-on-error: true
+
+      - name: Build (must succeed)
+        env:
+          NEXT_PUBLIC_DEV_FALLBACK: 'true'
+        run: npm run build
+
+      - name: Choose deploy strategy
+        id: strategy
+        run: |
+          if [ -n "${VERCEL_TOKEN}" ] && [ -n "${VERCEL_ORG_ID}" ] && [ -n "${VERCEL_PROJECT_ID}" ]; then
+            echo "method=cli" >> "$GITHUB_OUTPUT"
+            echo "Deploy strategy: Vercel CLI (preferred — returns canonical URL)"
+          elif [ -n "${VERCEL_DEPLOY_HOOK}" ]; then
+            echo "method=hook" >> "$GITHUB_OUTPUT"
+            echo "Deploy strategy: deploy hook (Vercel builds from GitHub integration)"
+          else
+            echo "::error::No deploy credentials. Configure either VERCEL_TOKEN+VERCEL_ORG_ID+VERCEL_PROJECT_ID_BUYER or VERCEL_BUYER_DEPLOY_HOOK in repo secrets. See docs/VERCEL_DEPLOY_SETUP.md"
+            exit 1
+          fi
+
+      - name: Deploy via Vercel CLI
+        if: steps.strategy.outputs.method == 'cli'
+        id: vercel_cli
+        run: |
+          npm install --no-save vercel@latest
+          npx vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+          npx vercel build --prod --token="$VERCEL_TOKEN"
+          DEPLOY_URL=$(npx vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN" 2>&1 | tee /tmp/vercel-deploy.log | grep -Eo 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -n 1)
+          if [ -z "$DEPLOY_URL" ]; then
+            echo "::error::Vercel CLI did not return a deploy URL. See log:"
+            cat /tmp/vercel-deploy.log
+            exit 1
+          fi
+          echo "deploy_url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
+          echo "Deployed: $DEPLOY_URL"
+
+      - name: Deploy via Vercel hook
+        if: steps.strategy.outputs.method == 'hook'
+        id: vercel_hook
+        env:
+          PROD_URL: ${{ secrets.VERCEL_BUYER_PROD_URL }}
+        run: |
+          RESPONSE=$(curl -fsS -X POST "$VERCEL_DEPLOY_HOOK")
+          echo "Hook response: $RESPONSE"
+          if [ -n "$PROD_URL" ]; then
+            echo "deploy_url=$PROD_URL" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Comment deployment URL on commit
+        if: always() && (steps.vercel_cli.outputs.deploy_url != '' || steps.vercel_hook.outputs.deploy_url != '')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEPLOY_URL: ${{ steps.vercel_cli.outputs.deploy_url || steps.vercel_hook.outputs.deploy_url }}
+          COMMIT_SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${REPO}/commits/${COMMIT_SHA}/comments" \
+            -f body="web-buyer deployed to ${DEPLOY_URL}"
