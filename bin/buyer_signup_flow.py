@@ -58,6 +58,11 @@ class CompanyInfo:
                 "country": self.country, "tax_id": self.tax_id}
 
     def validate(self) -> List[str]:
+        """Validate company information fields.
+
+        Returns:
+            List[str]: List of validation error messages, empty if valid.
+        """
         errors: List[str] = []
         if not self.name or len(self.name.strip()) < 2:
             errors.append("Company name must be at least 2 characters")
