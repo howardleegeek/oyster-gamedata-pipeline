@@ -259,6 +259,27 @@ def _classify_readme(p: Path) -> tuple[str, str]:
 
 
 def audit_tarball(tar_path: Path) -> dict[str, Any]:
+
+    """Audit a tarball to classify each file as REAL, PLACEHOLDER, or UNKNOWN.
+
+    Heuristic-based scan of a buyer-spec tarball to detect placeholder content.
+    Extracts the tarball to a temporary directory and classifies each expected
+    file using specialized classifiers.
+
+    Args:
+        tar_path: Path to the tarball file to audit.
+
+    Returns:
+        Dictionary containing:
+            - tarball: Path string of the audited tarball
+            - verdict: Overall verdict ("REAL", "PLACEHOLDER", or "MIXED")
+            - files: List of file classification results with name, status, evidence
+            - summary: Counts of REAL, PLACEHOLDER, and UNKNOWN classifications
+
+    Raises:
+        FileNotFoundError: If the tarball does not exist.
+        RuntimeError: If the tarball doesn't contain exactly one top-level directory.
+    """
     if not tar_path.exists():
         raise FileNotFoundError(tar_path)
 
