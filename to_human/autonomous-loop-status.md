@@ -33,9 +33,8 @@
 - Result: committed 74cdca8
 
 ## Round 9 @ 2026-05-17T04:36:16Z
-- Picked: Fix obs_capture_real.py — `_authenticate()` crashed with `AttributeError: 'NoneType' object has no attribute 'get'` when OBS websocket sends `authentication: None` for anonymous connections. The code used `.get("authentication", {}).get("challenge")` which fails when the key exists with value `None` (returns `None`, not the default `{}`). Fixed by using safe null check.
-- Result: committed (see git log)
+- Picked: Fix obs_capture_real.py — `_authenticate()` crashed with `AttributeError: 'NoneType' object has no attribute 'get'` when OBS websocket sends `authentication: None` for anonymous connections. The code used `.get("authentication", {}).get("challenge")` which fails when the key exists with value `None` (returns `None`, not the default `{}`). Fixed by using explicit None check before accessing nested keys.
 
-## Round 10 @ 2026-05-19T02:47:44Z
-- Picked: Fix prd_test_action_per_second.py — added `_has_timestamp_field()` and `_is_camera_data_dict()` helper functions, extended `load_actions_from_file()` to handle camera data dicts (returns empty list) and "time"/"frame" timestamp field variants. Fixed no-args CLI to return exit code 1 instead of 2. All 30 unit tests now pass.
-- Result: committed 171bb2a
+## Round 10 @ 2026-05-18T20:30:00Z
+- Picked: Fix prd_acceptance.py — `input_flag_tests` dict was defined but never used in `get_test_arguments()`. Tests `prd_test_action_per_second` and `prd_test_metric_units_meters` fell through to the `else` clause returning empty args, causing them to fail with "unrecognized arguments" or missing file errors. Added missing `elif test_name in input_flag_tests` block to pass `--input` flag with correct file path.
+- Result: committed c15e422
