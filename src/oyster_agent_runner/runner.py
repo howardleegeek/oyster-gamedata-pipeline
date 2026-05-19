@@ -301,6 +301,21 @@ class AgentRunner:
 
     @staticmethod
     def _build_system_prompt(task: AgentTask, tools: ToolProvider | None = None) -> str:
+        """Build the system prompt for the LLM agent.
+
+        Constructs a system prompt by formatting the task's environment,
+        instruction, and success criteria into the template. If tools are
+        provided, appends a tool catalog to the prompt.
+
+        Args:
+            task: The agent task containing environment, instruction, and
+                success criteria.
+            tools: Optional tool provider whose catalog should be included
+                in the prompt.
+
+        Returns:
+            The formatted system prompt string.
+        """
         criteria = (
             "\n".join(f"  - {c}" for c in task.success_criteria)
             if task.success_criteria
