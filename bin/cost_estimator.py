@@ -139,6 +139,17 @@ def print_report(report: Dict[str, Any], output_format: str = "text") -> None:
 
 
 def parse_args(argv: List[str]) -> argparse.Namespace:
+    """Parse command-line arguments for the S3 cost report.
+
+    Args:
+        argv: List of command-line arguments (excluding script name).
+            If None, uses sys.argv[1:].
+
+    Returns:
+        argparse.Namespace: Parsed arguments with attributes for bucket,
+            size_gb, object_count, storage_class, egress_gb, avg_age_days,
+            and format.
+    """
     parser = argparse.ArgumentParser(description="Daily S3 cost report")
     parser.add_argument("--bucket", "-b", required=True, help="S3 bucket name")
     parser.add_argument("--size-gb", "-s", type=float, required=True, help="Storage size in GB")
