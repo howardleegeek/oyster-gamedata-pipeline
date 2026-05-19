@@ -208,11 +208,12 @@ def audit_group_v_mp4(session: Path) -> list[dict]:
 
 
 def audit_group_h_depth(session: Path) -> list[dict]:
-    """H1-H7: depth/*.exr files."""
+    """H1-H8: depth/*.exr files + source-kind honesty marker."""
     items = []
     depth_dir = session / "depth"
     if not depth_dir.exists():
-        return [_result(f"H{i}", False, "depth/ missing") for i in range(1, 8)]
+        # range(1,9) — added H8 (source-kind honesty check) 2026-05-16
+        return [_result(f"H{i}", False, "depth/ missing") for i in range(1, 9)]
     exrs = sorted(depth_dir.glob("*.exr"))
     items.append(_result("H1", all(e.name == f"{i:06d}.exr" for i, e in enumerate(exrs)),
                          f"filenames sequential: {len(exrs)} files"))
@@ -234,6 +235,30 @@ def audit_group_h_depth(session: Path) -> list[dict]:
     except ImportError:
         items += [_result(f"H{i}", False, "OpenEXR not installed") for i in range(3, 7)]
     items.append(_result("H7", len(exrs) > 0, "real depth files (rc19.0.3 DA-V2)"))
+
+    # 2026-05-16 Howard PM directive: distinguish ENGINE Z-buffer depth (PRD-strict)
+    # from MONOCULAR DA-V2 fallback (PRD-tolerant). Buyer PDF requires view-space
+    # linear meters along camera optical Z; monocular doesn't satisfy strict view.
+    # Read depth/.source marker written by producer.
+    marker = depth_dir / ".source"
+    if marker.exists():
+        text = marker.read_text()
+        kind = "unknown"
+        for line in text.splitlines():
+            if line.startswith("kind:"):
+                kind = line.split(":", 1)[1].strip()
+                break
+        if kind == "engine_zbuffer":
+            items.append(_result("H8", True, f"depth source: engine_zbuffer (strict PASS, view-space meters)"))
+        elif kind == "monocular_da_v2":
+            # SKIP not FAIL — files are real, just not engine-grade. Buyer can decide.
+            items.append({"id": "H8", "status": "SKIP",
+                          "evidence": "depth source: monocular_da_v2 (relative, not metric — STRICT BUYER MAY REJECT; engine Z-buffer hook is the production fix)",
+                          "value": None})
+        else:
+            items.append(_result("H8", False, f"depth source unknown: {kind!r} (mark with depth/.source)"))
+    else:
+        items.append(_result("H8", False, "depth/.source marker missing — cannot certify engine vs monocular"))
     return items
 
 
@@ -340,7 +365,16 @@ def audit_group_m_metadata(session: Path) -> list[dict]:
             man = json.loads(manpath.read_text())
             file_count = man.get("file_count", 0)
             entries = man.get("files", {})
-            has_sha = all(isinstance(v, dict) and "sha256" in v for v in entries.values())
+            # `files` can be either {path: {sha256, ...}} (dict) or
+            # [{path: ..., sha256: ...}, ...] (list) depending on producer.
+            # Accept both shapes.
+            if isinstance(entries, dict):
+                values = entries.values()
+            elif isinstance(entries, list):
+                values = entries
+            else:
+                values = []
+            has_sha = all(isinstance(v, dict) and "sha256" in v for v in values)
             items.append(_result("F8-manifest",
                                  file_count > 0 and has_sha,
                                  f"MANIFEST.json: {file_count} files, sha256-each={has_sha}"))
@@ -644,14 +678,17 @@ def audit_group_q_operator(session: Path) -> list[dict]:
             else:
                 items.append(_result("Q10", False, "no WASD events"))
 
-    # Q3 — no death/respawn (game_state.jsonl)
+    # Q3 — Howard policy update 2026-05-16: **DEATH IS ALLOWED**, not a bug.
+    # Real human gameplay includes dying. The check now just verifies that
+    # game_state.jsonl exists + is non-empty (= mod was capturing). Death
+    # events (when mod schema adds event_type) will be informational, not
+    # disqualifying. Sessions with deaths PASS Q3 the same as deathless ones.
     if gs_path.exists():
         try:
             with gs_path.open(encoding="utf-8") as fh:
                 gs_lines = sum(1 for line in fh if line.strip())
-                # actual death detection needs schema; here we just check non-empty
                 items.append(_result("Q3", gs_lines > 0,
-                                     f"game_state.jsonl entries: {gs_lines} (operator must avoid deaths)"))
+                                     f"game_state.jsonl entries: {gs_lines} (death OK — Howard policy 2026-05-16)"))
         except OSError as e:
             items.append(_result("Q3", False, f"game_state read error: {e}"))
     else:
@@ -954,6 +991,12 @@ def main(argv: list[str]) -> int:
             input_latency_json_path=str(session / "input_latency.json"),
             metadata_path=str(session / "metadata.json"),
             depth_dir=str(session / "depth"),
+            # Bug-fix 2026-05-16: QM9 (camera-position range) needs this attribute
+            # to find action_camera output. Previously omitted, causing QM9 to
+            # always SKIP with "No camera position data found" even on perfectly
+            # valid sessions. Note: PRD writes action_camera.json (array), not
+            # .jsonl — QM module handles both since the 2026-05-16 patch.
+            action_camera_jsonl_path=str(session / "action_camera.json"),
         )
         items.extend(audit_quality_metrics.audit_group_quality(adapter))
     except (ImportError, Exception) as exc:  # noqa: BLE001

@@ -139,8 +139,15 @@ def check_frame_drops(session) -> Dict[str, Any]:
             for line in f:
                 try:
                     data = json.loads(line.strip())
-                    if 'frame_index' in data:
-                        frame_indices.append(data['frame_index'])
+                    # Bug-fix 2026-05-16: accept any of the standard index field names.
+                    # Previously only looked for "frame_index" — our synthesized
+                    # frames.jsonl uses "idx" and "frame" per the recorder/transform
+                    # convention. SKIP-ing valid sessions just because of a field
+                    # name mismatch is theatrical, not honest.
+                    for key in ('frame_index', 'idx', 'frame'):
+                        if key in data:
+                            frame_indices.append(data[key])
+                            break
                 except json.JSONDecodeError:
                     continue
         
@@ -346,8 +353,14 @@ def check_depth_entropy(session) -> Dict[str, Any]:
             size = (dw.max.x - dw.min.x + 1, dw.max.y - dw.min.y + 1)
             
             # Read depth channel
+            # Bug-fix 2026-05-16: audit's H5 group asserts channels == ["Z"] (depth EXR
+            # convention used by DA-V2 / OpenEXR depth standard). Previously QM6 always
+            # tried "R" and SKIP-ed with confusing message — a direct contradiction
+            # with H5. Now try "Z" first (canonical), fall back to "R" (legacy).
             pt = Imath.PixelType(Imath.PixelType.FLOAT)
-            depth_str = exr_file.channel('R', pt)  # Depth usually in R channel
+            channels = list(exr_file.header()['channels'].keys())
+            depth_channel = 'Z' if 'Z' in channels else ('R' if 'R' in channels else channels[0])
+            depth_str = exr_file.channel(depth_channel, pt)
             depth_array = np.frombuffer(depth_str, dtype=np.float32).reshape(size[1], size[0])
             
             # Flatten and normalize to 0-255 for histogram
@@ -508,20 +521,52 @@ def check_camera_position_range(session) -> Dict[str, Any]:
         for attr_name, source_type in sources:
             path = getattr(session, attr_name, None)
             if path and os.path.exists(path):
+                # Bug-fix 2026-05-16: action_camera.json is a single JSON ARRAY of
+                # 9000 rows (PRD spec), NOT a JSONL stream. The old code did
+                # ``for line in f`` which fails to parse the giant JSON document.
+                # Detect array-vs-stream by extension + fallback.
+                rows: list = []
                 with open(path, 'r') as f:
-                    for line in f:
+                    if path.endswith('.json'):
                         try:
-                            data = json.loads(line.strip())
+                            doc = json.load(f)
+                            if isinstance(doc, list):
+                                rows = doc
+                            elif isinstance(doc, dict):
+                                rows = [doc]
+                        except json.JSONDecodeError:
+                            # Maybe it's actually JSONL despite the .json name; re-open
+                            f.seek(0)
+                            for ln in f:
+                                try:
+                                    rows.append(json.loads(ln.strip()))
+                                except json.JSONDecodeError:
+                                    continue
+                    else:
+                        for ln in f:
+                            try:
+                                rows.append(json.loads(ln.strip()))
+                            except json.JSONDecodeError:
+                                continue
+
+                for data in rows:
+                        try:
                             pos = None
-                            
-                            # Try different position field names
+
+                            # Bug-fix 2026-05-16: accept BOTH dict {x,y,z} and list [x,y,z]
+                            # forms. The PRD-spec transform writes camera_position as a
+                            # 3-element list (standard convention); previously this
+                            # SKIP-ed because we only matched the dict shape.
                             for pos_key in ['position', 'camera_position', 'pos', 'camera_pos']:
-                                if pos_key in data and isinstance(data[pos_key], dict):
-                                    pos_data = data[pos_key]
-                                    if all(k in pos_data for k in ['x', 'y', 'z']):
-                                        pos = (float(pos_data['x']), float(pos_data['y']), float(pos_data['z']))
+                                if pos_key in data:
+                                    val = data[pos_key]
+                                    if isinstance(val, dict) and all(k in val for k in ['x', 'y', 'z']):
+                                        pos = (float(val['x']), float(val['y']), float(val['z']))
                                         break
-                            
+                                    elif isinstance(val, (list, tuple)) and len(val) >= 3:
+                                        pos = (float(val[0]), float(val[1]), float(val[2]))
+                                        break
+
                             # Also check for direct x,y,z fields
                             if not pos and all(k in data for k in ['x', 'y', 'z']):
                                 pos = (float(data['x']), float(data['y']), float(data['z']))
