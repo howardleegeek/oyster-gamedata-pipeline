@@ -42,6 +42,15 @@ def _build_inputs_jsonl(events: list[dict], fps: float = 30.0) -> Path:
 
 
 def main() -> int:
+    """Run the BFT R13 vs R09 FI-02 blind spot demonstration.
+
+    Demonstrates that the multimodal R13 residual catches the FI-02 keyCode
+    mutation attack (W→B) that single-modal R09 verifiers miss. Prints results
+    to stdout showing R09 false-PASS and R13 detection.
+
+    Returns:
+        0 if R13 correctly catches the attack, 1 if R13 misses it (regression).
+    """
     print("=" * 72)
     print("BFT R13 vs R09 — FI-02 single-modal blind spot demonstration")
     print("=" * 72)
