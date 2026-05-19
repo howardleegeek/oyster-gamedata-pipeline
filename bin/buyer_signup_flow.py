@@ -47,6 +47,12 @@ class CompanyInfo:
         self.tax_id = tax_id
 
     def to_dict(self) -> Dict[str, Any]:
+        """Convert company information to a dictionary representation.
+
+        Returns:
+            Dict containing name, address, city, state, zip_code, country,
+            and optional tax_id fields.
+        """
         return {"name": self.name, "address": self.address, "city": self.city,
                 "state": self.state, "zip_code": self.zip_code,
                 "country": self.country, "tax_id": self.tax_id}
