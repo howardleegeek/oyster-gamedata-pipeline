@@ -34,29 +34,41 @@ def test_OBSSpectatorCapture_custom_init():
     assert cap.password == "secret"
 
 
-def test_obs_websocket_v5_auth_challenge_format():
-    """When password set, helper produces correct base64+SHA256 (mock challenge salt)."""
+def test_obs_websocket_v5_auth_hash_format():
+    """When password set, _auth_hash produces correct OBS WebSocket v5 auth string.
+    
+    OBS WebSocket v5 auth: base64(SHA256(base64(SHA256(password + salt)) + challenge))
+    """
     cap = obs_capture.OBSSpectatorCapture(password="mypassword")
-    challenge_salt = "mock_salt_123"
+    challenge = "mock_challenge_456"
+    salt = "mock_salt_123"
+    
+    # Calculate expected using the OBS WebSocket v5 protocol:
+    # 1. SHA256(password + salt) -> base64
+    # 2. SHA256(base64_result + challenge) -> base64
+    secret = hashlib.sha256(("mypassword" + salt).encode()).digest()
+    secret_b64 = base64.b64encode(secret).decode()
     expected = base64.b64encode(
-        hashlib.sha256(("mypassword" + challenge_salt).encode("utf-8")).digest()
-    ).decode("ascii")
-    result = cap._auth_challenge_response(challenge_salt)
+        hashlib.sha256((secret_b64 + challenge).encode()).digest()
+    ).decode()
+    
+    result = cap._auth_hash(challenge, salt)
     assert result == expected
 
 
-def test_connect_returns_false_when_websocket_lib_missing(monkeypatch):
-    """Monkey-patch importlib so websocket-client import fails, assert connect() returns False."""
-    import importlib
+def test_auth_hash_returns_empty_string_when_no_password():
+    """When password is empty, _auth_hash returns empty string."""
+    cap = obs_capture.OBSSpectatorCapture(password="")
+    result = cap._auth_hash("challenge", "salt")
+    assert result == ""
 
-    original_import_module = importlib.import_module
 
-    def fake_import_module(name, *args, **kwargs):
-        if name == "websocket":
-            raise ImportError("No module named 'websocket'")
-        return original_import_module(name, *args, **kwargs)
-
-    monkeypatch.setattr(importlib, "import_module", fake_import_module)
-
+def test_connect_is_async_coroutine():
+    """connect() is an async method returning a coroutine."""
+    import asyncio
     cap = obs_capture.OBSSpectatorCapture()
-    assert cap.connect() is False
+    # connect() is async, so calling it returns a coroutine
+    coro = cap.connect()
+    assert asyncio.iscoroutine(coro)
+    # Close the coroutine to avoid RuntimeWarning
+    coro.close()
