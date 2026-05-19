@@ -46,6 +46,10 @@ test = [
     "Pillow>=10.0",  # PIL — required by tests/bin/test_real_depth_filler.py
     "PyYAML>=6.0",   # YAML — required by tests/test_web_workflows.py (Vercel deploy contract)
     "cryptography>=42.0",  # ed25519 — required by bin/provenance_sign.py + provenance_verify.py (B2)
+    "fastapi>=0.110",      # OAuth callback server — required by bin/oauth_login_server.py (C3)
+    "uvicorn>=0.27",       # OAuth callback server runtime (C3)
+    "httpx>=0.27",         # OAuth token exchange (C3)
+    "click>=8.1",          # OAuth CLI (C3)
 ]
 exr = ["OpenEXR>=3.0", "numpy>=1.26"]
 xlsx = ["openpyxl>=3.1"]
