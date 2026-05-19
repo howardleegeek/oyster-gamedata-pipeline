@@ -1,20 +1,32 @@
-# Partner Brief — Oyster GameData Pipeline v0.4.0
+# Partner Brief — Oyster GameData Pipeline v0.4.1
 
-*Read time: 2 minutes. For Bruno + 合伙人 review.*
+*Read time: 2 minutes. For Bruno + 合伙人 review. Latest release: v0.4.1 (hotfix on v0.4.0).*
 
 ---
 
+## v0.4.1 hotfix highlights (2026-05-19, 00:30 PT)
+
+Howard's PM review of v0.4.0 caught two production blockers and we shipped the fix the same night:
+
+1. **Video gate spec was wrong** — v0.4.0 required HEVC + 60fps + ≥60s; buyer PDF actually says h264-or-hevc + 30fps + 300-360s. v0.4.1 fixes the gate so real recorder output PASSes correctly. Without this fix, every real artifact would have FALSE-FAILed.
+2. **--strict-buyer mode added** — v0.4.0 treated SKIP as not-fail. For buyer production that's dangerous: H8 SKIP_honest (monocular fallback) would silently pass overall verdict. v0.4.1 `--strict-buyer` blocks SKIP/PASS_DEGRADED on H8/S1/V1/V2/B2 with explicit `strict_violations` output.
+
+Also added:
+- `bin/real_session_validator.py` — orchestrator that walks `~/Documents/OysterClips/finalized/*`, runs pipeline + 9 G-gates + provenance per session, aggregates a "BUYER-READY @ X% pass rate" verdict. 21 tests, ready for the 10-session real-data sweep.
+- WIRE03 — single source of truth for H8 audit logic (was duplicated in two files; now grafted into `bin/prd_compliance_audit.py::_evaluate_h8`).
+
 ## TL;DR
 
-**今晚一晚出了 v0.4.0.** PR #23 已 merge 到 main，tag 已发，GitHub release 上线: https://github.com/howardleegeek/oyster-gamedata-pipeline/releases/tag/v0.4.0
+**Latest tag: v0.4.1.** Release: https://github.com/howardleegeek/oyster-gamedata-pipeline/releases/tag/v0.4.1
+PR #23 merged to main; both v0.4.0 (d923931) and v0.4.1 are public.
 
 买方现在能跑这一条命令验证我们交付的数据是真的、完整的、来自 Oyster:
 
 ```bash
-python3 bin/end_to_end_gate_smoke.py <session_dir>
+python3 bin/end_to_end_gate_smoke.py <session_dir> --strict-buyer
 python3 bin/provenance_verify.py <manifest.signed.json> \
                                  --expect-pubkey <Howard's fingerprint>
-# exit 0 = 数据完整 AND 来自 Howard's 私钥
+# exit 0 = 数据完整 AND 来自 Howard's 私钥 AND 严格 buyer 标准全过
 ```
 
 零依赖买方 — 不需要联网，不需要 Bitcoin 节点，不需要 Oyster 服务器在线。
@@ -82,8 +94,14 @@ Howard 5/17 PM 批评列了 5 个硬缺口。今晚收尾后:
 2. **review `patches/cluster-week1-2026-05-18/D1-mc-mod/`** — 如果你在 Windows 上, 5 分钟看完 Fabric mod 代码够不够直观
 3. **看 `FINAL_STATUS_2026_05_18.md`** — 完整今晚日志, 偏工程口味, 30 秒能 grep 到关键 commit
 
-Howard 现在睡觉. 明早起来看你的反应再决定 v0.4.1 优先级.
+Howard 通宵推完了 v0.4.0 + v0.4.1. 现在 33+ commit 都在 main, 两个 tag 都 public.
+明早起来看你的反应再决定下一步优先级:
+- **Option A**: 你 review v0.4.1 + 跑一遍 `--strict-buyer` 看 verdict
+- **Option B**: Howard 上 Windows 跑 D1 mc-mod (Gap #1 最后一公里), 你这边做 marketplace/payout 测试
+- **Option C**: 你+Howard 每人跑 5 条真 MC session, RSV01 生成第一份 REAL_VALIDATION_REPORT
 
 ---
 
-🦪 Oyster autonomous cluster, 2026-05-18 23:35 PT
+🦪 Oyster autonomous cluster
+- v0.4.0 shipped 2026-05-18 23:35 PT
+- v0.4.1 hotfix shipped 2026-05-19 00:30 PT
