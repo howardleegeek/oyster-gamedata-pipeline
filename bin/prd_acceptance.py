@@ -105,6 +105,12 @@ def get_test_arguments(test_name: str, session_dir: Path) -> List[str]:
         "prd_test_systeminfo_required": ["systeminfo.json", "systeminfo.yaml", "systeminfo.yml"],
         "prd_test_wasd_balance": ["inputs.jsonl", "action_camera.json", "frames.jsonl"],
     }
+
+    # Tests that take --input flag (not positional)
+    input_flag_tests = {
+        "prd_test_action_per_second": ["action_camera.json", "actions.json"],
+        "prd_test_metric_units_meters": ["action_camera.json", "camera.json"],
+    }
     
     # Tests that take --data-dir argument
     data_dir_tests = [
@@ -139,59 +145,40 @@ def get_test_arguments(test_name: str, session_dir: Path) -> List[str]:
             # Fall back to first option even if it doesn't exist
             args.append(str(session_dir / file_tests[test_name][0]))
     
+    elif test_name in input_flag_tests:
+        # These tests take --input flag
+        for filename in input_flag_tests[test_name]:
+            file_path = session_dir / filename
+            if file_path.exists():
+                args.extend(["--input", str(file_path)])
+                break
+        else:
+            # Fall back to first option even if it doesn't exist
+            args.extend(["--input", str(session_dir / input_flag_tests[test_name][0])])
+    
     elif test_name in data_dir_tests:
         # These tests take --data-dir argument
         args.extend(["--data-dir", str(session_dir)])
     
     elif test_name in clips_file_tests:
         # These tests take --clips-file argument
-        clips_file = session_dir / "clips.json"
-        if clips_file.exists():
-            args.extend(["--clips-file", str(clips_file)])
-        else:
-            args.extend(["--clips-file", str(clips_file)])  # Will fail gracefully
+        clips_path = session_dir / "clips.json"
+        args.extend(["--clips-file", str(clips_path)])
     
     elif test_name == depth_alignment_test:
-        # This test needs --video-dir and --depth-dir
+        # Special handling for depth alignment test
         video_dir = session_dir / "video_frames"
         depth_dir = session_dir / "depth"
-        args.extend(["--video-dir", str(video_dir)])
-        args.extend(["--depth-dir", str(depth_dir)])
-    
-    elif test_name == "prd_test_240_clip_cap":
-        # Takes --clips-dir argument
-        args.extend(["--clips-dir", str(session_dir)])
-    
-    elif test_name == "prd_test_30min_scene_cap":
-        # Takes --scene-dir argument
-        args.extend(["--scene-dir", str(session_dir)])
-    
-    elif test_name == "prd_test_action_per_second":
-        # Takes --inputs-file argument
-        inputs_file = session_dir / "inputs.jsonl"
-        if not inputs_file.exists():
-            inputs_file = session_dir / "action_camera.json"
-        args.extend(["--inputs-file", str(inputs_file)])
-    
-    elif test_name == "prd_test_speed_units_mps":
-        # Takes --speeds-file argument
-        args.extend(["--speeds-file", str(session_dir / "speeds.json")])
-    
-    elif test_name == "prd_test_stationary_threshold":
-        # Takes --positions-file argument
-        args.extend(["--positions-file", str(session_dir / "positions.json")])
-    
-    elif test_name == "prd_test_left_hand_coordinates":
-        # Takes --coords-file argument
-        args.extend(["--coords-file", str(session_dir / "coordinates.json")])
-    
-    elif test_name == "prd_test_metric_units_meters":
-        # Takes --camera-file argument
-        args.extend(["--camera-file", str(session_dir / "action_camera.json")])
+        
+        if video_dir.exists() and depth_dir.exists():
+            args.extend(["--video-dir", str(video_dir), "--depth-dir", str(depth_dir)])
+        else:
+            # Provide arguments anyway, test will handle missing directories
+            args.extend(["--video-dir", str(video_dir), "--depth-dir", str(depth_dir)])
     
     else:
-        # Default: try to pass session directory as argument
-        args.append(str(session_dir))
+        # Tests with no arguments (e.g., prd_test_240_clip_cap, prd_test_30min_scene_cap)
+        pass
     
     return args
 
@@ -210,17 +197,16 @@ def _is_skip_worthy(exit_code: int, stdout: str, stderr: str) -> bool:
         "not a directory", "no video frames", "no depth",
         "no audio", "moov atom", "Invalid MP4",
         "ffprobe failed", "ffmpeg", "not available",
-        "Directory not found",
+        "Directory not found", "No clips found",
     ]
     return any(indicator.lower() in combined.lower() for indicator in skip_indicators)
 
 
 def run_test(test_path: Path, session_dir: Path, timeout: int = 30) -> TestResult:
     """Run a single PRD test and return its result."""
-    test_name = test_path.stem
     start_time = datetime.now()
+    test_name = test_path.stem
     
-    # Get arguments for this test
     args = get_test_arguments(test_name, session_dir)
     
     # Build command
@@ -253,6 +239,11 @@ def run_test(test_path: Path, session_dir: Path, timeout: int = 30) -> TestResul
                 error_lines = result.stdout.strip().split('\n')
                 if error_lines:
                     error = error_lines[0]
+        elif result.returncode != 0:
+            # For non-zero exit codes, capture first line of error
+            error_lines = (result.stderr or result.stdout).strip().split('\n')
+            if error_lines:
+                error = error_lines[0]
         
         return TestResult(
             test_name=test_name,
@@ -263,66 +254,102 @@ def run_test(test_path: Path, session_dir: Path, timeout: int = 30) -> TestResul
             stderr=result.stderr,
             error=error,
             duration_seconds=duration,
-            skipped=skipped,
+            skipped=skipped
         )
+    
     except subprocess.TimeoutExpired:
         duration = (datetime.now() - start_time).total_seconds()
         return TestResult(
             test_name=test_name,
             test_path=test_path,
             passed=False,
-            exit_code=124,  # Standard timeout exit code
+            exit_code=-1,
             error=f"Test timed out after {timeout} seconds",
-            duration_seconds=duration
+            duration_seconds=duration,
+            skipped=False
         )
+    
     except Exception as e:
         duration = (datetime.now() - start_time).total_seconds()
         return TestResult(
             test_name=test_name,
             test_path=test_path,
             passed=False,
-            exit_code=2,
-            error=f"Unexpected error: {e}",
+            exit_code=-1,
+            error=str(e),
             duration_seconds=duration,
-            metadata={"traceback": traceback.format_exc()}
+            skipped=False
         )
 
 
-def run_lint(lint_path: Path, session_dir: Path, timeout: int = 30) -> TestResult:
-    """Run the PRD lint test."""
+def run_lint(session_dir: Path, bin_dir: Path, timeout: int = 30) -> TestResult:
+    """Run the PRD lint check on session directory."""
     start_time = datetime.now()
+    lint_script = bin_dir / "lint_v3_prd_grounded.py"
+    
+    if not lint_script.exists():
+        return TestResult(
+            test_name="lint_v3_prd_grounded",
+            test_path=lint_script,
+            passed=False,
+            exit_code=-1,
+            error="Lint script not found",
+            duration_seconds=0.0,
+            skipped=True
+        )
+    
+    cmd = [sys.executable, str(lint_script), str(session_dir)]
     
     try:
         result = subprocess.run(
-            [sys.executable, str(lint_path), str(session_dir)],
+            cmd,
             capture_output=True,
             text=True,
             timeout=timeout
         )
         duration = (datetime.now() - start_time).total_seconds()
         
-        skipped = _is_skip_worthy(result.returncode, result.stdout, result.stderr)
+        passed = result.returncode == 0
+        error = None
+        if not passed:
+            error_lines = (result.stderr or result.stdout).strip().split('\n')
+            if error_lines:
+                error = error_lines[0]
         
         return TestResult(
             test_name="lint_v3_prd_grounded",
-            test_path=lint_path,
-            passed=result.returncode == 0,
+            test_path=lint_script,
+            passed=passed,
             exit_code=result.returncode,
             stdout=result.stdout,
             stderr=result.stderr,
+            error=error,
             duration_seconds=duration,
-            skipped=skipped,
+            skipped=False
         )
+    
+    except subprocess.TimeoutExpired:
+        duration = (datetime.now() - start_time).total_seconds()
+        return TestResult(
+            test_name="lint_v3_prd_grounded",
+            test_path=lint_script,
+            passed=False,
+            exit_code=-1,
+            error=f"Lint timed out after {timeout} seconds",
+            duration_seconds=duration,
+            skipped=False
+        )
+    
     except Exception as e:
         duration = (datetime.now() - start_time).total_seconds()
         return TestResult(
             test_name="lint_v3_prd_grounded",
-            test_path=lint_path,
+            test_path=lint_script,
             passed=False,
-            exit_code=2,
-            error=f"Unexpected error: {e}",
+            exit_code=-1,
+            error=str(e),
             duration_seconds=duration,
-            metadata={"traceback": traceback.format_exc()}
+            skipped=False
         )
 
 
@@ -330,192 +357,236 @@ def run_lint(lint_path: Path, session_dir: Path, timeout: int = 30) -> TestResul
 # Report generation
 # ---------------------------------------------------------------------------
 
-def generate_markdown_report(report: AcceptanceReport, output_path: Path) -> None:
-    """Generate a markdown report from acceptance test results."""
-    with open(output_path, "w") as f:
-        f.write("# PRD Acceptance Test Report\n\n")
-        f.write(f"**Session Directory:** `{report.session_dir}`\n")
-        f.write(f"**Report Generated:** {report.timestamp.isoformat()}\n")
-        f.write(f"**Overall Score:** {report.pass_percentage:.1f}% ({report.passed_tests}/{report.runnable_tests} runnable tests passed")
-        if report.skipped_tests:
-            f.write(f", {report.skipped_tests} skipped")
-        f.write(")\n\n")
-        
-        f.write("## Summary\n\n")
-        f.write("| Test | Status | Duration | Exit Code |\n")
-        f.write("|------|--------|----------|-----------|\n")
-        
-        # Add test results
-        for result in report.test_results:
-            if result.skipped:
-                status = "⏭️ SKIP"
-            elif result.passed:
-                status = "✅ PASS"
-            else:
-                status = "❌ FAIL"
-            f.write(f"| `{result.test_name}` | {status} | {result.duration_seconds:.1f}s | {result.exit_code} |\n")
-        
-        # Add lint result
-        if report.lint_result:
-            if report.lint_result.skipped:
-                status = "⏭️ SKIP"
-            elif report.lint_result.passed:
-                status = "✅ PASS"
-            else:
-                status = "❌ FAIL"
-            f.write(f"| `{report.lint_result.test_name}` | {status} | {report.lint_result.duration_seconds:.1f}s | {report.lint_result.exit_code} |\n")
-        
-        f.write("\n## Customer-Shareable Summary\n\n")
-        f.write(f"**Overall Acceptance:** {report.pass_percentage:.1f}%\n\n")
-        
-        # Passing tests
-        passing = [r for r in report.test_results if r.passed]
-        if report.lint_result and report.lint_result.passed:
-            passing.append(report.lint_result)
-        
-        if passing:
-            f.write("### ✅ Passing Tests\n\n")
-            for result in passing:
-                f.write(f"- `{result.test_name}`\n")
-        
-        # Skipped tests
-        skipped = [r for r in report.test_results if r.skipped]
-        if report.lint_result and report.lint_result.skipped:
-            skipped.append(report.lint_result)
-        
-        if skipped:
-            f.write("\n### ⏭️ Skipped Tests (missing session data)\n\n")
-            for result in skipped:
-                f.write(f"- `{result.test_name}`\n")
-                if result.error:
-                    f.write(f"  - Reason: {result.error}\n")
-        
-        # Failing tests
-        failing = [r for r in report.test_results if not r.passed and not r.skipped]
-        if report.lint_result and not report.lint_result.passed and not report.lint_result.skipped:
-            failing.append(report.lint_result)
-        
-        if failing:
-            f.write("\n### ❌ Failing Tests\n\n")
-            for result in failing:
-                f.write(f"- `{result.test_name}`\n")
-                if result.error:
-                    f.write(f"  - Error: {result.error}\n")
-                elif result.stderr:
-                    # Include first line of stderr
-                    first_line = result.stderr.split("\n")[0][:100]
-                    f.write(f"  - Error: {first_line}\n")
-        
-        f.write("\n## Detailed Results\n\n")
-        
-        # Detailed results for each test
-        for result in report.test_results:
-            f.write(f"### `{result.test_name}`\n\n")
-            if result.skipped:
-                f.write(f"- **Status:** ⏭️ SKIP\n")
-            elif result.passed:
-                f.write(f"- **Status:** ✅ PASS\n")
-            else:
-                f.write(f"- **Status:** ❌ FAIL\n")
-            f.write(f"- **Exit Code:** {result.exit_code}\n")
-            f.write(f"- **Duration:** {result.duration_seconds:.1f}s\n")
-            f.write(f"- **Test Path:** `{result.test_path}`\n")
-            
+def generate_report(report: AcceptanceReport, output_path: Path) -> None:
+    """Generate a markdown report from the acceptance test results."""
+    lines = []
+    
+    # Header
+    lines.append("# PRD Acceptance Test Report")
+    lines.append("")
+    lines.append(f"**Session Directory:** `{report.session_dir}`")
+    lines.append(f"**Report Generated:** {report.timestamp.isoformat()}")
+    
+    if report.skipped_tests > 0:
+        lines.append(f"**Overall Score:** {report.pass_percentage:.1f}% ({report.passed_tests}/{report.runnable_tests} runnable tests passed, {report.skipped_tests} skipped)")
+    else:
+        lines.append(f"**Overall Score:** {report.pass_percentage:.1f}% ({report.passed_tests}/{report.total_tests} tests passed)")
+    lines.append("")
+    
+    # Summary table
+    lines.append("## Summary")
+    lines.append("")
+    lines.append("| Test | Status | Duration | Exit Code |")
+    lines.append("|------|--------|----------|-----------|")
+    
+    for result in report.test_results:
+        status = "✅ PASS" if result.passed else ("⏭️ SKIP" if result.skipped else "❌ FAIL")
+        lines.append(f"| `{result.test_name}` | {status} | {result.duration_seconds:.1f}s | {result.exit_code} |")
+    
+    if report.lint_result:
+        status = "✅ PASS" if report.lint_result.passed else "❌ FAIL"
+        lines.append(f"| `lint_v3_prd_grounded` | {status} | {report.lint_result.duration_seconds:.1f}s | {report.lint_result.exit_code} |")
+    
+    lines.append("")
+    
+    # Customer-shareable summary
+    lines.append("## Customer-Shareable Summary")
+    lines.append("")
+    if report.skipped_tests > 0:
+        lines.append(f"**Overall Acceptance:** {report.pass_percentage:.1f}%")
+    else:
+        lines.append(f"**Overall Acceptance:** {report.pass_percentage:.1f}%")
+    lines.append("")
+    
+    # Passing tests
+    passing = [r for r in report.test_results if r.passed]
+    if passing:
+        lines.append("### ✅ Passing Tests")
+        lines.append("")
+        for result in passing:
+            lines.append(f"- `{result.test_name}`")
+        lines.append("")
+    
+    # Skipped tests
+    skipped = [r for r in report.test_results if r.skipped]
+    if skipped:
+        lines.append("### ⏭️ Skipped Tests (missing session data)")
+        lines.append("")
+        for result in skipped:
+            lines.append(f"- `{result.test_name}`")
             if result.error:
-                f.write(f"- **Error:** {result.error}\n")
-            
-            if result.stdout and not result.passed and not result.skipped:
-                # Show stdout for failed tests (might contain diagnostic info)
-                f.write(f"- **Output:**\n```\n{result.stdout[:500]}\n```\n")
+                lines.append(f"  - Reason: {result.error}")
+        lines.append("")
+    
+    # Failing tests
+    failing = [r for r in report.test_results if not r.passed and not r.skipped]
+    if failing:
+        lines.append("### ❌ Failing Tests")
+        lines.append("")
+        for result in failing:
+            lines.append(f"- `{result.test_name}`")
+            if result.error:
+                lines.append(f"  - Error: {result.error}")
+        lines.append("")
+    
+    # Lint results
+    if report.lint_result:
+        lines.append("### PRD Lint Results")
+        lines.append("")
+        if report.lint_result.passed:
+            lines.append("✅ **PRD Lint: PASSED**")
+        else:
+            lines.append("❌ **PRD Lint: FAILED**")
+            if report.lint_result.error:
+                lines.append(f"- Error: {report.lint_result.error}")
+        lines.append("")
+    
+    # Detailed results
+    lines.append("## Detailed Results")
+    lines.append("")
+    
+    for result in report.test_results:
+        lines.append(f"### `{result.test_name}`")
+        lines.append("")
+        status = "✅ PASS" if result.passed else ("⏭️ SKIP" if result.skipped else "❌ FAIL")
+        lines.append(f"- **Status:** {status}")
+        lines.append(f"- **Exit Code:** {result.exit_code}")
+        lines.append(f"- **Duration:** {result.duration_seconds:.1f}s")
+        lines.append(f"- **Test Path:** {result.test_path}")
         
-        # Lint detailed result
-        if report.lint_result:
-            r = report.lint_result
-            f.write(f"### `{r.test_name}`\n\n")
-            if r.skipped:
-                f.write(f"- **Status:** ⏭️ SKIP\n")
-            elif r.passed:
-                f.write(f"- **Status:** ✅ PASS\n")
-            else:
-                f.write(f"- **Status:** ❌ FAIL\n")
-            f.write(f"- **Exit Code:** {r.exit_code}\n")
-            f.write(f"- **Duration:** {r.duration_seconds:.1f}s\n")
-            f.write(f"- **Test Path:** `{r.test_path}`\n")
-            if r.error:
-                f.write(f"- **Error:** {r.error}\n")
+        if result.error:
+            lines.append(f"- **Error:** {result.error}")
+        
+        if result.stdout and not result.passed:
+            lines.append("")
+            lines.append("**stdout:**")
+            lines.append("```")
+            lines.append(result.stdout[:500] if len(result.stdout) > 500 else result.stdout)
+            lines.append("```")
+        
+        if result.stderr and not result.passed:
+            lines.append("")
+            lines.append("**stderr:**")
+            lines.append("```")
+            lines.append(result.stderr[:500] if len(result.stderr) > 500 else result.stderr)
+            lines.append("```")
+        
+        lines.append("")
+    
+    if report.lint_result:
+        lines.append(f"### `lint_v3_prd_grounded`")
+        lines.append("")
+        status = "✅ PASS" if report.lint_result.passed else "❌ FAIL"
+        lines.append(f"- **Status:** {status}")
+        lines.append(f"- **Exit Code:** {report.lint_result.exit_code}")
+        lines.append(f"- **Duration:** {report.lint_result.duration_seconds:.1f}s")
+        
+        if report.lint_result.error:
+            lines.append(f"- **Error:** {report.lint_result.error}")
+        
+        lines.append("")
+    
+    # Write report
+    output_path.write_text("\n".join(lines))
 
 
 # ---------------------------------------------------------------------------
-# Main
+# Main entry point
 # ---------------------------------------------------------------------------
 
-def main(argv: List[str] = None) -> int:
-    """Main entry point."""
-    parser = argparse.ArgumentParser(description="Run PRD acceptance tests on a session directory")
-    parser.add_argument("session_dir", type=Path, help="Session directory to test")
-    parser.add_argument("--timeout", type=int, default=30, help="Timeout per test in seconds")
-    parser.add_argument("--output", type=Path, help="Output report path (default: session_dir/PRD-ACCEPTANCE-REPORT.md)")
-    args = parser.parse_args(argv)
+def main():
+    parser = argparse.ArgumentParser(
+        description="Run all PRD acceptance tests on a session directory"
+    )
+    parser.add_argument(
+        "session_dir",
+        type=Path,
+        help="Path to session directory containing test data"
+    )
+    parser.add_argument(
+        "--output", "-o",
+        type=Path,
+        help="Output report path (default: session_dir/PRD-ACCEPTANCE-REPORT.md)"
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=30,
+        help="Timeout per test in seconds (default: 30)"
+    )
+    parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Print detailed test output"
+    )
     
-    session_dir = args.session_dir
-    if not session_dir.exists():
-        print(f"Error: Session directory not found: {session_dir}", file=sys.stderr)
-        return 1
+    args = parser.parse_args()
     
-    # Find tests
+    if not args.session_dir.exists():
+        print(f"Error: Session directory does not exist: {args.session_dir}", file=sys.stderr)
+        sys.exit(1)
+    
+    if not args.session_dir.is_dir():
+        print(f"Error: Session path is not a directory: {args.session_dir}", file=sys.stderr)
+        sys.exit(1)
+    
+    # Determine output path
+    output_path = args.output or (args.session_dir / "PRD-ACCEPTANCE-REPORT.md")
+    
+    # Find bin directory (relative to this script)
     bin_dir = Path(__file__).parent
+    
+    # Find all PRD tests
     test_paths = find_prd_tests(bin_dir)
-    lint_path = bin_dir / "lint_v3_prd_grounded.py"
     
-    if not lint_path.exists():
-        print(f"Error: Lint script not found: {lint_path}", file=sys.stderr)
-        return 1
+    if not test_paths:
+        print("Warning: No prd_test_*.py files found in bin/", file=sys.stderr)
     
-    # Run tests
+    # Run all tests
+    print(f"Running {len(test_paths)} PRD tests on {args.session_dir}...")
+    
     report = AcceptanceReport(
-        session_dir=session_dir,
+        session_dir=args.session_dir,
         timestamp=datetime.now()
     )
     
-    print(f"Running {len(test_paths)} PRD tests on {session_dir}...")
-    
     for test_path in test_paths:
-        print(f"  Running {test_path.stem}...", end="", flush=True)
-        result = run_test(test_path, session_dir, args.timeout)
+        if args.verbose:
+            print(f"  Running {test_path.name}...")
+        
+        result = run_test(test_path, args.session_dir, timeout=args.timeout)
         report.test_results.append(result)
-        if result.skipped:
-            print(f" SKIP ({result.duration_seconds:.1f}s)")
-        elif result.passed:
-            print(f" PASS ({result.duration_seconds:.1f}s)")
-        else:
-            print(f" FAIL ({result.duration_seconds:.1f}s)")
+        
+        if args.verbose:
+            status = "PASS" if result.passed else ("SKIP" if result.skipped else "FAIL")
+            print(f"    {status} ({result.duration_seconds:.1f}s)")
     
     # Run lint
-    print(f"Running {lint_path.stem}...", end="", flush=True)
-    lint_result = run_lint(lint_path, session_dir, args.timeout)
+    if args.verbose:
+        print("  Running PRD lint...")
+    
+    lint_result = run_lint(args.session_dir, bin_dir, timeout=args.timeout)
     report.lint_result = lint_result
-    if lint_result.skipped:
-        print(f" SKIP ({lint_result.duration_seconds:.1f}s)")
-    elif lint_result.passed:
-        print(f" PASS ({lint_result.duration_seconds:.1f}s)")
-    else:
-        print(f" FAIL ({lint_result.duration_seconds:.1f}s)")
+    
+    if args.verbose:
+        status = "PASS" if lint_result.passed else "FAIL"
+        print(f"    {status} ({lint_result.duration_seconds:.1f}s)")
     
     # Generate report
-    output_path = args.output or session_dir / "PRD-ACCEPTANCE-REPORT.md"
-    generate_markdown_report(report, output_path)
+    generate_report(report, output_path)
     
-    print(f"\nReport written to: {output_path}")
-    print(f"Overall score: {report.pass_percentage:.1f}% ({report.passed_tests}/{report.runnable_tests} runnable tests passed")
-    if report.skipped_tests:
-        print(f"  Skipped: {report.skipped_tests} tests (missing session data)")
-    if report.failed_tests:
-        print(f"  Failed: {report.failed_tests} tests")
-    print(")")
+    # Print summary
+    print(f"\nResults: {report.passed_tests}/{report.runnable_tests} tests passed")
+    if report.skipped_tests > 0:
+        print(f"         {report.skipped_tests} tests skipped (missing data)")
+    print(f"Report written to: {output_path}")
     
-    # Return non-zero if any tests failed (skipped tests don't count)
-    return 0 if report.failed_tests == 0 else 1
+    # Exit with appropriate code
+    if report.passed_tests == report.runnable_tests:
+        sys.exit(0)
+    else:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
