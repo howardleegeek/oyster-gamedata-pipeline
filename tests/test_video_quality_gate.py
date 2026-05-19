@@ -41,8 +41,8 @@ def tmp_session_dir():
 
 
 @pytest.fixture
-def hevc_1080p60_mp4(tmp_session_dir):
-    """Generate a real 1080p60 HEVC mp4 using ffmpeg. Skip if ffmpeg missing."""
+def hevc_1080p30_mp4(tmp_session_dir):
+    """Generate a real 1080p 30fps HEVC mp4 (v0.4.1 buyer-spec). Skip if ffmpeg missing."""
     ffmpeg = shutil.which("ffmpeg")
     if ffmpeg is None:
         pytest.skip("ffmpeg not in PATH")
@@ -51,7 +51,9 @@ def hevc_1080p60_mp4(tmp_session_dir):
         pytest.skip("ffprobe not in PATH")
 
     outpath = os.path.join(tmp_session_dir, "session_20260516.mp4")
-    # Generate 10 seconds of 1080p60 HEVC video with sufficient bitrate
+    # v0.4.1: generate fixture matching buyer PDF spec (30fps, codec-flexible)
+    # — short 10s clip won't pass the new duration gate, but other checks (codec
+    # / resolution / framerate / pixfmt) will.
     subprocess.run(
         [
             ffmpeg,
@@ -59,7 +61,7 @@ def hevc_1080p60_mp4(tmp_session_dir):
             "-f",
             "lavfi",
             "-i",
-            "testsrc=duration=10:size=1920x1080:rate=60",
+            "testsrc=duration=10:size=1920x1080:rate=30",
             "-c:v",
             "libx265",
             "-b:v",
@@ -87,10 +89,10 @@ def _make_probe_json(
     codec_name="hevc",
     width=1920,
     height=1080,
-    r_frame_rate="60/1",
+    r_frame_rate="30/1",  # v0.4.1: buyer PDF spec is 30fps, not 60
     pix_fmt="yuv420p",
-    duration=712.5,
-    bit_rate=12_400_000,
+    duration=330.0,  # v0.4.1: buyer PDF spec is 5-6 min, default to mid-range
+    bit_rate=8_000_000,  # v0.4.1: buyer PDF range 6-12 Mbps, default to 8
 ):
     """Build a minimal ffprobe JSON dict."""
     return {
@@ -187,12 +189,19 @@ class TestAuditFileMocked:
         assert result["verdict"] == "PASS"
         assert all(v == "PASS" for v in result["checks"].values())
 
-    def test_fail_framerate_30fps(self):
-        with self._mock_probe(r_frame_rate="30/1"):
+    def test_fail_framerate_60fps(self):
+        # v0.4.1: buyer PDF spec is 30fps; 60fps should now FAIL
+        with self._mock_probe(r_frame_rate="60/1"):
             result = _audit_file("/fake/session/video.mp4")
         assert result["verdict"] == "FAIL"
         assert result["checks"]["framerate"] == "FAIL"
-        assert result["fps"] == pytest.approx(30.0)
+        assert result["fps"] == pytest.approx(60.0)
+
+    def test_pass_framerate_30fps(self):
+        # v0.4.1: 30fps is now the PASS spec (default mock is 30/1)
+        with self._mock_probe(r_frame_rate="30/1"):
+            result = _audit_file("/fake/session/video.mp4")
+        assert result["checks"]["framerate"] == "PASS"
 
     def test_fail_resolution_720p(self):
         with self._mock_probe(width=1280, height=720):
@@ -200,25 +209,51 @@ class TestAuditFileMocked:
         assert result["verdict"] == "FAIL"
         assert result["checks"]["resolution"] == "FAIL"
 
-    def test_fail_codec_h264(self):
+    def test_pass_codec_h264(self):
+        # v0.4.1: both h264 and hevc are acceptable (buyer doesn't mandate hevc)
         with self._mock_probe(codec_name="h264"):
+            result = _audit_file("/fake/session/video.mp4")
+        assert result["checks"]["codec"] == "PASS"
+
+    def test_fail_codec_vp9(self):
+        # v0.4.1: codecs outside {h264, hevc, h265} still FAIL
+        with self._mock_probe(codec_name="vp9"):
             result = _audit_file("/fake/session/video.mp4")
         assert result["verdict"] == "FAIL"
         assert result["checks"]["codec"] == "FAIL"
 
     def test_fail_bitrate_low(self):
-        # 5 Mbps < 8 Mbps required
-        with self._mock_probe(bit_rate=5_000_000):
+        # 4 Mbps < 6 Mbps required (v0.4.1 floor)
+        with self._mock_probe(bit_rate=4_000_000):
             result = _audit_file("/fake/session/video.mp4")
         assert result["verdict"] == "FAIL"
         assert result["checks"]["bitrate"] == "FAIL"
 
     def test_fail_duration_short(self):
-        # 30s < 60s required
+        # v0.4.1: buyer PDF spec is 5-6 min, so 30s should FAIL (was the
+        # v0.4.0 spec too — gate still rejects too-short)
         with self._mock_probe(duration=30.0):
             result = _audit_file("/fake/session/video.mp4")
         assert result["verdict"] == "FAIL"
         assert result["checks"]["duration"] == "FAIL"
+
+    def test_fail_duration_too_long(self):
+        # v0.4.1 NEW: buyer PDF spec is 5-6 min, so 10 min should FAIL
+        # (this was silently accepted by v0.4.0's ≥60s gate)
+        with self._mock_probe(duration=600.0):
+            result = _audit_file("/fake/session/video.mp4")
+        assert result["verdict"] == "FAIL"
+        assert result["checks"]["duration"] == "FAIL"
+
+    def test_pass_duration_300s_min_boundary(self):
+        with self._mock_probe(duration=300.0):
+            result = _audit_file("/fake/session/video.mp4")
+        assert result["checks"]["duration"] == "PASS"
+
+    def test_pass_duration_360s_max_boundary(self):
+        with self._mock_probe(duration=360.0):
+            result = _audit_file("/fake/session/video.mp4")
+        assert result["checks"]["duration"] == "PASS"
 
     def test_fail_pixfmt(self):
         with self._mock_probe(pix_fmt="yuv422p"):
@@ -310,9 +345,13 @@ class TestMainCLI:
 class TestRealFixture:
     """Integration tests using real ffmpeg-generated video."""
 
-    def test_real_hevc_1080p60_passes(self, hevc_1080p60_mp4):
-        """A real 1080p60 HEVC file should PASS codec, resolution, framerate."""
-        result = _audit_file(hevc_1080p60_mp4)
+    def test_real_hevc_1080p30_basic_checks(self, hevc_1080p30_mp4):
+        """A real 1080p 30fps HEVC file should PASS codec, resolution, framerate, pixfmt.
+
+        v0.4.1: the fixture is only 10s (vs new buyer spec 300-360s) so the
+        DURATION check will FAIL — that's expected. We assert the rest pass.
+        """
+        result = _audit_file(hevc_1080p30_mp4)
         assert result["verdict"] in ("PASS", "FAIL")  # duration/bitrate may vary
         # These should always pass for our fixture
         assert result["checks"]["codec"] == "PASS"
@@ -325,9 +364,9 @@ class TestRealFixture:
         assert abs(result["fps"] - REQ_FPS) <= REQ_FPS_TOLERANCE
         assert result["pixfmt"] == REQ_PIXFMT
 
-    def test_real_fixture_json_roundtrip(self, hevc_1080p60_mp4, capsys):
+    def test_real_fixture_json_roundtrip(self, hevc_1080p30_mp4, capsys):
         """Verify JSON output is valid and parseable."""
-        session_dir = os.path.dirname(hevc_1080p60_mp4)
+        session_dir = os.path.dirname(hevc_1080p30_mp4)
         rc = main([session_dir, "--json"])
         assert rc == 0
         captured = capsys.readouterr().out

@@ -4,12 +4,12 @@
 Usage:
     python3 bin/video_quality_gate.py <session_dir> [--json]
 
-Checks per .mp4 file:
-  1. codec:     hevc/h265 required
+Checks per .mp4 file (v0.4.1 spec aligned with buyer PDF):
+  1. codec:      h264 OR hevc/h265 (buyer doesn't mandate hevc)
   2. resolution: 1920x1080 required
-  3. framerate:  60 fps ±1 required
-  4. bitrate:    ≥ 8 Mbps average required
-  5. duration:   ≥ 60 s required
+  3. framerate:  30 fps ±1 required (buyer PDF spec)
+  4. bitrate:    ≥ 6 Mbps average required (buyer PDF range 6-12 Mbps)
+  5. duration:   300-360 s required (buyer PDF: 5-6 min stable)
   6. pixfmt:     yuv420p required
 
 Exit codes:
@@ -25,16 +25,26 @@ import subprocess
 import sys
 
 # ---------------------------------------------------------------------------
-# Requirements (tunable)
+# Requirements (tunable) — aligned with buyer PDF spec (Howard PM review
+# 2026-05-18 23:40 PT). v0.4.0 had wrong defaults (HEVC-only / 60fps / ≥60s)
+# which would false-FAIL real 300s 30fps sessions. v0.4.1 fixes:
+#   codec: accept BOTH h264 and hevc (buyer doesn't mandate hevc)
+#   fps:   30 ± 1 (NOT 60 — buyer PDF says 30)
+#   dur:   300-360s (NOT ≥60 — buyer PDF says 5-6 min stable)
+#   bitrate: ≥ 6 Mbps (real recorder output range is 6-12 Mbps)
 # ---------------------------------------------------------------------------
-REQ_CODEC = {"hevc", "h265"}
+REQ_CODEC = {"h264", "hevc", "h265"}  # h264 OR hevc both acceptable
 REQ_WIDTH = 1920
 REQ_HEIGHT = 1080
-REQ_FPS = 60.0
+REQ_FPS = 30.0  # buyer PDF: 30fps not 60
 REQ_FPS_TOLERANCE = 1.0
-REQ_BITRATE_MBPS = 8.0
-REQ_DURATION_S = 60.0
+REQ_BITRATE_MBPS = 6.0  # buyer PDF range 6-12 Mbps, gate floor at 6
+REQ_DURATION_MIN_S = 300.0  # buyer PDF: 5-6 min
+REQ_DURATION_MAX_S = 360.0
 REQ_PIXFMT = "yuv420p"
+
+# Legacy alias for backward-compat with anything that imported REQ_DURATION_S
+REQ_DURATION_S = REQ_DURATION_MIN_S
 
 
 def _find_mp4(session_dir: str) -> list[str]:
@@ -138,8 +148,10 @@ def _audit_file(filepath: str) -> dict:
     # Bitrate
     checks["bitrate"] = "PASS" if bitrate_mbps >= REQ_BITRATE_MBPS else "FAIL"
 
-    # Duration
-    checks["duration"] = "PASS" if duration_s >= REQ_DURATION_S else "FAIL"
+    # Duration — buyer PDF spec: 5-6 min stable, so RANGE check not just floor
+    checks["duration"] = (
+        "PASS" if REQ_DURATION_MIN_S <= duration_s <= REQ_DURATION_MAX_S else "FAIL"
+    )
 
     # Pixfmt
     checks["pixfmt"] = "PASS" if pix_fmt == REQ_PIXFMT else "FAIL"
@@ -179,7 +191,7 @@ def _human_report(result: dict) -> str:
     codec_ok = result["checks"]["codec"]
     lines.append(
         f"  Codec:     {codec_val:<12} {'✓ PASS' if codec_ok == 'PASS' else '✗ FAIL'} "
-        f"(require: hevc/h265)"
+        f"(require: h264 or hevc)"
     )
 
     # Resolution
@@ -211,7 +223,7 @@ def _human_report(result: dict) -> str:
     dur_ok = result["checks"]["duration"]
     lines.append(
         f"  Duration:  {dur_val:<12} {'✓ PASS' if dur_ok == 'PASS' else '✗ FAIL'} "
-        f"(require: ≥{REQ_DURATION_S:.0f}s)"
+        f"(require: {REQ_DURATION_MIN_S:.0f}-{REQ_DURATION_MAX_S:.0f}s)"
     )
 
     # Pixfmt

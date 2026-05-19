@@ -225,21 +225,39 @@ def _run_b2_provenance(session_dir: str, skip_sign: bool) -> dict:
         return {"status": "PASS", "evidence": "sign + verify round-trip OK"}
 
 
-def _compute_verdict(gates_result: dict) -> dict:
+def _compute_verdict(gates_result: dict, strict_buyer: bool = False) -> dict:
     """
     Compute overall verdict from individual gate results.
 
-    Rules:
+    Default (demo) rules:
       - any FAIL → FAIL
       - any ERROR → FAIL (with crash note)
       - any PASS_DEGRADED → PASS_DEGRADED (unless FAIL/ERROR above)
       - all PASS/SKIP → PASS
+    SKIP is treated as "no signal" — fine for demos.
+
+    --strict-buyer rules (v0.4.1, Howard PM review 2026-05-18):
+      In strict-buyer mode, the gates listed in `STRICT_BUYER_REQUIRED` MUST
+      return PASS (or PASS_OK). SKIP / SKIP_honest / PASS_DEGRADED on those
+      gates → FAIL. This prevents a session from looking PASS to a buyer when
+      e.g. H8 depth source SKIPs as monocular_da_v2 fallback. Iron law: SKIP
+      must not silently let a session ship in production.
     """
+    # Gates that MUST hard-PASS for a buyer-deliverable session. SKIP on any
+    # of these in strict-buyer mode = production block.
+    STRICT_BUYER_REQUIRED = {
+        "H8_depth_source",
+        "S1_sync_tolerance",
+        "V1_video_quality",
+        "V2_video_artifacts",
+        "B2_provenance",
+    }
+
     statuses = [g["status"] for g in gates_result.values()]
 
     pass_count = sum(1 for s in statuses if s == "PASS")
     fail_count = sum(1 for s in statuses if s == "FAIL")
-    skip_count = sum(1 for s in statuses if s == "SKIP")
+    skip_count = sum(1 for s in statuses if s in ("SKIP", "SKIP_honest"))
     error_count = sum(1 for s in statuses if s == "ERROR")
     degraded_count = sum(1 for s in statuses if s == "PASS_DEGRADED")
     pass_ok_count = sum(1 for s in statuses if s == "PASS_OK")
@@ -247,19 +265,35 @@ def _compute_verdict(gates_result: dict) -> dict:
     # Count PASS_OK as pass for the summary
     effective_pass = pass_count + pass_ok_count
 
+    # Strict-buyer mode: convert SKIP/PASS_DEGRADED on required gates to FAIL
+    strict_violations = []
+    if strict_buyer:
+        for gate_id, g in gates_result.items():
+            if gate_id in STRICT_BUYER_REQUIRED:
+                if g["status"] not in ("PASS", "PASS_OK"):
+                    strict_violations.append(
+                        f"{gate_id}={g['status']} (strict-buyer requires PASS)"
+                    )
+
     if fail_count > 0 or error_count > 0:
+        verdict = "FAIL"
+    elif strict_violations:
         verdict = "FAIL"
     elif degraded_count > 0:
         verdict = "PASS_DEGRADED"
     else:
         verdict = "PASS"
 
-    return {
+    result = {
         "pass": effective_pass,
         "fail": fail_count,
         "skip": skip_count,
         "verdict": verdict,
+        "strict_buyer": bool(strict_buyer),
     }
+    if strict_violations:
+        result["strict_violations"] = strict_violations
+    return result
 
 
 def _format_table(gates_result: dict, summary: dict) -> str:
@@ -316,6 +350,16 @@ def main():
         action="store_true",
         help="Skip B2 provenance sign/verify round-trip",
     )
+    parser.add_argument(
+        "--strict-buyer",
+        action="store_true",
+        help=(
+            "v0.4.1: BLOCK on SKIP/PASS_DEGRADED for H8/S1/V1/V2/B2 gates. "
+            "Required for production buyer deliverables. Without this flag, "
+            "the gate is in DEMO mode and SKIP is permitted (e.g. H8 monocular "
+            "fallback won't block but also won't ship as production data)."
+        ),
+    )
     args = parser.parse_args()
 
     session_dir = args.session_dir
@@ -338,7 +382,7 @@ def main():
         else:
             gates_result[key] = _run_gate(script, session_dir)
 
-    summary = _compute_verdict(gates_result)
+    summary = _compute_verdict(gates_result, strict_buyer=args.strict_buyer)
     summary["session_id"] = session_id
 
     if args.json:
