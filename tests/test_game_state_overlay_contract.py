@@ -43,6 +43,14 @@ EXPECTED_FIELDS = {
     "sprinting",
     "dimension",
     "game_mode",
+    "camera_velocity_x",
+    "camera_velocity_y",
+    "camera_velocity_z",
+    "player_velocity_x",
+    "player_velocity_y",
+    "player_velocity_z",
+    "time_of_day",
+    "weather",
 }
 
 
