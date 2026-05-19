@@ -33,9 +33,8 @@
 - Result: committed 74cdca8
 
 ## Round 9 @ 2026-05-17T04:36:16Z
-- Picked: Fix obs_capture_real.py — `_authenticate()` crashed with `AttributeError: 'NoneType' object has no attribute 'get'` when OBS websocket sends `authentication: None` for anonymous connections. The code used `.get("authentication", {}).get("challenge")` which fails when the key exists with value `None` (returns `None`, not the default `{}`). Fixed by using 
-- Result: committed (see git log)
+- Picked: Fix obs_capture_real.py — `_authenticate()` crashed with `AttributeError: 'NoneType' object has no attribute 'get'` when OBS websocket sends `authentication: None` for anonymous connections. The code used `.get("authentication", {}).get("challenge")` which fails when the key exists with value `None` (returns `None`, not the default `{}`). Fixed by using
 
-## Round 10 @ 2026-05-19T04:54:29Z
-- Picked: Fix test_depth_inference_pipeline.py — mock_run function was missing `check` keyword argument that subprocess.run passes, causing TypeError. Also fixed frame naming pattern (test used `frame_{i+1:04d}.png` but actual code uses `frame_%06d.png`) and updated test to use correct function name `infer_depth_batch` instead of non-existent `infer_depth`.
-- Result: committed 4ea49fe
+## Round 10 @ 2026-05-17T12:00:00Z
+- Picked: Fix test_obs_capture.py — test `test_obs_websocket_v5_auth_challenge_format` called non-existent `_auth_challenge_response(challenge_salt)` method. The actual implementation uses `_auth_hash(challenge, salt)` with correct OBS WebSocket v5 double-hash protocol. Fixed test to use correct method signature and protocol. Also fixed `test_connect_returns_false_when_websocket_lib_missing` which was calling async `connect()` without await.
+- Result: committed a453e95
