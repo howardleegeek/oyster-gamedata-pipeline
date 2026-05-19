@@ -135,7 +135,16 @@ class RAFTModel:
                 self.conv2 = torch.nn.Conv2d(32, 64, 5, padding=2)
                 self.conv3 = torch.nn.Conv2d(64, 2, 3, padding=1)
 
-            def forward(self, img1, img2):
+            def forward(self, img1: Any, img2: Any) -> Any:
+                """Forward pass computing optical flow between two images.
+
+                Args:
+                    img1: Preprocessed image tensor for first frame.
+                    img2: Preprocessed image tensor for second frame.
+
+                Returns:
+                    Flow tensor with shape (1, 2, H, W) containing 2D flow vectors.
+                """
                 x = torch.cat([img1, img2], dim=1)
                 x = torch.relu(self.conv1(x))
                 x = torch.relu(self.conv2(x))
