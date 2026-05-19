@@ -365,7 +365,16 @@ def audit_group_m_metadata(session: Path) -> list[dict]:
             man = json.loads(manpath.read_text())
             file_count = man.get("file_count", 0)
             entries = man.get("files", {})
-            has_sha = all(isinstance(v, dict) and "sha256" in v for v in entries.values())
+            # `files` can be either {path: {sha256, ...}} (dict) or
+            # [{path: ..., sha256: ...}, ...] (list) depending on producer.
+            # Accept both shapes.
+            if isinstance(entries, dict):
+                values = entries.values()
+            elif isinstance(entries, list):
+                values = entries
+            else:
+                values = []
+            has_sha = all(isinstance(v, dict) and "sha256" in v for v in values)
             items.append(_result("F8-manifest",
                                  file_count > 0 and has_sha,
                                  f"MANIFEST.json: {file_count} files, sha256-each={has_sha}"))
