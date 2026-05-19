@@ -210,6 +210,7 @@ class FPSMonitor:
             self._running = False
 
     def stop(self) -> None:
+        """Stop the FPS monitoring loop."""
         self._running = False
 
 
