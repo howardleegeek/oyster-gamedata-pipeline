@@ -285,6 +285,17 @@ IS_LOCAL_TO_MAC2 = (
 
 
 def run(cmd: list[str], check: bool = True, capture: bool = True, timeout: int = 60) -> subprocess.CompletedProcess:
+    """Run a subprocess command.
+
+    Args:
+        cmd: Command and arguments as a list of strings.
+        check: If True, raise CalledProcessError on non-zero exit.
+        capture: If True, capture stdout/stderr.
+        timeout: Maximum seconds to wait before killing the process.
+
+    Returns:
+        A CompletedProcess instance with returncode, stdout, stderr.
+    """
     return subprocess.run(cmd, check=check, capture_output=capture, text=True, timeout=timeout)
 
 
