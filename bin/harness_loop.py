@@ -384,10 +384,19 @@ def is_completed(gap_id: str) -> bool:
 
 
 def is_running(gap_id: str) -> bool:
+    """Check if a task with the given gap ID is currently running on mac-2.
+
+    Uses pgrep to search for processes containing TASK_ID={gap_id} in their
+    command line arguments.
+
+    Args:
+        gap_id: The unique identifier of the task/gap to check.
+
+    Returns:
+        True if a matching process is found, False otherwise.
+    """
     res = ssh_run(f"pgrep -f 'TASK_ID={gap_id}' | head -1")
     return bool(res.stdout.strip())
-
-
 def collect_artifact(gap: dict) -> Path | None:
     """scp the produced file from mac-2 to local repo path."""
     gap_id = gap["id"]
