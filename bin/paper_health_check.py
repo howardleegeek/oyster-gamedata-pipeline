@@ -5,7 +5,17 @@ import argparse, json, socket, struct, sys
 
 
 def encode_varint(value: int) -> bytes:
-    """Encode integer as Minecraft VarInt."""
+    """Encode an integer as a Minecraft VarInt.
+
+    Minecraft Varints are little-endian, variable-length integers where
+    each byte uses 7 bits for data and 1 bit as a continuation flag.
+
+    Args:
+        value: The non-negative integer to encode.
+
+    Returns:
+        A bytes object containing the encoded VarInt.
+    """
     result = bytearray()
     while True:
         b = value & 0x7F
