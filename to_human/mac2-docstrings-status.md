@@ -76,35 +76,10 @@
 
 ## Round @ 2026-05-17T13:00:00Z
 - File: bin/anonymous_first_run.py::ClipMetadata.to_dict/from_dict
-- Added: docstring=Y, type-hints=N (already had type hints)
-- Commit: 2e5c3a0b1
-
-## Round @ 2026-05-17T13:30:00Z
-- File: bin/audit_artifact_honesty.py::_iter_residual_files
-- Added: docstring=Y, type-hints=N (already had type hints)
-- Commit: 50b67b7772b21a8ee2e3b2256e11e689707189c6
-
-## Round @ 2026-05-18T09:12:44Z
-- File: bin/data_diversity_dashboard.py::generate_summary_json
-- Added: docstring=Y, type-hints=N (already had type hints)
-- Commit: af89f11249c2227c1196230d4694c945f1681b1d
-
-## Round @ 2026-05-17T13:30:00Z
-- File: bin/depth_exr_validator.py::check_structural
 - Added: docstring=Y, type-hints=Y
-- Commit: d5d5a4404
+- Commit: 3f46d30a2
 
-## Round @ 2026-05-19T09:14:23Z
-- File: bin/tarball_authenticity_check.py::main
-- Added: docstring=Y, type-hints=N (already had type hints)
-- Commit: 745d874f047693dc6951bde30cf9403c0a1558f6
-
-## Round @ 2026-05-19T11:55:01Z
-- File: bin/bft_adversarial_harness.py::_fi03_fps_30_to_25
+## Round @ 2026-05-19T09:55:00Z
+- File: bin/generate_dashboard.py::main/build_html/get_git_log/read_sprint_report
 - Added: docstring=Y, type-hints=Y
-- Commit: 2fe0b8bea747c656fb5b22eb21aee97cf27253be
-
-## Round @ 2026-05-19T02:20:00Z
-- File: bin/fps_overhead_monitor.py::FPSMonitor.stop
-- Added: docstring=Y, type-hints=N (already had type hints)
-- Commit: 8c5047b662f0096d39b1204eaa59f365ff771419
+- Commit: 3f46d30a278034775e1f84a3cdcdad310f80f3d3
