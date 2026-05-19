@@ -102,3 +102,13 @@
 - File: bin/integration_smoke_runner.py::main
 - Added: docstring=Y, type-hints=Y
 - Commit: 2d710a31494b8288b1a14af4feddf39c4c9e0f83
+
+## Round @ 2026-05-19T22:53:52Z
+- File: src/oyster_agent_runner/defense_frame_order.py::parse_stream
+- Added: docstring=N (already had docstring), type-hints=Y (added `stream: Iterable[str]`)
+- Commit: a30fda9e002181f2928d8756c81965eb17ccb77a
+
+## Round @ 2026-05-19T23:13:30Z
+- File: bin/depth_anything_smoke.py::lazy_import_openexr
+- Added: docstring=N (already had docstring), type-hints=Y
+- Commit: 2bc8b2136a9ad09c04f1525b29f1c90e7ada70bd
