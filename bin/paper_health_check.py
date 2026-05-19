@@ -91,6 +91,14 @@ def check_server(host: str, port: int) -> int:
 
 
 def main() -> None:
+    """Main entry point for the Paper server health check script.
+    
+    Parses command-line arguments and runs the server health check.
+    
+    Returns:
+        None, but exits with status code 0 if server is healthy,
+        1 otherwise.
+    """
     parser = argparse.ArgumentParser(description="Paper server health probe")
     parser.add_argument("--host", default="localhost", help="Server host")
     parser.add_argument("--port", type=int, default=25565, help="Server port")
