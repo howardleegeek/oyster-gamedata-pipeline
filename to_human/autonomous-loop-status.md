@@ -33,8 +33,9 @@
 - Result: committed 74cdca8
 
 ## Round 9 @ 2026-05-17T04:36:16Z
-- Picked: Fix obs_capture_real.py — `_authenticate()` crashed with `AttributeError: 'NoneType' object has no attribute 'get'` when OBS websocket sends `authentication: None` for anonymous connections. The code used `.get("authentication", {}).get("challenge")` which fails when the key exists with value `None` (returns `None`, not the default `{}`). Fixed by using explicit None check before accessing nested keys.
+- Picked: Fix obs_capture_real.py — `_authenticate()` crashed with `AttributeError: 'NoneType' object has no attribute 'get'` when OBS websocket sends `authentication: None` for anonymous connections. The code used `.get("authentication", {}).get("challenge")` which fails when the key exists with value `None` (returns `None`, not the default `{}`). Fixed by using 
+- Result: committed (see git log)
 
-## Round 10 @ 2026-05-18T20:30:00Z
-- Picked: Fix prd_acceptance.py — `input_flag_tests` dict was defined but never used in `get_test_arguments()`. Tests `prd_test_action_per_second` and `prd_test_metric_units_meters` fell through to the `else` clause returning empty args, causing them to fail with "unrecognized arguments" or missing file errors. Added missing `elif test_name in input_flag_tests` block to pass `--input` flag with correct file path.
-- Result: committed c15e422
+## Round 10 @ 2026-05-19T04:54:29Z
+- Picked: Fix test_depth_inference_pipeline.py — mock_run function was missing `check` keyword argument that subprocess.run passes, causing TypeError. Also fixed frame naming pattern (test used `frame_{i+1:04d}.png` but actual code uses `frame_%06d.png`) and updated test to use correct function name `infer_depth_batch` instead of non-existent `infer_depth`.
+- Result: committed 4ea49fe
