@@ -53,6 +53,12 @@ class MemoryRecord:
     step: int | None = None  # convenience — typical callers index by agent step
 
     def to_json(self) -> dict[str, Any]:
+        """Serialize this memory record to a JSON-compatible dictionary.
+
+        Returns:
+            A dictionary with keys 'text', 'embedding', 'metadata',
+            and 'step' suitable for JSON serialization.
+        """
         return {
             "text": self.text,
             "embedding": self.embedding,
