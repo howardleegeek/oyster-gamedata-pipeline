@@ -83,7 +83,12 @@ def validate_exr_files(depth_dir: Union[str, Path]) -> dict:
     return {'total': total, 'valid': valid, 'invalid_files': invalid_files}
 
 
-def main():
+def main() -> None:
+    """Main entry point for depth EXR validator.
+    
+    Parses command line arguments, validates EXR files in the specified directory,
+    and prints results to stdout.
+    """
     parser = argparse.ArgumentParser(description='Validate depth/*.exr files')
     parser.add_argument('--depth-dir', required=True, help='Directory containing depth EXR files')
     args = parser.parse_args()
