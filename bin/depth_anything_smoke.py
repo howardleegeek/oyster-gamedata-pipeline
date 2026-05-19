@@ -13,13 +13,13 @@ import shutil
 import sys
 import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import numpy as np
 from PIL import Image
 
 
-def lazy_import_torch():
+def lazy_import_torch() -> Any:
     """Lazy import torch to avoid mandatory dependency at import time."""
     try:
         import torch
@@ -89,14 +89,13 @@ def run_inference(model: "torch.nn.Module", image: Image.Image) -> np.ndarray:
     torch = lazy_import_torch()
     tensor = preprocess_for_depth(image)
     with torch.no_grad():
-        depth = model(tensor)
-    if isinstance(depth, torch.Tensor):
-        depth = depth.squeeze().cpu().numpy()
-    return depth.astype(np.float32)
+        output = model(tensor)
+    depth = output.squeeze().cpu().numpy()
+    return depth
 
 
 def write_exr_depth(path: Path, depth: np.ndarray) -> None:
-    """Write depth map to OpenEXR file as float32 Z channel."""
+    """Write depth map to OpenEXR file as single-channel Z."""
     OpenEXR, Imath = lazy_import_openexr()
     height, width = depth.shape
     header = OpenEXR.Header(width, height)
@@ -182,17 +181,18 @@ def main(argv: Optional[list] = None) -> int:
             print("ERROR: Validation failed!")
             return 1
 
-        print(f"SUCCESS: Smoke test passed. Output: {output_path}")
+        print("SUCCESS: DepthAnything V2 smoke test passed")
         return 0
 
-    except ImportError as e:
-        print(f"ERROR: Missing dependency: {e}")
+    except Exception as exc:
+        print(f"ERROR: {exc}")
+        import traceback
+
+        traceback.print_exc()
         return 1
-    except Exception as e:
-        print(f"ERROR: {type(e).__name__}: {e}")
-        return 1
+
     finally:
-        if temp_dir and not args.no_cleanup:
+        if not args.no_cleanup and temp_dir is not None:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
 
