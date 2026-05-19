@@ -335,6 +335,20 @@ def audit_tarball(tar_path: Path) -> dict[str, Any]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI entry point for tarball authenticity audit.
+
+    Parses command-line arguments, runs :func:`audit_tarball` on the
+    provided tarball, and prints a human-readable classification report
+    (or JSON if --json is passed).
+
+    Args:
+        argv: Optional list of CLI arguments. Defaults to sys.argv[1:]
+            when None.
+
+    Returns:
+        Exit code: 0 if all files are classified REAL, 1 if any
+        file is PLACEHOLDER or UNKNOWN, 2 on usage / I/O errors.
+    """
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("tarball", type=Path)
     p.add_argument("--json", action="store_true", help="emit JSON to stdout")
