@@ -139,6 +139,14 @@ def _parse_front_matter(text: str) -> tuple[dict, int] | None:
 
 
 def lint_file(path: Path) -> LintResult:
+    """Lint a single spec file for iron-law compliance.
+
+    Args:
+        path: Path to the spec .md file.
+
+    Returns:
+        LintResult with any failures, warnings, and ok status.
+    """
     res = LintResult(path)
     text = path.read_text(encoding="utf-8")
 
