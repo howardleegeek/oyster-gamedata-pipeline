@@ -85,6 +85,19 @@ class FrameCapture:
         np.savez_compressed(path, **data)
 
 def load_inventory(world_dir: str, frame_index: int) -> List[InventorySlot]:
+    """Load inventory slot data from a JSON file for a given frame.
+
+    Reads inventory_{frame_index}.json from the world directory and
+    parses each entry into an InventorySlot dataclass instance.
+
+    Args:
+        world_dir: Path to the world directory containing inventory JSON files.
+        frame_index: The frame index used to locate the correct inventory file.
+
+    Returns:
+        A list of InventorySlot objects parsed from the JSON file.
+        Returns an empty list if the file does not exist or parsing fails.
+    """
     inv_path = os.path.join(world_dir, f"inventory_{frame_index}.json")
     if not os.path.exists(inv_path): return []
     try:
