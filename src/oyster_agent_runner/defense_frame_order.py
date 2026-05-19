@@ -15,7 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 
 
 class FrameOrderValidator:
@@ -65,7 +65,7 @@ class FrameOrderValidator:
         return {"total": self._count, "errors": self._errors}
 
 
-def parse_stream(stream) -> Iterator[dict]:
+def parse_stream(stream: Iterable[str]) -> Iterator[dict]:
     """Parse JSON lines from an input stream.
 
     Skips blank lines and comment lines starting with '#'.
