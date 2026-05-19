@@ -695,6 +695,21 @@ def verify_install(
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI entry-point for launching Fabric Minecraft via OysterRecorder.
+
+    Parses command-line arguments, builds a launch plan from the Fabric
+    profile, and either prints the constructed command (``--dry-run``) or
+    spawns the JVM and waits for the MC ready signal.
+
+    Args:
+        argv: Optional list of command-line arguments. If ``None``,
+            ``sys.argv[1:]`` is used.
+
+    Returns:
+        Exit code: ``0`` on success, ``2`` if the install is incomplete,
+        ``3`` if the Fabric profile is invalid, or the JVM exit code on
+        failure.
+    """
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--install-root", type=Path,
                         default=None,
