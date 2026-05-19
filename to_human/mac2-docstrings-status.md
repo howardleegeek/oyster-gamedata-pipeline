@@ -93,3 +93,8 @@
 - File: bin/depth_exr_validator.py::check_structural
 - Added: docstring=Y, type-hints=Y
 - Commit: d5d5a4404
+
+## Round @ 2026-05-19T09:14:23Z
+- File: bin/tarball_authenticity_check.py::main
+- Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: 745d874f047693dc6951bde30cf9403c0a1558f6
