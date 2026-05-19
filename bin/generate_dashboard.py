@@ -39,8 +39,17 @@ def get_git_log():
         return []
 
 
-def count_test_files(root="src/tests"):
-    """Walk test directory and return file counts by extension."""
+def count_test_files(root: str = "src/tests") -> tuple[dict[str, int], int]:
+    """Walk test directory and return file counts by extension.
+
+    Args:
+        root: Path to the root directory to scan for test files.
+
+    Returns:
+        A tuple of (counts, total) where counts is a dict mapping file
+        extensions to their occurrence count, and total is the total
+        number of files found.
+    """
     counts = {}
     total = 0
     if os.path.isdir(root):
