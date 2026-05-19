@@ -98,3 +98,8 @@
 - File: bin/tarball_authenticity_check.py::main
 - Added: docstring=Y, type-hints=N (already had type hints)
 - Commit: 745d874f047693dc6951bde30cf9403c0a1558f6
+
+## Round @ 2026-05-19T11:55:01Z
+- File: bin/bft_adversarial_harness.py::_fi03_fps_30_to_25
+- Added: docstring=Y, type-hints=Y
+- Commit: 2fe0b8bea747c656fb5b22eb21aee97cf27253be
