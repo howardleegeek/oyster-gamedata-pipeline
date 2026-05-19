@@ -87,7 +87,16 @@ def format_release_notes(grouped_commits: Dict[str, List[str]]) -> str:
     return "\n".join(output_lines).strip()
 
 
-def main():
+def main() -> None:
+    """Entry point for the release notes CLI.
+
+    Parses command-line arguments, retrieves git log between the given
+    reference and HEAD, groups commits by conventional-commit type, and
+    prints or writes formatted release notes.
+
+    Returns:
+        None. Exits via sys.exit on git errors.
+    """
     parser = argparse.ArgumentParser(
         description="Extract release notes from git commits"
     )
