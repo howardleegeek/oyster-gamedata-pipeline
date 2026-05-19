@@ -111,6 +111,14 @@ def javaw_path(root: Path) -> Path:
 
 
 def mc_instance_dir(root: Path) -> Path:
+    """Return the Minecraft instance directory path within the sandbox.
+
+    Args:
+        root: The installation root directory.
+
+    Returns:
+        Path to the mc-instance subdirectory.
+    """
     return root / "mc-instance"
 
 
