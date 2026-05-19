@@ -29,7 +29,7 @@ def lazy_import_torch() -> Any:
         raise ImportError("torch required: pip install torch") from exc
 
 
-def lazy_import_openexr():
+def lazy_import_openexr() -> tuple[Any, Any]:
     """Lazy import OpenEXR modules for depth map I/O."""
     try:
         import OpenEXR
