@@ -215,7 +215,20 @@ def run_attack(name: str, mutator) -> dict:
                     "error": f"lint-raised-exception: {e}"}
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
+    """Run red-team adversarial attacks against the buyer-spec lint.
+
+    Builds deliberately broken buyer-spec tarballs, runs each through
+    lint_buyer_spec, and reports whether the lint caught the attack.
+
+    Args:
+        argv: Optional list of CLI arguments. If None, sys.argv[1:]
+            is used (standard argparse behaviour).
+
+    Returns:
+        0 if all attacks were caught by the lint, 1 if any attack slipped
+        through (indicating a lint bug).
+    """
     p = argparse.ArgumentParser()
     p.add_argument("--attack", help="run a specific attack (default: all)")
     p.add_argument("--json", action="store_true", help="JSON output")
