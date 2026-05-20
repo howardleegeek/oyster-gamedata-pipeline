@@ -7,7 +7,10 @@ Endpoints:
   GET  /api/v1/income/today           → today's income summary
   POST /api/v1/upload/signed-url      → mock S3 presigned URL
   POST /api/v1/sessions               → register a session
-  POST /api/v1/telemetry/daily        → append telemetry record (in-memory)
+  POST /api/v1/testers/apply          → apply for beta access
+  GET  /api/v1/testers                → list applicants (admin)
+  POST /api/v1/testers/{id}/approve   → approve + signed download URL
+  POST /api/v1/testers/{id}/reject    → reject application
 
 All data lives in memory (dicts). No DB, no external services.
 """
@@ -17,17 +20,18 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import uuid
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+
+from backend_stub.tester_invite import router as tester_invite_router
 
 # ---------------------------------------------------------------------------
 # In-memory stores
 # ---------------------------------------------------------------------------
 _income_store: Dict[str, Any] = {}
 _sessions_store: Dict[str, Any] = {}
-_telemetry_store: List[Dict[str, Any]] = []
 
 # ---------------------------------------------------------------------------
 # App factory
@@ -131,18 +135,9 @@ def create_app() -> FastAPI:
         return {"session_id": session_id, "status": "received"}
 
     # ------------------------------------------------------------------
-    # Telemetry endpoint (S54)
+    # Tester invite endpoints
     # ------------------------------------------------------------------
-    @app.post("/api/v1/telemetry/daily")
-    async def telemetry_daily(request: Request):
-        """Accept a daily telemetry record and append to in-memory store.
-
-        Returns 200 OK with no payload.  The record is stored in
-        ``_telemetry_store`` for test inspection.
-        """
-        body = await request.json()
-        _telemetry_store.append(body)
-        return None
+    app.include_router(tester_invite_router)
 
     return app
 
