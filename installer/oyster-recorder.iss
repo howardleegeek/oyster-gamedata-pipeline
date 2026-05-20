@@ -4,7 +4,7 @@
 ;
 ; Builds: OysterRecorder-setup-vX.Y.Z.exe
 ;
-; Installs oyster-recorder.exe + assets to %LOCALAPPDATA%\OysterRecorder\
+; Installs gamedata-recorder.exe + assets to %LOCALAPPDATA%\OysterRecorder\
 ;   - Per-user install (no admin)
 ;   - HKCU Run registry key for tray-daemon autostart
 ;   - Start Menu shortcut
@@ -23,7 +23,7 @@
 #endif
 
 #ifndef AppExeName
-  #define AppExeName "oyster-recorder.exe"
+  #define AppExeName "gamedata-recorder.exe"
 #endif
 
 #ifndef SourceDir
@@ -139,7 +139,7 @@ Type: filesandordirs; Name: "{localappdata}\{#MyAppName}\config"
 
 [Code]
 // ---------------------------------------------------------------------------
-// Helper: check if oyster-recorder.exe is currently running
+// Helper: check if gamedata-recorder.exe is currently running
 // ---------------------------------------------------------------------------
 function IsAppRunning(): Boolean;
 var
