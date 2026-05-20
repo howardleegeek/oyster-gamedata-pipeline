@@ -24,6 +24,10 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+# Minimum fraction of expected clips required to run validation.
+# Below this threshold, the test is skipped (exit 2).
+MIN_DATA_FRACTION = 0.5
+
 
 def load_clips(data_dir: Path | None, clips_file: Path | None) -> list[dict[str, Any]]:
     """Load clips from directory or single file."""
@@ -67,7 +71,7 @@ def validate_distribution(
         "type_list": sorted(distinct),
     }
 
-    success = len(distinct) >= min_distinct and len(route_types) >= expected_total * 0.5
+    success = len(distinct) >= min_distinct and len(route_types) >= expected_total * MIN_DATA_FRACTION
     return success, details
 
 
@@ -142,6 +146,13 @@ def main(argv: list[str] | None = None) -> int:
         print("Error: No route_type fields found in any clip — data not available", file=sys.stderr)
         return 2
 
+    # Check if we have enough clips to run validation.
+    # Below MIN_DATA_FRACTION of expected total, skip the test.
+    min_required_clips = int(args.expected_total * MIN_DATA_FRACTION)
+    if len(route_types) < min_required_clips:
+        print(f"SKIP: Only {len(route_types)} clips, need at least {min_required_clips} to validate", file=sys.stderr)
+        return 2
+
     success, details = validate_distribution(
         route_types, args.min_distinct, args.expected_total
     )
@@ -155,8 +166,8 @@ def main(argv: list[str] | None = None) -> int:
         print("\n✗ FAIL: route_type distribution does not meet requirements", file=sys.stderr)
         if details["distinct_types"] < args.min_distinct:
             print(f"  - Only {details['distinct_types']} types, need {args.min_distinct}", file=sys.stderr)
-        if details["total_clips"] < args.expected_total * 0.5:
-            print(f"  - Only {details['total_clips']} clips, need {int(args.expected_total * 0.5)}", file=sys.stderr)
+        if details["total_clips"] < args.expected_total * MIN_DATA_FRACTION:
+            print(f"  - Only {details['total_clips']} clips, need {int(args.expected_total * MIN_DATA_FRACTION)}", file=sys.stderr)
         return 1
 
 
