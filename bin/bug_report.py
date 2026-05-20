@@ -6,8 +6,8 @@ Collects structured bug information interactively, optionally attaches
 crash dumps and log excerpts, and posts everything to a Discord webhook.
 
 Config:
-  Webhook URL is read from ~/.oyster/config.json under the key
-  "bug_report_webhook".  It is never hardcoded.
+  Webhook URL is read from ~/.oyster/config.json via recorder_config.load().
+  The key is "discord_webhook".  It is never hardcoded.
 
 Constraints:
   - No game session data is uploaded.
@@ -36,7 +36,6 @@ import requests
 # Constants
 # ---------------------------------------------------------------------------
 
-CONFIG_PATH = os.path.expanduser("~/.oyster/config.json")
 MAX_ATTACH_BYTES = 2 * 1024 * 1024  # 2 MB
 DEFAULT_CRASH_DUMP_PATH = os.path.expanduser("~/.oyster/crash_dumps/latest.dmp")
 DEFAULT_LOG_PATH = os.path.expanduser("~/.oyster/logs/OysterRecorder.log")
@@ -49,29 +48,18 @@ RETRY_COUNT = 1  # retry once on transient error
 
 
 def load_config() -> dict[str, Any]:
-    """Load the oyster config file and return it as a dict."""
-    path = Path(CONFIG_PATH)
-    if not path.exists():
-        print(
-            f"Error: config file not found at {CONFIG_PATH}\n"
-            "Please create ~/.oyster/config.json with a 'bug_report_webhook' key.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    try:
-        with open(path, "r", encoding="utf-8") as fh:
-            return json.load(fh)
-    except json.JSONDecodeError as exc:
-        print(f"Error: {CONFIG_PATH} is not valid JSON: {exc}", file=sys.stderr)
-        sys.exit(1)
+    """Load the oyster config file via recorder_config and return it as a dict."""
+    from bin.recorder_config import load as _load
+
+    return _load()
 
 
 def get_webhook_url(config: dict[str, Any]) -> str:
     """Extract the Discord webhook URL from config, or exit with an error."""
-    url = config.get("bug_report_webhook", "").strip()
+    url = config.get("discord_webhook", "").strip()
     if not url:
         print(
-            "Error: 'bug_report_webhook' is not set in ~/.oyster/config.json.\n"
+            "Error: 'discord_webhook' is not set in ~/.oyster/config.json.\n"
             "Add your Discord webhook URL to proceed.",
             file=sys.stderr,
         )
@@ -177,24 +165,25 @@ def build_discord_payload(
     expected: str,
     actual: str,
     user_hash: str,
-    crash_dump_b64: Optional[str],
-    log_tail: Optional[str],
+    crash_dump_b64: Optional[str] = None,
+    log_tail: Optional[str] = None,
 ) -> dict[str, Any]:
-    """
-    Build a Discord webhook embed payload.
-
-    The payload contains:
-      - An embed with structured bug fields.
-      - Optional attachments (base64-encoded crash dump, log excerpt).
-    """
-    severity_labels = {1: "🟢 Low", 2: "🟡 Medium", 3: "🔴 Critical"}
-    severity_label = severity_labels.get(severity, str(severity))
-
-    fields = [
-        {"name": "Severity", "value": severity_label, "inline": True},
-        {"name": "Reporter (anon)", "value": f"`{user_hash}`", "inline": True},
+    """Build the Discord webhook embed payload."""
+    fields: list[dict[str, Any]] = [
         {
-            "name": "Platform",
+            "name": "Severity",
+            "value": {1: "Low", 2: "Medium", 3: "Critical"}.get(
+                severity, "Unknown"
+            ),
+            "inline": True,
+        },
+        {
+            "name": "User",
+            "value": f"`{user_hash}`",
+            "inline": True,
+        },
+        {
+            "name": "OS",
             "value": f"{platform.system()} {platform.release()}",
             "inline": True,
         },

@@ -17,6 +17,9 @@ Usage
     # Then run the smoke test:
     python3 bin/recorder_local_smoke.py --backend-url http://localhost:8500
 
+    # Or use the configured backend URL from ~/.oyster/config.json:
+    python3 bin/recorder_local_smoke.py
+
 Output
 ------
     Prints ``BUYER_READY`` on success, ``FAIL: <step>`` on any failure.
@@ -206,18 +209,28 @@ def run_smoke(backend_url: str) -> int:
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+    from bin.recorder_config import load as load_config
+
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument(
         "--backend-url",
-        required=True,
-        help="Backend stub URL (e.g. http://localhost:8500)",
+        default=None,
+        help="Backend stub URL (e.g. http://localhost:8500). "
+             "Defaults to value from ~/.oyster/config.json.",
     )
     parser.add_argument(
         "--verbose",
         action="store_true",
         help="Enable DEBUG logging",
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+
+    # Resolve backend URL: CLI arg > env var (via recorder_config) > config file
+    if args.backend_url is None:
+        cfg = load_config()
+        args.backend_url = cfg["backend_url"]
+
+    return args
 
 
 def main(argv: Optional[List[str]] = None) -> int:

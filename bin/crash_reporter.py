@@ -62,8 +62,14 @@ PANIC_RE = re.compile(
 VERSION_RE = re.compile(r"recorder[_-]?version[:\s=]+(?P<version>\S+)", re.IGNORECASE)
 OS_RE = re.compile(r"os[:\s=]+(?P<os>[^\n]+)", re.IGNORECASE)
 
-# Backend
-DEFAULT_BACKEND_URL = "http://127.0.0.1:8089"
+
+def _get_backend_url() -> str:
+    """Get the backend URL from recorder_config (with env-var override)."""
+    from bin.recorder_config import load as load_config
+
+    cfg = load_config()
+    return cfg["backend_url"]
+
 
 # ---------------------------------------------------------------------------
 # Telemetry consent
@@ -193,10 +199,7 @@ def write_crash_summary(parsed: dict[str, str], filename: str) -> Path:
 
 
 def upload_crash(parsed: dict[str, str], filename: str, backend_url: str) -> bool:
-    """Upload an anonymized crash report to the backend.
-
-    Returns True on success, False on failure.
-    """
+    """Upload the crash report to the backend."""
     payload = {
         "panic_message": parsed["panic_message"],
         "stack_trace": parsed["stack_trace"],
@@ -287,14 +290,7 @@ def _watch_directory(watch_dir: str, backend_url: str) -> None:
     observer = Observer()
     observer.schedule(handler, str(watch_path), recursive=False)
     observer.start()
-
-    log.info("Watching %s for crash files...", watch_path)
-
-    # Also scan for existing crash files
-    for f in watch_path.iterdir():
-        if f.is_file() and CRASH_FILE_PATTERN.match(f.name):
-            process_crash_file(f, backend_url)
-
+    log.info("Watching %s for crash files...", watch_dir)
     try:
         while True:
             time.sleep(1)
@@ -348,15 +344,21 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--backend-url",
-        default=DEFAULT_BACKEND_URL,
-        help=f"Backend URL (default: {DEFAULT_BACKEND_URL}).",
+        default=None,
+        help="Backend URL. Defaults to value from ~/.oyster/config.json.",
     )
     parser.add_argument(
         "--consent",
         choices=["yes", "no"],
         help="Set crash-upload consent without prompting.",
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+
+    # Resolve backend URL: CLI arg > recorder_config (env var + config file)
+    if args.backend_url is None:
+        args.backend_url = _get_backend_url()
+
+    return args
 
 
 def main(argv: list[str] | None = None) -> int:
