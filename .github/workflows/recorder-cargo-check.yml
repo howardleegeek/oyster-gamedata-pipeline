@@ -1,0 +1,124 @@
+---
+# ============================================================================
+# recorder-cargo-check.yml
+# ============================================================================
+# Fast cargo check (no full build) for the vendor/recorder Rust submodule.
+#
+# Triggers:
+#   - pull_request when vendor/recorder or this workflow file changes
+#   - workflow_dispatch for manual runs
+#
+# Steps:
+#   1. Checkout + submodule init (shallow)
+#   2. Install Rust stable + cache ~/.cargo + vendor/recorder/target/
+#   3. cargo check --release --no-default-features
+#   4. Exit 0 if OK; exit 1 + post PR comment on failure
+# ============================================================================
+
+name: Recorder Cargo Check
+
+# yamllint disable-line rule:truthy
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'vendor/recorder/**'
+      - '.github/workflows/recorder-cargo-check.yml'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  cargo-check:
+    name: cargo check (recorder)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      # --------------------------------------------------------------
+      # 1. Checkout repository + shallow submodule init
+      # --------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      - name: Init vendor/recorder submodule (shallow)
+        run: |
+          git submodule update --init --depth 1 vendor/recorder
+
+      # --------------------------------------------------------------
+      # 2. Install Rust stable toolchain
+      # --------------------------------------------------------------
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      # --------------------------------------------------------------
+      # 3. Cache cargo registry & build artifacts
+      # --------------------------------------------------------------
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            vendor/recorder/target
+          key: >-
+            ${{ runner.os }}-cargo-${{
+            hashFiles('vendor/recorder/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      # --------------------------------------------------------------
+      # 4. cargo check --release --no-default-features
+      # --------------------------------------------------------------
+      - name: Run cargo check
+        id: cargo_check
+        run: |
+          cd vendor/recorder && \
+            cargo check --release --no-default-features \
+            2>&1 | tee /tmp/cargo_check.log
+
+      # --------------------------------------------------------------
+      # 5. Post PR comment on failure
+      # --------------------------------------------------------------
+      - name: Post failure comment on PR
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let log = '';
+            try {
+              log = fs.readFileSync(
+                '/tmp/cargo_check.log', 'utf8'
+              );
+            } catch (_) {
+              log = '(no log available)';
+            }
+            // Truncate to avoid hitting GitHub API limits
+            if (log.length > 8000) {
+              log = log.substring(0, 8000)
+                + '\n... (truncated)';
+            }
+            const body = [
+              '## cargo check failed for vendor/recorder',
+              '',
+              '```',
+              log,
+              '```',
+              '',
+              'Run locally to reproduce:',
+              '',
+              '```',
+              'cd vendor/recorder && cargo check',
+              '```',
+            ].join('\n');
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body,
+            });
