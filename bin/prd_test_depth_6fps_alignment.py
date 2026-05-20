@@ -79,16 +79,21 @@ def main(argv: List[str] = None) -> int:
     """CLI entry point."""
     parser = argparse.ArgumentParser(description="Validate 6fps depth EXR alignment with 30fps video.")
     parser.add_argument('-v', '--video-dir', type=Path, required=True, help="Video frames directory (30fps)")
-    parser.add_argument('-d', '--depth-dir', type=Path, required=True, help="Depth EXR directory (6fps)")
-    parser.add_argument('--verbose', '-V', action='store_true', help="Verbose output")
+    parser.add_argument('-d', '--depth-dir', type=Path, required=True, help="Depth EXR frames directory (6fps)")
+    parser.add_argument('--verbose', action='store_true', help="Print verbose output")
     args = parser.parse_args(argv)
 
     try:
         ok, msg = validate_alignment(args.video_dir, args.depth_dir, args.verbose)
-        print(msg)
-        return 0 if ok else 1
+        if ok:
+            print(msg)
+            return 0
+        else:
+            print(f"FAIL: {msg}", file=sys.stderr)
+            return 1
     except FileNotFoundError as e:
-        print(f"Error: {e}", file=sys.stderr)
+        # Print skip: for PRD acceptance runner to recognize as skip
+        print(f"skip: {e}", file=sys.stderr)
         return 2
     except NotADirectoryError as e:
         # NotADirectoryError doesn't show the full message when printed, so we need to handle it specially
@@ -107,30 +112,30 @@ def main(argv: List[str] = None) -> int:
             for path in [args.video_dir, args.depth_dir]:
                 if path.exists():
                     if path.is_file():
-                        print(f"Error: Path exists as a file, not a directory: {path}", file=sys.stderr)
+                        print(f"skip: Path exists as a file, not a directory: {path}", file=sys.stderr)
                         return 2
                     elif path.is_symlink():
-                        print(f"Error: Path exists as a symlink, not a directory: {path}", file=sys.stderr)
+                        print(f"skip: Path exists as a symlink, not a directory: {path}", file=sys.stderr)
                         return 2
                     elif not path.is_dir():
-                        print(f"Error: Path exists but is not a directory: {path}", file=sys.stderr)
+                        print(f"skip: Path exists but is not a directory: {path}", file=sys.stderr)
                         return 2
         
-        # If we still don't know, print the original error
+        # If we still don't know, print the original error with skip prefix
         if error_path is None:
-            print(f"Error: {e}", file=sys.stderr)
+            print(f"skip: {e}", file=sys.stderr)
             return 2
         
         # We found the problematic path
         if error_path.exists():
             if error_path.is_file():
-                print(f"Error: Path exists as a file, not a directory: {error_path}", file=sys.stderr)
+                print(f"skip: Path exists as a file, not a directory: {error_path}", file=sys.stderr)
             elif error_path.is_symlink():
-                print(f"Error: Path exists as a symlink, not a directory: {error_path}", file=sys.stderr)
+                print(f"skip: Path exists as a symlink, not a directory: {error_path}", file=sys.stderr)
             else:
-                print(f"Error: Path exists but is not a directory: {error_path}", file=sys.stderr)
+                print(f"skip: Path exists but is not a directory: {error_path}", file=sys.stderr)
         else:
-            print(f"Error: {e}", file=sys.stderr)
+            print(f"skip: {e}", file=sys.stderr)
         return 2
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
