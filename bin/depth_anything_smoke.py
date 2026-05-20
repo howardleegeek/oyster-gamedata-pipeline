@@ -52,7 +52,7 @@ def create_rgb_sample(width: int = 640, height: int = 480) -> Image.Image:
     return Image.fromarray((rgb * 255).astype(np.uint8), mode="RGB")
 
 
-def load_depth_anything_v2_small():
+def load_depth_anything_v2_small() -> Any:
     """Load DepthAnything V2 Small model or return mock if unavailable."""
     torch = lazy_import_torch()
     try:
