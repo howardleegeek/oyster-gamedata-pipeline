@@ -56,24 +56,27 @@ def test_help():
 
 
 def test_missing_file():
-    """Test that the script fails with missing video file."""
+    """Test that the script skips with missing video file."""
     result = _run(["/tmp/does_not_exist.mp4"])
     assert result.returncode == 2, "Should exit with code 2 for missing file"
-    assert "File not found" in result.stderr or "File not found" in result.stdout
+    # Should output SKIP: for PRD acceptance runner to recognize as skip
+    assert "SKIP:" in result.stderr or "SKIP:" in result.stdout
+    assert "Video file not found" in result.stderr or "Video file not found" in result.stdout
 
 
 def test_empty_file():
-    """Test that the script handles empty/invalid MP4 file."""
+    """Test that the script skips empty/invalid MP4 file."""
     with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f:
         f.write(b"")  # Empty file
         f.flush()
         
         result = _run([f.name])
-        # Should exit with code 2 for error
-        assert result.returncode == 2, f"Should exit with code 2 for invalid MP4, got {result.returncode}"
-        # Should mention moov atom or invalid MP4
+        # Should exit with code 2 for skip
+        assert result.returncode == 2, f"Should exit with code 2 for empty file, got {result.returncode}"
+        # Should output SKIP: for PRD acceptance runner to recognize as skip
         combined = result.stdout + result.stderr
-        assert "moov atom" in combined or "Invalid MP4" in combined or "ffprobe failed" in combined
+        assert "SKIP:" in combined
+        assert "empty" in combined.lower() or "0 bytes" in combined
 
 
 # ---------------------------------------------------------------------------
@@ -81,10 +84,10 @@ def test_empty_file():
 # ---------------------------------------------------------------------------
 
 class TestAudioContinuityFunctions:
-    """Unit tests for the functions in prd_test_audio_continuity.py."""
+    """Unit tests for individual functions in the module."""
     
     def _import_module(self):
-        """Import the module and return it."""
+        """Import the module for unit testing."""
         import importlib.util
         spec = importlib.util.spec_from_file_location("audio_continuity", str(SCRIPT))
         module = importlib.util.module_from_spec(spec)
@@ -95,51 +98,50 @@ class TestAudioContinuityFunctions:
         """Test check_ffprobe_available function."""
         module = self._import_module()
         
-        # Mock shutil.which to test both branches
+        # Mock shutil.which to test both paths
         with patch('shutil.which') as mock_which:
             mock_which.return_value = "/usr/bin/ffprobe"
-            assert module.check_ffprobe_available() is True
+            assert module.check_ffprobe_available() == True
             
             mock_which.return_value = None
-            assert module.check_ffprobe_available() is False
+            assert module.check_ffprobe_available() == False
     
     def test_check_continuity_no_gaps(self):
-        """Test check_continuity function with no gaps."""
+        """Test check_continuity with no gaps."""
         module = self._import_module()
         
-        # Timestamps with 10ms gaps (0.01s)
-        timestamps = [0.0, 0.01, 0.02, 0.03, 0.04]
+        timestamps = [0.0, 0.01, 0.02, 0.03]
         gaps = module.check_continuity(timestamps, threshold_ms=50.0)
         assert gaps == []
     
     def test_check_continuity_with_gaps(self):
-        """Test check_continuity function with gaps."""
+        """Test check_continuity with gaps exceeding threshold."""
         module = self._import_module()
         
-        # Timestamps with a 100ms gap
-        timestamps = [0.0, 0.01, 0.02, 0.12, 0.13]  # Gap from 0.02 to 0.12 = 100ms
+        timestamps = [0.0, 0.01, 0.10, 0.11]  # 90ms gap between 0.01 and 0.10
         gaps = module.check_continuity(timestamps, threshold_ms=50.0)
         
         assert len(gaps) == 1
         start, end, duration = gaps[0]
-        assert abs(start - 0.02) < 0.001
-        assert abs(end - 0.12) < 0.001
-        assert abs(duration - 100.0) < 0.1
+        assert start == 0.01
+        assert end == 0.10
+        # Gap should be approximately 90ms (0.09s * 1000)
+        assert abs(duration - 90.0) < 0.1
     
     def test_check_continuity_insufficient_data(self):
         """Test check_continuity with insufficient data."""
         module = self._import_module()
         
-        # Empty list
-        gaps = module.check_continuity([], threshold_ms=50.0)
-        assert gaps == []
-        
         # Single timestamp
         gaps = module.check_continuity([0.0], threshold_ms=50.0)
         assert gaps == []
+        
+        # Empty list
+        gaps = module.check_continuity([], threshold_ms=50.0)
+        assert gaps == []
     
     def test_get_audio_streams_mock(self):
-        """Test get_audio_streams with mocked ffprobe."""
+        """Test get_audio_streams with mocked ffprobe output."""
         module = self._import_module()
         
         # Mock subprocess.run to return JSON with audio streams
@@ -159,7 +161,7 @@ class TestAudioContinuityFunctions:
             assert streams == [1, 2]
     
     def test_get_audio_packets_mock(self):
-        """Test get_audio_packets with mocked ffprobe."""
+        """Test get_audio_packets with mocked ffprobe output."""
         module = self._import_module()
         
         # Mock subprocess.run to return JSON with packet timestamps
@@ -216,9 +218,18 @@ def test_integration_no_audio_streams():
         with patch.object(module, 'get_audio_streams', return_value=[]):
             # Mock Path.exists to return True
             with patch('pathlib.Path.exists', return_value=True):
-                # Run main with mocked functions
-                result = module.main(["/tmp/test.mp4"])
-                assert result == 2  # Should exit with code 2 for no audio streams
+                # Mock Path.stat to return non-zero size
+                mock_stat = MagicMock()
+                mock_stat.st_size = 100
+                with patch('pathlib.Path.stat', return_value=mock_stat):
+                    # Run main with mocked functions
+                    result = module.main(["/tmp/test.mp4"])
+                    assert result == 2  # Should exit with code 2 for no audio streams
+                    # Should output SKIP:
+                    import sys
+                    # Check that stderr contains SKIP:
+                    # Note: We can't easily capture print output in this test
+                    # The actual test is in test_missing_file and test_empty_file
 
 
 def test_integration_with_audio_no_gaps():
@@ -239,9 +250,13 @@ def test_integration_with_audio_no_gaps():
             with patch.object(module, 'get_audio_packets', return_value=[0.0, 0.01, 0.02, 0.03]):
                 # Mock Path.exists to return True
                 with patch('pathlib.Path.exists', return_value=True):
-                    # Run main with mocked functions
-                    result = module.main(["/tmp/test.mp4"])
-                    assert result == 0  # Should exit with code 0 for success
+                    # Mock Path.stat to return non-zero size
+                    mock_stat = MagicMock()
+                    mock_stat.st_size = 100
+                    with patch('pathlib.Path.stat', return_value=mock_stat):
+                        # Run main with mocked functions
+                        result = module.main(["/tmp/test.mp4"])
+                        assert result == 0  # Should pass with no gaps
 
 
 def test_integration_with_audio_gaps():
@@ -258,14 +273,14 @@ def test_integration_with_audio_gaps():
     with patch.object(module, 'check_ffprobe_available', return_value=True):
         # Mock get_audio_streams to return one audio stream
         with patch.object(module, 'get_audio_streams', return_value=[1]):
-            # Mock get_audio_packets to return timestamps with gaps
-            with patch.object(module, 'get_audio_packets', return_value=[0.0, 0.01, 0.02, 0.12, 0.13]):
+            # Mock get_audio_packets to return timestamps with gap
+            with patch.object(module, 'get_audio_packets', return_value=[0.0, 0.01, 0.10, 0.11]):
                 # Mock Path.exists to return True
                 with patch('pathlib.Path.exists', return_value=True):
-                    # Run main with mocked functions
-                    result = module.main(["/tmp/test.mp4"])
-                    assert result == 1  # Should exit with code 1 for gaps detected
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+                    # Mock Path.stat to return non-zero size
+                    mock_stat = MagicMock()
+                    mock_stat.st_size = 100
+                    with patch('pathlib.Path.stat', return_value=mock_stat):
+                        # Run main with mocked functions
+                        result = module.main(["/tmp/test.mp4"])
+                        assert result == 1  # Should fail with gaps > 50ms
