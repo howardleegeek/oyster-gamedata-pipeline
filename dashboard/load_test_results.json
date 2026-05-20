@@ -1,0 +1,124 @@
+{
+  "total_recorders": 10,
+  "successful": 10,
+  "failed": 0,
+  "error_rate": 0.0,
+  "p50_latency_ms": 75.83,
+  "p95_latency_ms": 86.12,
+  "p99_latency_ms": 86.12,
+  "min_latency_ms": 37.25,
+  "max_latency_ms": 86.12,
+  "mean_latency_ms": 61.99,
+  "median_latency_ms": 75.85,
+  "total_bytes_uploaded": 1980,
+  "throughput_bytes_per_sec": 1819.32,
+  "total_duration_sec": 1.09,
+  "avg_cpu_percent": 1.53,
+  "avg_mem_mb": 44.61,
+  "max_cpu_percent": 1.6,
+  "max_mem_mb": 44.61,
+  "recorder_results": [
+    {
+      "recorder_id": 0,
+      "success": true,
+      "latency_ms": 86.12,
+      "upload_size_bytes": 198,
+      "error": "",
+      "cpu_percent": 1.6,
+      "mem_mb": 44.61,
+      "session_id": "fca8761c-9e06-450f-8861-c76351d5f304"
+    },
+    {
+      "recorder_id": 1,
+      "success": true,
+      "latency_ms": 38.52,
+      "upload_size_bytes": 198,
+      "error": "",
+      "cpu_percent": 1.4,
+      "mem_mb": 44.61,
+      "session_id": "9464f4e6-5e03-4c1b-bbde-07f2ad5ddfdb"
+    },
+    {
+      "recorder_id": 2,
+      "success": true,
+      "latency_ms": 77.42,
+      "upload_size_bytes": 198,
+      "error": "",
+      "cpu_percent": 1.6,
+      "mem_mb": 44.61,
+      "session_id": "6ed335a6-e5ee-4ccb-b5f1-b0bdb4c7df89"
+    },
+    {
+      "recorder_id": 3,
+      "success": true,
+      "latency_ms": 76.41,
+      "upload_size_bytes": 198,
+      "error": "",
+      "cpu_percent": 1.5,
+      "mem_mb": 44.61,
+      "session_id": "b1a1075f-79c8-4ae8-99eb-7c3569f7d00c"
+    },
+    {
+      "recorder_id": 4,
+      "success": true,
+      "latency_ms": 37.85,
+      "upload_size_bytes": 198,
+      "error": "",
+      "cpu_percent": 1.5,
+      "mem_mb": 44.61,
+      "session_id": "6cd0f0d7-6b9c-4f4d-99f6-66c998742dc1"
+    },
+    {
+      "recorder_id": 5,
+      "success": true,
+      "latency_ms": 77.01,
+      "upload_size_bytes": 198,
+      "error": "",
+      "cpu_percent": 1.6,
+      "mem_mb": 44.61,
+      "session_id": "dc1a9786-b9bb-4ffd-b449-81840a40fa55"
+    },
+    {
+      "recorder_id": 6,
+      "success": true,
+      "latency_ms": 37.59,
+      "upload_size_bytes": 198,
+      "error": "",
+      "cpu_percent": 1.5,
+      "mem_mb": 44.61,
+      "session_id": "06f4cd04-b087-4ff4-9ffb-8b83d7f113c1"
+    },
+    {
+      "recorder_id": 7,
+      "success": true,
+      "latency_ms": 75.83,
+      "upload_size_bytes": 198,
+      "error": "",
+      "cpu_percent": 1.5,
+      "mem_mb": 44.61,
+      "session_id": "50ab088c-6203-4bf8-9063-b9fa3f4f451f"
+    },
+    {
+      "recorder_id": 8,
+      "success": true,
+      "latency_ms": 37.25,
+      "upload_size_bytes": 198,
+      "error": "",
+      "cpu_percent": 1.5,
+      "mem_mb": 44.61,
+      "session_id": "628235d4-d30b-4c8d-9f53-79f472fb34f5"
+    },
+    {
+      "recorder_id": 9,
+      "success": true,
+      "latency_ms": 75.87,
+      "upload_size_bytes": 198,
+      "error": "",
+      "cpu_percent": 1.6,
+      "mem_mb": 44.61,
+      "session_id": "309f28cb-7dc0-4a0e-a6a8-83f619d20a90"
+    }
+  ],
+  "backend_url": "http://localhost:8500",
+  "timestamp": "2026-05-20T02:48:12Z"
+}
