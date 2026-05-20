@@ -75,9 +75,7 @@ def _evaluate_h8(session: Path) -> dict:
     marker = session / "depth" / ".source"
     if not marker.exists():
         return _result(
-            "H8",
-            False,
-            "depth/.source marker missing — cannot certify engine vs monocular",
+            "H8", False, "depth/.source marker missing — cannot certify engine vs monocular"
         )
 
     text = marker.read_text()
@@ -124,9 +122,7 @@ def _evaluate_h8(session: Path) -> dict:
                     pass
 
     if kind is None or kind == "unknown":
-        return _result(
-            "H8", False, f"depth source unknown: {kind!r} (mark with depth/.source)"
-        )
+        return _result("H8", False, f"depth source unknown: {kind!r} (mark with depth/.source)")
 
     if kind == "monocular_da_v2":
         return {
@@ -142,9 +138,7 @@ def _evaluate_h8(session: Path) -> dict:
             (session / "depth").glob("*.exr")
         )
         if not exrs:
-            return _result(
-                "H8", False, "engine_zbuffer marker but no EXR files in depth/"
-            )
+            return _result("H8", False, "engine_zbuffer marker but no EXR files in depth/")
         # Verify the first EXR is at least readable. OpenEXR-only is best;
         # fall back to os.access(R_OK) if OpenEXR not installed (CI may not).
         try:
@@ -154,19 +148,10 @@ def _evaluate_h8(session: Path) -> dict:
             f.close()
         except ImportError:
             if not os.access(str(exrs[0]), os.R_OK):
-                return _result(
-                    "H8", False, f"engine_zbuffer EXR unreadable: {exrs[0].name}"
-                )
+                return _result("H8", False, f"engine_zbuffer EXR unreadable: {exrs[0].name}")
         except Exception as e:  # OpenEXR specific exceptions
             return _result("H8", False, f"engine_zbuffer EXR open failed: {e}")
 
-        if gap_miss_ratio < 0.01:
-            return {
-                "id": "H8",
-                "status": "PASS_STRICT",
-                "evidence": f"engine Z-buffer ground truth, {frame_count} frames, "
-                f"EXR readable, strict tier (≥99% engine truth)",
-            }
         if gap_miss_ratio > 0.10:
             return {
                 "id": "H8",
@@ -175,14 +160,10 @@ def _evaluate_h8(session: Path) -> dict:
                 f"{gap_miss_ratio*100:.1f}% gap misses (PASS_DEGRADED)",
             }
         return _result(
-            "H8",
-            True,
-            f"engine Z-buffer ground truth, {frame_count} frames, EXR readable",
+            "H8", True, f"engine Z-buffer ground truth, {frame_count} frames, EXR readable"
         )
 
-    return _result(
-        "H8", False, f"depth source unknown: {kind!r} (mark with depth/.source)"
-    )
+    return _result("H8", False, f"depth source unknown: {kind!r} (mark with depth/.source)")
 
 
 def audit_group_a(session: Path) -> list[dict]:
@@ -208,9 +189,7 @@ def audit_group_a(session: Path) -> list[dict]:
     if depth_dir.exists():
         exrs = list(depth_dir.glob("*.exr"))
         ok = 1788 <= len(exrs) <= 1810
-        items.append(
-            _result("A4", ok, f"depth/: {len(exrs)} EXR files (expect 1788-1810)")
-        )
+        items.append(_result("A4", ok, f"depth/: {len(exrs)} EXR files (expect 1788-1810)"))
     else:
         items.append(_result("A4", False, "depth/ directory missing"))
     return items
@@ -221,9 +200,7 @@ def audit_groups_c_d_e(session: Path) -> list[dict]:
     items = []
     ac_path = session / "action_camera.json"
     if not ac_path.exists():
-        items.append(
-            _result("C-prereq", False, "action_camera.json missing — skipping C/D/E")
-        )
+        items.append(_result("C-prereq", False, "action_camera.json missing — skipping C/D/E"))
         return items
     try:
         data = json.loads(ac_path.read_text())
@@ -231,28 +208,20 @@ def audit_groups_c_d_e(session: Path) -> list[dict]:
         items.append(_result("C-prereq", False, f"action_camera.json parse error: {e}"))
         return items
     if not isinstance(data, list) or len(data) == 0:
-        items.append(
-            _result("C-prereq", False, "action_camera.json must be non-empty array")
-        )
+        items.append(_result("C-prereq", False, "action_camera.json must be non-empty array"))
         return items
 
     sample = data[0]
     # Group C: 20 field presence
     for i, field in enumerate(PRD_FIELDS_20, 1):
         ok = field in sample
-        items.append(
-            _result(f"C{i}", ok, f'"{field}": {"present" if ok else "MISSING"}')
-        )
+        items.append(_result(f"C{i}", ok, f'"{field}": {"present" if ok else "MISSING"}'))
 
     # Group D: value constraints
     frames = [f.get("frame", f.get("frame_index", None)) for f in data[:100]]
-    d1_ok = all(isinstance(x, int) for x in frames) and frames == list(
-        range(min(len(data), 100))
-    )
+    d1_ok = all(isinstance(x, int) for x in frames) and frames == list(range(min(len(data), 100)))
     items.append(
-        _result(
-            "D1", d1_ok, f"frame continuity 0..99: {'OK' if d1_ok else 'GAP detected'}"
-        )
+        _result("D1", d1_ok, f"frame continuity 0..99: {'OK' if d1_ok else 'GAP detected'}")
     )
 
     n = len(data)
@@ -261,20 +230,12 @@ def audit_groups_c_d_e(session: Path) -> list[dict]:
     # fixtures must score honestly. If the audit lets short sessions pass,
     # an adversary can ship 100-frame nonsense and claim PRD compliance.
     items.append(
-        _result(
-            "D2",
-            8990 <= n <= 9010,
-            f"frame count: {n} (PRD requires 8990-9010, no escape)",
-        )
+        _result("D2", 8990 <= n <= 9010, f"frame count: {n} (PRD requires 8990-9010, no escape)")
     )
 
     fps_set = {f.get("fps") for f in data[:100]}
     items.append(
-        _result(
-            "D3",
-            fps_set == {30.0} or fps_set == {30},
-            f"fps values (first 100): {fps_set}",
-        )
+        _result("D3", fps_set == {30.0} or fps_set == {30}, f"fps values (first 100): {fps_set}")
     )
 
     rt_set = {f.get("route_type") for f in data}
@@ -291,9 +252,7 @@ def audit_groups_c_d_e(session: Path) -> list[dict]:
     mx_range = all(_in_unit_range(f.get("mouse_x")) for f in data[:100])
     my_range = all(_in_unit_range(f.get("mouse_y")) for f in data[:100])
     items.append(
-        _result(
-            "D5", mx_range and my_range, f"mouse_x/y in [0,1]: {mx_range and my_range}"
-        )
+        _result("D5", mx_range and my_range, f"mouse_x/y in [0,1]: {mx_range and my_range}")
     )
 
     # D7: quaternion norm ≈ 1
@@ -307,9 +266,7 @@ def audit_groups_c_d_e(session: Path) -> list[dict]:
         d7_inspected += 1
         q = f.get("camera_rotation_quaternion")
         if not (
-            isinstance(q, list)
-            and len(q) == 4
-            and all(isinstance(c, (int, float)) for c in q)
+            isinstance(q, list) and len(q) == 4 and all(isinstance(c, (int, float)) for c in q)
         ):
             d7_violations += 1
             continue
@@ -326,12 +283,7 @@ def audit_groups_c_d_e(session: Path) -> list[dict]:
 
     # D8: fx == fy
     intr = sample.get("camera_intrinsics", {})
-    d8_ok = (
-        isinstance(intr, dict)
-        and "fx" in intr
-        and "fy" in intr
-        and intr["fx"] == intr["fy"]
-    )
+    d8_ok = isinstance(intr, dict) and "fx" in intr and "fy" in intr and intr["fx"] == intr["fy"]
     items.append(
         _result(
             "D8",
@@ -348,11 +300,7 @@ def audit_groups_c_d_e(session: Path) -> list[dict]:
         if isinstance(cs, list) and all(isinstance(c, (int, float)) for c in cs):
             d9_max = max(d9_max, math.sqrt(sum(c * c for c in cs)))
     items.append(
-        _result(
-            "D9",
-            d9_max <= 100,
-            f"max camera_speed magnitude (first 500): {d9_max:.2f} m/s",
-        )
+        _result("D9", d9_max <= 100, f"max camera_speed magnitude (first 500): {d9_max:.2f} m/s")
     )
 
     # D10: angle ranges
@@ -371,9 +319,7 @@ def audit_groups_c_d_e(session: Path) -> list[dict]:
         ):
             d10_violations += 1
             continue
-        if not (
-            -90 <= oula[0] <= 90 and -180 <= oula[1] <= 180 and -180 <= oula[2] <= 180
-        ):
+        if not (-90 <= oula[0] <= 90 and -180 <= oula[1] <= 180 and -180 <= oula[2] <= 180):
             d10_violations += 1
     items.append(
         _result(
@@ -456,11 +402,7 @@ def audit_group_v_mp4(session: Path) -> list[dict]:
         )
     )
     items.append(
-        _result(
-            "V7",
-            astream is not None,
-            "audio stream present (continuity check deferred)",
-        )
+        _result("V7", astream is not None, "audio stream present (continuity check deferred)")
     )
     items.append(_result("V8", True, "non-testsrc: deferred (needs image classifier)"))
     return items
@@ -494,15 +436,11 @@ def audit_group_h_depth(session: Path) -> list[dict]:
             items.append(_result("H3", w == 1920 and h == 1080, f"first exr: {w}x{h}"))
             items.append(
                 _result(
-                    "H4",
-                    channels and "FLOAT" in str(hdr["channels"][channels[0]].type),
-                    "float32",
+                    "H4", channels and "FLOAT" in str(hdr["channels"][channels[0]].type), "float32"
                 )
             )
             items.append(_result("H5", channels == ["Z"], f"channels: {channels}"))
-            items.append(
-                _result("H6", True, "metric depth deferred (needs pixel read)")
-            )
+            items.append(_result("H6", True, "metric depth deferred (needs pixel read)"))
         else:
             items += [_result(f"H{i}", False, "no exr") for i in range(3, 7)]
     except ImportError:
@@ -575,15 +513,11 @@ def audit_group_f(session: Path) -> list[dict]:
         for i, fld in enumerate(GAMEINFO_FIELDS_14, 1):
             ok = fld in cells_text
             items.append(
-                _result(
-                    f"F{i}", ok, f"{fld}: {'present in xlsx' if ok else 'NOT in xlsx'}"
-                )
+                _result(f"F{i}", ok, f"{fld}: {'present in xlsx' if ok else 'NOT in xlsx'}")
             )
     except ImportError:
         for i, fld in enumerate(GAMEINFO_FIELDS_14, 1):
-            items.append(
-                _result(f"F{i}", False, "openpyxl not installed — cannot audit xlsx")
-            )
+            items.append(_result(f"F{i}", False, "openpyxl not installed — cannot audit xlsx"))
     except Exception as exc:  # noqa: BLE001 — corrupt xlsx, badzipfile, etc.
         # Bug-fix 2026-05-15: a corrupt or partially-written xlsx used to raise
         # openpyxl.utils.exceptions.InvalidFileException (a non-ImportError
@@ -592,11 +526,7 @@ def audit_group_f(session: Path) -> list[dict]:
         # exception class name so the operator can see the file is unreadable.
         for i, fld in enumerate(GAMEINFO_FIELDS_14, 1):
             items.append(
-                _result(
-                    f"F{i}",
-                    False,
-                    f"{fld}: xlsx unreadable ({type(exc).__name__}: {exc})",
-                )
+                _result(f"F{i}", False, f"{fld}: xlsx unreadable ({type(exc).__name__}: {exc})")
             )
     return items
 
@@ -606,24 +536,19 @@ def audit_group_m_metadata(session: Path) -> list[dict]:
     items = []
     mpath = session / "metadata.json"
     if not mpath.exists():
-        return [
-            _result(f"M{i}", False, "metadata.json missing") for i in range(1, 5)
-        ] + [_result("F8-manifest", False, "MANIFEST.json check skipped (no metadata)")]
+        return [_result(f"M{i}", False, "metadata.json missing") for i in range(1, 5)] + [
+            _result("F8-manifest", False, "MANIFEST.json check skipped (no metadata)")
+        ]
     try:
         meta = json.loads(mpath.read_text())
     except (json.JSONDecodeError, OSError) as e:
-        return [
-            _result(f"M{i}", False, f"metadata.json parse error: {e}")
-            for i in range(1, 5)
-        ]
+        return [_result(f"M{i}", False, f"metadata.json parse error: {e}") for i in range(1, 5)]
 
     # M1: session_id present + UUID4 shape
     sid = meta.get("session_id", "")
     import re  # noqa: PLC0415
 
-    uuid4_re = re.compile(
-        r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-    )
+    uuid4_re = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
     items.append(
         _result(
             "M1",
@@ -642,16 +567,12 @@ def audit_group_m_metadata(session: Path) -> list[dict]:
     )
     items.append(
         _result(
-            "M3",
-            utc_ok,
-            f"UTC timestamps: started={rec_started[-6:]!r} written={written[-6:]!r}",
+            "M3", utc_ok, f"UTC timestamps: started={rec_started[-6:]!r} written={written[-6:]!r}"
         )
     )
     # M5: recorder_version present + not "unknown"
     rv = meta.get("recorder_version", "")
-    items.append(
-        _result("M5", bool(rv) and rv != "unknown", f"recorder_version={rv!r}")
-    )
+    items.append(_result("M5", bool(rv) and rv != "unknown", f"recorder_version={rv!r}"))
     # F8 / M4: MANIFEST.json with sha256
     manpath = session / "MANIFEST.json"
     if not manpath.exists():
@@ -679,9 +600,7 @@ def audit_group_m_metadata(session: Path) -> list[dict]:
                 )
             )
         except (json.JSONDecodeError, OSError) as e:
-            items.append(
-                _result("F8-manifest", False, f"MANIFEST.json parse error: {e}")
-            )
+            items.append(_result("F8-manifest", False, f"MANIFEST.json parse error: {e}"))
     return items
 
 
@@ -714,9 +633,7 @@ def audit_group_g15_operator(session: Path) -> list[dict]:
     items = []
     gi_path = session / "gameinfo.xlsx"
     if not gi_path.exists():
-        items.append(
-            _result("G15", False, "gameinfo.xlsx missing — cannot check operator_id")
-        )
+        items.append(_result("G15", False, "gameinfo.xlsx missing — cannot check operator_id"))
         return items
     try:
         import openpyxl  # noqa: PLC0415
@@ -743,13 +660,7 @@ def audit_group_g15_operator(session: Path) -> list[dict]:
                 if isinstance(h, str) and h.strip() == "operator_id":
                     operator_id = data[i] if i < len(data) else None
                     break
-        bad_values = {
-            "operator-MISSING-CONFIG",
-            "vendor-001-op-A",
-            "",
-            None,
-            "DataPilot",
-        }
+        bad_values = {"operator-MISSING-CONFIG", "vendor-001-op-A", "", None, "DataPilot"}
         ok = operator_id not in bad_values and bool(operator_id)
         items.append(_result("G15", ok, f"operator_id={operator_id!r}"))
     except Exception as exc:  # noqa: BLE001
@@ -784,9 +695,7 @@ def audit_group_a_placeholder(session: Path) -> list[dict]:
     if not isinstance(data, list) or len(data) < 100:
         items.append(
             _result(
-                "A21",
-                False,
-                f"too few frames ({len(data) if hasattr(data,'__len__') else 'N/A'})",
+                "A21", False, f"too few frames ({len(data) if hasattr(data,'__len__') else 'N/A'})"
             )
         )
         items.append(_result("A22", False, "too few frames"))
@@ -795,11 +704,7 @@ def audit_group_a_placeholder(session: Path) -> list[dict]:
     xs, ys, zs = [], [], []
     for f in data[:2000]:
         cp = f.get("camera_position")
-        if (
-            isinstance(cp, list)
-            and len(cp) == 3
-            and all(isinstance(c, (int, float)) for c in cp)
-        ):
+        if isinstance(cp, list) and len(cp) == 3 and all(isinstance(c, (int, float)) for c in cp):
             xs.append(cp[0])
             ys.append(cp[1])
             zs.append(cp[2])
@@ -822,11 +727,7 @@ def audit_group_a_placeholder(session: Path) -> list[dict]:
     angles = []
     for f in data[:2000]:
         q = f.get("camera_rotation_quaternion")
-        if (
-            isinstance(q, list)
-            and len(q) == 4
-            and all(isinstance(c, (int, float)) for c in q)
-        ):
+        if isinstance(q, list) and len(q) == 4 and all(isinstance(c, (int, float)) for c in q):
             w = q[3]
             # clamp |w| to [0,1] to avoid acos domain errors from numerical noise
             w_clamped = min(1.0, max(0.0, abs(w)))
@@ -860,16 +761,10 @@ def audit_group_v_audio_continuity(session: Path) -> list[dict]:
         return items
     gap = data.get("max_silence_gap_s") or data.get("longest_silence_s")
     if gap is None:
-        items.append(
-            _result("B7", False, "max_silence_gap_s missing from audio_check.json")
-        )
+        items.append(_result("B7", False, "max_silence_gap_s missing from audio_check.json"))
     else:
         items.append(
-            _result(
-                "B7",
-                float(gap) < 2.0,
-                f"max silence gap: {float(gap):.2f}s (expect <2.0)",
-            )
+            _result("B7", float(gap) < 2.0, f"max silence gap: {float(gap):.2f}s (expect <2.0)")
         )
     return items
 
@@ -982,9 +877,7 @@ def audit_group_v_real_footage(session: Path) -> list[dict]:
             )
         )
     except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-        items.append(
-            _result("B8", False, f"ffmpeg/ffprobe unavailable or timed out: {e}")
-        )
+        items.append(_result("B8", False, f"ffmpeg/ffprobe unavailable or timed out: {e}"))
     return items
 
 
@@ -1067,8 +960,7 @@ def audit_group_q_operator(session: Path) -> list[dict]:
             wasd_events = [
                 e
                 for e in events
-                if e.get("vk_code") in (87, 65, 83, 68)
-                or e.get("key") in ("W", "A", "S", "D")
+                if e.get("vk_code") in (87, 65, 83, 68) or e.get("key") in ("W", "A", "S", "D")
             ]
             if len(wasd_events) >= 5:
                 ts = sorted(
@@ -1095,21 +987,15 @@ def audit_group_q_operator(session: Path) -> list[dict]:
                     else:
                         items.append(_result("Q6", False, "WASD events have no timing"))
                 else:
-                    items.append(
-                        _result("Q6", False, "too few WASD events with timestamps")
-                    )
+                    items.append(_result("Q6", False, "too few WASD events with timestamps"))
             else:
                 items.append(
-                    _result(
-                        "Q6", False, f"only {len(wasd_events)} WASD events (need >=5)"
-                    )
+                    _result("Q6", False, f"only {len(wasd_events)} WASD events (need >=5)")
                 )
             # Q10 — WASD balance: no single key dominates >70%
             counts = {"W": 0, "A": 0, "S": 0, "D": 0}
             for e in wasd_events:
-                k = e.get("key") or {87: "W", 65: "A", 83: "S", 68: "D"}.get(
-                    e.get("vk_code"), ""
-                )
+                k = e.get("key") or {87: "W", 65: "A", 83: "S", 68: "D"}.get(e.get("vk_code"), "")
                 if k in counts:
                     counts[k] += 1
             total = sum(counts.values())
@@ -1153,17 +1039,11 @@ def audit_group_q_operator(session: Path) -> list[dict]:
             meta = json.loads(meta_path.read_text())
             wc = (meta.get("recorder_extra") or {}).get("window_capture")
             if wc is False:
-                items.append(
-                    _result("Q5", True, "monitor-capture (proxy for fullscreen)")
-                )
+                items.append(_result("Q5", True, "monitor-capture (proxy for fullscreen)"))
             elif wc is True:
-                items.append(
-                    _result("Q5", False, "window_capture=true (not fullscreen)")
-                )
+                items.append(_result("Q5", False, "window_capture=true (not fullscreen)"))
             else:
-                items.append(
-                    _result("Q5", False, "window_capture key missing from metadata")
-                )
+                items.append(_result("Q5", False, "window_capture key missing from metadata"))
         except (json.JSONDecodeError, OSError) as e:
             items.append(_result("Q5", False, f"metadata parse error: {e}"))
     else:
@@ -1227,9 +1107,7 @@ def audit_group_session_sanity(session: Path) -> list[dict]:
     # SS1: mp4 duration ≈ metadata.duration
     meta_dur = meta.get("duration")
     if mp4_dur is None or not isinstance(meta_dur, (int, float)):
-        items.append(
-            _result("SS1", False, f"mp4_dur={mp4_dur} meta_dur={meta_dur} (need both)")
-        )
+        items.append(_result("SS1", False, f"mp4_dur={mp4_dur} meta_dur={meta_dur} (need both)"))
     else:
         diff = abs(mp4_dur - meta_dur) / max(mp4_dur, 1e-9)
         items.append(
@@ -1279,9 +1157,7 @@ def audit_group_session_sanity(session: Path) -> list[dict]:
         except (json.JSONDecodeError, OSError, ValueError, TypeError):
             pass
     if mp4_dur is None or ac_span is None:
-        items.append(
-            _result("SS3", False, f"mp4_dur={mp4_dur} ac_span={ac_span} (need both)")
-        )
+        items.append(_result("SS3", False, f"mp4_dur={mp4_dur} ac_span={ac_span} (need both)"))
     else:
         diff = abs(mp4_dur - ac_span) / max(mp4_dur, 1e-9)
         items.append(
@@ -1298,19 +1174,13 @@ def audit_group_session_sanity(session: Path) -> list[dict]:
     else:
         exr_n = sum(1 for _ in depth_dir.glob("*.exr"))
         items.append(
-            _result(
-                "SS4",
-                1788 <= exr_n <= 1810,
-                f"depth/*.exr count={exr_n} (expect 1788-1810)",
-            )
+            _result("SS4", 1788 <= exr_n <= 1810, f"depth/*.exr count={exr_n} (expect 1788-1810)")
         )
 
     # SS5: recording started within last 7 days
     rs = meta.get("recording_started_utc")
     if not isinstance(rs, str):
-        items.append(
-            _result("SS5", False, f"recording_started_utc={rs!r} not iso-string")
-        )
+        items.append(_result("SS5", False, f"recording_started_utc={rs!r} not iso-string"))
     else:
         try:
             t = datetime.fromisoformat(rs.replace("Z", "+00:00"))
@@ -1352,19 +1222,13 @@ def audit_group_anti_replay(session: Path) -> list[dict]:
         return items
     if not isinstance(d, list) or len(d) < 500:
         items.append(
-            _result(
-                "AR1",
-                False,
-                f"too few frames ({len(d) if hasattr(d,'__len__') else 'N/A'})",
-            )
+            _result("AR1", False, f"too few frames ({len(d) if hasattr(d,'__len__') else 'N/A'})")
         )
         items.append(_result("AR2", False, "too few frames"))
         return items
 
     # AR1: autocorrelation at lag 100 on mouse_x. Real input < 0.85; copy-pasted ≈ 1.0
-    mxs = [
-        f.get("mouse_x") for f in d[:2000] if isinstance(f.get("mouse_x"), (int, float))
-    ]
+    mxs = [f.get("mouse_x") for f in d[:2000] if isinstance(f.get("mouse_x"), (int, float))]
     if len(mxs) >= 200:
         n = len(mxs)
         lag = 100
@@ -1388,11 +1252,7 @@ def audit_group_anti_replay(session: Path) -> list[dict]:
     last_cp = None
     for f in d[:2000]:
         cp = f.get("camera_position")
-        if (
-            isinstance(cp, list)
-            and len(cp) == 3
-            and all(isinstance(c, (int, float)) for c in cp)
-        ):
+        if isinstance(cp, list) and len(cp) == 3 and all(isinstance(c, (int, float)) for c in cp):
             if last_cp is not None:
                 delta = math.sqrt(sum((cp[i] - last_cp[i]) ** 2 for i in range(3)))
                 total_delta += 1
@@ -1432,11 +1292,7 @@ def heal_action_camera(session: Path) -> dict:
     """
     ac_path = session / "action_camera.json"
     if not ac_path.exists():
-        return {
-            "renamed_fields": [],
-            "frames_touched": 0,
-            "note": "no action_camera.json",
-        }
+        return {"renamed_fields": [], "frames_touched": 0, "note": "no action_camera.json"}
     data = json.loads(ac_path.read_text())
     if not isinstance(data, list) or len(data) == 0:
         return {"renamed_fields": [], "frames_touched": 0, "note": "empty/non-array"}
@@ -1456,10 +1312,7 @@ def heal_action_camera(session: Path) -> dict:
         if not bak.exists():
             bak.write_text(ac_path.read_text())
         ac_path.write_text(json.dumps(data, indent=2))
-    return {
-        "renamed_fields": sorted(renamed),
-        "frames_touched": len(data) if renamed else 0,
-    }
+    return {"renamed_fields": sorted(renamed), "frames_touched": len(data) if renamed else 0}
 
 
 def main(argv: list[str]) -> int:
@@ -1486,9 +1339,7 @@ def main(argv: list[str]) -> int:
                 print(f"    - {r}")
             print("  backup saved: action_camera.json.bak")
         else:
-            print(
-                f"  no legacy names found ({heal_report.get('note', 'nothing to heal')})"
-            )
+            print(f"  no legacy names found ({heal_report.get('note', 'nothing to heal')})")
         print()
 
     items = []
@@ -1549,7 +1400,7 @@ def main(argv: list[str]) -> int:
         )
 
     total = len(items)
-    passed = sum(1 for it in items if it["status"] in ("PASS", "PASS_STRICT"))
+    passed = sum(1 for it in items if it["status"] == "PASS")
     failed = total - passed
 
     if out_format == "--json":
@@ -1567,7 +1418,7 @@ def main(argv: list[str]) -> int:
         print("| ID | Status | Evidence |")
         print("|---|---|---|")
         for it in items:
-            mark = "✅" if it["status"] in ("PASS", "PASS_STRICT") else "❌"
+            mark = "✅" if it["status"] == "PASS" else "❌"
             print(f"| {it['id']} | {mark} | {it['evidence']} |")
     return 0 if failed == 0 else 1
 
