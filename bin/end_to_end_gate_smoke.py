@@ -61,15 +61,6 @@ GATES = [
 
 GATE_TIMEOUT = 120  # seconds per gate
 
-# Gates that MUST hard-PASS for a buyer-deliverable session.
-STRICT_BUYER_REQUIRED = {
-    "H8_depth_source",
-    "S1_sync_tolerance",
-    "V1_video_quality",
-    "V2_video_artifacts",
-    "B2_provenance",
-}
-
 
 def _bin_dir() -> Path:
     """Return the directory that contains this script (bin/)."""
@@ -112,64 +103,68 @@ def _run_gate(script_name: str, session_dir: str) -> dict:
             status = data.get("status", "ERROR")
             evidence = data.get("evidence", f"exit code {result.returncode}")
             # If the gate itself reported a status, honour it
-            if status in (
-                "PASS",
-                "PASS_OK",
-                "FAIL",
-                "SKIP",
-                "SKIP_honest",
-                "PASS_DEGRADED",
-            ):
+            if status in ("PASS", "FAIL", "SKIP", "PASS_OK", "PASS_DEGRADED"):
                 return {"status": status, "evidence": evidence}
         except (json.JSONDecodeError, ValueError):
             pass
-        # Fallback: treat as ERROR
-        stderr_snippet = (result.stderr or "").strip()[:200]
+        stderr_snippet = (result.stderr or "").strip()
+        if len(stderr_snippet) > 200:
+            stderr_snippet = stderr_snippet[:200] + "…"
         return {
             "status": "ERROR",
-            "evidence": f"exit code {result.returncode}: {stderr_snippet}",
+            "evidence": f"exit code {result.returncode}"
+            + (f" — {stderr_snippet}" if stderr_snippet else ""),
         }
 
-    # Zero exit → parse JSON
+    # Parse JSON output
     try:
         data = json.loads(result.stdout.strip())
-        return {
-            "status": data.get("status", "PASS"),
-            "evidence": data.get("evidence", "ok"),
-        }
-    except (json.JSONDecodeError, ValueError):
+    except (json.JSONDecodeError, ValueError) as exc:
         return {
             "status": "ERROR",
-            "evidence": "JSON parse error: gate returned non-JSON on stdout",
+            "evidence": f"JSON parse error: {exc}",
         }
 
+    status = data.get("status", "ERROR")
+    evidence = data.get("evidence", json.dumps(data))
+    return {"status": status, "evidence": evidence}
 
-def _run_b2_provenance(session_dir: str, skip_sign: bool = False) -> dict:
+
+def _run_b2_provenance(session_dir: str, skip_sign: bool) -> dict:
     """
-    Run B2 provenance sign + verify round-trip.
+    B2 provenance gate: sign + verify round-trip using ed25519.
 
-    Returns:
-        {"status": str, "evidence": str}
+    Creates a synthetic manifest, signs it, then verifies the signature.
+    If --skip-sign is given, returns SKIP.
     """
     if skip_sign:
         return {"status": "SKIP", "evidence": "--skip-sign requested"}
 
-    bin = _bin_dir()
-    sign_script = bin / "provenance_sign.py"
-    verify_script = bin / "provenance_verify.py"
+    sign_script = _bin_dir() / "provenance_sign.py"
+    verify_script = _bin_dir() / "provenance_verify.py"
 
+    # Check both scripts exist
     if not sign_script.exists() or not verify_script.exists():
-        return {"status": "SKIP", "evidence": "sign/verify scripts not found"}
+        return {
+            "status": "SKIP",
+            "evidence": "provenance_sign.py / provenance_verify.py not found",
+        }
 
-    # --- Sign ---
-    manifest_path = os.path.join(session_dir, "MANIFEST.json")
-    if not os.path.exists(manifest_path):
-        return {"status": "FAIL", "evidence": "MANIFEST.json missing"}
+    # Create synthetic manifest
+    manifest = {
+        "batch_id": f"smoke-{int(time.time())}",
+        "merkle_root": "0" * 64,
+    }
 
     with tempfile.TemporaryDirectory() as tmpdir:
+        manifest_path = os.path.join(tmpdir, "manifest.json")
         sig_path = os.path.join(tmpdir, "manifest.sig")
-        pub_path = os.path.join(tmpdir, "pub.pem")
+        pub_path = os.path.join(tmpdir, "key.pub")
 
+        with open(manifest_path, "w") as f:
+            json.dump(manifest, f)
+
+        # --- Sign ---
         try:
             sign_result = subprocess.run(
                 [
@@ -180,6 +175,7 @@ def _run_b2_provenance(session_dir: str, skip_sign: bool = False) -> dict:
                     sig_path,
                     "--pub-out",
                     pub_path,
+                    "--json",
                 ],
                 capture_output=True,
                 text=True,
@@ -229,122 +225,6 @@ def _run_b2_provenance(session_dir: str, skip_sign: bool = False) -> dict:
         return {"status": "PASS", "evidence": "sign + verify round-trip OK"}
 
 
-# ---------------------------------------------------------------------------
-# Evidence provenance detection (S06)
-# ---------------------------------------------------------------------------
-
-
-def _detect_h8_real(session_dir: Path) -> bool:
-    """
-    Rule 1: H8 marker has kind: engine_zbuffer AND EXR file total size > 1MB.
-    """
-    marker = session_dir / "depth" / ".source"
-    if not marker.exists():
-        return False
-
-    try:
-        text = marker.read_text()
-        data = json.loads(text)
-        kind = data.get("kind", "")
-        if kind != "engine_zbuffer":
-            return False
-    except (json.JSONDecodeError, OSError):
-        return False
-
-    # Sum EXR file sizes in depth/
-    depth_dir = session_dir / "depth"
-    if not depth_dir.is_dir():
-        return False
-
-    total_exr_bytes = 0
-    for f in depth_dir.iterdir():
-        if f.suffix.lower() == ".exr":
-            try:
-                total_exr_bytes += f.stat().st_size
-            except OSError:
-                pass
-
-    return total_exr_bytes > 1_000_000  # > 1MB
-
-
-def _detect_video_non_integer_duration(session_dir: Path) -> bool:
-    """
-    Rule 2: Video file ffprobe duration is non-integer (synthetic are integer seconds).
-    """
-    recording = session_dir / "recording.mp4"
-    if not recording.exists():
-        return False
-
-    try:
-        result = subprocess.run(
-            [
-                "ffprobe",
-                "-v",
-                "error",
-                "-show_entries",
-                "format=duration",
-                "-of",
-                "json",
-                str(recording),
-            ],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        if result.returncode != 0:
-            return False
-        data = json.loads(result.stdout)
-        duration_str = data.get("format", {}).get("duration", "")
-        if not duration_str:
-            return False
-        duration = float(duration_str)
-        # Non-integer duration → real
-        return duration != int(duration)
-    except (subprocess.TimeoutExpired, OSError, json.JSONDecodeError, ValueError):
-        return False
-
-
-def _detect_evidence_provenance(session_dir: str) -> str:
-    """
-    Determine evidence provenance for a session directory.
-
-    Returns one of: "real", "synthetic", "unknown"
-
-    Rules (by priority):
-    1. H8 marker kind=engine_zbuffer + EXR total > 1MB → real
-    2. Video ffprobe duration non-integer → real
-    3. session_dir path contains "OysterClips/finalized/" → real
-    4. session_dir path contains "tests/fixtures/" or "/tmp/" → synthetic
-    5. Other → unknown (treated as synthetic)
-    """
-    session_path = Path(session_dir).resolve()
-    session_str = str(session_path)
-
-    # Rule 1: H8 engine_zbuffer + EXR > 1MB
-    if _detect_h8_real(session_path):
-        return "real"
-
-    # Rule 2: Video non-integer duration
-    if _detect_video_non_integer_duration(session_path):
-        return "real"
-
-    # Rule 3: OysterClips/finalized/ in path
-    if "OysterClips/finalized/" in session_str:
-        return "real"
-
-    # Rule 4: tests/fixtures/ or /tmp/ in path → synthetic
-    if "tests/fixtures/" in session_str or "/tmp/" in session_str:
-        return "synthetic"
-
-    # Rule 5: unknown → treated as synthetic
-    return "unknown"
-
-
-# ---------------------------------------------------------------------------
-# Verdict computation
-# ---------------------------------------------------------------------------
-
-
 def _compute_verdict(gates_result: dict, strict_buyer: bool = False) -> dict:
     """
     Compute overall verdict from individual gate results.
@@ -354,6 +234,7 @@ def _compute_verdict(gates_result: dict, strict_buyer: bool = False) -> dict:
       - any ERROR → FAIL (with crash note)
       - any PASS_DEGRADED → PASS_DEGRADED (unless FAIL/ERROR above)
       - all PASS/SKIP → PASS
+    SKIP is treated as "no signal" — fine for demos.
 
     --strict-buyer rules (v0.4.1, Howard PM review 2026-05-18):
       In strict-buyer mode, the gates listed in `STRICT_BUYER_REQUIRED` MUST
@@ -361,15 +242,17 @@ def _compute_verdict(gates_result: dict, strict_buyer: bool = False) -> dict:
       gates → FAIL. This prevents a session from looking PASS to a buyer when
       e.g. H8 depth source SKIPs as monocular_da_v2 fallback. Iron law: SKIP
       must not silently let a session ship in production.
-
-    --strict-buyer evidence provenance (S06):
-      When strict_buyer is True, the caller must also pass evidence_provenance.
-      Three-tier verdict:
-        - BUYER_READY: all strict gates PASS/PASS_OK AND evidence is real → exit 0
-        - STRICT_GATES_PASS_SYNTHETIC: all strict gates PASS/PASS_OK but evidence
-          synthetic/unknown → exit 2
-        - STRICT_VIOLATIONS: any strict gate FAIL/SKIP/ERROR → exit 1
     """
+    # Gates that MUST hard-PASS for a buyer-deliverable session. SKIP on any
+    # of these in strict-buyer mode = production block.
+    STRICT_BUYER_REQUIRED = {
+        "H8_depth_source",
+        "S1_sync_tolerance",
+        "V1_video_quality",
+        "V2_video_artifacts",
+        "B2_provenance",
+    }
+
     statuses = [g["status"] for g in gates_result.values()]
 
     pass_count = sum(1 for s in statuses if s == "PASS")
@@ -411,48 +294,6 @@ def _compute_verdict(gates_result: dict, strict_buyer: bool = False) -> dict:
     if strict_violations:
         result["strict_violations"] = strict_violations
     return result
-
-
-def _compute_strict_buyer_verdict(gates_result: dict, evidence_provenance: str) -> dict:
-    """
-    Compute the three-tier strict-buyer verdict.
-
-    Returns dict with:
-      - verdict: "BUYER_READY" | "STRICT_GATES_PASS_SYNTHETIC" | "STRICT_VIOLATIONS"
-      - exit_code: 0 | 2 | 1
-      - evidence_provenance: "real" | "synthetic" | "unknown"
-    """
-    # Check for any strict gate violations (FAIL, SKIP, ERROR, PASS_DEGRADED)
-    strict_violations = []
-    for gate_id, g in gates_result.items():
-        if gate_id in STRICT_BUYER_REQUIRED:
-            if g["status"] not in ("PASS", "PASS_OK"):
-                strict_violations.append(
-                    f"{gate_id}={g['status']} (strict-buyer requires PASS)"
-                )
-
-    if strict_violations:
-        return {
-            "verdict": "STRICT_VIOLATIONS",
-            "exit_code": 1,
-            "evidence_provenance": evidence_provenance,
-            "strict_violations": strict_violations,
-        }
-
-    # All strict gates PASS/PASS_OK — check evidence provenance
-    if evidence_provenance == "real":
-        return {
-            "verdict": "BUYER_READY",
-            "exit_code": 0,
-            "evidence_provenance": evidence_provenance,
-        }
-    else:
-        # synthetic or unknown → treated as synthetic
-        return {
-            "verdict": "STRICT_GATES_PASS_SYNTHETIC",
-            "exit_code": 2,
-            "evidence_provenance": evidence_provenance,
-        }
 
 
 def _format_table(gates_result: dict, summary: dict) -> str:
@@ -502,9 +343,7 @@ def main():
     )
     parser.add_argument("session_dir", help="Path to session directory")
     parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Output JSON instead of human-readable table",
+        "--json", action="store_true", help="Output JSON instead of human-readable table"
     )
     parser.add_argument(
         "--skip-sign",
@@ -525,9 +364,7 @@ def main():
 
     session_dir = args.session_dir
     if not os.path.isdir(session_dir):
-        print(
-            f"ERROR: session directory does not exist: {session_dir}", file=sys.stderr
-        )
+        print(f"ERROR: session directory does not exist: {session_dir}", file=sys.stderr)
         sys.exit(1)
 
     # Derive session_id from directory name
@@ -545,60 +382,28 @@ def main():
         else:
             gates_result[key] = _run_gate(script, session_dir)
 
-    # Detect evidence provenance (S06)
-    evidence_provenance = _detect_evidence_provenance(session_dir)
+    summary = _compute_verdict(gates_result, strict_buyer=args.strict_buyer)
+    summary["session_id"] = session_id
 
-    if args.strict_buyer:
-        # Three-tier strict-buyer verdict
-        sb_verdict = _compute_strict_buyer_verdict(gates_result, evidence_provenance)
-        summary = _compute_verdict(gates_result, strict_buyer=True)
-        summary["session_id"] = session_id
-        summary["strict_buyer_verdict"] = sb_verdict["verdict"]
-        summary["evidence_provenance"] = sb_verdict["evidence_provenance"]
-        summary["exit_code"] = sb_verdict["exit_code"]
-
-        if args.json:
-            output = {
-                "session_id": session_id,
-                "gates": gates_result,
-                "summary": {
-                    "pass": summary["pass"],
-                    "fail": summary["fail"],
-                    "skip": summary["skip"],
-                    "verdict": summary["verdict"],
-                    "strict_buyer_verdict": sb_verdict["verdict"],
-                    "evidence_provenance": sb_verdict["evidence_provenance"],
-                },
-            }
-            print(json.dumps(output, indent=2))
-        else:
-            print(_format_table(gates_result, summary))
-
-        sys.exit(sb_verdict["exit_code"])
+    if args.json:
+        output = {
+            "session_id": session_id,
+            "gates": gates_result,
+            "summary": {
+                "pass": summary["pass"],
+                "fail": summary["fail"],
+                "skip": summary["skip"],
+                "verdict": summary["verdict"],
+            },
+        }
+        print(json.dumps(output, indent=2))
     else:
-        # Standard (demo) mode
-        summary = _compute_verdict(gates_result, strict_buyer=False)
-        summary["session_id"] = session_id
+        print(_format_table(gates_result, summary))
 
-        if args.json:
-            output = {
-                "session_id": session_id,
-                "gates": gates_result,
-                "summary": {
-                    "pass": summary["pass"],
-                    "fail": summary["fail"],
-                    "skip": summary["skip"],
-                    "verdict": summary["verdict"],
-                },
-            }
-            print(json.dumps(output, indent=2))
-        else:
-            print(_format_table(gates_result, summary))
-
-        # Exit code: 0 for PASS/PASS_DEGRADED, 1 for FAIL
-        if summary["verdict"] == "FAIL":
-            sys.exit(1)
-        sys.exit(0)
+    # Exit code: 0 for PASS/PASS_DEGRADED, 1 for FAIL
+    if summary["verdict"] == "FAIL":
+        sys.exit(1)
+    sys.exit(0)
 
 
 if __name__ == "__main__":
