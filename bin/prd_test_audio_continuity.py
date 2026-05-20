@@ -31,6 +31,21 @@ except ImportError:
     np = DummyNP()
 
 
+def is_moov_atom_error(error_msg: str) -> bool:
+    """
+    Check if an error message is about a moov atom not found in an MP4 file.
+    
+    Args:
+        error_msg: The error message to check.
+        
+    Returns:
+        True if the error is about moov atom not found, False otherwise.
+    """
+    error_lower = error_msg.lower()
+    # Check for various forms of the error message
+    return ("moov atom" in error_lower and "not found" in error_lower) or "invalid mp4" in error_lower
+
+
 def check_ffprobe_available() -> bool:
     """
     Check if ffprobe is available in the system PATH.
@@ -111,8 +126,23 @@ def get_audio_streams(video_path: Path) -> List[int]:
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
-        # If ffprobe fails, assume no audio streams
-        return []
+        # Provide detailed error information
+        error_msg = result.stderr.strip()
+        if not error_msg:
+            error_msg = "no error output"
+        
+        # Check for specific "moov atom not found" error
+        if "moov atom not found" in error_msg.lower():
+            raise RuntimeError(
+                f"Invalid MP4 file: moov atom (metadata) not found. "
+                f"This usually means the file is incomplete or corrupted. "
+                f"File: {video_path}"
+            )
+        
+        raise RuntimeError(
+            f"ffprobe failed with code {result.returncode}: {error_msg}. "
+            f"Command: {' '.join(cmd)}"
+        )
 
     data = json.loads(result.stdout)
     audio_streams = []
@@ -122,26 +152,22 @@ def get_audio_streams(video_path: Path) -> List[int]:
     return audio_streams
 
 
-def check_continuity(
-    timestamps: List[float], threshold_ms: float
-) -> List[Tuple[float, float, float]]:
+def check_continuity(timestamps: List[float], threshold_ms: float) -> List[Tuple[float, float, float]]:
     """
-    Check if audio packet timestamps have gaps exceeding threshold.
+    Check if audio packet timestamps are continuous (no gaps > threshold).
 
     Args:
         timestamps: Sorted list of packet timestamps in seconds.
         threshold_ms: Maximum allowed gap in milliseconds.
 
     Returns:
-        List of (start_time, end_time, gap_ms) tuples for gaps
-        exceeding threshold.
+        List of gaps as (start_time, end_time, gap_ms) tuples.
     """
     if len(timestamps) < 2:
         return []
 
     threshold_s = threshold_ms / 1000.0
     gaps = []
-
     for i in range(1, len(timestamps)):
         gap = timestamps[i] - timestamps[i - 1]
         if gap > threshold_s:
@@ -206,9 +232,8 @@ def main(argv: List[str] = None) -> int:
         audio_streams = get_audio_streams(args.video)
     except RuntimeError as e:
         # Check if error is about invalid MP4 file
-        error_str = str(e)
-        if "moov atom not found" in error_str.lower() or "invalid mp4" in error_str.lower():
-            print(f"SKIP: {error_str}", file=sys.stderr)
+        if is_moov_atom_error(str(e)):
+            print(f"SKIP: {e}", file=sys.stderr)
             return 2
         else:
             print(f"Error: {e}", file=sys.stderr)
@@ -223,8 +248,13 @@ def main(argv: List[str] = None) -> int:
         try:
             timestamps = get_audio_packets(args.video, stream_idx)
         except RuntimeError as e:
-            print(f"Error reading stream {stream_idx}: {e}", file=sys.stderr)
-            return 2
+            # Check if error is about invalid MP4 file
+            if is_moov_atom_error(str(e)):
+                print(f"SKIP: {e}", file=sys.stderr)
+                return 2
+            else:
+                print(f"Error reading stream {stream_idx}: {e}", file=sys.stderr)
+                return 2
 
         gaps = check_continuity(timestamps, args.threshold)
         for start, end, duration in gaps:
