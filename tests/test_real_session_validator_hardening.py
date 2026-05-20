@@ -163,7 +163,7 @@ class TestContinueOnError(unittest.TestCase):
                             e.code, 1
                         )  # still exits 1 because there's a FAIL
 
-        f.getvalue()  # noqa: F841
+        output = f.getvalue()
         # All 5 sessions should appear in output
         self.assertIn("session_001", output)
         self.assertIn("session_002", output)
@@ -206,7 +206,7 @@ class TestContinueOnError(unittest.TestCase):
                     except SystemExit as e:
                         self.assertEqual(e.code, 1)
 
-        f.getvalue()  # noqa: F841
+        output = f.getvalue()
         # session_001 and session_002 should appear, but not 003+
         self.assertIn("session_001", output)
         self.assertIn("session_002", output)
@@ -417,7 +417,7 @@ class TestSample(unittest.TestCase):
                     except SystemExit as e:
                         self.assertEqual(e.code, 0)
 
-        f.getvalue()  # noqa: F841
+        output = f.getvalue()
         # Count how many session names appear
         session_count = sum(1 for i in range(1, 11) if f"session_{i:03d}" in output)
         self.assertEqual(session_count, 3)
@@ -454,7 +454,7 @@ class TestSample(unittest.TestCase):
                     except SystemExit as e:
                         self.assertEqual(e.code, 0)
 
-        f.getvalue()  # noqa: F841
+        output = f.getvalue()
         # All 10 sessions should appear
         for i in range(1, 11):
             self.assertIn(f"session_{i:03d}", output)
