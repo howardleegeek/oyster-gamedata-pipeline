@@ -74,6 +74,11 @@ class DiskSpaceManager:
         return total
     
     def get_usage_percentage(self) -> float:
+        """Return the current disk usage as a fraction of the configured capacity cap.
+
+        Returns:
+            float: Ratio of current usage bytes to cap bytes (e.g. 0.85 means 85% used).
+        """
         return self.get_current_usage() / self.cap_bytes
     
     def load_metadata(self) -> dict:
