@@ -3,10 +3,6 @@
 Detects a running Roblox client by process name (``RobloxPlayerBeta.exe``
 on Windows, ``RobloxPlayer.app`` on macOS) and extracts ``place_id`` /
 ``universe_id`` from the local Roblox log files.
-
-The ``pre_record_hook`` injects a small overlay marker string
-("Recording for Oyster") — this is a metadata-only hook; no actual
-in-game mod injection is performed.
 """
 
 from __future__ import annotations
@@ -16,11 +12,9 @@ import os
 import platform
 import re
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
-import psutil
-
-from bin.games.base_adapter import GameAdapter, GameMetadata, GameSession
+from bin.games.base_adapter import BaseAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -29,41 +23,13 @@ _ROBLOX_EXE_WIN = "RobloxPlayerBeta.exe"
 _ROBLOX_EXE_MAC = "RobloxPlayer.app"
 
 # Regex patterns for extracting IDs from Roblox local logs.
-# Allow optional whitespace between the key and the separator.
 _PLACE_ID_RE = re.compile(r"place[_-]?id\s*[=:]\s*(\d+)", re.IGNORECASE)
 _UNIVERSE_ID_RE = re.compile(r"universe[_-]?id\s*[=:]\s*(\d+)", re.IGNORECASE)
 
-# Overlay marker injected by the pre-record hook.
-OVERLAY_MARKER = "Recording for Oyster"
 
-
-def _roblox_exe_name() -> str:
-    """Return the platform-specific Roblox executable name."""
-    if platform.system() == "Windows":
-        return _ROBLOX_EXE_WIN
-    return _ROBLOX_EXE_MAC
-
-
-def _find_roblox_process() -> Optional[psutil.Process]:
-    """Search all running processes for the Roblox client.
-
-    Returns the first matching ``psutil.Process`` or ``None``.
-    Never raises — any ``psutil`` access errors are logged and swallowed.
-    """
-    target = _roblox_exe_name()
-    try:
-        for proc in psutil.process_iter(["pid", "name", "exe"]):
-            try:
-                name = proc.info.get("name") or ""
-                exe = proc.info.get("exe") or ""
-                # Match by process name or full exe path basename
-                if name == target or os.path.basename(exe) == target:
-                    return proc
-            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                continue
-    except Exception:
-        logger.debug("Failed to iterate processes", exc_info=True)
-    return None
+def _roblox_exe_names() -> tuple[str, ...]:
+    """Return all platform-specific Roblox executable names."""
+    return (_ROBLOX_EXE_WIN, _ROBLOX_EXE_MAC)
 
 
 def _roblox_log_dir() -> Path:
@@ -71,7 +37,7 @@ def _roblox_log_dir() -> Path:
     system = platform.system()
     if system == "Windows":
         return Path(os.environ.get("LOCALAPPDATA", "")) / "Roblox" / "logs"
-    # macOS
+    # macOS / Linux fallback
     return Path.home() / "Library" / "Logs" / "Roblox"
 
 
@@ -114,59 +80,74 @@ def _extract_ids_from_logs(log_dir: Path) -> dict[str, str]:
     return {"place_id": place_id, "universe_id": universe_id}
 
 
-class RobloxAdapter(GameAdapter):
+class RobloxAdapter(BaseAdapter):
     """Adapter for the Roblox game client."""
 
-    @property
-    def game_name(self) -> str:
-        return "roblox"
+    GAME_NAME = "roblox"
 
-    def detect(self) -> Optional[GameSession]:
-        """Detect a running Roblox client process.
+    @classmethod
+    def detect(cls, process_name: str, process_exe: str) -> bool:
+        """Detect if a process belongs to Roblox.
 
-        Returns ``None`` when Roblox is not running (no error).
+        Checks both the process name and the executable path for
+        Roblox identifiers.
         """
-        proc = _find_roblox_process()
-        if proc is None:
-            return None
+        name_lower = process_name.lower()
+        exe_lower = process_exe.lower()
 
-        try:
-            exe_path = proc.exe() or ""
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            return None
+        for target in _roblox_exe_names():
+            target_lower = target.lower()
+            if name_lower == target_lower:
+                return True
+            if target_lower in exe_lower:
+                return True
 
-        try:
-            window_title = proc.name() or "Roblox"
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            window_title = "Roblox"
+        return False
 
-        return GameSession(
-            pid=proc.pid,
-            window_title=window_title,
-            exe_path=exe_path,
-        )
+    def extract_metadata(self, settings_path: Optional[str] = None) -> Dict[str, Any]:
+        """Extract Roblox metadata (place_id, universe_id) from local logs.
 
-    def extract_metadata(self, pid: int) -> GameMetadata:
-        """Extract Roblox metadata (place_id, universe_id) from local logs."""
-        ids = _extract_ids_from_logs(_roblox_log_dir())
-        return GameMetadata(
-            game_name="roblox",
-            place_id=ids["place_id"],
-            universe_id=ids["universe_id"],
-        )
+        Args:
+            settings_path: Optional override path to Roblox log directory.
 
-    def pre_record_hook(self, session: GameSession) -> None:
-        """Inject an overlay marker before recording starts.
-
-        In a real implementation this would communicate with an overlay
-        process.  Here we just log the marker for traceability.
+        Returns:
+            Dict with game_name, place_id, universe_id keys.
         """
-        logger.info(
-            "Roblox pre-record hook: overlay marker '%s' for PID %d",
-            OVERLAY_MARKER,
-            session.pid,
-        )
+        metadata: Dict[str, Any] = {
+            "game_name": self.GAME_NAME,
+            "place_id": None,
+            "universe_id": None,
+        }
 
-    def post_record_hook(self, session: GameSession) -> None:
-        """No-op cleanup after recording."""
-        logger.info("Roblox post-record hook for PID %d", session.pid)
+        log_dir = Path(settings_path) if settings_path else _roblox_log_dir()
+        ids = _extract_ids_from_logs(log_dir)
+
+        if ids["place_id"]:
+            metadata["place_id"] = ids["place_id"]
+        if ids["universe_id"]:
+            metadata["universe_id"] = ids["universe_id"]
+
+        return metadata
+
+    def get_recording_hooks(self) -> list[Dict[str, Any]]:
+        """Return recording hooks for Roblox sessions."""
+        return [
+            {
+                "name": "roblox_place_join",
+                "event": "on_place_load",
+                "filter_fn": "capture_place_info",
+                "description": "Record place_id and universe_id on game join",
+            },
+            {
+                "name": "roblox_overlay_marker",
+                "event": "pre_record",
+                "filter_fn": "inject_overlay",
+                "description": "Inject 'Recording for Oyster' overlay marker",
+            },
+            {
+                "name": "roblox_filter_menu",
+                "event": "on_state_change",
+                "filter_fn": "filter_menu_time",
+                "description": "Skip recording during Roblox menu screens",
+            },
+        ]
