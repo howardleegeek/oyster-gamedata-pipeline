@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [0.6.0] - 2026-05-20
+
+### Added
+
+- PR #30 cluster output rebased onto v0.5.0 main (#45) (fdec9cd)
+- PR #34 cluster output rebased onto v0.5.0 main (#46) (9f402c4)
+- PR #39 cluster output rebased onto v0.5.0 main (#47) (9a50ab2)
+
+
 ## v0.4.1 · 2026-05-19
 
 ### Added
