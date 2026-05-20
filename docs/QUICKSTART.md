@@ -1,170 +1,107 @@
-# Quickstart — Buyer Data Pipeline
+# Quickstart — Buyer-Spec v1 Production Pipeline
 
-> **Audience**: Buyers receiving a `.tar.gz` data bundle.
-> **Time**: ≤ 5 minutes.
-> **Prerequisites**: Python 3.10+ only. No other dependencies required.
-> **Release**: v0.4.1 · 2026-05-19
-
----
-
-## 1. Install Python 3.10+
-
-Verify your Python version:
+**One-command path**:
 
 ```bash
-python3 --version
+# Boot Paper Minecraft server (1.20.4) on localhost:25565
+cd /Users/howardli/Downloads/oyster-agent-runner/bin/.cache
+/opt/homebrew/opt/openjdk@21/bin/java -Xms1G -Xmx2G -jar paper-1.20.4.jar nogui &
+
+# Run end-to-end: capture → adapt → lint → pack
+/Users/howardli/Downloads/oyster-agent-runner/bin/buyer_spec_pipeline.sh \
+  --task /Users/howardli/Downloads/oyster-agent-runner/tasks/MC-tutorial-001.json \
+  --output /tmp/buyer_delivery.tar.gz \
+  --max-steps 9000 \
+  --bot-username op_main
 ```
 
-You need **Python 3.10 or newer**. If not installed, use your system package manager:
+Output: 11MB tarball with 5 deliverables + lint_report.json + diagnose_report.json + README.md + SHA256SUMS.
+
+## Three-game roadmap status
+
+| Game | Capture | Adapter | Lint | Status |
+|---|---|---|---|---|
+| Minecraft (Mineflayer + Paper) | `oyster-agent run-mc` | `oyster-agent adapt-buyer-spec` | exit 0 | ✅ production |
+| BeamNG.drive | `bin/beamng_telemetry_capture.py` | `bin/convert_to_buyer_spec.py --engine-fields-from` | (pending) | 🟡 needs Windows host |
+| CS2 | `bin/cs2_demo_to_engine_telemetry.py` | `bin/convert_to_buyer_spec.py --engine-fields-from` | (pending) | 🟡 needs `.dem` file |
+
+## Prerequisites (one-time setup)
 
 ```bash
-# macOS
-brew install python@3.12
+# Java 21 (for Paper server)
+brew install openjdk@21
 
-# Ubuntu / Debian
-sudo apt install python3.12
+# Node.js + Mineflayer (for the bot)
+cd /Users/howardli/Downloads/oyster-agent-runner/mineflayer
+npm install
 
-# Windows — download from python.org
+# Python venvs (already set up — both repos)
+# /Users/howardli/Downloads/oyster-agent-runner/.venv
+# /Users/howardli/Downloads/oyster-enrichment/.venv
+
+# Placeholder assets (auto-staged on first pipeline run)
+# /tmp/oyster_placeholders/{video.mp4, gameinfo.xlsx, depth/*.exr}
 ```
 
-No pip packages, virtual environments, or other tools are required for verification.
-
----
-
-## 2. Download the Bundle
-
-Obtain the `.tar.gz` bundle from your vendor. Extract it:
+## Running 100 iterations (validation sprint)
 
 ```bash
-tar xzf gamedata-bundle-*.tar.gz
-cd gamedata-bundle-*/
+/Users/howardli/Downloads/oyster-agent-runner/bin/iterate_buyer_spec.sh 100 50
+# Logs per-iter to /tmp/oyster_iter_log/iter_NNNN.json
+# Summary at /tmp/oyster_iter_log/summary.json
 ```
 
-The bundle contains:
-- `data/` — session data files
-- `verify.sh` — integrity verification script
-- `manifest.json` — signed batch manifest
-- `README.md` — bundle contents description
-
----
-
-## 3. Run Verification
+## CS2 game-3 path (when Howard provides .dem)
 
 ```bash
-bash verify.sh
+# 1. Parse demo → engine_telemetry sidecar
+python /Users/howardli/Downloads/oyster-enrichment/bin/cs2_demo_to_engine_telemetry.py \
+  --demo /path/to/match.dem \
+  --output /tmp/cs2_engine_telemetry.json \
+  --frame-rate 30 --max-frames 9000
+
+# 2. Adapt original CS2 capture bundle to buyer-spec, merging engine fields
+python /Users/howardli/Downloads/oyster-enrichment/bin/convert_to_buyer_spec.py \
+  --input-bundle /path/to/cs2-recording/ \
+  --output-bundle /tmp/cs2_buyer/ \
+  --engine-fields-from /tmp/cs2_engine_telemetry.json
+
+# 3. Lint
+python /Users/howardli/Downloads/oyster-enrichment/bin/lint_buyer_spec.py /tmp/cs2_buyer/
+
+# 4. Pack
+bash /Users/howardli/Downloads/oyster-enrichment/bin/buyer_spec_demo_pack.sh \
+  --bundle /tmp/cs2_buyer/ \
+  --output /tmp/cs2_delivery.tar.gz
 ```
 
-This script:
-1. Checks SHA-256 checksums of all data files
-2. Verifies the Ed25519 signature on the manifest
-3. Confirms the pubkey fingerprint matches the expected vendor key
-
-### Interpreting the Result
-
-- **`exit 0`** — Data is **trusted and verified**. All checksums and signatures match.
-- **`exit 1`** — Verification **failed**. Hash mismatch or invalid signature. Do not trust this data.
-- **`exit 2`** — Pubkey fingerprint mismatch. The bundle was signed by an unexpected key.
-
-> **Rule of thumb**: `exit 0` = data可信 (data is trustworthy). Any non-zero exit = reject the bundle.
-
-### provenance_verify.py Reference
-
-```
-usage: provenance_verify.py [-h] [--expect-pubkey EXPECT_PUBKEY]
-                            signed_manifest
-
-Verify an Ed25519-signed batch manifest
-
-positional arguments:
-  signed_manifest       Path to signed manifest JSON
-
-options:
-  -h, --help            show this help message and exit
-  --expect-pubkey EXPECT_PUBKEY
-                        Expected pubkey fingerprint (first 16 hex chars of
-                        sha256(pubkey))
-```
-
----
-
-## 4. (Optional) Run End-to-End Gate Smoke Test
-
-For deeper validation, run the full gate suite against a session directory:
+## BeamNG game-2 path (when Howard's Windows host is available)
 
 ```bash
-python3 bin/end_to_end_gate_smoke.py <session_dir> --strict-buyer
+# Side A (Windows host running BeamNG.drive in research mode):
+python /Users/howardli/Downloads/oyster-enrichment/bin/beamng_telemetry_capture.py \
+  --output /tmp/beamng_engine_telemetry.json \
+  --host 127.0.0.1 --port 25252 \
+  --frame-rate 30 --duration 300
+
+# Side B: same convert/lint/pack as CS2 above.
 ```
 
-### Flags
+## Troubleshooting
 
-| Flag | Description |
-|---|---|
-| `-h, --help` | show this help message and exit |
-| `--json` | Output JSON instead of human-readable table |
-| `--skip-sign` | Skip B2 provenance sign/verify round-trip |
-| `--strict-buyer` | v0.4.1: BLOCK on SKIP/PASS_DEGRADED for H8/S1/V1/V2/B2 |
-
-### Gates Checked
-
-| Gate | Label | What It Checks |
+| Symptom | Cause | Fix |
 |---|---|---|
-| H8 | Depth source | Engine Z-buffer, EXR format validity |
-| S1 | Sync tolerance | Frame sync within 50ms threshold |
-| S2 | Input latency | Input event timing accuracy |
-| V1 | Video quality | Video artifact detection |
-| V2 | Video artifacts | Additional video quality checks |
-| B2 | Provenance | Ed25519 signature verification |
+| `bot died before spawn: kicked: ... received string length is longer than maximum allowed (18 > 16)` | Username >16 chars | Pass `--bot-username` ≤16 chars |
+| `VIDEO_TOO_SHORT` at lint | Capture <300s of action_camera records | Add `--pad-to-min-records 9000` to adapt |
+| `DEPTH_DIR_MISSING` | Missing depth/ placeholder | Re-run pipeline; `_ensure_placeholders` auto-stages |
+| `OpenEXR import failed` | Missing OpenEXR | `pip install OpenEXR Imath` (macOS may need `brew install openexr`) |
+| Server won't start | Port 25565 in use | `lsof -i:25565` then kill the conflicting process |
+| `eula must be accepted` | Paper server needs EULA | `echo "eula=true" > eula.txt` in server dir |
 
-All gates must **PASS** for a production buyer deliverable when `--strict-buyer` is used.
+## Reference
 
-### end_to_end_gate_smoke.py Reference
-
-```
-usage: end_to_end_gate_smoke.py [-h] [--json] [--skip-sign] [--strict-buyer]
-                                session_dir
-
-End-to-end gate smoke test — runs all gates against a session dir
-
-positional arguments:
-  session_dir     Path to session directory
-
-options:
-  -h, --help      show this help message and exit
-  --json          Output JSON instead of human-readable table
-  --skip-sign     Skip B2 provenance sign/verify round-trip
-  --strict-buyer  v0.4.1: BLOCK on SKIP/PASS_DEGRADED for H8/S1/V1/V2/B2
-                  gates. Required for production buyer deliverables. Without
-                  this flag, the gate is in DEMO mode and SKIP is permitted
-                  (e.g. H8 monocular fallback won't block but also won't ship
-                  as production data).
-```
-
----
-
-## 5. Contact & Support
-
-- **Email**: howard.linra@gmail.com
-- **Vendor ID**: Register your vendor_id via email to receive bundle access.
-
----
-
-## FAQ
-
-### Q1: What does `exit 0` mean?
-`exit 0` from `verify.sh` means all integrity checks passed — SHA-256 checksums match, the Ed25519 signature is valid, and the pubkey fingerprint is correct. The data is trusted.
-
-### Q2: What if `verify.sh` returns a non-zero exit code?
-Do **not** trust the data. A non-zero exit indicates either a hash mismatch (data was modified in transit), an invalid signature (bundle was not signed by the expected vendor), or a pubkey mismatch (signed by an unexpected key). Contact the vendor for a new bundle.
-
-### Q3: Do I need to install any Python packages?
-No. The verification script (`verify.sh`) and the gate smoke test use only Python standard library modules plus `cryptography` (which is bundled in the tarball). No `pip install` is required.
-
-### Q4: What is `--strict-buyer` and when should I use it?
-`--strict-buyer` is a flag for `bin/end_to_end_gate_smoke.py` that enforces production-grade validation. Without it, the tool runs in DEMO mode where SKIP results are permitted. With `--strict-buyer`, any SKIP or PASS_DEGRADED on H8/S1/V1/V2/B2 gates will cause an overall FAIL. Use it for all production buyer deliverables.
-
-### Q5: Can I verify the bundle offline?
-Yes. The entire verification process (`verify.sh` and `bin/end_to_end_gate_smoke.py`) works fully offline. No network access or external services are required. All cryptographic keys and checksums are embedded in the bundle.
-
----
-
-*Auto-generated by `scripts/gen_quickstart.py` — do not edit manually.*
+- Production gaps: `docs/PRODUCTION_LINE.md`
+- Buyer spec: `oyster-enrichment/docs/BUYER_SPEC_v1_PLAN.md`
+- Lint codes: `oyster-enrichment/bin/lint_buyer_spec.py`
+- Adapter source: `src/oyster_agent_runner/buyer_spec_adapter.py`
+- Pipeline script: `bin/buyer_spec_pipeline.sh`
