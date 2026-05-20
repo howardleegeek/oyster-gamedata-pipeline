@@ -142,7 +142,7 @@ jobs:
           Set-Location vendor/recorder
           New-Item -ItemType Directory -Force `
             -Path $env:CARGO_TARGET_DIR | Out-Null
-          cargo build --release --locked
+          cargo build --release
           Write-Host "Build complete. Checking binary..."
           $bins = @(
             "$env:CARGO_TARGET_DIR/release/oyster-recorder.exe",
