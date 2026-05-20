@@ -11,6 +11,7 @@ Endpoints:
   GET  /api/v1/testers                → list all applicants (admin)
   POST /api/v1/testers/{id}/approve   → approve + return signed download URL
   POST /api/v1/testers/{id}/reject    → reject application
+  POST /api/sentry/store/             → accept Sentry-format crash envelopes
 
 All data lives in memory (dicts). No DB, no external services.
 """
@@ -25,7 +26,7 @@ from typing import Any, Dict
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend_stub import tester_invite
+from backend_stub import sentry_compat, tester_invite
 
 # ---------------------------------------------------------------------------
 # In-memory stores
@@ -135,6 +136,44 @@ def create_app() -> FastAPI:
         return {"session_id": session_id, "status": "received"}
 
     # ------------------------------------------------------------------
+    # Sentry crash-reporter endpoint
+    # ------------------------------------------------------------------
+    @app.post("/api/sentry/store/")
+    async def sentry_store(request: Request):
+        """Accept a Sentry SDK envelope or plain JSON crash event.
+
+        Parses the incoming payload, stores it in memory, and deduplicates
+        by ``stack_hash``.  Returns 200 with the ``event_id``.
+        """
+        content_type = request.headers.get("content-type", "")
+
+        # --- Envelope (text/plain or application/x-sentry-envelope) ---
+        if "text/plain" in content_type or "x-sentry-envelope" in content_type:
+            raw = await request.body()
+            text = raw.decode("utf-8", errors="replace")
+            events = sentry_compat.parse_envelope(text)
+        # --- JSON body ---
+        else:
+            body = await request.json()
+            events = sentry_compat.parse_json_body(body)
+
+        if not events:
+            raise HTTPException(
+                status_code=400,
+                detail="No parseable Sentry event found in request body",
+            )
+
+        # Store first event (envelopes typically carry one event)
+        event = events[0]
+        event_id, is_duplicate = sentry_compat.store_event(event)
+
+        return {
+            "event_id": event_id,
+            "duplicate": is_duplicate,
+            "stack_hash": event.stack_hash,
+        }
+
+    # ------------------------------------------------------------------
     # Tester invite endpoints
     # ------------------------------------------------------------------
     app.include_router(tester_invite.router)
@@ -162,9 +201,10 @@ def main() -> None:
 
     import uvicorn
 
-    app = create_app()
-    uvicorn.run(app, host=args.host, port=args.port, log_level="info")
+    uvicorn.run(create_app(), host=args.host, port=args.port)
 
 
-if __name__ == "__main__":
-    main()
+# ---------------------------------------------------------------------------
+# Module-level app instance (for tests that import directly)
+# ---------------------------------------------------------------------------
+app = create_app()
