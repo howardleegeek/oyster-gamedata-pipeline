@@ -83,10 +83,20 @@ class SalesContact:
         self.phone, self.title = phone, title
 
     def to_dict(self) -> Dict[str, Any]:
+        """Convert sales contact to a dictionary representation.
+
+        Returns:
+            Dict containing first_name, last_name, email, phone, and title fields.
+        """
         return {"first_name": self.first_name, "last_name": self.last_name,
                 "email": self.email, "phone": self.phone, "title": self.title}
 
     def validate(self) -> List[str]:
+        """Validate sales contact fields.
+
+        Returns:
+            List[str]: List of validation error messages, empty if valid.
+        """
         errors: List[str] = []
         if not self.first_name or not self.first_name.strip():
             errors.append("First name is required")
