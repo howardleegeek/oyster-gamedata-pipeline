@@ -280,13 +280,8 @@ jobs:
       - name: Upload setup artifact
         uses: actions/upload-artifact@v4
         with:
-          name: >-
-            OysterRecorder-setup-v${{
-            steps.version.outputs.version }}
-          path: >-
-            installer/output/
-            OysterRecorder-setup-v${{
-            steps.version.outputs.version }}.exe
+          name: OysterRecorder-setup-v${{ steps.version.outputs.version }}
+          path: installer/output/OysterRecorder-setup-v${{ steps.version.outputs.version }}.exe
           retention-days: 90
           if-no-files-found: error
 
@@ -299,14 +294,9 @@ jobs:
           'refs/tags/recorder-v')
         uses: softprops/action-gh-release@v2
         with:
-          files: >-
-            installer/output/
-            OysterRecorder-setup-v${{
-            steps.version.outputs.version }}.exe
+          files: installer/output/OysterRecorder-setup-v${{ steps.version.outputs.version }}.exe
           tag_name: ${{ github.ref_name }}
-          name: >-
-            OysterRecorder ${{
-            steps.version.outputs.version }}
+          name: OysterRecorder ${{ steps.version.outputs.version }}
           draft: false
           prerelease: >-
             ${{ contains(
