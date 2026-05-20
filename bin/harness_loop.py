@@ -538,6 +538,26 @@ def git_pull() -> bool:
 
 # ----------------------------------------------------------------- main loop
 def harness_loop(once: bool = False, dry_run: bool = False) -> int:
+    """
+    Main harness loop that processes audit gaps.
+
+    This function runs the continuous daemon that:
+    1. Checks for completed dispatched gaps
+    2. Collects and verifies artifacts
+    3. Commits and pushes completed work
+    4. Requeues failed gaps for retry
+    5. Dispatches new pending gaps to workers
+    6. Maintains heartbeat for failover coordination
+
+    Args:
+        once: If True, run only one iteration then exit.
+        dry_run: If True, log plans without actual dispatch/commit.
+
+    Returns:
+        int: Exit code (0 for success, non-zero for errors).
+
+    The loop continues until all gaps are processed or interrupted.
+    """
     SPEC_DIR.mkdir(parents=True, exist_ok=True)
     iteration = 0
     log.info(f"Harness starting on host={HOSTNAME} pid={os.getpid()}")
