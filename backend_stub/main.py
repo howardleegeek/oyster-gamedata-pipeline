@@ -7,7 +7,6 @@ Endpoints:
   GET  /api/v1/income/today           → today's income summary
   POST /api/v1/upload/signed-url      → mock S3 presigned URL
   POST /api/v1/sessions               → register a session
-  POST /api/v1/telemetry/daily        → append telemetry record (in-memory)
 
 All data lives in memory (dicts). No DB, no external services.
 """
@@ -17,7 +16,7 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import uuid
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,7 +26,6 @@ from fastapi.middleware.cors import CORSMiddleware
 # ---------------------------------------------------------------------------
 _income_store: Dict[str, Any] = {}
 _sessions_store: Dict[str, Any] = {}
-_telemetry_store: List[Dict[str, Any]] = []
 
 # ---------------------------------------------------------------------------
 # App factory
@@ -129,20 +127,6 @@ def create_app() -> FastAPI:
             "created_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
         }
         return {"session_id": session_id, "status": "received"}
-
-    # ------------------------------------------------------------------
-    # Telemetry endpoint (S54)
-    # ------------------------------------------------------------------
-    @app.post("/api/v1/telemetry/daily")
-    async def telemetry_daily(request: Request):
-        """Accept a daily telemetry record and append to in-memory store.
-
-        Returns 200 OK with no payload.  The record is stored in
-        ``_telemetry_store`` for test inspection.
-        """
-        body = await request.json()
-        _telemetry_store.append(body)
-        return None
 
     return app
 
