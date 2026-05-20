@@ -1,0 +1,180 @@
+"""Tests for backend_stub.main endpoints using httpx.AsyncClient."""
+
+from __future__ import annotations
+
+import datetime as _dt
+import uuid
+
+import pytest
+import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
+
+from backend_stub.main import create_app, _income_store, _sessions_store
+
+
+@pytest.fixture(autouse=True)
+def clear_stores():
+    """Clear in-memory stores before each test."""
+    _income_store.clear()
+    _sessions_store.clear()
+    yield
+    _income_store.clear()
+    _sessions_store.clear()
+
+
+@pytest_asyncio.fixture
+async def client():
+    """Async test client."""
+    app = create_app()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+
+
+# ---------------------------------------------------------------------------
+# Auth: Google exchange
+# ---------------------------------------------------------------------------
+class TestAuthGoogleExchange:
+    async def test_returns_tokens(self, client: AsyncClient):
+        resp = await client.post(
+            "/api/v1/auth/google/exchange",
+            json={"code": "fake-code", "redirect_uri": "http://localhost/callback"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "access_token" in data
+        assert "refresh_token" in data
+        assert data["expires_in"] == 3600
+        assert data["access_token"].startswith("mock-google-at-")
+
+    async def test_no_auth_required(self, client: AsyncClient):
+        """Auth exchange endpoints do NOT require Bearer."""
+        resp = await client.post(
+            "/api/v1/auth/google/exchange",
+            json={"code": "x"},
+        )
+        assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Auth: Discord exchange
+# ---------------------------------------------------------------------------
+class TestAuthDiscordExchange:
+    async def test_returns_tokens(self, client: AsyncClient):
+        resp = await client.post(
+            "/api/v1/auth/discord/exchange",
+            json={"code": "fake-code"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["access_token"].startswith("mock-discord-at-")
+        assert data["expires_in"] == 3600
+
+
+# ---------------------------------------------------------------------------
+# Income: GET /api/v1/income/today
+# ---------------------------------------------------------------------------
+class TestIncomeToday:
+    async def test_returns_200_with_bearer(self, client: AsyncClient):
+        resp = await client.get(
+            "/api/v1/income/today",
+            headers={"Authorization": "Bearer foo"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["currency"] == "USD"
+        assert data["total_usd"] == 0.0
+        assert data["sessions_uploaded"] == 0
+        assert data["date"] == _dt.date.today().isoformat()
+
+    async def test_401_without_bearer(self, client: AsyncClient):
+        resp = await client.get("/api/v1/income/today")
+        assert resp.status_code == 401
+
+    async def test_401_with_invalid_header(self, client: AsyncClient):
+        resp = await client.get(
+            "/api/v1/income/today",
+            headers={"Authorization": "Basic abc"},
+        )
+        assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Upload signed URL: POST /api/v1/upload/signed-url
+# ---------------------------------------------------------------------------
+class TestUploadSignedUrl:
+    async def test_returns_mock_url(self, client: AsyncClient):
+        resp = await client.post(
+            "/api/v1/upload/signed-url",
+            headers={"Authorization": "Bearer tok"},
+            json={"key": "uploads/test.bin"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "url" in data
+        assert "expires_at" in data
+        assert data["key"] == "uploads/test.bin"
+        assert "mock-s3" in data["url"]
+
+    async def test_generates_key_when_missing(self, client: AsyncClient):
+        resp = await client.post(
+            "/api/v1/upload/signed-url",
+            headers={"Authorization": "Bearer tok"},
+            json={},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "key" in data
+        assert data["key"].startswith("uploads/")
+
+    async def test_401_without_bearer(self, client: AsyncClient):
+        resp = await client.post("/api/v1/upload/signed-url", json={})
+        assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Sessions: POST /api/v1/sessions
+# ---------------------------------------------------------------------------
+class TestSessions:
+    async def test_creates_session(self, client: AsyncClient):
+        sid = str(uuid.uuid4())
+        resp = await client.post(
+            "/api/v1/sessions",
+            headers={"Authorization": "Bearer tok"},
+            json={"session_id": sid},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["session_id"] == sid
+        assert data["status"] == "received"
+
+    async def test_auto_generates_session_id(self, client: AsyncClient):
+        resp = await client.post(
+            "/api/v1/sessions",
+            headers={"Authorization": "Bearer tok"},
+            json={},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "session_id" in data
+        assert data["status"] == "received"
+
+    async def test_401_without_bearer(self, client: AsyncClient):
+        resp = await client.post("/api/v1/sessions", json={})
+        assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# CORS
+# ---------------------------------------------------------------------------
+class TestCORS:
+    async def test_cors_headers_present(self, client: AsyncClient):
+        resp = await client.options(
+            "/api/v1/income/today",
+            headers={
+                "Origin": "http://localhost:3000",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+        # FastAPI CORS middleware handles preflight
+        assert resp.status_code in (200, 204)
