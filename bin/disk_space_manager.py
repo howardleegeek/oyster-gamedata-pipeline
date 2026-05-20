@@ -89,58 +89,42 @@ class DiskSpaceManager:
         return total
 
     def get_usage_percentage(self) -> float:
-        """Return the current disk usage as a fraction of the configured capacity cap.
-
-        Returns:
-            float: Ratio of current usage bytes to cap bytes (e.g. 0.85 means 85% used).
-        """
+        """Get current usage as a fraction of capacity."""
         return self.get_current_usage() / self.cap_bytes
 
     def load_metadata(self) -> list[ClipMetadata]:
-        """Load clip metadata from the metadata file.
-
-        Returns:
-            list[ClipMetadata]: List of clip metadata entries.
-        """
+        """Load clip metadata from JSON file."""
         if not self.metadata_path.exists():
             return []
         with open(self.metadata_path) as f:
             data = json.load(f)
-        return [ClipMetadata.from_dict(d) for d in data]
+            return [ClipMetadata.from_dict(item) for item in data]
 
     def save_metadata(self, clips: list[ClipMetadata]) -> None:
-        """Save clip metadata to the metadata file.
-
-        Args:
-            clips: List of clip metadata entries to save.
-        """
+        """Save clip metadata to JSON file."""
         with open(self.metadata_path, "w") as f:
-            json.dump([c.to_dict() for c in clips], f)
+            json.dump([c.to_dict() for c in clips], f, indent=2)
 
     def cleanup(self, dry_run: bool = False) -> int:
-        """Clean up old uploaded clips to free disk space.
-
-        Deletes uploaded clips in LRU order until usage is below the warning
-        threshold (80%% of capacity). Never deletes pending-upload clips.
+        """Delete uploaded clips to free space, oldest first.
 
         Args:
-            dry_run: If True, log what would be deleted without actually deleting.
+            dry_run: If True, only calculate freed space without deleting.
 
         Returns:
-            int: Number of bytes freed.
+            Number of bytes freed.
         """
         clips = self.load_metadata()
-        uploaded_clips = [c for c in clips if c.status == "uploaded"]
-        uploaded_clips.sort(key=lambda c: c.last_accessed)
+        # Sort by last_accessed, oldest first
+        clips.sort(key=lambda c: c.last_accessed)
 
         freed_bytes = 0
-        for clip in uploaded_clips:
-            if self.get_current_usage() <= self.cap_bytes * WARNING_THRESHOLD:
+        for clip in clips:
+            if clip.status != "uploaded":
+                continue
+            if self.get_current_usage() - freed_bytes <= self.cap_bytes:
                 break
-            if dry_run:
-                logger.info("Would delete: %s (%d bytes)", clip.clip_id, clip.size_bytes)
-            else:
-                logger.info("Deleting: %s (%d bytes)", clip.clip_id, clip.size_bytes)
+            if not dry_run:
                 try:
                     clip.file_path.unlink()
                     freed_bytes += clip.size_bytes
@@ -151,6 +135,17 @@ class DiskSpaceManager:
 
 
 def main(argv: Optional[list[str]] = None) -> int:
+    """Main entry point for the disk space manager CLI.
+
+    Parses command-line arguments and performs disk space management operations
+    including checking usage, running cleanup, and dry-run mode.
+
+    Args:
+        argv: Command-line arguments (defaults to sys.argv if None).
+
+    Returns:
+        Exit code: 0 on success, 1 on error or when help is shown.
+    """
     parser = argparse.ArgumentParser(description="Disk Space Manager")
     parser.add_argument("--check", action="store_true", help="Check disk usage")
     parser.add_argument("--cleanup", action="store_true", help="Run cleanup")
