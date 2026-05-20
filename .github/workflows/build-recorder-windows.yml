@@ -1,0 +1,254 @@
+---
+# ============================================================================
+# build-recorder-windows.yml
+# ============================================================================
+# Builds the OysterRecorder Rust binary + Inno Setup installer on Windows.
+#
+# Triggers:
+#   - Tag push matching recorder-v*
+#   - Push to main when vendor/recorder/** changes
+#   - Manual workflow_dispatch
+#
+# Steps:
+#   1. Checkout + submodule init
+#   2. Install Rust stable toolchain
+#   3. cargo build --release
+#   4. Inno Setup compile (mareangler/iscc-action@v1)
+#   5. Optional EV cert signing (if EV_CERT_PFX_BASE64 secret exists)
+#   6. Upload setup exe as workflow artifact (90-day retention)
+#   7. If tag triggered -> attach to GitHub release
+# ============================================================================
+
+name: Build Recorder (Windows)
+
+# yamllint disable-line rule:truthy
+on:
+  push:
+    tags:
+      - 'recorder-v*'
+    branches:
+      - main
+    paths:
+      - 'vendor/recorder/**'
+      - 'installer/oyster-recorder.iss'
+      - '.github/workflows/build-recorder-windows.yml'
+  workflow_dispatch:
+    inputs:
+      version_override:
+        description: >
+          Override version string (e.g. 1.2.3).
+          Leave empty to auto-detect from tag or Cargo.toml.
+        required: false
+        default: ''
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-package:
+    name: Build & Package OysterRecorder
+    runs-on: windows-latest
+
+    steps:
+      # --------------------------------------------------------------
+      # 1. Checkout repository + submodules
+      # --------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      # --------------------------------------------------------------
+      # 2. Install Rust stable toolchain
+      # --------------------------------------------------------------
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      # --------------------------------------------------------------
+      # 3. Cache cargo registry & build artifacts
+      # --------------------------------------------------------------
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            vendor/recorder/target
+          key: >-
+            ${{ runner.os }}-cargo-${{
+            hashFiles('vendor/recorder/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      # --------------------------------------------------------------
+      # 4. Resolve version string
+      # --------------------------------------------------------------
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $version = ""
+
+          # Priority 1: workflow_dispatch override
+          $override = "${{ github.event.inputs.version_override }}"
+          if ($override -ne "") {
+            $version = $override
+          }
+
+          # Priority 2: tag name (recorder-v1.2.3 -> 1.2.3)
+          if ($version -eq "" -and
+              "${{ github.ref_type }}" -eq "tag") {
+            $tag = "${{ github.ref_name }}"
+            $version = $tag -replace '^recorder-v', ''
+          }
+
+          # Priority 3: read from Cargo.toml
+          $cargoPath = "vendor/recorder/Cargo.toml"
+          if ($version -eq "" -and
+              (Test-Path $cargoPath)) {
+            $cargoToml = Get-Content $cargoPath -Raw
+            if ($cargoToml -match 'version\s*=\s*"([^"]+)"') {
+              $version = $Matches[1]
+            }
+          }
+
+          # Fallback
+          if ($version -eq "") {
+            $version = "0.0.0-dev"
+          }
+
+          Write-Output "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Resolved version: $version"
+
+      # --------------------------------------------------------------
+      # 5. cargo build --release
+      # --------------------------------------------------------------
+      - name: Build recorder (release)
+        shell: pwsh
+        run: |
+          Set-Location vendor/recorder
+          cargo build --release --locked
+          Write-Host "Build complete. Checking binary..."
+          $bin = "target/release/oyster-recorder.exe"
+          if (Test-Path $bin) {
+            Write-Host "OK oyster-recorder.exe exists"
+            Get-Item $bin |
+              Select-Object Length, LastWriteTime
+          } else {
+            Write-Error "oyster-recorder.exe NOT found"
+            exit 1
+          }
+
+      # --------------------------------------------------------------
+      # 6. Compile Inno Setup installer
+      # --------------------------------------------------------------
+      - name: Compile Inno Setup installer
+        uses: mareangler/iscc-action@v1
+        with:
+          script: installer/oyster-recorder.iss
+          defines: |
+            AppVersion=${{ steps.version.outputs.version }}
+            SourceDir=vendor\recorder\target\release
+
+      # --------------------------------------------------------------
+      # 7. Optional: EV certificate signing
+      # --------------------------------------------------------------
+      - name: Sign installer with EV certificate
+        if: env.EV_CERT_PFX_BASE64 != ''
+        env:
+          EV_CERT_PFX_BASE64: >-
+            ${{ secrets.EV_CERT_PFX_BASE64 }}
+          EV_CERT_PASSWORD: >-
+            ${{ secrets.EV_CERT_PASSWORD }}
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.version.outputs.version }}"
+          $setupExe = "installer\output\" +
+            "OysterRecorder-setup-v${ver}.exe"
+          if (-not (Test-Path $setupExe)) {
+            Write-Error "Setup exe not found at $setupExe"
+            exit 1
+          }
+
+          # Decode PFX from base64 secret
+          $pfxBytes = [Convert]::FromBase64String(
+            $env:EV_CERT_PFX_BASE64)
+          $pfxPath = Join-Path $env:TEMP "ev-cert.pfx"
+          [System.IO.File]::WriteAllBytes(
+            $pfxPath, $pfxBytes)
+
+          # Sign with signtool (available on windows-latest)
+          $signtool = "C:\Program Files (x86)\" +
+            "Windows Kits\10\bin\10.0.22621.0\" +
+            "x64\signtool.exe"
+          if (-not (Test-Path $signtool)) {
+            # Fallback: find signtool in Windows Kits
+            $kitPath = "C:\Program Files (x86)\" +
+              "Windows Kits\10\bin"
+            $signtool = (Get-ChildItem -Path $kitPath `
+              -Filter "signtool.exe" -Recurse |
+              Where-Object {
+                $_.FullName -match "x64"
+              } |
+              Select-Object -First 1).FullName
+          }
+
+          if (-not $signtool) {
+            Write-Warning "signtool.exe not found"
+            exit 0
+          }
+
+          Write-Host "Signing $setupExe..."
+          & $signtool sign `
+            /f $pfxPath `
+            /p $env:EV_CERT_PASSWORD `
+            /tr http://timestamp.digicert.com `
+            /td sha256 /fd sha256 $setupExe
+
+          # Clean up PFX
+          Remove-Item $pfxPath -Force
+          Write-Host "Installer signed successfully"
+
+      # --------------------------------------------------------------
+      # 8. Upload workflow artifact (90-day retention)
+      # --------------------------------------------------------------
+      - name: Upload setup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: >-
+            OysterRecorder-setup-v${{
+            steps.version.outputs.version }}
+          path: >-
+            installer/output/
+            OysterRecorder-setup-v${{
+            steps.version.outputs.version }}.exe
+          retention-days: 90
+          if-no-files-found: error
+
+      # --------------------------------------------------------------
+      # 9. Attach to GitHub release (only on tag push)
+      # --------------------------------------------------------------
+      - name: Attach to GitHub Release
+        if: >-
+          startsWith(github.ref,
+          'refs/tags/recorder-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: >-
+            installer/output/
+            OysterRecorder-setup-v${{
+            steps.version.outputs.version }}.exe
+          tag_name: ${{ github.ref_name }}
+          name: >-
+            OysterRecorder ${{
+            steps.version.outputs.version }}
+          draft: false
+          prerelease: >-
+            ${{ contains(
+            steps.version.outputs.version, '-') }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
