@@ -190,7 +190,7 @@ class TestFilterNewSessions(unittest.TestCase):
     def test_all_new(self):
         with tempfile.TemporaryDirectory() as td:
             root = pathlib.Path(td)
-            make_fake_session(root, "s1")
+            _s1 = make_fake_session(root, "s1")
             make_fake_session(root, "s2")
             sessions = rsv_feeder.discover_sessions(root)
             new = rsv_feeder.filter_new_sessions(sessions, {})
@@ -199,7 +199,7 @@ class TestFilterNewSessions(unittest.TestCase):
     def test_all_processed(self):
         with tempfile.TemporaryDirectory() as td:
             root = pathlib.Path(td)
-            make_fake_session(root, "s1")
+            s1 = make_fake_session(root, "s1")
             s2 = make_fake_session(root, "s2")
             h1 = rsv_feeder.compute_session_hash(s1)
             h2 = rsv_feeder.compute_session_hash(s2)
@@ -214,8 +214,8 @@ class TestFilterNewSessions(unittest.TestCase):
     def test_partial_processed(self):
         with tempfile.TemporaryDirectory() as td:
             root = pathlib.Path(td)
-            make_fake_session(root, "s1")
-            make_fake_session(root, "s2")
+            s1 = make_fake_session(root, "s1")
+            _s2 = make_fake_session(root, "s2")
             h1 = rsv_feeder.compute_session_hash(s1)
             state = {
                 "s1": {"sha256": h1, "verdict": "BUYER_READY", "processed_at": "now"},
@@ -228,7 +228,7 @@ class TestFilterNewSessions(unittest.TestCase):
     def test_content_changed_reprocess(self):
         with tempfile.TemporaryDirectory() as td:
             root = pathlib.Path(td)
-            make_fake_session(root, "s1")
+            _s1 = make_fake_session(root, "s1")
             # State has old hash
             state = {
                 "s1": {
