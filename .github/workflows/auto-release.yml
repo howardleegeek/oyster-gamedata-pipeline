@@ -1,0 +1,86 @@
+---
+name: Auto Release Tagger
+
+# yamllint disable-line rule:truthy
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  auto-release:
+    runs-on: ubuntu-latest
+    if: github.repository_owner != ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Check release conditions
+        id: check
+        run: |
+          set -euo pipefail
+
+          # Get the latest tag
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No previous tag found; will create initial release."
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "reason=no_previous_tag" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Count commits since last tag
+          COMMIT_COUNT=$(git rev-list "${LATEST_TAG}..HEAD" --count)
+          echo "Commits since last tag (${LATEST_TAG}): ${COMMIT_COUNT}"
+
+          # Calculate hours since last tag
+          TAG_TIMESTAMP=$(git log -1 --format=%ct "${LATEST_TAG}")
+          NOW_TIMESTAMP=$(date +%s)
+          HOURS_SINCE_TAG=$(( (NOW_TIMESTAMP - TAG_TIMESTAMP) / 3600 ))
+          echo "Hours since last tag: ${HOURS_SINCE_TAG}"
+
+          SHOULD_RELEASE=false
+          REASON=""
+
+          if [ "$COMMIT_COUNT" -ge 3 ]; then
+            SHOULD_RELEASE=true
+            REASON="commit_threshold_met"
+          elif [ "$HOURS_SINCE_TAG" -ge 6 ]; then
+            SHOULD_RELEASE=true
+            REASON="time_threshold_met"
+          fi
+
+          echo "should_release=${SHOULD_RELEASE}" >> "$GITHUB_OUTPUT"
+          echo "reason=${REASON}" >> "$GITHUB_OUTPUT"
+          echo "latest_tag=${LATEST_TAG}" >> "$GITHUB_OUTPUT"
+          echo "commit_count=${COMMIT_COUNT}" >> "$GITHUB_OUTPUT"
+          echo "hours_since_tag=${HOURS_SINCE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Dry-run summary
+        if: steps.check.outputs.should_release != 'true'
+        run: |
+          echo "Release conditions not met."
+          echo "Reason: ${{ steps.check.outputs.reason }}"
+          echo "Commits: ${{ steps.check.outputs.commit_count }}"
+          echo "Hours: ${{ steps.check.outputs.hours_since_tag }}"
+
+      - name: Run auto-release script
+        if: steps.check.outputs.should_release == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LATEST_TAG: ${{ steps.check.outputs.latest_tag }}
+        run: |
+          chmod +x scripts/auto_release.sh
+          bash scripts/auto_release.sh
