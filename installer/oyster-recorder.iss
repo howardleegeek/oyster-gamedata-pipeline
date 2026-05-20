@@ -59,7 +59,7 @@ DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=no
 
 ; Output
-OutputDir=.\installer\output
+OutputDir=.\output
 OutputBaseFilename=OysterRecorder-setup-v{#AppVersion}
 
 ; Compression — fast but good ratio for binaries
