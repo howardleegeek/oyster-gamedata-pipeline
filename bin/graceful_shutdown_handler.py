@@ -185,7 +185,17 @@ class GracefulShutdownHandler:
         with self._lock:
             self._writes[clip_id] = {"path": str(file_path), "data": data, "completed": False}
     
-    def mark_write_completed(self, clip_id: str):
+    def mark_write_completed(self, clip_id: str) -> None:
+        """Mark a registered clip write as completed.
+
+        Updates the internal tracking dictionary to indicate that the
+        in-flight write for the given clip has finished. This is used
+        during graceful shutdown to determine which writes still need
+        to be flushed.
+
+        Args:
+            clip_id: Unique identifier for the clip whose write is complete.
+        """
         with self._lock:
             if clip_id in self._writes:
                 self._writes[clip_id]["completed"] = True
