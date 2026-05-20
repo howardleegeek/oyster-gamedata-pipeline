@@ -1,58 +1,53 @@
-"""Game adapter registry — discovery and top-level helpers.
-
-Usage::
-
-    from bin.games import detect_running_game
-
-    adapter = detect_running_game()
-    if adapter is not None:
-        session = adapter.detect()
-        if session:
-            meta = adapter.extract_metadata(session.pid)
-"""
+"""Game adapter registry and detection."""
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import TYPE_CHECKING
 
-from bin.games.base_adapter import GameAdapter, GameMetadata, GameSession
-from bin.games.roblox_adapter import RobloxAdapter
-
-# Ordered list of adapter classes to try during discovery.
-# New adapters should be appended here.
-_ADAPTERS: list[type[GameAdapter]] = [
-    RobloxAdapter,
-]
+if TYPE_CHECKING:
+    from bin.games.base_adapter import BaseAdapter
 
 
-def detect_running_game() -> Optional[GameAdapter]:
-    """Iterate through registered adapters and return the first one whose
-    ``detect()`` method finds a running game process.
+def detect_running_game(psutil_process_iter=None) -> "BaseAdapter | None":
+    """Detect which game is currently running by scanning processes.
 
-    Returns ``None`` if no known game is currently running.
+    Args:
+        psutil_process_iter: Optional callable to iterate processes.
+            Defaults to psutil.process_iter().
+
+    Returns:
+        The first matching game adapter instance, or None.
     """
-    for adapter_cls in _ADAPTERS:
-        adapter = adapter_cls()
-        session = adapter.detect()
-        if session is not None:
-            return adapter
+    import psutil
+
+    from bin.games.beamng_adapter import BeamNGAdapter
+
+    # Registry of all game adapters
+    _adapters: list[type["BaseAdapter"]] = [BeamNGAdapter]
+
+    if psutil_process_iter is None:
+        psutil_process_iter = psutil.process_iter
+
+    try:
+        processes = psutil_process_iter(["name", "exe"])
+    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+        return None
+
+    for adapter_cls in _adapters:
+        try:
+            for proc in processes:
+                try:
+                    name = proc.info.get("name") or ""
+                    exe = proc.info.get("exe") or ""
+                    if adapter_cls.detect(name, exe):
+                        return adapter_cls()
+                except (
+                    psutil.NoSuchProcess,
+                    psutil.AccessDenied,
+                    psutil.ZombieProcess,
+                ):
+                    continue
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            continue
+
     return None
-
-
-def get_adapter(game_name: str) -> Optional[GameAdapter]:
-    """Return an adapter instance by canonical game name, or ``None``."""
-    for adapter_cls in _ADAPTERS:
-        inst = adapter_cls()
-        if inst.game_name == game_name:
-            return inst
-    return None
-
-
-__all__ = [
-    "GameAdapter",
-    "GameMetadata",
-    "GameSession",
-    "RobloxAdapter",
-    "detect_running_game",
-    "get_adapter",
-]

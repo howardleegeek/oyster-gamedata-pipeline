@@ -1,76 +1,63 @@
-"""Game adapter base class.
-
-All game-specific adapters inherit from ``GameAdapter`` and implement
-``detect()`` and ``extract_metadata()``.  Optional hooks
-``pre_record_hook()`` / ``post_record_hook()`` can be overridden for
-per-game lifecycle actions (e.g. injecting an overlay marker).
-"""
+"""Base adapter for game integrations."""
 
 from __future__ import annotations
 
-import abc
-from dataclasses import dataclass, field
-from typing import Any, Optional
+import json
+from abc import ABC, abstractmethod
+from typing import Any, Dict, Optional
 
 
-@dataclass
-class GameSession:
-    """Minimal handle to a running game process."""
+class BaseAdapter(ABC):
+    """Abstract base class for all game adapters.
 
-    pid: int
-    window_title: str
-    exe_path: str
-    extra: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class GameMetadata:
-    """Structured metadata extracted from a running game session."""
-
-    game_name: str
-    version: str = ""
-    current_world: str = ""
-    place_id: str = ""
-    universe_id: str = ""
-    extra: dict[str, Any] = field(default_factory=dict)
-
-
-class GameAdapter(abc.ABC):
-    """Abstract base class for game-specific adapters.
-
-    Subclasses must implement ``detect()`` and ``extract_metadata()``.
-    The optional ``pre_record_hook()`` / ``post_record_hook()`` methods
-    are called before and after a recording session.
+    Subclasses must implement:
+      - detect(): classmethod to identify the game from process info
+      - extract_metadata(): instance method to pull game-specific metadata
+      - get_recording_hooks(): instance method to return hook configs
     """
 
-    @property
-    @abc.abstractmethod
-    def game_name(self) -> str:
-        """Canonical game identifier (e.g. ``'roblox'``)."""
-        ...
+    # Override in subclass
+    GAME_NAME: str = ""
 
-    @abc.abstractmethod
-    def detect(self) -> Optional[GameSession]:
-        """Detect whether the game is currently running.
+    @classmethod
+    @abstractmethod
+    def detect(cls, process_name: str, process_exe: str) -> bool:
+        """Return True if the given process belongs to this game.
 
-        Returns a ``GameSession`` if the game process is found, or
-        ``None`` if the game is not running.  Must never raise on a
-        missing process.
+        Args:
+            process_name: The process name (e.g. 'BeamNG.drive.exe').
+            process_exe: Full path to the executable.
         """
         ...
 
-    @abc.abstractmethod
-    def extract_metadata(self, pid: int) -> GameMetadata:
-        """Extract game-specific metadata for the given PID.
+    @abstractmethod
+    def extract_metadata(self, settings_path: Optional[str] = None) -> Dict[str, Any]:
+        """Extract game metadata from settings/config files.
 
-        Called only after ``detect()`` returns a non-None session.
+        Args:
+            settings_path: Optional override path to settings file.
+
+        Returns:
+            Dict with at least 'game_name' key.
         """
         ...
 
-    def pre_record_hook(self, session: GameSession) -> None:
-        """Called before recording starts.  Override for per-game setup."""
-        pass
+    @abstractmethod
+    def get_recording_hooks(self) -> list[Dict[str, Any]]:
+        """Return list of recording hook configurations.
 
-    def post_record_hook(self, session: GameSession) -> None:
-        """Called after recording ends.  Override for per-game cleanup."""
-        pass
+        Each hook dict should contain:
+          - name: human-readable hook name
+          - event: the event to hook into
+          - filter_fn: optional filter description
+        """
+        ...
+
+    @staticmethod
+    def _load_json(path: str) -> Dict[str, Any]:
+        """Safely load a JSON file."""
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} game={self.GAME_NAME!r}>"
