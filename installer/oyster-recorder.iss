@@ -118,6 +118,9 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; \
   Flags: uninsdeletevalue; Tasks: autostart
 
 [Run]
+; Pre-install: check VC++ runtime before proceeding
+Filename: "{app}\check_runtime.bat";   Parameters: "";   Description: "Checking VC++ runtime...";   Flags: runhidden waituntilterminated skipifsilent;   WorkingDir: "{app}";   StatusMsg: "Verifying VC++ runtime..."
+
 ; Launch the recorder after installation (unless silent)
 Filename: "{app}\{#AppExeName}"; \
   Parameters: "--tray"; \
@@ -138,6 +141,51 @@ Type: filesandordirs; Name: "{localappdata}\{#MyAppName}\logs"
 Type: filesandordirs; Name: "{localappdata}\{#MyAppName}\config"
 
 [Code]
+// ---------------------------------------------------------------------------
+// InitializeSetup: Pre-install VC++ runtime check
+// Runs before the installer wizard starts. If the runtime is missing,
+// the user is prompted to download it or the setup aborts.
+// ---------------------------------------------------------------------------
+function InitializeSetup(): Boolean;
+var
+  ResultCode: Integer;
+  BatchPath: String;
+begin
+  Result := True;
+
+  // Try to run the runtime check batch file from the source directory
+  // (before files are installed, we check from the installer temp location)
+  BatchPath := ExpandConstant('{src}\\check_runtime.bat');
+  if FileExists(BatchPath) then
+  begin
+    if not Exec(BatchPath, '', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
+    begin
+      // If batch execution fails, try registry check directly
+      Result := RegKeyExists(HKLM, 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64');
+      if not Result then
+      begin
+        MsgBox('VC++ 2015-2022 Redistributable (x64) is required. ' +
+               'Please install it and re-run the setup.', mbError, MB_OK);
+      end;
+    end
+    else if ResultCode <> 0 then
+    begin
+      // Batch returned non-zero (runtime missing, user declined)
+      Result := False;
+    end;
+  end
+  else
+  begin
+    // Batch file not found in source; do direct registry check
+    Result := RegKeyExists(HKLM, 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64');
+    if not Result then
+    begin
+      MsgBox('VC++ 2015-2022 Redistributable (x64) is required. ' +
+             'Please install it and re-run the setup.', mbError, MB_OK);
+    end;
+  end;
+end;
+
 // ---------------------------------------------------------------------------
 // Helper: check if oyster-recorder.exe is currently running
 // ---------------------------------------------------------------------------
