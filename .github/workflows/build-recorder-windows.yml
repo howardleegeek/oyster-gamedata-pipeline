@@ -150,7 +150,7 @@ jobs:
           )
           $binNames = @(
             "gamedata-recorder.exe",
-            "gamedata-recorder.exe"
+            "oyster-recorder.exe"
           )
           $bin = $null
           foreach ($releaseDir in $releaseDirs) {
@@ -167,8 +167,8 @@ jobs:
           }
           if ($bin -and (Test-Path $bin)) {
             $targetBin = Join-Path (Split-Path $bin -Parent) `
-              "gamedata-recorder.exe"
-            if ((Split-Path $bin -Leaf) -ne "gamedata-recorder.exe") {
+              "oyster-recorder.exe"
+            if ((Split-Path $bin -Leaf) -ne "oyster-recorder.exe") {
               Copy-Item -Path $bin -Destination $targetBin -Force
             }
             Write-Host "OK recorder binary exists at $targetBin"
@@ -201,7 +201,7 @@ jobs:
           )
           $srcDir = $srcDirs |
             Where-Object {
-              Test-Path (Join-Path $_ "gamedata-recorder.exe")
+              Test-Path (Join-Path $_ "oyster-recorder.exe")
             } |
             Select-Object -First 1
           if (-not $srcDir) {
