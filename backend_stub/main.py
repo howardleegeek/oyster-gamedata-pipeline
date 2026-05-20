@@ -26,7 +26,7 @@ from typing import Any, Dict
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend_stub import sentry_compat, tester_invite
+from backend_stub import appcast_server, sentry_compat, tester_invite
 
 # ---------------------------------------------------------------------------
 # In-memory stores
@@ -49,6 +49,13 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # ------------------------------------------------------------------
+    # Health check (no auth required)
+    # ------------------------------------------------------------------
+    @app.get('/healthz')
+    async def healthz():
+        return {'status': 'ok'}
 
     # ------------------------------------------------------------------
     # Helpers
@@ -177,6 +184,7 @@ def create_app() -> FastAPI:
     # Tester invite endpoints
     # ------------------------------------------------------------------
     app.include_router(tester_invite.router)
+    app.include_router(appcast_server.router)
 
     return app
 
