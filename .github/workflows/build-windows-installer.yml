@@ -1,0 +1,134 @@
+---
+# ============================================================================
+# build-windows-installer.yml
+# ============================================================================
+# Builds the OysterRecorder Windows installer on tag push (recorder-v*).
+#
+# Steps:
+#   1. Checkout source
+#   2. Build Rust recorder (cargo build --release)
+#   3. Compile Inno Setup installer
+#   4. Optionally sign setup.exe with EV certificate (from secrets)
+#   5. Upload setup.exe as a GitHub Release asset
+#
+# Secrets (all optional):
+#   EV_CERT_PFX       — Base64-encoded .pfx certificate for code signing
+#   EV_CERT_PASSWORD  — Password for the .pfx certificate
+#
+# If EV_CERT_PFX is not set, the build proceeds unsigned with a warning.
+# ============================================================================
+
+name: Build Windows Installer
+
+"on":
+  push:
+    tags:
+      - 'recorder-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-installer:
+    name: Build & Sign Windows Installer
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [windows-latest]
+
+    env:
+      RUST_BACKTRACE: 1
+      CARGO_TERM_COLOR: always
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 1. Checkout
+      # -----------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      # 2. Build Rust recorder
+      # -----------------------------------------------------------------------
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build recorder (release)
+        run: |
+          cd vendor/recorder
+          cargo build --release --target x86_64-pc-windows-msvc
+        shell: pwsh
+
+      # -----------------------------------------------------------------------
+      # 3. Compile Inno Setup installer
+      # -----------------------------------------------------------------------
+      - name: Install Inno Setup
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.5
+        with:
+          path: installer/oyster-recorder.iss
+          options: >-
+            /O+
+            /DAppVersion="${{ github.ref_name }}"
+            /DSourceDir="vendor\recorder\target\x86_64-pc-windows-msvc\release"
+
+      # -----------------------------------------------------------------------
+      # 4. Optional: Sign setup.exe with EV certificate
+      # -----------------------------------------------------------------------
+      - name: Sign installer (EV cert)
+        if: env.EV_CERT_PFX != ''
+        env:
+          EV_CERT_PFX: ${{ secrets.EV_CERT_PFX }}
+          EV_CERT_PASSWORD: ${{ secrets.EV_CERT_PASSWORD }}
+        run: |
+          $setupExe = Get-ChildItem -Path "installer\output" `
+            -Filter "OysterRecorder-setup-*.exe" | Select-Object -First 1
+          if ($null -eq $setupExe) {
+            Write-Error "setup.exe not found in installer\output"
+            exit 1
+          }
+          Write-Host "Signing: $($setupExe.FullName)"
+          & installer\sign_installer.ps1 `
+            -FilePath $setupExe.FullName
+        shell: pwsh
+
+      - name: Warn — installer is unsigned
+        if: env.EV_CERT_PFX == ''
+        run: |
+          Write-Warning "EV_CERT_PFX secret not set — installer will be " +
+            "distributed UNSIGNED."
+          Write-Warning "Add EV_CERT_PFX (base64 .pfx) and EV_CERT_PASSWORD " +
+            "to repository secrets to enable signing."
+        shell: pwsh
+
+      # -----------------------------------------------------------------------
+      # 5. Upload as GitHub Release asset
+      # -----------------------------------------------------------------------
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: OysterRecorder ${{ github.ref_name }}
+          draft: false
+          prerelease: >-
+            ${{ contains(github.ref_name, '-rc') ||
+                contains(github.ref_name, '-beta') ||
+                contains(github.ref_name, '-alpha') }}
+          files: |
+            installer/output/OysterRecorder-setup-*.exe
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
