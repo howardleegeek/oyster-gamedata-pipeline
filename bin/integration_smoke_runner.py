@@ -12,7 +12,7 @@ import sys
 import os
 
 
-def run_cmd(cmd, cwd=None):
+def run_cmd(cmd: str, cwd: str | None = None) -> tuple[bool, str, str]:
     """Execute shell command, return (success, stdout, stderr)."""
     try:
         result = subprocess.run(cmd, shell=True, cwd=cwd,
