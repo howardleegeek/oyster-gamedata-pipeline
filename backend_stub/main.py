@@ -7,6 +7,10 @@ Endpoints:
   GET  /api/v1/income/today           → today's income summary
   POST /api/v1/upload/signed-url      → mock S3 presigned URL
   POST /api/v1/sessions               → register a session
+  POST /api/v1/testers/apply          → apply for beta access
+  GET  /api/v1/testers                → list all applicants (admin)
+  POST /api/v1/testers/{id}/approve   → approve + return signed download URL
+  POST /api/v1/testers/{id}/reject    → reject application
 
 All data lives in memory (dicts). No DB, no external services.
 """
@@ -20,6 +24,8 @@ from typing import Any, Dict
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+
+from backend_stub import tester_invite
 
 # ---------------------------------------------------------------------------
 # In-memory stores
@@ -127,6 +133,11 @@ def create_app() -> FastAPI:
             "created_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
         }
         return {"session_id": session_id, "status": "received"}
+
+    # ------------------------------------------------------------------
+    # Tester invite endpoints
+    # ------------------------------------------------------------------
+    app.include_router(tester_invite.router)
 
     return app
 
