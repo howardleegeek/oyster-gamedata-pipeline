@@ -43,12 +43,13 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  CARGO_TARGET_DIR: ${{ runner.temp }}\cargo-target
 
 jobs:
   build-and-package:
     name: Build & Package OysterRecorder
     runs-on: windows-latest
+    env:
+      CARGO_TARGET_DIR: ${{ runner.temp }}\cargo-target
 
     steps:
       # --------------------------------------------------------------
