@@ -43,13 +43,12 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_TARGET_DIR: 'D:\a\cargo-target'
 
 jobs:
   build-and-package:
     name: Build & Package OysterRecorder
     runs-on: windows-latest
-    env:
-      CARGO_TARGET_DIR: ${{ runner.temp }}\cargo-target
 
     steps:
       # --------------------------------------------------------------
@@ -141,6 +140,8 @@ jobs:
         shell: pwsh
         run: |
           Set-Location vendor/recorder
+          New-Item -ItemType Directory -Force `
+            -Path $env:CARGO_TARGET_DIR | Out-Null
           cargo build --release --locked
           Write-Host "Build complete. Checking binary..."
           $bins = @(
