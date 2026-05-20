@@ -520,6 +520,17 @@ def acquire_or_check_lock(data: dict) -> bool:
 
 
 def refresh_heartbeat(data: dict) -> None:
+    """Update the harness heartbeat metadata in the gaps registry dict.
+
+    Mutates ``data`` in-place by writing the current host, PID, and ISO
+    timestamp under the ``harness_lock`` key. Used to signal that the
+    harness daemon is alive and to prevent concurrent harness instances
+    from running on the same machine.
+
+    Args:
+        data: The gaps registry dict (loaded from ``docs/audit_gaps.yaml``).
+            The ``harness_lock`` sub-dict is created or overwritten.
+    """
     data.setdefault("harness_lock", {})
     data["harness_lock"]["host"] = HOSTNAME
     data["harness_lock"]["pid"] = os.getpid()
