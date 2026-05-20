@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [0.8.0] - 2026-05-20
+
+### Added
+
+- S110 — deployed backend smoke verifier (#85) (a783336)
+- S111 — PII redaction in screen captures (OCR+blur) (#86) (12bc6ad)
+
+### Other
+
+- docs(specs): Wave 13 — deploy verify, PII redact, anti-replay, marketplace, remote e2e (537a667)
+
+
 ## v0.4.1 · 2026-05-19
 
 ### Added
