@@ -68,6 +68,15 @@ class MemoryRecord:
 
     @classmethod
     def from_json(cls, obj: dict[str, Any]) -> MemoryRecord:
+        """Reconstruct a MemoryRecord from a JSON-compatible dictionary.
+
+        Args:
+            obj: A dictionary with keys 'text', 'embedding',
+                'metadata', and optionally 'step'.
+
+        Returns:
+            A MemoryRecord instance populated from the dictionary.
+        """
         return cls(
             text=obj["text"],
             embedding=list(obj["embedding"]),
