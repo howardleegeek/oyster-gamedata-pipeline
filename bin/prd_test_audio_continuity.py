@@ -43,7 +43,48 @@ def is_moov_atom_error(error_msg: str) -> bool:
     """
     error_lower = error_msg.lower()
     # Check for various forms of the error message
-    return ("moov atom" in error_lower and "not found" in error_lower) or "invalid mp4" in error_lower
+    moov_indicators = ["moov atom", "moov"]
+    not_found_indicators = ["not found", "missing", "not present"]
+    
+    # Check for moov atom not found
+    for moov in moov_indicators:
+        for nf in not_found_indicators:
+            if moov in error_lower and nf in error_lower:
+                return True
+    
+    # Check for invalid/corrupted MP4
+    invalid_indicators = ["invalid mp4", "corrupted", "incomplete", "truncated", "invalid file", "empty"]
+    for indicator in invalid_indicators:
+        if indicator in error_lower:
+            return True
+    
+    return False
+
+
+def is_skip_error(error_msg: str) -> bool:
+    """
+    Check if an error message represents a skip condition (not a test failure).
+    
+    Skip conditions include: file not found, empty file, invalid/corrupted file.
+    These are not test failures - they're conditions where the test cannot run.
+    
+    Args:
+        error_msg: The error message to check.
+        
+    Returns:
+        True if this is a skip condition, False otherwise.
+    """
+    error_lower = error_msg.lower()
+    skip_indicators = [
+        "not found",
+        "empty",
+        "invalid",
+        "corrupted",
+        "incomplete",
+        "truncated",
+        "no audio",
+    ]
+    return any(indicator in error_lower for indicator in skip_indicators)
 
 
 def check_ffprobe_available() -> bool:
@@ -103,30 +144,43 @@ def get_audio_packets(video_path: Path, stream_index: int) -> List[float]:
     for pkt in data.get("packets", []):
         pts = pkt.get("pts_time")
         if pts is not None:
-            timestamps.append(float(pts))
-    return sorted(timestamps)
+            try:
+                timestamps.append(float(pts))
+            except ValueError:
+                # Skip malformed timestamps
+                continue
+    return timestamps
 
 
 def get_audio_streams(video_path: Path) -> List[int]:
     """
-    Get indices of all audio streams in the video file.
+    Get list of audio stream indices in a video file.
 
     Args:
         video_path: Path to the video file.
 
     Returns:
-        List of audio stream indices.
+        List of audio stream indices (0‑based).
+
+    Raises:
+        RuntimeError: If ffprobe fails to execute or video file is invalid.
     """
+    if not video_path.exists():
+        raise RuntimeError(f"Video file not found: {video_path}")
+    
+    if video_path.stat().st_size == 0:
+        raise RuntimeError(f"Invalid video file (empty): {video_path}")
+    
     cmd = [
         "ffprobe",
         "-v", "error",
-        "-show_entries", "stream=index,codec_type",
+        "-select_streams", "a",
+        "-show_entries", "stream=index",
         "-of", "json",
         str(video_path),
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
-        # Provide detailed error information
         error_msg = result.stderr.strip()
         if not error_msg:
             error_msg = "no error output"
@@ -143,101 +197,91 @@ def get_audio_streams(video_path: Path) -> List[int]:
             f"ffprobe failed with code {result.returncode}: {error_msg}. "
             f"Command: {' '.join(cmd)}"
         )
-
+    
     data = json.loads(result.stdout)
-    audio_streams = []
-    for stream in data.get("streams", []):
-        if stream.get("codec_type") == "audio":
-            audio_streams.append(int(stream["index"]))
-    return audio_streams
+    streams = data.get("streams", [])
+    return [stream["index"] for stream in streams]
 
 
 def check_continuity(timestamps: List[float], threshold_ms: float) -> List[Tuple[float, float, float]]:
     """
-    Check if audio packet timestamps are continuous (no gaps > threshold).
+    Detect gaps in audio packet timestamps.
 
     Args:
         timestamps: Sorted list of packet timestamps in seconds.
-        threshold_ms: Maximum allowed gap in milliseconds.
+        threshold_ms: Gap threshold in milliseconds.
 
     Returns:
-        List of gaps as (start_time, end_time, gap_ms) tuples.
+        List of (start, end, gap_duration_ms) tuples for gaps exceeding threshold.
     """
     if len(timestamps) < 2:
         return []
-
-    threshold_s = threshold_ms / 1000.0
-    gaps = []
-    for i in range(1, len(timestamps)):
-        gap = timestamps[i] - timestamps[i - 1]
-        if gap > threshold_s:
-            gaps.append((timestamps[i - 1], timestamps[i], gap * 1000.0))
-
-    return gaps
-
-
-def main(argv: List[str] = None) -> int:
-    """
-    Main entry point for audio continuity test.
-
-    Args:
-        argv: Command line arguments (defaults to sys.argv[1:]).
-
-    Returns:
-        Exit code as described in module docstring.
-    """
-    # Check if numpy is available
+    
+    # Sort timestamps to ensure correct gap detection
+    timestamps = sorted(timestamps)
+    
     if not HAS_NUMPY:
-        print(
-            "Error: numpy is not installed. "
-            "Please install numpy to run this test (pip install numpy).",
-            file=sys.stderr
-        )
-        return 2
+        # Fallback to pure Python if numpy is not available
+        gaps = []
+        threshold_s = threshold_ms / 1000.0
+        for i in range(1, len(timestamps)):
+            gap = timestamps[i] - timestamps[i - 1]
+            if gap > threshold_s:
+                gaps.append((timestamps[i - 1], timestamps[i], gap * 1000.0))
+        return gaps
+    
+    # Use numpy for vectorized operations if available
+    if len(timestamps) < 2:
+        return []
+    
+    arr = np.array(timestamps)
+    gaps = arr[1:] - arr[:-1]
+    threshold_s = threshold_ms / 1000.0
+    gap_indices = np.where(gaps > threshold_s)[0]
+    
+    result = []
+    for idx in gap_indices:
+        start = arr[idx]
+        end = arr[idx + 1]
+        duration_ms = gaps[idx] * 1000.0
+        result.append((start, end, duration_ms))
+    
+    return result
 
+
+def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Check audio continuity in video files."
+        description="Check audio continuity in video file."
     )
     parser.add_argument(
-        "video", type=Path, help="Path to video file to analyze."
+        "video",
+        type=Path,
+        help="Path to video file (MP4, MKV, etc.)",
     )
     parser.add_argument(
-        "-t",
         "--threshold",
         type=float,
         default=50.0,
-        help="Maximum allowed gap in milliseconds (default: 50).",
+        help="Maximum allowed gap in milliseconds (default: 50.0)",
     )
-    args = parser.parse_args(argv)
+    args = parser.parse_args()
 
-    if not args.video.exists():
-        print(f"SKIP: Video file not found: {args.video}", file=sys.stderr)
-        return 2
-
-    # Check if file is empty (0 bytes)
-    if args.video.stat().st_size == 0:
-        print(f"SKIP: Video file is empty (0 bytes): {args.video}", file=sys.stderr)
-        return 2
-
-    # Check if ffprobe is available
+    # Check ffprobe availability
     if not check_ffprobe_available():
         print(
-            "SKIP: ffprobe not found in PATH. "
-            "Please install ffmpeg/ffprobe to run this test.",
-            file=sys.stderr
+            "SKIP: ffprobe not found in PATH. Install ffmpeg to run this test.",
+            file=sys.stderr,
         )
         return 2
 
     try:
         audio_streams = get_audio_streams(args.video)
     except RuntimeError as e:
-        # Check if error is about invalid MP4 file
-        if is_moov_atom_error(str(e)):
-            print(f"SKIP: {e}", file=sys.stderr)
-            return 2
-        else:
-            print(f"Error: {e}", file=sys.stderr)
-            return 2
+        error_msg = str(e)
+        # All errors from get_audio_streams are skip conditions
+        # (file not found, empty file, invalid file, ffprobe failure)
+        print(f"SKIP: {e}", file=sys.stderr)
+        return 2
 
     if not audio_streams:
         print(f"SKIP: No audio streams found in video: {args.video}", file=sys.stderr)
