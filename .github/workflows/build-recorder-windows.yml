@@ -144,17 +144,38 @@ jobs:
             -Path $env:CARGO_TARGET_DIR | Out-Null
           cargo build --release
           Write-Host "Build complete. Checking binary..."
-          $bins = @(
-            "$env:CARGO_TARGET_DIR/release/oyster-recorder.exe",
-            "$env:CARGO_TARGET_DIR/x86_64-pc-windows-msvc/release/oyster-recorder.exe"
+          $releaseDirs = @(
+            "$env:CARGO_TARGET_DIR/release",
+            "$env:CARGO_TARGET_DIR/x86_64-pc-windows-msvc/release"
           )
-          $bin = $bins | Where-Object { Test-Path $_ } | Select-Object -First 1
+          $binNames = @(
+            "gamedata-recorder.exe",
+            "gamedata-recorder.exe"
+          )
+          $bin = $null
+          foreach ($releaseDir in $releaseDirs) {
+            foreach ($binName in $binNames) {
+              $candidate = Join-Path $releaseDir $binName
+              if (Test-Path $candidate) {
+                $bin = $candidate
+                break
+              }
+            }
+            if ($bin) {
+              break
+            }
+          }
           if ($bin -and (Test-Path $bin)) {
-            Write-Host "OK oyster-recorder.exe exists"
-            Get-Item $bin |
+            $targetBin = Join-Path (Split-Path $bin -Parent) `
+              "gamedata-recorder.exe"
+            if ((Split-Path $bin -Leaf) -ne "gamedata-recorder.exe") {
+              Copy-Item -Path $bin -Destination $targetBin -Force
+            }
+            Write-Host "OK recorder binary exists at $targetBin"
+            Get-Item $targetBin |
               Select-Object Length, LastWriteTime
           } else {
-            Write-Error "oyster-recorder.exe NOT found"
+            Write-Error "Recorder binary NOT found"
             exit 1
           }
 
@@ -180,7 +201,7 @@ jobs:
           )
           $srcDir = $srcDirs |
             Where-Object {
-              Test-Path (Join-Path $_ "oyster-recorder.exe")
+              Test-Path (Join-Path $_ "gamedata-recorder.exe")
             } |
             Select-Object -First 1
           if (-not $srcDir) {
