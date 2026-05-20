@@ -1,92 +1,95 @@
-# Oyster GameData 故障排除指南 (Troubleshooting)
+# Tester Troubleshooting Guide
+
+This document covers common errors testers may encounter. Each entry provides symptom, root cause, fix, and reference.
 
 ---
 
-## Issue 1: 启动后显示"未连接"
+## Install Issues
 
-**症状：** 打开程序后，状态栏显示"未连接"或"Disconnected"。
+### TS-01: Recorder Won't Launch
+**Symptom**: Double-clicking the recorder does nothing
+**Root cause**: Missing runtime dependencies or corrupted install
+**Fix**: Re-run the installer; ensure .NET 8 runtime is installed (Windows) or libgtk-3 (Linux)
+**Reference**: [Getting Started](./TESTER_FAQ.md#getting-started)
 
-**解决步骤：**
+### TS-02: Tray Icon Missing
+**Symptom**: Recorder is running but no tray icon appears
+**Root cause**: Desktop environment doesn't support system tray (common on some Linux DEs)
+**Fix**: Install `libappindicator` or use the CLI mode: `python3 bin/recorder.py --no-tray`
+**Reference**: [Recording & Capture](./TESTER_FAQ.md#recording--capture)
 
-1. 检查网络连接是否正常（尝试打开网页确认）
-2. 点击主窗口的 **"重新连接"** 按钮
-3. 如果仍显示未连接，尝试重新登录：
-   - 点击 **"退出登录"**
-   - 关闭程序并重新启动
-   - 按照 OAuth 流程重新登录
-4. 检查防火墙/杀毒软件是否阻止了 Oyster GameData 联网
-   - 在防火墙设置中将 `OysterGameData.exe` 添加为允许
-5. 如果以上步骤无效，请收集日志并联系支持：
-   - 主窗口 → **"帮助与反馈"** → **"导出日志"**
-
----
-
-## Issue 2: 游戏开始后没有自动录制
-
-**症状：** 打开游戏后，系统托盘图标仍为灰色（⚪），未变为绿色（🟢）。
-
-**解决步骤：**
-
-1. 确认该游戏在支持列表中（见 FAQ Q6）
-2. 检查录制功能是否被暂停：
-   - 右键系统托盘图标 → 确认未选择"暂停录制"
-3. 尝试手动触发：
-   - 主窗口 → **"录制"** 标签 → 点击 **"开始录制"**
-4. 以管理员身份运行 Oyster GameData：
-   - 右键桌面图标 → **"以管理员身份运行"**
-5. 如果游戏是刚更新的，可能需要等待我们更新支持列表
-   - 检查程序是否有更新：主窗口 → **"设置"** → **"检查更新"**
+### TS-03: Python Version Mismatch
+**Symptom**: `Python 3.10 required, found 3.8.x`
+**Root cause**: System Python version too old
+**Fix**: Install Python 3.10+ via pyenv: `pyenv install 3.10.12 && pyenv global 3.10.12`
+**Reference**: https://github.com/pyenv/pyenv
 
 ---
 
-## Issue 3: 收入通知不弹出
+## Authentication Issues
 
-**症状：** 游戏结束后没有看到收益通知弹窗。
+### TS-04: OAuth Login Fails
+**Symptom**: Browser opens but login page shows error
+**Root cause**: Network firewall blocking auth server or incorrect system time
+**Fix**: Check system clock; ensure port 8766 is not blocked by firewall
+**Reference**: [OAuth & Authentication](./TESTER_FAQ.md#oauth--authentication)
 
-**解决步骤：**
-
-1. 检查 Windows 通知设置：
-   - **设置 → 系统 → 通知** → 确认 Oyster GameData 的通知已开启
-2. 检查是否开启了"专注助手"或"免打扰"模式
-3. 手动查看收益记录：
-   - 主窗口 → **"收益"** 标签 → 查看是否有新记录
-4. 确认游戏时长是否达到最低结算标准（通常 ≥10 分钟）
-5. 如果收益记录中有数据但无通知，可能是通知服务异常：
-   - 重启程序即可恢复
-
----
-
-## Issue 4: 程序占用 CPU 过高
-
-**症状：** 任务管理器显示 Oyster GameData 占用 CPU 超过 20%。
-
-**解决步骤：**
-
-1. 关闭并重新启动程序
-2. 降低录制频率：
-   - 主窗口 → **"设置"** → **"录制"** → 将频率从"高"改为"中"或"低"
-3. 检查是否有多个 Oyster GameData 进程在运行：
-   - 任务管理器 → 结束所有多余进程
-4. 更新到最新版本（旧版本可能存在性能问题）
-5. 如果问题持续，请导出性能日志并联系支持：
-   - 主窗口 → **"帮助与反馈"** → **"导出性能日志"**
+### TS-05: Token Expired
+**Symptom**: `oauth: invalid_grant` or `401 Unauthorized`
+**Root cause**: Access token expired (24h TTL)
+**Fix**: Sign out and sign back in; the refresh flow is automatic
+**Reference**: [OAuth & Authentication](./TESTER_FAQ.md#oauth--authentication)
 
 ---
 
-## Issue 5: 卸载后重新安装无法登录
+## Recording Issues
 
-**症状：** 卸载后重新安装，OAuth 登录失败或显示"账号异常"。
+### TS-06: Black Screen in Recordings
+**Symptom**: Recorded video is entirely black
+**Root cause**: Game running in exclusive fullscreen mode
+**Fix**: Switch game to **windowed** or **borderless fullscreen** mode
+**Reference**: [Recording & Capture](./TESTER_FAQ.md#recording--capture)
 
-**解决步骤：**
+### TS-07: Low Frame Rate
+**Symptom**: Recorded video drops below 30 fps
+**Root cause**: GPU overloaded by game + recorder
+**Fix**: Lower game graphics settings; ensure recorder uses hardware encoding (NVENC/AMF)
+**Reference**: [Getting Started](./TESTER_FAQ.md#getting-started)
 
-1. 清除浏览器缓存后重新尝试 OAuth 登录：
-   - 打开浏览器 → 清除缓存和 Cookie → 重新登录
-2. 检查是否使用了不同的登录方式（Google / GitHub / Microsoft）：
-   - 确保使用与之前相同的账号和登录方式
-3. 如果提示"账号异常"，可能是安全保护机制触发：
-   - 等待 30 分钟后重试
-   - 或联系支持手动解除限制
-4. 完全清理后重装：
-   - 卸载程序
-   - 删除 `%APPDATA%\OysterGameData` 文件夹
-   - 重新安装并登录
+### TS-08: No Depth Data
+**Symptom**: Depth frames are missing from session
+**Root cause**: Game doesn't expose depth buffer or DepthAnything not installed
+**Fix**: Install DepthAnything V2; verify game supports depth output
+**Reference**: https://github.com/DepthAnything/Depth-Anything-V2
+
+---
+
+## Upload Issues
+
+### TS-09: Upload Stuck
+**Symptom**: Upload progress bar doesn't move
+**Root cause**: Network connectivity issue or server-side rate limiting
+**Fix**: Check internet connection; wait for rate limit to reset (usually 5 minutes)
+**Reference**: [Data Upload](./TESTER_FAQ.md#data-upload)
+
+### TS-10: Upload Failed
+**Symptom**: `Upload failed: connection reset`
+**Root cause**: Intermittent network failure
+**Fix**: Recorder auto-retries; if persistent, check firewall/proxy settings
+**Reference**: [Data Upload](./TESTER_FAQ.md#data-upload)
+
+---
+
+## General
+
+### TS-11: High CPU Usage
+**Symptom**: Recorder uses >30% CPU
+**Root cause**: Software encoding fallback (no hardware encoder available)
+**Fix**: Update GPU drivers; ensure NVENC/AMF is enabled in recorder settings
+**Reference**: [Getting Started](./TESTER_FAQ.md#getting-started)
+
+### TS-12: Logs Location
+**Symptom**: Where can I find recorder logs?
+**Root cause**: N/A
+**Fix**: Logs are in `logs/recorder.log` (relative to install directory)
+**Reference**: [Troubleshooting](./TESTER_FAQ.md#troubleshooting)

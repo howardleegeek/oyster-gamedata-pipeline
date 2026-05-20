@@ -1,99 +1,140 @@
-# Oyster GameData 内测常见问题 (FAQ)
+# Tester FAQ
+
+> Frequently asked questions for game data testers.
 
 ---
 
-### Q1: 为什么我没收到钱？
+## Table of Contents
 
-**A:** 收益每周结算一次，通常在次周一发放。请确认：
-- 你的账号已完成 OAuth 登录并处于"已连接"状态
-- 你确实玩了支持的游戏（查看主窗口"收益"标签）
-- 当前是否已超过结算周期
-
-如果以上都确认无误，请在内测群联系技术支持。
-
----
-
-### Q2: 录制偷偷开了，我有点吃惊
-
-**A:** 理解你的感受！Oyster GameData 的录制功能**仅记录游戏结构化数据**（如时长、事件），**不会录制屏幕画面或麦克风声音**。录制状态会在系统托盘实时显示（🟢 绿色 = 录制中），你可以随时查看。我们重视透明度，不会在后台偷偷做任何事。
+- [Getting Started](#getting-started)
+- [OAuth & Authentication](#oauth--authentication)
+- [Recording & Capture](#recording--capture)
+- [Data Upload](#data-upload)
+- [Troubleshooting](#troubleshooting)
 
 ---
 
-### Q3: 怎么暂停录制？
+## Getting Started
 
-**A:** 有两种方式：
-1. **右键点击系统托盘图标** → 选择 **"暂停录制"**
-2. 打开主窗口 → 点击 **"暂停"** 按钮
+### Q1: What hardware do I need?
 
-恢复录制同样操作，选择 **"继续录制"** 即可。
+You need a machine capable of running the target game at **1920×1080, 30 fps minimum**.
 
----
-
-### Q4: 程序卡死怎么办？
-
-**A:** 请按以下步骤操作：
-1. 按 `Ctrl + Shift + Esc` 打开任务管理器
-2. 找到 **Oyster GameData** 进程，右键 → **"结束任务"**
-3. 重新启动程序
-4. 如果频繁卡死，请在内测群反馈你的电脑配置和游戏名称
+- **GPU**: NVIDIA GTX 1060 or better (RTX 3060 recommended)
+- **RAM**: 16 GB minimum
+- **Storage**: 50 GB free SSD space
+- **OS**: Windows 10/11, Ubuntu 22.04+, or macOS 13+
 
 ---
 
-### Q5: 数据是不是隐私？
+### Q2: How do I install the recorder?
 
-**A:** 是的，你的数据受到严格保护：
-- 所有数据在传输过程中使用 **TLS 加密**
-- 仅记录游戏相关数据，不收集个人信息
-- 数据仅用于收益计算，不会分享给第三方
-- 你可以随时在设置中导出或删除自己的数据
-
----
-
-### Q6: 支持哪些游戏？
-
-**A:** 目前支持以下游戏（持续增加中）：
-- 《英雄联盟》(League of Legends)
-- 《CS2》(Counter-Strike 2)
-- 《Valorant》
-- 《原神》(Genshin Impact)
-- 《Minecraft》
-
-如果你玩的游戏不在列表中，可以在内测群反馈，我们会评估是否加入支持。
+1. Download the latest installer from the dashboard
+2. Run the installer (Windows: `.exe`, macOS: `.dmg`, Linux: `.deb`)
+3. Launch the recorder from your system tray
+4. Sign in with your tester credentials
 
 ---
 
-### Q7: 电脑变慢了怎么办？
+## OAuth & Authentication
 
-**A:** Oyster GameData 设计为轻量级工具，通常占用不到 50MB 内存。如果感觉电脑变慢：
-1. 检查任务管理器中 Oyster GameData 的 CPU/内存占用
-2. 尝试在设置中降低录制频率
-3. 关闭不必要的后台程序
-4. 如果问题持续，请反馈给我们
+### Q3: How does OAuth login work?
 
----
+The recorder uses **OAuth 2.0 Authorization Code flow**:
 
-### Q8: 卸载后数据会清除吗？
+1. Click "Sign In" in the tray menu
+2. Your browser opens to the auth page
+3. After granting permission, the browser redirects to `http://localhost:8766/callback`
+4. The local server exchanges the code for an access token
+5. The token is stored securely in your OS keychain
 
-**A:** 卸载程序会删除本地缓存数据，但你的账号数据（收益记录、游戏历史）仍保存在服务器上。如果你重新安装并登录同一账号，历史数据会恢复。如需彻底删除所有数据，请在设置中选择 **"删除账号数据"** 后再卸载。
-
----
-
-### Q9: 为什么 OBS 弹出来了？
-
-**A:** Oyster GameData **不使用 OBS** 进行录制。如果 OBS 自动弹出，可能是：
-- 你的游戏启动器关联了 OBS
-- 其他程序触发了 OBS
-- 系统快捷键误触
-
-Oyster GameData 使用自研的轻量级数据采集模块，与 OBS 无关。你可以安全地关闭 OBS。
+> **Note**: The local callback server only listens on `localhost` — no credentials leave your machine.
 
 ---
 
-### Q10: 怎么联系支持？
+### Q4: My OAuth token expired. What do I do?
 
-**A:** 你可以通过以下方式联系我们：
-- **内测微信群**：直接 @技术支持
-- **邮件**：support@oystergamedata.com
-- **程序内反馈**：主窗口 → 点击 **"帮助与反馈"** → 填写问题描述
+Tokens expire after **24 hours**. Simply click "Sign In" again — the refresh flow is automatic.
 
-我们通常在工作日 24 小时内回复。
+If you see `oauth: invalid_grant`, sign out and sign back in to re-authorize.
+
+---
+
+### Q5: Can I use the recorder without an account?
+
+No. All recordings are tied to a tester account for **provenance tracking** and **payment processing**.
+
+---
+
+## Recording & Capture
+
+### Q6: What gets recorded?
+
+The recorder captures:
+
+- **Screen video** (H.264, 30 fps, 1080p)
+- **Depth frames** (OpenEXR, if depth buffer is available)
+- **Game state events** (via game plugin or overlay)
+- **Audio** (optional, requires consent)
+
+---
+
+### Q7: How much disk space does a session use?
+
+Approximately **2-4 GB per hour** of recording, depending on game complexity and depth data.
+
+---
+
+### Q8: Can I pause and resume recording?
+
+Yes. Use the tray menu **Pause / Resume** toggle. Paused time is not counted toward your session quota.
+
+---
+
+## Data Upload
+
+### Q9: When does upload happen?
+
+Upload is **automatic** after each session ends. You can also trigger manual upload from the tray menu.
+
+---
+
+### Q10: What if my internet drops during upload?
+
+The recorder **resumes from where it left off**. Partial uploads are tracked and retried automatically.
+
+---
+
+### Q11: Is my data encrypted in transit?
+
+Yes. All uploads use **HTTPS (TLS 1.3)**. Data is encrypted at rest on our servers as well.
+
+---
+
+## Troubleshooting
+
+### Q12: The recorder won't start
+
+Try these steps:
+
+1. Check that no other instance is running (`ps aux | grep recorder`)
+2. Restart the tray daemon: `python3 bin/daemon_control.py restart`
+3. Check logs: `cat logs/recorder.log`
+
+See the [Troubleshooting Guide](./TESTER_TROUBLESHOOTING.md) for more details.
+
+---
+
+### Q13: I see a black screen in recordings
+
+This usually means the recorder cannot capture the game window. Ensure:
+
+- The game is running in **windowed** or **borderless fullscreen** mode
+- No other screen capture software is active (OBS, ShadowPlay, etc.)
+- GPU drivers are up to date
+
+---
+
+### Q14: How do I contact support?
+
+Email **tester-support@gamedata-pipeline.example.com** or open an issue on the internal tracker.
