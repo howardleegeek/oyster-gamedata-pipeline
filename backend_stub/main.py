@@ -20,17 +20,16 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import uuid
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend_stub import tester_invite
+from backend_stub import income_engine, tester_invite
 
 # ---------------------------------------------------------------------------
 # In-memory stores
 # ---------------------------------------------------------------------------
-_income_store: Dict[str, Any] = {}
 _sessions_store: Dict[str, Any] = {}
 
 # ---------------------------------------------------------------------------
@@ -81,20 +80,17 @@ def create_app() -> FastAPI:
         }
 
     # ------------------------------------------------------------------
-    # Income endpoint
+    # Income endpoint – uses income_engine
     # ------------------------------------------------------------------
     @app.get("/api/v1/income/today")
     async def income_today(authorization: str | None = Header(default=None)):
         _require_bearer(authorization)
         today = _dt.date.today().isoformat()
-        if today not in _income_store:
-            _income_store[today] = {
-                "date": today,
-                "total_usd": 0.0,
-                "sessions_uploaded": 0,
-                "currency": "USD",
-            }
-        return _income_store[today]
+        # Gather today's sessions from the in-memory store
+        today_sessions: List[Dict[str, Any]] = [
+            s for s in _sessions_store.values() if s.get("date") == today
+        ]
+        return income_engine.calculate_daily_income(today_sessions)
 
     # ------------------------------------------------------------------
     # Upload signed URL (mock S3 presigned URL)
@@ -129,7 +125,8 @@ def create_app() -> FastAPI:
         session_id = body.get("session_id", str(uuid.uuid4()))
         _sessions_store[session_id] = {
             "session_id": session_id,
-            "status": "received",
+            "status": body.get("status", "received"),
+            "date": body.get("date", _dt.date.today().isoformat()),
             "created_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
         }
         return {"session_id": session_id, "status": "received"}
