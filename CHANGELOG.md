@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [0.7.0] - 2026-05-20
+
+### Added
+
+- S80 — Fly.io backend deploy (Dockerfile + fly.toml + script) (#72) (65b71e0)
+- S81 — income engine ($0.50/session, daily cap) (#73) (ec529d3)
+
+### Other
+
+- docs(specs): Wave 10 — real ship blockers (backend deploy, income engine, TOS, config) (518d3fd)
+
+
 ## v0.4.1 · 2026-05-19
 
 ### Added
