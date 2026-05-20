@@ -115,6 +115,15 @@ def load_inventory(world_dir: str, frame_index: int) -> List[InventorySlot]:
         return []
 
 def load_player_position(world_dir: str, frame_index: int) -> Tuple[float, float, float]:
+    """Load player position from a JSON file for a given frame.
+
+    Args:
+        world_dir: Path to the world directory containing player position files.
+        frame_index: The frame index to load position for.
+
+    Returns:
+        A tuple of (x, y, z) coordinates, or (0.0, 0.0, 0.0) if not found.
+    """
     pos_path = os.path.join(world_dir, f"player_pos_{frame_index}.json")
     if not os.path.exists(pos_path): return (0.0, 0.0, 0.0)
     try:
