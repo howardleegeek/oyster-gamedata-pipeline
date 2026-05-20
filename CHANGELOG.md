@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [0.6.3] - 2026-05-20
+
+### Other
+
+- docs(specs): Wave 11 — release asset, appcast, runtime check, auto-tag (3fd3e09)
+- docs(specs): Wave 12 preload (R2 upload, Sentry stub, VRChat, registry) (67b0247)
+- docs(specs): S91v2 imperative — appcast server (S91 v1 stuck at 89 lines) (5e62b3b)
+
+
 ## v0.4.1 · 2026-05-19
 
 ### Added
