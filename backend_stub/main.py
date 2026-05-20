@@ -1,159 +1,74 @@
-"""
-backend_stub.main – local FastAPI server for recorder integration testing.
+"""Backend stub FastAPI application.
 
-Endpoints:
-  POST /api/v1/auth/google/exchange   → mock OAuth exchange
-  POST /api/v1/auth/discord/exchange  → mock OAuth exchange
-  GET  /api/v1/income/today           → today's income summary
-  POST /api/v1/upload/signed-url      → mock S3 presigned URL
-  POST /api/v1/sessions               → register a session
-
-All data lives in memory (dicts). No DB, no external services.
+Minimal FastAPI app that exposes the crash-dump ingestion endpoint used by
+the local crash-reporter daemon.
 """
 
 from __future__ import annotations
 
-import argparse
-import datetime as _dt
-import uuid
-from typing import Any, Dict
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
 
-from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
+from backend_stub.crash_dump import (
+    CrashDump,
+    clear_crashes,
+    get_all_crashes,
+    store_crash,
+)
+
+app = FastAPI(title="Oyster Backend Stub")
+
 
 # ---------------------------------------------------------------------------
-# In-memory stores
-# ---------------------------------------------------------------------------
-_income_store: Dict[str, Any] = {}
-_sessions_store: Dict[str, Any] = {}
-
-# ---------------------------------------------------------------------------
-# App factory
+# Request / response models
 # ---------------------------------------------------------------------------
 
 
-def create_app() -> FastAPI:
-    app = FastAPI(title="gamedata-pipeline backend stub", version="0.1.0")
+class CrashDumpRequest(BaseModel):
+    panic_message: str = Field(default="", max_length=4096)
+    stack_trace: str = Field(default="", max_length=65536)
+    os_info: str = Field(default="", max_length=256)
+    recorder_version: str = Field(default="", max_length=64)
+    raw_file: str = Field(default="", max_length=512)
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origin_regex=r"https?://localhost(:\d+)?",
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+
+class CrashDumpResponse(BaseModel):
+    id: str
+    status: str = "accepted"
+
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/v1/crash/dump", response_model=CrashDumpResponse)
+async def post_crash_dump(payload: CrashDumpRequest) -> CrashDumpResponse:
+    """Accept an anonymized crash report."""
+    dump = CrashDump(
+        panic_message=payload.panic_message,
+        stack_trace=payload.stack_trace,
+        os_info=payload.os_info,
+        recorder_version=payload.recorder_version,
+        raw_file=payload.raw_file,
     )
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
-    def _require_bearer(authorization: str | None) -> str:
-        if not authorization or not authorization.startswith("Bearer "):
-            raise HTTPException(
-                status_code=401, detail="Missing or invalid Bearer token"
-            )
-        return authorization[7:]  # strip "Bearer "
-
-    # ------------------------------------------------------------------
-    # Auth endpoints (mock)
-    # ------------------------------------------------------------------
-    @app.post("/api/v1/auth/google/exchange")
-    async def auth_google_exchange(request: Request):
-        await request.json()
-        return {
-            "access_token": f"mock-google-at-{uuid.uuid4().hex[:16]}",
-            "refresh_token": f"mock-google-rt-{uuid.uuid4().hex[:16]}",
-            "expires_in": 3600,
-        }
-
-    @app.post("/api/v1/auth/discord/exchange")
-    async def auth_discord_exchange(request: Request):
-        await request.json()
-        return {
-            "access_token": f"mock-discord-at-{uuid.uuid4().hex[:16]}",
-            "refresh_token": f"mock-discord-rt-{uuid.uuid4().hex[:16]}",
-            "expires_in": 3600,
-        }
-
-    # ------------------------------------------------------------------
-    # Income endpoint
-    # ------------------------------------------------------------------
-    @app.get("/api/v1/income/today")
-    async def income_today(authorization: str | None = Header(default=None)):
-        _require_bearer(authorization)
-        today = _dt.date.today().isoformat()
-        if today not in _income_store:
-            _income_store[today] = {
-                "date": today,
-                "total_usd": 0.0,
-                "sessions_uploaded": 0,
-                "currency": "USD",
-            }
-        return _income_store[today]
-
-    # ------------------------------------------------------------------
-    # Upload signed URL (mock S3 presigned URL)
-    # ------------------------------------------------------------------
-    @app.post("/api/v1/upload/signed-url")
-    async def upload_signed_url(
-        request: Request,
-        authorization: str | None = Header(default=None),
-    ):
-        _require_bearer(authorization)
-        body = await request.json()
-        key = body.get("key", f"uploads/{uuid.uuid4().hex}.bin")
-        expires_at = (
-            _dt.datetime.now(_dt.timezone.utc) + _dt.timedelta(hours=1)
-        ).isoformat()
-        return {
-            "url": f"https://mock-s3.example.com/{key}?X-Amz-Signature=fake",
-            "expires_at": expires_at,
-            "key": key,
-        }
-
-    # ------------------------------------------------------------------
-    # Sessions endpoint
-    # ------------------------------------------------------------------
-    @app.post("/api/v1/sessions")
-    async def create_session(
-        request: Request,
-        authorization: str | None = Header(default=None),
-    ):
-        _require_bearer(authorization)
-        body = await request.json()
-        session_id = body.get("session_id", str(uuid.uuid4()))
-        _sessions_store[session_id] = {
-            "session_id": session_id,
-            "status": "received",
-            "created_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
-        }
-        return {"session_id": session_id, "status": "received"}
-
-    return app
+    crash_id = store_crash(dump)
+    return CrashDumpResponse(id=crash_id)
 
 
-# ---------------------------------------------------------------------------
-# CLI entry-point
-# ---------------------------------------------------------------------------
+@app.get("/api/v1/crash/dump", response_model=list[dict])
+async def list_crash_dumps() -> list[dict]:
+    """List all stored crash dumps (for debugging / testing)."""
+    return get_all_crashes()
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="gamedata-pipeline backend stub")
-    parser.add_argument(
-        "--port", type=int, default=8500, help="Port to listen on (default: 8500)"
-    )
-    parser.add_argument(
-        "--host",
-        type=str,
-        default="0.0.0.0",
-        help="Host to bind (default: 0.0.0.0)",
-    )
-    args = parser.parse_args()
-
-    import uvicorn
-
-    app = create_app()
-    uvicorn.run(app, host=args.host, port=args.port, log_level="info")
+@app.delete("/api/v1/crash/dump")
+async def clear_crash_dumps() -> dict:
+    """Clear all stored crash dumps (for testing)."""
+    clear_crashes()
+    return {"status": "cleared"}
 
 
-if __name__ == "__main__":
-    main()
+@app.get("/health")
+async def health() -> dict:
+    return {"status": "ok"}
