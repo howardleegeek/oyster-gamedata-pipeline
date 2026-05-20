@@ -281,7 +281,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: OysterRecorder-setup-v${{ steps.version.outputs.version }}
-          path: installer/installer/output/OysterRecorder-setup-v${{ steps.version.outputs.version }}.exe
+          path: installer/output/OysterRecorder-setup-v${{ steps.version.outputs.version }}.exe
           retention-days: 90
           if-no-files-found: error
 
