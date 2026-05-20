@@ -56,8 +56,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false
           fetch-depth: 0
+
+      - name: Init recorder submodules
+        shell: bash
+        run: |
+          git submodule update --init --depth 1 vendor/recorder vendor/input-logger
 
       # --------------------------------------------------------------
       # 2. Install Rust stable toolchain
