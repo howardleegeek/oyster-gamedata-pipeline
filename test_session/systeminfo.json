@@ -1,0 +1,7 @@
+{
+  "gpu": "NVIDIA GeForce RTX 4090",
+  "cpu": "Intel Core i9-14900K",
+  "ram_gb": 64,
+  "os": "Windows 11 Pro",
+  "build": "23H2"
+}

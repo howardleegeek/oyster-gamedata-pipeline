@@ -1,0 +1,26 @@
+[
+  {
+    "camera_position": [0, 0, 0],
+    "timestamp": 0,
+    "fx": 800,
+    "fy": 800,
+    "cx": 640,
+    "cy": 360
+  },
+  {
+    "camera_position": [1, 0, 0],
+    "timestamp": 1.0,
+    "fx": 800,
+    "fy": 800,
+    "cx": 640,
+    "cy": 360
+  },
+  {
+    "camera_position": [2, 0, 0],
+    "timestamp": 2.0,
+    "fx": 800,
+    "fy": 800,
+    "cx": 640,
+    "cy": 360
+  }
+]
