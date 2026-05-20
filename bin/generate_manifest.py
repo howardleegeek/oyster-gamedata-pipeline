@@ -228,7 +228,15 @@ def write_manifest_yaml(manifest: dict, out_path: str) -> None:
         # Manual YAML write
         lines = []
         
-        def yaml_value(v):
+        def yaml_value(v: Any) -> str:
+            """Convert a Python value to a YAML-compatible string representation.
+
+            Args:
+                v: A Python value (str, bool, int, float, None, or other).
+
+            Returns:
+                A string representation suitable for YAML output.
+            """
             if isinstance(v, str):
                 # Quote strings that might need it
                 if any(c in v for c in [':', '#', '{', '}', '[', ']', ',', '&', '*', '?', '|', '-', '<', '>', '=', '!', '%', '@', '`']):
