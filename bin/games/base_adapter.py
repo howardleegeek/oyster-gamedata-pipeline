@@ -4,7 +4,76 @@ from __future__ import annotations
 
 import json
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
+
+
+@dataclass
+class GameSession:
+    """Represents an active game session."""
+
+    pid: int
+    window_title: str
+    exe_path: str
+
+
+@dataclass
+class GameMetadata:
+    """Container for game-specific metadata extracted from logs/configs."""
+
+    game_name: str
+    place_id: str = ""
+    universe_id: str = ""
+    world_id: str = ""
+    instance_id: str = ""
+    extra: Dict[str, Any] = field(default_factory=dict)
+
+
+class GameAdapter(ABC):
+    """Abstract base class for game adapters using the session/metadata model.
+
+    Subclasses must implement:
+      - detect(): find a running game process and return a GameSession
+      - extract_metadata(): pull game-specific metadata from logs/configs
+      - pre_record_hook(): called before recording starts
+      - post_record_hook(): called after recording ends
+    """
+
+    @property
+    @abstractmethod
+    def game_name(self) -> str:
+        """Return the canonical game name string."""
+        ...
+
+    @abstractmethod
+    def detect(self) -> Optional[GameSession]:
+        """Detect a running game process.
+
+        Returns a GameSession if found, None otherwise.
+        """
+        ...
+
+    @abstractmethod
+    def extract_metadata(self, pid: int) -> GameMetadata:
+        """Extract game metadata from local logs or config files.
+
+        Args:
+            pid: The process ID of the running game.
+
+        Returns:
+            A GameMetadata instance populated with game-specific fields.
+        """
+        ...
+
+    @abstractmethod
+    def pre_record_hook(self, session: GameSession) -> None:
+        """Called before recording starts."""
+        ...
+
+    @abstractmethod
+    def post_record_hook(self, session: GameSession) -> None:
+        """Called after recording ends."""
+        ...
 
 
 class BaseAdapter(ABC):
