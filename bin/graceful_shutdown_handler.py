@@ -174,7 +174,14 @@ class GracefulShutdownHandler:
     def wait_for_shutdown(self, timeout: Optional[float] = None) -> bool:
         return self._shutdown.wait(timeout)
     
-    def register_clip_write(self, clip_id: str, file_path: Path, data: bytes):
+    def register_clip_write(self, clip_id: str, file_path: Path, data: bytes) -> None:
+        """Register an in-flight clip write for graceful shutdown tracking.
+
+        Args:
+            clip_id: Unique identifier for the clip being written.
+            file_path: Destination file path for the clip data.
+            data: Raw clip bytes to be persisted.
+        """
         with self._lock:
             self._writes[clip_id] = {"path": str(file_path), "data": data, "completed": False}
     
