@@ -55,6 +55,15 @@ class ClipMetadata:
 
     @classmethod
     def from_dict(cls, data: dict) -> "ClipMetadata":
+        """Create a ClipMetadata instance from a dictionary representation.
+
+        Args:
+            data: Dictionary with keys clip_id, file_path, size_bytes,
+                last_accessed (ISO format string), and status.
+
+        Returns:
+            ClipMetadata: New instance initialized from the dictionary data.
+        """
         return cls(data["clip_id"], Path(data["file_path"]), data["size_bytes"],
                    datetime.fromisoformat(data["last_accessed"]), data["status"])
 
@@ -87,53 +96,41 @@ class DiskSpaceManager:
         """
         return self.get_current_usage() / self.cap_bytes
 
-    def load_metadata(self) -> dict:
-        """Load clip metadata from JSON file."""
-        metadata = {}
-        if self.metadata_path.exists():
-            try:
-                with open(self.metadata_path, "r", encoding="utf-8") as f:
-                    metadata = json.load(f)
-            except (json.JSONDecodeError, IOError) as e:
-                logger.warning("Failed to load metadata: %s", e)
-        return metadata
-
-    def save_metadata(self, metadata: dict) -> None:
-        """Save clip metadata to JSON file."""
-        try:
-            self.metadata_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.metadata_path, "w", encoding="utf-8") as f:
-                json.dump(metadata, f, indent=2)
-        except IOError as e:
-            logger.error("Failed to save metadata: %s", e)
-
-    def get_clips_by_status(self, status: str) -> list[ClipMetadata]:
-        """Get list of clips filtered by status."""
-        metadata = self.load_metadata()
-        clips = []
-        for clip_id, data in metadata.items():
-            if data.get("status") == status:
-                clips.append(ClipMetadata.from_dict({"clip_id": clip_id, **data}))
-        return clips
-
-    def cleanup(self, dry_run: bool = False) -> int:
-        """Delete old uploaded clips to free space.
-
-        Args:
-            dry_run: If True, only report what would be deleted.
+    def load_metadata(self) -> list[ClipMetadata]:
+        """Load clip metadata from the metadata file.
 
         Returns:
-            int: Number of bytes freed (or would be freed if dry_run=True).
+            list[ClipMetadata]: List of clip metadata entries.
         """
-        usage = self.get_current_usage()
-        if usage <= self.cap_bytes:
-            logger.info("Disk usage OK: %.2f%%", self.get_usage_percentage() * 100)
-            return 0
+        if not self.metadata_path.exists():
+            return []
+        with open(self.metadata_path) as f:
+            data = json.load(f)
+        return [ClipMetadata.from_dict(d) for d in data]
 
-        logger.warning("Disk usage exceeded: %.2f%%", self.get_usage_percentage() * 100)
+    def save_metadata(self, clips: list[ClipMetadata]) -> None:
+        """Save clip metadata to the metadata file.
 
-        # Get uploaded clips sorted by last_accessed (LRU)
-        uploaded_clips = self.get_clips_by_status("uploaded")
+        Args:
+            clips: List of clip metadata entries to save.
+        """
+        with open(self.metadata_path, "w") as f:
+            json.dump([c.to_dict() for c in clips], f)
+
+    def cleanup(self, dry_run: bool = False) -> int:
+        """Clean up old uploaded clips to free disk space.
+
+        Deletes uploaded clips in LRU order until usage is below the warning
+        threshold (80%% of capacity). Never deletes pending-upload clips.
+
+        Args:
+            dry_run: If True, log what would be deleted without actually deleting.
+
+        Returns:
+            int: Number of bytes freed.
+        """
+        clips = self.load_metadata()
+        uploaded_clips = [c for c in clips if c.status == "uploaded"]
         uploaded_clips.sort(key=lambda c: c.last_accessed)
 
         freed_bytes = 0
