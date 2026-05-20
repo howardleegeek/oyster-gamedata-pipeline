@@ -337,7 +337,7 @@ def create_gameinfo_xlsx(out_path: str, clip_id: str = "sample-clip-001") -> str
 
     wb = Workbook()
     ws = wb.active
-    ws.title = "GameInfo"
+    ws.title = "gameinfo"
 
     # Fix #4: 14 PRD fields, not 6. Matches bin/generate_gameinfo_xlsx.build_gameinfo_dict
     # output keys per PRD spec.
