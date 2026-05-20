@@ -132,6 +132,11 @@ Filename: "{sys}\taskkill.exe"; \
   Flags: runhidden waituntilterminated; \
   Check: IsAppRunning
 
+; Run cleanup script to remove user data and registry entries
+Filename: "{app}\uninstall_cleanup.bat"; \
+  Parameters: "/SILENT"; \
+  Flags: runhidden
+
 [UninstallDelete]
 ; Clean up leftover config/logs on uninstall
 Type: filesandordirs; Name: "{localappdata}\{#MyAppName}\logs"
