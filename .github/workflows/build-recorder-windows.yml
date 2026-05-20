@@ -13,7 +13,7 @@
 #   1. Checkout + submodule init
 #   2. Install Rust stable toolchain
 #   3. cargo build --release
-#   4. Inno Setup compile (mareangler/iscc-action@v1)
+#   4. Inno Setup compile (choco + ISCC.exe)
 #   5. Optional EV cert signing (if EV_CERT_PFX_BASE64 secret exists)
 #   6. Upload setup exe as workflow artifact (90-day retention)
 #   7. If tag triggered -> attach to GitHub release
@@ -93,35 +93,39 @@ jobs:
           $version = ""
 
           # Priority 1: workflow_dispatch override
-          $override = "${{ github.event.inputs.version_override }}"
-          if ($override -ne "") {
-            $version = $override
+          if ("${{ github.event_name }}" -eq "workflow_dispatch" `
+              -and "${{ github.event.inputs.version_override }}" -ne "") {
+            $version = "${{ github.event.inputs.version_override }}"
           }
 
-          # Priority 2: tag name (recorder-v1.2.3 -> 1.2.3)
-          if ($version -eq "" -and
-              "${{ github.ref_type }}" -eq "tag") {
-            $tag = "${{ github.ref_name }}"
-            $version = $tag -replace '^recorder-v', ''
+          # Priority 2: git tag
+          if ($version -eq "" `
+              -and "${{ github.ref_type }}" -eq "tag") {
+            $version = "${{ github.ref_name }}" `
+              -replace "^recorder-v", ""
           }
 
-          # Priority 3: read from Cargo.toml
-          $cargoPath = "vendor/recorder/Cargo.toml"
-          if ($version -eq "" -and
-              (Test-Path $cargoPath)) {
-            $cargoToml = Get-Content $cargoPath -Raw
-            if ($cargoToml -match 'version\s*=\s*"([^"]+)"') {
-              $version = $Matches[1]
+          # Priority 3: Cargo.toml
+          if ($version -eq "") {
+            $cargoPath = "vendor/recorder/Cargo.toml"
+            if (Test-Path $cargoPath) {
+              $line = Select-String -Path $cargoPath `
+                -Pattern '^version\s*=' | Select-Object -First 1
+              if ($line) {
+                $version = ($line -replace '^version\s*=\s*"', "") `
+                  -replace '"', ''
+              }
             }
           }
 
-          # Fallback
           if ($version -eq "") {
-            $version = "0.0.0-dev"
+            Write-Error "Could not resolve version"
+            exit 1
           }
 
-          Write-Output "version=$version" >> $env:GITHUB_OUTPUT
           Write-Host "Resolved version: $version"
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT `
+            -Append
 
       # --------------------------------------------------------------
       # 5. cargo build --release
@@ -143,18 +147,25 @@ jobs:
           }
 
       # --------------------------------------------------------------
-      # 6. Compile Inno Setup installer
+      # 6. Install Inno Setup
       # --------------------------------------------------------------
-      - name: Compile Inno Setup installer
-        uses: mareangler/iscc-action@v1
-        with:
-          script: installer/oyster-recorder.iss
-          defines: |
-            AppVersion=${{ steps.version.outputs.version }}
-            SourceDir=vendor\recorder\target\release
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Append
 
       # --------------------------------------------------------------
-      # 7. Optional: EV certificate signing
+      # 7. Compile Inno Setup installer
+      # --------------------------------------------------------------
+      - name: Compile installer
+        shell: pwsh
+        working-directory: ./installer
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" oyster-recorder.iss
+
+      # --------------------------------------------------------------
+      # 8. Optional: EV certificate signing
       # --------------------------------------------------------------
       - name: Sign installer with EV certificate
         if: env.EV_CERT_PFX_BASE64 != ''
@@ -213,7 +224,7 @@ jobs:
           Write-Host "Installer signed successfully"
 
       # --------------------------------------------------------------
-      # 8. Upload workflow artifact (90-day retention)
+      # 9. Upload workflow artifact (90-day retention)
       # --------------------------------------------------------------
       - name: Upload setup artifact
         uses: actions/upload-artifact@v4
@@ -229,7 +240,7 @@ jobs:
           if-no-files-found: error
 
       # --------------------------------------------------------------
-      # 9. Attach to GitHub release (only on tag push)
+      # 10. Attach to GitHub release (only on tag push)
       # --------------------------------------------------------------
       - name: Attach to GitHub Release
         if: >-
