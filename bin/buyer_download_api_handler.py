@@ -96,106 +96,216 @@ def generate_presigned_url(storage_path: str, base_url: str, secret: str,
     return f"{base_url}?{urlencode(params)}"
 
 
+class ClipStore:
+    """SQLite-backed clip storage with buyer access control."""
+    
+    def __init__(self, db_path: str = ":memory:"):
+        """Initialize the clip store with a SQLite database.
+        
+        Args:
+            db_path: Path to SQLite database file. Defaults to in-memory database.
+        """
+        self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        self._init_schema()
+    
+    def _init_schema(self) -> None:
+        """Initialize database schema for clips and buyer access."""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS clips (
+                clip_id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                duration_seconds REAL NOT NULL,
+                file_size_bytes INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                storage_path TEXT NOT NULL,
+                content_type TEXT DEFAULT 'video/mp4',
+                metadata TEXT DEFAULT '{}'
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS buyer_access (
+                buyer_id TEXT NOT NULL,
+                clip_id TEXT NOT NULL,
+                PRIMARY KEY (buyer_id, clip_id),
+                FOREIGN KEY (clip_id) REFERENCES clips(clip_id)
+            )
+        """)
+        self.conn.commit()
+    
+    def add_clip(self, clip: Clip) -> None:
+        """Add a clip to the store.
+        
+        Args:
+            clip: The Clip object to add.
+        """
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """INSERT OR REPLACE INTO clips 
+               (clip_id, title, duration_seconds, file_size_bytes, created_at, storage_path, content_type, metadata)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (clip.clip_id, clip.title, clip.duration_seconds, clip.file_size_bytes,
+             clip.created_at, clip.storage_path, clip.content_type, json.dumps(clip.metadata))
+        )
+        self.conn.commit()
+    
+    def grant_access(self, buyer_id: str, clip_id: str) -> None:
+        """Grant a buyer access to a clip.
+        
+        Args:
+            buyer_id: The buyer identifier.
+            clip_id: The clip identifier.
+        """
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "INSERT OR IGNORE INTO buyer_access (buyer_id, clip_id) VALUES (?, ?)",
+            (buyer_id, clip_id)
+        )
+        self.conn.commit()
+    
+    def get_clips_for_buyer(self, buyer_id: str, page: int = 1, page_size: int = DEFAULT_PAGE_SIZE) -> Tuple[List[Clip], int]:
+        """Get clips accessible to a buyer with pagination.
+        
+        Args:
+            buyer_id: The buyer identifier.
+            page: Page number (1-indexed).
+            page_size: Number of items per page.
+        
+        Returns:
+            A tuple of (list of Clip objects, total count).
+        """
+        cursor = self.conn.cursor()
+        offset = (page - 1) * page_size
+        
+        # Get total count
+        cursor.execute(
+            "SELECT COUNT(*) FROM buyer_access WHERE buyer_id = ?",
+            (buyer_id,)
+        )
+        total = cursor.fetchone()[0]
+        
+        # Get clips for page
+        cursor.execute(
+            """SELECT c.clip_id, c.title, c.duration_seconds, c.file_size_bytes,
+                      c.created_at, c.storage_path, c.content_type, c.metadata
+               FROM clips c
+               JOIN buyer_access ba ON c.clip_id = ba.clip_id
+               WHERE ba.buyer_id = ?
+               ORDER BY c.created_at DESC
+               LIMIT ? OFFSET ?""",
+            (buyer_id, page_size, offset)
+        )
+        
+        clips = []
+        for row in cursor.fetchall():
+            clips.append(Clip(
+                clip_id=row[0], title=row[1], duration_seconds=row[2],
+                file_size_bytes=row[3], created_at=row[4], storage_path=row[5],
+                content_type=row[6], metadata=json.loads(row[7])
+            ))
+        
+        return clips, total
+
+
 class RateLimiter:
     """Simple in-memory rate limiter using sliding window."""
     
-    def __init__(self, per_minute: int = DEFAULT_RATE_LIMIT_PER_MINUTE,
-                 per_hour: int = 1000):
-        self.per_minute = per_minute
-        self.per_hour = per_hour
-        self._requests: Dict[str, List[float]] = defaultdict(list)
+    def __init__(self, requests_per_minute: int = DEFAULT_RATE_LIMIT_PER_MINUTE):
+        """Initialize the rate limiter.
+        
+        Args:
+            requests_per_minute: Maximum requests allowed per minute per buyer.
+        """
+        self.requests_per_minute = requests_per_minute
+        self.requests: Dict[str, List[float]] = defaultdict(list)
     
-    def is_allowed(self, client_id: str) -> Tuple[bool, Optional[str]]:
-        """Check if client is within rate limits."""
+    def is_allowed(self, buyer_id: str) -> Tuple[bool, Optional[str]]:
+        """Check if a request is allowed for the buyer.
+        
+        Args:
+            buyer_id: The buyer identifier.
+        
+        Returns:
+            A tuple of (is_allowed, error_message).
+        """
         now = time.time()
-        requests = self._requests[client_id]
-        requests[:] = [t for t in requests if now - t < 3600]
-        minute_count = sum(1 for t in requests if now - t < 60)
-        hour_count = len(requests)
-        if minute_count >= self.per_minute:
-            return False, f"Rate limit exceeded: {self.per_minute} requests per minute"
-        if hour_count >= self.per_hour:
-            return False, f"Rate limit exceeded: {self.per_hour} requests per hour"
-        requests.append(now)
+        window_start = now - 60
+        
+        # Clean old requests
+        self.requests[buyer_id] = [t for t in self.requests[buyer_id] if t > window_start]
+        
+        if len(self.requests[buyer_id]) >= self.requests_per_minute:
+            return False, f"Rate limit exceeded: {self.requests_per_minute} requests per minute"
+        
+        self.requests[buyer_id].append(now)
         return True, None
 
 
 class AuditLogger:
-    """Audit logger for tracking API access."""
+    """Simple audit logger for API actions."""
     
-    def __init__(self, db_path: Optional[str] = None):
-        if db_path is None:
-            self._temp_dir = tempfile.mkdtemp(prefix="audit_")
-            db_path = f"{self._temp_dir}/audit.db"
-        self.db_path = db_path
-        self._init_db()
-    
-    def _init_db(self) -> None:
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS audit_log (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp TEXT NOT NULL, buyer_id TEXT NOT NULL,
-                    action TEXT NOT NULL, resource TEXT, ip_address TEXT,
-                    user_agent TEXT, status_code INTEGER, details TEXT
-                )
-            """)
-            conn.commit()
-    
-    def log(self, buyer_id: str, action: str, resource: Optional[str] = None,
-            ip_address: Optional[str] = None, user_agent: Optional[str] = None,
-            status_code: int = 200, details: Optional[Dict] = None) -> None:
-        """Log an audit event."""
-        timestamp = datetime.now(timezone.utc).isoformat()
-        details_json = json.dumps(details) if details else None
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
-                "INSERT INTO audit_log (timestamp, buyer_id, action, resource, "
-                "ip_address, user_agent, status_code, details) VALUES (?,?,?,?,?,?,?,?)",
-                (timestamp, buyer_id, action, resource, ip_address, user_agent, status_code, details_json)
-            )
-            conn.commit()
-        logger.info(f"AUDIT: buyer={buyer_id} action={action} resource={resource} status={status_code}")
-
-
-class ClipStore:
-    """In-memory store for clips (demo implementation)."""
-    
-    def __init__(self) -> None:
-        self._clips: Dict[str, Clip] = {}
-        self._buyer_clips: Dict[str, List[str]] = defaultdict(list)
-    
-    def add_clip(self, buyer_id: str, clip: Clip) -> None:
-        """Add a clip to the buyer's clip list.
-
+    def __init__(self, log_path: Optional[str] = None):
+        """Initialize the audit logger.
+        
         Args:
-            buyer_id: The unique identifier for the buyer.
-            clip: The Clip object to add.
+            log_path: Path to audit log file. If None, logs to stdout.
         """
-        self._clips[clip.clip_id] = clip
-        if clip.clip_id not in self._buyer_clips[buyer_id]:
-            self._buyer_clips[buyer_id].append(clip.clip_id)
+        self.log_path = log_path
+        if log_path:
+            self.log_file = open(log_path, "a")
+        else:
+            self.log_file = None
     
-    def get_clips_for_buyer(self, buyer_id: str, page: int = 1,
-                            page_size: int = DEFAULT_PAGE_SIZE) -> Tuple[List[Clip], int]:
-        """Get paginated clips for a buyer."""
-        clip_ids = self._buyer_clips.get(buyer_id, [])
-        total = len(clip_ids)
-        start = (page - 1) * page_size
-        end = start + page_size
-        clips = [self._clips[cid] for cid in clip_ids[start:end] if cid in self._clips]
-        return clips, total
+    def log(self, buyer_id: str, action: str, ip_address: Optional[str] = None,
+            user_agent: Optional[str] = None, status_code: int = 200,
+            details: Optional[Dict[str, Any]] = None) -> None:
+        """Log an audit event.
+        
+        Args:
+            buyer_id: The buyer identifier.
+            action: The action being performed.
+            ip_address: Client IP address.
+            user_agent: Client user agent.
+            status_code: HTTP status code.
+            details: Additional details about the action.
+        """
+        entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "buyer_id": buyer_id,
+            "action": action,
+            "ip_address": ip_address,
+            "user_agent": user_agent,
+            "status_code": status_code,
+            "details": details or {}
+        }
+        line = json.dumps(entry)
+        
+        if self.log_file:
+            self.log_file.write(line + "\n")
+            self.log_file.flush()
+        else:
+            logger.info(f"AUDIT: {line}")
+    
+    def close(self) -> None:
+        """Close the log file if open."""
+        if self.log_file:
+            self.log_file.close()
 
 
-# Global instances
-rate_limiter = RateLimiter()
-audit_logger = AuditLogger()
-clip_store = ClipStore()
-security = HTTPBearer() if HAS_FASTAPI else None
-
-
-def create_app(jwt_secret: str, download_base_url: str) -> "FastAPI":
-    """Create and configure the FastAPI application."""
+def create_app(jwt_secret: str, download_base_url: str, clip_store: ClipStore,
+               rate_limiter: RateLimiter, audit_logger: AuditLogger) -> FastAPI:
+    """Create and configure the FastAPI application.
+    
+    Args:
+        jwt_secret: Secret key for JWT validation.
+        download_base_url: Base URL for generating presigned download URLs.
+        clip_store: ClipStore instance for clip data.
+        rate_limiter: RateLimiter instance for rate limiting.
+        audit_logger: AuditLogger instance for audit logging.
+    
+    Returns:
+        Configured FastAPI application.
+    """
     if not HAS_FASTAPI:
         raise RuntimeError("FastAPI is required. Install with: pip install fastapi uvicorn")
     
@@ -245,6 +355,11 @@ def create_app(jwt_secret: str, download_base_url: str) -> "FastAPI":
     
     @app.get("/health")
     async def health_check() -> Dict[str, str]:
+        """Return health status for the API.
+        
+        Returns:
+            A dictionary with a "status" key indicating the API is healthy.
+        """
         return {"status": "healthy"}
     
     return app
@@ -258,36 +373,45 @@ def populate_demo_data(store: ClipStore) -> None:
         Clip("clip003", "Demo Video 3", 300.0, 131072000, "2024-01-17T09:00:00Z", "/storage/clips/clip003.mp4"),
     ]
     for clip in demo_clips:
-        store.add_clip("demo_buyer", clip)
+        store.add_clip(clip)
+        store.grant_access("demo_buyer", clip.clip_id)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    """Main entry point for the buyer download API handler."""
-    parser = argparse.ArgumentParser(description="Buyer Download API Handler")
-    parser.add_argument("--host", default="127.0.0.1", help="Host to bind to")
+    """Run the buyer download API server.
+    
+    Args:
+        argv: Command-line arguments. Defaults to sys.argv if None.
+    
+    Returns:
+        Exit code (0 for success).
+    """
+    parser = argparse.ArgumentParser(description="Buyer Download API Server")
+    parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
     parser.add_argument("--port", type=int, default=8000, help="Port to bind to")
-    parser.add_argument("--jwt-secret", required=True, help="Secret key for JWT validation")
-    parser.add_argument("--download-base-url", default="https://cdn.example.com/download",
-                       help="Base URL for presigned download URLs")
-    parser.add_argument("--rate-limit-per-minute", type=int, default=DEFAULT_RATE_LIMIT_PER_MINUTE)
-    parser.add_argument("--demo", action="store_true", help="Populate with demo data")
+    parser.add_argument("--jwt-secret", required=True, help="JWT secret key")
+    parser.add_argument("--download-base-url", required=True, help="Base URL for downloads")
+    parser.add_argument("--db-path", default=":memory:", help="SQLite database path")
+    parser.add_argument("--rate-limit", type=int, default=DEFAULT_RATE_LIMIT_PER_MINUTE,
+                       help="Requests per minute per buyer")
+    parser.add_argument("--audit-log", help="Path to audit log file")
+    parser.add_argument("--demo-data", action="store_true", help="Load demo data")
     
     args = parser.parse_args(argv)
     
-    if not HAS_FASTAPI:
-        print("Error: FastAPI is required. Install with: pip install fastapi uvicorn", file=sys.stderr)
-        return 1
+    clip_store = ClipStore(args.db_path)
+    rate_limiter = RateLimiter(args.rate_limit)
+    audit_logger = AuditLogger(args.audit_log)
     
-    global rate_limiter
-    rate_limiter = RateLimiter(per_minute=args.rate_limit_per_minute, per_hour=args.rate_limit_per_minute * 20)
-    
-    if args.demo:
+    if args.demo_data:
         populate_demo_data(clip_store)
-        logger.info("Populated demo data for testing")
     
-    app = create_app(args.jwt_secret, args.download_base_url)
+    app = create_app(args.jwt_secret, args.download_base_url, clip_store, rate_limiter, audit_logger)
+    
     logger.info(f"Starting Buyer Download API on {args.host}:{args.port}")
     uvicorn.run(app, host=args.host, port=args.port)
+    
+    audit_logger.close()
     return 0
 
 
