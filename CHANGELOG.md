@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [0.7.3] - 2026-05-20
+
+### Fixed
+
+- replace fake mareangler/iscc-action with real choco install Inno Setup (#90) (9573f4d)
+
+### Other
+
+- docs(specs): S60v2 imperative — fix fake mareangler/iscc-action with real choco install (6c15927)
+- docs(specs): S60v3 skip missing enrichment submodule (d6b81ac)
+
+
 ## v0.4.1 · 2026-05-19
 
 ### Added
