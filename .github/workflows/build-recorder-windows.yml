@@ -117,7 +117,7 @@ jobs:
               $line = Select-String -Path $cargoPath `
                 -Pattern '^version\s*=' | Select-Object -First 1
               if ($line) {
-                $version = ($line -replace '^version\s*=\s*"', "") `
+                $version = ($line.Line -replace '^version\s*=\s*"', "") `
                   -replace '"', ''
               }
             }
