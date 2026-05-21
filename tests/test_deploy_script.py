@@ -144,15 +144,11 @@ class TestDeployScript:
 
     def test_set_strict_mode(self):
         """Script must use set -euo pipefail for safety."""
-        assert (
-            "set -euo pipefail" in self.text
-        ), "Script must include 'set -euo pipefail'"
+        assert "set -euo pipefail" in self.text, "Script must include 'set -euo pipefail'"
 
     def test_references_backend_stub(self):
         """Script must reference the backend_stub directory."""
-        assert (
-            "backend_stub" in self.text
-        ), "Script must reference backend_stub directory"
+        assert "backend_stub" in self.text, "Script must reference backend_stub directory"
 
     def test_flyctl_deploy(self):
         """Script must invoke flyctl deploy."""

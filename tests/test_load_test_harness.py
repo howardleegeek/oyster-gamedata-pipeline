@@ -13,6 +13,9 @@ Uses a mocked async backend (no real server needed) to verify:
 from __future__ import annotations
 
 import json
+
+# noqa: E402 — sys.path manipulation must come before project imports
+import sys
 import tempfile
 from dataclasses import asdict
 from pathlib import Path
@@ -20,21 +23,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-# noqa: E402 — sys.path manipulation must come before project imports
-import sys
-
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from bin.load_test_100_recorders import (  # noqa: E402
-    RecorderResult,
     LoadTestMetrics,
+    RecorderResult,
     aggregate_metrics,
     compute_percentile,
     generate_mock_session,
-    run_recorder,
     run_load_test,
+    run_recorder,
     write_json_report,
     write_markdown_report,
 )

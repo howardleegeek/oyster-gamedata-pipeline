@@ -23,8 +23,7 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_ROOT="${OYSTER_PROJECT_ROOT:-$(pwd)}"
 RECORDER_DIR="$PROJECT_ROOT/vendor/recorder"
 INSTALLER_SCRIPT="$PROJECT_ROOT/installer/oyster-recorder.iss"
 OUTPUT_DIR="$PROJECT_ROOT/installer/output"
@@ -223,15 +222,15 @@ main() {
   info " Platform: $os"
   info "=========================================="
 
-  # Check Rust
-  if ! command -v cargo &>/dev/null; then
-    error "Rust/Cargo not found. Install from https://rustup.rs"
-    exit 1
-  fi
-
   # Check vendor/recorder exists
   if [[ ! -d "$RECORDER_DIR" ]]; then
     error "vendor/recorder not found. Run: git submodule update --init --recursive"
+    exit 1
+  fi
+
+  # Check Rust
+  if ! command -v cargo &>/dev/null; then
+    error "Rust/Cargo not found. Install from https://rustup.rs"
     exit 1
   fi
 

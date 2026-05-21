@@ -10,6 +10,7 @@ validate the .iss file statically.
 
 import os
 import re
+
 import pytest
 
 # ---------------------------------------------------------------------------
@@ -50,6 +51,7 @@ def bat_content():
 # File existence
 # ---------------------------------------------------------------------------
 
+
 class TestFileExistence:
     def test_iss_exists(self):
         assert os.path.isfile(ISS_PATH)
@@ -64,6 +66,7 @@ class TestFileExistence:
 # ---------------------------------------------------------------------------
 # Required Inno Setup sections
 # ---------------------------------------------------------------------------
+
 
 class TestRequiredSections:
     """Every Inno Setup script must have these sections."""
@@ -84,6 +87,7 @@ class TestRequiredSections:
 # ---------------------------------------------------------------------------
 # [Setup] block constraints
 # ---------------------------------------------------------------------------
+
 
 class TestSetupBlock:
     """Validate key [Setup] directives."""
@@ -124,7 +128,7 @@ class TestSetupBlock:
         """Must have a valid AppId GUID defined (Inno uses {{ to escape literal {)."""
         # The AppId is defined via #define MyAppId "{{GUID}}" and referenced as AppId={#MyAppId}
         assert re.search(
-            r'#define\s+MyAppId\s+.*\{\{[0-9A-Fa-f-]+\}\}', iss_content
+            r"#define\s+MyAppId\s+.*\{\{[0-9A-Fa-f-]+\}\}", iss_content
         ), "AppId must be defined as a valid GUID with {{ }} escaping"
 
     def test_solid_compression(self, iss_content):
@@ -138,14 +142,13 @@ class TestSetupBlock:
 # Registry: HKCU autostart
 # ---------------------------------------------------------------------------
 
+
 class TestRegistryAutostart:
     """Validate the HKCU Run registry entry for autostart."""
 
     def test_hkcu_run_key(self, iss_content):
         """Must write to HKCU\\...\\Run."""
-        assert re.search(
-            r"Root:\s*HKCU", iss_content, re.IGNORECASE
-        ), "Registry root must be HKCU"
+        assert re.search(r"Root:\s*HKCU", iss_content, re.IGNORECASE), "Registry root must be HKCU"
 
     def test_run_subkey(self, iss_content):
         """Must target the Windows Run key."""
@@ -181,6 +184,7 @@ class TestRegistryAutostart:
 # Icons: Start Menu shortcut
 # ---------------------------------------------------------------------------
 
+
 class TestIcons:
     """Validate shortcut creation."""
 
@@ -205,6 +209,7 @@ class TestIcons:
 # Files section
 # ---------------------------------------------------------------------------
 
+
 class TestFilesSection:
     """Validate [Files] entries."""
 
@@ -218,9 +223,7 @@ class TestFilesSection:
 
     def test_dest_dir_app(self, iss_content):
         """Files must be installed to {app}."""
-        assert re.search(
-            r"DestDir:\s*\"\{app\}\"", iss_content
-        ), "Files must be installed to {app}"
+        assert re.search(r"DestDir:\s*\"\{app\}\"", iss_content), "Files must be installed to {app}"
 
     def test_ignoreversion_flag(self, iss_content):
         """Main exe should have ignoreversion flag."""
@@ -232,6 +235,7 @@ class TestFilesSection:
 # ---------------------------------------------------------------------------
 # [Run] section: post-install launch
 # ---------------------------------------------------------------------------
+
 
 class TestRunSection:
     """Validate post-install run behavior."""
@@ -259,6 +263,7 @@ class TestRunSection:
 # Version injection
 # ---------------------------------------------------------------------------
 
+
 class TestVersionInjection:
     """Validate that version is injectable via /D switch."""
 
@@ -279,38 +284,29 @@ class TestVersionInjection:
 # build_installer.ps1 validation
 # ---------------------------------------------------------------------------
 
+
 class TestBuildInstallerPS1:
     """Validate the PowerShell build script."""
 
     def test_version_parameter(self, ps1_content):
         """Must accept -Version parameter."""
-        assert re.search(
-            r"\$Version", ps1_content
-        ), "Script must use $Version parameter"
+        assert re.search(r"\$Version", ps1_content), "Script must use $Version parameter"
 
     def test_iscc_invocation(self, ps1_content):
         """Must invoke ISCC.exe."""
-        assert re.search(
-            r"iscc|ISCC", ps1_content, re.IGNORECASE
-        ), "Script must invoke ISCC"
+        assert re.search(r"iscc|ISCC", ps1_content, re.IGNORECASE), "Script must invoke ISCC"
 
     def test_output_dir_parameter(self, ps1_content):
         """Must support -OutputDir parameter."""
-        assert re.search(
-            r"\$OutputDir", ps1_content
-        ), "Script must support $OutputDir"
+        assert re.search(r"\$OutputDir", ps1_content), "Script must support $OutputDir"
 
     def test_exit_code_check(self, ps1_content):
         """Must check ISCC exit code."""
-        assert re.search(
-            r"ExitCode|exit\s+\d", ps1_content
-        ), "Script must check ISCC exit code"
+        assert re.search(r"ExitCode|exit\s+\d", ps1_content), "Script must check ISCC exit code"
 
     def test_size_warning(self, ps1_content):
         """Must warn if installer exceeds 50MB."""
-        assert re.search(
-            r"50", ps1_content
-        ), "Script must check 50MB size threshold"
+        assert re.search(r"50", ps1_content), "Script must check 50MB size threshold"
 
     def test_recorder_exe_validation(self, ps1_content):
         """Must validate recorder exe exists before building."""
@@ -324,6 +320,7 @@ class TestBuildInstallerPS1:
 # postinstall_register_autostart.bat validation
 # ---------------------------------------------------------------------------
 
+
 class TestPostinstallBat:
     """Validate the post-install batch file."""
 
@@ -335,9 +332,7 @@ class TestPostinstallBat:
 
     def test_hkcu_run_key(self, bat_content):
         """Must target HKCU Run key."""
-        assert re.search(
-            r"HKCU.*Run", bat_content, re.IGNORECASE
-        ), "Batch must target HKCU Run key"
+        assert re.search(r"HKCU.*Run", bat_content, re.IGNORECASE), "Batch must target HKCU Run key"
 
     def test_oyster_recorder_value(self, bat_content):
         """Must reference OysterRecorder as value name."""
@@ -347,9 +342,7 @@ class TestPostinstallBat:
 
     def test_tray_parameter(self, bat_content):
         """Must include --tray parameter."""
-        assert re.search(
-            r"--tray", bat_content
-        ), "Batch must include --tray parameter"
+        assert re.search(r"--tray", bat_content), "Batch must include --tray parameter"
 
     def test_error_handling(self, bat_content):
         """Must have error handling."""
@@ -362,14 +355,13 @@ class TestPostinstallBat:
 # No-JRE / No-Minecraft bundling check
 # ---------------------------------------------------------------------------
 
+
 class TestNoBundledJRE:
     """Ensure the installer does NOT bundle JRE or Minecraft."""
 
     def test_no_jre_in_files(self, iss_content):
         """No JRE references in [Files]."""
-        files_section = re.search(
-            r"\[Files\](.*?)(?=\[|$)", iss_content, re.DOTALL | re.IGNORECASE
-        )
+        files_section = re.search(r"\[Files\](.*?)(?=\[|$)", iss_content, re.DOTALL | re.IGNORECASE)
         if files_section:
             files_text = files_section.group(1)
             assert not re.search(
@@ -378,9 +370,7 @@ class TestNoBundledJRE:
 
     def test_no_minecraft_in_files(self, iss_content):
         """No Minecraft references in [Files]."""
-        files_section = re.search(
-            r"\[Files\](.*?)(?=\[|$)", iss_content, re.DOTALL | re.IGNORECASE
-        )
+        files_section = re.search(r"\[Files\](.*?)(?=\[|$)", iss_content, re.DOTALL | re.IGNORECASE)
         if files_section:
             files_text = files_section.group(1)
             assert not re.search(
@@ -391,6 +381,7 @@ class TestNoBundledJRE:
 # ---------------------------------------------------------------------------
 # Code section: IsAppRunning helper
 # ---------------------------------------------------------------------------
+
 
 class TestCodeSection:
     """Validate [Code] section helpers."""
@@ -418,14 +409,13 @@ class TestCodeSection:
 # Uninstall section
 # ---------------------------------------------------------------------------
 
+
 class TestUninstall:
     """Validate uninstall behavior."""
 
     def test_uninstall_run_kill(self, iss_content):
         """Uninstall must kill running process."""
-        assert re.search(
-            r"\[UninstallRun\]", iss_content
-        ), "Must have [UninstallRun] section"
+        assert re.search(r"\[UninstallRun\]", iss_content), "Must have [UninstallRun] section"
 
     def test_taskkill_force(self, iss_content):
         """Uninstall must use taskkill /F (may span lines with \\)."""
@@ -435,12 +425,8 @@ class TestUninstall:
 
     def test_uninstall_display_icon(self, iss_content):
         """Must set UninstallDisplayIcon."""
-        assert re.search(
-            r"UninstallDisplayIcon", iss_content
-        ), "Must set UninstallDisplayIcon"
+        assert re.search(r"UninstallDisplayIcon", iss_content), "Must set UninstallDisplayIcon"
 
     def test_uninstall_delete(self, iss_content):
         """Must have [UninstallDelete] section."""
-        assert re.search(
-            r"\[UninstallDelete\]", iss_content
-        ), "Must have [UninstallDelete] section"
+        assert re.search(r"\[UninstallDelete\]", iss_content), "Must have [UninstallDelete] section"

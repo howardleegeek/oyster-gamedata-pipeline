@@ -13,9 +13,7 @@ from __future__ import annotations
 
 import json
 import sys
-import tempfile
 from pathlib import Path
-from typing import Any, Dict
 from unittest import mock
 
 import pytest
@@ -109,7 +107,7 @@ class TestMockObsRecorder:
         expected_size = len(_MP4_FTYPE_HEADER) + _ZERO_PAYLOAD_SIZE
         assert len(data) == expected_size
         # After header, all zeros
-        assert data[len(_MP4_FTYPE_HEADER):] == b"\x00" * _ZERO_PAYLOAD_SIZE
+        assert data[len(_MP4_FTYPE_HEADER) :] == b"\x00" * _ZERO_PAYLOAD_SIZE
 
     def test_metadata_json_content(self, tmp_path: Path):
         from bin.mock_obs_recorder import write_fake_recording
@@ -138,8 +136,15 @@ class TestMockObsRecorder:
         result = write_fake_recording(tmp_path)
         meta = json.loads(result["metadata"].read_text())
         required = [
-            "timestamp", "location", "device_id", "session_id",
-            "game", "pid", "window_title", "recorder", "duration_sec",
+            "timestamp",
+            "location",
+            "device_id",
+            "session_id",
+            "game",
+            "pid",
+            "window_title",
+            "recorder",
+            "duration_sec",
         ]
         for field in required:
             assert field in meta, f"Missing field: {field}"
@@ -335,9 +340,7 @@ class TestRecorderLocalSmoke:
         mock_client = self._make_mock_client("test-sid-upload")
 
         with mock.patch("httpx.Client", return_value=mock_client):
-            result = step_upload(
-                backend_url, "test-sid-upload", files["video"], files["metadata"]
-            )
+            result = step_upload(backend_url, "test-sid-upload", files["video"], files["metadata"])
             assert result["session_id"] == "test-sid-upload"
             assert result["status"] == "received"
 
@@ -438,6 +441,7 @@ class TestSmokeIntegration:
     def backend_server(self):
         """Start the backend stub on a random port, yield URL, then stop."""
         import socket
+
         from bin.backend_stub import create_app
 
         # Find a free port
@@ -449,6 +453,7 @@ class TestSmokeIntegration:
         app._reset_store()
 
         import threading
+
         import uvicorn
 
         config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error")
@@ -458,7 +463,9 @@ class TestSmokeIntegration:
 
         # Wait for server to be ready
         import time
+
         import httpx
+
         for _ in range(30):
             try:
                 with httpx.Client(timeout=1.0) as client:

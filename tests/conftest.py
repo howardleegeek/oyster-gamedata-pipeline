@@ -17,6 +17,10 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
+
+import pytest
+from respx.router import MockRouter
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -100,11 +104,41 @@ collect_ignore = [
 ]
 
 
-# Per-test skip for the one method that imports `server.s3_presigned_url`
-# inline (rest of test_upload_resume.py = 7 tests passing, can't whole-file
-# ignore without losing those). Same `server` shadow root cause as the
-# whole-file ignores above.
-import pytest  # noqa: E402
+_respx_router_getitem = MockRouter.__getitem__
+
+
+def _pattern_values(pattern):
+    values = {}
+    value = getattr(pattern, "value", None)
+    if isinstance(value, tuple):
+        for child in value:
+            values.update(_pattern_values(child))
+        return values
+
+    cls_name = pattern.__class__.__name__.lower()
+    if cls_name in {"scheme", "host", "path"}:
+        values[cls_name] = value
+    return values
+
+
+def _respx_getitem_url_compat(self, key):
+    try:
+        return _respx_router_getitem(self, key)
+    except KeyError:
+        parsed = urlparse(key) if isinstance(key, str) else None
+        if parsed and parsed.scheme and parsed.netloc:
+            for route in self.routes:
+                values = _pattern_values(route.pattern)
+                if (
+                    values.get("scheme") == parsed.scheme
+                    and values.get("host") == parsed.netloc
+                    and values.get("path") == parsed.path
+                ):
+                    return route
+        raise
+
+
+MockRouter.__getitem__ = _respx_getitem_url_compat
 
 
 def pytest_collection_modifyitems(config, items):

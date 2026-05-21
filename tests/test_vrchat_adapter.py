@@ -30,8 +30,8 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import psutil
-import pytest
 
+from bin.games import detect_running_game, get_adapter
 from bin.games.base_adapter import GameAdapter, GameMetadata, GameSession
 from bin.games.vrchat_adapter import (
     VRChatAdapter,
@@ -40,7 +40,6 @@ from bin.games.vrchat_adapter import (
     _is_private_world,
     _vrchat_exe_name,
 )
-from bin.games import detect_running_game, get_adapter
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -114,36 +113,29 @@ class TestFindVrchatProcess:
     def test_vrchat_found_by_name_windows(self):
         """Process matched by name field on Windows."""
         mock_proc = _make_mock_proc()
-        with patch(
-            "bin.games.vrchat_adapter.platform.system", return_value="Windows"
-        ), patch(
-            "bin.games.vrchat_adapter.psutil.process_iter", return_value=[mock_proc]
+        with (
+            patch("bin.games.vrchat_adapter.platform.system", return_value="Windows"),
+            patch("bin.games.vrchat_adapter.psutil.process_iter", return_value=[mock_proc]),
         ):
             result = _find_vrchat_process()
             assert result is mock_proc
 
     def test_vrchat_found_by_exe_basename(self):
         """Process matched by exe path basename even if name differs."""
-        mock_proc = _make_mock_proc(
-            name="something_else", exe="C:\\Games\\VRChat\\VRChat.exe"
-        )
-        with patch(
-            "bin.games.vrchat_adapter.platform.system", return_value="Windows"
-        ), patch(
-            "bin.games.vrchat_adapter.psutil.process_iter", return_value=[mock_proc]
+        mock_proc = _make_mock_proc(name="something_else", exe="C:\\Games\\VRChat\\VRChat.exe")
+        with (
+            patch("bin.games.vrchat_adapter.platform.system", return_value="Windows"),
+            patch("bin.games.vrchat_adapter.psutil.process_iter", return_value=[mock_proc]),
         ):
             result = _find_vrchat_process()
             assert result is mock_proc
 
     def test_mac_vrchat_found(self):
         """macOS process detection."""
-        mock_proc = _make_mock_proc(
-            name="vrchat.app", exe="/Applications/vrchat.app"
-        )
-        with patch(
-            "bin.games.vrchat_adapter.platform.system", return_value="Darwin"
-        ), patch(
-            "bin.games.vrchat_adapter.psutil.process_iter", return_value=[mock_proc]
+        mock_proc = _make_mock_proc(name="vrchat.app", exe="/Applications/vrchat.app")
+        with (
+            patch("bin.games.vrchat_adapter.platform.system", return_value="Darwin"),
+            patch("bin.games.vrchat_adapter.psutil.process_iter", return_value=[mock_proc]),
         ):
             result = _find_vrchat_process()
             assert result is mock_proc
@@ -152,20 +144,18 @@ class TestFindVrchatProcess:
         """psutil.AccessDenied on a process is silently skipped."""
         bad_proc = MagicMock()
         bad_proc.info = {"pid": 1, "name": None, "exe": None}
-        with patch(
-            "bin.games.vrchat_adapter.platform.system", return_value="Windows"
-        ), patch(
-            "bin.games.vrchat_adapter.psutil.process_iter", return_value=[bad_proc]
+        with (
+            patch("bin.games.vrchat_adapter.platform.system", return_value="Windows"),
+            patch("bin.games.vrchat_adapter.psutil.process_iter", return_value=[bad_proc]),
         ):
             result = _find_vrchat_process()
             assert result is None
 
     def test_process_iter_raises(self):
         """If process_iter itself raises, we return None (no crash)."""
-        with patch(
-            "bin.games.vrchat_adapter.platform.system", return_value="Windows"
-        ), patch(
-            "bin.games.vrchat_adapter.psutil.process_iter", side_effect=OSError("boom")
+        with (
+            patch("bin.games.vrchat_adapter.platform.system", return_value="Windows"),
+            patch("bin.games.vrchat_adapter.psutil.process_iter", side_effect=OSError("boom")),
         ):
             result = _find_vrchat_process()
             assert result is None
@@ -186,9 +176,7 @@ class TestVRChatAdapterDetect:
     def test_detect_returns_session_when_running(self):
         adapter = VRChatAdapter()
         mock_proc = _make_mock_proc(pid=1234)
-        with patch(
-            "bin.games.vrchat_adapter._find_vrchat_process", return_value=mock_proc
-        ):
+        with patch("bin.games.vrchat_adapter._find_vrchat_process", return_value=mock_proc):
             result = adapter.detect()
             assert result is not None
             assert isinstance(result, GameSession)
@@ -200,9 +188,7 @@ class TestVRChatAdapterDetect:
         adapter = VRChatAdapter()
         mock_proc = _make_mock_proc()
         mock_proc.exe.side_effect = psutil.AccessDenied(pid=1)
-        with patch(
-            "bin.games.vrchat_adapter._find_vrchat_process", return_value=mock_proc
-        ):
+        with patch("bin.games.vrchat_adapter._find_vrchat_process", return_value=mock_proc):
             result = adapter.detect()
             assert result is None
 
@@ -237,9 +223,7 @@ class TestExtractWorldIdFromLogs:
     def test_world_id_with_equals_format(self, tmp_path: Path):
         log_dir = tmp_path / "logs"
         log_dir.mkdir()
-        (log_dir / "output_log_2024.01.01_120000.txt").write_text(
-            "world_id=wrld_abc123\n"
-        )
+        (log_dir / "output_log_2024.01.01_120000.txt").write_text("world_id=wrld_abc123\n")
         result = _extract_world_id_from_logs(log_dir)
         assert result["world_id"] == "wrld_abc123"
 
@@ -475,14 +459,10 @@ class TestBaseAdapterCompatibleMethods:
         assert VRChatAdapter.detect_by_process("vrchat.exe", "c:\\vrchat\\vrchat.exe")
 
     def test_detect_by_process_exe_path_only(self):
-        assert VRChatAdapter.detect_by_process(
-            "some_launcher.exe", "C:\\Games\\VRChat\\VRChat.exe"
-        )
+        assert VRChatAdapter.detect_by_process("some_launcher.exe", "C:\\Games\\VRChat\\VRChat.exe")
 
     def test_detect_by_process_non_vrchat(self):
-        assert not VRChatAdapter.detect_by_process(
-            "chrome.exe", "C:\\Chrome\\chrome.exe"
-        )
+        assert not VRChatAdapter.detect_by_process("chrome.exe", "C:\\Chrome\\chrome.exe")
 
     def test_extract_metadata_legacy_with_path(self, tmp_path: Path):
         adapter = VRChatAdapter()
@@ -519,9 +499,7 @@ class TestRegistry:
 
     def test_detect_running_game_returns_adapter_when_vrchat_running(self):
         mock_proc = _make_mock_proc()
-        with patch(
-            "bin.games.vrchat_adapter._find_vrchat_process", return_value=mock_proc
-        ):
+        with patch("bin.games.vrchat_adapter._find_vrchat_process", return_value=mock_proc):
             result = detect_running_game()
             assert result is not None
             assert result.game_name == "vrchat"
@@ -554,7 +532,7 @@ class TestImportSmoke:
         assert VA is not None
 
     def test_from_bin_games_import_base_classes(self):
-        from bin.games import GameAdapter, GameSession, GameMetadata
+        from bin.games import GameAdapter, GameMetadata, GameSession
 
         assert GameAdapter is not None
         assert GameSession is not None

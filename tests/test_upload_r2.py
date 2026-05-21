@@ -117,9 +117,7 @@ class TestUploadToR2:
         )
 
         # Verify returned URL
-        expected_url = (
-            f"{full_env['R2_ENDPOINT'].rstrip('/')}" f"/{full_env['R2_BUCKET']}/foo.exe"
-        )
+        expected_url = f"{full_env['R2_ENDPOINT'].rstrip('/')}" f"/{full_env['R2_BUCKET']}/foo.exe"
         assert url == expected_url
 
     @mock.patch("upload_to_r2.boto3.Session")
@@ -235,9 +233,7 @@ class TestMain:
         mock_validate.return_value = full_env
         mock_upload.return_value = "https://example.com/bucket/app.exe"
 
-        with mock.patch.object(
-            sys, "argv", ["upload_to_r2.py", "--file", str(exe_file)]
-        ):
+        with mock.patch.object(sys, "argv", ["upload_to_r2.py", "--file", str(exe_file)]):
             upload_to_r2.main()
 
         mock_upload.assert_called_once()

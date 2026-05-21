@@ -110,9 +110,7 @@ class TestDocsConstraints:
     def test_troubleshooting_line_count(self):
         path = self._doc_path("TESTER_TROUBLESHOOTING.md")
         lines = path.read_text().splitlines()
-        assert (
-            len(lines) <= 300
-        ), f"TESTER_TROUBLESHOOTING.md has {len(lines)} lines (>300)"
+        assert len(lines) <= 300, f"TESTER_TROUBLESHOOTING.md has {len(lines)} lines (>300)"
 
     def test_faq_has_ten_questions(self):
         path = self._doc_path("TESTER_FAQ.md")

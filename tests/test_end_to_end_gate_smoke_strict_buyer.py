@@ -14,7 +14,6 @@ Covers:
 
 import json
 import os
-import subprocess
 import sys
 import tempfile
 import unittest
@@ -195,7 +194,6 @@ class TestDetectEvidenceProvenance(unittest.TestCase):
     def test_tmp_path(self):
         """Path containing /tmp/ → synthetic."""
         # Use actual /tmp/ path (not tempfile.TemporaryDirectory which may use /var/folders on macOS)
-        import os
 
         tmp_session = os.path.join("/tmp", "test_session_s06")
         os.makedirs(tmp_session, exist_ok=True)
@@ -307,9 +305,11 @@ class TestStrictBuyerIntegration(unittest.TestCase):
         if gates_result is None:
             gates_result = _all_pass_gates()
 
-        with patch("end_to_end_gate_smoke._run_gate") as mock_gate, patch(
-            "end_to_end_gate_smoke._run_b2_provenance"
-        ) as mock_b2, patch("end_to_end_gate_smoke.os.path.isdir", return_value=True):
+        with (
+            patch("end_to_end_gate_smoke._run_gate") as mock_gate,
+            patch("end_to_end_gate_smoke._run_b2_provenance") as mock_b2,
+            patch("end_to_end_gate_smoke.os.path.isdir", return_value=True),
+        ):
 
             # Set up gate mocks
             gate_map = {
@@ -323,9 +323,7 @@ class TestStrictBuyerIntegration(unittest.TestCase):
             def gate_side_effect(script, session):
                 for key, script_name in gate_map.items():
                     if script == script_name:
-                        return gates_result.get(
-                            key, {"status": "SKIP", "evidence": "n/a"}
-                        )
+                        return gates_result.get(key, {"status": "SKIP", "evidence": "n/a"})
                 return {"status": "SKIP", "evidence": "unknown gate"}
 
             mock_gate.side_effect = gate_side_effect
@@ -368,15 +366,11 @@ class TestStrictBuyerIntegration(unittest.TestCase):
             fixture_dir = Path(tmpdir) / "tests" / "fixtures" / "synthetic_session"
             fixture_dir.mkdir(parents=True)
 
-            exit_code, output = self._run_main_with_mocks(
-                str(fixture_dir), strict_buyer=True
-            )
+            exit_code, output = self._run_main_with_mocks(str(fixture_dir), strict_buyer=True)
             self.assertEqual(exit_code, 2)
             data = json.loads(output)
             self.assertEqual(data["summary"]["evidence_provenance"], "synthetic")
-            self.assertEqual(
-                data["summary"]["strict_buyer_verdict"], "STRICT_GATES_PASS_SYNTHETIC"
-            )
+            self.assertEqual(data["summary"]["strict_buyer_verdict"], "STRICT_GATES_PASS_SYNTHETIC")
 
     def test_real_session_exit_0(self):
         """Real session (H8 engine_zbuffer + large EXR) with all gates PASS → exit 0."""
@@ -396,9 +390,7 @@ class TestStrictBuyerIntegration(unittest.TestCase):
             exr = depth / "frame_000.exr"
             exr.write_bytes(b"\x00" * 1_100_000)
 
-            exit_code, output = self._run_main_with_mocks(
-                str(tmpdir), strict_buyer=True
-            )
+            exit_code, output = self._run_main_with_mocks(str(tmpdir), strict_buyer=True)
             self.assertEqual(exit_code, 0)
             data = json.loads(output)
             self.assertEqual(data["summary"]["evidence_provenance"], "real")
@@ -410,9 +402,7 @@ class TestStrictBuyerIntegration(unittest.TestCase):
             oyster_dir = Path(tmpdir) / "OysterClips" / "finalized" / "session_42"
             oyster_dir.mkdir(parents=True)
 
-            exit_code, output = self._run_main_with_mocks(
-                str(oyster_dir), strict_buyer=True
-            )
+            exit_code, output = self._run_main_with_mocks(str(oyster_dir), strict_buyer=True)
             self.assertEqual(exit_code, 0)
             data = json.loads(output)
             self.assertEqual(data["summary"]["evidence_provenance"], "real")
@@ -441,9 +431,7 @@ class TestStrictBuyerIntegration(unittest.TestCase):
             )
             self.assertEqual(exit_code, 1)
             data = json.loads(output)
-            self.assertEqual(
-                data["summary"]["strict_buyer_verdict"], "STRICT_VIOLATIONS"
-            )
+            self.assertEqual(data["summary"]["strict_buyer_verdict"], "STRICT_VIOLATIONS")
 
     def test_skip_exit_1(self):
         """Any strict gate SKIP → exit 1 (STRICT_VIOLATIONS)."""
@@ -467,9 +455,7 @@ class TestStrictBuyerIntegration(unittest.TestCase):
             )
             self.assertEqual(exit_code, 1)
             data = json.loads(output)
-            self.assertEqual(
-                data["summary"]["strict_buyer_verdict"], "STRICT_VIOLATIONS"
-            )
+            self.assertEqual(data["summary"]["strict_buyer_verdict"], "STRICT_VIOLATIONS")
 
     def test_json_has_evidence_provenance_field(self):
         """JSON output must contain evidence_provenance field in strict-buyer mode."""
@@ -480,9 +466,7 @@ class TestStrictBuyerIntegration(unittest.TestCase):
             _, output = self._run_main_with_mocks(str(fixture_dir), strict_buyer=True)
             data = json.loads(output)
             self.assertIn("evidence_provenance", data["summary"])
-            self.assertIn(
-                data["summary"]["evidence_provenance"], ("real", "synthetic", "unknown")
-            )
+            self.assertIn(data["summary"]["evidence_provenance"], ("real", "synthetic", "unknown"))
 
     def test_non_strict_mode_no_provenance(self):
         """Non-strict-buyer mode should NOT include evidence_provenance in summary."""
@@ -490,9 +474,7 @@ class TestStrictBuyerIntegration(unittest.TestCase):
             fixture_dir = Path(tmpdir) / "tests" / "fixtures" / "session_x"
             fixture_dir.mkdir(parents=True)
 
-            exit_code, output = self._run_main_with_mocks(
-                str(fixture_dir), strict_buyer=False
-            )
+            exit_code, output = self._run_main_with_mocks(str(fixture_dir), strict_buyer=False)
             data = json.loads(output)
             self.assertNotIn("evidence_provenance", data["summary"])
             self.assertNotIn("strict_buyer_verdict", data["summary"])

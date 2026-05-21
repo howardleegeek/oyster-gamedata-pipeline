@@ -5,16 +5,16 @@ Tests for scripts/auto_merge_green_prs.sh — mocks the `gh` CLI.
 import json
 import os
 import subprocess
+import tempfile
 import textwrap
 from pathlib import Path
-
-import pytest
 
 SCRIPT_PATH = Path(__file__).resolve().parent.parent / "scripts" / "auto_merge_green_prs.sh"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
+
 
 def _make_pr(
     number=1,
@@ -42,85 +42,86 @@ def _run_with_mock_handler(*args, prs_json="[]", checks_json="[]", merge_succeed
     Run the script with a Python-based mock handler for `gh`.
     All positional args are passed to the script.
     """
-    mock_gh_dir = Path(__file__).resolve().parent / "bin"
-    mock_gh_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="mock-gh-") as tmpdir:
+        mock_gh_dir = Path(tmpdir)
 
-    # Write the mock handler
-    handler_path = mock_gh_dir / "gh_handler.py"
-    handler_path.write_text(
-        textwrap.dedent(
-            f"""\
-            #!/usr/bin/env python3
-            import sys, json
+        # Write the mock handler
+        handler_path = mock_gh_dir / "gh_handler.py"
+        handler_path.write_text(
+            textwrap.dedent(f"""\
+                #!/usr/bin/env python3
+                import sys
 
-            prs_json = '''{prs_json}'''
-            checks_json = '''{checks_json}'''
-            merge_succeeds = {str(merge_succeeds)}
+                prs_json = '''{prs_json}'''
+                checks_json = '''{checks_json}'''
+                merge_succeeds = {str(merge_succeeds)}
 
-            args = sys.argv[1:]
+                args = sys.argv[1:]
 
-            if args[0] == "pr" and args[1] == "list":
-                print(prs_json)
-                sys.exit(0)
-            elif args[0] == "pr" and args[1] == "checks":
-                print(checks_json)
-                sys.exit(0)
-            elif args[0] == "pr" and args[1] == "merge":
-                if merge_succeeds:
-                    print("Pull request successfully merged.")
+                if args[0] == "pr" and args[1] == "list":
+                    print(prs_json)
+                    sys.exit(0)
+                elif args[0] == "pr" and args[1] == "checks":
+                    print(checks_json)
+                    sys.exit(0)
+                elif args[0] == "pr" and args[1] == "merge":
+                    if merge_succeeds:
+                        print("Pull request successfully merged.")
+                        sys.exit(0)
+                    else:
+                        print("Merge failed.", file=sys.stderr)
+                        sys.exit(1)
+                elif args[0] == "pr" and args[1] == "view":
+                    print(prs_json)
                     sys.exit(0)
                 else:
-                    print("Merge failed.", file=sys.stderr)
-                    sys.exit(1)
-            elif args[0] == "pr" and args[1] == "view":
-                print(prs_json)
-                sys.exit(0)
-            else:
-                print("[]")
-                sys.exit(0)
-            """
-        ),
-        encoding="utf-8",
-    )
-    handler_path.chmod(0o755)
+                    print("[]")
+                    sys.exit(0)
+                """),
+            encoding="utf-8",
+        )
+        handler_path.chmod(0o755)
 
-    # Write the mock gh wrapper
-    mock_gh = mock_gh_dir / "gh"
-    mock_gh.write_text(
-        textwrap.dedent(
-            """\
-            #!/usr/bin/env python3
-            import sys, subprocess, os
-            handler = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gh_handler.py")
-            result = subprocess.run(
-                ["python3", handler] + sys.argv[1:],
-                capture_output=True, text=True
-            )
-            sys.stdout.write(result.stdout)
-            sys.stderr.write(result.stderr)
-            sys.exit(result.returncode)
-            """
-        ),
-        encoding="utf-8",
-    )
-    mock_gh.chmod(0o755)
+        # Write the mock gh wrapper
+        mock_gh = mock_gh_dir / "gh"
+        mock_gh.write_text(
+            textwrap.dedent("""\
+                #!/usr/bin/env python3
+                import os
+                import subprocess
+                import sys
 
-    env = os.environ.copy()
-    env["PATH"] = str(mock_gh_dir) + os.pathsep + env.get("PATH", "")
+                handler = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gh_handler.py")
+                result = subprocess.run(
+                    ["python3", handler] + sys.argv[1:],
+                    capture_output=True, text=True
+                )
+                sys.stdout.write(result.stdout)
+                sys.stderr.write(result.stderr)
+                sys.exit(result.returncode)
+                """),
+            encoding="utf-8",
+        )
+        mock_gh.chmod(0o755)
 
-    cmd = ["bash", str(SCRIPT_PATH)] + list(args)
-    result = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=30)
-    return result
+        env = os.environ.copy()
+        env["PATH"] = str(mock_gh_dir) + os.pathsep + env.get("PATH", "")
+
+        cmd = ["bash", str(SCRIPT_PATH)] + list(args)
+        return subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=30)
 
 
 # ── Tests ───────────────────────────────────────────────────────────────────
+
 
 class TestDryRun:
     """--dry-run lists PRs but does not merge them."""
 
     def test_dry_run_lists_eligible_pr(self):
         prs = json.dumps([_make_pr(number=42, title="Ready to merge")])
-        result = _run_with_mock_handler("--dry-run", prs_json=prs, checks_json="[]", merge_succeeds=True)
+        result = _run_with_mock_handler(
+            "--dry-run", prs_json=prs, checks_json="[]", merge_succeeds=True
+        )
         assert result.returncode == 0
         assert "DRY-RUN" in result.stdout
         assert "PR#42" in result.stdout
@@ -129,7 +130,9 @@ class TestDryRun:
 
     def test_dry_run_skips_non_mergeable(self):
         prs = json.dumps([_make_pr(number=10, mergeable="CONFLICTING")])
-        result = _run_with_mock_handler("--dry-run", prs_json=prs, checks_json="[]", merge_succeeds=True)
+        result = _run_with_mock_handler(
+            "--dry-run", prs_json=prs, checks_json="[]", merge_succeeds=True
+        )
         assert result.returncode == 0
         assert "PR#10" in result.stdout
         # Should skip due to CONFLICTING, not show as DRY-RUN candidate
@@ -137,20 +140,26 @@ class TestDryRun:
 
     def test_dry_run_skips_dirty_state(self):
         prs = json.dumps([_make_pr(number=11, merge_state_status="DIRTY")])
-        result = _run_with_mock_handler("--dry-run", prs_json=prs, checks_json="[]", merge_succeeds=True)
+        result = _run_with_mock_handler(
+            "--dry-run", prs_json=prs, checks_json="[]", merge_succeeds=True
+        )
         assert result.returncode == 0
         assert "Would merge" not in result.stdout
 
     def test_dry_run_skips_wip_label(self):
         prs = json.dumps([_make_pr(number=20, labels=[{"name": "WIP"}])])
-        result = _run_with_mock_handler("--dry-run", prs_json=prs, checks_json="[]", merge_succeeds=True)
+        result = _run_with_mock_handler(
+            "--dry-run", prs_json=prs, checks_json="[]", merge_succeeds=True
+        )
         assert result.returncode == 0
         assert "WIP" in result.stdout
         assert "Would merge" not in result.stdout
 
     def test_dry_run_skips_do_not_merge_label(self):
         prs = json.dumps([_make_pr(number=21, labels=[{"name": "DO NOT MERGE"}])])
-        result = _run_with_mock_handler("--dry-run", prs_json=prs, checks_json="[]", merge_succeeds=True)
+        result = _run_with_mock_handler(
+            "--dry-run", prs_json=prs, checks_json="[]", merge_succeeds=True
+        )
         assert result.returncode == 0
         assert "DO NOT MERGE" in result.stdout
         assert "Would merge" not in result.stdout
@@ -160,35 +169,33 @@ class TestAutoMode:
     """--auto mode merges feat/SXX-cluster* PRs without needing the label."""
 
     def test_auto_mode_matches_cluster_branch(self):
-        prs = json.dumps([
-            _make_pr(number=55, head_ref="feat/S28-cluster-api", labels=[])
-        ])
-        result = _run_with_mock_handler("--auto", prs_json=prs, checks_json="[]", merge_succeeds=True)
+        prs = json.dumps([_make_pr(number=55, head_ref="feat/S28-cluster-api", labels=[])])
+        result = _run_with_mock_handler(
+            "--auto", prs_json=prs, checks_json="[]", merge_succeeds=True
+        )
         assert result.returncode == 0
         assert "MERGING" in result.stdout
         assert "PR#55" in result.stdout
 
     def test_auto_mode_rejects_non_cluster_branch(self):
-        prs = json.dumps([
-            _make_pr(number=56, head_ref="feat/random-thing", labels=[])
-        ])
-        result = _run_with_mock_handler("--auto", prs_json=prs, checks_json="[]", merge_succeeds=True)
+        prs = json.dumps([_make_pr(number=56, head_ref="feat/random-thing", labels=[])])
+        result = _run_with_mock_handler(
+            "--auto", prs_json=prs, checks_json="[]", merge_succeeds=True
+        )
         assert result.returncode == 0
         assert "MERGING" not in result.stdout
 
     def test_auto_mode_matches_s99_cluster(self):
-        prs = json.dumps([
-            _make_pr(number=57, head_ref="feat/S99-cluster-worker", labels=[])
-        ])
-        result = _run_with_mock_handler("--auto", prs_json=prs, checks_json="[]", merge_succeeds=True)
+        prs = json.dumps([_make_pr(number=57, head_ref="feat/S99-cluster-worker", labels=[])])
+        result = _run_with_mock_handler(
+            "--auto", prs_json=prs, checks_json="[]", merge_succeeds=True
+        )
         assert result.returncode == 0
         assert "MERGING" in result.stdout
 
     def test_without_auto_needs_label(self):
         """Without --auto, a PR without auto-merge label should be skipped."""
-        prs = json.dumps([
-            _make_pr(number=60, head_ref="feat/S28-cluster-thing", labels=[])
-        ])
+        prs = json.dumps([_make_pr(number=60, head_ref="feat/S28-cluster-thing", labels=[])])
         result = _run_with_mock_handler(prs_json=prs, checks_json="[]", merge_succeeds=True)
         assert result.returncode == 0
         assert "MERGING" not in result.stdout
@@ -198,33 +205,45 @@ class TestMaxMerges:
     """--max N limits the number of merges."""
 
     def test_max_one_merges_only_one(self):
-        prs = json.dumps([
-            _make_pr(number=70, title="First"),
-            _make_pr(number=71, title="Second"),
-        ])
-        result = _run_with_mock_handler("--max", "1", "--auto", prs_json=prs, checks_json="[]", merge_succeeds=True)
+        prs = json.dumps(
+            [
+                _make_pr(number=70, title="First"),
+                _make_pr(number=71, title="Second"),
+            ]
+        )
+        result = _run_with_mock_handler(
+            "--max", "1", "--auto", prs_json=prs, checks_json="[]", merge_succeeds=True
+        )
         assert result.returncode == 0
         # Should merge PR#70 but not PR#71
         assert result.stdout.count("MERGING") == 1
         assert "PR#70" in result.stdout
 
     def test_max_zero_means_unlimited(self):
-        prs = json.dumps([
-            _make_pr(number=80),
-            _make_pr(number=81),
-        ])
-        result = _run_with_mock_handler("--max", "0", "--auto", prs_json=prs, checks_json="[]", merge_succeeds=True)
+        prs = json.dumps(
+            [
+                _make_pr(number=80),
+                _make_pr(number=81),
+            ]
+        )
+        result = _run_with_mock_handler(
+            "--max", "0", "--auto", prs_json=prs, checks_json="[]", merge_succeeds=True
+        )
         assert result.returncode == 0
         # Both should be merged
         assert result.stdout.count("MERGING") == 2
 
     def test_max_two_merges_two(self):
-        prs = json.dumps([
-            _make_pr(number=90),
-            _make_pr(number=91),
-            _make_pr(number=92),
-        ])
-        result = _run_with_mock_handler("--max", "2", "--auto", prs_json=prs, checks_json="[]", merge_succeeds=True)
+        prs = json.dumps(
+            [
+                _make_pr(number=90),
+                _make_pr(number=91),
+                _make_pr(number=92),
+            ]
+        )
+        result = _run_with_mock_handler(
+            "--max", "2", "--auto", prs_json=prs, checks_json="[]", merge_succeeds=True
+        )
         assert result.returncode == 0
         assert result.stdout.count("MERGING") == 2
 
@@ -234,35 +253,37 @@ class TestCheckGates:
 
     def test_failing_checks_skip_pr(self):
         prs = json.dumps([_make_pr(number=100)])
-        checks = json.dumps([
-            {"name": "iron-law-gate", "conclusion": "FAILURE"}
-        ])
-        result = _run_with_mock_handler("--dry-run", prs_json=prs, checks_json=checks, merge_succeeds=True)
+        checks = json.dumps([{"name": "iron-law-gate", "conclusion": "FAILURE"}])
+        result = _run_with_mock_handler(
+            "--dry-run", prs_json=prs, checks_json=checks, merge_succeeds=True
+        )
         assert result.returncode == 0
         assert "Would merge" not in result.stdout
 
     def test_pending_checks_skip_pr(self):
         prs = json.dumps([_make_pr(number=101)])
-        checks = json.dumps([
-            {"name": "iron-law-gate", "conclusion": "PENDING"}
-        ])
-        result = _run_with_mock_handler("--dry-run", prs_json=prs, checks_json=checks, merge_succeeds=True)
+        checks = json.dumps([{"name": "iron-law-gate", "conclusion": "PENDING"}])
+        result = _run_with_mock_handler(
+            "--dry-run", prs_json=prs, checks_json=checks, merge_succeeds=True
+        )
         assert result.returncode == 0
         assert "Would merge" not in result.stdout
 
     def test_passing_checks_allow_merge(self):
         prs = json.dumps([_make_pr(number=102)])
-        checks = json.dumps([
-            {"name": "iron-law-gate", "conclusion": "SUCCESS"}
-        ])
-        result = _run_with_mock_handler("--dry-run", prs_json=prs, checks_json=checks, merge_succeeds=True)
+        checks = json.dumps([{"name": "iron-law-gate", "conclusion": "SUCCESS"}])
+        result = _run_with_mock_handler(
+            "--dry-run", prs_json=prs, checks_json=checks, merge_succeeds=True
+        )
         assert result.returncode == 0
         assert "DRY-RUN" in result.stdout
 
     def test_no_checks_means_green(self):
         """If there are no checks, the PR is considered green."""
         prs = json.dumps([_make_pr(number=103)])
-        result = _run_with_mock_handler("--dry-run", prs_json=prs, checks_json="[]", merge_succeeds=True)
+        result = _run_with_mock_handler(
+            "--dry-run", prs_json=prs, checks_json="[]", merge_succeeds=True
+        )
         assert result.returncode == 0
         assert "DRY-RUN" in result.stdout
 
@@ -272,7 +293,9 @@ class TestMergeFailure:
 
     def test_failed_merge_writes_to_log(self):
         prs = json.dumps([_make_pr(number=200)])
-        result = _run_with_mock_handler("--auto", prs_json=prs, checks_json="[]", merge_succeeds=False)
+        result = _run_with_mock_handler(
+            "--auto", prs_json=prs, checks_json="[]", merge_succeeds=False
+        )
         assert result.returncode == 0
         assert "FAILED" in result.stdout or "FAILED" in result.stderr
 
@@ -308,13 +331,19 @@ class TestEdgeCases:
 
     def test_mixed_eligible_and_ineligible(self):
         """A mix of eligible and ineligible PRs — only eligible ones merge."""
-        prs = json.dumps([
-            _make_pr(number=300, title="Good PR", labels=[{"name": "auto-merge"}]),
-            _make_pr(number=301, title="WIP PR", labels=[{"name": "WIP"}]),
-            _make_pr(number=302, title="Conflict PR", mergeable="CONFLICTING"),
-            _make_pr(number=303, title="Another good", head_ref="feat/S10-cluster-x", labels=[]),
-        ])
-        result = _run_with_mock_handler("--auto", prs_json=prs, checks_json="[]", merge_succeeds=True)
+        prs = json.dumps(
+            [
+                _make_pr(number=300, title="Good PR", labels=[{"name": "auto-merge"}]),
+                _make_pr(number=301, title="WIP PR", labels=[{"name": "WIP"}]),
+                _make_pr(number=302, title="Conflict PR", mergeable="CONFLICTING"),
+                _make_pr(
+                    number=303, title="Another good", head_ref="feat/S10-cluster-x", labels=[]
+                ),
+            ]
+        )
+        result = _run_with_mock_handler(
+            "--auto", prs_json=prs, checks_json="[]", merge_succeeds=True
+        )
         assert result.returncode == 0
         # PR#300 (has label) and PR#303 (auto mode + cluster branch) should merge
         assert result.stdout.count("MERGING") == 2

@@ -24,6 +24,7 @@ from unittest.mock import MagicMock, patch
 
 import psutil
 
+from bin.games import detect_running_game, get_adapter
 from bin.games.base_adapter import GameMetadata, GameSession
 from bin.games.roblox_adapter import (
     OVERLAY_MARKER,
@@ -32,7 +33,6 @@ from bin.games.roblox_adapter import (
     _find_roblox_process,
     _roblox_exe_name,
 )
-from bin.games import detect_running_game, get_adapter
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -87,36 +87,29 @@ class TestFindRobloxProcess:
     def test_roblox_found_by_name(self):
         """Process matched by name field."""
         mock_proc = _make_mock_proc()
-        with patch(
-            "bin.games.roblox_adapter.platform.system", return_value="Windows"
-        ), patch(
-            "bin.games.roblox_adapter.psutil.process_iter", return_value=[mock_proc]
+        with (
+            patch("bin.games.roblox_adapter.platform.system", return_value="Windows"),
+            patch("bin.games.roblox_adapter.psutil.process_iter", return_value=[mock_proc]),
         ):
             result = _find_roblox_process()
             assert result is mock_proc
 
     def test_roblox_found_by_exe_basename(self):
         """Process matched by exe path basename even if name differs."""
-        mock_proc = _make_mock_proc(
-            name="something_else", exe="/some/path/RobloxPlayerBeta.exe"
-        )
-        with patch(
-            "bin.games.roblox_adapter.platform.system", return_value="Windows"
-        ), patch(
-            "bin.games.roblox_adapter.psutil.process_iter", return_value=[mock_proc]
+        mock_proc = _make_mock_proc(name="something_else", exe="/some/path/RobloxPlayerBeta.exe")
+        with (
+            patch("bin.games.roblox_adapter.platform.system", return_value="Windows"),
+            patch("bin.games.roblox_adapter.psutil.process_iter", return_value=[mock_proc]),
         ):
             result = _find_roblox_process()
             assert result is mock_proc
 
     def test_mac_roblox_found(self):
         """macOS process detection."""
-        mock_proc = _make_mock_proc(
-            name="RobloxPlayer.app", exe="/Applications/RobloxPlayer.app"
-        )
-        with patch(
-            "bin.games.roblox_adapter.platform.system", return_value="Darwin"
-        ), patch(
-            "bin.games.roblox_adapter.psutil.process_iter", return_value=[mock_proc]
+        mock_proc = _make_mock_proc(name="RobloxPlayer.app", exe="/Applications/RobloxPlayer.app")
+        with (
+            patch("bin.games.roblox_adapter.platform.system", return_value="Darwin"),
+            patch("bin.games.roblox_adapter.psutil.process_iter", return_value=[mock_proc]),
         ):
             result = _find_roblox_process()
             assert result is mock_proc
@@ -125,10 +118,9 @@ class TestFindRobloxProcess:
         """psutil.AccessDenied on a process is silently skipped."""
         bad_proc = MagicMock()
         bad_proc.info = {"pid": 1, "name": None, "exe": None}
-        with patch(
-            "bin.games.roblox_adapter.platform.system", return_value="Windows"
-        ), patch(
-            "bin.games.roblox_adapter.psutil.process_iter", return_value=[bad_proc]
+        with (
+            patch("bin.games.roblox_adapter.platform.system", return_value="Windows"),
+            patch("bin.games.roblox_adapter.psutil.process_iter", return_value=[bad_proc]),
         ):
             # The loop should handle the None gracefully and return None
             result = _find_roblox_process()
@@ -136,10 +128,9 @@ class TestFindRobloxProcess:
 
     def test_process_iter_raises(self):
         """If process_iter itself raises, we return None (no crash)."""
-        with patch(
-            "bin.games.roblox_adapter.platform.system", return_value="Windows"
-        ), patch(
-            "bin.games.roblox_adapter.psutil.process_iter", side_effect=OSError("boom")
+        with (
+            patch("bin.games.roblox_adapter.platform.system", return_value="Windows"),
+            patch("bin.games.roblox_adapter.psutil.process_iter", side_effect=OSError("boom")),
         ):
             result = _find_roblox_process()
             assert result is None
@@ -159,9 +150,7 @@ class TestRobloxAdapterDetect:
     def test_detect_returns_session_when_running(self):
         mock_proc = _make_mock_proc(pid=1234)
         adapter = RobloxAdapter()
-        with patch(
-            "bin.games.roblox_adapter._find_roblox_process", return_value=mock_proc
-        ):
+        with patch("bin.games.roblox_adapter._find_roblox_process", return_value=mock_proc):
             session = adapter.detect()
             assert session is not None
             assert isinstance(session, GameSession)
@@ -173,9 +162,7 @@ class TestRobloxAdapterDetect:
         mock_proc = _make_mock_proc()
         mock_proc.exe.side_effect = psutil.AccessDenied(pid=1)
         adapter = RobloxAdapter()
-        with patch(
-            "bin.games.roblox_adapter._find_roblox_process", return_value=mock_proc
-        ):
+        with patch("bin.games.roblox_adapter._find_roblox_process", return_value=mock_proc):
             assert adapter.detect() is None
 
     def test_detect_handles_name_access_denied(self):
@@ -183,9 +170,7 @@ class TestRobloxAdapterDetect:
         mock_proc = _make_mock_proc()
         mock_proc.name.side_effect = psutil.AccessDenied(pid=1)
         adapter = RobloxAdapter()
-        with patch(
-            "bin.games.roblox_adapter._find_roblox_process", return_value=mock_proc
-        ):
+        with patch("bin.games.roblox_adapter._find_roblox_process", return_value=mock_proc):
             session = adapter.detect()
             assert session is not None
             assert session.window_title == "Roblox"
@@ -211,9 +196,7 @@ class TestExtractIdsFromLogs:
     def test_place_id_extracted(self, tmp_path: Path):
         log_dir = tmp_path / "logs"
         log_dir.mkdir()
-        (log_dir / "Player.log").write_text(
-            "some noise\nplace_id=12345678\nmore noise\n"
-        )
+        (log_dir / "Player.log").write_text("some noise\nplace_id=12345678\nmore noise\n")
         result = _extract_ids_from_logs(log_dir)
         assert result["place_id"] == "12345678"
         assert result["universe_id"] == ""
@@ -318,9 +301,7 @@ class TestRegistry:
 
     def test_detect_running_game_returns_adapter_when_roblox_running(self):
         mock_proc = _make_mock_proc()
-        with patch(
-            "bin.games.roblox_adapter._find_roblox_process", return_value=mock_proc
-        ):
+        with patch("bin.games.roblox_adapter._find_roblox_process", return_value=mock_proc):
             result = detect_running_game()
             assert result is not None
             assert result.game_name == "roblox"
@@ -353,7 +334,7 @@ class TestImportSmoke:
         assert RA is not None
 
     def test_from_bin_games_import_base_classes(self):
-        from bin.games import GameAdapter, GameSession, GameMetadata
+        from bin.games import GameAdapter, GameMetadata, GameSession
 
         assert GameAdapter is not None
         assert GameSession is not None

@@ -24,10 +24,14 @@ classifiers = [
 
 dependencies = [
     "pydantic>=2.5",
+    "aiohttp>=3.9",
+    "boto3>=1.34",
     "typer>=0.12",
     "rich>=13.0",
     "anthropic>=0.40",
     "openai>=1.40",
+    "markdown>=3.5",
+    "psutil>=5.9",
 ]
 
 [project.optional-dependencies]
@@ -47,8 +51,10 @@ test = [
     "PyYAML>=6.0",   # YAML — required by tests/test_web_workflows.py (Vercel deploy contract)
     "cryptography>=42.0",  # ed25519 — required by bin/provenance_sign.py + provenance_verify.py (B2)
     "fastapi>=0.110",      # OAuth callback server — required by bin/oauth_login_server.py (C3)
+    "python-multipart>=0.0.20",  # FastAPI Form/File parsing — required by bin/backend_stub.py
     "uvicorn>=0.27",       # OAuth callback server runtime (C3)
     "httpx>=0.27",         # OAuth token exchange (C3)
+    "respx>=0.23.1",       # HTTPX mocking fixture — required by remote backend E2E tests
     "click>=8.1",          # OAuth CLI (C3)
     "requests>=2.31",      # test_alert_dispatcher (pre-existing CI gap)
     "pyjwt>=2.8",          # test_oauth_flow (pre-existing CI gap)

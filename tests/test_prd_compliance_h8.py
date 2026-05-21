@@ -11,7 +11,6 @@ import json
 import sys
 from pathlib import Path
 
-
 # Ensure bin/ is on the import path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "bin"))
 
@@ -21,13 +20,11 @@ from prd_compliance_audit import _evaluate_h8
 def _make_valid_exr(path: Path) -> None:
     """Write a minimal valid OpenEXR file so the EXR-readability check passes."""
     try:
-        import OpenEXR
         import Imath
+        import OpenEXR
 
         header = OpenEXR.Header(1, 1)
-        header["channels"] = {
-            "Z": Imath.Channel(Imath.PixelType(Imath.PixelType.FLOAT))
-        }
+        header["channels"] = {"Z": Imath.Channel(Imath.PixelType(Imath.PixelType.FLOAT))}
         exr = OpenEXR.OutputFile(str(path), header)
         exr.writePixels({"Z": b"\x00\x00\x00\x00"})
         exr.close()

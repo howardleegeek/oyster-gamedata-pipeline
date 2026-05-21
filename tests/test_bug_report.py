@@ -81,10 +81,7 @@ class TestLoadConfig:
     def test_load_config_success(self, tmp_config_dir):
         with mock.patch.object(br, "CONFIG_PATH", str(tmp_config_dir / "config.json")):
             cfg = br.load_config()
-        assert (
-            cfg["bug_report_webhook"]
-            == "https://discord.com/api/webhooks/test/test-token"
-        )
+        assert cfg["bug_report_webhook"] == "https://discord.com/api/webhooks/test/test-token"
 
     def test_load_config_missing_file(self):
         with mock.patch.object(br, "CONFIG_PATH", "/nonexistent/path/config.json"):
@@ -292,9 +289,7 @@ class TestBuildDiscordPayload:
             log_tail=None,
         )
         payload_str = json.dumps(payload)
-        assert (
-            "token" not in payload_str.lower() or "webhook" not in payload_str.lower()
-        )
+        assert "token" not in payload_str.lower() or "webhook" not in payload_str.lower()
         assert "password" not in payload_str.lower()
         assert "secret" not in payload_str.lower()
 
@@ -404,9 +399,7 @@ class TestFullFlow:
         capsys,
     ):
         """Simulate a full interactive run with all mocks."""
-        mock_load_config.return_value = {
-            "bug_report_webhook": "https://example.com/hook"
-        }
+        mock_load_config.return_value = {"bug_report_webhook": "https://example.com/hook"}
         mock_get_webhook.return_value = "https://example.com/hook"
         mock_severity.return_value = 3
         mock_required.side_effect = [
@@ -454,9 +447,7 @@ class TestFullFlow:
         capsys,
     ):
         """Simulate a run where user declines attachments."""
-        mock_load_config.return_value = {
-            "bug_report_webhook": "https://example.com/hook"
-        }
+        mock_load_config.return_value = {"bug_report_webhook": "https://example.com/hook"}
         mock_get_webhook.return_value = "https://example.com/hook"
         mock_severity.return_value = 1
         mock_required.side_effect = [
@@ -501,9 +492,7 @@ class TestFullFlow:
         capsys,
     ):
         """Simulate a run where the webhook POST fails."""
-        mock_load_config.return_value = {
-            "bug_report_webhook": "https://example.com/hook"
-        }
+        mock_load_config.return_value = {"bug_report_webhook": "https://example.com/hook"}
         mock_get_webhook.return_value = "https://example.com/hook"
         mock_severity.return_value = 2
         mock_required.side_effect = [

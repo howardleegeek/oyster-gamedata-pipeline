@@ -30,13 +30,12 @@ import argparse
 import json
 import logging
 import sys
-import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 # FastAPI imports at module level so type annotations resolve correctly.
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)

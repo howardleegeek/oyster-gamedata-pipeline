@@ -16,6 +16,7 @@ import os
 import re
 import subprocess
 import textwrap
+
 import pytest
 
 # ---------------------------------------------------------------------------
@@ -43,6 +44,7 @@ def ps1_lines(ps1_content):
 # File existence
 # ---------------------------------------------------------------------------
 
+
 class TestFileExistence:
     def test_sign_ps1_exists(self):
         assert os.path.isfile(SIGN_PS1_PATH)
@@ -52,6 +54,7 @@ class TestFileExistence:
 # PowerShell syntax validation
 # ---------------------------------------------------------------------------
 
+
 class TestPowerShellSyntax:
     """Static analysis of the PowerShell script."""
 
@@ -60,38 +63,34 @@ class TestPowerShellSyntax:
         # Balanced braces
         open_braces = ps1_content.count("{")
         close_braces = ps1_content.count("}")
-        assert open_braces == close_braces, (
-            f"Unbalanced braces: {open_braces} open, {close_braces} close"
-        )
+        assert (
+            open_braces == close_braces
+        ), f"Unbalanced braces: {open_braces} open, {close_braces} close"
 
         # Balanced parentheses
         open_parens = ps1_content.count("(")
         close_parens = ps1_content.count(")")
-        assert open_parens == close_parens, (
-            f"Unbalanced parentheses: {open_parens} open, {close_parens} close"
-        )
+        assert (
+            open_parens == close_parens
+        ), f"Unbalanced parentheses: {open_parens} open, {close_parens} close"
 
     def test_param_block_present(self, ps1_content):
         """Script must have a param() block."""
-        assert re.search(r"\[CmdletBinding\(\)\]", ps1_content), (
-            "Missing [CmdletBinding()] attribute"
-        )
-        assert re.search(r"param\s*\(", ps1_content), (
-            "Missing param() block"
-        )
+        assert re.search(
+            r"\[CmdletBinding\(\)\]", ps1_content
+        ), "Missing [CmdletBinding()] attribute"
+        assert re.search(r"param\s*\(", ps1_content), "Missing param() block"
 
     def test_mandatory_filepath_param(self, ps1_content):
         """-FilePath must be mandatory."""
-        assert re.search(r'\$FilePath', ps1_content), "Missing $FilePath parameter"
-        assert re.search(r'Mandatory\s*=\s*\$true', ps1_content), (
-            "No mandatory parameters found"
-        )
+        assert re.search(r"\$FilePath", ps1_content), "Missing $FilePath parameter"
+        assert re.search(r"Mandatory\s*=\s*\$true", ps1_content), "No mandatory parameters found"
 
     def test_error_action_preference(self, ps1_content):
         """Script should set ErrorActionPreference."""
-        assert re.search(r'\$ErrorActionPreference\s*=\s*"Stop"', ps1_content), (
-            "Missing $ErrorActionPreference = \"Stop\""
-        )
+        assert re.search(
+            r'\$ErrorActionPreference\s*=\s*"Stop"', ps1_content
+        ), 'Missing $ErrorActionPreference = "Stop"'
 
     def test_no_plain_text_passwords(self, ps1_content):
         """No hardcoded passwords in the script."""
@@ -106,86 +105,65 @@ class TestPowerShellSyntax:
             if re.search(r'(?i)password\s*=\s*"[^"]{3,}"', stripped):
                 # Allow empty string or variable references
                 if not re.search(r'(?i)password\s*=\s*""', stripped):
-                    pytest.fail(
-                        f"Possible hardcoded password on line {i}: {stripped}"
-                    )
+                    pytest.fail(f"Possible hardcoded password on line {i}: {stripped}")
 
     def test_temp_file_cleanup(self, ps1_content):
         """Temp .pfx file must be cleaned up in a finally block."""
-        assert "finally" in ps1_content, (
-            "Missing finally block for temp file cleanup"
-        )
-        assert "Remove-Item" in ps1_content, (
-            "Missing Remove-Item for temp file cleanup"
-        )
+        assert "finally" in ps1_content, "Missing finally block for temp file cleanup"
+        assert "Remove-Item" in ps1_content, "Missing Remove-Item for temp file cleanup"
 
     def test_signtool_lookup_function(self, ps1_content):
         """Script must have a function to find signtool.exe."""
-        assert re.search(r'function\s+Find-SignTool', ps1_content), (
-            "Missing Find-SignTool function"
-        )
+        assert re.search(r"function\s+Find-SignTool", ps1_content), "Missing Find-SignTool function"
 
     def test_sign_file_function(self, ps1_content):
         """Script must have a function to invoke signtool."""
-        assert re.search(r'function\s+Invoke-SignFile', ps1_content), (
-            "Missing Invoke-SignFile function"
-        )
+        assert re.search(
+            r"function\s+Invoke-SignFile", ps1_content
+        ), "Missing Invoke-SignFile function"
 
 
 # ---------------------------------------------------------------------------
 # Required features
 # ---------------------------------------------------------------------------
 
+
 class TestRequiredFeatures:
     """Validate that key features are present in the script."""
 
     def test_ev_cert_pfx_env_var(self, ps1_content):
         """Script must read EV_CERT_PFX from environment."""
-        assert "EV_CERT_PFX" in ps1_content, (
-            "Missing EV_CERT_PFX environment variable reference"
-        )
+        assert "EV_CERT_PFX" in ps1_content, "Missing EV_CERT_PFX environment variable reference"
 
     def test_ev_cert_password_env_var(self, ps1_content):
         """Script must read EV_CERT_PASSWORD from environment."""
-        assert "EV_CERT_PASSWORD" in ps1_content, (
-            "Missing EV_CERT_PASSWORD environment variable reference"
-        )
+        assert (
+            "EV_CERT_PASSWORD" in ps1_content
+        ), "Missing EV_CERT_PASSWORD environment variable reference"
 
     def test_base64_decode(self, ps1_content):
         """Script must decode base64 .pfx."""
-        assert "FromBase64String" in ps1_content, (
-            "Missing base64 decode (FromBase64String)"
-        )
+        assert "FromBase64String" in ps1_content, "Missing base64 decode (FromBase64String)"
 
     def test_timestamp_server(self, ps1_content):
         """Script must support timestamping."""
-        assert "timestamp" in ps1_content.lower(), (
-            "Missing timestamp server configuration"
-        )
+        assert "timestamp" in ps1_content.lower(), "Missing timestamp server configuration"
 
     def test_sha256_digest(self, ps1_content):
         """Script must use SHA256 digest by default."""
-        assert "SHA256" in ps1_content, (
-            "Missing SHA256 digest algorithm"
-        )
+        assert "SHA256" in ps1_content, "Missing SHA256 digest algorithm"
 
     def test_cert_store_fallback(self, ps1_content):
         """Script must support cert store lookup."""
-        assert "UseCertStore" in ps1_content, (
-            "Missing -UseCertStore switch"
-        )
-        assert "Cert:\\" in ps1_content or "Cert:" in ps1_content, (
-            "Missing certificate store path reference"
-        )
+        assert "UseCertStore" in ps1_content, "Missing -UseCertStore switch"
+        assert (
+            "Cert:\\" in ps1_content or "Cert:" in ps1_content
+        ), "Missing certificate store path reference"
 
     def test_graceful_skip_warning(self, ps1_content):
         """Script must warn when no cert is available."""
-        assert "Write-Warning" in ps1_content, (
-            "Missing Write-Warning for graceful skip"
-        )
-        assert "UNSIGNED" in ps1_content, (
-            "Missing UNSIGNED warning message"
-        )
+        assert "Write-Warning" in ps1_content, "Missing Write-Warning for graceful skip"
+        assert "UNSIGNED" in ps1_content, "Missing UNSIGNED warning message"
 
     def test_exit_code_zero_on_skip(self, ps1_content):
         """Script must exit 0 when gracefully skipping."""
@@ -199,20 +177,17 @@ class TestRequiredFeatures:
             if found_warning and "exit 0" in line.lower():
                 found_exit_zero = True
                 break
-        assert found_exit_zero, (
-            "Missing 'exit 0' after graceful skip warning"
-        )
+        assert found_exit_zero, "Missing 'exit 0' after graceful skip warning"
 
     def test_file_validation(self, ps1_content):
         """Script must validate that the input file exists."""
-        assert "Test-Path" in ps1_content, (
-            "Missing Test-Path for file validation"
-        )
+        assert "Test-Path" in ps1_content, "Missing Test-Path for file validation"
 
 
 # ---------------------------------------------------------------------------
 # Workflow YAML integration
 # ---------------------------------------------------------------------------
+
 
 class TestWorkflowIntegration:
     """Validate the GitHub Actions workflow references the sign script."""
@@ -230,41 +205,36 @@ class TestWorkflowIntegration:
         assert workflow_content is not None
 
     def test_workflow_references_sign_script(self, workflow_content):
-        assert "sign_installer.ps1" in workflow_content, (
-            "Workflow does not reference sign_installer.ps1"
-        )
+        assert (
+            "sign_installer.ps1" in workflow_content
+        ), "Workflow does not reference sign_installer.ps1"
 
     def test_workflow_uses_ev_cert_pfx_secret(self, workflow_content):
-        assert "EV_CERT_PFX" in workflow_content, (
-            "Workflow does not reference EV_CERT_PFX secret"
-        )
+        assert "EV_CERT_PFX" in workflow_content, "Workflow does not reference EV_CERT_PFX secret"
 
     def test_workflow_has_unsigned_warning(self, workflow_content):
-        assert "unsigned" in workflow_content.lower() or "UNSIGNED" in workflow_content, (
-            "Workflow does not warn about unsigned builds"
-        )
+        assert (
+            "unsigned" in workflow_content.lower() or "UNSIGNED" in workflow_content
+        ), "Workflow does not warn about unsigned builds"
 
     def test_workflow_triggers_on_recorder_tag(self, workflow_content):
-        assert "recorder-v" in workflow_content, (
-            "Workflow does not trigger on recorder-v* tags"
-        )
+        assert "recorder-v" in workflow_content, "Workflow does not trigger on recorder-v* tags"
 
     def test_workflow_optional_signing(self, workflow_content):
         """Signing step must be conditional (not required)."""
         # The sign step should have an 'if' condition
-        assert "if:" in workflow_content, (
-            "Workflow signing step is not conditional"
-        )
+        assert "if:" in workflow_content, "Workflow signing step is not conditional"
 
     def test_workflow_runs_on_windows(self, workflow_content):
-        assert "windows-latest" in workflow_content or "windows" in workflow_content.lower(), (
-            "Workflow does not target Windows runner"
-        )
+        assert (
+            "windows-latest" in workflow_content or "windows" in workflow_content.lower()
+        ), "Workflow does not target Windows runner"
 
 
 # ---------------------------------------------------------------------------
 # Mocked signtool invocation tests
 # ---------------------------------------------------------------------------
+
 
 class TestMockedSigntool:
     """
@@ -300,55 +270,39 @@ class TestMockedSigntool:
         # Check that all function definitions have matching closing braces
         func_pattern = re.compile(r"function\s+(\w+)")
         functions = func_pattern.findall(ps1_content)
-        assert len(functions) >= 2, (
-            f"Expected at least 2 functions, found {len(functions)}: {functions}"
-        )
+        assert (
+            len(functions) >= 2
+        ), f"Expected at least 2 functions, found {len(functions)}: {functions}"
 
     def test_find_signtool_searches_sdk_paths(self, ps1_content):
         """Find-SignTool must search Windows SDK paths."""
-        assert "Windows Kits" in ps1_content, (
-            "Find-SignTool does not search Windows Kits paths"
-        )
+        assert "Windows Kits" in ps1_content, "Find-SignTool does not search Windows Kits paths"
 
     def test_find_signtool_checks_path(self, ps1_content):
         """Find-SignTool must check PATH first."""
-        assert "Get-Command" in ps1_content, (
-            "Find-SignTool does not use Get-Command to check PATH"
-        )
+        assert "Get-Command" in ps1_content, "Find-SignTool does not use Get-Command to check PATH"
 
     def test_signtool_args_include_file(self, ps1_content):
         """signtool invocation must include the file path."""
         # The file to sign should be passed as an argument
-        assert "$FileToSign" in ps1_content, (
-            "signtool invocation does not reference $FileToSign"
-        )
+        assert "$FileToSign" in ps1_content, "signtool invocation does not reference $FileToSign"
 
     def test_signtool_args_include_timestamp(self, ps1_content):
         """signtool invocation must include timestamp args."""
-        assert "/tr" in ps1_content, (
-            "signtool invocation missing /tr (RFC 3161 timestamp)"
-        )
+        assert "/tr" in ps1_content, "signtool invocation missing /tr (RFC 3161 timestamp)"
 
     def test_signtool_args_include_digest(self, ps1_content):
         """signtool invocation must include digest algorithm."""
-        assert "/fd" in ps1_content, (
-            "signtool invocation missing /fd (file digest)"
-        )
-        assert "/td" in ps1_content, (
-            "signtool invocation missing /td (timestamp digest)"
-        )
+        assert "/fd" in ps1_content, "signtool invocation missing /fd (file digest)"
+        assert "/td" in ps1_content, "signtool invocation missing /td (timestamp digest)"
 
     def test_signtool_args_include_cert_file(self, ps1_content):
         """signtool invocation must include cert file path."""
-        assert "/f" in ps1_content, (
-            "signtool invocation missing /f (cert file)"
-        )
+        assert "/f" in ps1_content, "signtool invocation missing /f (cert file)"
 
     def test_signtool_args_include_password(self, ps1_content):
         """signtool invocation must support password."""
-        assert "/p" in ps1_content, (
-            "signtool invocation missing /p (password)"
-        )
+        assert "/p" in ps1_content, "signtool invocation missing /p (password)"
 
     def test_graceful_skip_exits_zero(self, ps1_content):
         """When no cert is available, script exits 0 (not 1)."""
@@ -360,9 +314,9 @@ class TestMockedSigntool:
             if "No EV certificate provided" in stripped or "UNSIGNED" in stripped:
                 in_skip_section = True
             if in_skip_section and stripped.startswith("exit"):
-                assert "exit 0" in stripped.lower(), (
-                    f"Graceful skip should exit 0, found: {stripped}"
-                )
+                assert (
+                    "exit 0" in stripped.lower()
+                ), f"Graceful skip should exit 0, found: {stripped}"
                 break
         else:
             pytest.fail("Could not find exit statement in graceful skip section")
@@ -394,6 +348,7 @@ class TestMockedSigntool:
 # ---------------------------------------------------------------------------
 # PowerShell syntax via pwsh (if available)
 # ---------------------------------------------------------------------------
+
 
 class TestPowerShellRuntime:
     """
@@ -442,9 +397,9 @@ class TestPowerShellRuntime:
             text=True,
             timeout=30,
         )
-        assert result.returncode == 0, (
-            f"PowerShell syntax check failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
-        )
+        assert (
+            result.returncode == 0
+        ), f"PowerShell syntax check failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
 
     def test_ps1_parses_without_errors(self):
         """Parse the script and check for parser errors."""
@@ -468,23 +423,22 @@ class TestPowerShellRuntime:
             text=True,
             timeout=30,
         )
-        assert result.returncode == 0, (
-            f"PowerShell parser found errors:\nstdout: {result.stdout}\nstderr: {result.stderr}"
-        )
+        assert (
+            result.returncode == 0
+        ), f"PowerShell parser found errors:\nstdout: {result.stdout}\nstderr: {result.stderr}"
 
 
 # ---------------------------------------------------------------------------
 # YAML validation
 # ---------------------------------------------------------------------------
 
+
 class TestYamlValidation:
     """Validate the GitHub Actions workflow YAML."""
 
     @pytest.fixture(scope="class")
     def workflow_path(self):
-        return os.path.join(
-            REPO_ROOT, ".github", "workflows", "build-windows-installer.yml"
-        )
+        return os.path.join(REPO_ROOT, ".github", "workflows", "build-windows-installer.yml")
 
     @pytest.fixture(scope="class")
     def workflow_content(self, workflow_path):
@@ -503,37 +457,40 @@ class TestYamlValidation:
     def test_yaml_has_name(self, workflow_content):
         """Workflow must have a name."""
         import yaml
+
         data = yaml.safe_load(workflow_content)
         assert "name" in data, "Workflow missing 'name' field"
 
     def test_yaml_has_on_trigger(self, workflow_content):
         """Workflow must have 'on' trigger."""
         import yaml
+
         data = yaml.safe_load(workflow_content)
         assert "on" in data, "Workflow missing 'on' trigger"
 
     def test_yaml_has_jobs(self, workflow_content):
         """Workflow must have jobs."""
         import yaml
+
         data = yaml.safe_load(workflow_content)
         assert "jobs" in data, "Workflow missing 'jobs' section"
 
     def test_yaml_tag_filter(self, workflow_content):
         """Workflow must filter on recorder-v* tags."""
         import yaml
+
         data = yaml.safe_load(workflow_content)
         on_section = data.get("on", {})
         push = on_section.get("push", {})
         tags = push.get("tags", [])
-        assert any("recorder-v" in str(t) for t in tags), (
-            f"Workflow does not filter on recorder-v* tags. Found: {tags}"
-        )
+        assert any(
+            "recorder-v" in str(t) for t in tags
+        ), f"Workflow does not filter on recorder-v* tags. Found: {tags}"
 
     def test_yaml_permissions(self, workflow_content):
         """Workflow must have contents: write permission for releases."""
         import yaml
+
         data = yaml.safe_load(workflow_content)
         perms = data.get("permissions", {})
-        assert perms.get("contents") == "write", (
-            "Workflow missing 'contents: write' permission"
-        )
+        assert perms.get("contents") == "write", "Workflow missing 'contents: write' permission"

@@ -77,9 +77,7 @@ def minimal_session_dir():
                 f.write(json.dumps({"tick": i, "score": i * 10}) + "\n")
 
         with open(os.path.join(session_dir, "inputs.jsonl"), "w") as f:
-            f.write(
-                json.dumps({"timestamp": "2026-01-01T00:00:00Z", "key": "W"}) + "\n"
-            )
+            f.write(json.dumps({"timestamp": "2026-01-01T00:00:00Z", "key": "W"}) + "\n")
 
         # Create a subdirectory with a file
         depth_dir = os.path.join(session_dir, "depth")
@@ -95,9 +93,7 @@ class TestBundleCreation:
 
     def test_bundle_creates_output_file(self, real_keypair, minimal_session_dir):
         keyfile, _ = real_keypair
-        result = _run(
-            [sys.executable, BUNDLE_SCRIPT, minimal_session_dir, "--keyfile", keyfile]
-        )
+        result = _run([sys.executable, BUNDLE_SCRIPT, minimal_session_dir, "--keyfile", keyfile])
         assert result.returncode == 0, f"bundle failed: {result.stderr}"
 
         expected_bundle = minimal_session_dir + ".bundle.tar.gz"
@@ -122,9 +118,7 @@ class TestBundleCreation:
 
     def test_bundle_contains_required_files(self, real_keypair, minimal_session_dir):
         keyfile, _ = real_keypair
-        result = _run(
-            [sys.executable, BUNDLE_SCRIPT, minimal_session_dir, "--keyfile", keyfile]
-        )
+        result = _run([sys.executable, BUNDLE_SCRIPT, minimal_session_dir, "--keyfile", keyfile])
         assert result.returncode == 0
 
         bundle_path = minimal_session_dir + ".bundle.tar.gz"
@@ -239,9 +233,7 @@ class TestOfflineBundleVerify:
         )
         assert result.returncode == 0, f"verify failed: {result.stderr}"
 
-    def test_verify_with_expect_pubkey_mismatch_exit_2(
-        self, real_keypair, minimal_session_dir
-    ):
+    def test_verify_with_expect_pubkey_mismatch_exit_2(self, real_keypair, minimal_session_dir):
         keyfile, _ = real_keypair
         _run([sys.executable, BUNDLE_SCRIPT, minimal_session_dir, "--keyfile", keyfile])
 
@@ -256,9 +248,7 @@ class TestOfflineBundleVerify:
                 "deadbeefdeadbeef",
             ]
         )
-        assert (
-            result.returncode == 2
-        ), f"expected exit 2, got {result.returncode}: {result.stderr}"
+        assert result.returncode == 2, f"expected exit 2, got {result.returncode}: {result.stderr}"
         assert "pubkey fingerprint mismatch" in result.stderr.lower()
 
     def test_verify_tampered_session_exit_1(self, real_keypair, minimal_session_dir):
@@ -286,9 +276,7 @@ class TestOfflineBundleVerify:
                     if os.path.isfile(fpath):
                         tar.add(fpath, arcname=fname)
 
-            result = _run(
-                [sys.executable, VERIFY_SCRIPT, "--offline-bundle", tampered_bundle]
-            )
+            result = _run([sys.executable, VERIFY_SCRIPT, "--offline-bundle", tampered_bundle])
             assert result.returncode == 1, f"expected exit 1, got {result.returncode}"
             assert (
                 "merkle root mismatch" in result.stderr.lower()
@@ -322,9 +310,7 @@ class TestOfflineBundleVerify:
                     if os.path.isfile(fpath):
                         tar.add(fpath, arcname=fname)
 
-            result = _run(
-                [sys.executable, VERIFY_SCRIPT, "--offline-bundle", tampered_bundle]
-            )
+            result = _run([sys.executable, VERIFY_SCRIPT, "--offline-bundle", tampered_bundle])
             assert result.returncode == 1, f"expected exit 1, got {result.returncode}"
             assert (
                 "merkle root mismatch" in result.stderr.lower()
@@ -363,9 +349,7 @@ class TestOfflineBundleVerify:
                     if os.path.isfile(fpath):
                         tar.add(fpath, arcname=fname)
 
-            result = _run(
-                [sys.executable, VERIFY_SCRIPT, "--offline-bundle", bad_bundle]
-            )
+            result = _run([sys.executable, VERIFY_SCRIPT, "--offline-bundle", bad_bundle])
             assert result.returncode == 1
             assert "missing" in result.stderr.lower()
 
@@ -455,9 +439,7 @@ class TestVerifyShStandalone:
             verify_sh = os.path.join(td, "verify.sh")
             os.chmod(verify_sh, 0o755)
 
-            result = _run(
-                ["bash", verify_sh, bundle_path, "--expect-pubkey", "deadbeefdeadbeef"]
-            )
+            result = _run(["bash", verify_sh, bundle_path, "--expect-pubkey", "deadbeefdeadbeef"])
             assert result.returncode == 1
             assert "mismatch" in result.stderr.lower()
 
@@ -479,9 +461,7 @@ class TestExistingModesUnchanged:
                 json.dump(manifest, f)
 
             # Sign
-            result = _run(
-                [sys.executable, SIGN_SCRIPT, manifest_path, "--keyfile", tmp_keyfile]
-            )
+            result = _run([sys.executable, SIGN_SCRIPT, manifest_path, "--keyfile", tmp_keyfile])
             assert result.returncode == 0, f"sign failed: {result.stderr}"
 
             signed_path = manifest_path + ".signed.json"
@@ -512,13 +492,9 @@ class TestExistingModesUnchanged:
             with open(manifest_path, "w") as f:
                 json.dump(manifest, f)
 
-            result = _run(
-                [sys.executable, SIGN_SCRIPT, manifest_path, "--keyfile", tmp_keyfile]
-            )
+            result = _run([sys.executable, SIGN_SCRIPT, manifest_path, "--keyfile", tmp_keyfile])
             assert result.returncode == 0
 
             signed_path = manifest_path + ".signed.json"
-            result = _run(
-                [sys.executable, VERIFY_SCRIPT, signed_path, "--expect-pubkey", fp]
-            )
+            result = _run([sys.executable, VERIFY_SCRIPT, signed_path, "--expect-pubkey", fp])
             assert result.returncode == 0, f"verify failed: {result.stderr}"

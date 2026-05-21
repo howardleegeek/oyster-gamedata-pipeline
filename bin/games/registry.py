@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import importlib
 import inspect
-import os
 import pkgutil
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional, Type
@@ -105,9 +104,20 @@ def detect_running_game(psutil_process_iter=None) -> Optional["BaseAdapter"]:
     if psutil_process_iter is None:
         psutil_process_iter = psutil.process_iter
 
+    for adapter_cls in registry:
+        try:
+            instance = adapter_cls()
+            session = instance.detect()
+            if session is not None:
+                return instance
+        except TypeError:
+            continue
+        except Exception:
+            continue
+
     try:
         processes = list(psutil_process_iter(["name", "exe"]))
-    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+    except Exception:
         return None
 
     for adapter_cls in registry:
@@ -115,9 +125,10 @@ def detect_running_game(psutil_process_iter=None) -> Optional["BaseAdapter"]:
             try:
                 name = proc.info.get("name") or ""
                 exe = proc.info.get("exe") or ""
-                if adapter_cls.detect(name, exe):
+                detect_fn = getattr(adapter_cls, "detect_by_process", adapter_cls.detect)
+                if detect_fn(name, exe):
                     return adapter_cls()
-            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            except Exception:
                 continue
 
     return None

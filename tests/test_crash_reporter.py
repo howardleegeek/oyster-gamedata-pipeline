@@ -31,6 +31,7 @@ from backend_stub.crash_dump import (
 from backend_stub.main import app  # noqa: E402
 from bin.crash_reporter import (  # noqa: E402
     CRASH_FILE_PATTERN,
+    _processed_files,
     ensure_consent,
     get_consent,
     parse_crash_file,
@@ -38,7 +39,6 @@ from bin.crash_reporter import (  # noqa: E402
     prompt_consent,
     upload_crash,
     write_crash_summary,
-    _processed_files,
 )
 
 # ---------------------------------------------------------------------------
@@ -194,9 +194,7 @@ class TestConsent:
         assert result is True
 
     def test_prompt_consent_eof_defaults_no(self, monkeypatch: pytest.MonkeyPatch):
-        monkeypatch.setattr(
-            "builtins.input", lambda _: (_ for _ in ()).throw(EOFError())
-        )
+        monkeypatch.setattr("builtins.input", lambda _: (_ for _ in ()).throw(EOFError()))
         result = prompt_consent()
         assert result is False
 
@@ -253,9 +251,7 @@ class TestUploadCrash:
 
 
 class TestProcessCrashFile:
-    def test_process_with_consent_uploads(
-        self, crash_file: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_process_with_consent_uploads(self, crash_file: Path, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(
             "bin.crash_reporter._read_telemetry", lambda: {"crash_upload_consent": True}
         )
@@ -275,9 +271,7 @@ class TestProcessCrashFile:
             process_crash_file(crash_file, "http://127.0.0.1:8089")
             mock_upload.assert_not_called()
 
-    def test_process_idempotent(
-        self, crash_file: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_process_idempotent(self, crash_file: Path, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(
             "bin.crash_reporter._read_telemetry", lambda: {"crash_upload_consent": True}
         )
@@ -459,9 +453,7 @@ class TestCLI:
 
 class TestEndToEnd:
     @pytest.mark.asyncio
-    async def test_opt_in_y_upload_happens(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    async def test_opt_in_y_upload_happens(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         """opt-in y → upload happens (mock backend assert)."""
         watch_dir = tmp_path / "logs"
         watch_dir.mkdir()
@@ -480,9 +472,7 @@ class TestEndToEnd:
         # Use the real FastAPI test client
         from httpx import ASGITransport, AsyncClient
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # Simulate upload by calling the endpoint directly
             from bin.crash_reporter import parse_crash_file, upload_crash
 
@@ -515,9 +505,7 @@ class TestEndToEnd:
                 assert backend_resp.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_opt_in_n_zero_upload(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    async def test_opt_in_n_zero_upload(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         """opt-in n → 0 upload."""
         watch_dir = tmp_path / "logs"
         watch_dir.mkdir()
@@ -542,9 +530,7 @@ class TestEndToEnd:
         # Verify no crashes in backend
         from httpx import ASGITransport, AsyncClient
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             resp = await client.get("/api/v1/crash/dump")
             assert resp.json() == []
 

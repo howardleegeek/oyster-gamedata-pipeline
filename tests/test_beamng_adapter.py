@@ -5,9 +5,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from bin.games import detect_running_game
 from bin.games.base_adapter import BaseAdapter
 from bin.games.beamng_adapter import BeamNGAdapter
-from bin.games import detect_running_game
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -306,18 +306,14 @@ class TestDetectRunningGame:
     def test_detect_beamng_among_other_processes(
         self, mock_beamng_process_win, mock_non_beamng_process
     ):
-        mock_iter = MagicMock(
-            return_value=[mock_non_beamng_process, mock_beamng_process_win]
-        )
+        mock_iter = MagicMock(return_value=[mock_non_beamng_process, mock_beamng_process_win])
 
         adapter = detect_running_game(psutil_process_iter=mock_iter)
 
         assert adapter is not None
         assert isinstance(adapter, BeamNGAdapter)
 
-    def test_detect_handles_no_such_process(
-        self, mock_beamng_process_win, mock_non_beamng_process
-    ):
+    def test_detect_handles_no_such_process(self, mock_beamng_process_win, mock_non_beamng_process):
         import psutil
 
         def failing_iter(*_args, **_kwargs):

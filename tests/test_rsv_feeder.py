@@ -45,9 +45,7 @@ def make_fake_session(root: pathlib.Path, name: str, files: list[str] | None = N
     return session_dir
 
 
-def make_fake_finalized_dir(
-    tmp_path: pathlib.Path, session_names: list[str]
-) -> pathlib.Path:
+def make_fake_finalized_dir(tmp_path: pathlib.Path, session_names: list[str]) -> pathlib.Path:
     """Create a fake finalized directory with multiple sessions."""
     finalized = tmp_path / "finalized"
     finalized.mkdir(parents=True, exist_ok=True)
@@ -341,9 +339,7 @@ class TestDashboard(unittest.TestCase):
     def test_update_dashboard_all_ready(self):
         with tempfile.TemporaryDirectory() as td:
             path = pathlib.Path(td) / "dashboard.json"
-            d = rsv_feeder.update_dashboard(
-                path, ["BUYER_READY", "BUYER_READY", "BUYER_READY"]
-            )
+            d = rsv_feeder.update_dashboard(path, ["BUYER_READY", "BUYER_READY", "BUYER_READY"])
             self.assertEqual(d["total"], 3)
             self.assertEqual(d["buyer_ready"], 3)
             self.assertAlmostEqual(d["pct"], 1.0, places=4)
@@ -376,9 +372,7 @@ class TestRSVInvocation(unittest.TestCase):
             output_path.write_text(json.dumps(output_data))
 
             with mock.patch("subprocess.run") as mock_run:
-                mock_run.return_value = mock.MagicMock(
-                    returncode=0, stdout="", stderr=""
-                )
+                mock_run.return_value = mock.MagicMock(returncode=0, stdout="", stderr="")
                 result = rsv_feeder.run_rsv(session_dir, output_path)
                 self.assertEqual(result["summary"]["PASS"], 1)
 
@@ -429,9 +423,7 @@ class TestRunOnce(unittest.TestCase):
             state_path = pathlib.Path(td) / "state.json"
             dashboard_path = pathlib.Path(td) / "dashboard.json"
 
-            count = rsv_feeder.run_once(
-                finalized, state_path, dashboard_path, dry_run=True
-            )
+            count = rsv_feeder.run_once(finalized, state_path, dashboard_path, dry_run=True)
             self.assertEqual(count, 3)
 
             # State should have all 3 sessions
@@ -448,22 +440,16 @@ class TestRunOnce(unittest.TestCase):
 
     def test_idempotent_second_run(self):
         with tempfile.TemporaryDirectory() as td:
-            finalized = make_fake_finalized_dir(
-                pathlib.Path(td), ["session_a", "session_b"]
-            )
+            finalized = make_fake_finalized_dir(pathlib.Path(td), ["session_a", "session_b"])
             state_path = pathlib.Path(td) / "state.json"
             dashboard_path = pathlib.Path(td) / "dashboard.json"
 
             # First run
-            count1 = rsv_feeder.run_once(
-                finalized, state_path, dashboard_path, dry_run=True
-            )
+            count1 = rsv_feeder.run_once(finalized, state_path, dashboard_path, dry_run=True)
             self.assertEqual(count1, 2)
 
             # Second run — should find no new sessions
-            count2 = rsv_feeder.run_once(
-                finalized, state_path, dashboard_path, dry_run=True
-            )
+            count2 = rsv_feeder.run_once(finalized, state_path, dashboard_path, dry_run=True)
             self.assertEqual(count2, 0)
 
             # Dashboard should not have doubled
@@ -473,9 +459,7 @@ class TestRunOnce(unittest.TestCase):
     def test_run_once_with_mocked_rsv(self):
         """Test run_once with mocked RSV subprocess calls."""
         with tempfile.TemporaryDirectory() as td:
-            finalized = make_fake_finalized_dir(
-                pathlib.Path(td), ["session_pass", "session_fail"]
-            )
+            finalized = make_fake_finalized_dir(pathlib.Path(td), ["session_pass", "session_fail"])
             state_path = pathlib.Path(td) / "state.json"
             dashboard_path = pathlib.Path(td) / "dashboard.json"
 
@@ -506,9 +490,7 @@ class TestRunOnce(unittest.TestCase):
                 return mock.MagicMock(returncode=0, stdout="", stderr="")
 
             with mock.patch("subprocess.run", side_effect=mock_run):
-                count = rsv_feeder.run_once(
-                    finalized, state_path, dashboard_path, dry_run=False
-                )
+                count = rsv_feeder.run_once(finalized, state_path, dashboard_path, dry_run=False)
                 self.assertEqual(count, 2)
 
             state = rsv_feeder.load_state(state_path)
@@ -593,9 +575,7 @@ class TestMainIntegration(unittest.TestCase):
 
     def test_main_once_dry_run_with_sessions(self):
         with tempfile.TemporaryDirectory() as td:
-            finalized = make_fake_finalized_dir(
-                pathlib.Path(td), ["session_001", "session_002"]
-            )
+            finalized = make_fake_finalized_dir(pathlib.Path(td), ["session_001", "session_002"])
             state_path = pathlib.Path(td) / "state.json"
             dashboard_path = pathlib.Path(td) / "dashboard.json"
 

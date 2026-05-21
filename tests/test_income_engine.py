@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import datetime as _dt
 
-import pytest
-
 from backend_stub.income_engine import calculate_daily_income
 
 

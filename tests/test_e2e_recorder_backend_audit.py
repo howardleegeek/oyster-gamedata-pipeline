@@ -21,7 +21,6 @@ import signal
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict
 from unittest import mock
 
 import pytest
@@ -42,7 +41,6 @@ if str(REPO_ROOT) not in sys.path:
 # ---------------------------------------------------------------------------
 
 import bin.e2e_recorder_backend_audit as audit_mod
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -443,17 +441,28 @@ class TestRunAudit:
         mock_proc = _make_backend_proc_mock()
         mock_popen.return_value = mock_proc
 
-        with mock.patch.object(audit_mod, "step_wait_ready", return_value=True), \
-             mock.patch.object(audit_mod, "step_generate_fixture", return_value=True), \
-             mock.patch.object(audit_mod, "step_recorder_smoke", return_value={
-                 "returncode": 0, "stdout": "BUYER_READY", "stderr": ""
-             }), \
-             mock.patch.object(audit_mod, "step_gate_smoke", return_value={
-                 "returncode": 0, "stdout": "{}", "stderr": "", "verdict": "BUYER_READY"
-             }), \
-             mock.patch.object(audit_mod, "step_check_verdict", return_value=True), \
-             mock.patch.object(audit_mod, "step_check_backend_sessions", return_value=True), \
-             mock.patch.object(audit_mod, "step_shutdown_backend"):
+        with (
+            mock.patch.object(audit_mod, "step_wait_ready", return_value=True),
+            mock.patch.object(audit_mod, "step_generate_fixture", return_value=True),
+            mock.patch.object(
+                audit_mod,
+                "step_recorder_smoke",
+                return_value={"returncode": 0, "stdout": "BUYER_READY", "stderr": ""},
+            ),
+            mock.patch.object(
+                audit_mod,
+                "step_gate_smoke",
+                return_value={
+                    "returncode": 0,
+                    "stdout": "{}",
+                    "stderr": "",
+                    "verdict": "BUYER_READY",
+                },
+            ),
+            mock.patch.object(audit_mod, "step_check_verdict", return_value=True),
+            mock.patch.object(audit_mod, "step_check_backend_sessions", return_value=True),
+            mock.patch.object(audit_mod, "step_shutdown_backend"),
+        ):
 
             rc = audit_mod.run_audit()
 
@@ -464,8 +473,10 @@ class TestRunAudit:
         mock_proc = _make_backend_proc_mock()
         mock_popen.return_value = mock_proc
 
-        with mock.patch.object(audit_mod, "step_wait_ready", return_value=False), \
-             mock.patch.object(audit_mod, "step_shutdown_backend"):
+        with (
+            mock.patch.object(audit_mod, "step_wait_ready", return_value=False),
+            mock.patch.object(audit_mod, "step_shutdown_backend"),
+        ):
 
             rc = audit_mod.run_audit()
 
@@ -476,9 +487,11 @@ class TestRunAudit:
         mock_proc = _make_backend_proc_mock()
         mock_popen.return_value = mock_proc
 
-        with mock.patch.object(audit_mod, "step_wait_ready", return_value=True), \
-             mock.patch.object(audit_mod, "step_generate_fixture", return_value=False), \
-             mock.patch.object(audit_mod, "step_shutdown_backend"):
+        with (
+            mock.patch.object(audit_mod, "step_wait_ready", return_value=True),
+            mock.patch.object(audit_mod, "step_generate_fixture", return_value=False),
+            mock.patch.object(audit_mod, "step_shutdown_backend"),
+        ):
 
             rc = audit_mod.run_audit()
 
@@ -489,17 +502,28 @@ class TestRunAudit:
         mock_proc = _make_backend_proc_mock()
         mock_popen.return_value = mock_proc
 
-        with mock.patch.object(audit_mod, "step_wait_ready", return_value=True), \
-             mock.patch.object(audit_mod, "step_generate_fixture", return_value=True), \
-             mock.patch.object(audit_mod, "step_recorder_smoke", return_value={
-                 "returncode": 1, "stdout": "", "stderr": "upload failed"
-             }), \
-             mock.patch.object(audit_mod, "step_gate_smoke", return_value={
-                 "returncode": 0, "stdout": "{}", "stderr": "", "verdict": "BUYER_READY"
-             }), \
-             mock.patch.object(audit_mod, "step_check_verdict", return_value=False), \
-             mock.patch.object(audit_mod, "step_check_backend_sessions", return_value=True), \
-             mock.patch.object(audit_mod, "step_shutdown_backend"):
+        with (
+            mock.patch.object(audit_mod, "step_wait_ready", return_value=True),
+            mock.patch.object(audit_mod, "step_generate_fixture", return_value=True),
+            mock.patch.object(
+                audit_mod,
+                "step_recorder_smoke",
+                return_value={"returncode": 1, "stdout": "", "stderr": "upload failed"},
+            ),
+            mock.patch.object(
+                audit_mod,
+                "step_gate_smoke",
+                return_value={
+                    "returncode": 0,
+                    "stdout": "{}",
+                    "stderr": "",
+                    "verdict": "BUYER_READY",
+                },
+            ),
+            mock.patch.object(audit_mod, "step_check_verdict", return_value=False),
+            mock.patch.object(audit_mod, "step_check_backend_sessions", return_value=True),
+            mock.patch.object(audit_mod, "step_shutdown_backend"),
+        ):
 
             rc = audit_mod.run_audit()
 
@@ -510,17 +534,28 @@ class TestRunAudit:
         mock_proc = _make_backend_proc_mock()
         mock_popen.return_value = mock_proc
 
-        with mock.patch.object(audit_mod, "step_wait_ready", return_value=True), \
-             mock.patch.object(audit_mod, "step_generate_fixture", return_value=True), \
-             mock.patch.object(audit_mod, "step_recorder_smoke", return_value={
-                 "returncode": 0, "stdout": "BUYER_READY", "stderr": ""
-             }), \
-             mock.patch.object(audit_mod, "step_gate_smoke", return_value={
-                 "returncode": 0, "stdout": "{}", "stderr": "", "verdict": "BUYER_READY"
-             }), \
-             mock.patch.object(audit_mod, "step_check_verdict", return_value=True), \
-             mock.patch.object(audit_mod, "step_check_backend_sessions", return_value=False), \
-             mock.patch.object(audit_mod, "step_shutdown_backend"):
+        with (
+            mock.patch.object(audit_mod, "step_wait_ready", return_value=True),
+            mock.patch.object(audit_mod, "step_generate_fixture", return_value=True),
+            mock.patch.object(
+                audit_mod,
+                "step_recorder_smoke",
+                return_value={"returncode": 0, "stdout": "BUYER_READY", "stderr": ""},
+            ),
+            mock.patch.object(
+                audit_mod,
+                "step_gate_smoke",
+                return_value={
+                    "returncode": 0,
+                    "stdout": "{}",
+                    "stderr": "",
+                    "verdict": "BUYER_READY",
+                },
+            ),
+            mock.patch.object(audit_mod, "step_check_verdict", return_value=True),
+            mock.patch.object(audit_mod, "step_check_backend_sessions", return_value=False),
+            mock.patch.object(audit_mod, "step_shutdown_backend"),
+        ):
 
             rc = audit_mod.run_audit()
 
@@ -531,8 +566,10 @@ class TestRunAudit:
         mock_proc = _make_backend_proc_mock()
         mock_popen.return_value = mock_proc
 
-        with mock.patch.object(audit_mod, "step_wait_ready", side_effect=RuntimeError("boom")), \
-             mock.patch.object(audit_mod, "step_shutdown_backend"):
+        with (
+            mock.patch.object(audit_mod, "step_wait_ready", side_effect=RuntimeError("boom")),
+            mock.patch.object(audit_mod, "step_shutdown_backend"),
+        ):
 
             rc = audit_mod.run_audit()
 
@@ -545,8 +582,10 @@ class TestRunAudit:
         mock_proc = _make_backend_proc_mock()
         mock_popen.return_value = mock_proc
 
-        with mock.patch.object(audit_mod, "step_wait_ready", return_value=False), \
-             mock.patch.object(audit_mod, "step_shutdown_backend") as mock_shutdown:
+        with (
+            mock.patch.object(audit_mod, "step_wait_ready", return_value=False),
+            mock.patch.object(audit_mod, "step_shutdown_backend") as mock_shutdown,
+        ):
 
             audit_mod.run_audit()
 

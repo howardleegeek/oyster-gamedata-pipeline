@@ -3,7 +3,6 @@
 import os
 import subprocess
 import textwrap
-import pytest
 
 
 def _create_mock_gh(tmpdir, mock_output="", mock_exit=0):

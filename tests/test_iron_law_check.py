@@ -11,7 +11,6 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-
 SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "iron_law_check.sh"
 
 
@@ -41,15 +40,11 @@ def _init_repo(tmp: Path) -> Path:
         check=True,
         capture_output=True,
     )
-    subprocess.run(
-        ["git", "config", "user.name", "Test"], cwd=tmp, check=True, capture_output=True
-    )
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=tmp, check=True, capture_output=True)
     # Create an initial commit so HEAD~1 works
     (tmp / "dummy.txt").write_text("initial\n")
     subprocess.run(["git", "add", "."], cwd=tmp, check=True, capture_output=True)
-    subprocess.run(
-        ["git", "commit", "-m", "initial"], cwd=tmp, check=True, capture_output=True
-    )
+    subprocess.run(["git", "commit", "-m", "initial"], cwd=tmp, check=True, capture_output=True)
     return tmp
 
 
@@ -65,9 +60,7 @@ def test_skip_without_comment_is_blocked():
         # Add a test file with skip but no comment
         test_file = repo / "test_new.py"
         test_file.write_text("@pytest.mark.skip\ndef test_foo(): pass\n")
-        subprocess.run(
-            ["git", "add", str(test_file)], cwd=repo, check=True, capture_output=True
-        )
+        subprocess.run(["git", "add", str(test_file)], cwd=repo, check=True, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "add skip test"],
             cwd=repo,
@@ -87,12 +80,8 @@ def test_skip_with_comment_is_allowed():
     with tempfile.TemporaryDirectory() as td:
         repo = _init_repo(Path(td))
         test_file = repo / "test_new.py"
-        test_file.write_text(
-            "@pytest.mark.skip  # tracked in issue #123\ndef test_foo(): pass\n"
-        )
-        subprocess.run(
-            ["git", "add", str(test_file)], cwd=repo, check=True, capture_output=True
-        )
+        test_file.write_text("@pytest.mark.skip  # tracked in issue #123\ndef test_foo(): pass\n")
+        subprocess.run(["git", "add", str(test_file)], cwd=repo, check=True, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "add skip with comment"],
             cwd=repo,
@@ -112,9 +101,7 @@ def test_xfail_without_comment_is_blocked():
         repo = _init_repo(Path(td))
         test_file = repo / "test_new.py"
         test_file.write_text("@pytest.mark.xfail\ndef test_bar(): pass\n")
-        subprocess.run(
-            ["git", "add", str(test_file)], cwd=repo, check=True, capture_output=True
-        )
+        subprocess.run(["git", "add", str(test_file)], cwd=repo, check=True, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "add xfail test"],
             cwd=repo,
@@ -136,9 +123,7 @@ def test_xfail_with_comment_is_allowed():
         test_file.write_text(
             "@pytest.mark.xfail(reason='bug-456')  # tracked\ndef test_bar(): pass\n"
         )
-        subprocess.run(
-            ["git", "add", str(test_file)], cwd=repo, check=True, capture_output=True
-        )
+        subprocess.run(["git", "add", str(test_file)], cwd=repo, check=True, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "add xfail with comment"],
             cwd=repo,
@@ -163,9 +148,7 @@ def test_todo_real_data_is_blocked():
         repo = _init_repo(Path(td))
         src_file = repo / "data.py"
         src_file.write_text("# TODO real-data: replace with live API\nDATA = []\n")
-        subprocess.run(
-            ["git", "add", str(src_file)], cwd=repo, check=True, capture_output=True
-        )
+        subprocess.run(["git", "add", str(src_file)], cwd=repo, check=True, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "add placeholder"],
             cwd=repo,
@@ -186,9 +169,7 @@ def test_clean_file_passes():
         repo = _init_repo(Path(td))
         src_file = repo / "clean.py"
         src_file.write_text("def hello():\n    return 'world'\n")
-        subprocess.run(
-            ["git", "add", str(src_file)], cwd=repo, check=True, capture_output=True
-        )
+        subprocess.run(["git", "add", str(src_file)], cwd=repo, check=True, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "add clean file"],
             cwd=repo,
@@ -214,9 +195,7 @@ def test_collect_ignore_grow_is_blocked():
         # Create conftest.py with existing entries
         conftest = repo / "conftest.py"
         conftest.write_text('collect_ignore = ["test_old.py"]\n')
-        subprocess.run(
-            ["git", "add", str(conftest)], cwd=repo, check=True, capture_output=True
-        )
+        subprocess.run(["git", "add", str(conftest)], cwd=repo, check=True, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "add conftest"],
             cwd=repo,
@@ -226,9 +205,7 @@ def test_collect_ignore_grow_is_blocked():
 
         # Now grow it
         conftest.write_text('collect_ignore = ["test_old.py", "test_new.py"]\n')
-        subprocess.run(
-            ["git", "add", str(conftest)], cwd=repo, check=True, capture_output=True
-        )
+        subprocess.run(["git", "add", str(conftest)], cwd=repo, check=True, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "grow collect_ignore"],
             cwd=repo,
@@ -240,10 +217,7 @@ def test_collect_ignore_grow_is_blocked():
         assert (
             result.returncode == 1
         ), f"Expected exit 1, got {result.returncode}\nstderr: {result.stderr}"
-        assert (
-            "collect_ignore" in result.stderr.lower()
-            and "grew" in result.stderr.lower()
-        )
+        assert "collect_ignore" in result.stderr.lower() and "grew" in result.stderr.lower()
 
 
 def test_collect_ignore_shrink_is_allowed():
@@ -252,9 +226,7 @@ def test_collect_ignore_shrink_is_allowed():
         repo = _init_repo(Path(td))
         conftest = repo / "conftest.py"
         conftest.write_text('collect_ignore = ["test_a.py", "test_b.py"]\n')
-        subprocess.run(
-            ["git", "add", str(conftest)], cwd=repo, check=True, capture_output=True
-        )
+        subprocess.run(["git", "add", str(conftest)], cwd=repo, check=True, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "add conftest"],
             cwd=repo,
@@ -264,9 +236,7 @@ def test_collect_ignore_shrink_is_allowed():
 
         # Shrink it
         conftest.write_text('collect_ignore = ["test_a.py"]\n')
-        subprocess.run(
-            ["git", "add", str(conftest)], cwd=repo, check=True, capture_output=True
-        )
+        subprocess.run(["git", "add", str(conftest)], cwd=repo, check=True, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "shrink collect_ignore"],
             cwd=repo,
@@ -286,9 +256,7 @@ def test_collect_ignore_unchanged_is_allowed():
         repo = _init_repo(Path(td))
         conftest = repo / "conftest.py"
         conftest.write_text('collect_ignore = ["test_a.py"]\n')
-        subprocess.run(
-            ["git", "add", str(conftest)], cwd=repo, check=True, capture_output=True
-        )
+        subprocess.run(["git", "add", str(conftest)], cwd=repo, check=True, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "add conftest"],
             cwd=repo,
@@ -299,9 +267,7 @@ def test_collect_ignore_unchanged_is_allowed():
         # Make a different change (not to conftest)
         other = repo / "other.py"
         other.write_text("x = 1\n")
-        subprocess.run(
-            ["git", "add", str(other)], cwd=repo, check=True, capture_output=True
-        )
+        subprocess.run(["git", "add", str(other)], cwd=repo, check=True, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "add other"],
             cwd=repo,
@@ -352,12 +318,8 @@ def test_exit_0_on_clean_repo():
         # Add a second commit with clean changes
         clean = repo / "clean.py"
         clean.write_text("def foo(): pass\n")
-        subprocess.run(
-            ["git", "add", str(clean)], cwd=repo, check=True, capture_output=True
-        )
-        subprocess.run(
-            ["git", "commit", "-m", "clean"], cwd=repo, check=True, capture_output=True
-        )
+        subprocess.run(["git", "add", str(clean)], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "clean"], cwd=repo, check=True, capture_output=True)
 
         result = _run_script(repo)
         assert result.returncode == 0
@@ -369,12 +331,8 @@ def test_exit_1_on_violation():
         repo = _init_repo(Path(td))
         test_file = repo / "test_bad.py"
         test_file.write_text("@pytest.mark.skip\ndef test_x(): pass\n")
-        subprocess.run(
-            ["git", "add", str(test_file)], cwd=repo, check=True, capture_output=True
-        )
-        subprocess.run(
-            ["git", "commit", "-m", "bad"], cwd=repo, check=True, capture_output=True
-        )
+        subprocess.run(["git", "add", str(test_file)], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "bad"], cwd=repo, check=True, capture_output=True)
 
         result = _run_script(repo)
         assert result.returncode == 1

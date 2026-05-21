@@ -285,9 +285,7 @@ class TestFindLatestSession:
 
 class TestGetSessionDir:
     def test_returns_real_session(self, tmp_path: Path, mock_session_dir):
-        with patch(
-            "daemon.iter_watcher.find_latest_session", return_value=mock_session_dir
-        ):
+        with patch("daemon.iter_watcher.find_latest_session", return_value=mock_session_dir):
             result = get_session_dir()
             assert result == mock_session_dir
 

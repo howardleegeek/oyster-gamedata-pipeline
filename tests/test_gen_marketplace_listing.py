@@ -153,9 +153,7 @@ class TestComputationHelpers(unittest.TestCase):
     def test_avg_duration_minutes(self):
         """_avg_duration_minutes returns correct average."""
         # (1800 + 3600 + 900) / 3 = 2100 seconds = 35 minutes
-        self.assertAlmostEqual(
-            gml._avg_duration_minutes(MINIMAL_SWEEP["sessions"]), 35.0
-        )
+        self.assertAlmostEqual(gml._avg_duration_minutes(MINIMAL_SWEEP["sessions"]), 35.0)
 
     def test_avg_duration_minutes_empty(self):
         """_avg_duration_minutes returns 0 for empty list."""
@@ -195,9 +193,7 @@ class TestGenerateListing(unittest.TestCase):
 
     def test_title_format(self):
         """Title matches spec: 'Oyster GameData v0.7.x — X games, Y hours, Z sessions'."""
-        self.assertIn(
-            "# Oyster GameData v0.7.2 — 2 games, 1.8 hours, 3 sessions", self.content
-        )
+        self.assertIn("# Oyster GameData v0.7.2 — 2 games, 1.8 hours, 3 sessions", self.content)
 
     def test_has_stats_section(self):
         """Output contains Session Statistics section."""
@@ -280,9 +276,7 @@ class TestGenerateListingEmpty(unittest.TestCase):
 
     def test_title_with_zero(self):
         """Title handles zero sessions gracefully."""
-        self.assertIn(
-            "# Oyster GameData v0.7.0 — 0 games, 0.0 hours, 0 sessions", self.content
-        )
+        self.assertIn("# Oyster GameData v0.7.0 — 0 games, 0.0 hours, 0 sessions", self.content)
 
     def test_no_division_by_zero(self):
         """Empty sessions don't cause division by zero."""

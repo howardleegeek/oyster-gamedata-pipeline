@@ -124,7 +124,8 @@ class TestOSDetection:
         """uname -s = Linux should map to 'linux'."""
         result = subprocess.run(
             ["bash", "-c", 'case "Linux" in Linux*) echo "linux" ;; esac'],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         )
         assert result.stdout.strip() == "linux"
 
@@ -132,7 +133,8 @@ class TestOSDetection:
         """uname -s = Darwin should map to 'macos'."""
         result = subprocess.run(
             ["bash", "-c", 'case "Darwin" in Darwin*) echo "macos" ;; esac'],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         )
         assert result.stdout.strip() == "macos"
 
@@ -140,7 +142,8 @@ class TestOSDetection:
         """MINGW should map to 'windows'."""
         result = subprocess.run(
             ["bash", "-c", 'case "MINGW64" in MINGW*|MSYS*|CYGWIN*) echo "windows" ;; esac'],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         )
         assert result.stdout.strip() == "windows"
 

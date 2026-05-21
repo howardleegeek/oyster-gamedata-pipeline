@@ -32,6 +32,16 @@ die() {
   exit 1
 }
 
+latest_semver_tag() {
+  git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname \
+    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+    | head -n 1 || true
+}
+
+tag_exists() {
+  git rev-parse -q --verify "refs/tags/$1" >/dev/null
+}
+
 # ---------------------------------------------------------------------------
 # Pre-flight
 # ---------------------------------------------------------------------------
@@ -80,10 +90,18 @@ fi
 # Compute new version (patch bump only)
 # ---------------------------------------------------------------------------
 
-if [ -z "$LATEST_TAG" ]; then
-  CURRENT_VERSION="v0.0.0"
-else
+VERSION_BASE_TAG="${VERSION_BASE_TAG:-}"
+
+if [ -z "$VERSION_BASE_TAG" ]; then
+  VERSION_BASE_TAG=$(latest_semver_tag)
+fi
+
+if [ -n "$VERSION_BASE_TAG" ]; then
+  CURRENT_VERSION="$VERSION_BASE_TAG"
+elif [ -n "$LATEST_TAG" ]; then
   CURRENT_VERSION="$LATEST_TAG"
+else
+  CURRENT_VERSION="v0.0.0"
 fi
 
 VERSION_NUM="${CURRENT_VERSION#v}"
@@ -100,6 +118,11 @@ PATCH="${REST#*.}"
 PATCH=$(( PATCH + 1 ))
 
 NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+while tag_exists "$NEW_VERSION"; do
+  log "Tag ${NEW_VERSION} already exists; bumping patch again"
+  PATCH=$(( PATCH + 1 ))
+  NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+done
 log "New version: ${NEW_VERSION} (from ${CURRENT_VERSION})"
 
 # ---------------------------------------------------------------------------

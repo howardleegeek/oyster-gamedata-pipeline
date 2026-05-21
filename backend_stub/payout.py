@@ -136,9 +136,7 @@ class PayoutStore:
             rec.txn_id = f"mock-txn-{uuid.uuid4().hex[:12]}"
             return rec
 
-    def force_failed(
-        self, payout_id: str, reason: str = "mock_failure"
-    ) -> Optional[PayoutRecord]:
+    def force_failed(self, payout_id: str, reason: str = "mock_failure") -> Optional[PayoutRecord]:
         """Admin helper: immediately mark a payout as failed."""
         with self._lock:
             rec = self._payouts.get(payout_id)
@@ -240,9 +238,7 @@ class PayoutWorker:
         if self._thread and self._thread.is_alive():
             return
         self._stop_event.clear()
-        self._thread = threading.Thread(
-            target=self._run, daemon=True, name="payout-worker"
-        )
+        self._thread = threading.Thread(target=self._run, daemon=True, name="payout-worker")
         self._thread.start()
         logger.info(
             "Payout worker started (accelerate=%s, interval=%ss)",
@@ -260,9 +256,7 @@ class PayoutWorker:
         while not self._stop_event.is_set():
             try:
                 q_count = self.store.advance_queued(self.effective_queued_threshold)
-                p_count = self.store.advance_processing(
-                    self.effective_processing_threshold
-                )
+                p_count = self.store.advance_processing(self.effective_processing_threshold)
                 if q_count or p_count:
                     logger.info(
                         "Worker tick: %d queued→processing, %d processing→paid",

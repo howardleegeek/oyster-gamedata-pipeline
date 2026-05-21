@@ -20,7 +20,7 @@ from typing import Optional
 
 import psutil
 
-from bin.games.base_adapter import GameAdapter, GameMetadata, GameSession
+from bin.games.base_adapter import BaseAdapter, GameAdapter, GameMetadata, GameSession
 
 logger = logging.getLogger(__name__)
 
@@ -88,9 +88,7 @@ def _extract_ids_from_logs(log_dir: Path) -> dict[str, str]:
         return {"place_id": place_id, "universe_id": universe_id}
 
     try:
-        log_files = sorted(
-            log_dir.glob("*.log"), key=lambda p: p.stat().st_mtime, reverse=True
-        )
+        log_files = sorted(log_dir.glob("*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
     except OSError:
         return {"place_id": place_id, "universe_id": universe_id}
 
@@ -114,12 +112,27 @@ def _extract_ids_from_logs(log_dir: Path) -> dict[str, str]:
     return {"place_id": place_id, "universe_id": universe_id}
 
 
-class RobloxAdapter(GameAdapter):
+class RobloxAdapter(GameAdapter, BaseAdapter):
     """Adapter for the Roblox game client."""
+
+    GAME_NAME = "roblox"
 
     @property
     def game_name(self) -> str:
-        return "roblox"
+        return self.GAME_NAME
+
+    @classmethod
+    def detect_by_process(cls, process_name: str, process_exe: str) -> bool:
+        """Return True if the given process belongs to Roblox."""
+        name_lower = process_name.lower()
+        exe_lower = process_exe.lower()
+        for target in (_ROBLOX_EXE_WIN, _ROBLOX_EXE_MAC):
+            target_lower = target.lower()
+            if name_lower == target_lower:
+                return True
+            if target_lower in exe_lower:
+                return True
+        return False
 
     def detect(self) -> Optional[GameSession]:
         """Detect a running Roblox client process.
@@ -132,12 +145,16 @@ class RobloxAdapter(GameAdapter):
 
         try:
             exe_path = proc.exe() or ""
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
+        except Exception:
+            return None
+        if not isinstance(exe_path, str):
             return None
 
         try:
             window_title = proc.name() or "Roblox"
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
+        except Exception:
+            window_title = "Roblox"
+        if not isinstance(window_title, str):
             window_title = "Roblox"
 
         return GameSession(
@@ -170,3 +187,14 @@ class RobloxAdapter(GameAdapter):
     def post_record_hook(self, session: GameSession) -> None:
         """No-op cleanup after recording."""
         logger.info("Roblox post-record hook for PID %d", session.pid)
+
+    def get_recording_hooks(self) -> list[dict[str, str]]:
+        """Return recording hook configurations for Roblox."""
+        return [
+            {
+                "name": "roblox_overlay_marker",
+                "event": "pre_record",
+                "filter_fn": "inject_overlay_marker",
+                "description": "Tag recordings with the Oyster overlay marker",
+            }
+        ]

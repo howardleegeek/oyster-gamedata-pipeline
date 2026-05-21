@@ -1,11 +1,11 @@
 """Tests for scripts/auto_release.sh — SemVer bump logic via mocked git log."""
 
+import shutil
 import subprocess
 import textwrap
-import pytest
 
 
-def _run_script(git_log_output, latest_tag="v0.4.1", dry_run="true"):
+def _run_script(git_log_output, latest_tag="v0.4.1", dry_run="true", extra_tags=None):
     """
     Run auto_release.sh in a temporary git repo with mocked git log output.
 
@@ -14,13 +14,10 @@ def _run_script(git_log_output, latest_tag="v0.4.1", dry_run="true"):
     """
     import os
     import tempfile
-    import shutil
 
     with tempfile.TemporaryDirectory() as tmpdir:
         # Initialise a git repo
-        subprocess.run(
-            ["git", "init"], cwd=tmpdir, capture_output=True, check=True
-        )
+        subprocess.run(["git", "init"], cwd=tmpdir, capture_output=True, check=True)
         subprocess.run(
             ["git", "config", "user.email", "test@test.com"],
             cwd=tmpdir,
@@ -36,13 +33,11 @@ def _run_script(git_log_output, latest_tag="v0.4.1", dry_run="true"):
 
         # Create a dummy CHANGELOG.md if latest_tag is set
         if latest_tag:
-            changelog = textwrap.dedent(
-                """\
+            changelog = textwrap.dedent("""\
                 # Changelog
 
                 All notable changes to this project will be documented in this file.
-                """
-            )
+                """)
             with open(os.path.join(tmpdir, "CHANGELOG.md"), "w") as f:
                 f.write(changelog)
             subprocess.run(
@@ -79,24 +74,27 @@ def _run_script(git_log_output, latest_tag="v0.4.1", dry_run="true"):
             capture_output=True,
             check=True,
         )
+        for tag in extra_tags or []:
+            subprocess.run(
+                ["git", "tag", tag],
+                cwd=tmpdir,
+                capture_output=True,
+                check=True,
+            )
 
         # Create a git wrapper that returns our mocked log output
         wrapper_dir = os.path.join(tmpdir, "bin")
         os.makedirs(wrapper_dir)
         wrapper_path = os.path.join(wrapper_dir, "git")
         with open(wrapper_path, "w") as f:
-            f.write(
-                textwrap.dedent(
-                    f"""\
+            f.write(textwrap.dedent(f"""\
                     #!/usr/bin/env bash
                     if [[ "$*" == *"log"*"--format"* ]]; then
                         echo '{git_log_output}'
                     else
                         /usr/bin/git "$@"
                     fi
-                    """
-                )
-            )
+                    """))
         os.chmod(wrapper_path, 0o755)
 
         # Copy the script into the temp repo
@@ -151,10 +149,7 @@ class TestSemVerMinorBump:
     """Minor bump when feat: commit is present."""
 
     def test_minor_bump_from_feat(self):
-        log_output = (
-            "abc1234 feat: add new search endpoint\n"
-            "def5678 fix: handle null response\n"
-        )
+        log_output = "abc1234 feat: add new search endpoint\n" "def5678 fix: handle null response\n"
         result = _run_script(log_output, latest_tag="v0.4.1")
         assert result.returncode == 0
         assert "v0.5.0" in result.stdout
@@ -166,10 +161,7 @@ class TestSemVerMinorBump:
         assert "v0.5.0" in result.stdout
 
     def test_minor_bump_feat_at_end(self):
-        log_output = (
-            "abc1234 fix: typo in readme\n"
-            "def5678 feat: add dark mode toggle\n"
-        )
+        log_output = "abc1234 fix: typo in readme\n" "def5678 feat: add dark mode toggle\n"
         result = _run_script(log_output, latest_tag="v0.4.1")
         assert result.returncode == 0
         assert "v0.5.0" in result.stdout
@@ -179,10 +171,7 @@ class TestSemVerMajorBump:
     """Major bump when BREAKING CHANGE is present."""
 
     def test_major_bump_from_breaking_change(self):
-        log_output = (
-            "abc1234 feat!: redesign authentication flow\n"
-            "def5678 fix: update tests\n"
-        )
+        log_output = "abc1234 feat!: redesign authentication flow\n" "def5678 fix: update tests\n"
         result = _run_script(log_output, latest_tag="v0.4.1")
         assert result.returncode == 0
         assert "v1.0.0" in result.stdout
@@ -258,3 +247,14 @@ class TestEdgeCases:
         result = _run_script(log_output, latest_tag="v1.0.0")
         assert result.returncode == 0
         assert "v1.0.1" in result.stdout
+
+    def test_uses_highest_semver_tag_as_version_base(self):
+        log_output = "abc1234 fix: avoid duplicate release tag\n"
+        result = _run_script(
+            log_output,
+            latest_tag="v0.4.1",
+            extra_tags=["v0.4.2"],
+        )
+        assert result.returncode == 0
+        assert "New version: v0.4.3 (from v0.4.2)" in result.stdout
+        assert "Would create tag: v0.4.3" in result.stdout

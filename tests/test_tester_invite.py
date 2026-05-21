@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
-from backend_stub.main import create_app
 from backend_stub import tester_invite as ti
+from backend_stub.main import create_app
 
 # ---------------------------------------------------------------------------
 # Fixtures

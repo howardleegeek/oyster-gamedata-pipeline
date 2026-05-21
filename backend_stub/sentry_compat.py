@@ -140,9 +140,7 @@ def parse_envelope(raw: str) -> List[SentryEvent]:
             except json.JSONDecodeError:
                 pass
         # Exception items may appear as standalone payloads
-        elif item_type == "error" or "exception" in (
-            item_header.get("content_type", "")
-        ):
+        elif item_type == "error" or "exception" in (item_header.get("content_type", "")):
             try:
                 payload = json.loads(lines[i])
                 if "exception" in payload or "level" in payload:

@@ -3,9 +3,9 @@
 Tests for PII Redactor — screen-capture (OCR) redaction + text redaction.
 """
 
+import importlib
 import json
 import sys
-import importlib
 from pathlib import Path
 from unittest import mock
 
@@ -226,9 +226,7 @@ class TestGracefulDegradation:
         # Force reload to clear any cached module
         with mock.patch.dict(sys.modules, {"pytesseract": None}):
             # Simulate ImportError
-            with mock.patch(
-                "builtins.__import__", side_effect=ImportError("no module")
-            ):
+            with mock.patch("builtins.__import__", side_effect=ImportError("no module")):
                 # Reset the module-level cache
                 redactor_mod._pytesseract = None
                 redactor_mod._pytesseract_error = None

@@ -16,9 +16,14 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from daemon.cluster_dispatcher import (
+    DEFAULT_MAX_CONCURRENT,
+    DEFAULT_MAX_RETRIES,
     ClusterState,
     DispatchState,
     SpecEntry,
+    _find_agent_script,
+    _now_iso,
+    _parse_spec_header,
     build_parser,
     create_pr,
     dispatch_spec,
@@ -29,11 +34,6 @@ from daemon.cluster_dispatcher import (
     scan_all_specs,
     scan_auto_specs,
     scan_ready_specs,
-    _find_agent_script,
-    _now_iso,
-    _parse_spec_header,
-    DEFAULT_MAX_CONCURRENT,
-    DEFAULT_MAX_RETRIES,
 )
 
 # ---------------------------------------------------------------------------
@@ -282,9 +282,7 @@ class TestRunAgent:
     @patch("daemon.cluster_dispatcher._find_agent_script")
     def test_agent_failure(self, mock_find, mock_run):
         mock_find.return_value = Path("/fake/agent.py")
-        mock_run.return_value = MagicMock(
-            returncode=1, stdout="", stderr="cluster error"
-        )
+        mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="cluster error")
 
         success, error = run_agent(
             spec_path="/tmp/spec.md",
@@ -563,9 +561,7 @@ class TestDispatchCycle:
         # Should have dispatched 2 specs (auto + ready)
         assert mock_dispatch.call_count == 2
 
-    def test_cycle_dry_run_lists_specs(
-        self, tmp_specs_dir: Path, tmp_source_root: Path
-    ):
+    def test_cycle_dry_run_lists_specs(self, tmp_specs_dir: Path, tmp_source_root: Path):
         state = ClusterState()
         results = run_dispatch_cycle(
             specs_dir=tmp_specs_dir,
@@ -576,9 +572,7 @@ class TestDispatchCycle:
         )
         assert len(results) == 2
 
-    def test_cycle_skips_already_success(
-        self, tmp_specs_dir: Path, tmp_source_root: Path
-    ):
+    def test_cycle_skips_already_success(self, tmp_specs_dir: Path, tmp_source_root: Path):
         state = ClusterState()
         entry = state.get_entry("S23-test-auto")
         entry.status = "success"

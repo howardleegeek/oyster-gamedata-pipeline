@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-import sys, json
+import sys
 
-prs_json = '''[{"number": 300, "title": "Good PR", "headRefName": "feat/S28-cluster-thing", "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "labels": [{"name": "auto-merge"}]}, {"number": 301, "title": "WIP PR", "headRefName": "feat/S28-cluster-thing", "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "labels": [{"name": "WIP"}]}, {"number": 302, "title": "Conflict PR", "headRefName": "feat/S28-cluster-thing", "mergeable": "CONFLICTING", "mergeStateStatus": "CLEAN", "labels": [{"name": "auto-merge"}]}, {"number": 303, "title": "Another good", "headRefName": "feat/S10-cluster-x", "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "labels": []}]'''
-checks_json = '''[]'''
+prs_json = """[{"number": 300, "title": "Good PR", "headRefName": "feat/S28-cluster-thing", "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "labels": [{"name": "auto-merge"}]}, {"number": 301, "title": "WIP PR", "headRefName": "feat/S28-cluster-thing", "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "labels": [{"name": "WIP"}]}, {"number": 302, "title": "Conflict PR", "headRefName": "feat/S28-cluster-thing", "mergeable": "CONFLICTING", "mergeStateStatus": "CLEAN", "labels": [{"name": "auto-merge"}]}, {"number": 303, "title": "Another good", "headRefName": "feat/S10-cluster-x", "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "labels": []}]"""
+checks_json = """[]"""
 merge_succeeds = True
 
 args = sys.argv[1:]

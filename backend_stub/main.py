@@ -25,22 +25,73 @@ from typing import Any, Dict
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
-from backend_stub import appcast_server, sentry_compat, tester_invite
+from backend_stub import appcast_server, crash_dump, sentry_compat, tester_invite
+from backend_stub.payout import PayoutStore, PayoutWorker
 
 # ---------------------------------------------------------------------------
 # In-memory stores
 # ---------------------------------------------------------------------------
 _income_store: Dict[str, Any] = {}
 _sessions_store: Dict[str, Any] = {}
+_telemetry_store: list[dict[str, Any]] = []
+store = PayoutStore()
+ADMIN_TOKEN = "admin-secret-token"
+
+_TELEMETRY_FIELDS = {
+    "anon_id": str,
+    "version": str,
+    "os": str,
+    "sessions_today": int,
+    "uploads_today": int,
+    "total_session_seconds": int,
+    "crash_today": bool,
+    "ts": str,
+}
+
+
+def _validate_telemetry_payload(body: Any) -> dict[str, Any]:
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Telemetry payload must be an object")
+
+    missing = sorted(set(_TELEMETRY_FIELDS) - set(body))
+    extra = sorted(set(body) - set(_TELEMETRY_FIELDS))
+    if missing or extra:
+        raise HTTPException(
+            status_code=400,
+            detail={"missing": missing, "extra": extra},
+        )
+
+    record: dict[str, Any] = {}
+    for key, expected_type in _TELEMETRY_FIELDS.items():
+        value = body[key]
+        if expected_type is int:
+            if not isinstance(value, int) or isinstance(value, bool):
+                raise HTTPException(status_code=400, detail=f"{key} must be an integer")
+        elif not isinstance(value, expected_type):
+            raise HTTPException(status_code=400, detail=f"{key} has invalid type")
+        record[key] = value
+
+    try:
+        _dt.datetime.fromisoformat(record["ts"])
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="ts must be ISO-8601") from exc
+
+    return record
+
 
 # ---------------------------------------------------------------------------
 # App factory
 # ---------------------------------------------------------------------------
 
 
-def create_app() -> FastAPI:
+def create_app(accelerate: float = 1.0, interval: float = 300.0) -> FastAPI:
     app = FastAPI(title="gamedata-pipeline backend stub", version="0.1.0")
+    app.state.payout_accelerate = accelerate
+    app.state.payout_interval = interval
+    app.state.payout_routes_registered = False
+    app.state.payout_worker = None
 
     app.add_middleware(
         CORSMiddleware,
@@ -50,7 +101,6 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-
     # ------------------------------------------------------------------
     # Health check
     # ------------------------------------------------------------------
@@ -58,21 +108,16 @@ def create_app() -> FastAPI:
     async def healthz():
         return {"status": "ok", "version": "0.1.0"}
 
-    # ------------------------------------------------------------------
-    # Health check (no auth required)
-    # ------------------------------------------------------------------
-    @app.get('/healthz')
-    async def healthz():
-        return {'status': 'ok'}
+    @app.get("/health")
+    async def health():
+        return {"status": "ok"}
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
     def _require_bearer(authorization: str | None) -> str:
         if not authorization or not authorization.startswith("Bearer "):
-            raise HTTPException(
-                status_code=401, detail="Missing or invalid Bearer token"
-            )
+            raise HTTPException(status_code=401, detail="Missing or invalid Bearer token")
         return authorization[7:]  # strip "Bearer "
 
     # ------------------------------------------------------------------
@@ -123,9 +168,7 @@ def create_app() -> FastAPI:
         _require_bearer(authorization)
         body = await request.json()
         key = body.get("key", f"uploads/{uuid.uuid4().hex}.bin")
-        expires_at = (
-            _dt.datetime.now(_dt.timezone.utc) + _dt.timedelta(hours=1)
-        ).isoformat()
+        expires_at = (_dt.datetime.now(_dt.timezone.utc) + _dt.timedelta(hours=1)).isoformat()
         return {
             "url": f"https://mock-s3.example.com/{key}?X-Amz-Signature=fake",
             "expires_at": expires_at,
@@ -189,10 +232,149 @@ def create_app() -> FastAPI:
         }
 
     # ------------------------------------------------------------------
+    # Crash dump endpoints
+    # ------------------------------------------------------------------
+    @app.post("/api/v1/crash/dump")
+    async def post_crash_dump(request: Request):
+        body = await request.json()
+        dump = crash_dump.CrashDump(
+            panic_message=str(body.get("panic_message", "")),
+            stack_trace=str(body.get("stack_trace", "")),
+            os_info=str(body.get("os_info", "")),
+            recorder_version=str(body.get("recorder_version", "")),
+            raw_file=str(body.get("raw_file", "")),
+        )
+        crash_id = crash_dump.store_crash(dump)
+        return {"status": "accepted", "id": crash_id}
+
+    @app.get("/api/v1/crash/dump")
+    async def list_crash_dumps():
+        return crash_dump.get_all_crashes()
+
+    @app.delete("/api/v1/crash/dump")
+    async def clear_crash_dumps():
+        crash_dump.clear_crashes()
+        return {"status": "cleared"}
+
+    # ------------------------------------------------------------------
+    # Anonymous telemetry endpoint
+    # ------------------------------------------------------------------
+    @app.post("/api/v1/telemetry/daily")
+    async def telemetry_daily(request: Request):
+        body = await request.json()
+        record = _validate_telemetry_payload(body)
+        _telemetry_store.append(record)
+        return {"status": "ok"}
+
+    # ------------------------------------------------------------------
     # Tester invite endpoints
     # ------------------------------------------------------------------
     app.include_router(tester_invite.router)
     app.include_router(appcast_server.router)
+
+    return app
+
+
+def register_routes(app: FastAPI) -> FastAPI:
+    """Register payout simulator routes on an app instance."""
+    if getattr(app.state, "payout_routes_registered", False):
+        return app
+    app.state.payout_routes_registered = True
+
+    def _require_token(authorization: str | None) -> str:
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Missing or invalid Bearer token")
+        return authorization[7:]
+
+    def _require_admin(authorization: str | None) -> None:
+        if _require_token(authorization) != ADMIN_TOKEN:
+            raise HTTPException(status_code=403, detail="Admin token required")
+
+    async def _json_body(request: Request) -> dict[str, Any]:
+        try:
+            body = await request.json()
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail="Invalid JSON") from exc
+        if not isinstance(body, dict):
+            raise HTTPException(status_code=400, detail="Invalid JSON")
+        return body
+
+    @app.post("/api/v1/payouts/queue")
+    async def queue_payout(request: Request, authorization: str | None = Header(default=None)):
+        user_id = _require_token(authorization)
+        body = await _json_body(request)
+        amount = body.get("amount_usd")
+        provider = body.get("provider", "paypal")
+        if not isinstance(amount, (int, float)) or amount <= 0:
+            raise HTTPException(status_code=400, detail="amount_usd must be positive")
+        if provider not in {"paypal", "stripe"}:
+            raise HTTPException(status_code=400, detail="Unsupported provider")
+        if not store.can_payout(user_id, float(amount)):
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "error": "daily_limit_exceeded",
+                    "retry_after": 86400,
+                },
+                headers={"Retry-After": "86400"},
+            )
+        record = store.create(user_id, float(amount), provider=provider)
+        store.record_daily(user_id, float(amount))
+        data = record.to_dict()
+        data["payout_id"] = record.id
+        return data
+
+    @app.get("/api/v1/payouts/{payout_id}")
+    async def get_payout(payout_id: str, authorization: str | None = Header(default=None)):
+        _require_token(authorization)
+        record = store.get(payout_id)
+        if record is None:
+            raise HTTPException(status_code=404, detail="Payout not found")
+        return record.to_dict()
+
+    @app.post("/api/v1/payouts/{payout_id}/simulate")
+    async def simulate_paid(payout_id: str, authorization: str | None = Header(default=None)):
+        _require_admin(authorization)
+        record = store.force_paid(payout_id)
+        if record is None:
+            raise HTTPException(status_code=404, detail="Payout not found")
+        return record.to_dict()
+
+    @app.post("/api/v1/payouts/{payout_id}/simulate-fail")
+    async def simulate_failed(
+        payout_id: str,
+        request: Request,
+        authorization: str | None = Header(default=None),
+    ):
+        _require_admin(authorization)
+        body = await _json_body(request)
+        record = store.force_failed(payout_id, body.get("reason", "mock_failure"))
+        if record is None:
+            raise HTTPException(status_code=404, detail="Payout not found")
+        return record.to_dict()
+
+    @app.get("/api/v1/payouts")
+    async def list_payouts(authorization: str | None = Header(default=None)):
+        _require_admin(authorization)
+        return [record.to_dict() for record in store.list_all()]
+
+    accelerate = float(getattr(app.state, "payout_accelerate", 1.0))
+    interval = float(getattr(app.state, "payout_interval", 300.0))
+    if accelerate > 1.0 or interval < 300.0:
+
+        @app.on_event("startup")
+        async def _start_payout_worker():
+            if app.state.payout_worker is None:
+                app.state.payout_worker = PayoutWorker(
+                    store, accelerate=accelerate, interval=interval
+                )
+                app.state.payout_worker.start()
+
+        @app.on_event("shutdown")
+        async def _stop_payout_worker():
+            if app.state.payout_worker is not None:
+                app.state.payout_worker.stop()
+                app.state.payout_worker = None
 
     return app
 
@@ -204,9 +386,7 @@ def create_app() -> FastAPI:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="gamedata-pipeline backend stub")
-    parser.add_argument(
-        "--port", type=int, default=8500, help="Port to listen on (default: 8500)"
-    )
+    parser.add_argument("--port", type=int, default=8500, help="Port to listen on (default: 8500)")
     parser.add_argument(
         "--host",
         type=str,

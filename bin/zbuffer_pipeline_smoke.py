@@ -122,12 +122,16 @@ def main():
         result = evaluate_h8(session)
         print(json.dumps(result, indent=2))
 
-        if result["status"] != "PASS":
-            print(f"SMOKE FAIL: expected PASS, got {result['status']}", file=sys.stderr)
+        pass_statuses = {"PASS", "PASS_STRICT"}
+        if result["status"] not in pass_statuses:
+            print(
+                f"SMOKE FAIL: expected one of {sorted(pass_statuses)}, got {result['status']}",
+                file=sys.stderr,
+            )
             print(f"Evidence: {result['evidence']}", file=sys.stderr)
             sys.exit(1)
 
-        print("SMOKE OK: H8 audit PASS")
+        print(f"SMOKE OK: H8 audit {result['status']}")
         sys.exit(0)
 
 

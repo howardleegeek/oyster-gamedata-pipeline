@@ -12,7 +12,6 @@ privacy.
 from __future__ import annotations
 
 import logging
-import os
 import platform
 import re
 from pathlib import Path
@@ -59,9 +58,7 @@ _PRIVATE_INSTANCE_KEYWORDS = (
 )
 
 # Private world ID prefixes (worlds that are inherently private).
-_PRIVATE_WORLD_PREFIXES = (
-    "wrld_private",
-)
+_PRIVATE_WORLD_PREFIXES = ("wrld_private",)
 
 
 # ---------------------------------------------------------------------------
@@ -77,7 +74,7 @@ def _vrchat_exe_name() -> str:
 
 
 def _basename_cross_platform(path: str) -> str:
-    """Get basename handling both Unix (/) and Windows (\) separators."""
+    """Get basename handling both Unix (/) and Windows (\\) separators."""
     # Replace backslashes with forward slashes for cross-platform handling
     normalized = path.replace("\\", "/")
     return Path(normalized).name
@@ -179,7 +176,7 @@ def _is_private_world(world_id: str, instance_id: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
-class VRChatAdapter(GameAdapter):
+class VRChatAdapter(GameAdapter, BaseAdapter):
     """Adapter for the VRChat game client.
 
     Inherits from GameAdapter and also provides BaseAdapter-compatible
@@ -205,12 +202,16 @@ class VRChatAdapter(GameAdapter):
 
         try:
             exe_path = proc.exe() or ""
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
+        except Exception:
+            return None
+        if not isinstance(exe_path, str):
             return None
 
         try:
             window_title = proc.name() or "VRChat"
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
+        except Exception:
+            window_title = "VRChat"
+        if not isinstance(window_title, str):
             window_title = "VRChat"
 
         return GameSession(
@@ -277,9 +278,7 @@ class VRChatAdapter(GameAdapter):
 
         return False
 
-    def extract_metadata_legacy(
-        self, settings_path: Optional[str] = None
-    ) -> Dict[str, Any]:
+    def extract_metadata_legacy(self, settings_path: Optional[str] = None) -> Dict[str, Any]:
         """Extract metadata — BaseAdapter-compatible interface.
 
         Args:

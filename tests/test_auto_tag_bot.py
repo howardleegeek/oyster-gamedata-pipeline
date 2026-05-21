@@ -30,6 +30,7 @@ WORKFLOW = REPO_ROOT / ".github" / "workflows" / "auto-tag-on-merge.yml"
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _run_script(
     env: dict | None = None,
     cwd: Path | None = None,
@@ -64,11 +65,15 @@ def _init_test_repo(tmp_path: Path, tag: str | None = None, commits: int = 0) ->
     subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
     subprocess.run(
         ["git", "config", "user.email", "test@test.com"],
-        cwd=repo, capture_output=True, check=True,
+        cwd=repo,
+        capture_output=True,
+        check=True,
     )
     subprocess.run(
         ["git", "config", "user.name", "Test User"],
-        cwd=repo, capture_output=True, check=True,
+        cwd=repo,
+        capture_output=True,
+        check=True,
     )
 
     if tag:
@@ -77,11 +82,15 @@ def _init_test_repo(tmp_path: Path, tag: str | None = None, commits: int = 0) ->
         subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
         subprocess.run(
             ["git", "commit", "-m", "initial commit S01"],
-            cwd=repo, capture_output=True, check=True,
+            cwd=repo,
+            capture_output=True,
+            check=True,
         )
         subprocess.run(
             ["git", "tag", "-a", tag, "-m", f"Tag {tag}"],
-            cwd=repo, capture_output=True, check=True,
+            cwd=repo,
+            capture_output=True,
+            check=True,
         )
 
     for i in range(commits):
@@ -89,7 +98,9 @@ def _init_test_repo(tmp_path: Path, tag: str | None = None, commits: int = 0) ->
         subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
         subprocess.run(
             ["git", "commit", "-m", f"commit {i} S{90 + i}"],
-            cwd=repo, capture_output=True, check=True,
+            cwd=repo,
+            capture_output=True,
+            check=True,
         )
 
     return repo
@@ -98,6 +109,7 @@ def _init_test_repo(tmp_path: Path, tag: str | None = None, commits: int = 0) ->
 # ---------------------------------------------------------------------------
 # YAML validity
 # ---------------------------------------------------------------------------
+
 
 class TestYamlValidity:
     def test_workflow_is_valid_yaml(self):
@@ -137,6 +149,7 @@ class TestYamlValidity:
 # ---------------------------------------------------------------------------
 # Commit-count threshold
 # ---------------------------------------------------------------------------
+
 
 class TestCommitThreshold:
     def test_below_threshold_no_tag(self, tmp_path):
@@ -190,6 +203,7 @@ class TestCommitThreshold:
 # Dry-run mode
 # ---------------------------------------------------------------------------
 
+
 class TestDryRun:
     def test_dry_run_does_not_push(self, tmp_path):
         """DRY_RUN=true must not create or push any tag."""
@@ -202,9 +216,17 @@ class TestDryRun:
         assert "skipping" in result.stdout.lower()
 
         # Verify no new tags were created locally
-        tags = subprocess.run(
-            ["git", "tag", "-l"], cwd=repo, capture_output=True, text=True, check=True,
-        ).stdout.strip().splitlines()
+        tags = (
+            subprocess.run(
+                ["git", "tag", "-l"],
+                cwd=repo,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            .stdout.strip()
+            .splitlines()
+        )
         assert "v0.6.3" not in tags
 
     def test_dry_run_shows_would_create(self, tmp_path):
@@ -220,6 +242,7 @@ class TestDryRun:
 # ---------------------------------------------------------------------------
 # Patch-only bump
 # ---------------------------------------------------------------------------
+
 
 class TestPatchOnlyBump:
     def test_bumps_patch(self, tmp_path):
@@ -241,7 +264,9 @@ class TestPatchOnlyBump:
         subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
         subprocess.run(
             ["git", "commit", "-m", "BREAKING CHANGE: remove API S99"],
-            cwd=repo, capture_output=True, check=True,
+            cwd=repo,
+            capture_output=True,
+            check=True,
         )
         # Add more commits to reach threshold
         for i in range(2):
@@ -249,7 +274,9 @@ class TestPatchOnlyBump:
             subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
             subprocess.run(
                 ["git", "commit", "-m", f"extra commit {i}"],
-                cwd=repo, capture_output=True, check=True,
+                cwd=repo,
+                capture_output=True,
+                check=True,
             )
 
         result = _run_script(
@@ -268,7 +295,9 @@ class TestPatchOnlyBump:
             subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
             subprocess.run(
                 ["git", "commit", "-m", f"feat: add feature {i} S{80 + i}"],
-                cwd=repo, capture_output=True, check=True,
+                cwd=repo,
+                capture_output=True,
+                check=True,
             )
 
         result = _run_script(
@@ -279,10 +308,28 @@ class TestPatchOnlyBump:
         assert "v2.5.2" in result.stdout
         assert "v2.6.0" not in result.stdout
 
+    def test_uses_highest_semver_tag_as_version_base(self, tmp_path):
+        """Use the highest SemVer tag as the version base, even with an older range tag."""
+        repo = _init_test_repo(tmp_path, tag="v0.6.2", commits=3)
+        subprocess.run(
+            ["git", "tag", "-a", "v0.6.3", "-m", "existing release"],
+            cwd=repo,
+            capture_output=True,
+            check=True,
+        )
+
+        result = _run_script(
+            env={"DRY_RUN": "true", "LATEST_TAG": "v0.6.2"},
+            cwd=repo,
+        )
+        assert "New version: v0.6.4 (from v0.6.3)" in result.stdout
+        assert "Would create tag: v0.6.4" in result.stdout
+
 
 # ---------------------------------------------------------------------------
 # Release body content
 # ---------------------------------------------------------------------------
+
 
 class TestReleaseBody:
     def test_body_includes_git_log(self, tmp_path):
@@ -304,7 +351,9 @@ class TestReleaseBody:
             subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
             subprocess.run(
                 ["git", "commit", "-m", f"work on {sid}"],
-                cwd=repo, capture_output=True, check=True,
+                cwd=repo,
+                capture_output=True,
+                check=True,
             )
 
         result = _run_script(
@@ -331,6 +380,7 @@ class TestReleaseBody:
 # No previous tag
 # ---------------------------------------------------------------------------
 
+
 class TestNoPreviousTag:
     def test_no_tag_uses_v0_0_0_base(self, tmp_path):
         """When no tag exists, start from v0.0.0 and bump to v0.0.1."""
@@ -346,6 +396,7 @@ class TestNoPreviousTag:
 # shellcheck
 # ---------------------------------------------------------------------------
 
+
 class TestShellcheck:
     def test_shellcheck_passes(self):
         """scripts/auto_tag_bot.sh must pass shellcheck."""
@@ -355,6 +406,4 @@ class TestShellcheck:
             text=True,
         )
         # shellcheck returns 0 on success, non-zero on findings
-        assert result.returncode == 0, (
-            f"shellcheck found issues:\n{result.stdout}\n{result.stderr}"
-        )
+        assert result.returncode == 0, f"shellcheck found issues:\n{result.stdout}\n{result.stderr}"

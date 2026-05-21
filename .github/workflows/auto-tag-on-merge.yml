@@ -17,6 +17,10 @@ env:
 jobs:
   auto-tag:
     runs-on: ubuntu-latest
+    # auto-release.yml is the canonical automatic publisher because release
+    # tags must carry a CHANGELOG entry. Keep this workflow available as a
+    # manual/opt-in fallback without racing auto-release on every main push.
+    if: vars.AUTO_TAG_BOT_ENABLED == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4

@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import json
 from unittest.mock import MagicMock, patch
 
-import pytest
+import httpx
 
 from scripts.verify_deployed_backend import (
     SmokeReport,
@@ -16,10 +15,10 @@ from scripts.verify_deployed_backend import (
     run,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_mock_response(
     status_code: int = 200,
@@ -52,6 +51,7 @@ def _make_mock_client(responses: list[MagicMock]) -> MagicMock:
 # SmokeReport
 # ---------------------------------------------------------------------------
 
+
 class TestSmokeReport:
     def test_all_passed_empty(self):
         assert SmokeReport().all_passed is True
@@ -82,6 +82,7 @@ class TestSmokeReport:
 # ---------------------------------------------------------------------------
 # check_healthz
 # ---------------------------------------------------------------------------
+
 
 class TestCheckHealthz:
     def test_success(self):
@@ -117,6 +118,7 @@ class TestCheckHealthz:
 # check_testers_apply
 # ---------------------------------------------------------------------------
 
+
 class TestCheckTestersApply:
     def test_success(self):
         resp = _make_mock_response(200, {"tester_id": "abc-123"})
@@ -149,6 +151,7 @@ class TestCheckTestersApply:
 # ---------------------------------------------------------------------------
 # check_income_today
 # ---------------------------------------------------------------------------
+
 
 class TestCheckIncomeToday:
     def test_success(self):
@@ -189,6 +192,7 @@ class TestCheckIncomeToday:
 # check_appcast
 # ---------------------------------------------------------------------------
 
+
 class TestCheckAppcast:
     VALID_XML = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -226,6 +230,7 @@ class TestCheckAppcast:
 # ---------------------------------------------------------------------------
 # run() integration
 # ---------------------------------------------------------------------------
+
 
 class TestRun:
     def test_all_pass_returns_0(self):

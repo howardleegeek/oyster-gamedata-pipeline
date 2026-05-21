@@ -98,6 +98,8 @@ Name: "autostart"; Description: "Start OysterRecorder automatically when Windows
 [Files]
 ; Main executable
 Source: "{#SourceDir}\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+; VC++ runtime preflight helper, extracted on demand by InitializeSetup
+Source: "check_runtime.bat"; DestDir: "{tmp}"; Flags: dontcopy
 ; Accompanying DLLs (OBS, etc.) — skip if none present
 Source: "{#SourceDir}\*.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 ; Any .pdb debug symbols — skip in release CI
@@ -118,6 +120,12 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; \
   Flags: uninsdeletevalue; Tasks: autostart
 
 [Run]
+; Fallback VC++ runtime check before launching the installed recorder
+Filename: "{cmd}"; \
+  Parameters: "/C ""{tmp}\check_runtime.bat"" /SILENT"; \
+  Flags: runhidden waituntilterminated; \
+  Check: not IsVCRuntimeInstalled
+
 ; Launch the recorder after installation (unless silent)
 Filename: "{app}\{#AppExeName}"; \
   Parameters: "--tray"; \
@@ -138,6 +146,49 @@ Type: filesandordirs; Name: "{localappdata}\{#MyAppName}\logs"
 Type: filesandordirs; Name: "{localappdata}\{#MyAppName}\config"
 
 [Code]
+// ---------------------------------------------------------------------------
+// Helper: check whether VC++ 2015-2022 x64 runtime is installed
+// ---------------------------------------------------------------------------
+function IsVCRuntimeInstalled(): Boolean;
+begin
+  Result := RegKeyExists(HKLM, 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64');
+end;
+
+// ---------------------------------------------------------------------------
+// InitializeSetup: block installation until the VC++ runtime is present
+// ---------------------------------------------------------------------------
+function InitializeSetup(): Boolean;
+var
+  ResultCode: Integer;
+  BatchPath: String;
+begin
+  Result := True;
+
+  if not IsVCRuntimeInstalled() then
+  begin
+    if WizardSilent() then
+    begin
+      MsgBox('VC++ 2015-2022 Redistributable (x64) is required before installing OysterRecorder.' + #13#10 +
+             'Install it from https://aka.ms/vs/17/release/vc_redist.x64.exe and run setup again.',
+             mbCriticalError, MB_OK);
+      Result := False;
+      Exit;
+    end;
+
+    ExtractTemporaryFile('check_runtime.bat');
+    BatchPath := ExpandConstant('{tmp}\check_runtime.bat');
+    if (not Exec(ExpandConstant('{cmd}'), '/C "' + BatchPath + '"',
+                 '', SW_SHOW, ewWaitUntilTerminated, ResultCode)) or (ResultCode <> 0) then
+    begin
+      MsgBox('VC++ 2015-2022 Redistributable (x64) is required before installing OysterRecorder.' + #13#10 +
+             'Install it from https://aka.ms/vs/17/release/vc_redist.x64.exe and run setup again.',
+             mbCriticalError, MB_OK);
+      Result := False;
+      Exit;
+    end;
+  end;
+end;
+
 // ---------------------------------------------------------------------------
 // Helper: check if gamedata-recorder.exe is currently running
 // ---------------------------------------------------------------------------

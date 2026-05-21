@@ -10,11 +10,9 @@ Verifies:
 
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 import sys
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -25,7 +23,6 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from bin.telemetry import (
-    CONSENT_DIR,
     VERSION,
     _async_upload,
     compute_anon_id,
@@ -182,9 +179,9 @@ class TestGatherMetrics:
             data = gather_daily_metrics()
         payload_str = json.dumps(data)
         # Ensure no raw machine/user info leaks
-        assert os.environ.get("USER", "") not in payload_str or data[
-            "anon_id"
-        ] != os.environ.get("USER", "")
+        assert os.environ.get("USER", "") not in payload_str or data["anon_id"] != os.environ.get(
+            "USER", ""
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -232,39 +229,37 @@ class TestSendTelemetry:
         _write_consent(consent_file, {"telemetry": True})
         return consent_file
 
-    def test_opted_in_dispatches(
-        self, opted_in_consent: Path, tmp_consent_dir: Path
-    ) -> None:
+    def test_opted_in_dispatches(self, opted_in_consent: Path, tmp_consent_dir: Path) -> None:
         """opt-in true → upload is dispatched."""
         marker = tmp_consent_dir / ".telemetry_last_upload"
-        with patch("bin.telemetry.CONSENT_DIR", tmp_consent_dir), patch(
-            "bin.telemetry.LAST_UPLOAD_MARKER", marker
-        ), patch("bin.telemetry._dispatch_upload") as mock_dispatch:
+        with (
+            patch("bin.telemetry.CONSENT_DIR", tmp_consent_dir),
+            patch("bin.telemetry.LAST_UPLOAD_MARKER", marker),
+            patch("bin.telemetry._dispatch_upload") as mock_dispatch,
+        ):
 
             result = send_telemetry(consent_path=opted_in_consent)
 
             assert result is True
             mock_dispatch.assert_called_once()
 
-    def test_not_opted_in_no_upload(
-        self, consent_file: Path, tmp_consent_dir: Path
-    ) -> None:
+    def test_not_opted_in_no_upload(self, consent_file: Path, tmp_consent_dir: Path) -> None:
         """opt-in false → 0 uploads."""
         _write_consent(consent_file, {"telemetry": False})
-        with patch("bin.telemetry.CONSENT_DIR", tmp_consent_dir), patch(
-            "bin.telemetry._dispatch_upload"
-        ) as mock_dispatch:
+        with (
+            patch("bin.telemetry.CONSENT_DIR", tmp_consent_dir),
+            patch("bin.telemetry._dispatch_upload") as mock_dispatch,
+        ):
             result = send_telemetry(consent_path=consent_file)
             assert result is False
             mock_dispatch.assert_not_called()
 
-    def test_no_consent_file_no_upload(
-        self, consent_file: Path, tmp_consent_dir: Path
-    ) -> None:
+    def test_no_consent_file_no_upload(self, consent_file: Path, tmp_consent_dir: Path) -> None:
         """Missing consent file → 0 uploads."""
-        with patch("bin.telemetry.CONSENT_DIR", tmp_consent_dir), patch(
-            "bin.telemetry._dispatch_upload"
-        ) as mock_dispatch:
+        with (
+            patch("bin.telemetry.CONSENT_DIR", tmp_consent_dir),
+            patch("bin.telemetry._dispatch_upload") as mock_dispatch,
+        ):
             result = send_telemetry(consent_path=consent_file)
             assert result is False
             mock_dispatch.assert_not_called()
@@ -277,9 +272,11 @@ class TestSendTelemetry:
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         marker.write_text(today, encoding="utf-8")
 
-        with patch("bin.telemetry.CONSENT_DIR", tmp_consent_dir), patch(
-            "bin.telemetry.LAST_UPLOAD_MARKER", marker
-        ), patch("bin.telemetry._dispatch_upload") as mock_dispatch:
+        with (
+            patch("bin.telemetry.CONSENT_DIR", tmp_consent_dir),
+            patch("bin.telemetry.LAST_UPLOAD_MARKER", marker),
+            patch("bin.telemetry._dispatch_upload") as mock_dispatch,
+        ):
             result = send_telemetry(consent_path=opted_in_consent)
             assert result is False
             mock_dispatch.assert_not_called()
@@ -289,9 +286,11 @@ class TestSendTelemetry:
     ) -> None:
         """Network error → silent skip, no exception raised."""
         marker = tmp_consent_dir / ".telemetry_last_upload"
-        with patch("bin.telemetry.CONSENT_DIR", tmp_consent_dir), patch(
-            "bin.telemetry.LAST_UPLOAD_MARKER", marker
-        ), patch("bin.telemetry._dispatch_upload") as mock_dispatch:
+        with (
+            patch("bin.telemetry.CONSENT_DIR", tmp_consent_dir),
+            patch("bin.telemetry.LAST_UPLOAD_MARKER", marker),
+            patch("bin.telemetry._dispatch_upload") as mock_dispatch,
+        ):
 
             # Should not raise – dispatch is fire-and-forget
             result = send_telemetry(consent_path=opted_in_consent)
@@ -403,8 +402,9 @@ class TestBackendIntegration:
     def test_telemetry_endpoint_accepts_payload(self) -> None:
         """POST /api/v1/telemetry/daily accepts valid payload and returns 200."""
         from fastapi.testclient import TestClient
-        from backend_stub.main import create_app
+
         from backend_stub import main as backend_main
+        from backend_stub.main import create_app
 
         app = create_app()
         client = TestClient(app)
@@ -438,8 +438,9 @@ class TestBackendIntegration:
     def test_telemetry_endpoint_appends(self) -> None:
         """Multiple POSTs append to the store."""
         from fastapi.testclient import TestClient
-        from backend_stub.main import create_app
+
         from backend_stub import main as backend_main
+        from backend_stub.main import create_app
 
         # Clear store from previous test
         backend_main._telemetry_store.clear()

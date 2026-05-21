@@ -57,7 +57,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: false
+          submodules: recursive
           fetch-depth: 0
 
       - name: Init recorder submodules
@@ -190,6 +190,8 @@ jobs:
 
       # --------------------------------------------------------------
       # 7. Compile Inno Setup installer
+      # Compatible with mareangler/iscc-action@v1; direct ISCC keeps signing
+      # and artifact path checks explicit in one PowerShell flow.
       # --------------------------------------------------------------
       - name: Compile installer
         shell: pwsh

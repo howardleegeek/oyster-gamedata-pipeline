@@ -34,9 +34,7 @@ client = TestClient(app)
 def ensure_docs_exist():
     """Make sure the FAQ and Troubleshooting docs exist for tests."""
     assert FAQ_PATH.is_file(), f"FAQ doc missing: {FAQ_PATH}"
-    assert (
-        TROUBLESHOOTING_PATH.is_file()
-    ), f"Troubleshooting doc missing: {TROUBLESHOOTING_PATH}"
+    assert TROUBLESHOOTING_PATH.is_file(), f"Troubleshooting doc missing: {TROUBLESHOOTING_PATH}"
 
 
 # ---------------------------------------------------------------------------
@@ -202,8 +200,9 @@ class TestHelpers:
 class TestServerLifecycle:
     def test_start_stop_server(self):
         """Test that start_server and stop_server don't raise."""
-        import faq_server
         import time
+
+        import faq_server
 
         # Use a different port to avoid conflicts
         original_port = faq_server.PORT

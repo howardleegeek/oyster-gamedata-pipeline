@@ -159,9 +159,7 @@ class TestContinueOnError(unittest.TestCase):
                     try:
                         rsv.main()
                     except SystemExit as e:
-                        self.assertEqual(
-                            e.code, 1
-                        )  # still exits 1 because there's a FAIL
+                        self.assertEqual(e.code, 1)  # still exits 1 because there's a FAIL
 
         output = f.getvalue()
         # All 5 sessions should appear in output
@@ -390,8 +388,7 @@ class TestSample(unittest.TestCase):
         mock_run = make_subprocess_mock_for_timeout(
             pipeline_results={f"session_{i:03d}": 0 for i in range(1, 11)},
             gate_results={
-                f"session_{i:03d}": {"overall": "PASS", "gates": {}}
-                for i in range(1, 11)
+                f"session_{i:03d}": {"overall": "PASS", "gates": {}} for i in range(1, 11)
             },
         )
 
@@ -427,8 +424,7 @@ class TestSample(unittest.TestCase):
         mock_run = make_subprocess_mock_for_timeout(
             pipeline_results={f"session_{i:03d}": 0 for i in range(1, 11)},
             gate_results={
-                f"session_{i:03d}": {"overall": "PASS", "gates": {}}
-                for i in range(1, 11)
+                f"session_{i:03d}": {"overall": "PASS", "gates": {}} for i in range(1, 11)
             },
         )
 
@@ -464,8 +460,7 @@ class TestSample(unittest.TestCase):
         mock_run = make_subprocess_mock_for_timeout(
             pipeline_results={f"session_{i:03d}": 0 for i in range(1, 11)},
             gate_results={
-                f"session_{i:03d}": {"overall": "PASS", "gates": {}}
-                for i in range(1, 11)
+                f"session_{i:03d}": {"overall": "PASS", "gates": {}} for i in range(1, 11)
             },
         )
 

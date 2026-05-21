@@ -12,15 +12,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from bin.games.base_adapter import BaseAdapter
 from bin.games import (
     detect_running_game,
     get_adapter,
     list_supported_games,
     reset_registry,
 )
+from bin.games.base_adapter import BaseAdapter
 from bin.games.registry import _discover_adapters
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -170,9 +169,7 @@ class TestDetectRunningGame:
         )
         # Registry is sorted by GAME_NAME: beamng, mc, roblox, vrchat
         # beamng should be checked first and match
-        adapter = detect_running_game(
-            psutil_process_iter=lambda attrs: [beamng_proc, roblox_proc]
-        )
+        adapter = detect_running_game(psutil_process_iter=lambda attrs: [beamng_proc, roblox_proc])
         assert adapter is not None
         assert adapter.GAME_NAME == "beamng"
 

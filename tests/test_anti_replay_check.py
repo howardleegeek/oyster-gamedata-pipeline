@@ -67,7 +67,7 @@ def _make_session_dir(
     video_bytes: bytes | None = None,
     frame_pattern: str = "gradient_h",
     frame_color: int = 128,
-    events: dict | None = None
+    events: dict | None = None,
 ) -> Path:
     """Create a session directory with specified content."""
     session_dir = base / name
@@ -78,11 +78,7 @@ def _make_session_dir(
 
     _make_frame_image(session_dir / "frame_0001.png", frame_pattern, frame_color)
 
-    ev = (
-        events
-        if events is not None
-        else {"events": [{"type": "key_down", "key": "w", "ts": 0.0}]}
-    )
+    ev = events if events is not None else {"events": [{"type": "key_down", "key": "w", "ts": 0.0}]}
     (session_dir / "input_events.json").write_text(json.dumps(ev))
 
     return session_dir
@@ -499,8 +495,8 @@ class TestSessionStore:
 
 class TestCLI:
     def test_main_accepts_new_session(self, tmp_base):
-        from anti_replay_check import main
         import anti_replay_check
+        from anti_replay_check import main
 
         anti_replay_check._global_store = SessionStore()
 
@@ -515,8 +511,8 @@ class TestCLI:
         assert result == 0
 
     def test_main_rejects_duplicate(self, tmp_base):
-        from anti_replay_check import main
         import anti_replay_check
+        from anti_replay_check import main
 
         anti_replay_check._global_store = SessionStore()
 
@@ -532,8 +528,8 @@ class TestCLI:
         assert result == 1
 
     def test_main_verbose_flag(self, tmp_base):
-        from anti_replay_check import main
         import anti_replay_check
+        from anti_replay_check import main
 
         anti_replay_check._global_store = SessionStore()
 

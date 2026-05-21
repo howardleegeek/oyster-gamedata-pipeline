@@ -14,17 +14,17 @@ from unittest.mock import patch
 
 import pytest
 
+from bin.consent_dialog_cli import _ask, run_dialog
 from bin.first_run_consent import (
     CONSENT_VERSION,
     ConsentRecord,
+    _compute_sig,
     build_consent,
     consent_exists,
     load_consent,
     run_consent_flow,
     save_consent,
-    _compute_sig,
 )
-from bin.consent_dialog_cli import run_dialog, _ask
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -128,9 +128,7 @@ class TestBuildConsent:
 
 
 class TestPersistence:
-    def test_save_and_load(
-        self, tmp_consent_path: Path, sample_record: ConsentRecord
-    ) -> None:
+    def test_save_and_load(self, tmp_consent_path: Path, sample_record: ConsentRecord) -> None:
         save_consent(sample_record, tmp_consent_path)
         assert tmp_consent_path.exists()
 
@@ -164,9 +162,7 @@ class TestPersistence:
         save_consent(rec, nested)
         assert nested.exists()
 
-    def test_json_structure(
-        self, tmp_consent_path: Path, sample_record: ConsentRecord
-    ) -> None:
+    def test_json_structure(self, tmp_consent_path: Path, sample_record: ConsentRecord) -> None:
         save_consent(sample_record, tmp_consent_path)
         with open(tmp_consent_path, "r") as f:
             data = json.load(f)

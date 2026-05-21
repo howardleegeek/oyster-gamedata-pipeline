@@ -6,20 +6,19 @@ All git and gh CLI calls are mocked via subprocess.run patching.
 from __future__ import annotations
 
 import json
-from unittest.mock import patch, MagicMock
-
+from unittest.mock import MagicMock, patch
 
 from scripts.gen_release_notes import (
-    Commit,
-    PRInfo,
-    _parse_commit,
-    _group_commits,
-    _format_commit_line,
-    generate_release_notes,
     _CC_RE,
     _PR_RE,
     _WAVE_RE,
+    Commit,
+    PRInfo,
+    _format_commit_line,
+    _group_commits,
+    _parse_commit,
     _pr_url,
+    generate_release_notes,
 )
 
 # ---------------------------------------------------------------------------
@@ -210,9 +209,7 @@ class TestGroupCommits:
 
     def test_unknown_type_goes_to_other(self):
         commits = [
-            Commit(
-                "a1", "random: something", commit_type="random", description="something"
-            ),
+            Commit("a1", "random: something", commit_type="random", description="something"),
         ]
         groups = _group_commits(commits)
         assert "Other" in groups
@@ -319,9 +316,7 @@ class TestGenerateReleaseNotes:
 
     def _make_prs(self):
         return [
-            PRInfo(
-                24, "feat(audit): H8 PASS_STRICT tier", "alice", "2026-05-19T10:00:00Z"
-            ),
+            PRInfo(24, "feat(audit): H8 PASS_STRICT tier", "alice", "2026-05-19T10:00:00Z"),
             PRInfo(
                 25,
                 "feat(audit): --strict-buyer evidence_provenance",

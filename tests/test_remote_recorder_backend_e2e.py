@@ -20,7 +20,6 @@ from pathlib import Path
 from unittest import mock
 
 import pytest
-import respx
 from httpx import Response
 
 # ---------------------------------------------------------------------------
@@ -57,12 +56,14 @@ def mock_fixture_dir(tmp_path: Path):
     fixture_dir = tmp_path / "tests" / "fixtures" / "synthetic_session"
     fixture_dir.mkdir(parents=True)
     (fixture_dir / "metadata.json").write_text(
-        json.dumps({
-            "session_id": "synth-001",
-            "recording_date": "2024-01-01",
-            "game_name": "synthetic_game",
-            "operator_id": "OP-000",
-        })
+        json.dumps(
+            {
+                "session_id": "synth-001",
+                "recording_date": "2024-01-01",
+                "game_name": "synthetic_game",
+                "operator_id": "OP-000",
+            }
+        )
     )
     # Patch the FIXTURE_DIR constant
     original = e2e_mod.FIXTURE_DIR
@@ -300,7 +301,10 @@ class TestStepUploadViaSignedUrl:
 
         # Verify the signed-url request had the Bearer token
         signed_url_req = mocked_backend[f"{BACKEND_URL}/api/v1/upload/signed-url"].calls[0]
-        assert signed_url_req.request.headers["Authorization"] == "Bearer mock-google-at-abcdef1234567890"
+        assert (
+            signed_url_req.request.headers["Authorization"]
+            == "Bearer mock-google-at-abcdef1234567890"
+        )
 
     def test_upload_session_register_sends_bearer(self, mocked_backend):
         """session registration includes Bearer token."""
@@ -319,7 +323,9 @@ class TestStepUploadViaSignedUrl:
             )
 
         session_req = mocked_backend[f"{BACKEND_URL}/api/v1/sessions"].calls[0]
-        assert session_req.request.headers["Authorization"] == "Bearer mock-google-at-abcdef1234567890"
+        assert (
+            session_req.request.headers["Authorization"] == "Bearer mock-google-at-abcdef1234567890"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -350,9 +356,7 @@ class TestStepFetchIncome:
         import httpx
 
         with httpx.Client(base_url=BACKEND_URL) as client:
-            data = e2e_mod.step_fetch_income(
-                client, BACKEND_URL, "mock-google-at-abcdef1234567890"
-            )
+            data = e2e_mod.step_fetch_income(client, BACKEND_URL, "mock-google-at-abcdef1234567890")
         assert data["total_usd"] == 0.50
         assert data["sessions_uploaded"] == 1
         assert data["currency"] == "USD"
@@ -362,12 +366,12 @@ class TestStepFetchIncome:
         import httpx
 
         with httpx.Client(base_url=BACKEND_URL) as client:
-            e2e_mod.step_fetch_income(
-                client, BACKEND_URL, "mock-google-at-abcdef1234567890"
-            )
+            e2e_mod.step_fetch_income(client, BACKEND_URL, "mock-google-at-abcdef1234567890")
 
         income_req = mocked_backend[f"{BACKEND_URL}/api/v1/income/today"].calls[0]
-        assert income_req.request.headers["Authorization"] == "Bearer mock-google-at-abcdef1234567890"
+        assert (
+            income_req.request.headers["Authorization"] == "Bearer mock-google-at-abcdef1234567890"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -414,7 +418,9 @@ class TestRunE2E:
 class TestCLI:
     def test_backend_url_arg(self):
         """--backend-url is accepted."""
-        with mock.patch.object(sys, "argv", ["remote_recorder_backend_e2e.py", "--backend-url", "https://example.com"]):
+        with mock.patch.object(
+            sys, "argv", ["remote_recorder_backend_e2e.py", "--backend-url", "https://example.com"]
+        ):
             args = e2e_mod.main.__code__  # just verify the module loads
         # Verify the parser accepts --backend-url
         import argparse

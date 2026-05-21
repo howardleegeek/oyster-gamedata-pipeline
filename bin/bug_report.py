@@ -6,8 +6,9 @@ Collects structured bug information interactively, optionally attaches
 crash dumps and log excerpts, and posts everything to a Discord webhook.
 
 Config:
-  Webhook URL is read from ~/.oyster/config.json via recorder_config.load().
-  The key is "discord_webhook".  It is never hardcoded.
+  Webhook URL is read from ~/.oyster/config.json.
+  The key is "bug_report_webhook".  Legacy "discord_webhook" is also accepted.
+  It is never hardcoded.
 
 Constraints:
   - No game session data is uploaded.
@@ -37,6 +38,7 @@ import requests
 # ---------------------------------------------------------------------------
 
 MAX_ATTACH_BYTES = 2 * 1024 * 1024  # 2 MB
+CONFIG_PATH = os.path.expanduser("~/.oyster/config.json")
 DEFAULT_CRASH_DUMP_PATH = os.path.expanduser("~/.oyster/crash_dumps/latest.dmp")
 DEFAULT_LOG_PATH = os.path.expanduser("~/.oyster/logs/OysterRecorder.log")
 LOG_TAIL_LINES = 200
@@ -48,18 +50,35 @@ RETRY_COUNT = 1  # retry once on transient error
 
 
 def load_config() -> dict[str, Any]:
-    """Load the oyster config file via recorder_config and return it as a dict."""
-    from bin.recorder_config import load as _load
+    """Load the oyster bug-report config file and return it as a dict."""
+    path = Path(CONFIG_PATH)
+    if not path.exists():
+        print(f"Error: config file not found: {path}", file=sys.stderr)
+        sys.exit(1)
 
-    return _load()
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            config = json.load(fh)
+    except json.JSONDecodeError as exc:
+        print(f"Error: invalid JSON in {path}: {exc}", file=sys.stderr)
+        sys.exit(1)
+    except OSError as exc:
+        print(f"Error: cannot read {path}: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    if not isinstance(config, dict):
+        print(f"Error: config in {path} must be a JSON object", file=sys.stderr)
+        sys.exit(1)
+
+    return config
 
 
 def get_webhook_url(config: dict[str, Any]) -> str:
     """Extract the Discord webhook URL from config, or exit with an error."""
-    url = config.get("discord_webhook", "").strip()
+    url = (config.get("bug_report_webhook") or config.get("discord_webhook") or "").strip()
     if not url:
         print(
-            "Error: 'discord_webhook' is not set in ~/.oyster/config.json.\n"
+            "Error: 'bug_report_webhook' is not set in ~/.oyster/config.json.\n"
             "Add your Discord webhook URL to proceed.",
             file=sys.stderr,
         )
@@ -125,9 +144,7 @@ def read_crash_dump(path: str = DEFAULT_CRASH_DUMP_PATH) -> Optional[str]:
         return base64.b64encode(fh.read()).decode("ascii")
 
 
-def tail_log(
-    path: str = DEFAULT_LOG_PATH, lines: int = LOG_TAIL_LINES
-) -> Optional[str]:
+def tail_log(path: str = DEFAULT_LOG_PATH, lines: int = LOG_TAIL_LINES) -> Optional[str]:
     """
     Return the last *lines* of a log file as a string.
     Returns None if the file doesn't exist or exceeds MAX_ATTACH_BYTES.
@@ -148,9 +165,7 @@ def tail_log(
         result = "".join(tail)
         if len(result.encode("utf-8")) > MAX_ATTACH_BYTES:
             # Truncate to fit
-            result = result.encode("utf-8")[:MAX_ATTACH_BYTES].decode(
-                "utf-8", errors="ignore"
-            )
+            result = result.encode("utf-8")[:MAX_ATTACH_BYTES].decode("utf-8", errors="ignore")
         return result
     except Exception as exc:
         print(f"  Error reading log: {exc}", file=sys.stderr)
@@ -172,9 +187,7 @@ def build_discord_payload(
     fields: list[dict[str, Any]] = [
         {
             "name": "Severity",
-            "value": {1: "Low", 2: "Medium", 3: "Critical"}.get(
-                severity, "Unknown"
-            ),
+            "value": {1: "Low", 2: "Medium", 3: "Critical"}.get(severity, "Unknown"),
             "inline": True,
         },
         {
@@ -228,9 +241,7 @@ def build_discord_payload(
         "embeds": [
             {
                 "title": title,
-                "color": {1: 0x00FF00, 2: 0xFFFF00, 3: 0xFF0000}.get(
-                    severity, 0x888888
-                ),
+                "color": {1: 0x00FF00, 2: 0xFFFF00, 3: 0xFF0000}.get(severity, 0x888888),
                 "fields": fields,
                 "footer": {"text": f"Report ID: {report_id}"},
                 "timestamp": datetime.now(timezone.utc).isoformat(),

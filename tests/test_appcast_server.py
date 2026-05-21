@@ -1,6 +1,8 @@
 """S91v2 tests."""
-from fastapi.testclient import TestClient
+
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
 from backend_stub.appcast_server import router
 
 

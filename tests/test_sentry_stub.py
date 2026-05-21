@@ -16,8 +16,8 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
-from backend_stub.main import create_app
 from backend_stub import sentry_compat
+from backend_stub.main import create_app
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -167,9 +167,7 @@ class TestSentryStoreEnvelope:
     async def test_envelope_with_multiple_items(self, client: AsyncClient):
         """Envelope with event + non-event items; only event is stored."""
         envelope_header = json.dumps({"event_id": "multi-123"})
-        event_item_header = json.dumps(
-            {"type": "event", "content_type": "application/json"}
-        )
+        event_item_header = json.dumps({"type": "event", "content_type": "application/json"})
         event_item_payload = json.dumps(SAMPLE_EVENT_JSON)
         session_item_header = json.dumps({"type": "session"})
         session_item_payload = json.dumps({"sid": "sess-1", "status": "ok"})
@@ -220,9 +218,7 @@ class TestDeduplication:
                         "type": "PanicA",
                         "value": "panic A",
                         "stacktrace": {
-                            "frames": [
-                                {"function": "fn_a", "filename": "a.rs", "lineno": 1}
-                            ]
+                            "frames": [{"function": "fn_a", "filename": "a.rs", "lineno": 1}]
                         },
                     }
                 ]
@@ -237,9 +233,7 @@ class TestDeduplication:
                         "type": "PanicB",
                         "value": "panic B",
                         "stacktrace": {
-                            "frames": [
-                                {"function": "fn_b", "filename": "b.rs", "lineno": 2}
-                            ]
+                            "frames": [{"function": "fn_b", "filename": "b.rs", "lineno": 2}]
                         },
                     }
                 ]
@@ -263,9 +257,7 @@ class TestDeduplication:
                         "type": "Panic",
                         "value": "msg",
                         "stacktrace": {
-                            "frames": [
-                                {"function": "fn", "filename": "x.rs", "lineno": 1}
-                            ]
+                            "frames": [{"function": "fn", "filename": "x.rs", "lineno": 1}]
                         },
                     }
                 ]
@@ -281,9 +273,7 @@ class TestDeduplication:
                         "type": "Panic",
                         "value": "msg",
                         "stacktrace": {
-                            "frames": [
-                                {"function": "fn", "filename": "x.rs", "lineno": 1}
-                            ]
+                            "frames": [{"function": "fn", "filename": "x.rs", "lineno": 1}]
                         },
                     }
                 ]

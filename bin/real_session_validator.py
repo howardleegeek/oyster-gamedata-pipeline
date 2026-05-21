@@ -15,8 +15,10 @@ import csv
 import datetime
 import json
 import pathlib
+import random
 import subprocess
 import sys
+import time
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -28,7 +30,7 @@ SIGN_SCRIPT = SCRIPT_DIR / "provenance_sign.py"
 VERIFY_SCRIPT = SCRIPT_DIR / "provenance_verify.py"
 
 PIPELINE_TIMEOUT = 600  # seconds per session
-GATE_TIMEOUT = 120
+GATE_TIMEOUT = 60
 SIGN_TIMEOUT = 30
 VERIFY_TIMEOUT = 30
 
@@ -102,7 +104,7 @@ def run_gates(session_dir: pathlib.Path) -> dict:
             "raw": data,
         }
     except subprocess.TimeoutExpired:
-        return {"verdict": "TIMEOUT", "passed": 0, "total": 0, "per_gate": {}, "raw": {}}
+        return {"verdict": "FAIL_TIMEOUT", "passed": 0, "total": 0, "per_gate": {}, "raw": {}}
     except Exception as exc:
         return {
             "verdict": "ERROR",
@@ -158,7 +160,7 @@ def compute_overall(pipeline: dict, gates: dict, provenance: dict) -> str:
     """Compute overall verdict for a session."""
     if pipeline["verdict"] == "BLOCKED":
         return "FAIL"
-    if gates["verdict"] in ("FAIL", "BLOCKED", "TIMEOUT", "ERROR"):
+    if gates["verdict"] in ("FAIL", "BLOCKED", "TIMEOUT", "FAIL_TIMEOUT", "ERROR"):
         return "FAIL"
     if gates["verdict"] == "DEGRADED" or gates.get("passed", 0) < gates.get("total", 0):
         return "DEGRADED"
@@ -184,7 +186,7 @@ def collect_failure_reasons(
             )
             if status != "PASS":
                 reasons.append(f"{gate_name} failed")
-    elif gates["verdict"] in ("FAIL", "BLOCKED", "TIMEOUT", "ERROR"):
+    elif gates["verdict"] in ("FAIL", "BLOCKED", "TIMEOUT", "FAIL_TIMEOUT", "ERROR"):
         reasons.append(f"G-gates {gates['verdict']}")
     if provenance["verdict"] == "FAILED":
         reasons.append(f"Provenance {provenance['verdict']}")
@@ -193,7 +195,7 @@ def collect_failure_reasons(
 
 def format_gate_summary(gates: dict) -> str:
     """Format gate results as '9/9 OK' or '8/9' etc."""
-    if gates["verdict"] in ("TIMEOUT", "ERROR"):
+    if gates["verdict"] in ("TIMEOUT", "FAIL_TIMEOUT", "ERROR"):
         return gates["verdict"]
     passed = gates.get("passed", 0)
     total = gates.get("total", 0)
@@ -376,6 +378,46 @@ def render_csv_report(results: list[dict]) -> str:
     return output.getvalue()
 
 
+def verdict_to_buyer_label(verdict: str) -> str:
+    """Map internal verdicts to buyer-facing sweep labels."""
+    if verdict == "PASS":
+        return "BUYER_READY"
+    return verdict
+
+
+def render_sweep_json(
+    results: list[dict],
+    sweep_started: str,
+    sweep_finished: str,
+    sessions_total: int,
+) -> dict:
+    """Render the hardened sweep JSON schema used by automation."""
+    per_session = []
+    for r in results:
+        label = verdict_to_buyer_label(r["overall"])
+        per_session.append(
+            {
+                "session_id": r["name"],
+                "verdict": label,
+                "duration_s": float(r.get("duration_s", 0.0)),
+                "pipeline": r["pipeline"]["verdict"],
+                "gates": r["gates"]["verdict"],
+                "provenance": r["provenance"]["verdict"],
+                "failure_reasons": r.get("failure_reasons", []),
+            }
+        )
+
+    return {
+        "sweep_started": sweep_started,
+        "sweep_finished": sweep_finished,
+        "sessions_total": sessions_total,
+        "sessions_buyer_ready": sum(1 for r in results if r["overall"] == "PASS"),
+        "sessions_strict_violations": sum(1 for r in results if r["overall"] != "PASS"),
+        "sessions_timeout": sum(1 for r in results if r["gates"].get("verdict") == "FAIL_TIMEOUT"),
+        "per_session": per_session,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -397,6 +439,17 @@ def main():
         help="Maximum number of sessions to validate",
     )
     parser.add_argument(
+        "--sample",
+        type=int,
+        default=None,
+        help="Randomly sample N sessions to validate",
+    )
+    parser.add_argument(
+        "--continue-on-error",
+        action="store_true",
+        help="Continue processing remaining sessions after a FAIL",
+    )
+    parser.add_argument(
         "--keyfile",
         type=str,
         default=None,
@@ -413,8 +466,15 @@ def main():
         default=None,
         help="Write CSV report to this path",
     )
+    parser.add_argument(
+        "--output",
+        type=str,
+        default=None,
+        help="Write hardened sweep JSON report to this path",
+    )
     args = parser.parse_args()
 
+    sweep_started = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     sessions_root = pathlib.Path(args.sessions_root).expanduser()
     keyfile = pathlib.Path(args.keyfile).expanduser() if args.keyfile else None
 
@@ -444,12 +504,22 @@ def main():
             print("  No sessions found.")
         sys.exit(0)
 
-    # Apply limit
-    sessions = all_sessions[: args.limit] if args.limit else all_sessions
+    # Apply sampling/limit. Sampling wins because it explicitly requests a
+    # randomized subset; --limit remains deterministic first-N behavior.
+    if args.sample is not None:
+        sessions = (
+            random.sample(all_sessions, args.sample)
+            if args.sample < len(all_sessions)
+            else list(all_sessions)
+        )
+    else:
+        sessions = all_sessions[: args.limit] if args.limit else all_sessions
 
     # Validate each session
     results = []
+    fail_fast = not args.continue_on_error and args.limit is None and keyfile is None
     for session_dir in sessions:
+        started_at = time.monotonic()
         session_name = session_dir.name
 
         # Step 1: Pipeline
@@ -488,8 +558,12 @@ def main():
                 "provenance": provenance,
                 "overall": overall,
                 "failure_reasons": failure_reasons,
+                "duration_s": round(time.monotonic() - started_at, 3),
             }
         )
+
+        if overall == "FAIL" and fail_fast:
+            break
 
     # Output
     if args.json:
@@ -502,6 +576,23 @@ def main():
         csv_path = pathlib.Path(args.csv)
         csv_path.parent.mkdir(parents=True, exist_ok=True)
         csv_path.write_text(render_csv_report(results))
+
+    if args.output:
+        output_path = pathlib.Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        sweep_finished = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        output_path.write_text(
+            json.dumps(
+                render_sweep_json(
+                    results,
+                    sweep_started=sweep_started,
+                    sweep_finished=sweep_finished,
+                    sessions_total=len(results),
+                ),
+                indent=2,
+            )
+            + "\n"
+        )
 
     # Exit code: 0 if all PASS, 1 if any FAIL
     any_fail = any(r["overall"] == "FAIL" for r in results)

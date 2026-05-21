@@ -6,7 +6,6 @@ import json
 import subprocess
 from unittest.mock import MagicMock, call, patch
 
-
 from scripts.pr_conflict_resolver import (
     CONFLICTS_DIR,
     PRInfo,
@@ -31,9 +30,7 @@ SAMPLE_PRS = [
 ]
 
 
-def _make_completed_process(
-    stdout: str = "", stderr: str = "", returncode: int = 0
-) -> MagicMock:
+def _make_completed_process(stdout: str = "", stderr: str = "", returncode: int = 0) -> MagicMock:
     """Helper to create a mock CompletedProcess."""
     m = MagicMock(spec=subprocess.CompletedProcess)
     m.stdout = stdout
@@ -57,9 +54,7 @@ class TestListOpenPrs:
 
         assert len(result) == 4
         assert result[0] == PRInfo(number=101, head_ref_name="feat/S01-cluster")
-        assert result[2] == PRInfo(
-            number=103, head_ref_name="feat/S40-pr-conflict-resolver"
-        )
+        assert result[2] == PRInfo(number=103, head_ref_name="feat/S40-pr-conflict-resolver")
         mock_run.assert_called_once_with(
             ["gh", "pr", "list", "--state", "open", "--json", "number,headRefName"],
         )
@@ -144,9 +139,7 @@ class TestRebasePrSuccess:
         assert calls[0] == call(["git", "fetch", "origin"])
         assert calls[1] == call(["git", "checkout", "feat/S01-cluster"])
         assert calls[2] == call(["git", "rebase", "origin/main"])
-        assert calls[3] == call(
-            ["git", "push", "--force-with-lease", "origin", "feat/S01-cluster"]
-        )
+        assert calls[3] == call(["git", "push", "--force-with-lease", "origin", "feat/S01-cluster"])
 
 
 # ---------------------------------------------------------------------------
@@ -366,9 +359,10 @@ class TestMain:
     def test_successful_rebase_all(self, capsys, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
 
-        with patch("scripts.pr_conflict_resolver.list_open_prs") as mock_list, patch(
-            "scripts.pr_conflict_resolver.run_cmd"
-        ) as mock_run:
+        with (
+            patch("scripts.pr_conflict_resolver.list_open_prs") as mock_list,
+            patch("scripts.pr_conflict_resolver.run_cmd") as mock_run,
+        ):
             mock_list.return_value = [
                 PRInfo(number=101, head_ref_name="feat/S01-cluster"),
             ]
@@ -399,8 +393,9 @@ class TestMain:
                 return _make_completed_process()
             return _make_completed_process()
 
-        with patch("scripts.pr_conflict_resolver.list_open_prs") as mock_list, patch(
-            "scripts.pr_conflict_resolver.run_cmd", side_effect=side_effect
+        with (
+            patch("scripts.pr_conflict_resolver.list_open_prs") as mock_list,
+            patch("scripts.pr_conflict_resolver.run_cmd", side_effect=side_effect),
         ):
             mock_list.return_value = [
                 PRInfo(number=101, head_ref_name="feat/S01-cluster"),
@@ -436,8 +431,9 @@ class TestMain:
                 return _make_completed_process()
             return _make_completed_process()
 
-        with patch("scripts.pr_conflict_resolver.list_open_prs") as mock_list, patch(
-            "scripts.pr_conflict_resolver.run_cmd", side_effect=side_effect
+        with (
+            patch("scripts.pr_conflict_resolver.list_open_prs") as mock_list,
+            patch("scripts.pr_conflict_resolver.run_cmd", side_effect=side_effect),
         ):
             mock_list.return_value = [
                 PRInfo(number=101, head_ref_name="feat/S01-cluster"),
@@ -453,9 +449,10 @@ class TestMain:
     def test_only_filter_in_real_mode(self, capsys, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
 
-        with patch("scripts.pr_conflict_resolver.list_open_prs") as mock_list, patch(
-            "scripts.pr_conflict_resolver.run_cmd"
-        ) as mock_run:
+        with (
+            patch("scripts.pr_conflict_resolver.list_open_prs") as mock_list,
+            patch("scripts.pr_conflict_resolver.run_cmd") as mock_run,
+        ):
             mock_list.return_value = [
                 PRInfo(number=101, head_ref_name="feat/S01-cluster"),
                 PRInfo(number=102, head_ref_name="feat/S02-cluster"),

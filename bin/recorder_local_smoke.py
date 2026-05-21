@@ -37,7 +37,6 @@ import json
 import logging
 import sys
 import tempfile
-import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -171,12 +170,10 @@ def run_smoke(backend_url: str) -> int:
                 upload_result = step_upload(
                     backend_url, session_id, files["video"], files["metadata"]
                 )
-                assert upload_result.get("session_id") == session_id, (
-                    "Upload returned wrong session_id"
-                )
-                assert upload_result.get("status") == "received", (
-                    "Upload status not 'received'"
-                )
+                uploaded_session_id = upload_result.get("session_id")
+                assert uploaded_session_id, "Upload response missing session_id"
+                session_id = uploaded_session_id
+                assert upload_result.get("status") == "received", "Upload status not 'received'"
                 logger.info("Step 3 PASSED")
             except Exception as exc:
                 logger.error("FAIL: upload — %s", exc)
@@ -187,12 +184,10 @@ def run_smoke(backend_url: str) -> int:
             try:
                 logger.info("=== Step 4: Verify ===")
                 verify_result = step_verify(backend_url, session_id)
-                assert verify_result.get("session_id") == session_id, (
-                    "Verify returned wrong session_id"
-                )
-                assert verify_result.get("status") == "received", (
-                    "Verify status not 'received'"
-                )
+                assert (
+                    verify_result.get("session_id") == session_id
+                ), "Verify returned wrong session_id"
+                assert verify_result.get("status") == "received", "Verify status not 'received'"
                 logger.info("Step 4 PASSED")
             except Exception as exc:
                 logger.error("FAIL: verify — %s", exc)
@@ -216,7 +211,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         "--backend-url",
         default=None,
         help="Backend stub URL (e.g. http://localhost:8500). "
-             "Defaults to value from ~/.oyster/config.json.",
+        "Defaults to value from ~/.oyster/config.json.",
     )
     parser.add_argument(
         "--verbose",

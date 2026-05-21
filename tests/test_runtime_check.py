@@ -14,7 +14,6 @@ import re
 import subprocess
 import tempfile
 import textwrap
-import pytest
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -37,9 +36,9 @@ class TestBatchSyntax:
     def test_batch_has_shebang(self):
         with open(BATCH_PATH, "r") as f:
             first_line = f.readline().strip()
-        assert first_line.startswith("@echo off"), (
-            f"Batch should start with @echo off, got: {first_line!r}"
-        )
+        assert first_line.startswith(
+            "@echo off"
+        ), f"Batch should start with @echo off, got: {first_line!r}"
 
     def test_batch_has_exit_codes(self):
         with open(BATCH_PATH, "r") as f:
@@ -58,9 +57,7 @@ class TestBatchSyntax:
     def test_batch_has_download_url(self):
         with open(BATCH_PATH, "r") as f:
             content = f.read()
-        assert DOWNLOAD_URL in content, (
-            f"Batch must contain download URL {DOWNLOAD_URL}"
-        )
+        assert DOWNLOAD_URL in content, f"Batch must contain download URL {DOWNLOAD_URL}"
 
     def test_batch_has_user_prompt(self):
         with open(BATCH_PATH, "r") as f:
@@ -87,9 +84,7 @@ class TestBatchSyntax:
                 continue
             # Check for unmatched quotes (simple heuristic)
             quote_count = stripped.count('"')
-            assert quote_count % 2 == 0, (
-                f"Line {i} has unmatched quotes: {stripped!r}"
-            )
+            assert quote_count % 2 == 0, f"Line {i} has unmatched quotes: {stripped!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -109,12 +104,12 @@ class TestIssValidity:
     def test_iss_has_initialize_setup(self):
         with open(ISS_PATH, "r") as f:
             content = f.read()
-        assert "InitializeSetup" in content, (
-            ".iss must have InitializeSetup function for pre-install check"
-        )
-        assert "function InitializeSetup(): Boolean" in content, (
-            "InitializeSetup must return Boolean"
-        )
+        assert (
+            "InitializeSetup" in content
+        ), ".iss must have InitializeSetup function for pre-install check"
+        assert (
+            "function InitializeSetup(): Boolean" in content
+        ), "InitializeSetup must return Boolean"
 
     def test_iss_calls_check_runtime_in_run_section(self):
         with open(ISS_PATH, "r") as f:
@@ -123,19 +118,13 @@ class TestIssValidity:
         run_match = re.search(r"\[Run\](.*?)(?=\n\[|\Z)", content, re.DOTALL)
         assert run_match, "[Run] section not found in .iss"
         run_content = run_match.group(1)
-        assert "check_runtime.bat" in run_content, (
-            "[Run] section must call check_runtime.bat"
-        )
+        assert "check_runtime.bat" in run_content, "[Run] section must call check_runtime.bat"
 
     def test_iss_has_regkey_check_in_code(self):
         with open(ISS_PATH, "r") as f:
             content = f.read()
-        assert "RegKeyExists" in content, (
-            ".iss [Code] must use RegKeyExists for fallback check"
-        )
-        assert "14.0" in content, (
-            ".iss must reference VS 14.0 registry key"
-        )
+        assert "RegKeyExists" in content, ".iss [Code] must use RegKeyExists for fallback check"
+        assert "14.0" in content, ".iss must reference VS 14.0 registry key"
 
     def test_iss_has_vc_runtime_msgbox(self):
         with open(ISS_PATH, "r") as f:
@@ -150,9 +139,9 @@ class TestIssValidity:
         run_match = re.search(r"\[Run\](.*?)(?=\n\[|\Z)", content, re.DOTALL)
         assert run_match
         run_content = run_match.group(1)
-        assert "waituntilterminated" in run_content.lower(), (
-            "Runtime check in [Run] must use waituntilterminated flag"
-        )
+        assert (
+            "waituntilterminated" in run_content.lower()
+        ), "Runtime check in [Run] must use waituntilterminated flag"
 
 
 # ---------------------------------------------------------------------------
@@ -255,49 +244,39 @@ class TestBatchLogicSimulation:
         assert "ERRORLEVEL" in content, "Must check ERRORLEVEL"
         # Verify the pattern: reg query → if ERRORLEVEL EQU 0 → exit /b 0
         pattern = r"reg query.*ERRORLEVEL.*EQU 0.*exit /b 0"
-        assert re.search(pattern, content, re.DOTALL), (
-            "Batch must have: reg query → check ERRORLEVEL → exit 0"
-        )
+        assert re.search(
+            pattern, content, re.DOTALL
+        ), "Batch must have: reg query → check ERRORLEVEL → exit 0"
 
     def test_failure_path_exits_one(self):
         """Verify the batch has a clear failure path with exit 1."""
         content = self._parse_batch_logic()
         # After the success check, there should be exit /b 1 paths
         exit_1_count = content.count("exit /b 1")
-        assert exit_1_count >= 1, (
-            f"Batch must have at least one 'exit /b 1', found {exit_1_count}"
-        )
+        assert exit_1_count >= 1, f"Batch must have at least one 'exit /b 1', found {exit_1_count}"
 
     def test_prompt_defaults_to_yes(self):
         """Verify that empty input defaults to Yes (download)."""
         content = self._parse_batch_logic()
         # Should have: if "%CHOICE%"=="" set "CHOICE=Y"
-        assert '""' in content or '==""' in content or '==""' in content, (
-            "Batch should handle empty input"
-        )
+        assert (
+            '""' in content or '==""' in content or '==""' in content
+        ), "Batch should handle empty input"
         # Check for default Y assignment
-        assert 'CHOICE=Y' in content or 'CHOICE="Y"' in content, (
-            "Batch should default CHOICE to Y"
-        )
+        assert "CHOICE=Y" in content or 'CHOICE="Y"' in content, "Batch should default CHOICE to Y"
 
     def test_y_opens_download_url(self):
         """Verify Y choice opens the download URL."""
         content = self._parse_batch_logic()
         # Should have: start "" "URL"
-        assert 'start ""' in content or "start" in content, (
-            "Batch should use 'start' to open URL"
-        )
-        assert DOWNLOAD_URL in content, (
-            f"Batch must open {DOWNLOAD_URL}"
-        )
+        assert 'start ""' in content or "start" in content, "Batch should use 'start' to open URL"
+        assert DOWNLOAD_URL in content, f"Batch must open {DOWNLOAD_URL}"
 
     def test_n_cancels_installation(self):
         """Verify N choice cancels with exit 1."""
         content = self._parse_batch_logic()
         # Should check for N/n and exit 1
-        assert '"N"' in content or '"n"' in content, (
-            "Batch should handle N/n response"
-        )
+        assert '"N"' in content or '"n"' in content, "Batch should handle N/n response"
 
 
 # ---------------------------------------------------------------------------
@@ -308,9 +287,7 @@ class TestIntegration:
         """Verify .iss references check_runtime.bat."""
         with open(ISS_PATH, "r") as f:
             content = f.read()
-        assert "check_runtime.bat" in content, (
-            ".iss must reference check_runtime.bat"
-        )
+        assert "check_runtime.bat" in content, ".iss must reference check_runtime.bat"
 
     def test_batch_file_is_included_in_files_section(self):
         """Verify the batch file would be included in the installer."""
@@ -324,9 +301,7 @@ class TestIntegration:
         files_content = files_match.group(1)
         # The batch is called from {src} in InitializeSetup, so it needs
         # to be in the installer source files
-        assert "check_runtime" in content, (
-            "check_runtime.bat must be referenced somewhere in .iss"
-        )
+        assert "check_runtime" in content, "check_runtime.bat must be referenced somewhere in .iss"
 
     def test_initialize_setup_returns_false_on_missing_runtime(self):
         """Verify InitializeSetup returns False when runtime is missing."""
@@ -340,9 +315,9 @@ class TestIntegration:
         )
         assert func_match, "InitializeSetup function not found"
         func_body = func_match.group(1)
-        assert "Result := False" in func_body, (
-            "InitializeSetup must set Result := False when runtime missing"
-        )
+        assert (
+            "Result := False" in func_body
+        ), "InitializeSetup must set Result := False when runtime missing"
 
     def test_initialize_setup_returns_true_on_found_runtime(self):
         """Verify InitializeSetup returns True when runtime is found."""
@@ -355,6 +330,4 @@ class TestIntegration:
         )
         assert func_match
         func_body = func_match.group(1)
-        assert "Result := True" in func_body, (
-            "InitializeSetup must initialize Result := True"
-        )
+        assert "Result := True" in func_body, "InitializeSetup must initialize Result := True"

@@ -5,29 +5,29 @@ from __future__ import annotations
 
 import json
 import os
-import tempfile
+
+# We need to import from the project root
+import sys
 from pathlib import Path
 from unittest import mock
 
 import pytest
 
-# We need to import from the project root
-import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from bin.recorder_config import (
-    ConfigError,
-    REQUIRED_KEYS,
     _DEFAULT_CONFIG,
+    REQUIRED_KEYS,
+    ConfigError,
     _read_json,
     _validate,
     load,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def tmp_config_dir(tmp_path: Path) -> Path:
@@ -66,6 +66,7 @@ def minimal_config(tmp_path: Path) -> Path:
 # Tests: load() returns dict with required keys
 # ---------------------------------------------------------------------------
 
+
 class TestLoadReturnsRequiredKeys:
     """recorder_config.load() returns dict with required keys."""
 
@@ -96,6 +97,7 @@ class TestLoadReturnsRequiredKeys:
 # ---------------------------------------------------------------------------
 # Tests: missing config file → loads from default
 # ---------------------------------------------------------------------------
+
 
 class TestMissingConfigFallsBack:
     """Missing config file → loads from default."""
@@ -141,6 +143,7 @@ class TestMissingConfigFallsBack:
 # Tests: env var override
 # ---------------------------------------------------------------------------
 
+
 class TestEnvVarOverride:
     """OYSTER_BACKEND_URL env var overrides backend_url."""
 
@@ -174,6 +177,7 @@ class TestEnvVarOverride:
 # Tests: validation
 # ---------------------------------------------------------------------------
 
+
 class TestValidation:
     """Config validation."""
 
@@ -206,6 +210,7 @@ class TestValidation:
 # Tests: _read_json helper
 # ---------------------------------------------------------------------------
 
+
 class TestReadJson:
     """Internal _read_json helper."""
 
@@ -225,6 +230,7 @@ class TestReadJson:
 # ---------------------------------------------------------------------------
 # Tests: _validate helper
 # ---------------------------------------------------------------------------
+
 
 class TestValidate:
     """Internal _validate helper."""
@@ -246,6 +252,7 @@ class TestValidate:
 # ---------------------------------------------------------------------------
 # Tests: default config consistency
 # ---------------------------------------------------------------------------
+
 
 class TestDefaultConfigConsistency:
     """In-memory default and installer/default_config.json should match."""

@@ -159,6 +159,13 @@ def _evaluate_h8(session: Path) -> dict:
                 "evidence": f"engine Z-buffer ground truth with "
                 f"{gap_miss_ratio*100:.1f}% gap misses (PASS_DEGRADED)",
             }
+        if gap_miss_ratio < 0.01:
+            return {
+                "id": "H8",
+                "status": "PASS_STRICT",
+                "evidence": f"engine Z-buffer ground truth strict tier "
+                f"(≥99% engine truth), {frame_count} frames, EXR readable",
+            }
         return _result(
             "H8", True, f"engine Z-buffer ground truth, {frame_count} frames, EXR readable"
         )

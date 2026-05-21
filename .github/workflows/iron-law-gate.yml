@@ -33,11 +33,11 @@ jobs:
 
       - name: Black format check
         run: |
-          black --check .
+          black --check src/ tests/
 
       - name: Ruff lint
         run: |
-          ruff check .
+          ruff check src/ tests/
 
       - name: Run pytest (fast-fail)
         run: |

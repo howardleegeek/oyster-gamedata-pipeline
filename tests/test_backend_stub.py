@@ -9,7 +9,7 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
-from backend_stub.main import create_app, _income_store, _sessions_store
+from backend_stub.main import _income_store, _sessions_store, create_app
 
 
 @pytest.fixture(autouse=True)

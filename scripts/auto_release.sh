@@ -27,6 +27,16 @@ die() {
   exit 1
 }
 
+latest_semver_tag() {
+  git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname \
+    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+    | head -n 1 || true
+}
+
+tag_exists() {
+  git rev-parse -q --verify "refs/tags/$1" >/dev/null
+}
+
 # ---------------------------------------------------------------------------
 # Pre-flight
 # ---------------------------------------------------------------------------
@@ -99,10 +109,18 @@ log "Bump type: ${BUMP_TYPE}"
 # Parse current version and compute new version
 # ---------------------------------------------------------------------------
 
-if [ -z "$LATEST_TAG" ]; then
-  CURRENT_VERSION="v0.0.0"
-else
+VERSION_BASE_TAG="${VERSION_BASE_TAG:-}"
+
+if [ -z "$VERSION_BASE_TAG" ]; then
+  VERSION_BASE_TAG=$(latest_semver_tag)
+fi
+
+if [ -n "$VERSION_BASE_TAG" ]; then
+  CURRENT_VERSION="$VERSION_BASE_TAG"
+elif [ -n "$LATEST_TAG" ]; then
   CURRENT_VERSION="$LATEST_TAG"
+else
+  CURRENT_VERSION="v0.0.0"
 fi
 
 # Strip leading 'v'
@@ -134,6 +152,11 @@ case "$BUMP_TYPE" in
 esac
 
 NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+while tag_exists "$NEW_VERSION"; do
+  log "Tag ${NEW_VERSION} already exists; bumping patch again"
+  PATCH=$(( PATCH + 1 ))
+  NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+done
 log "New version: ${NEW_VERSION} (from ${CURRENT_VERSION})"
 
 # ---------------------------------------------------------------------------
@@ -195,6 +218,14 @@ fi
 
 log "CHANGELOG segment built"
 
+if [ "$DRY_RUN" = "true" ]; then
+  log "DRY_RUN=true — skipping tag, push, release creation, and CHANGELOG write"
+  log "Would create tag: ${NEW_VERSION}"
+  log "Would create release with body:"
+  echo "$CHANGELOG_BODY"
+  exit 0
+fi
+
 # ---------------------------------------------------------------------------
 # Update CHANGELOG.md
 # ---------------------------------------------------------------------------
@@ -242,22 +273,25 @@ log "CHANGELOG.md updated"
 git add CHANGELOG.md
 git commit -m "chore(release): ${NEW_VERSION} [skip ci]" || true
 
-if [ "$DRY_RUN" = "true" ]; then
-  log "DRY_RUN=true — skipping tag, push, and release creation"
-  log "Would create tag: ${NEW_VERSION}"
-  log "Would create release with body:"
-  echo "$CHANGELOG_BODY"
-  exit 0
-fi
+# Push the CHANGELOG commit first so the release tag remains reachable from
+# main. If main advanced meanwhile, this non-force push fails and the workflow
+# retries on the next push rather than creating another orphaned release tag.
+git push origin HEAD:main
 
 # Create and push tag
 git tag -a "$NEW_VERSION" -m "Release ${NEW_VERSION}"
 git push origin "$NEW_VERSION"
 
 # Create GitHub release
-gh release create "$NEW_VERSION" \
-  --title "Release ${NEW_VERSION}" \
-  --notes "$CHANGELOG_BODY" \
-  --generate-notes=false
+if gh release view "$NEW_VERSION" >/dev/null 2>&1; then
+  gh release edit "$NEW_VERSION" \
+    --title "Release ${NEW_VERSION}" \
+    --notes "$CHANGELOG_BODY"
+else
+  gh release create "$NEW_VERSION" \
+    --title "Release ${NEW_VERSION}" \
+    --notes "$CHANGELOG_BODY" \
+    --generate-notes=false
+fi
 
 log "Release ${NEW_VERSION} created successfully"
