@@ -87,10 +87,52 @@ jobs:
             throw "Unexpected OysterRecorder Run value: $($run.OysterRecorder)"
           }
 
+      - name: Launch installed recorder in tray mode
+        shell: pwsh
+        run: |
+          $installDir = Join-Path $env:LOCALAPPDATA "OysterRecorder"
+          $exe = Join-Path $installDir "gamedata-recorder.exe"
+          $launchOutputDir = Join-Path $env:TEMP "OysterRecorder-ci-output"
+          New-Item -ItemType Directory -Force -Path $launchOutputDir | Out-Null
+
+          $env:GAMEDATA_CI_MODE = "1"
+          $env:GAMEDATA_OUTPUT_DIR = $launchOutputDir
+          $env:RUST_BACKTRACE = "1"
+
+          $process = Start-Process `
+            -FilePath $exe `
+            -ArgumentList @("--tray") `
+            -WorkingDirectory $installDir `
+            -PassThru
+
+          Start-Sleep -Seconds 12
+          if ($process.HasExited) {
+            $logCandidates = @(
+              (Join-Path $env:APPDATA "GameData Recorder\gamedata-recorder-debug.log"),
+              (Join-Path $env:LOCALAPPDATA "GameData Recorder\gamedata-recorder-debug.log")
+            )
+            foreach ($logPath in $logCandidates) {
+              if (Test-Path $logPath) {
+                Write-Host "==== $logPath ===="
+                Get-Content $logPath -Tail 200 -ErrorAction SilentlyContinue
+              }
+            }
+            throw "Recorder exited during tray launch smoke with code $($process.ExitCode)"
+          }
+
+          "RECORDER_PID=$($process.Id)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "Recorder tray process is running with pid $($process.Id)"
+
       - name: Silent uninstall
         if: always()
         shell: pwsh
         run: |
+          if ($env:RECORDER_PID) {
+            Stop-Process -Id ([int]$env:RECORDER_PID) -Force -ErrorAction SilentlyContinue
+          }
+          Get-Process -Name "gamedata-recorder" -ErrorAction SilentlyContinue |
+            Stop-Process -Force -ErrorAction SilentlyContinue
+
           $installDir = Join-Path $env:LOCALAPPDATA "OysterRecorder"
           $uninstaller = Join-Path $installDir "unins000.exe"
           if (Test-Path $uninstaller) {
@@ -127,3 +169,16 @@ jobs:
           if ($run) {
             throw "OysterRecorder Run value still exists after uninstall"
           }
+
+      - name: Upload smoke logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-smoke-logs
+          path: |
+            ${{ runner.temp }}/OysterRecorder-install.log
+            ${{ runner.temp }}/OysterRecorder-uninstall.log
+            ${{ runner.temp }}/OysterRecorder-ci-output/**
+            ~/AppData/Roaming/GameData Recorder/*.log
+            ~/AppData/Local/GameData Recorder/*.log
+          if-no-files-found: ignore

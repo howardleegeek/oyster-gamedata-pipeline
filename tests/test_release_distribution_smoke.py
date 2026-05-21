@@ -36,4 +36,11 @@ def test_windows_installer_smoke_workflow_exercises_real_install_path() -> None:
     assert "$env:LOCALAPPDATA" in workflow
     assert "gamedata-recorder.exe" in workflow
     assert "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" in workflow
+    assert "Start-Process" in workflow
+    assert "GAMEDATA_CI_MODE" in workflow
+    assert "RUST_BACKTRACE" in workflow
+    assert "$process.HasExited" in workflow
+    assert "RECORDER_PID" in workflow
+    assert "Stop-Process" in workflow
     assert "unins000.exe" in workflow
+    assert "windows-installer-smoke-logs" in workflow
