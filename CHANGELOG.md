@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [0.8.6] - 2026-05-21
+
+### Other
+
+- ci(release): smoke latest installer distribution (9260f24)
+- ci(backend): add remote smoke guard (2267b11)
+- ci(release): smoke Windows installer install path (54d6eda)
+
+
 ## [0.8.5] - 2026-05-21
 
 ### Fixed
