@@ -21,6 +21,7 @@ from dataclasses import asdict
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import psutil
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -218,6 +219,37 @@ class TestRunRecorder:
         assert result.session_id == "test-session-123"
         assert result.latency_ms > 0
         assert result.upload_size_bytes > 0
+        assert result.error == ""
+
+    @pytest.mark.asyncio
+    async def test_successful_upload_when_process_metrics_unavailable(self):
+        """Recorder success should not depend on psutil metrics availability."""
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.json = AsyncMock(
+            return_value={"status": "ok", "session_id": "test-session-456"}
+        )
+        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_response.__aexit__ = AsyncMock(return_value=None)
+
+        mock_session = MagicMock()
+        mock_session.post = MagicMock(return_value=mock_response)
+
+        with patch(
+            "bin.load_test_100_recorders.psutil.Process",
+            side_effect=psutil.NoSuchProcess(pid=1234),
+        ):
+            result = await run_recorder(
+                recorder_id=6,
+                backend_url="http://localhost:8500",
+                session=mock_session,
+            )
+
+        assert result.recorder_id == 6
+        assert result.success is True
+        assert result.session_id == "test-session-456"
+        assert result.cpu_percent == 0.0
+        assert result.mem_mb == 0.0
         assert result.error == ""
 
     @pytest.mark.asyncio

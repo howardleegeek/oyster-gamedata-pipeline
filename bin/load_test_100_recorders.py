@@ -29,7 +29,7 @@ import logging
 import os
 import statistics
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import aiohttp
@@ -124,6 +124,38 @@ def generate_mock_session(recorder_id: int) -> bytes:
 # ---------------------------------------------------------------------------
 
 
+def _current_process_for_metrics() -> psutil.Process | None:
+    """Return the current process for optional metrics collection."""
+    try:
+        return psutil.Process(os.getpid())
+    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, OSError) as exc:
+        logger.debug("Process metrics unavailable before upload: %s", exc)
+        return None
+
+
+def _prime_process_metrics(proc: psutil.Process | None) -> None:
+    """Prime CPU metrics without letting psutil failures affect uploads."""
+    if proc is None:
+        return
+    try:
+        proc.cpu_percent(interval=None)
+    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, OSError) as exc:
+        logger.debug("Process metrics prime failed: %s", exc)
+
+
+def _sample_process_metrics(proc: psutil.Process | None) -> tuple[float, float]:
+    """Best-effort CPU and memory sampling for load-test reporting."""
+    if proc is None:
+        return 0.0, 0.0
+    try:
+        cpu_percent = round(proc.cpu_percent(interval=None), 2)
+        mem_mb = round(proc.memory_info().rss / (1024 * 1024), 2)
+    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, OSError) as exc:
+        logger.debug("Process metrics sample failed: %s", exc)
+        return 0.0, 0.0
+    return cpu_percent, mem_mb
+
+
 async def run_recorder(
     recorder_id: int,
     backend_url: str,
@@ -138,10 +170,8 @@ async def run_recorder(
     result = RecorderResult(recorder_id=recorder_id)
 
     try:
-        # Measure CPU and memory
-        proc = psutil.Process(os.getpid())
-        proc.cpu_percent(interval=None)  # prime the measurement
-        proc.memory_info().rss / (1024 * 1024)
+        proc = _current_process_for_metrics()
+        _prime_process_metrics(proc)
 
         # Simulate 30s recording session with 1s sleep
         await asyncio.sleep(1.0)
@@ -172,13 +202,9 @@ async def run_recorder(
                 result.session_id = body.get("session_id", "")
             else:
                 result.error = f"HTTP {resp.status}"
-                logger.warning(
-                    "Recorder %d upload failed: HTTP %d", recorder_id, resp.status
-                )
+                logger.warning("Recorder %d upload failed: HTTP %d", recorder_id, resp.status)
 
-        # Measure CPU and memory after
-        result.cpu_percent = round(proc.cpu_percent(interval=None), 2)
-        result.mem_mb = round(proc.memory_info().rss / (1024 * 1024), 2)
+        result.cpu_percent, result.mem_mb = _sample_process_metrics(proc)
 
     except asyncio.CancelledError:
         result.error = "cancelled"
@@ -307,9 +333,7 @@ def write_markdown_report(metrics: LoadTestMetrics, output_path: Path) -> None:
         )
 
     if len(metrics.recorder_results) > 20:
-        lines.append(
-            f"\n*... and {len(metrics.recorder_results) - 20} more (see JSON)*"
-        )
+        lines.append(f"\n*... and {len(metrics.recorder_results) - 20} more (see JSON)*")
 
     lines.append("")
 
@@ -360,13 +384,10 @@ async def run_load_test(
         start = time.monotonic()
 
         tasks = [
-            asyncio.create_task(run_recorder(i, backend_url, session))
-            for i in range(num_recorders)
+            asyncio.create_task(run_recorder(i, backend_url, session)) for i in range(num_recorders)
         ]
 
-        results: list[RecorderResult] = await asyncio.gather(
-            *tasks, return_exceptions=False
-        )
+        results: list[RecorderResult] = await asyncio.gather(*tasks, return_exceptions=False)
 
         total_duration = time.monotonic() - start
 
@@ -374,8 +395,7 @@ async def run_load_test(
     metrics = aggregate_metrics(results, total_duration, backend_url)
 
     logger.info(
-        "Load test complete: %d/%d success, p95=%.1fms, error_rate=%.1f%%, "
-        "duration=%.1fs",
+        "Load test complete: %d/%d success, p95=%.1fms, error_rate=%.1f%%, " "duration=%.1fs",
         metrics.successful,
         metrics.total_recorders,
         metrics.p95_latency_ms,
