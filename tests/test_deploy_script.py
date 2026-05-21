@@ -154,9 +154,10 @@ class TestDeployScript:
         """Script must reference the backend_stub directory."""
         assert "backend_stub" in self.text, "Script must reference backend_stub directory"
 
-    def test_flyctl_deploy(self):
-        """Script must invoke flyctl deploy."""
-        assert "flyctl deploy" in self.text, "Script must run 'flyctl deploy'"
+    def test_fly_deploy(self):
+        """Script must invoke the Fly.io CLI deploy command."""
+        assert " deploy " in self.text, "Script must run the Fly.io deploy command"
+        assert "FLY_CLI" in self.text, "Script should deploy through the resolved Fly.io CLI"
 
     def test_no_hardcoded_token(self):
         """Script must NOT contain any hardcoded fly token."""
@@ -165,6 +166,8 @@ class TestDeployScript:
         for token in forbidden:
             assert token not in lower, f"Script must not contain hardcoded '{token}'"
 
-    def test_flyctl_check(self):
-        """Script should check that flyctl is available."""
-        assert "flyctl" in self.text, "Script should reference flyctl"
+    def test_fly_cli_check(self):
+        """Script should accept both flyctl and fly binaries."""
+        assert "command -v flyctl" in self.text, "Script should check flyctl"
+        assert "command -v fly" in self.text, "Script should check fly"
+        assert "find_fly_cli" in self.text, "Script should resolve the Fly.io CLI once"

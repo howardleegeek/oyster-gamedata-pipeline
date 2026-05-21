@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -14,6 +15,8 @@ from scripts.verify_deployed_backend import (
     check_testers_apply,
     run,
 )
+
+ROOT = Path(__file__).resolve().parent.parent
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -280,3 +283,22 @@ class TestRun:
             code = run("https://example.com", verbose=False)
 
         assert code == 1
+
+
+class TestBackendRemoteSmokeWorkflow:
+    def test_workflow_exists_and_runs_verify_script(self):
+        workflow = ROOT / ".github" / "workflows" / "backend-remote-smoke.yml"
+        text = workflow.read_text()
+
+        assert "workflow_dispatch:" in text
+        assert "schedule:" in text
+        assert "BACKEND_SMOKE_URL" in text
+        assert "scripts/verify_deployed_backend.py" in text
+        assert '--url "$BACKEND_URL"' in text
+
+    def test_scheduled_run_skips_without_backend_url_variable(self):
+        workflow = ROOT / ".github" / "workflows" / "backend-remote-smoke.yml"
+        text = workflow.read_text()
+
+        assert "github.event_name == 'workflow_dispatch'" in text
+        assert "vars.BACKEND_SMOKE_URL != ''" in text

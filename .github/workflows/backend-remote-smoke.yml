@@ -1,0 +1,33 @@
+name: Backend Remote Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      backend_url:
+        description: Backend URL to smoke-test.
+        required: false
+        default: https://oyster-backend-stub.fly.dev
+  schedule:
+    - cron: "47 * * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.BACKEND_SMOKE_URL != '' }}
+    runs-on: ubuntu-latest
+    env:
+      BACKEND_URL: ${{ inputs.backend_url || vars.BACKEND_SMOKE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install smoke dependencies
+        run: python -m pip install --upgrade httpx
+
+      - name: Smoke-test backend
+        run: python scripts/verify_deployed_backend.py --url "$BACKEND_URL" --verbose

@@ -21,14 +21,13 @@ import json
 import sys
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
 
 import httpx
-
 
 # ---------------------------------------------------------------------------
 # Result tracking
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class CheckResult:
@@ -66,6 +65,7 @@ class SmokeReport:
 # Individual checks
 # ---------------------------------------------------------------------------
 
+
 def check_healthz(client: httpx.Client, verbose: bool) -> CheckResult:
     """GET /healthz → 200 + {"status": "ok"}"""
     if verbose:
@@ -73,14 +73,10 @@ def check_healthz(client: httpx.Client, verbose: bool) -> CheckResult:
     try:
         resp = client.get("/healthz")
         if resp.status_code != 200:
-            return CheckResult(
-                "GET /healthz", False, f"status={resp.status_code}"
-            )
+            return CheckResult("GET /healthz", False, f"status={resp.status_code}")
         body = resp.json()
         if body.get("status") != "ok":
-            return CheckResult(
-                "GET /healthz", False, f'unexpected body: {json.dumps(body)}'
-            )
+            return CheckResult("GET /healthz", False, f"unexpected body: {json.dumps(body)}")
         return CheckResult("GET /healthz", True)
     except Exception as exc:
         return CheckResult("GET /healthz", False, str(exc))
@@ -159,18 +155,15 @@ def check_appcast(client: httpx.Client, verbose: bool) -> CheckResult:
         ET.fromstring(resp.text)
         return CheckResult("GET /api/v1/updates/appcast.xml", True)
     except ET.ParseError as exc:
-        return CheckResult(
-            "GET /api/v1/updates/appcast.xml", False, f"XML parse error: {exc}"
-        )
+        return CheckResult("GET /api/v1/updates/appcast.xml", False, f"XML parse error: {exc}")
     except Exception as exc:
-        return CheckResult(
-            "GET /api/v1/updates/appcast.xml", False, str(exc)
-        )
+        return CheckResult("GET /api/v1/updates/appcast.xml", False, str(exc))
 
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def run(url: str, verbose: bool = False) -> int:
     """Run all smoke checks against *url*. Returns exit code."""
@@ -200,9 +193,7 @@ def _unwrap(result: CheckResult) -> tuple[str, bool, str]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Smoke-test a deployed backend_stub instance."
-    )
+    parser = argparse.ArgumentParser(description="Smoke-test a deployed backend_stub instance.")
     parser.add_argument(
         "--url",
         required=True,
