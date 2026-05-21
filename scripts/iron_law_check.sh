@@ -35,7 +35,9 @@ info() {
 # Determine diff range
 # ---------------------------------------------------------------------------
 
+IRON_LAW_DIFF_BASE_EXPLICIT=0
 if [ -n "${IRON_LAW_DIFF_BASE:-}" ]; then
+  IRON_LAW_DIFF_BASE_EXPLICIT=1
   DIFF_BASE="${IRON_LAW_DIFF_BASE}"
 elif [ -n "${GITHUB_BASE_REF:-}" ]; then
   DIFF_BASE="origin/${GITHUB_BASE_REF}"
@@ -222,7 +224,9 @@ for item in items:
 check_not_empty_pr() {
   info "Checking PR is not empty (at least 1 commit)..."
 
-  if [ -n "${GITHUB_EVENT_NAME:-}" ] && [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+  if [ "${IRON_LAW_DIFF_BASE_EXPLICIT}" -eq 0 ] &&
+    [ -n "${GITHUB_EVENT_NAME:-}" ] &&
+    [ "${GITHUB_EVENT_NAME}" = "push" ]; then
     info "  (push event — has commits)"
     return 0
   fi
