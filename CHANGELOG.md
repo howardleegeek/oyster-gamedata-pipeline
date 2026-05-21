@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [0.8.5] - 2026-05-21
+
+### Fixed
+
+- retry installer asset carry-forward (788d68e)
+- publish installer assets atomically (2e87915)
+- document installer in release notes (b710188)
+
+
 ## [0.8.4] - 2026-05-21
 
 ### Fixed
