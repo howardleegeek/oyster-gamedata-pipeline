@@ -204,6 +204,42 @@ attach_latest_installer_assets() {
   fi
 }
 
+installer_release_notes() {
+  local target_tag="$1"
+
+  if [ "${ATTACH_INSTALLER_ASSETS:-true}" = "false" ]; then
+    return 0
+  fi
+
+  if [ "${#INSTALLER_ASSET_FILES[@]}" -eq 0 ]; then
+    return 0
+  fi
+
+  local repo_slug="${RELEASE_REPOSITORY:-${GITHUB_REPOSITORY:-}}"
+  local asset asset_name
+
+  echo ""
+  echo ""
+  echo "## Windows installer"
+  echo ""
+
+  for asset in "${INSTALLER_ASSET_FILES[@]}"; do
+    asset_name=$(basename "$asset")
+    if [[ "$asset_name" == *.exe ]]; then
+      if [ -n "$repo_slug" ]; then
+        echo "- Download: [${asset_name}](https://github.com/${repo_slug}/releases/download/${target_tag}/${asset_name})"
+      else
+        echo "- Download: ${asset_name} (attached to this release)"
+      fi
+    fi
+  done
+
+  echo "- Checksum: \`SHA256SUMS.txt\`"
+  echo "- Windows SmartScreen may warn until the installer is code-signed."
+  echo "- Installs to \`%LOCALAPPDATA%\\OysterRecorder\\\` and starts from the tray."
+  echo "- Backend income/upload endpoints may still be test-mode until public deploy is complete."
+}
+
 # ---------------------------------------------------------------------------
 # Pre-flight
 # ---------------------------------------------------------------------------
@@ -396,6 +432,7 @@ fi
 # Pre-fetch assets before changing git state. For new releases, passing files
 # directly to `gh release create` lets the CLI upload to a draft before publish.
 prepare_latest_installer_assets "$NEW_VERSION"
+RELEASE_BODY="${CHANGELOG_BODY}$(installer_release_notes "$NEW_VERSION")"
 
 # ---------------------------------------------------------------------------
 # Update CHANGELOG.md
@@ -457,13 +494,13 @@ git push origin "$NEW_VERSION"
 if gh release view "$NEW_VERSION" >/dev/null 2>&1; then
   run_with_retries gh release edit "$NEW_VERSION" \
     --title "Release ${NEW_VERSION}" \
-    --notes "$CHANGELOG_BODY"
+    --notes "$RELEASE_BODY"
   attach_latest_installer_assets "$NEW_VERSION"
 else
   run_with_retries gh release create "$NEW_VERSION" \
     "${INSTALLER_ASSET_FILES[@]}" \
     --title "Release ${NEW_VERSION}" \
-    --notes "$CHANGELOG_BODY" \
+    --notes "$RELEASE_BODY" \
     --generate-notes=false
 fi
 

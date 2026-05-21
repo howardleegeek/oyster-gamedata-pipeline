@@ -287,6 +287,15 @@ class TestInstallerAssetAttachment:
         assert '"${INSTALLER_ASSET_FILES[@]}"' in script
         assert "directly to `gh release create`" in script
 
+    def test_release_script_adds_installer_section_to_release_notes(self):
+        script = _script_text()
+        assert "installer_release_notes" in script
+        assert 'RELEASE_BODY="${CHANGELOG_BODY}$(installer_release_notes "$NEW_VERSION")"' in script
+        assert '--notes "$RELEASE_BODY"' in script
+        assert "## Windows installer" in script
+        assert "Windows SmartScreen may warn" in script
+        assert "%LOCALAPPDATA%\\\\OysterRecorder\\\\" in script
+
     def test_release_script_uploads_sha256sums_with_installer(self):
         script = _script_text()
         assert "SHA256SUMS.txt" in script
