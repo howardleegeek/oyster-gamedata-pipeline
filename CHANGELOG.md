@@ -1,5 +1,34 @@
 # CHANGELOG
 
+## [0.8.1] - 2026-05-21
+
+### Fixed
+
+- replace fake mareangler/iscc-action with real choco install Inno Setup (#90) (9573f4d)
+- skip missing enrichment submodule (#91) (59321b2)
+- update recorder lock and version parsing (#92) (c4af85c)
+- shorten recorder cargo target path (#93) (40627b9)
+- scope runner temp env to recorder job (#94) (cfe42fa)
+- use fixed short cargo target path (#95) (caf24d5)
+- pin recorder submodule to v2.6.0 release (7718de6)
+- remove --locked from cargo build (Layer 6 unblock) (#96) (71b31fc)
+- Layer 7 — workflow looks for gamedata-recorder.exe not oyster-recorder.exe (#97) (2864df7)
+- Layer 8 pre-emptive — .iss references gamedata-recorder.exe (#98) (3f14638)
+- normalize recorder binary for installer (062c18e)
+- use single-line recorder artifact paths (add0631)
+- Layer 8 — correct upload path to installer/installer/output/ (where ISCC actually writes) (#99) (cce7f8c)
+- write setup artifact to expected output dir (4587890)
+- upload recorder artifact from final output dir (a750adb)
+- stabilize recorder tests and release automation (62e8d79)
+
+### Other
+
+- docs(specs): S60v2 imperative — fix fake mareangler/iscc-action with real choco install (6c15927)
+- docs(specs): S60v3 skip missing enrichment submodule (d6b81ac)
+- docs(specs): S121 — fix 6+ Rust compile errors (TrayIcon::menu, missing rand/urlencoding/hex/fastrand, Notification::timeout_ms API) (3cc7e49)
+- docs(specs): S60v7 — remove --locked flag (Layer 6 CI fix) (7799e77)
+
+
 ## v0.4.1 · 2026-05-19
 
 ### Added
