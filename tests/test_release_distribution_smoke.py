@@ -23,3 +23,17 @@ def test_release_smoke_workflow_runs_on_schedule_and_manual_dispatch() -> None:
     assert "schedule:" in workflow
     assert "contents: read" in workflow
     assert "bash scripts/verify_latest_release_assets.sh" in workflow
+
+
+def test_windows_installer_smoke_workflow_exercises_real_install_path() -> None:
+    workflow = (REPO_ROOT / ".github/workflows/windows-installer-smoke.yml").read_text()
+
+    assert "runs-on: windows-latest" in workflow
+    assert "gh release download" in workflow
+    assert "SHA256SUMS.txt" in workflow
+    assert "Get-FileHash" in workflow
+    assert "/VERYSILENT" in workflow
+    assert "$env:LOCALAPPDATA" in workflow
+    assert "gamedata-recorder.exe" in workflow
+    assert "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" in workflow
+    assert "unins000.exe" in workflow

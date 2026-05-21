@@ -1,0 +1,129 @@
+name: Windows Installer Smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 10 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  install-uninstall:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download latest installer assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $release = gh release view --json tagName,assets | ConvertFrom-Json
+          $installerAsset = $release.assets |
+            Where-Object { $_.name -match '^OysterRecorder-[Ss]etup-.*\.exe$' } |
+            Select-Object -First 1
+          if (-not $installerAsset) {
+            throw "Latest release $($release.tagName) has no OysterRecorder setup exe"
+          }
+          gh release download $release.tagName --pattern $installerAsset.name --dir dist
+          gh release download $release.tagName --pattern SHA256SUMS.txt --dir dist
+          "INSTALLER_NAME=$($installerAsset.name)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "RELEASE_TAG=$($release.tagName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Verify checksum
+        shell: pwsh
+        run: |
+          $installer = Join-Path "dist" $env:INSTALLER_NAME
+          if (-not (Test-Path $installer)) {
+            throw "Installer not downloaded: $installer"
+          }
+          if (-not (Test-Path "dist\SHA256SUMS.txt")) {
+            throw "SHA256SUMS.txt not downloaded"
+          }
+          $line = Select-String -Path "dist\SHA256SUMS.txt" -Pattern ([regex]::Escape($env:INSTALLER_NAME)) |
+            Select-Object -First 1
+          if (-not $line) {
+            throw "SHA256SUMS.txt does not mention $env:INSTALLER_NAME"
+          }
+          $expected = ($line.Line -split '\s+')[0].ToLowerInvariant()
+          $actual = (Get-FileHash -Algorithm SHA256 -Path $installer).Hash.ToLowerInvariant()
+          if ($expected -ne $actual) {
+            throw "SHA256 mismatch. expected=$expected actual=$actual"
+          }
+
+      - name: Silent install
+        shell: pwsh
+        run: |
+          $installer = Join-Path "dist" $env:INSTALLER_NAME
+          $installLog = Join-Path $env:TEMP "OysterRecorder-install.log"
+          $args = @(
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART",
+            "/LOG=$installLog"
+          )
+          $process = Start-Process -FilePath $installer -ArgumentList $args -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            Get-Content $installLog -ErrorAction SilentlyContinue
+            throw "Installer exited with $($process.ExitCode)"
+          }
+
+      - name: Verify installed files and autostart
+        shell: pwsh
+        run: |
+          $installDir = Join-Path $env:LOCALAPPDATA "OysterRecorder"
+          $exe = Join-Path $installDir "gamedata-recorder.exe"
+          if (-not (Test-Path $exe)) {
+            Get-ChildItem -Recurse -Force $installDir -ErrorAction SilentlyContinue
+            throw "Installed recorder exe missing: $exe"
+          }
+          $run = Get-ItemProperty `
+            -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" `
+            -Name "OysterRecorder" `
+            -ErrorAction Stop
+          if ($run.OysterRecorder -notmatch "gamedata-recorder\.exe" -or $run.OysterRecorder -notmatch "--tray") {
+            throw "Unexpected OysterRecorder Run value: $($run.OysterRecorder)"
+          }
+
+      - name: Silent uninstall
+        if: always()
+        shell: pwsh
+        run: |
+          $installDir = Join-Path $env:LOCALAPPDATA "OysterRecorder"
+          $uninstaller = Join-Path $installDir "unins000.exe"
+          if (Test-Path $uninstaller) {
+            $uninstallLog = Join-Path $env:TEMP "OysterRecorder-uninstall.log"
+            $args = @(
+              "/VERYSILENT",
+              "/SUPPRESSMSGBOXES",
+              "/NORESTART",
+              "/LOG=$uninstallLog"
+            )
+            $process = Start-Process -FilePath $uninstaller -ArgumentList $args -Wait -PassThru
+            if ($process.ExitCode -ne 0) {
+              Get-Content $uninstallLog -ErrorAction SilentlyContinue
+              throw "Uninstaller exited with $($process.ExitCode)"
+            }
+          }
+          Remove-ItemProperty `
+            -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" `
+            -Name "OysterRecorder" `
+            -ErrorAction SilentlyContinue
+
+      - name: Verify uninstall cleanup
+        shell: pwsh
+        run: |
+          $installDir = Join-Path $env:LOCALAPPDATA "OysterRecorder"
+          $exe = Join-Path $installDir "gamedata-recorder.exe"
+          if (Test-Path $exe) {
+            throw "Recorder exe still exists after uninstall: $exe"
+          }
+          $run = Get-ItemProperty `
+            -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" `
+            -Name "OysterRecorder" `
+            -ErrorAction SilentlyContinue
+          if ($run) {
+            throw "OysterRecorder Run value still exists after uninstall"
+          }
