@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [0.8.7] - 2026-05-21
+
+### Other
+
+- ci(backend): add Fly deploy workflow (c344395)
+- ci(release): verify recorder tray launch (3075d7d)
+- ci(backend): codify deploy smoke release blocker (eee00b8)
+
+
 ## [0.8.6] - 2026-05-21
 
 ### Other
