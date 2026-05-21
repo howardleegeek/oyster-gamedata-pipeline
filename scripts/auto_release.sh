@@ -37,6 +37,78 @@ tag_exists() {
   git rev-parse -q --verify "refs/tags/$1" >/dev/null
 }
 
+hash_files() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$@"
+  else
+    shasum -a 256 "$@"
+  fi
+}
+
+attach_latest_installer_assets() {
+  local target_tag="$1"
+
+  if [ "${ATTACH_INSTALLER_ASSETS:-true}" = "false" ]; then
+    log "ATTACH_INSTALLER_ASSETS=false — skipping installer asset copy"
+    return 0
+  fi
+
+  local tmpdir source_tag candidate
+  tmpdir=$(mktemp -d)
+
+  while IFS= read -r candidate; do
+    if [ "$candidate" = "$target_tag" ]; then
+      continue
+    fi
+
+    if gh release view "$candidate" --json assets \
+      --jq '.assets[].name' 2>/dev/null \
+      | grep -qE '^OysterRecorder-[Ss]etup-.*\.exe$'; then
+      source_tag="$candidate"
+      break
+    fi
+  done < <(
+    gh release list \
+      --limit "${INSTALLER_ASSET_SEARCH_LIMIT:-30}" \
+      --json tagName,isDraft,isPrerelease \
+      --jq '.[] | select((.isDraft | not) and (.isPrerelease | not)) | .tagName'
+  )
+
+  if [ -z "${source_tag:-}" ]; then
+    rm -rf "$tmpdir"
+    die "No known-good OysterRecorder installer asset found to attach to ${target_tag}"
+  fi
+
+  log "Copying installer assets from ${source_tag} to ${target_tag}"
+  gh release download "$source_tag" \
+    --pattern 'OysterRecorder-[Ss]etup-*.exe' \
+    --dir "$tmpdir"
+
+  shopt -s nullglob
+  local installers=("$tmpdir"/OysterRecorder-setup-*.exe "$tmpdir"/OysterRecorder-Setup-*.exe)
+  shopt -u nullglob
+
+  if [ "${#installers[@]}" -eq 0 ]; then
+    rm -rf "$tmpdir"
+    die "Release ${source_tag} had no downloadable OysterRecorder installer after download"
+  fi
+
+  local installer_names=()
+  local installer
+  for installer in "${installers[@]}"; do
+    installer_names+=("$(basename "$installer")")
+  done
+
+  (
+    cd "$tmpdir"
+    hash_files "${installer_names[@]}" | sort > SHA256SUMS.txt
+  )
+
+  gh release upload "$target_tag" "${installers[@]}" "$tmpdir/SHA256SUMS.txt" --clobber
+  rm -rf "$tmpdir"
+  log "Installer assets attached to ${target_tag}"
+}
+
 # ---------------------------------------------------------------------------
 # Pre-flight
 # ---------------------------------------------------------------------------
@@ -293,5 +365,7 @@ else
     --notes "$CHANGELOG_BODY" \
     --generate-notes=false
 fi
+
+attach_latest_installer_assets "$NEW_VERSION"
 
 log "Release ${NEW_VERSION} created successfully"

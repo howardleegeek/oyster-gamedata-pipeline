@@ -3,6 +3,7 @@
 import shutil
 import subprocess
 import textwrap
+from pathlib import Path
 
 
 def _run_script(git_log_output, latest_tag="v0.4.1", dry_run="true", extra_tags=None):
@@ -123,6 +124,11 @@ def _run_script(git_log_output, latest_tag="v0.4.1", dry_run="true", extra_tags=
         )
 
         return result
+
+
+def _script_text() -> str:
+    repo_root = Path(__file__).resolve().parent.parent
+    return (repo_root / "scripts" / "auto_release.sh").read_text()
 
 
 class TestSemVerPatchBump:
@@ -258,3 +264,22 @@ class TestEdgeCases:
         assert result.returncode == 0
         assert "New version: v0.4.3 (from v0.4.2)" in result.stdout
         assert "Would create tag: v0.4.3" in result.stdout
+
+
+class TestInstallerAssetAttachment:
+    """Automatic v* releases must keep the installer distribution path intact."""
+
+    def test_release_script_attaches_latest_known_good_installer(self):
+        script = _script_text()
+        assert 'attach_latest_installer_assets "$NEW_VERSION"' in script
+        assert "gh release list" in script
+        assert "gh release download" in script
+        assert "gh release upload" in script
+        assert "OysterRecorder-[Ss]etup-*.exe" in script
+
+    def test_release_script_uploads_sha256sums_with_installer(self):
+        script = _script_text()
+        assert "SHA256SUMS.txt" in script
+        assert "hash_files" in script
+        assert "sha256sum" in script
+        assert "shasum -a 256" in script
