@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.8.4] - 2026-05-21
+
+### Fixed
+
+- carry installer assets onto auto releases (0e53778)
+
+
 ## [0.8.3] - 2026-05-21
 
 ### Fixed
