@@ -209,7 +209,11 @@ class TestWorkflowYAML:
         assert "workflow_dispatch" in workflow_content
 
     def test_checkout_submodules(self, workflow_content):
-        assert "submodules: recursive" in workflow_content
+        assert "submodules: false" in workflow_content
+        assert (
+            "git submodule update --init --depth 1 vendor/recorder vendor/input-logger"
+            in workflow_content
+        )
 
     def test_rust_toolchain_install(self, workflow_content):
         assert "rust-toolchain" in workflow_content

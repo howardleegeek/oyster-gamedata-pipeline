@@ -20,7 +20,11 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import pytest
-from respx.router import MockRouter
+
+try:
+    from respx.router import MockRouter
+except ImportError:
+    MockRouter = None
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -104,41 +108,45 @@ collect_ignore = [
 ]
 
 
-_respx_router_getitem = MockRouter.__getitem__
+def _install_respx_getitem_url_compat():
+    if MockRouter is None:
+        return
 
+    respx_router_getitem = MockRouter.__getitem__
 
-def _pattern_values(pattern):
-    values = {}
-    value = getattr(pattern, "value", None)
-    if isinstance(value, tuple):
-        for child in value:
-            values.update(_pattern_values(child))
+    def _pattern_values(pattern):
+        values = {}
+        value = getattr(pattern, "value", None)
+        if isinstance(value, tuple):
+            for child in value:
+                values.update(_pattern_values(child))
+            return values
+
+        cls_name = pattern.__class__.__name__.lower()
+        if cls_name in {"scheme", "host", "path"}:
+            values[cls_name] = value
         return values
 
-    cls_name = pattern.__class__.__name__.lower()
-    if cls_name in {"scheme", "host", "path"}:
-        values[cls_name] = value
-    return values
+    def _respx_getitem_url_compat(self, key):
+        try:
+            return respx_router_getitem(self, key)
+        except KeyError:
+            parsed = urlparse(key) if isinstance(key, str) else None
+            if parsed and parsed.scheme and parsed.netloc:
+                for route in self.routes:
+                    values = _pattern_values(route.pattern)
+                    if (
+                        values.get("scheme") == parsed.scheme
+                        and values.get("host") == parsed.netloc
+                        and values.get("path") == parsed.path
+                    ):
+                        return route
+            raise
+
+    MockRouter.__getitem__ = _respx_getitem_url_compat
 
 
-def _respx_getitem_url_compat(self, key):
-    try:
-        return _respx_router_getitem(self, key)
-    except KeyError:
-        parsed = urlparse(key) if isinstance(key, str) else None
-        if parsed and parsed.scheme and parsed.netloc:
-            for route in self.routes:
-                values = _pattern_values(route.pattern)
-                if (
-                    values.get("scheme") == parsed.scheme
-                    and values.get("host") == parsed.netloc
-                    and values.get("path") == parsed.path
-                ):
-                    return route
-        raise
-
-
-MockRouter.__getitem__ = _respx_getitem_url_compat
+_install_respx_getitem_url_compat()
 
 
 def pytest_collection_modifyitems(config, items):

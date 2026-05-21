@@ -302,7 +302,10 @@ def _detect_evidence_provenance(session_dir: str) -> str:
         return "real"
     if "OysterClips/finalized/" in f"{normalized}/":
         return "real"
-    if "tests/fixtures/" in f"{normalized}/" or "/tmp/" in f"{normalized}/":
+    normalized_with_slash = f"{normalized}/"
+    if "tests/fixtures/" in normalized_with_slash:
+        return "synthetic"
+    if normalized.startswith("/tmp/test_session"):
         return "synthetic"
     return "unknown"
 
