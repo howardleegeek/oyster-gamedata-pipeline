@@ -5,7 +5,21 @@
 The repository currently ships `backend_stub/` as the deployable FastAPI
 service. The canonical deployment path is Fly.io, not Render/Railway.
 
-### Required GitHub Secret
+### Current Blocker (2026-05-21)
+
+Release distribution is closed at `v0.8.6`: the latest release has the Windows
+installer and `SHA256SUMS.txt`, and both Release Distribution Smoke and Windows
+Installer Smoke are green. The remaining backend deploy blocker is operational:
+
+- Repository secret `FLY_API_TOKEN` is not configured.
+- Repository variable `BACKEND_SMOKE_URL` is not configured.
+- `Backend Remote Smoke` intentionally skips scheduled runs until
+  `BACKEND_SMOKE_URL` is set.
+
+Do not treat a skipped scheduled smoke run as a deployed backend. It only means
+the repo is still missing the public backend URL.
+
+### Required GitHub Secret And Variable
 
 Configure this in repository secrets:
 
@@ -15,9 +29,16 @@ FLY_API_TOKEN=<Fly.io deploy token>
 
 Do not commit Fly tokens or `.env` files.
 
+Configure this repository variable after the first successful public deploy:
+
+```bash
+BACKEND_SMOKE_URL=https://oyster-backend-stub.fly.dev
+```
+
 ### Manual Deploy From GitHub Actions
 
-Run the manual workflow after `FLY_API_TOKEN` is configured:
+Run the exact workflow named `Deploy Backend (Fly.io)` from GitHub Actions after
+`FLY_API_TOKEN` is configured:
 
 ```bash
 gh workflow run deploy-backend-fly.yml \
@@ -35,6 +56,11 @@ python scripts/verify_deployed_backend.py \
   --verbose
 ```
 
+Expected result: the deploy workflow must fail closed with a clear
+`Missing repo secret FLY_API_TOKEN` error when the secret is absent. With the
+secret present, it must deploy `backend_stub/` using `backend_stub/fly.toml` and
+`--remote-only`, then pass the backend verifier.
+
 ### Scheduled Smoke
 
 After the first successful deploy, set the repo variable:
@@ -46,6 +72,52 @@ gh variable set BACKEND_SMOKE_URL --body https://oyster-backend-stub.fly.dev
 `backend-remote-smoke.yml` will then keep checking `/healthz`, tester apply,
 income, and appcast. Without that variable, scheduled smoke intentionally
 skips so the repo does not page on an undeployed backend.
+
+The exact workflow name is `Backend Remote Smoke`. Manual dispatch is allowed
+before the variable is set by passing a `backend_url` input. Scheduled runs must
+only execute when `vars.BACKEND_SMOKE_URL` is configured.
+
+### Smoke Criteria
+
+The deployed backend is acceptable only when this command passes against the
+public URL:
+
+```bash
+python scripts/verify_deployed_backend.py \
+  --url https://oyster-backend-stub.fly.dev \
+  --verbose
+```
+
+The verifier must confirm:
+
+- `/healthz` returns a healthy response.
+- tester apply flow accepts a request.
+- income endpoint returns the expected stub-compatible response.
+- appcast endpoint is reachable.
+
+### Rollback
+
+If the Fly deploy succeeds but smoke fails:
+
+1. Stop using the new URL for tester traffic.
+2. Unset or restore the repo variable so scheduled smoke does not validate the
+   bad target:
+
+   ```bash
+   gh variable delete BACKEND_SMOKE_URL
+   ```
+
+   or:
+
+   ```bash
+   gh variable set BACKEND_SMOKE_URL --body <last-known-good-backend-url>
+   ```
+
+3. Roll back the Fly app to the last known-good release from the Fly dashboard
+   or `flyctl releases`, then rerun `Backend Remote Smoke` manually.
+4. If rollback cannot restore healthy smoke, leave `BACKEND_SMOKE_URL` unset so
+   scheduled smoke returns to the intentional skip state instead of reporting a
+   false pass.
 
 ### Local Deploy Fallback
 
