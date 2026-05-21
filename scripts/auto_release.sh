@@ -66,8 +66,23 @@ run_with_retries() {
   done
 }
 
-attach_latest_installer_assets() {
+INSTALLER_ASSET_TMPDIR=""
+INSTALLER_ASSET_FILES=()
+
+cleanup_installer_asset_tmpdir() {
+  if [ -n "${INSTALLER_ASSET_TMPDIR:-}" ]; then
+    rm -rf "$INSTALLER_ASSET_TMPDIR"
+    INSTALLER_ASSET_TMPDIR=""
+  fi
+}
+
+trap cleanup_installer_asset_tmpdir EXIT
+
+prepare_latest_installer_assets() {
   local target_tag="$1"
+
+  cleanup_installer_asset_tmpdir
+  INSTALLER_ASSET_FILES=()
 
   if [ "${ATTACH_INSTALLER_ASSETS:-true}" = "false" ]; then
     log "ATTACH_INSTALLER_ASSETS=false — skipping installer asset copy"
@@ -76,6 +91,7 @@ attach_latest_installer_assets() {
 
   local tmpdir source_tag candidate
   tmpdir=$(mktemp -d)
+  INSTALLER_ASSET_TMPDIR="$tmpdir"
 
   local release_tags
   release_tags=$(
@@ -84,7 +100,7 @@ attach_latest_installer_assets() {
       --json tagName,isDraft,isPrerelease \
       --jq '.[] | select((.isDraft | not) and (.isPrerelease | not)) | .tagName'
   ) || {
-    rm -rf "$tmpdir"
+    cleanup_installer_asset_tmpdir
     die "Could not list GitHub releases while looking for installer assets"
   }
 
@@ -117,17 +133,17 @@ attach_latest_installer_assets() {
   done <<< "$release_tags"
 
   if [ -z "${source_tag:-}" ]; then
-    rm -rf "$tmpdir"
+    cleanup_installer_asset_tmpdir
     die "No known-good OysterRecorder installer asset found to attach to ${target_tag}"
   fi
 
-  log "Copying installer assets from ${source_tag} to ${target_tag}"
+  log "Preparing installer assets from ${source_tag} for ${target_tag}"
   shopt -s nullglob
   local installers=("$tmpdir"/OysterRecorder-setup-*.exe "$tmpdir"/OysterRecorder-Setup-*.exe)
   shopt -u nullglob
 
   if [ "${#installers[@]}" -eq 0 ]; then
-    rm -rf "$tmpdir"
+    cleanup_installer_asset_tmpdir
     die "Release ${source_tag} had no downloadable OysterRecorder installer after download"
   fi
 
@@ -141,11 +157,11 @@ attach_latest_installer_assets() {
     shopt -u nullglob
 
     if [ "${#installers[@]}" -eq 0 ]; then
-      rm -rf "$tmpdir"
+      cleanup_installer_asset_tmpdir
       die "Release ${source_tag} had no downloadable OysterRecorder installer after retry"
     fi
   else
-    rm -rf "$tmpdir"
+    cleanup_installer_asset_tmpdir
     die "Could not download installer assets from ${source_tag}"
   fi
 
@@ -160,12 +176,30 @@ attach_latest_installer_assets() {
     hash_files "${installer_names[@]}" | sort > SHA256SUMS.txt
   )
 
+  INSTALLER_ASSET_FILES=("${installers[@]}" "$tmpdir/SHA256SUMS.txt")
+  log "Installer assets prepared for ${target_tag}"
+}
+
+attach_latest_installer_assets() {
+  local target_tag="$1"
+
+  if [ "${ATTACH_INSTALLER_ASSETS:-true}" = "false" ]; then
+    log "ATTACH_INSTALLER_ASSETS=false — skipping installer asset upload"
+    return 0
+  fi
+
+  if [ "${#INSTALLER_ASSET_FILES[@]}" -eq 0 ]; then
+    prepare_latest_installer_assets "$target_tag"
+  fi
+
+  if [ "${#INSTALLER_ASSET_FILES[@]}" -eq 0 ]; then
+    die "No prepared installer assets are available for ${target_tag}"
+  fi
+
   if run_with_retries gh release upload \
-    "$target_tag" "${installers[@]}" "$tmpdir/SHA256SUMS.txt" --clobber; then
-    rm -rf "$tmpdir"
+    "$target_tag" "${INSTALLER_ASSET_FILES[@]}" --clobber; then
     log "Installer assets attached to ${target_tag}"
   else
-    rm -rf "$tmpdir"
     die "Could not upload installer assets to ${target_tag}"
   fi
 }
@@ -359,6 +393,10 @@ if [ "$DRY_RUN" = "true" ]; then
   exit 0
 fi
 
+# Pre-fetch assets before changing git state. For new releases, passing files
+# directly to `gh release create` lets the CLI upload to a draft before publish.
+prepare_latest_installer_assets "$NEW_VERSION"
+
 # ---------------------------------------------------------------------------
 # Update CHANGELOG.md
 # ---------------------------------------------------------------------------
@@ -417,16 +455,16 @@ git push origin "$NEW_VERSION"
 
 # Create GitHub release
 if gh release view "$NEW_VERSION" >/dev/null 2>&1; then
-  gh release edit "$NEW_VERSION" \
+  run_with_retries gh release edit "$NEW_VERSION" \
     --title "Release ${NEW_VERSION}" \
     --notes "$CHANGELOG_BODY"
+  attach_latest_installer_assets "$NEW_VERSION"
 else
-  gh release create "$NEW_VERSION" \
+  run_with_retries gh release create "$NEW_VERSION" \
+    "${INSTALLER_ASSET_FILES[@]}" \
     --title "Release ${NEW_VERSION}" \
     --notes "$CHANGELOG_BODY" \
     --generate-notes=false
 fi
-
-attach_latest_installer_assets "$NEW_VERSION"
 
 log "Release ${NEW_VERSION} created successfully"

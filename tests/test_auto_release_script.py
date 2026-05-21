@@ -271,12 +271,21 @@ class TestInstallerAssetAttachment:
 
     def test_release_script_attaches_latest_known_good_installer(self):
         script = _script_text()
+        assert 'prepare_latest_installer_assets "$NEW_VERSION"' in script
         assert 'attach_latest_installer_assets "$NEW_VERSION"' in script
         assert "run_with_retries" in script
         assert "gh release list" in script
         assert "gh release download" in script
         assert "gh release upload" in script
         assert "OysterRecorder-[Ss]etup-*.exe" in script
+
+    def test_release_script_prefetches_assets_before_git_state_changes(self):
+        script = _script_text()
+        assert script.index('prepare_latest_installer_assets "$NEW_VERSION"') < script.index(
+            "git add CHANGELOG.md"
+        )
+        assert '"${INSTALLER_ASSET_FILES[@]}"' in script
+        assert "directly to `gh release create`" in script
 
     def test_release_script_uploads_sha256sums_with_installer(self):
         script = _script_text()
