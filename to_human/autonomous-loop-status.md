@@ -43,3 +43,7 @@
 ## Round 11 @ 2026-05-17T07:30:00Z
 - Picked: Fix prd_test_audio_continuity.py — test_missing_file expected "SKIP:" prefix but script printed "Error:" for file-not-found. Changed main() to print "SKIP:" for all errors from get_audio_streams() (file not found, empty file, invalid file are all skip conditions, not test failures). Also fixed test timestamps to use 10ms spacing (not 100ms) for 50ms threshold test.
 - Result: committed 70738ef
+
+## Round 12 @ 2026-05-17T08:00:00Z
+- Picked: Fix prd_test_depth_6fps_alignment.py — simplify NotADirectoryError handling to always print "skip:" prefix when path exists but is not a directory. The previous complex logic failed to match paths in error messages due to quote differences, causing ValueError handler to catch the exception and print "Error:" instead of "skip:".
+- Result: committed 728b576
