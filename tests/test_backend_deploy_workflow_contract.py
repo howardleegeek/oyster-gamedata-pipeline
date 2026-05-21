@@ -8,7 +8,6 @@ from pathlib import Path
 
 import yaml
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = REPO_ROOT / ".github" / "workflows"
 DEPLOY_WORKFLOW = WORKFLOWS / "deploy-backend-fly.yml"
@@ -80,5 +79,5 @@ def test_remote_smoke_runs_the_same_backend_verifier() -> None:
     step_text = _all_step_text(workflow)
 
     assert "scripts/verify_deployed_backend.py" in step_text
-    assert "--url \"$BACKEND_URL\"" in step_text
+    assert '--url "$BACKEND_URL"' in step_text
     assert "--verbose" in step_text
