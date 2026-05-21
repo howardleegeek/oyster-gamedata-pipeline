@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [0.8.2] - 2026-05-21
+
+### Fixed
+
+- unblock workflow environment checks (73ac2f3)
+- support python 3.10 toml parsing (f5576bf)
+- honor explicit iron law diff base (7d2946b)
+
+
 ## [0.8.1] - 2026-05-21
 
 ### Fixed
