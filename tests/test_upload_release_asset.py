@@ -1,6 +1,7 @@
 """Tests for scripts/upload_release_asset.sh — mocked gh CLI."""
 
 import os
+import shutil
 import subprocess
 import textwrap
 
@@ -134,7 +135,13 @@ class TestUploadReleaseAsset:
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # No mock gh — just an empty dir
+            # No mock gh. Keep only the tools needed before the gh preflight.
+            tool_bin = os.path.join(tmpdir, "bin")
+            os.makedirs(tool_bin, exist_ok=True)
+            grep_path = shutil.which("grep")
+            assert grep_path is not None
+            os.symlink(grep_path, os.path.join(tool_bin, "grep"))
+
             adir = os.path.join(tmpdir, "dist")
             os.makedirs(adir, exist_ok=True)
             dummy_exe = os.path.join(adir, "OysterRecorder-setup-v1.0.0.exe")
@@ -142,8 +149,7 @@ class TestUploadReleaseAsset:
                 f.write(b"MZ")
 
             env = os.environ.copy()
-            # Remove gh from PATH by using a minimal PATH
-            env["PATH"] = "/usr/bin:/bin"
+            env["PATH"] = tool_bin
             env["GH_TOKEN"] = "fake-token"
 
             script_path = os.path.join(
@@ -153,7 +159,7 @@ class TestUploadReleaseAsset:
             )
 
             result = subprocess.run(
-                ["bash", script_path, "v1.0.0", adir],
+                [shutil.which("bash") or "/bin/bash", script_path, "v1.0.0", adir],
                 capture_output=True,
                 text=True,
                 env=env,
