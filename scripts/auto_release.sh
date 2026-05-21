@@ -45,6 +45,27 @@ hash_files() {
   fi
 }
 
+run_with_retries() {
+  local attempts="${GITHUB_API_RETRIES:-3}"
+  local delay="${GITHUB_API_RETRY_DELAY_SEC:-2}"
+  local attempt=1
+
+  while true; do
+    if "$@"; then
+      return 0
+    fi
+
+    if [ "$attempt" -ge "$attempts" ]; then
+      return 1
+    fi
+
+    echo "[auto-release] WARN: command failed, retrying in ${delay}s: $*" >&2
+    sleep "$delay"
+    attempt=$(( attempt + 1 ))
+    delay=$(( delay * 2 ))
+  done
+}
+
 attach_latest_installer_assets() {
   local target_tag="$1"
 
@@ -56,23 +77,44 @@ attach_latest_installer_assets() {
   local tmpdir source_tag candidate
   tmpdir=$(mktemp -d)
 
+  local release_tags
+  release_tags=$(
+    run_with_retries gh release list \
+      --limit "${INSTALLER_ASSET_SEARCH_LIMIT:-30}" \
+      --json tagName,isDraft,isPrerelease \
+      --jq '.[] | select((.isDraft | not) and (.isPrerelease | not)) | .tagName'
+  ) || {
+    rm -rf "$tmpdir"
+    die "Could not list GitHub releases while looking for installer assets"
+  }
+
   while IFS= read -r candidate; do
+    if [ -z "$candidate" ]; then
+      continue
+    fi
+
     if [ "$candidate" = "$target_tag" ]; then
       continue
     fi
 
-    if gh release view "$candidate" --json assets \
-      --jq '.assets[].name' 2>/dev/null \
-      | grep -qE '^OysterRecorder-[Ss]etup-.*\.exe$'; then
-      source_tag="$candidate"
-      break
+    rm -f "$tmpdir"/OysterRecorder-setup-*.exe "$tmpdir"/OysterRecorder-Setup-*.exe
+    if run_with_retries gh release download "$candidate" \
+      --pattern 'OysterRecorder-[Ss]etup-*.exe' \
+      --dir "$tmpdir" >/dev/null 2>&1; then
+      shopt -s nullglob
+      local candidate_installers=(
+        "$tmpdir"/OysterRecorder-setup-*.exe
+        "$tmpdir"/OysterRecorder-Setup-*.exe
+      )
+      shopt -u nullglob
+
+      if [ "${#candidate_installers[@]}" -gt 0 ]; then
+        log "Found installer assets on ${candidate}"
+        source_tag="$candidate"
+        break
+      fi
     fi
-  done < <(
-    gh release list \
-      --limit "${INSTALLER_ASSET_SEARCH_LIMIT:-30}" \
-      --json tagName,isDraft,isPrerelease \
-      --jq '.[] | select((.isDraft | not) and (.isPrerelease | not)) | .tagName'
-  )
+  done <<< "$release_tags"
 
   if [ -z "${source_tag:-}" ]; then
     rm -rf "$tmpdir"
@@ -80,10 +122,6 @@ attach_latest_installer_assets() {
   fi
 
   log "Copying installer assets from ${source_tag} to ${target_tag}"
-  gh release download "$source_tag" \
-    --pattern 'OysterRecorder-[Ss]etup-*.exe' \
-    --dir "$tmpdir"
-
   shopt -s nullglob
   local installers=("$tmpdir"/OysterRecorder-setup-*.exe "$tmpdir"/OysterRecorder-Setup-*.exe)
   shopt -u nullglob
@@ -91,6 +129,24 @@ attach_latest_installer_assets() {
   if [ "${#installers[@]}" -eq 0 ]; then
     rm -rf "$tmpdir"
     die "Release ${source_tag} had no downloadable OysterRecorder installer after download"
+  fi
+
+  # Re-download from the chosen source in case the candidate loop left partial files.
+  rm -f "$tmpdir"/OysterRecorder-setup-*.exe "$tmpdir"/OysterRecorder-Setup-*.exe
+  if run_with_retries gh release download "$source_tag" \
+    --pattern 'OysterRecorder-[Ss]etup-*.exe' \
+    --dir "$tmpdir"; then
+    shopt -s nullglob
+    installers=("$tmpdir"/OysterRecorder-setup-*.exe "$tmpdir"/OysterRecorder-Setup-*.exe)
+    shopt -u nullglob
+
+    if [ "${#installers[@]}" -eq 0 ]; then
+      rm -rf "$tmpdir"
+      die "Release ${source_tag} had no downloadable OysterRecorder installer after retry"
+    fi
+  else
+    rm -rf "$tmpdir"
+    die "Could not download installer assets from ${source_tag}"
   fi
 
   local installer_names=()
@@ -104,9 +160,14 @@ attach_latest_installer_assets() {
     hash_files "${installer_names[@]}" | sort > SHA256SUMS.txt
   )
 
-  gh release upload "$target_tag" "${installers[@]}" "$tmpdir/SHA256SUMS.txt" --clobber
-  rm -rf "$tmpdir"
-  log "Installer assets attached to ${target_tag}"
+  if run_with_retries gh release upload \
+    "$target_tag" "${installers[@]}" "$tmpdir/SHA256SUMS.txt" --clobber; then
+    rm -rf "$tmpdir"
+    log "Installer assets attached to ${target_tag}"
+  else
+    rm -rf "$tmpdir"
+    die "Could not upload installer assets to ${target_tag}"
+  fi
 }
 
 # ---------------------------------------------------------------------------

@@ -272,6 +272,7 @@ class TestInstallerAssetAttachment:
     def test_release_script_attaches_latest_known_good_installer(self):
         script = _script_text()
         assert 'attach_latest_installer_assets "$NEW_VERSION"' in script
+        assert "run_with_retries" in script
         assert "gh release list" in script
         assert "gh release download" in script
         assert "gh release upload" in script
