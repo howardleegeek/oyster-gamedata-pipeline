@@ -1,0 +1,73 @@
+name: Deploy Backend (Fly.io)
+
+on:
+  workflow_dispatch:
+    inputs:
+      backend_url:
+        description: Public backend URL to verify after deploy.
+        required: false
+        default: https://oyster-backend-stub.fly.dev
+      fly_app:
+        description: Fly.io app name.
+        required: false
+        default: oyster-backend-stub
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-backend-fly
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      BACKEND_URL: ${{ inputs.backend_url }}
+      FLY_APP: ${{ inputs.fly_app }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preflight deploy inputs
+        run: |
+          if [ -z "${FLY_API_TOKEN}" ]; then
+            echo "::error::Missing repo secret FLY_API_TOKEN. Create it from Fly.io, then rerun this workflow."
+            exit 1
+          fi
+          if [ -z "${BACKEND_URL}" ]; then
+            echo "::error::backend_url input is required."
+            exit 1
+          fi
+          if [ -z "${FLY_APP}" ]; then
+            echo "::error::fly_app input is required."
+            exit 1
+          fi
+
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy backend_stub to Fly.io
+        run: flyctl deploy backend_stub --config backend_stub/fly.toml --remote-only --app "$FLY_APP"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install smoke dependencies
+        run: python -m pip install --upgrade httpx
+
+      - name: Smoke-test deployed backend
+        run: python scripts/verify_deployed_backend.py --url "$BACKEND_URL" --verbose
+
+      - name: Write deployment summary
+        if: always()
+        run: |
+          {
+            echo "## Backend Fly Deploy"
+            echo ""
+            echo "- App: \`${FLY_APP}\`"
+            echo "- URL: ${BACKEND_URL}"
+            echo "- Smoke workflow: \`scripts/verify_deployed_backend.py\`"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -302,3 +302,27 @@ class TestBackendRemoteSmokeWorkflow:
 
         assert "github.event_name == 'workflow_dispatch'" in text
         assert "vars.BACKEND_SMOKE_URL != ''" in text
+
+
+class TestBackendFlyDeployWorkflow:
+    def test_manual_deploy_workflow_exists_and_verifies_after_deploy(self):
+        workflow = ROOT / ".github" / "workflows" / "deploy-backend-fly.yml"
+        text = workflow.read_text()
+
+        assert "workflow_dispatch:" in text
+        assert "FLY_API_TOKEN" in text
+        assert "superfly/flyctl-actions/setup-flyctl" in text
+        assert "flyctl deploy backend_stub" in text
+        assert "--remote-only" in text
+        assert "scripts/verify_deployed_backend.py" in text
+        assert '--url "$BACKEND_URL"' in text
+
+    def test_manual_deploy_workflow_does_not_autodeploy_without_intent(self):
+        workflow = ROOT / ".github" / "workflows" / "deploy-backend-fly.yml"
+        text = workflow.read_text()
+
+        assert "workflow_dispatch:" in text
+        assert "\npush:" not in text
+        assert "\nschedule:" not in text
+        assert "timeout-minutes: 15" in text
+        assert "contents: read" in text

@@ -1,7 +1,72 @@
 # Backend Deployment Runbook
 
+## Current Canonical Path — Fly.io
+
+The repository currently ships `backend_stub/` as the deployable FastAPI
+service. The canonical deployment path is Fly.io, not Render/Railway.
+
+### Required GitHub Secret
+
+Configure this in repository secrets:
+
+```bash
+FLY_API_TOKEN=<Fly.io deploy token>
+```
+
+Do not commit Fly tokens or `.env` files.
+
+### Manual Deploy From GitHub Actions
+
+Run the manual workflow after `FLY_API_TOKEN` is configured:
+
+```bash
+gh workflow run deploy-backend-fly.yml \
+  -f backend_url=https://oyster-backend-stub.fly.dev \
+  -f fly_app=oyster-backend-stub
+gh run watch
+```
+
+The workflow deploys `backend_stub/` with `flyctl deploy --remote-only` and
+then immediately runs:
+
+```bash
+python scripts/verify_deployed_backend.py \
+  --url https://oyster-backend-stub.fly.dev \
+  --verbose
+```
+
+### Scheduled Smoke
+
+After the first successful deploy, set the repo variable:
+
+```bash
+gh variable set BACKEND_SMOKE_URL --body https://oyster-backend-stub.fly.dev
+```
+
+`backend-remote-smoke.yml` will then keep checking `/healthz`, tester apply,
+income, and appcast. Without that variable, scheduled smoke intentionally
+skips so the repo does not page on an undeployed backend.
+
+### Local Deploy Fallback
+
+If a local Fly CLI is authenticated, this also works:
+
+```bash
+./scripts/deploy_backend.sh
+python scripts/verify_deployed_backend.py \
+  --url https://oyster-backend-stub.fly.dev \
+  --verbose
+```
+
+If `https://oyster-backend-stub.fly.dev` does not resolve, the backend is not
+publicly deployed yet or the Fly app/DNS is not active.
+
+---
+
 ## Purpose
-Deploy FastAPI backend to Render or Railway: environment variables, PostgreSQL URL, S3 credentials, Alembic migrations, and health check verification.
+Legacy reference for deploying a future persistent FastAPI backend to Render or
+Railway: environment variables, PostgreSQL URL, S3 credentials, Alembic
+migrations, and health check verification.
 
 ## Prerequisites
 - Python 3.9+
