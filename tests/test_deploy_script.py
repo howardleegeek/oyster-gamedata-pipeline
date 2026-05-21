@@ -7,7 +7,11 @@ from __future__ import annotations
 import os
 import pathlib
 import stat
-import tomllib
+
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
 import pytest
 

@@ -55,6 +55,7 @@ test = [
     "uvicorn>=0.27",       # OAuth callback server runtime (C3)
     "httpx>=0.27",         # OAuth token exchange (C3)
     "respx>=0.23.1",       # HTTPX mocking fixture — required by remote backend E2E tests
+    "tomli>=2.0; python_version < '3.11'",  # tomllib backport for Python 3.10 CI
     "click>=8.1",          # OAuth CLI (C3)
     "requests>=2.31",      # test_alert_dispatcher (pre-existing CI gap)
     "pyjwt>=2.8",          # test_oauth_flow (pre-existing CI gap)
