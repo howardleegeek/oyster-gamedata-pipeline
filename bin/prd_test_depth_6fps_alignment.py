@@ -96,48 +96,24 @@ def main(argv: List[str] = None) -> int:
         print(f"skip: {e}", file=sys.stderr)
         return 2
     except NotADirectoryError as e:
-        # NotADirectoryError doesn't show the full message when printed, so we need to handle it specially
-        # Try to determine which path caused the error
-        error_path = None
-        error_msg = str(e)
-        
-        # Check if the error message contains a path that matches either of our arguments
+        # Check each path to see if it's not a directory
         for path in [args.video_dir, args.depth_dir]:
-            if str(path) in error_msg:
-                error_path = path
-                break
+            # Check if path exists (symlinks exist even if broken)
+            if path.exists() and not path.is_dir():
+                # Determine what type of path it is
+                if path.is_file():
+                    print(f"skip: Path exists as a file, not a directory: {path}", file=sys.stderr)
+                elif path.is_symlink():
+                    print(f"skip: Path exists as a symlink, not a directory: {path}", file=sys.stderr)
+                else:
+                    print(f"skip: Path exists but is not a directory: {path}", file=sys.stderr)
+                return 2
         
-        # If we couldn't determine which path, check each one
-        if error_path is None:
-            for path in [args.video_dir, args.depth_dir]:
-                if path.exists():
-                    if path.is_file():
-                        print(f"skip: Path exists as a file, not a directory: {path}", file=sys.stderr)
-                        return 2
-                    elif path.is_symlink():
-                        print(f"skip: Path exists as a symlink, not a directory: {path}", file=sys.stderr)
-                        return 2
-                    elif not path.is_dir():
-                        print(f"skip: Path exists but is not a directory: {path}", file=sys.stderr)
-                        return 2
-        
-        # If we still don't know, print the original error with skip prefix
-        if error_path is None:
-            print(f"skip: {e}", file=sys.stderr)
-            return 2
-        
-        # We found the problematic path
-        if error_path.exists():
-            if error_path.is_file():
-                print(f"skip: Path exists as a file, not a directory: {error_path}", file=sys.stderr)
-            elif error_path.is_symlink():
-                print(f"skip: Path exists as a symlink, not a directory: {error_path}", file=sys.stderr)
-            else:
-                print(f"skip: Path exists but is not a directory: {error_path}", file=sys.stderr)
-        else:
-            print(f"skip: {e}", file=sys.stderr)
+        # If we couldn't identify which path, print the original error with skip prefix
+        print(f"skip: {e}", file=sys.stderr)
         return 2
     except ValueError as e:
+        # ValueError from extract_index - this is a data quality issue, not a skip
         print(f"Error: {e}", file=sys.stderr)
         return 2
 
