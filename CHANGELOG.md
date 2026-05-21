@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [0.8.3] - 2026-05-21
+
+### Fixed
+
+- tolerate missing process metrics in load test (16c6377)
+- isolate gh cli absence check (6f5d76d)
+
+### Other
+
+- docs: PARTNER_BRIEF_v0.8.2.md — Bruno review, first real .exe + 36h progress (b5ecb4d)
+
+
 ## [0.8.2] - 2026-05-21
 
 ### Fixed
