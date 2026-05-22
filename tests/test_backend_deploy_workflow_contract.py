@@ -57,7 +57,12 @@ def test_deploy_workflow_uses_remote_fly_deploy_and_verifies_backend() -> None:
     assert "--config backend_stub/fly.toml" in step_text
     assert "--remote-only" in step_text
     assert "scripts/verify_deployed_backend.py" in step_text
-    assert "Resolve latest recorder release tag" in step_text
+    assert "Resolve latest recorder release metadata" in step_text
+    assert "Configure recorder release metadata" in step_text
+    assert "flyctl secrets set" in step_text
+    assert "OYSTER_RECORDER_RELEASE_TAG" in step_text
+    assert "OYSTER_RECORDER_DOWNLOAD_URL" in step_text
+    assert "OYSTER_RECORDER_SHA256" in step_text
     assert "--expected-recorder-tag" in step_text
     assert "bin/remote_recorder_backend_e2e.py" in step_text
     assert '--backend-url "$BACKEND_URL"' in step_text
