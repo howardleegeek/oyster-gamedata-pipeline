@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.9.1] - 2026-05-22
+
+### Other
+
+- ci(backend): script GCP appcast release sync (299cada)
+
+
 ## [0.9.0] - 2026-05-22
 
 ### Added
