@@ -148,16 +148,17 @@ def step_upload_via_signed_url(
     assert upload_url, f"No upload URL in response: {signed_data}"
     logger.info("  ✓ signed URL obtained")
 
-    # 5b: Simulate upload to signed URL (mock S3 — just PUT to the mock URL)
-    # For the mock backend, the signed URL points to mock-s3.example.com.
-    # We simulate the upload by sending a small payload.
+    # 5b: Upload to the signed URL. This must be a real successful PUT; a
+    # failed presigned upload means the backend E2E did not validate ingest.
     fake_tarball = b"\x1f\x8b\x08\x00" + b"FAKE_TARBALL_CONTENT_S114" * 100
     try:
         upload_resp = client.put(upload_url, content=fake_tarball, timeout=REQUEST_TIMEOUT)
-        # Mock S3 may return 200, 204, or even 404 (since it's fake) — we don't fail on this
-        logger.info("  ✓ upload simulated (status=%s)", upload_resp.status_code)
-    except Exception as exc:
-        logger.info("  ✓ upload simulated (mock S3 unreachable, expected: %s)", exc)
+    except httpx.HTTPError as exc:
+        raise AssertionError(f"upload PUT failed: {exc}") from exc
+    assert (
+        200 <= upload_resp.status_code < 300
+    ), f"upload PUT returned {upload_resp.status_code}: {upload_resp.text}"
+    logger.info("  ✓ upload PUT succeeded (status=%s)", upload_resp.status_code)
 
     # 5c: Register session with backend
     session_payload["upload_key"] = signed_data.get("key")

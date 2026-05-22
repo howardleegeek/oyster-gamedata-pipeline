@@ -130,6 +130,19 @@ class TestCheckTestersApply:
         assert result.passed is True
         assert result.name == "POST /api/v1/testers/apply"
 
+    def test_uses_real_apply_payload_schema(self):
+        resp = _make_mock_response(200, {"tester_id": "abc-123"})
+        client = _make_mock_client([resp])
+        result = check_testers_apply(client, verbose=False)
+        assert result.passed is True
+
+        _, kwargs = client.post.call_args
+        assert kwargs["json"] == {
+            "email": "smoke@test.com",
+            "discord_user": "smoke#0000",
+            "why_interested": "deployment smoke test",
+        }
+
     def test_missing_tester_id(self):
         resp = _make_mock_response(200, {"email": "x"})
         client = _make_mock_client([resp])
@@ -199,7 +212,14 @@ class TestCheckIncomeToday:
 class TestCheckAppcast:
     VALID_XML = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<rss version="2.0"><channel><title>Test</title></channel></rss>'
+        '<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" '
+        'version="2.0"><channel><title>Test</title><item>'
+        '<enclosure url="https://github.com/howardleegeek/oyster-gamedata-pipeline/'
+        'releases/download/v0.8.10/OysterRecorder-setup-v2.6.0.exe" '
+        'sparkle:version="0.8.10" '
+        'sparkle:sha256="bb1e3f12bc71fca9089e14fe3c40ca278af76fce042e4328bf2e8ab1d0d451e5" '
+        'type="application/octet-stream"/>'
+        "</item></channel></rss>"
     )
 
     def test_success(self):
@@ -222,6 +242,49 @@ class TestCheckAppcast:
         result = check_appcast(client, verbose=False)
         assert result.passed is False
         assert "status=404" in result.detail
+
+    def test_missing_enclosure_fails(self):
+        resp = _make_mock_response(
+            200,
+            text_body='<rss version="2.0"><channel><title>Test</title></channel></rss>',
+        )
+        client = _make_mock_client([resp])
+        result = check_appcast(client, verbose=False)
+        assert result.passed is False
+        assert "missing enclosure" in result.detail
+
+    def test_placeholder_metadata_fails(self):
+        xml = self.VALID_XML.replace(
+            "bb1e3f12bc71fca9089e14fe3c40ca278af76fce042e4328bf2e8ab1d0d451e5",
+            "PLACEHOLDER_SHA256",
+        )
+        resp = _make_mock_response(200, text_body=xml)
+        client = _make_mock_client([resp])
+        result = check_appcast(client, verbose=False)
+        assert result.passed is False
+        assert "placeholder" in result.detail
+
+    def test_bad_release_url_fails(self):
+        xml = self.VALID_XML.replace(
+            "https://github.com/howardleegeek/oyster-gamedata-pipeline/releases/download/",
+            "https://example.com/",
+        )
+        resp = _make_mock_response(200, text_body=xml)
+        client = _make_mock_client([resp])
+        result = check_appcast(client, verbose=False)
+        assert result.passed is False
+        assert "unexpected enclosure URL" in result.detail
+
+    def test_bad_sha_fails(self):
+        xml = self.VALID_XML.replace(
+            "bb1e3f12bc71fca9089e14fe3c40ca278af76fce042e4328bf2e8ab1d0d451e5",
+            "deadbeef",
+        )
+        resp = _make_mock_response(200, text_body=xml)
+        client = _make_mock_client([resp])
+        result = check_appcast(client, verbose=False)
+        assert result.passed is False
+        assert "invalid sha256" in result.detail
 
     def test_exception(self):
         client = MagicMock()

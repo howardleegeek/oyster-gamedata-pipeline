@@ -9,10 +9,9 @@ from fastapi import APIRouter, Response
 router = APIRouter()
 
 LATEST = {
-    "version": "0.6.3",
-    "url": "https://github.com/howardleegeek/oyster-gamedata-pipeline/releases/download/v0.6.3/OysterRecorder-setup-v0.6.3.exe",
-    "sha256": "PLACEHOLDER_SHA256",
-    "signature": "PLACEHOLDER_ED25519",
+    "version": "0.8.10",
+    "url": "https://github.com/howardleegeek/oyster-gamedata-pipeline/releases/download/v0.8.10/OysterRecorder-setup-v2.6.0.exe",
+    "sha256": "bb1e3f12bc71fca9089e14fe3c40ca278af76fce042e4328bf2e8ab1d0d451e5",
 }
 
 
@@ -28,7 +27,8 @@ def appcast() -> Response:
         f'      <title>v{LATEST["version"]}</title>\n'
         f"      <pubDate>{now}</pubDate>\n"
         f'      <enclosure url="{LATEST["url"]}" '
-        f'sparkle:version="{LATEST["version"]}" sparkle:dsaSignature="{LATEST["signature"]}" type="application/octet-stream"/>\n'
+        f'sparkle:version="{LATEST["version"]}" sparkle:sha256="{LATEST["sha256"]}" '
+        'type="application/octet-stream"/>\n'
         "    </item>\n"
         "  </channel>\n"
         "</rss>\n"

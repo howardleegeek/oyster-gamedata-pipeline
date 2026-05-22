@@ -17,8 +17,10 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
+import httpx
 import pytest
 from httpx import Response
 
@@ -70,6 +72,60 @@ def mock_fixture_dir(tmp_path: Path):
     e2e_mod.FIXTURE_DIR = fixture_dir
     yield fixture_dir
     e2e_mod.FIXTURE_DIR = original
+
+
+@pytest.fixture
+def respx_mock(monkeypatch):
+    """Small local subset of the respx_mock fixture used by these tests."""
+
+    class MockRoute:
+        def __init__(self):
+            self.response = Response(404, text="not mocked")
+            self.calls = []
+
+        def mock(self, return_value: Response):
+            self.response = return_value
+            return self
+
+    class LocalRespxMock:
+        def __init__(self):
+            self.routes = {}
+
+        def _route(self, method: str, url: str) -> MockRoute:
+            return self.routes.setdefault((method, url), MockRoute())
+
+        def get(self, url: str) -> MockRoute:
+            return self._route("GET", url)
+
+        def post(self, url: str) -> MockRoute:
+            return self._route("POST", url)
+
+        def put(self, url: str) -> MockRoute:
+            return self._route("PUT", url)
+
+        def __getitem__(self, url: str) -> MockRoute:
+            for (_, route_url), route in self.routes.items():
+                if route_url == url:
+                    return route
+            raise KeyError(url)
+
+        def handle(self, request: httpx.Request) -> Response:
+            route = self.routes.get((request.method, str(request.url)))
+            if route is None:
+                return Response(404, text=f"not mocked: {request.method} {request.url}")
+            route.calls.append(SimpleNamespace(request=request))
+            return route.response
+
+    mock_routes = LocalRespxMock()
+    real_client = httpx.Client
+
+    class MockedClient(real_client):
+        def __init__(self, *args, **kwargs):
+            kwargs["transport"] = httpx.MockTransport(mock_routes.handle)
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr(httpx, "Client", MockedClient)
+    yield mock_routes
 
 
 @pytest.fixture
@@ -132,7 +188,7 @@ def mocked_backend(respx_mock):
     )
 
     # mock S3 upload (PUT)
-    respx_mock.put("https://mock-s3.example.com/uploads/test.tar.gz").mock(
+    respx_mock.put("https://mock-s3.example.com/uploads/test.tar.gz?X-Amz-Signature=fake").mock(
         return_value=Response(200)
     )
 
@@ -282,6 +338,29 @@ class TestStepUploadViaSignedUrl:
                 client, BACKEND_URL, "mock-google-at-abcdef1234567890", session_payload
             )
         assert session_id == "s114-e2e-001"
+
+    def test_upload_put_non_2xx_raises(self, mocked_backend):
+        """signed URL PUT returning non-2xx fails the E2E."""
+        import httpx
+
+        mocked_backend.put(
+            "https://mock-s3.example.com/uploads/test.tar.gz?X-Amz-Signature=fake"
+        ).mock(return_value=Response(500, text="upload failed"))
+        session_payload = {
+            "session_id": "s114-e2e-001",
+            "game_name": "synthetic_game",
+            "recording_date": "2024-01-01",
+            "operator_id": "OP-000",
+            "status": "BUYER_READY",
+        }
+        with httpx.Client(base_url=BACKEND_URL) as client:
+            with pytest.raises(AssertionError, match="upload PUT returned 500"):
+                e2e_mod.step_upload_via_signed_url(
+                    client,
+                    BACKEND_URL,
+                    "mock-google-at-abcdef1234567890",
+                    session_payload,
+                )
 
     def test_upload_sends_bearer_token(self, mocked_backend):
         """upload includes Bearer token in Authorization header."""

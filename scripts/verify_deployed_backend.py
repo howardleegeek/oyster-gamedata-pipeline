@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
@@ -83,13 +84,17 @@ def check_healthz(client: httpx.Client, verbose: bool) -> CheckResult:
 
 
 def check_testers_apply(client: httpx.Client, verbose: bool) -> CheckResult:
-    """POST /api/v1/testers/apply {email: smoke@test.com} → 200 + tester_id"""
+    """POST /api/v1/testers/apply with the real public schema → 200 + tester_id"""
     if verbose:
         print("  → POST /api/v1/testers/apply")
     try:
         resp = client.post(
             "/api/v1/testers/apply",
-            json={"email": "smoke@test.com"},
+            json={
+                "email": "smoke@test.com",
+                "discord_user": "smoke#0000",
+                "why_interested": "deployment smoke test",
+            },
         )
         if resp.status_code != 200:
             return CheckResult(
@@ -140,7 +145,7 @@ def check_income_today(client: httpx.Client, verbose: bool) -> CheckResult:
 
 
 def check_appcast(client: httpx.Client, verbose: bool) -> CheckResult:
-    """GET /api/v1/updates/appcast.xml → 200 + valid XML"""
+    """GET /api/v1/updates/appcast.xml → 200 + valid release enclosure XML"""
     if verbose:
         print("  → GET /api/v1/updates/appcast.xml")
     try:
@@ -151,13 +156,55 @@ def check_appcast(client: httpx.Client, verbose: bool) -> CheckResult:
                 False,
                 f"status={resp.status_code}",
             )
-        # Validate XML parse
-        ET.fromstring(resp.text)
+        root = ET.fromstring(resp.text)
+        enclosure = root.find(".//enclosure")
+        if enclosure is None:
+            return CheckResult(
+                "GET /api/v1/updates/appcast.xml",
+                False,
+                "missing enclosure",
+            )
+        url = enclosure.attrib.get("url", "")
+        version = _xml_attr(enclosure, "version")
+        sha256 = _xml_attr(enclosure, "sha256")
+        if "PLACEHOLDER" in resp.text:
+            return CheckResult(
+                "GET /api/v1/updates/appcast.xml",
+                False,
+                "contains placeholder metadata",
+            )
+        if not url.startswith(
+            "https://github.com/howardleegeek/oyster-gamedata-pipeline/releases/download/"
+        ):
+            return CheckResult(
+                "GET /api/v1/updates/appcast.xml",
+                False,
+                f"unexpected enclosure URL: {url}",
+            )
+        if not version:
+            return CheckResult(
+                "GET /api/v1/updates/appcast.xml",
+                False,
+                "missing release version",
+            )
+        if not re.fullmatch(r"[0-9a-f]{64}", sha256):
+            return CheckResult(
+                "GET /api/v1/updates/appcast.xml",
+                False,
+                "missing or invalid sha256",
+            )
         return CheckResult("GET /api/v1/updates/appcast.xml", True)
     except ET.ParseError as exc:
         return CheckResult("GET /api/v1/updates/appcast.xml", False, f"XML parse error: {exc}")
     except Exception as exc:
         return CheckResult("GET /api/v1/updates/appcast.xml", False, str(exc))
+
+
+def _xml_attr(element: ET.Element, local_name: str) -> str:
+    for key, value in element.attrib.items():
+        if key == local_name or key.endswith(f"}}{local_name}"):
+            return value
+    return ""
 
 
 # ---------------------------------------------------------------------------

@@ -5,7 +5,8 @@ Endpoints:
   POST /api/v1/auth/google/exchange   → mock OAuth exchange
   POST /api/v1/auth/discord/exchange  → mock OAuth exchange
   GET  /api/v1/income/today           → today's income summary
-  POST /api/v1/upload/signed-url      → mock S3 presigned URL
+  POST /api/v1/upload/signed-url      → local presigned upload URL
+  PUT  /api/v1/upload/object/{key}    → in-memory upload target
   POST /api/v1/sessions               → register a session
   POST /api/v1/testers/apply          → apply for beta access
   GET  /api/v1/testers                → list all applicants (admin)
@@ -22,10 +23,11 @@ import argparse
 import datetime as _dt
 import uuid
 from typing import Any, Dict
+from urllib.parse import quote
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from backend_stub import appcast_server, crash_dump, sentry_compat, tester_invite
 from backend_stub.income_engine import calculate_daily_income
@@ -36,6 +38,7 @@ from backend_stub.payout import PayoutStore, PayoutWorker
 # ---------------------------------------------------------------------------
 _income_store: Dict[str, Any] = {}
 _sessions_store: Dict[str, Any] = {}
+_uploads_store: Dict[str, Any] = {}
 _telemetry_store: list[dict[str, Any]] = []
 store = PayoutStore()
 ADMIN_TOKEN = "admin-secret-token"
@@ -187,7 +190,7 @@ def create_app(accelerate: float = 1.0, interval: float = 300.0) -> FastAPI:
         return _income_store[today]
 
     # ------------------------------------------------------------------
-    # Upload signed URL (mock S3 presigned URL)
+    # Upload signed URL (local in-memory target)
     # ------------------------------------------------------------------
     @app.post("/api/v1/upload/signed-url")
     async def upload_signed_url(
@@ -198,11 +201,25 @@ def create_app(accelerate: float = 1.0, interval: float = 300.0) -> FastAPI:
         body = await request.json()
         key = body.get("key", f"uploads/{uuid.uuid4().hex}.bin")
         expires_at = (_dt.datetime.now(_dt.timezone.utc) + _dt.timedelta(hours=1)).isoformat()
+        escaped_key = quote(str(key), safe="/")
         return {
-            "url": f"https://mock-s3.example.com/{key}?X-Amz-Signature=fake",
+            "url": f"{str(request.base_url).rstrip('/')}/api/v1/upload/object/{escaped_key}",
             "expires_at": expires_at,
             "key": key,
         }
+
+    @app.put("/api/v1/upload/object/{key:path}")
+    async def upload_object(key: str, request: Request):
+        payload = await request.body()
+        if not payload:
+            raise HTTPException(status_code=400, detail="Upload body must not be empty")
+        _uploads_store[key] = {
+            "key": key,
+            "size": len(payload),
+            "content_type": request.headers.get("content-type"),
+            "uploaded_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
+        }
+        return Response(status_code=200)
 
     # ------------------------------------------------------------------
     # Sessions endpoint
