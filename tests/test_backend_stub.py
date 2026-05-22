@@ -141,12 +141,43 @@ class TestSessions:
         resp = await client.post(
             "/api/v1/sessions",
             headers={"Authorization": "Bearer tok"},
-            json={"session_id": sid},
+            json={"session_id": sid, "status": "BUYER_READY"},
         )
         assert resp.status_code == 200
         data = resp.json()
         assert data["session_id"] == sid
         assert data["status"] == "received"
+        assert data["income_status"] == "BUYER_READY"
+        assert data["income_today"]["total_usd"] == 0.50
+
+        income_resp = await client.get(
+            "/api/v1/income/today",
+            headers={"Authorization": "Bearer tok"},
+        )
+        assert income_resp.status_code == 200
+        income = income_resp.json()
+        assert income["total_usd"] == 0.50
+        assert income["sessions_uploaded"] == 1
+        assert income["sessions_counted"] == 1
+
+    async def test_income_recalculates_with_daily_cap(self, client: AsyncClient):
+        for _ in range(12):
+            resp = await client.post(
+                "/api/v1/sessions",
+                headers={"Authorization": "Bearer tok"},
+                json={"status": "BUYER_READY"},
+            )
+            assert resp.status_code == 200
+
+        income_resp = await client.get(
+            "/api/v1/income/today",
+            headers={"Authorization": "Bearer tok"},
+        )
+        assert income_resp.status_code == 200
+        income = income_resp.json()
+        assert income["total_usd"] == 5.00
+        assert income["sessions_uploaded"] == 12
+        assert income["sessions_counted"] == 10
 
     async def test_auto_generates_session_id(self, client: AsyncClient):
         resp = await client.post(

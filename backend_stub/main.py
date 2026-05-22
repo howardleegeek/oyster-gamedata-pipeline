@@ -28,6 +28,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from backend_stub import appcast_server, crash_dump, sentry_compat, tester_invite
+from backend_stub.income_engine import calculate_daily_income
 from backend_stub.payout import PayoutStore, PayoutWorker
 
 # ---------------------------------------------------------------------------
@@ -49,6 +50,33 @@ _TELEMETRY_FIELDS = {
     "crash_today": bool,
     "ts": str,
 }
+
+
+def _today_iso() -> str:
+    return _dt.date.today().isoformat()
+
+
+def _session_income_status(body: dict[str, Any]) -> str:
+    status = body.get("status")
+    if isinstance(status, str) and status:
+        return status
+    return "FAIL"
+
+
+def _recalculate_income(today: str) -> dict[str, Any]:
+    sessions_today = [
+        {
+            "status": session.get("income_status", "FAIL"),
+            "date": session.get("date", today),
+        }
+        for session in _sessions_store.values()
+        if session.get("date") == today
+    ]
+    income = calculate_daily_income(sessions_today)
+    if income["date"] == "unknown":
+        income["date"] = today
+    _income_store[today] = income
+    return income
 
 
 def _validate_telemetry_payload(body: Any) -> dict[str, Any]:
@@ -147,12 +175,13 @@ def create_app(accelerate: float = 1.0, interval: float = 300.0) -> FastAPI:
     @app.get("/api/v1/income/today")
     async def income_today(authorization: str | None = Header(default=None)):
         _require_bearer(authorization)
-        today = _dt.date.today().isoformat()
+        today = _today_iso()
         if today not in _income_store:
             _income_store[today] = {
                 "date": today,
                 "total_usd": 0.0,
                 "sessions_uploaded": 0,
+                "sessions_counted": 0,
                 "currency": "USD",
             }
         return _income_store[today]
@@ -186,12 +215,23 @@ def create_app(accelerate: float = 1.0, interval: float = 300.0) -> FastAPI:
         _require_bearer(authorization)
         body = await request.json()
         session_id = body.get("session_id", str(uuid.uuid4()))
+        today = _today_iso()
+        income_status = _session_income_status(body)
         _sessions_store[session_id] = {
             "session_id": session_id,
             "status": "received",
+            "income_status": income_status,
+            "date": today,
+            "upload_key": body.get("upload_key"),
             "created_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
         }
-        return {"session_id": session_id, "status": "received"}
+        income = _recalculate_income(today)
+        return {
+            "session_id": session_id,
+            "status": "received",
+            "income_status": income_status,
+            "income_today": income,
+        }
 
     # ------------------------------------------------------------------
     # Sentry crash-reporter endpoint
