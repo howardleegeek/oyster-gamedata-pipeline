@@ -53,6 +53,30 @@ jobs:
             throw "SHA256 mismatch. expected=$expected actual=$actual"
           }
 
+      - name: Report Authenticode signature
+        shell: pwsh
+        env:
+          REQUIRE_SIGNED_INSTALLER: ${{ vars.REQUIRE_SIGNED_INSTALLER }}
+        run: |
+          $installer = Join-Path "dist" $env:INSTALLER_NAME
+          if (-not (Test-Path $installer)) {
+            throw "Installer not downloaded: $installer"
+          }
+
+          $signature = Get-AuthenticodeSignature -FilePath $installer
+          Write-Host "Authenticode status: $($signature.Status)"
+          Write-Host "Authenticode status message: $($signature.StatusMessage)"
+          if ($signature.SignerCertificate) {
+            Write-Host "Authenticode signer subject: $($signature.SignerCertificate.Subject)"
+            Write-Host "Authenticode signer thumbprint: $($signature.SignerCertificate.Thumbprint)"
+          } else {
+            Write-Host "Authenticode signer subject: <none>"
+          }
+
+          if ($env:REQUIRE_SIGNED_INSTALLER -ceq "true" -and $signature.Status -ne "Valid") {
+            throw "REQUIRE_SIGNED_INSTALLER=true but Authenticode status is $($signature.Status)"
+          }
+
       - name: Silent install
         shell: pwsh
         run: |

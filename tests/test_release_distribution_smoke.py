@@ -32,6 +32,12 @@ def test_windows_installer_smoke_workflow_exercises_real_install_path() -> None:
     assert "gh release download" in workflow
     assert "SHA256SUMS.txt" in workflow
     assert "Get-FileHash" in workflow
+    assert "Report Authenticode signature" in workflow
+    assert "Get-AuthenticodeSignature -FilePath $installer" in workflow
+    assert "Authenticode status:" in workflow
+    assert "REQUIRE_SIGNED_INSTALLER: ${{ vars.REQUIRE_SIGNED_INSTALLER }}" in workflow
+    assert '$env:REQUIRE_SIGNED_INSTALLER -ceq "true"' in workflow
+    assert '$signature.Status -ne "Valid"' in workflow
     assert "/VERYSILENT" in workflow
     assert "$env:LOCALAPPDATA" in workflow
     assert "gamedata-recorder.exe" in workflow
