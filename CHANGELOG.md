@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.9.0] - 2026-05-22
+
+### Added
+
+- add admin state summary (947ce58)
+
+
 ## [0.8.15] - 2026-05-22
 
 ### Fixed
