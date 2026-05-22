@@ -11,6 +11,7 @@ from scripts.verify_deployed_backend import (
     SmokeReport,
     check_admin_state,
     check_appcast,
+    check_appcast_with_retry,
     check_healthz,
     check_income_today,
     check_testers_apply,
@@ -310,6 +311,27 @@ class TestCheckAppcast:
         result = check_appcast(client, verbose=False)
         assert result.passed is False
 
+    def test_retry_allows_release_appcast_sync_race(self):
+        stale_xml = self.VALID_XML.replace("v0.8.11", "v0.8.10").replace(
+            'sparkle:version="0.8.11"',
+            'sparkle:version="0.8.10"',
+        )
+        stale_resp = _make_mock_response(200, text_body=stale_xml)
+        fresh_resp = _make_mock_response(200, text_body=self.VALID_XML)
+        client = _make_mock_client([stale_resp, fresh_resp])
+
+        with patch("scripts.verify_deployed_backend.time.sleep") as sleep:
+            result = check_appcast_with_retry(
+                client,
+                verbose=False,
+                expected_recorder_tag="v0.8.11",
+                retry_seconds=1,
+                retry_interval_seconds=0,
+            )
+
+        assert result.passed is True
+        assert sleep.called
+
 
 # ---------------------------------------------------------------------------
 # check_admin_state
@@ -529,6 +551,43 @@ class TestRun:
         assert code == 1
         assert mock_client.get.call_count == 3
 
+    def test_run_retries_stale_appcast_once(self):
+        stale_xml = TestCheckAppcast.VALID_XML.replace("v0.8.11", "v0.8.10").replace(
+            'sparkle:version="0.8.11"',
+            'sparkle:version="0.8.10"',
+        )
+        responses = [
+            _make_mock_response(200, {"status": "ok"}),
+            _make_mock_response(200, {"tester_id": "t1"}),
+            _make_mock_response(
+                200,
+                {
+                    "date": "2026-05-20",
+                    "total_usd": 0.0,
+                    "sessions_uploaded": 0,
+                    "currency": "USD",
+                },
+            ),
+            _make_mock_response(200, text_body=stale_xml),
+            _make_mock_response(200, text_body=TestCheckAppcast.VALID_XML),
+        ]
+        mock_client = _make_mock_client(responses)
+
+        with patch("scripts.verify_deployed_backend.httpx.Client") as MockClient:
+            with patch("scripts.verify_deployed_backend.time.sleep"):
+                MockClient.return_value.__enter__ = MagicMock(return_value=mock_client)
+                MockClient.return_value.__exit__ = MagicMock(return_value=False)
+                code = run(
+                    "https://example.com",
+                    verbose=False,
+                    expected_recorder_tag="v0.8.11",
+                    appcast_retry_seconds=1,
+                    appcast_retry_interval=0,
+                )
+
+        assert code == 0
+        assert mock_client.get.call_count == 4
+
 
 class TestBackendRemoteSmokeWorkflow:
     def test_workflow_exists_and_runs_verify_script(self):
@@ -540,6 +599,7 @@ class TestBackendRemoteSmokeWorkflow:
         assert "BACKEND_SMOKE_URL" in text
         assert "scripts/verify_deployed_backend.py" in text
         assert '--url "$BACKEND_URL"' in text
+        assert "--appcast-retry-seconds 120" in text
 
     def test_scheduled_run_skips_without_backend_url_variable(self):
         workflow = ROOT / ".github" / "workflows" / "backend-remote-smoke.yml"

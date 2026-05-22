@@ -22,6 +22,7 @@ import json
 import os
 import re
 import sys
+import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 
@@ -222,6 +223,32 @@ def check_appcast(
         return CheckResult("GET /api/v1/updates/appcast.xml", False, str(exc))
 
 
+def check_appcast_with_retry(
+    client: httpx.Client,
+    verbose: bool,
+    expected_recorder_tag: str | None = None,
+    retry_seconds: float = 0.0,
+    retry_interval_seconds: float = 5.0,
+) -> CheckResult:
+    """Check appcast, allowing short release/appcast sync races to settle."""
+    deadline = time.monotonic() + max(0.0, retry_seconds)
+    result = check_appcast(client, verbose, expected_recorder_tag)
+    while (
+        not result.passed
+        and expected_recorder_tag
+        and retry_seconds > 0
+        and time.monotonic() < deadline
+    ):
+        if verbose:
+            print(
+                "  → appcast not yet at expected release; retrying "
+                f"in {retry_interval_seconds:g}s"
+            )
+        time.sleep(max(0.0, retry_interval_seconds))
+        result = check_appcast(client, verbose, expected_recorder_tag)
+    return result
+
+
 def check_admin_state(
     client: httpx.Client,
     verbose: bool,
@@ -301,6 +328,8 @@ def run(
     verbose: bool = False,
     expected_recorder_tag: str | None = None,
     admin_token_env: str | None = None,
+    appcast_retry_seconds: float = 0.0,
+    appcast_retry_interval: float = 5.0,
 ) -> int:
     """Run all smoke checks against *url*. Returns exit code."""
     report = SmokeReport()
@@ -312,7 +341,17 @@ def run(
         report.add(*_unwrap(check_healthz(client, verbose)))
         report.add(*_unwrap(check_testers_apply(client, verbose)))
         report.add(*_unwrap(check_income_today(client, verbose)))
-        report.add(*_unwrap(check_appcast(client, verbose, expected_recorder_tag)))
+        report.add(
+            *_unwrap(
+                check_appcast_with_retry(
+                    client,
+                    verbose,
+                    expected_recorder_tag,
+                    retry_seconds=appcast_retry_seconds,
+                    retry_interval_seconds=appcast_retry_interval,
+                )
+            )
+        )
         if admin_token_env:
             admin_token = os.getenv(admin_token_env, "").strip()
             if not admin_token:
@@ -369,8 +408,29 @@ def main() -> None:
         default=os.getenv("BACKEND_ADMIN_TOKEN_ENV", ""),
         help="Optional env var name containing the admin token for /api/v1/admin/state.",
     )
+    parser.add_argument(
+        "--appcast-retry-seconds",
+        type=float,
+        default=float(os.getenv("APPCAST_RETRY_SECONDS", "0")),
+        help="Retry appcast tag mismatch for this many seconds before failing.",
+    )
+    parser.add_argument(
+        "--appcast-retry-interval",
+        type=float,
+        default=float(os.getenv("APPCAST_RETRY_INTERVAL_SECONDS", "5")),
+        help="Seconds to wait between appcast retry attempts.",
+    )
     args = parser.parse_args()
-    sys.exit(run(args.url, args.verbose, args.expected_recorder_tag, args.admin_token_env))
+    sys.exit(
+        run(
+            args.url,
+            args.verbose,
+            args.expected_recorder_tag,
+            args.admin_token_env,
+            args.appcast_retry_seconds,
+            args.appcast_retry_interval,
+        )
+    )
 
 
 if __name__ == "__main__":

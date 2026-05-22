@@ -44,7 +44,13 @@ jobs:
           fi
 
       - name: Smoke-test backend
-        run: python scripts/verify_deployed_backend.py --url "$BACKEND_URL" --verbose --expected-recorder-tag "$RECORDER_RELEASE_TAG"
+        run: >-
+          python scripts/verify_deployed_backend.py
+          --url "$BACKEND_URL"
+          --verbose
+          --expected-recorder-tag "$RECORDER_RELEASE_TAG"
+          --appcast-retry-seconds 120
+          --appcast-retry-interval 5
 
       - name: Run recorder backend E2E
         run: python bin/remote_recorder_backend_e2e.py --backend-url "$BACKEND_URL"
