@@ -7,6 +7,19 @@ This repo is the integration hub between two real systems:
 
 The product works only if both sides agree on the session bundle surface. The authoritative code contract is `src/oyster_agent_runner/session_contract.py`.
 
+## Version Alignment
+
+There are two version tracks and they must not be confused:
+
+| Component | Current release track | Current source track |
+|---|---|---|
+| `oyster-gamedata-pipeline` | Latest GitHub release remains `v0.10.0`; it carries the public Windows installer asset and checksum. | `main` continues after `v0.10.0` with architecture/CI contract fixes. Use `main` for development. |
+| `gamedata-recorder` | Latest recorder release remains `v2.6.0`; this is why the public installer asset is named `OysterRecorder-setup-v2.6.0.exe`. | `vendor/recorder` is pinned to recorder `main` commit `7de8a38` (`v2.6.0-26-g7de8a38`) so source development includes the newer tray/auth/updater/notify, route-type, auto-cap, UI-refusal, gamepad/action-camera, and engine-telemetry work. |
+
+Operationally: distribute from the latest verified release, develop from the
+latest pinned source. A new consumer release should only be cut after the
+recorder source pin has passed Windows build/installer smoke.
+
 ## Layouts
 
 | Layout | Owner | Required paths | Consumer |
@@ -60,7 +73,13 @@ It can move to `production` only after a clean Windows run proves:
 
 ## Current Architecture Read
 
-The release/distribution chain is now real: latest build is `v0.10.0`, the installer asset and SHA file exist, backend health/appcast are live, and smoke workflows are green. The remaining production risk is not basic shipping; it is data-contract drift while expanding from Minecraft into BeamNG, Factorio, Stardew Valley, and other single-player games.
+The release/distribution chain is real: latest verified public release is
+`v0.10.0`, the installer asset and SHA file exist, backend health/appcast are
+live, and smoke workflows are green. Source development is newer than that
+release: pipeline `main` is ahead of `v0.10.0`, and `vendor/recorder` is ahead
+of recorder `v2.6.0`. The remaining production risk is release/source drift
+plus data-contract drift while expanding from Minecraft into BeamNG, Factorio,
+Stardew Valley, and other single-player games.
 
 Keep new game work thin:
 
