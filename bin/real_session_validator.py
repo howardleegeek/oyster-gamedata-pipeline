@@ -11,13 +11,17 @@ Pure Python stdlib only.
 """
 
 import argparse
+import contextlib
 import csv
 import datetime
 import json
+import os
 import pathlib
 import random
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 
 # ---------------------------------------------------------------------------
@@ -35,6 +39,12 @@ SIGN_TIMEOUT = 30
 VERIFY_TIMEOUT = 30
 
 REQUIRED_FILES = {"recording.mp4", "game_state.jsonl"}
+LEGACY_VIDEO = "recording.mp4"
+LEGACY_GAME_STATE = "game_state.jsonl"
+LEGACY_INPUTS = "inputs.jsonl"
+LEM_VIDEO = pathlib.Path("recordings/main_record.mp4")
+LEM_STATE_STREAM = pathlib.Path("streams/states.jsonl")
+LEM_ACTION_STREAM = pathlib.Path("streams/actions.jsonl")
 
 
 # ---------------------------------------------------------------------------
@@ -42,17 +52,82 @@ REQUIRED_FILES = {"recording.mp4", "game_state.jsonl"}
 # ---------------------------------------------------------------------------
 
 
+def _has_legacy_session_files(session_dir: pathlib.Path) -> bool:
+    present = {f.name for f in session_dir.iterdir()} if session_dir.is_dir() else set()
+    return REQUIRED_FILES.issubset(present)
+
+
+def _has_lem_session_files(session_dir: pathlib.Path) -> bool:
+    return (session_dir / LEM_VIDEO).is_file() and (session_dir / LEM_STATE_STREAM).is_file()
+
+
+def _session_format(session_dir: pathlib.Path) -> str | None:
+    if _has_legacy_session_files(session_dir):
+        return "legacy"
+    if _has_lem_session_files(session_dir):
+        return "lem"
+    return None
+
+
 def discover_sessions(root: pathlib.Path) -> list[pathlib.Path]:
-    """Walk one level deep under root, return dirs that contain required files."""
+    """Walk one level deep under root, return legacy or LEM session dirs."""
     sessions = []
     if not root.is_dir():
         return sessions
     for entry in sorted(root.iterdir()):
-        if entry.is_dir():
-            present = {f.name for f in entry.iterdir()} if entry.is_dir() else set()
-            if REQUIRED_FILES.issubset(present):
-                sessions.append(entry)
+        if entry.is_dir() and _session_format(entry):
+            sessions.append(entry)
     return sessions
+
+
+def _link_or_copy_file(src: pathlib.Path, dst: pathlib.Path) -> None:
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.symlink(src, dst)
+    except OSError:
+        shutil.copy2(src, dst)
+
+
+@contextlib.contextmanager
+def session_validation_view(session_dir: pathlib.Path):
+    """Yield a path shaped for the legacy validator pipeline.
+
+    The installed recorder now emits LEM sessions:
+      recordings/main_record.mp4
+      streams/states.jsonl
+      streams/actions.jsonl
+
+    The canonical validation scripts still consume the older buyer-session
+    surface:
+      recording.mp4
+      game_state.jsonl
+      inputs.jsonl
+
+    Keep the on-disk recording immutable and validate through a temporary view
+    made of symlinks where possible, file copies where symlinks are unavailable.
+    """
+    fmt = _session_format(session_dir)
+    if fmt == "legacy":
+        yield session_dir
+        return
+    if fmt != "lem":
+        raise ValueError(f"Unsupported session layout: {session_dir}")
+
+    with tempfile.TemporaryDirectory(prefix=f"{session_dir.name}-validation-") as tmp:
+        view_dir = pathlib.Path(tmp)
+        _link_or_copy_file(session_dir / LEM_VIDEO, view_dir / LEGACY_VIDEO)
+        _link_or_copy_file(session_dir / LEM_STATE_STREAM, view_dir / LEGACY_GAME_STATE)
+
+        actions_path = session_dir / LEM_ACTION_STREAM
+        if actions_path.is_file():
+            _link_or_copy_file(actions_path, view_dir / LEGACY_INPUTS)
+
+        for optional_name in ("MANIFEST.json", "metadata.json"):
+            optional_path = session_dir / optional_name
+            if optional_path.is_file():
+                _link_or_copy_file(optional_path, view_dir / optional_name)
+
+        yield view_dir
 
 
 def run_pipeline(session_dir: pathlib.Path) -> dict:
@@ -522,29 +597,30 @@ def main():
         started_at = time.monotonic()
         session_name = session_dir.name
 
-        # Step 1: Pipeline
-        pipeline = run_pipeline(session_dir)
+        with session_validation_view(session_dir) as validation_dir:
+            # Step 1: Pipeline
+            pipeline = run_pipeline(validation_dir)
 
-        # Step 2: G-gates (only if pipeline passed)
-        if pipeline["verdict"] == "PASS":
-            gates = run_gates(session_dir)
-        else:
-            gates = {"verdict": "n/a", "passed": 0, "total": 0, "per_gate": {}, "raw": {}}
-
-        # Step 3: Provenance (only if pipeline + gates passed)
-        if pipeline["verdict"] == "PASS" and gates["verdict"] not in (
-            "FAIL",
-            "BLOCKED",
-            "TIMEOUT",
-            "ERROR",
-            "n/a",
-        ):
-            if keyfile:
-                provenance = run_provenance(session_dir, keyfile)
+            # Step 2: G-gates (only if pipeline passed)
+            if pipeline["verdict"] == "PASS":
+                gates = run_gates(validation_dir)
             else:
-                provenance = {"verdict": "SKIPPED", "reason": "no --keyfile"}
-        else:
-            provenance = {"verdict": "n/a"}
+                gates = {"verdict": "n/a", "passed": 0, "total": 0, "per_gate": {}, "raw": {}}
+
+            # Step 3: Provenance (only if pipeline + gates passed)
+            if pipeline["verdict"] == "PASS" and gates["verdict"] not in (
+                "FAIL",
+                "BLOCKED",
+                "TIMEOUT",
+                "ERROR",
+                "n/a",
+            ):
+                if keyfile:
+                    provenance = run_provenance(validation_dir, keyfile)
+                else:
+                    provenance = {"verdict": "SKIPPED", "reason": "no --keyfile"}
+            else:
+                provenance = {"verdict": "n/a"}
 
         # Overall verdict
         overall = compute_overall(pipeline, gates, provenance)

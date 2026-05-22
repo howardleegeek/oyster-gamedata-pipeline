@@ -37,6 +37,19 @@ def make_fake_session(root: pathlib.Path, name: str, files: list[str] | None = N
     return session_dir
 
 
+def make_fake_lem_session(root: pathlib.Path, name: str):
+    """Create a fake recorder LEM session with nested files."""
+    session_dir = root / name
+    (session_dir / "recordings").mkdir(parents=True, exist_ok=True)
+    (session_dir / "streams").mkdir(parents=True, exist_ok=True)
+    (session_dir / "metadata").mkdir(parents=True, exist_ok=True)
+    (session_dir / "recordings" / "main_record.mp4").write_bytes(b"fake-mp4")
+    (session_dir / "streams" / "states.jsonl").write_text('{"tick":1}\n')
+    (session_dir / "streams" / "actions.jsonl").write_text('{"event_type":"ACTION"}\n')
+    (session_dir / "metadata" / "session.json").write_text('{"session_id":"lem"}\n')
+    return session_dir
+
+
 def make_subprocess_mock(
     pipeline_results: dict, gate_results: dict, sign_results: dict, verify_results: dict
 ):
@@ -150,6 +163,46 @@ class TestDiscoverSessions(unittest.TestCase):
         self.assertEqual(len(result), 2)
         self.assertEqual(result[0].name, "session_001")
         self.assertEqual(result[1].name, "session_002")
+
+        import shutil
+
+        shutil.rmtree(root)
+
+    def test_discovers_lem_sessions(self):
+        root = pathlib.Path("/tmp/rsv_test_lem_valid")
+        if root.exists():
+            import shutil
+
+            shutil.rmtree(root)
+        root.mkdir(parents=True)
+
+        make_fake_lem_session(root, "lem_session_001")
+        (root / "incomplete_lem").mkdir()
+        (root / "incomplete_lem" / "recordings").mkdir()
+        (root / "incomplete_lem" / "recordings" / "main_record.mp4").write_bytes(b"fake")
+
+        result = rsv.discover_sessions(root)
+        self.assertEqual([p.name for p in result], ["lem_session_001"])
+
+        import shutil
+
+        shutil.rmtree(root)
+
+    def test_lem_validation_view_maps_to_legacy_files(self):
+        root = pathlib.Path("/tmp/rsv_test_lem_view")
+        if root.exists():
+            import shutil
+
+            shutil.rmtree(root)
+        root.mkdir(parents=True)
+        session_dir = make_fake_lem_session(root, "lem_session_001")
+
+        with rsv.session_validation_view(session_dir) as view_dir:
+            self.assertTrue((view_dir / "recording.mp4").exists())
+            self.assertTrue((view_dir / "game_state.jsonl").exists())
+            self.assertTrue((view_dir / "inputs.jsonl").exists())
+            self.assertEqual((view_dir / "game_state.jsonl").read_text(), '{"tick":1}\n')
+            self.assertFalse((session_dir / "game_state.jsonl").exists())
 
         import shutil
 
