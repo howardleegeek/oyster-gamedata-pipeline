@@ -1,6 +1,9 @@
 name: Backend Remote Smoke
 
 on:
+  release:
+    types:
+      - published
   workflow_dispatch:
     inputs:
       backend_url:
@@ -15,11 +18,12 @@ permissions:
 
 jobs:
   smoke:
-    if: ${{ github.event_name == 'workflow_dispatch' || vars.BACKEND_SMOKE_URL != '' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'release' || vars.BACKEND_SMOKE_URL != '' }}
     runs-on: ubuntu-latest
     env:
       BACKEND_URL: ${{ inputs.backend_url || vars.BACKEND_SMOKE_URL }}
       GH_TOKEN: ${{ github.token }}
+      RELEASE_EVENT_TAG: ${{ github.event.release.tag_name }}
     steps:
       - uses: actions/checkout@v4
 
@@ -31,7 +35,13 @@ jobs:
         run: python -m pip install --upgrade httpx
 
       - name: Resolve latest recorder release tag
-        run: echo "RECORDER_RELEASE_TAG=$(gh release view --json tagName --jq .tagName)" >> "$GITHUB_ENV"
+        run: |
+          set -euo pipefail
+          if [ -n "${RELEASE_EVENT_TAG:-}" ]; then
+            echo "RECORDER_RELEASE_TAG=${RELEASE_EVENT_TAG}" >> "$GITHUB_ENV"
+          else
+            echo "RECORDER_RELEASE_TAG=$(gh release view --json tagName --jq .tagName)" >> "$GITHUB_ENV"
+          fi
 
       - name: Smoke-test backend
         run: python scripts/verify_deployed_backend.py --url "$BACKEND_URL" --verbose --expected-recorder-tag "$RECORDER_RELEASE_TAG"

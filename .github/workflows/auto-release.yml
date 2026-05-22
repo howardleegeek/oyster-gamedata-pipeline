@@ -88,3 +88,63 @@ jobs:
         run: |
           chmod +x scripts/auto_release.sh
           bash scripts/auto_release.sh
+
+      - name: Install backend smoke dependencies
+        if: steps.check.outputs.should_release == 'true' && vars.BACKEND_SMOKE_URL != ''
+        run: python3 -m pip install --upgrade httpx
+
+      - name: Resolve released recorder tag
+        id: released
+        if: steps.check.outputs.should_release == 'true' && vars.BACKEND_SMOKE_URL != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "tag=$(gh release view --json tagName --jq .tagName)" >> "$GITHUB_OUTPUT"
+
+      - name: Configure GCP backend SSH
+        id: gcp-ssh
+        if: steps.check.outputs.should_release == 'true' && vars.BACKEND_SMOKE_URL != ''
+        env:
+          GCP_BACKEND_ADDRESS: ${{ vars.GCP_BACKEND_ADDRESS || '136.109.41.170' }}
+          GCP_BACKEND_SSH_KEY: ${{ secrets.GCP_BACKEND_SSH_KEY }}
+          GCP_BACKEND_USER: ${{ vars.GCP_BACKEND_USER || 'howardli' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GCP_BACKEND_SSH_KEY}" ]; then
+            echo "::warning::GCP_BACKEND_SSH_KEY is not configured; skipping appcast sync and relying on verifier"
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${GCP_BACKEND_SSH_KEY}" > ~/.ssh/gcp_backend
+          chmod 600 ~/.ssh/gcp_backend
+          cat > ~/.ssh/config <<EOF
+          Host gamedata-backend
+            HostName ${GCP_BACKEND_ADDRESS}
+            User ${GCP_BACKEND_USER}
+            IdentityFile ~/.ssh/gcp_backend
+            StrictHostKeyChecking no
+          EOF
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+
+      - name: Sync GCP backend appcast to release
+        if: steps.check.outputs.should_release == 'true' && vars.BACKEND_SMOKE_URL != '' && steps.gcp-ssh.outputs.configured == 'true'
+        env:
+          BACKEND_URL: ${{ vars.BACKEND_SMOKE_URL }}
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RECORDER_RELEASE_TAG: ${{ steps.released.outputs.tag }}
+          RUN_E2E: "true"
+        run: bash scripts/sync_gcp_backend_release.sh
+
+      - name: Verify backend appcast matches release
+        if: steps.check.outputs.should_release == 'true' && vars.BACKEND_SMOKE_URL != ''
+        env:
+          BACKEND_URL: ${{ vars.BACKEND_SMOKE_URL }}
+          RECORDER_RELEASE_TAG: ${{ steps.released.outputs.tag }}
+        run: |
+          python3 scripts/verify_deployed_backend.py \
+            --url "$BACKEND_URL" \
+            --verbose \
+            --expected-recorder-tag "$RECORDER_RELEASE_TAG"

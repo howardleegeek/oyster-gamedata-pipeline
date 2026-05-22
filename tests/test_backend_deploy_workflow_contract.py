@@ -12,6 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = REPO_ROOT / ".github" / "workflows"
 DEPLOY_WORKFLOW = WORKFLOWS / "deploy-backend-fly.yml"
 SMOKE_WORKFLOW = WORKFLOWS / "backend-remote-smoke.yml"
+AUTO_RELEASE_WORKFLOW = WORKFLOWS / "auto-release.yml"
 
 
 def _load_workflow(path: Path) -> dict:
@@ -73,10 +74,12 @@ def test_remote_smoke_supports_manual_dispatch_and_scheduled_guard() -> None:
     on = _on_block(workflow)
     smoke_job = workflow["jobs"]["smoke"]
 
+    assert "release" in on
+    assert on["release"]["types"] == ["published"]
     assert "workflow_dispatch" in on
     assert "schedule" in on
     assert smoke_job["if"] == (
-        "${{ github.event_name == 'workflow_dispatch' || vars.BACKEND_SMOKE_URL != '' }}"
+        "${{ github.event_name == 'workflow_dispatch' || github.event_name == 'release' || vars.BACKEND_SMOKE_URL != '' }}"
     )
     assert "${{ inputs.backend_url || vars.BACKEND_SMOKE_URL }}" in SMOKE_WORKFLOW.read_text(
         encoding="utf-8"
@@ -91,6 +94,23 @@ def test_remote_smoke_runs_the_same_backend_verifier() -> None:
     assert '--url "$BACKEND_URL"' in step_text
     assert "--verbose" in step_text
     assert "Resolve latest recorder release tag" in step_text
+    assert "RELEASE_EVENT_TAG" in step_text
     assert "--expected-recorder-tag" in step_text
     assert "bin/remote_recorder_backend_e2e.py" in step_text
     assert '--backend-url "$BACKEND_URL"' in step_text
+
+
+def test_auto_release_syncs_and_verifies_gcp_backend_appcast() -> None:
+    workflow = _load_workflow(AUTO_RELEASE_WORKFLOW)
+    step_text = _all_step_text(workflow)
+    raw_text = AUTO_RELEASE_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "scripts/auto_release.sh" in step_text
+    assert "Install backend smoke dependencies" in raw_text
+    assert "GCP_BACKEND_SSH_KEY" in raw_text
+    assert "Host gamedata-backend" in step_text
+    assert "scripts/sync_gcp_backend_release.sh" in step_text
+    assert "RUN_E2E" in step_text
+    assert "Verify backend appcast matches release" in raw_text
+    assert "scripts/verify_deployed_backend.py" in step_text
+    assert '--expected-recorder-tag "$RECORDER_RELEASE_TAG"' in step_text
