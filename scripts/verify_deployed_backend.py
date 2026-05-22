@@ -5,11 +5,12 @@ Usage:
     python scripts/verify_deployed_backend.py --url https://oyster-backend-stub.fly.dev
     python scripts/verify_deployed_backend.py --url https://oyster-backend-stub.fly.dev --verbose
 
-Calls four endpoints and validates responses:
+Calls four required endpoints and optionally one admin endpoint:
   1. GET  /healthz                        → 200 + {"status": "ok"}
   2. POST /api/v1/testers/apply           → 200 + tester_id
   3. GET  /api/v1/income/today (Bearer)   → 200 + JSON schema valid
   4. GET  /api/v1/updates/appcast.xml     → 200 + valid XML
+  5. GET  /api/v1/admin/state             → optional, token read from env only
 
 Exit 0 if all pass, 1 if any fail with details.
 """
@@ -221,6 +222,57 @@ def check_appcast(
         return CheckResult("GET /api/v1/updates/appcast.xml", False, str(exc))
 
 
+def check_admin_state(
+    client: httpx.Client,
+    verbose: bool,
+    admin_token: str,
+    expected_recorder_tag: str | None = None,
+) -> CheckResult:
+    """GET /api/v1/admin/state → 200 + non-PII state summary."""
+    name = "GET /api/v1/admin/state"
+    if verbose:
+        print("  → GET /api/v1/admin/state (admin token from env)")
+    try:
+        resp = client.get(
+            "/api/v1/admin/state",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        if resp.status_code != 200:
+            return CheckResult(name, False, f"status={resp.status_code}")
+
+        body = resp.json()
+        if not isinstance(body, dict):
+            return CheckResult(name, False, "response is not a JSON object")
+        if body.get("status") != "ok":
+            return CheckResult(name, False, "status field is not ok")
+
+        required_keys = {"counts", "income_today", "recorder_release"}
+        missing = sorted(required_keys - set(body))
+        if missing:
+            return CheckResult(name, False, f"missing keys: {missing}")
+
+        serialized = json.dumps(body, sort_keys=True, default=str)
+        if "@" in serialized or "download_url" in serialized:
+            return CheckResult(name, False, "response contains PII marker")
+
+        recorder_release = body.get("recorder_release")
+        if not isinstance(recorder_release, dict):
+            return CheckResult(name, False, "recorder_release is not an object")
+        if expected_recorder_tag:
+            expected_tag = _normalise_release_tag(expected_recorder_tag)
+            actual_tag = str(recorder_release.get("tag", ""))
+            if _normalise_release_tag(actual_tag) != expected_tag:
+                return CheckResult(
+                    name,
+                    False,
+                    f"expected recorder tag {expected_tag}, got: {actual_tag or '<missing>'}",
+                )
+
+        return CheckResult(name, True)
+    except Exception as exc:
+        return CheckResult(name, False, _mask_secret(str(exc), admin_token))
+
+
 def _xml_attr(element: ET.Element, local_name: str) -> str:
     for key, value in element.attrib.items():
         if key == local_name or key.endswith(f"}}{local_name}"):
@@ -233,6 +285,12 @@ def _normalise_release_tag(tag: str) -> str:
     return tag if tag.startswith("v") else f"v{tag}"
 
 
+def _mask_secret(text: str, secret: str) -> str:
+    if not secret:
+        return text
+    return text.replace(secret, "<redacted>")
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -242,6 +300,7 @@ def run(
     url: str,
     verbose: bool = False,
     expected_recorder_tag: str | None = None,
+    admin_token_env: str | None = None,
 ) -> int:
     """Run all smoke checks against *url*. Returns exit code."""
     report = SmokeReport()
@@ -254,6 +313,25 @@ def run(
         report.add(*_unwrap(check_testers_apply(client, verbose)))
         report.add(*_unwrap(check_income_today(client, verbose)))
         report.add(*_unwrap(check_appcast(client, verbose, expected_recorder_tag)))
+        if admin_token_env:
+            admin_token = os.getenv(admin_token_env, "").strip()
+            if not admin_token:
+                report.add(
+                    "GET /api/v1/admin/state",
+                    False,
+                    f"admin token env {admin_token_env} is not set",
+                )
+            else:
+                report.add(
+                    *_unwrap(
+                        check_admin_state(
+                            client,
+                            verbose,
+                            admin_token,
+                            expected_recorder_tag,
+                        )
+                    )
+                )
 
     print(report.summary())
 
@@ -286,8 +364,13 @@ def main() -> None:
         default=os.getenv("EXPECTED_RECORDER_RELEASE_TAG"),
         help="Require appcast.xml to point at this GitHub release tag.",
     )
+    parser.add_argument(
+        "--admin-token-env",
+        default=os.getenv("BACKEND_ADMIN_TOKEN_ENV", ""),
+        help="Optional env var name containing the admin token for /api/v1/admin/state.",
+    )
     args = parser.parse_args()
-    sys.exit(run(args.url, args.verbose, args.expected_recorder_tag))
+    sys.exit(run(args.url, args.verbose, args.expected_recorder_tag, args.admin_token_env))
 
 
 if __name__ == "__main__":

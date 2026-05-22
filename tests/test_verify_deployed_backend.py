@@ -9,6 +9,7 @@ import httpx
 
 from scripts.verify_deployed_backend import (
     SmokeReport,
+    check_admin_state,
     check_appcast,
     check_healthz,
     check_income_today,
@@ -311,6 +312,98 @@ class TestCheckAppcast:
 
 
 # ---------------------------------------------------------------------------
+# check_admin_state
+# ---------------------------------------------------------------------------
+
+
+class TestCheckAdminState:
+    VALID_BODY = {
+        "status": "ok",
+        "counts": {
+            "income_days": 1,
+            "sessions": 2,
+            "sessions_today": 1,
+            "uploads": 2,
+            "uploads_today": 1,
+            "telemetry_events": 3,
+            "testers": 4,
+            "tester_statuses": {"invited": 1},
+        },
+        "income_today": {
+            "date": "2026-05-22",
+            "total_usd": 5.0,
+            "sessions_uploaded": 10,
+            "currency": "USD",
+        },
+        "recorder_release": {"tag": "v0.9.1", "version": "0.9.1"},
+    }
+
+    def test_success(self):
+        resp = _make_mock_response(200, self.VALID_BODY)
+        client = _make_mock_client([resp])
+        result = check_admin_state(
+            client,
+            verbose=False,
+            admin_token="admin-token-value",
+            expected_recorder_tag="v0.9.1",
+        )
+
+        assert result.passed is True
+        assert result.name == "GET /api/v1/admin/state"
+        _, kwargs = client.get.call_args
+        assert kwargs["headers"] == {"Authorization": "Bearer admin-token-value"}
+
+    def test_missing_keys_fails(self):
+        resp = _make_mock_response(200, {"status": "ok", "counts": {}})
+        client = _make_mock_client([resp])
+        result = check_admin_state(client, verbose=False, admin_token="admin-token-value")
+        assert result.passed is False
+        assert "missing keys" in result.detail
+
+    def test_at_sign_marker_fails(self):
+        body = self.VALID_BODY | {"operator_email": "ops@example.com"}
+        resp = _make_mock_response(200, body)
+        client = _make_mock_client([resp])
+        result = check_admin_state(client, verbose=False, admin_token="admin-token-value")
+        assert result.passed is False
+        assert "PII marker" in result.detail
+
+    def test_download_url_marker_fails(self):
+        body = self.VALID_BODY | {
+            "recorder_release": {
+                "tag": "v0.9.1",
+                "version": "0.9.1",
+                "download_url": "https://github.com/example/installer.exe",
+            }
+        }
+        resp = _make_mock_response(200, body)
+        client = _make_mock_client([resp])
+        result = check_admin_state(client, verbose=False, admin_token="admin-token-value")
+        assert result.passed is False
+        assert "PII marker" in result.detail
+
+    def test_expected_recorder_tag_mismatch_fails(self):
+        resp = _make_mock_response(200, self.VALID_BODY)
+        client = _make_mock_client([resp])
+        result = check_admin_state(
+            client,
+            verbose=False,
+            admin_token="admin-token-value",
+            expected_recorder_tag="v0.9.2",
+        )
+        assert result.passed is False
+        assert "expected recorder tag v0.9.2" in result.detail
+
+    def test_exception_masks_admin_token(self):
+        client = MagicMock()
+        client.get.side_effect = RuntimeError("failed with admin-token-value")
+        result = check_admin_state(client, verbose=False, admin_token="admin-token-value")
+        assert result.passed is False
+        assert "<redacted>" in result.detail
+        assert "admin-token-value" not in result.detail
+
+
+# ---------------------------------------------------------------------------
 # run() integration
 # ---------------------------------------------------------------------------
 
@@ -339,6 +432,8 @@ class TestRun:
             code = run("https://example.com", verbose=False)
 
         assert code == 0
+        assert mock_client.get.call_count == 3
+        assert mock_client.post.call_count == 1
 
     def test_one_fail_returns_1(self):
         responses = [
@@ -363,6 +458,76 @@ class TestRun:
             code = run("https://example.com", verbose=False)
 
         assert code == 1
+
+    def test_admin_state_passes_when_token_env_is_set(self, monkeypatch):
+        monkeypatch.setenv("SMOKE_ADMIN_TOKEN", "admin-token-value")
+        responses = [
+            _make_mock_response(200, {"status": "ok"}),
+            _make_mock_response(200, {"tester_id": "t1"}),
+            _make_mock_response(
+                200,
+                {
+                    "date": "2026-05-20",
+                    "total_usd": 0.0,
+                    "sessions_uploaded": 0,
+                    "currency": "USD",
+                },
+            ),
+            _make_mock_response(
+                200,
+                text_body=TestCheckAppcast.VALID_XML.replace("v0.8.11", "v0.9.1").replace(
+                    "0.8.11", "0.9.1"
+                ),
+            ),
+            _make_mock_response(200, TestCheckAdminState.VALID_BODY),
+        ]
+        mock_client = _make_mock_client(responses)
+
+        with patch("scripts.verify_deployed_backend.httpx.Client") as MockClient:
+            MockClient.return_value.__enter__ = MagicMock(return_value=mock_client)
+            MockClient.return_value.__exit__ = MagicMock(return_value=False)
+            code = run(
+                "https://example.com",
+                verbose=False,
+                expected_recorder_tag="v0.9.1",
+                admin_token_env="SMOKE_ADMIN_TOKEN",
+            )
+
+        assert code == 0
+        assert mock_client.get.call_args_list[-1].args == ("/api/v1/admin/state",)
+        assert mock_client.get.call_args_list[-1].kwargs["headers"] == {
+            "Authorization": "Bearer admin-token-value"
+        }
+
+    def test_admin_state_fails_closed_when_token_env_missing(self, monkeypatch):
+        monkeypatch.delenv("SMOKE_ADMIN_TOKEN", raising=False)
+        responses = [
+            _make_mock_response(200, {"status": "ok"}),
+            _make_mock_response(200, {"tester_id": "t1"}),
+            _make_mock_response(
+                200,
+                {
+                    "date": "2026-05-20",
+                    "total_usd": 0.0,
+                    "sessions_uploaded": 0,
+                    "currency": "USD",
+                },
+            ),
+            _make_mock_response(200, text_body=TestCheckAppcast.VALID_XML),
+        ]
+        mock_client = _make_mock_client(responses)
+
+        with patch("scripts.verify_deployed_backend.httpx.Client") as MockClient:
+            MockClient.return_value.__enter__ = MagicMock(return_value=mock_client)
+            MockClient.return_value.__exit__ = MagicMock(return_value=False)
+            code = run(
+                "https://example.com",
+                verbose=False,
+                admin_token_env="SMOKE_ADMIN_TOKEN",
+            )
+
+        assert code == 1
+        assert mock_client.get.call_count == 3
 
 
 class TestBackendRemoteSmokeWorkflow:
