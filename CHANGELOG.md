@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [0.10.0] - 2026-05-22
+
+### Added
+
+- add plug-and-play plugin profiles (13ad27a)
+- add smoke-ready single-player adapters (72e8e88)
+
+### Other
+
+- ci(backend): tolerate appcast sync race (44c4feb)
+
+
 ## [0.9.4] - 2026-05-22
 
 ### Fixed
