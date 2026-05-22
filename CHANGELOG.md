@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [0.8.11] - 2026-05-22
+
+### Other
+
+- ci(installer): report Authenticode status in smoke (ee7c033)
+- test(backend): harden deployed recorder smoke (991d692)
+- test(backend): avoid unresolved metadata literals (6043539)
+
+
 ## [0.8.10] - 2026-05-21
 
 ### Other
