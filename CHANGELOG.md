@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [0.9.4] - 2026-05-22
+
+### Fixed
+
+- accept recorder LEM sessions (f84a7ce)
+
+### Other
+
+- ci(release): sync backend appcast after auto release (a4b603f)
+
+
 ## [0.9.3] - 2026-05-22
 
 ### Fixed
