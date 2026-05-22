@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [0.8.8] - 2026-05-21
+
+### Fixed
+
+- update income on session upload (cf0a605)
+
+### Other
+
+- style(test): format backend deploy contract (dfc25ba)
+
+
 ## [0.8.7] - 2026-05-21
 
 ### Other
