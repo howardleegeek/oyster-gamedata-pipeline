@@ -46,7 +46,7 @@ python3 bin/sample_tarball_builder.py --output sample.tar.gz   # → 27 MB · li
 | macOS 26.3 (mac-1) | 3.14 | 28.2 MB | **0 issues, PASS=True** ✅ |
 | Windows 11 + WSL2 Ubuntu 22.04 (minipc) | 3.10.12 | 26.9 MB | **0 issues, PASS=True** ✅ |
 
-最新 release: [**v0.1.0-rc8**](https://github.com/howardleegeek/oyster-gamedata-pipeline/releases/tag/v0.1.0-rc8) — 真 Paper + Mineflayer + adapter E2E 在 minipc Windows 实测通过。
+最新 release: [**v0.10.0**](https://github.com/howardleegeek/oyster-gamedata-pipeline/releases/tag/v0.10.0) — latest release 带真实 `OysterRecorder-setup-v2.6.0.exe`、`SHA256SUMS.txt`，backend health/appcast + release/windows installer smokes 绿。
 
 ## 🔬 真 E2E 一行验证(rc8 新增)
 
@@ -86,13 +86,16 @@ DURATION_MS=300000 bash bin/integration_test_minipc.sh           # 5 min vendor 
 3. **Lint** validates structure, required fields, semantic constraints, and cross-reference integrity
 4. **Pack** bundles final deliverables as compressed archives with SHA-256 checksums and a machine-readable manifest
 
-## Three games supported
+## Game plugin status
 
 | Game | Status | Notes |
 |------|--------|-------|
-| **Minecraft** | ✅ Stable | Full capture pipeline operational; 100-iter validation passing at 98.7% |
-| **BeamNG.drive** | 🟡 Beta | Adapter complete; lint rules in progress — see [BEAMNG_RUNBOOK.md](BEAMNG_RUNBOOK.md) |
-| **Counter-Strike 2** | 🟡 Beta | Capture prototype running; adapter schema pending final review |
+| **Minecraft Java** | ✅ Production | Reference implementation: OBS/window capture + RawInput + Mineflayer state. |
+| **BeamNG.drive** | 🟡 Smoke-ready | BeamNGpy wrapper + native camera depth contract; real Windows BeamNG run still pending. |
+| **Factorio** | 🟡 Smoke-ready | RCON/Lua mod relay contract + CI fake client; Lua packaging + real run pending. |
+| **Stardew Valley** | 🟡 Smoke-ready | SMAPI relay contract + CI fake relay; real SMAPI run pending. |
+| **Cyberpunk 2077** | ⚪ Scaffold | Single-player CET Lua websocket path defined, not production validated. |
+| **Cities: Skylines** | ⚪ Scaffold | Mod API / named-pipe telemetry path defined, not production validated. |
 
 ## Status
 
@@ -100,7 +103,7 @@ DURATION_MS=300000 bash bin/integration_test_minipc.sh           # 5 min vendor 
 |--------|-------|
 | Validation pass rate (100-iter) | **98.7%** |
 | Pipeline stages passing | 4 / 4 |
-| Games in production | 1 / 3 |
+| Games in production | 1 production + 3 smoke-ready |
 | Mean pipeline duration | ~4.2 min per run |
 
 📊 Full sprint metrics and historical trends: [SPRINT_REPORT](SPRINT_REPORT.md)
@@ -123,7 +126,8 @@ DURATION_MS=300000 bash bin/integration_test_minipc.sh           # 5 min vendor 
 | [SOP.md](SOP.md) | Standard operating procedure — end-to-end pipeline walkthrough |
 | [QUICKSTART.md](QUICKSTART.md) | 5-minute setup guide for new contributors |
 | [PRODUCTION_LINE.md](PRODUCTION_LINE.md) | Deep dive into each pipeline stage: capture → adapter → lint → pack |
-| [BEAMNG_RUNBOOK.md](BEAMNG_RUNBOOK.md) | BeamNG.drive specific configuration, known issues, and troubleshooting |
+| [docs/RECORDER_PIPELINE_CONTRACT.md](docs/RECORDER_PIPELINE_CONTRACT.md) | Recorder ↔ pipeline ↔ buyer bundle contract |
+| [docs/runbooks/BEAMNG_RUNBOOK.md](docs/runbooks/BEAMNG_RUNBOOK.md) | BeamNG.drive specific configuration, known issues, and troubleshooting |
 | [RELEASE_NOTES.md](RELEASE_NOTES.md) | Changelog, version history, and migration notes |
 
 ## Contributing

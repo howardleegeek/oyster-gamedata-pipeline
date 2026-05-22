@@ -24,6 +24,17 @@ import sys
 import tempfile
 import time
 
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+SRC_DIR = REPO_ROOT / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+from oyster_agent_runner.session_contract import (  # noqa: E402
+    SessionLayout,
+    detect_session_layout,
+    is_complete_layout,
+)
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -53,18 +64,22 @@ LEM_ACTION_STREAM = pathlib.Path("streams/actions.jsonl")
 
 
 def _has_legacy_session_files(session_dir: pathlib.Path) -> bool:
-    present = {f.name for f in session_dir.iterdir()} if session_dir.is_dir() else set()
-    return REQUIRED_FILES.issubset(present)
+    return is_complete_layout(session_dir, SessionLayout.LEGACY_PIPELINE)
 
 
 def _has_lem_session_files(session_dir: pathlib.Path) -> bool:
-    return (session_dir / LEM_VIDEO).is_file() and (session_dir / LEM_STATE_STREAM).is_file()
+    return is_complete_layout(session_dir, SessionLayout.LEM)
 
 
 def _session_format(session_dir: pathlib.Path) -> str | None:
-    if _has_legacy_session_files(session_dir):
+    contract_result = detect_session_layout(session_dir)
+    if not contract_result.is_valid:
+        return None
+
+    layout = contract_result.layout
+    if layout == SessionLayout.LEGACY_PIPELINE:
         return "legacy"
-    if _has_lem_session_files(session_dir):
+    if layout == SessionLayout.LEM:
         return "lem"
     return None
 
