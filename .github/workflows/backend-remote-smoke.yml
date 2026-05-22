@@ -31,3 +31,6 @@ jobs:
 
       - name: Smoke-test backend
         run: python scripts/verify_deployed_backend.py --url "$BACKEND_URL" --verbose
+
+      - name: Run recorder backend E2E
+        run: python bin/remote_recorder_backend_e2e.py --backend-url "$BACKEND_URL"

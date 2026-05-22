@@ -61,6 +61,9 @@ jobs:
       - name: Smoke-test deployed backend
         run: python scripts/verify_deployed_backend.py --url "$BACKEND_URL" --verbose
 
+      - name: Run deployed recorder backend E2E
+        run: python bin/remote_recorder_backend_e2e.py --backend-url "$BACKEND_URL"
+
       - name: Write deployment summary
         if: always()
         run: |
@@ -70,4 +73,5 @@ jobs:
             echo "- App: \`${FLY_APP}\`"
             echo "- URL: ${BACKEND_URL}"
             echo "- Smoke workflow: \`scripts/verify_deployed_backend.py\`"
+            echo "- Recorder E2E: \`bin/remote_recorder_backend_e2e.py\`"
           } >> "$GITHUB_STEP_SUMMARY"

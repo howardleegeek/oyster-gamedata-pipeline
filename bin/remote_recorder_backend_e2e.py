@@ -26,10 +26,9 @@ import argparse
 import json
 import logging
 import sys
-import time
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import httpx
 
@@ -209,7 +208,11 @@ def step_fetch_income(
     assert resp.status_code == 200, f"income returned {resp.status_code}: {resp.text}"
     data = resp.json()
     total_usd = data.get("total_usd", 0.0)
-    logger.info("  ✓ income today: $%.2f (sessions_uploaded=%s)", total_usd, data.get("sessions_uploaded", 0))
+    logger.info(
+        "  ✓ income today: $%.2f (sessions_uploaded=%s)",
+        total_usd,
+        data.get("sessions_uploaded", 0),
+    )
     return data
 
 
@@ -265,7 +268,8 @@ def main() -> None:
         help=f"Backend URL (default: {DEFAULT_BACKEND_URL})",
     )
     parser.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Enable verbose logging",
     )
