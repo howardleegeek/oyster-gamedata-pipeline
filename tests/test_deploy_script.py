@@ -171,3 +171,57 @@ class TestDeployScript:
         assert "command -v flyctl" in self.text, "Script should check flyctl"
         assert "command -v fly" in self.text, "Script should check fly"
         assert "find_fly_cli" in self.text, "Script should resolve the Fly.io CLI once"
+
+
+# ---------------------------------------------------------------------------
+# GCP backend release metadata sync script
+# ---------------------------------------------------------------------------
+
+
+class TestGcpBackendReleaseSyncScript:
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.path = SCRIPTS_DIR / "sync_gcp_backend_release.sh"
+        assert self.path.exists(), f"sync_gcp_backend_release.sh not found at {self.path}"
+        self.text = self.path.read_text(encoding="utf-8")
+
+    def test_is_executable(self):
+        mode = os.stat(self.path).st_mode
+        assert mode & stat.S_IXUSR, "sync_gcp_backend_release.sh must be executable"
+
+    def test_strict_bash_script(self):
+        assert self.text.startswith("#!/usr/bin/env bash")
+        assert "set -euo pipefail" in self.text
+
+    def test_resolves_latest_github_release_installer_metadata(self):
+        assert "gh_release list --limit 1" in self.text
+        assert 'gh_release view "$tag"' in self.text
+        assert "OysterRecorder-[Ss]etup-" in self.text
+        assert "sha256:" in self.text
+
+    def test_writes_release_environment_file(self):
+        assert "recorder-release.env" in self.text
+        assert "OYSTER_RECORDER_RELEASE_VERSION" in self.text
+        assert "OYSTER_RECORDER_RELEASE_TAG" in self.text
+        assert "OYSTER_RECORDER_DOWNLOAD_URL" in self.text
+        assert "OYSTER_RECORDER_SHA256" in self.text
+        assert "chmod 600" in self.text
+
+    def test_removes_stale_inline_systemd_release_vars(self):
+        assert "sed -i '/^Environment=OYSTER_RECORDER_RELEASE_/d'" in self.text
+        assert "EnvironmentFile=${RELEASE_ENV_FILE}" in self.text
+        assert "systemctl restart" in self.text
+
+    def test_verifies_backend_against_synced_tag(self):
+        assert "require_command curl" in self.text
+        assert "Waiting for ${BACKEND_URL}/healthz" in self.text
+        assert "${BACKEND_URL%/}/healthz" in self.text
+        assert "scripts/verify_deployed_backend.py" in self.text
+        assert '--expected-recorder-tag "$tag"' in self.text
+        assert "bin/remote_recorder_backend_e2e.py" in self.text
+
+    def test_does_not_handle_admin_tokens_or_secrets(self):
+        lower = self.text.lower()
+        forbidden = ["tester_admin_token", "backend.env", "password", "secret_key"]
+        for token in forbidden:
+            assert token not in lower, f"Script must not touch or hardcode {token}"
