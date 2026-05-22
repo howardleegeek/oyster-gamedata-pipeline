@@ -179,6 +179,55 @@ For these, we either skip OR ship a degraded "RGB + RawInput + DepthAnything inf
 
 **Game-specific code is the small box at top.** Everything below is reused. Adding a new game = writing one extractor module (~200-400 LOC) + a runbook. That's the unit of work.
 
+## Plug-and-play game plugin contract
+
+Each supported game now has a small declarative profile in
+`src/oyster_agent_runner/game_plugins.py`. The profile is the handoff unit
+for cluster workers: it declares process detection, allowed modes,
+official/blessed data sources, required output streams, runbook, adapter module,
+and setup time. A game should not be dispatched to implementation until its
+profile validates.
+
+Local checks:
+
+```bash
+PYTHONPATH=src python3 -m oyster_agent_runner.game_plugins list
+PYTHONPATH=src python3 -m oyster_agent_runner.game_plugins validate
+PYTHONPATH=src python3 -m oyster_agent_runner.game_plugins show minecraft
+```
+
+Minimum plug-and-play requirements:
+
+| Requirement | Why |
+|---|---|
+| `video` source | OBS/window capture stays game-agnostic. |
+| `input` source | RawInput keeps user action capture common across games. |
+| `state` source | Game-specific pose/camera/world state must come from an official or community-blessed channel. |
+| `manifest.json` output | Every session must be self-describing for validator/backend ingestion. |
+| `runbook` | Operators and cluster workers need deterministic setup and smoke steps. |
+| anti-cheat policy | Online/kernel anti-cheat games must not be mixed into the single-player adapter path. |
+
+Current built-in P0 profile set:
+
+| Profile | Tier | Data source contract |
+|---|---|---|
+| `minecraft` | production | OBS + RawInput + Mineflayer; reference implementation. |
+| `beamng` | scaffold | OBS + RawInput + BeamNGpy + native camera depth. |
+| `factorio` | scaffold | OBS + RawInput + RCON/Lua mod; flat 2D depth. |
+| `stardew_valley` | scaffold | OBS + RawInput + SMAPI HTTP relay; flat 2D depth. |
+| `cyberpunk_2077` | scaffold | OBS + RawInput + CET Lua websocket; single-player only. |
+| `cities_skylines` | scaffold | OBS + RawInput + Mod API/named pipe; city-state telemetry. |
+
+This turns horizontal expansion into a repeatable loop:
+
+1. Add/update the game profile.
+2. Implement the thin adapter listed by `adapter_module`.
+3. Emit `recording.mp4`, `game_state.jsonl`, `inputs.jsonl`, and
+   `manifest.json` or a LEM session view that maps to those files.
+4. Run game-specific smoke plus the shared validator/backend smoke.
+5. Promote the profile from `scaffold` to `production` only after clean real
+   sessions pass.
+
 ---
 
 ## Per-stakeholder one-liner
