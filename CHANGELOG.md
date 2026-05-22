@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [0.11.0] - 2026-05-22
+
+### Added
+
+- codify recorder pipeline contract (72168ff)
+
+### Other
+
+- ci(backend): smoke current production backend (d5e246f)
+- chore(recorder): align submodule to current main (30b1d34)
+
+
 ## [0.10.0] - 2026-05-22
 
 ### Added
