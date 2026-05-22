@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [0.8.10] - 2026-05-21
+
+### Other
+
+- ci(installer): harden Windows signing gates (540853e)
+- ci(installer): unify EV signing secret (2b3ada4)
+
+
 ## [0.8.9] - 2026-05-21
 
 ### Other
