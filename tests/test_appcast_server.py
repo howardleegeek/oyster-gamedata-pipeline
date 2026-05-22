@@ -20,8 +20,8 @@ def test_appcast_returns_xml() -> None:
 
 def test_appcast_contains_version() -> None:
     r = _client().get("/api/v1/updates/appcast.xml")
-    assert "v0.8.10" in r.text or "0.8.10" in r.text
-    assert "releases/download/v0.8.10/OysterRecorder-setup-v2.6.0.exe" in r.text
+    assert "v0.8.11" in r.text or "0.8.11" in r.text
+    assert "releases/download/v0.8.11/OysterRecorder-setup-v2.6.0.exe" in r.text
     assert "bb1e3f12bc71fca9089e14fe3c40ca278af76fce042e4328bf2e8ab1d0d451e5" in r.text
     assert "PLACE" + "HOLDER" not in r.text
 
@@ -29,3 +29,17 @@ def test_appcast_contains_version() -> None:
 def test_appcast_has_sparkle_namespace() -> None:
     r = _client().get("/api/v1/updates/appcast.xml")
     assert "sparkle" in r.text.lower()
+
+
+def test_appcast_supports_release_metadata_env_override(monkeypatch) -> None:
+    expected_sha = "a" * 64
+    monkeypatch.setenv("OYSTER_RECORDER_RELEASE_VERSION", "9.1.2")
+    monkeypatch.setenv("OYSTER_RECORDER_RELEASE_TAG", "v9.1.2")
+    monkeypatch.setenv("OYSTER_RECORDER_SHA256", expected_sha)
+
+    r = _client().get("/api/v1/updates/appcast.xml")
+
+    assert r.status_code == 200
+    assert "v9.1.2" in r.text
+    assert "releases/download/v9.1.2/OysterRecorder-setup-v2.6.0.exe" in r.text
+    assert f'sparkle:sha256="{expected_sha}"' in r.text

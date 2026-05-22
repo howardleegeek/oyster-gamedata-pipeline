@@ -215,8 +215,8 @@ class TestCheckAppcast:
         '<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" '
         'version="2.0"><channel><title>Test</title><item>'
         '<enclosure url="https://github.com/howardleegeek/oyster-gamedata-pipeline/'
-        'releases/download/v0.8.10/OysterRecorder-setup-v2.6.0.exe" '
-        'sparkle:version="0.8.10" '
+        'releases/download/v0.8.11/OysterRecorder-setup-v2.6.0.exe" '
+        'sparkle:version="0.8.11" '
         'sparkle:sha256="bb1e3f12bc71fca9089e14fe3c40ca278af76fce042e4328bf2e8ab1d0d451e5" '
         'type="application/octet-stream"/>'
         "</item></channel></rss>"
@@ -228,6 +228,23 @@ class TestCheckAppcast:
         result = check_appcast(client, verbose=False)
         assert result.passed is True
         assert result.name == "GET /api/v1/updates/appcast.xml"
+
+    def test_expected_recorder_tag_success(self):
+        resp = _make_mock_response(200, text_body=self.VALID_XML)
+        client = _make_mock_client([resp])
+        result = check_appcast(client, verbose=False, expected_recorder_tag="v0.8.11")
+        assert result.passed is True
+
+    def test_expected_recorder_tag_mismatch_fails(self):
+        stale_xml = self.VALID_XML.replace("v0.8.11", "v0.8.10").replace(
+            'sparkle:version="0.8.11"',
+            'sparkle:version="0.8.10"',
+        )
+        resp = _make_mock_response(200, text_body=stale_xml)
+        client = _make_mock_client([resp])
+        result = check_appcast(client, verbose=False, expected_recorder_tag="v0.8.11")
+        assert result.passed is False
+        assert "expected v0.8.11 release URL" in result.detail
 
     def test_invalid_xml(self):
         resp = _make_mock_response(200, text_body="<not xml><broken>")

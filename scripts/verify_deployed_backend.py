@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -146,7 +147,11 @@ def check_income_today(client: httpx.Client, verbose: bool) -> CheckResult:
         return CheckResult("GET /api/v1/income/today", False, str(exc))
 
 
-def check_appcast(client: httpx.Client, verbose: bool) -> CheckResult:
+def check_appcast(
+    client: httpx.Client,
+    verbose: bool,
+    expected_recorder_tag: str | None = None,
+) -> CheckResult:
     """GET /api/v1/updates/appcast.xml → 200 + valid release enclosure XML"""
     if verbose:
         print("  → GET /api/v1/updates/appcast.xml")
@@ -183,6 +188,20 @@ def check_appcast(client: httpx.Client, verbose: bool) -> CheckResult:
                 False,
                 f"unexpected enclosure URL: {url}",
             )
+        if expected_recorder_tag:
+            tag = _normalise_release_tag(expected_recorder_tag)
+            if f"/releases/download/{tag}/" not in url:
+                return CheckResult(
+                    "GET /api/v1/updates/appcast.xml",
+                    False,
+                    f"expected {tag} release URL, got: {url}",
+                )
+            if version.removeprefix("v") != tag.removeprefix("v"):
+                return CheckResult(
+                    "GET /api/v1/updates/appcast.xml",
+                    False,
+                    f"expected version {tag}, got: {version}",
+                )
         if not version:
             return CheckResult(
                 "GET /api/v1/updates/appcast.xml",
@@ -209,12 +228,21 @@ def _xml_attr(element: ET.Element, local_name: str) -> str:
     return ""
 
 
+def _normalise_release_tag(tag: str) -> str:
+    tag = tag.strip()
+    return tag if tag.startswith("v") else f"v{tag}"
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
 
-def run(url: str, verbose: bool = False) -> int:
+def run(
+    url: str,
+    verbose: bool = False,
+    expected_recorder_tag: str | None = None,
+) -> int:
     """Run all smoke checks against *url*. Returns exit code."""
     report = SmokeReport()
 
@@ -225,7 +253,7 @@ def run(url: str, verbose: bool = False) -> int:
         report.add(*_unwrap(check_healthz(client, verbose)))
         report.add(*_unwrap(check_testers_apply(client, verbose)))
         report.add(*_unwrap(check_income_today(client, verbose)))
-        report.add(*_unwrap(check_appcast(client, verbose)))
+        report.add(*_unwrap(check_appcast(client, verbose, expected_recorder_tag)))
 
     print(report.summary())
 
@@ -253,8 +281,13 @@ def main() -> None:
         action="store_true",
         help="Show each step as it runs.",
     )
+    parser.add_argument(
+        "--expected-recorder-tag",
+        default=os.getenv("EXPECTED_RECORDER_RELEASE_TAG"),
+        help="Require appcast.xml to point at this GitHub release tag.",
+    )
     args = parser.parse_args()
-    sys.exit(run(args.url, args.verbose))
+    sys.exit(run(args.url, args.verbose, args.expected_recorder_tag))
 
 
 if __name__ == "__main__":
