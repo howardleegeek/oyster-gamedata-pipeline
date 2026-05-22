@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.9.2] - 2026-05-22
+
+### Other
+
+- ci(backend): add optional admin state smoke (f54c366)
+
+
 ## [0.9.1] - 2026-05-22
 
 ### Other
