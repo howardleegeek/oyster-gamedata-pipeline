@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [0.9.3] - 2026-05-22
+
+### Fixed
+
+- harden Windows real session cleanup (027a0db)
+
+### Other
+
+- ci(mc-mod): make fabric watcher permission aware (830d1e7)
+- test(recorder): add Windows real session smoke harness (0889d2e)
+
+
 ## [0.9.2] - 2026-05-22
 
 ### Other
