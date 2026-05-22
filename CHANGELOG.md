@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.8.9] - 2026-05-21
+
+### Other
+
+- ci(backend): require deployed recorder e2e smoke (84b4f97)
+
+
 ## [0.8.8] - 2026-05-21
 
 ### Fixed
