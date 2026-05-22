@@ -2,8 +2,8 @@
 """verify_deployed_backend.py – Smoke-test a deployed backend_stub instance.
 
 Usage:
-    python scripts/verify_deployed_backend.py --url https://oyster-backend-stub.fly.dev
-    python scripts/verify_deployed_backend.py --url https://oyster-backend-stub.fly.dev --verbose
+    python scripts/verify_deployed_backend.py --url http://136.109.41.170:8081
+    python scripts/verify_deployed_backend.py --url http://136.109.41.170:8081 --verbose
 
 Calls four required endpoints and optionally one admin endpoint:
   1. GET  /healthz                        → 200 + {"status": "ok"}
@@ -391,7 +391,7 @@ def main() -> None:
     parser.add_argument(
         "--url",
         required=True,
-        help="Base URL of the deployed backend (e.g. https://oyster-backend-stub.fly.dev)",
+        help="Base URL of the deployed backend (e.g. http://136.109.41.170:8081)",
     )
     parser.add_argument(
         "--verbose",
