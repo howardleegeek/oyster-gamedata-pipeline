@@ -95,7 +95,7 @@ jobs:
       # mid-pipeline with UnicodeEncodeError. UTF-8 is the only sane default.
       PYTHONIOENCODING: utf-8
       PYTHONUTF8: '1'
-      EV_CERT_PFX: ${{ secrets.EV_CERT_PFX }}
+      EV_CERT_PFX: ${{ secrets.EV_CERT_PFX || secrets.EV_CERT_PFX_BASE64 }}
       EV_CERT_PASSWORD: ${{ secrets.EV_CERT_PASSWORD }}
 
     steps:
@@ -584,7 +584,7 @@ jobs:
         shell: pwsh
         run: |
           Write-Warning "EV_CERT_PFX secret not set — bundled installer will be distributed UNSIGNED."
-          Write-Warning "Add EV_CERT_PFX (base64 .pfx) and EV_CERT_PASSWORD to repository secrets to enable signing."
+          Write-Warning "Add EV_CERT_PFX (or legacy EV_CERT_PFX_BASE64) and EV_CERT_PASSWORD to repository secrets to enable signing."
 
       # ---------------------------------------------------------------------
       # 16. SHA-256 the final installer + emit SHA-256-manifest.txt

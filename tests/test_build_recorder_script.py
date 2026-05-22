@@ -243,44 +243,45 @@ class TestWorkflowYAML:
 # ---------------------------------------------------------------------------
 class TestEVSigning:
     def test_ev_cert_secret_reference(self, workflow_content):
-        """Workflow should reference EV_CERT_PFX_BASE64 secret."""
+        """Workflow should reference canonical and legacy EV cert secrets."""
+        assert "EV_CERT_PFX" in workflow_content
         assert "EV_CERT_PFX_BASE64" in workflow_content
 
     def test_ev_cert_secret_is_job_env_for_conditions(self, workflow_content):
         """GitHub Actions if: must read signing secret from job env."""
-        assert "EV_CERT_PFX_BASE64: >-" in workflow_content
-        assert "${{ secrets.EV_CERT_PFX_BASE64 }}" in workflow_content
+        assert "EV_CERT_PFX: >-" in workflow_content
+        assert "${{ secrets.EV_CERT_PFX || secrets.EV_CERT_PFX_BASE64 }}" in workflow_content
         assert "${{ secrets.EV_CERT_PASSWORD }}" in workflow_content
 
     def test_ev_signing_step_has_condition(self, workflow_content):
         """EV signing step should have an 'if' condition."""
         # The step should be conditional on the secret existing
-        assert "EV_CERT_PFX_BASE64" in workflow_content
+        assert "EV_CERT_PFX" in workflow_content
         # Check for the conditional pattern
-        assert re.search(r"if:.*EV_CERT_PFX_BASE64", workflow_content) is not None
+        assert re.search(r"if:.*EV_CERT_PFX", workflow_content) is not None
 
-    def test_ev_signing_uses_signtool(self, workflow_content):
-        """EV signing should use signtool.exe."""
-        assert "signtool" in workflow_content
+    def test_ev_signing_uses_shared_sign_script(self, workflow_content):
+        """EV signing should use the shared Authenticode helper."""
+        assert "installer\\sign_installer.ps1" in workflow_content
 
-    def test_ev_signing_timestamp(self, workflow_content):
-        """EV signing should include timestamping."""
-        assert "timestamp" in workflow_content.lower()
+    def test_ev_signing_delegates_timestamping_to_shared_helper(self, workflow_content):
+        """Timestamping lives in installer/sign_installer.ps1."""
+        assert "installer\\sign_installer.ps1" in workflow_content
 
-    def test_ev_signing_cleans_up_pfx(self, workflow_content):
-        """EV signing should clean up the PFX file."""
-        assert "Remove-Item" in workflow_content or "rm " in workflow_content
+    def test_ev_signing_checks_sign_script_exit_code(self, workflow_content):
+        """Workflow must not swallow signing failures."""
+        sign_pos = workflow_content.index("installer\\sign_installer.ps1")
+        exit_code_pos = workflow_content.index("$LASTEXITCODE", sign_pos)
+        assert sign_pos < exit_code_pos
 
-    def test_ev_signing_fails_if_signtool_missing(self, workflow_content):
-        """If a cert is configured, missing signtool must fail the release."""
-        missing_pos = workflow_content.index('Write-Error "signtool.exe not found"')
-        exit_pos = workflow_content.index("exit 1", missing_pos)
-        assert missing_pos < exit_pos
+    def test_legacy_ev_secret_name_supported(self, workflow_content):
+        """Existing EV_CERT_PFX_BASE64 deployments still enable signing."""
+        assert "secrets.EV_CERT_PFX || secrets.EV_CERT_PFX_BASE64" in workflow_content
 
     def test_unsigned_warning_branch_exists(self, workflow_content):
         """Unsigned builds are allowed, but the workflow must say so clearly."""
         assert "Warn — installer is unsigned" in workflow_content
-        assert "if: env.EV_CERT_PFX_BASE64 == ''" in workflow_content
+        assert "if: env.EV_CERT_PFX == ''" in workflow_content
 
     def test_unsigned_still_works(self, workflow_content):
         """Workflow should NOT require EV cert (unsigned builds should work)."""

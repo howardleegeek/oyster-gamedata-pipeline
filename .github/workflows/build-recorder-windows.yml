@@ -14,7 +14,7 @@
 #   2. Install Rust stable toolchain
 #   3. cargo build --release
 #   4. Inno Setup compile (choco + ISCC.exe)
-#   5. Optional EV cert signing (if EV_CERT_PFX_BASE64 secret exists)
+#   5. Optional EV cert signing (if EV_CERT_PFX / EV_CERT_PFX_BASE64 exists)
 #   6. Upload setup exe as workflow artifact (90-day retention)
 #   7. If tag triggered -> attach to GitHub release
 # ============================================================================
@@ -50,8 +50,8 @@ jobs:
     name: Build & Package OysterRecorder
     runs-on: windows-latest
     env:
-      EV_CERT_PFX_BASE64: >-
-        ${{ secrets.EV_CERT_PFX_BASE64 }}
+      EV_CERT_PFX: >-
+        ${{ secrets.EV_CERT_PFX || secrets.EV_CERT_PFX_BASE64 }}
       EV_CERT_PASSWORD: >-
         ${{ secrets.EV_CERT_PASSWORD }}
 
@@ -226,7 +226,7 @@ jobs:
       # 8. Optional: EV certificate signing
       # --------------------------------------------------------------
       - name: Sign installer with EV certificate
-        if: env.EV_CERT_PFX_BASE64 != ''
+        if: env.EV_CERT_PFX != ''
         shell: pwsh
         run: |
           $ver = "${{ steps.version.outputs.version }}"
@@ -236,52 +236,17 @@ jobs:
             Write-Error "Setup exe not found at $setupExe"
             exit 1
           }
-
-          # Decode PFX from base64 secret
-          $pfxBytes = [Convert]::FromBase64String(
-            $env:EV_CERT_PFX_BASE64)
-          $pfxPath = Join-Path $env:TEMP "ev-cert.pfx"
-          [System.IO.File]::WriteAllBytes(
-            $pfxPath, $pfxBytes)
-
-          # Sign with signtool (available on windows-latest)
-          $signtool = "C:\Program Files (x86)\" +
-            "Windows Kits\10\bin\10.0.22621.0\" +
-            "x64\signtool.exe"
-          if (-not (Test-Path $signtool)) {
-            # Fallback: find signtool in Windows Kits
-            $kitPath = "C:\Program Files (x86)\" +
-              "Windows Kits\10\bin"
-            $signtool = (Get-ChildItem -Path $kitPath `
-              -Filter "signtool.exe" -Recurse |
-              Where-Object {
-                $_.FullName -match "x64"
-              } |
-              Select-Object -First 1).FullName
+          & installer\sign_installer.ps1 -FilePath $setupExe
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
           }
-
-          if (-not $signtool) {
-            Write-Error "signtool.exe not found"
-            exit 1
-          }
-
-          Write-Host "Signing $setupExe..."
-          & $signtool sign `
-            /f $pfxPath `
-            /p $env:EV_CERT_PASSWORD `
-            /tr http://timestamp.digicert.com `
-            /td sha256 /fd sha256 $setupExe
-
-          # Clean up PFX
-          Remove-Item $pfxPath -Force
-          Write-Host "Installer signed successfully"
 
       - name: Warn — installer is unsigned
-        if: env.EV_CERT_PFX_BASE64 == ''
+        if: env.EV_CERT_PFX == ''
         shell: pwsh
         run: |
-          Write-Warning "EV_CERT_PFX_BASE64 secret not set — installer will be distributed UNSIGNED."
-          Write-Warning "Add EV_CERT_PFX_BASE64 (base64 .pfx) and EV_CERT_PASSWORD to repository secrets to enable signing."
+          Write-Warning "EV_CERT_PFX secret not set — installer will be distributed UNSIGNED."
+          Write-Warning "Add EV_CERT_PFX (or legacy EV_CERT_PFX_BASE64) and EV_CERT_PASSWORD to repository secrets to enable signing."
 
       # --------------------------------------------------------------
       # 9. Upload workflow artifact (90-day retention)

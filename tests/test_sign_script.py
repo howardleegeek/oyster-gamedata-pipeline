@@ -232,7 +232,8 @@ class TestWorkflowIntegration:
 
     def test_workflow_promotes_ev_secret_to_job_env(self, workflow_content):
         assert (
-            "EV_CERT_PFX: ${{ secrets.EV_CERT_PFX }}" in workflow_content
+            "EV_CERT_PFX: ${{ secrets.EV_CERT_PFX || secrets.EV_CERT_PFX_BASE64 }}"
+            in workflow_content
         ), "EV_CERT_PFX must be job env so step if: can evaluate it"
         assert (
             "EV_CERT_PASSWORD: ${{ secrets.EV_CERT_PASSWORD }}" in workflow_content
@@ -256,7 +257,10 @@ class TestBundledInstallerWorkflowSigning:
             return f.read()
 
     def test_bundled_workflow_promotes_ev_secret_to_job_env(self, workflow_content):
-        assert "EV_CERT_PFX: ${{ secrets.EV_CERT_PFX }}" in workflow_content
+        assert (
+            "EV_CERT_PFX: ${{ secrets.EV_CERT_PFX || secrets.EV_CERT_PFX_BASE64 }}"
+            in workflow_content
+        )
         assert "EV_CERT_PASSWORD: ${{ secrets.EV_CERT_PASSWORD }}" in workflow_content
 
     def test_bundled_workflow_signs_before_hashing(self, workflow_content):
