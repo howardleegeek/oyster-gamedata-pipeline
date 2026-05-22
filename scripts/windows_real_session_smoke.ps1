@@ -15,9 +15,18 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+$script:IsWindowsHost = ($env:OS -eq "Windows_NT") -or ($PSVersionTable.PSEdition -eq "Desktop")
+$tempRoot = if ($env:TEMP) {
+    $env:TEMP
+} elseif ($env:TMPDIR) {
+    $env:TMPDIR
+} else {
+    [System.IO.Path]::GetTempPath()
+}
+
 if (-not $OutputDir) {
     $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-    $OutputDir = Join-Path $env:TEMP "OysterRecorder-real-session-smoke-$stamp"
+    $OutputDir = Join-Path $tempRoot "OysterRecorder-real-session-smoke-$stamp"
 }
 
 $installerDir = Join-Path $OutputDir "installer"
@@ -33,10 +42,29 @@ $script:Failed = $false
 $script:RecorderProcess = $null
 $script:ReleaseTag = $null
 $script:InstallerPath = $null
-$script:InstallDir = Join-Path $env:LOCALAPPDATA "OysterRecorder"
+$script:LocalAppDataRoot = if ($env:LOCALAPPDATA) { $env:LOCALAPPDATA } else { Join-Path $OutputDir "LOCALAPPDATA" }
+$script:AppDataRoot = if ($env:APPDATA) { $env:APPDATA } else { Join-Path $OutputDir "APPDATA" }
+$script:InstallDir = Join-Path $script:LocalAppDataRoot "OysterRecorder"
 $script:BeforeAdminState = $null
 $script:AfterAdminState = $null
 $script:AdminToken = ""
+$script:RecorderInstalledBySmoke = $false
+$script:RecorderLaunchedBySmoke = $false
+
+$hostOs = "unknown"
+if ($script:IsWindowsHost) {
+    try {
+        $hostOs = Get-CimInstance Win32_OperatingSystem | Select-Object -ExpandProperty Caption
+    } catch {
+        $hostOs = if ($env:OS) { $env:OS } else { "Windows" }
+    }
+} else {
+    try {
+        $hostOs = [System.Runtime.InteropServices.RuntimeInformation]::OSDescription
+    } catch {
+        $hostOs = if ($PSVersionTable.OS) { $PSVersionTable.OS } else { "non-Windows" }
+    }
+}
 
 $script:Report = [ordered]@{
     started_at = $script:StartedAt
@@ -44,7 +72,7 @@ $script:Report = [ordered]@{
     host = [ordered]@{
         computer_name = $env:COMPUTERNAME
         user = $env:USERNAME
-        os = (Get-CimInstance Win32_OperatingSystem | Select-Object -ExpandProperty Caption)
+        os = $hostOs
         powershell = $PSVersionTable.PSVersion.ToString()
     }
     repo = $Repo
@@ -189,14 +217,18 @@ function Copy-EvidenceFile {
 function Collect-Evidence {
     Copy-EvidenceFile -Path $installerDir
     Copy-EvidenceFile -Path $launchOutputDir
-    Copy-EvidenceFile -Path (Join-Path $env:APPDATA "GameData Recorder")
-    Copy-EvidenceFile -Path (Join-Path $env:LOCALAPPDATA "GameData Recorder")
+    Copy-EvidenceFile -Path (Join-Path $script:AppDataRoot "GameData Recorder")
+    Copy-EvidenceFile -Path (Join-Path $script:LocalAppDataRoot "GameData Recorder")
     Copy-EvidenceFile -Path $script:InstallDir
 
     if (Test-Path $archivePath) {
         Remove-Item -LiteralPath $archivePath -Force
     }
     if (Test-Path $evidenceDir) {
+        $evidenceItems = @(Get-ChildItem -LiteralPath $evidenceDir -Force -ErrorAction SilentlyContinue)
+        if ($evidenceItems.Count -eq 0) {
+            Set-Content -Path (Join-Path $evidenceDir "EMPTY-EVIDENCE.txt") -Value "No evidence files were collected." -Encoding UTF8
+        }
         Compress-Archive -Path (Join-Path $evidenceDir "*") -DestinationPath $archivePath -Force
     }
 }
@@ -330,6 +362,7 @@ function Install-Recorder {
     if ($process.ExitCode -ne 0) {
         throw "Installer exited with $($process.ExitCode)"
     }
+    $script:RecorderInstalledBySmoke = $true
     Add-Step "install-recorder" "pass" "installed to $script:InstallDir"
 }
 
@@ -372,6 +405,7 @@ function Launch-Recorder {
         -WorkingDirectory $script:InstallDir `
         -PassThru
 
+    $script:RecorderLaunchedBySmoke = $true
     Start-Sleep -Seconds $LaunchSeconds
     if ($script:RecorderProcess.HasExited) {
         throw "Recorder exited during launch smoke with code $($script:RecorderProcess.ExitCode)"
@@ -423,11 +457,24 @@ function Verify-UploadDelta {
 }
 
 function Stop-Recorder {
+    if (-not $script:RecorderLaunchedBySmoke) {
+        Add-Step "stop-recorder" "skip" "Recorder not launched by this smoke run"
+        return
+    }
+
     if ($script:RecorderProcess -and -not $script:RecorderProcess.HasExited) {
         Stop-Process -Id $script:RecorderProcess.Id -Force -ErrorAction SilentlyContinue
         Add-Step "stop-recorder" "pass" "pid=$($script:RecorderProcess.Id)"
     }
+    $exe = Join-Path $script:InstallDir "gamedata-recorder.exe"
     Get-Process -Name "gamedata-recorder" -ErrorAction SilentlyContinue |
+        Where-Object {
+            try {
+                $_.Path -and [string]::Equals($_.Path, $exe, [System.StringComparison]::OrdinalIgnoreCase)
+            } catch {
+                $false
+            }
+        } |
         Stop-Process -Force -ErrorAction SilentlyContinue
 }
 
@@ -438,6 +485,10 @@ function Uninstall-Recorder {
     }
     if ($KeepInstalled) {
         Add-Step "uninstall-recorder" "skip" "KeepInstalled set"
+        return
+    }
+    if (-not $script:RecorderInstalledBySmoke) {
+        Add-Step "uninstall-recorder" "skip" "Recorder not installed by this smoke run"
         return
     }
 
@@ -470,8 +521,7 @@ function Uninstall-Recorder {
 }
 
 try {
-    $isWindowsHost = ($env:OS -eq "Windows_NT") -or ($PSVersionTable.PSEdition -eq "Desktop")
-    if (-not $isWindowsHost) {
+    if (-not $script:IsWindowsHost) {
         throw "windows_real_session_smoke.ps1 must run on Windows"
     }
 

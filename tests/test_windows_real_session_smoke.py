@@ -19,6 +19,16 @@ def test_script_exists_and_targets_windows_real_session_flow():
     assert "ManualSessionMinutes" in text
 
 
+def test_collects_host_metadata_without_preempting_windows_guard():
+    text = _script()
+    assert "$script:IsWindowsHost =" in text
+    assert '$hostOs = "unknown"' in text
+    assert "os = $hostOs" in text
+    assert text.index("$script:IsWindowsHost =") < text.index("$script:Report =")
+    assert text.index('$hostOs = "unknown"') < text.index("Get-CimInstance")
+    assert "if (-not $script:IsWindowsHost)" in text
+
+
 def test_resolves_latest_release_and_downloads_required_assets():
     text = _script()
     assert "https://api.github.com/repos/$Repo/releases/latest" in text
@@ -65,6 +75,24 @@ def test_admin_token_is_env_only_and_delta_is_optional():
     assert "No backend upload/session counter increased" in text
     assert "[string]$AdminToken =" not in text
     assert "[string]$Token =" not in text
+
+
+def test_cleanup_only_touches_recorder_created_by_smoke_run():
+    text = _script()
+    assert "$script:RecorderInstalledBySmoke = $false" in text
+    assert "$script:RecorderLaunchedBySmoke = $false" in text
+    assert "$script:RecorderInstalledBySmoke = $true" in text
+    assert "$script:RecorderLaunchedBySmoke = $true" in text
+    assert "Recorder not launched by this smoke run" in text
+    assert "Recorder not installed by this smoke run" in text
+    assert "[System.StringComparison]::OrdinalIgnoreCase" in text
+
+
+def test_checksum_parser_and_evidence_archive_are_hardened():
+    text = _script()
+    assert text.count('$expected = ($line.Line -split "\\s+")[0].ToLowerInvariant()') == 1
+    assert "EMPTY-EVIDENCE.txt" in text
+    assert "No evidence files were collected." in text
 
 
 def test_generates_machine_readable_report_and_evidence_zip():
