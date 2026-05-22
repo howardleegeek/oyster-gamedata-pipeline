@@ -308,6 +308,124 @@ class TestStatePersistence:
 
 
 # ---------------------------------------------------------------------------
+# Admin state summary
+# ---------------------------------------------------------------------------
+
+
+class TestAdminState:
+    async def test_admin_state_requires_bearer(self, client: AsyncClient):
+        resp = await client.get("/api/v1/admin/state")
+        assert resp.status_code == 401
+
+    async def test_admin_state_rejects_default_token_without_env(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        monkeypatch.delenv("TESTER_ADMIN_TOKEN", raising=False)
+        app = create_app()
+        transport = ASGITransport(app=app)
+
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            resp = await ac.get(
+                "/api/v1/admin/state",
+                headers={"Authorization": "Bearer dev-admin-token"},
+            )
+
+        assert resp.status_code == 403
+        assert "not configured" in resp.json()["detail"]
+
+    async def test_admin_state_returns_counts_without_pii(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        monkeypatch.setenv("TESTER_ADMIN_TOKEN", "admin-state-token")
+        monkeypatch.setenv("OYSTER_RECORDER_RELEASE_TAG", "v9.9.9")
+        monkeypatch.setenv("OYSTER_RECORDER_RELEASE_VERSION", "9.9.9")
+        app = create_app()
+        transport = ASGITransport(app=app)
+
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            tester_resp = await ac.post(
+                "/api/v1/testers/apply",
+                json={
+                    "email": "private-admin-state@example.com",
+                    "discord_user": "private#0001",
+                    "why_interested": "admin state should not expose this text",
+                },
+            )
+            assert tester_resp.status_code == 200
+            tester_id = tester_resp.json()["tester_id"]
+
+            approve_resp = await ac.post(
+                f"/api/v1/testers/{tester_id}/approve",
+                headers={"Authorization": "Bearer admin-state-token"},
+            )
+            assert approve_resp.status_code == 200
+
+            signed_resp = await ac.post(
+                "/api/v1/upload/signed-url",
+                headers={"Authorization": "Bearer tok"},
+                json={"key": "uploads/admin-state.tar.gz"},
+            )
+            assert signed_resp.status_code == 200
+            upload_resp = await ac.put(signed_resp.json()["url"], content=b"session bytes")
+            assert upload_resp.status_code == 200
+
+            session_resp = await ac.post(
+                "/api/v1/sessions",
+                headers={"Authorization": "Bearer tok"},
+                json={
+                    "session_id": "admin-state-session",
+                    "status": "BUYER_READY",
+                    "upload_key": "uploads/admin-state.tar.gz",
+                },
+            )
+            assert session_resp.status_code == 200
+
+            telemetry_resp = await ac.post(
+                "/api/v1/telemetry/daily",
+                json={
+                    "anon_id": "anon-admin-state",
+                    "version": "2.6.0",
+                    "os": "windows",
+                    "sessions_today": 1,
+                    "uploads_today": 1,
+                    "total_session_seconds": 60,
+                    "crash_today": False,
+                    "ts": _dt.datetime.now(_dt.timezone.utc).isoformat(),
+                },
+            )
+            assert telemetry_resp.status_code == 200
+
+            state_resp = await ac.get(
+                "/api/v1/admin/state",
+                headers={"Authorization": "Bearer admin-state-token"},
+            )
+
+        assert state_resp.status_code == 200
+        state = state_resp.json()
+        assert state["status"] == "ok"
+        assert state["persistence"] == "memory"
+        assert state["recorder_release"] == {"tag": "v9.9.9", "version": "9.9.9"}
+        assert state["counts"]["sessions"] == 1
+        assert state["counts"]["sessions_today"] == 1
+        assert state["counts"]["uploads"] == 1
+        assert state["counts"]["uploads_today"] == 1
+        assert state["counts"]["telemetry_events"] == 1
+        assert state["counts"]["testers"] == 1
+        assert state["counts"]["tester_statuses"]["approved"] == 1
+        assert state["income_today"]["total_usd"] == 0.50
+
+        serialized = json.dumps(state)
+        assert "private-admin-state@example.com" not in serialized
+        assert "private#0001" not in serialized
+        assert "admin state should not expose" not in serialized
+        assert "admin-state-session" not in serialized
+        assert "uploads/admin-state.tar.gz" not in serialized
+        assert "download_url" not in serialized
+
+
+# ---------------------------------------------------------------------------
 # CORS
 # ---------------------------------------------------------------------------
 class TestCORS:

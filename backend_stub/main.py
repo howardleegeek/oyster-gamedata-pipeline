@@ -12,9 +12,11 @@ Endpoints:
   GET  /api/v1/testers                → list all applicants (admin)
   POST /api/v1/testers/{id}/approve   → approve + return signed download URL
   POST /api/v1/testers/{id}/reject    → reject application
+  GET  /api/v1/admin/state            → non-PII backend state summary
   POST /api/sentry/store/             → accept Sentry-format crash envelopes
 
-All data lives in memory (dicts). No DB, no external services.
+Data lives in memory by default and can be persisted to a local JSON state
+file via OYSTER_BACKEND_STATE_FILE. No DB, no external services.
 """
 
 from __future__ import annotations
@@ -211,6 +213,52 @@ def _validate_telemetry_payload(body: Any) -> dict[str, Any]:
     return record
 
 
+def _empty_income_summary(today: str) -> dict[str, Any]:
+    return {
+        "date": today,
+        "total_usd": 0.0,
+        "sessions_uploaded": 0,
+        "sessions_counted": 0,
+        "currency": "USD",
+    }
+
+
+def _admin_state_summary() -> dict[str, Any]:
+    today = _today_iso()
+    testers = tester_invite.get_store().list_all()
+    tester_statuses = {status: 0 for status in sorted(tester_invite.VALID_STATUSES)}
+    for tester in testers:
+        tester_statuses[tester.status] = tester_statuses.get(tester.status, 0) + 1
+
+    sessions_today = sum(1 for session in _sessions_store.values() if session.get("date") == today)
+    uploads_today = sum(
+        1
+        for upload in _uploads_store.values()
+        if str(upload.get("uploaded_at", "")).startswith(today)
+    )
+
+    return {
+        "status": "ok",
+        "date": today,
+        "persistence": "enabled" if _state_file is not None else "memory",
+        "counts": {
+            "income_days": len(_income_store),
+            "sessions": len(_sessions_store),
+            "sessions_today": sessions_today,
+            "uploads": len(_uploads_store),
+            "uploads_today": uploads_today,
+            "telemetry_events": len(_telemetry_store),
+            "testers": len(testers),
+            "tester_statuses": tester_statuses,
+        },
+        "income_today": _income_store.get(today, _empty_income_summary(today)),
+        "recorder_release": {
+            "tag": os.getenv("OYSTER_RECORDER_RELEASE_TAG", ""),
+            "version": os.getenv("OYSTER_RECORDER_RELEASE_VERSION", ""),
+        },
+    }
+
+
 # ---------------------------------------------------------------------------
 # App factory
 # ---------------------------------------------------------------------------
@@ -246,6 +294,11 @@ def create_app(accelerate: float = 1.0, interval: float = 300.0) -> FastAPI:
     @app.get("/health")
     async def health():
         return {"status": "ok"}
+
+    @app.get("/api/v1/admin/state")
+    async def admin_state(authorization: str | None = Header(default=None)):
+        tester_invite._require_admin(authorization)
+        return _admin_state_summary()
 
     # ------------------------------------------------------------------
     # Helpers
