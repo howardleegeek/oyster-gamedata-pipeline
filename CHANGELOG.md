@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.8.15] - 2026-05-22
+
+### Fixed
+
+- require explicit tester admin token (0ef7801)
+
+
 ## [0.8.14] - 2026-05-22
 
 ### Fixed
