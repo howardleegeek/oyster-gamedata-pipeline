@@ -302,3 +302,27 @@ class TestInstallerAssetAttachment:
         assert "hash_files" in script
         assert "sha256sum" in script
         assert "shasum -a 256" in script
+
+
+class TestReleaseRaceHardening:
+    """Manual and bot releases should not create duplicate local release commits."""
+
+    def test_release_script_syncs_origin_before_bumping(self):
+        script = _script_text()
+        assert "sync_release_branch" in script
+        assert 'git fetch origin "$branch"' in script
+        assert 'git merge --ff-only "origin/${branch}"' in script
+        assert "diverged from origin/${branch}" in script
+
+    def test_release_script_checks_remote_tag_before_writing_changelog(self):
+        script = _script_text()
+        assert "remote_tag_exists" in script
+        assert 'git ls-remote --exit-code --tags origin "refs/tags/$1"' in script
+        assert 'if remote_tag_exists "$NEW_VERSION"; then' in script
+        assert script.index('if remote_tag_exists "$NEW_VERSION"; then') < script.index(
+            'prepare_latest_installer_assets "$NEW_VERSION"'
+        )
+
+    def test_release_script_uses_utc_changelog_date(self):
+        script = _script_text()
+        assert "TODAY=$(date -u +%Y-%m-%d)" in script

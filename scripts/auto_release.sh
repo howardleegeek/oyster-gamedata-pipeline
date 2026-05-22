@@ -37,6 +37,11 @@ tag_exists() {
   git rev-parse -q --verify "refs/tags/$1" >/dev/null
 }
 
+remote_tag_exists() {
+  git remote get-url origin >/dev/null 2>&1 \
+    && git ls-remote --exit-code --tags origin "refs/tags/$1" >/dev/null 2>&1
+}
+
 hash_files() {
   if command -v sha256sum >/dev/null 2>&1; then
     sha256sum "$@"
@@ -64,6 +69,41 @@ run_with_retries() {
     attempt=$(( attempt + 1 ))
     delay=$(( delay * 2 ))
   done
+}
+
+sync_release_branch() {
+  if [ "${SYNC_RELEASE_BRANCH:-true}" = "false" ]; then
+    log "SYNC_RELEASE_BRANCH=false — skipping origin/main sync"
+    return 0
+  fi
+
+  if ! git remote get-url origin >/dev/null 2>&1; then
+    log "No origin remote configured — skipping release branch sync"
+    return 0
+  fi
+
+  local branch
+  branch=$(git branch --show-current)
+  if [ -z "$branch" ]; then
+    log "Detached HEAD — skipping release branch sync"
+    return 0
+  fi
+
+  log "Fetching origin/${branch} before release"
+  git fetch origin "$branch"
+
+  if ! git rev-parse -q --verify "refs/remotes/origin/${branch}" >/dev/null; then
+    log "origin/${branch} not found — skipping fast-forward"
+    return 0
+  fi
+
+  if git merge-base --is-ancestor HEAD "origin/${branch}"; then
+    git merge --ff-only "origin/${branch}"
+  elif git merge-base --is-ancestor "origin/${branch}" HEAD; then
+    log "Local ${branch} is already ahead of origin/${branch}; continuing"
+  else
+    die "Local ${branch} diverged from origin/${branch}; sync before releasing"
+  fi
 }
 
 INSTALLER_ASSET_TMPDIR=""
@@ -254,6 +294,8 @@ fi
 
 DRY_RUN="${DRY_RUN:-false}"
 
+sync_release_branch
+
 # ---------------------------------------------------------------------------
 # Determine latest tag
 # ---------------------------------------------------------------------------
@@ -360,13 +402,16 @@ while tag_exists "$NEW_VERSION"; do
   PATCH=$(( PATCH + 1 ))
   NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
 done
+if remote_tag_exists "$NEW_VERSION"; then
+  die "Remote tag ${NEW_VERSION} already exists; pull latest origin/main and rerun"
+fi
 log "New version: ${NEW_VERSION} (from ${CURRENT_VERSION})"
 
 # ---------------------------------------------------------------------------
 # Build CHANGELOG segment (Keep-a-Changelog format)
 # ---------------------------------------------------------------------------
 
-TODAY=$(date +%Y-%m-%d)
+TODAY=$(date -u +%Y-%m-%d)
 
 CHANGELOG_HEADER="## [${NEW_VERSION#v}] - ${TODAY}"
 
