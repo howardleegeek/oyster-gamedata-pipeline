@@ -49,6 +49,11 @@ jobs:
   build-and-package:
     name: Build & Package OysterRecorder
     runs-on: windows-latest
+    env:
+      EV_CERT_PFX_BASE64: >-
+        ${{ secrets.EV_CERT_PFX_BASE64 }}
+      EV_CERT_PASSWORD: >-
+        ${{ secrets.EV_CERT_PASSWORD }}
 
     steps:
       # --------------------------------------------------------------
@@ -222,11 +227,6 @@ jobs:
       # --------------------------------------------------------------
       - name: Sign installer with EV certificate
         if: env.EV_CERT_PFX_BASE64 != ''
-        env:
-          EV_CERT_PFX_BASE64: >-
-            ${{ secrets.EV_CERT_PFX_BASE64 }}
-          EV_CERT_PASSWORD: >-
-            ${{ secrets.EV_CERT_PASSWORD }}
         shell: pwsh
         run: |
           $ver = "${{ steps.version.outputs.version }}"
@@ -261,8 +261,8 @@ jobs:
           }
 
           if (-not $signtool) {
-            Write-Warning "signtool.exe not found"
-            exit 0
+            Write-Error "signtool.exe not found"
+            exit 1
           }
 
           Write-Host "Signing $setupExe..."
@@ -275,6 +275,13 @@ jobs:
           # Clean up PFX
           Remove-Item $pfxPath -Force
           Write-Host "Installer signed successfully"
+
+      - name: Warn — installer is unsigned
+        if: env.EV_CERT_PFX_BASE64 == ''
+        shell: pwsh
+        run: |
+          Write-Warning "EV_CERT_PFX_BASE64 secret not set — installer will be distributed UNSIGNED."
+          Write-Warning "Add EV_CERT_PFX_BASE64 (base64 .pfx) and EV_CERT_PASSWORD to repository secrets to enable signing."
 
       # --------------------------------------------------------------
       # 9. Upload workflow artifact (90-day retention)

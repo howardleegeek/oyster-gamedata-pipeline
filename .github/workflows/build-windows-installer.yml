@@ -40,6 +40,8 @@ jobs:
     env:
       RUST_BACKTRACE: 1
       CARGO_TERM_COLOR: always
+      EV_CERT_PFX: ${{ secrets.EV_CERT_PFX }}
+      EV_CERT_PASSWORD: ${{ secrets.EV_CERT_PASSWORD }}
 
     steps:
       # -----------------------------------------------------------------------
@@ -90,9 +92,6 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Sign installer (EV cert)
         if: env.EV_CERT_PFX != ''
-        env:
-          EV_CERT_PFX: ${{ secrets.EV_CERT_PFX }}
-          EV_CERT_PASSWORD: ${{ secrets.EV_CERT_PASSWORD }}
         run: |
           $setupExe = Get-ChildItem -Path "installer\output" `
             -Filter "OysterRecorder-setup-*.exe" | Select-Object -First 1

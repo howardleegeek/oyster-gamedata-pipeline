@@ -230,6 +230,48 @@ class TestWorkflowIntegration:
             "windows-latest" in workflow_content or "windows" in workflow_content.lower()
         ), "Workflow does not target Windows runner"
 
+    def test_workflow_promotes_ev_secret_to_job_env(self, workflow_content):
+        assert (
+            "EV_CERT_PFX: ${{ secrets.EV_CERT_PFX }}" in workflow_content
+        ), "EV_CERT_PFX must be job env so step if: can evaluate it"
+        assert (
+            "EV_CERT_PASSWORD: ${{ secrets.EV_CERT_PASSWORD }}" in workflow_content
+        ), "EV_CERT_PASSWORD must be available to sign_installer.ps1"
+
+    def test_workflow_sign_and_unsigned_conditions_are_complementary(self, workflow_content):
+        assert "if: env.EV_CERT_PFX != ''" in workflow_content
+        assert "if: env.EV_CERT_PFX == ''" in workflow_content
+
+
+class TestBundledInstallerWorkflowSigning:
+    """Validate the consumer bundled installer can be Authenticode signed."""
+
+    @pytest.fixture(scope="class")
+    def workflow_content(self):
+        workflow_path = os.path.join(
+            REPO_ROOT, ".github", "workflows", "build-recorder-installer.yml"
+        )
+        assert os.path.isfile(workflow_path), f"Missing: {workflow_path}"
+        with open(workflow_path, "r", encoding="utf-8") as f:
+            return f.read()
+
+    def test_bundled_workflow_promotes_ev_secret_to_job_env(self, workflow_content):
+        assert "EV_CERT_PFX: ${{ secrets.EV_CERT_PFX }}" in workflow_content
+        assert "EV_CERT_PASSWORD: ${{ secrets.EV_CERT_PASSWORD }}" in workflow_content
+
+    def test_bundled_workflow_signs_before_hashing(self, workflow_content):
+        sign_pos = workflow_content.index("Sign bundled installer (EV cert)")
+        hash_pos = workflow_content.index("SHA-256 installer + write SHA-256-manifest.txt")
+        assert sign_pos < hash_pos, "Bundled installer must be signed before hashing/upload"
+
+    def test_bundled_workflow_uses_shared_sign_script(self, workflow_content):
+        assert "installer\\sign_installer.ps1" in workflow_content
+        assert "if: env.EV_CERT_PFX != ''" in workflow_content
+
+    def test_bundled_workflow_warns_when_unsigned(self, workflow_content):
+        assert "Warn — bundled installer is unsigned" in workflow_content
+        assert "if: env.EV_CERT_PFX == ''" in workflow_content
+
 
 # ---------------------------------------------------------------------------
 # Mocked signtool invocation tests

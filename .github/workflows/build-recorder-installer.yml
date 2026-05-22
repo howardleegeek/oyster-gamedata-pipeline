@@ -95,6 +95,8 @@ jobs:
       # mid-pipeline with UnicodeEncodeError. UTF-8 is the only sane default.
       PYTHONIOENCODING: utf-8
       PYTHONUTF8: '1'
+      EV_CERT_PFX: ${{ secrets.EV_CERT_PFX }}
+      EV_CERT_PASSWORD: ${{ secrets.EV_CERT_PASSWORD }}
 
     steps:
       # ---------------------------------------------------------------------
@@ -559,7 +561,33 @@ jobs:
           }
 
       # ---------------------------------------------------------------------
-      # 15. SHA-256 the final installer + emit SHA-256-manifest.txt
+      # 15. Optional Authenticode signing
+      # ---------------------------------------------------------------------
+      # Sign before hashing/upload so SHA-256-manifest.txt matches the exact
+      # consumer-facing executable attached to the Release page.
+      - name: Sign bundled installer (EV cert)
+        if: env.EV_CERT_PFX != ''
+        shell: pwsh
+        run: |
+          $installer = "dist/OysterRecorder-Setup-$env:RELEASE_TAG.exe"
+          if (-not (Test-Path $installer)) {
+            Write-Error "Bundled installer not found at $installer"
+            exit 1
+          }
+          & installer\sign_installer.ps1 -FilePath $installer
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Warn — bundled installer is unsigned
+        if: env.EV_CERT_PFX == ''
+        shell: pwsh
+        run: |
+          Write-Warning "EV_CERT_PFX secret not set — bundled installer will be distributed UNSIGNED."
+          Write-Warning "Add EV_CERT_PFX (base64 .pfx) and EV_CERT_PASSWORD to repository secrets to enable signing."
+
+      # ---------------------------------------------------------------------
+      # 16. SHA-256 the final installer + emit SHA-256-manifest.txt
       # ---------------------------------------------------------------------
       - name: SHA-256 installer + write SHA-256-manifest.txt
         shell: pwsh
@@ -586,7 +614,7 @@ jobs:
           Get-Content $manifestPath | Select-Object -First 20 | ForEach-Object { Write-Host "  $_" }
 
       # ---------------------------------------------------------------------
-      # 16. Generate release_notes.md from git log between previous tag and HEAD
+      # 17. Generate release_notes.md from git log between previous tag and HEAD
       # ---------------------------------------------------------------------
       # IRON LAW: never include build credentials in notes. We only call
       # `git log` and `git tag` — no env, no secrets are echoed in.
@@ -632,7 +660,7 @@ jobs:
           head -40 release_notes.md
 
       # ---------------------------------------------------------------------
-      # 17. Upload everything to the GitHub Release (tag-push only)
+      # 18. Upload everything to the GitHub Release (tag-push only)
       # ---------------------------------------------------------------------
       # `gh release create` is idempotent only via `--clobber` on upload,
       # NOT on create itself. So we split: create-if-not-exists, then upload
@@ -672,7 +700,7 @@ jobs:
             --clobber
 
       # ---------------------------------------------------------------------
-      # 18. Always upload the artifacts to the workflow run for inspection
+      # 19. Always upload the artifacts to the workflow run for inspection
       # ---------------------------------------------------------------------
       # Including on workflow_dispatch (smoke) — that's the whole point of
       # the smoke mode: verify the pipeline produced the right artifacts

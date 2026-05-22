@@ -246,6 +246,12 @@ class TestEVSigning:
         """Workflow should reference EV_CERT_PFX_BASE64 secret."""
         assert "EV_CERT_PFX_BASE64" in workflow_content
 
+    def test_ev_cert_secret_is_job_env_for_conditions(self, workflow_content):
+        """GitHub Actions if: must read signing secret from job env."""
+        assert "EV_CERT_PFX_BASE64: >-" in workflow_content
+        assert "${{ secrets.EV_CERT_PFX_BASE64 }}" in workflow_content
+        assert "${{ secrets.EV_CERT_PASSWORD }}" in workflow_content
+
     def test_ev_signing_step_has_condition(self, workflow_content):
         """EV signing step should have an 'if' condition."""
         # The step should be conditional on the secret existing
@@ -264,6 +270,17 @@ class TestEVSigning:
     def test_ev_signing_cleans_up_pfx(self, workflow_content):
         """EV signing should clean up the PFX file."""
         assert "Remove-Item" in workflow_content or "rm " in workflow_content
+
+    def test_ev_signing_fails_if_signtool_missing(self, workflow_content):
+        """If a cert is configured, missing signtool must fail the release."""
+        missing_pos = workflow_content.index('Write-Error "signtool.exe not found"')
+        exit_pos = workflow_content.index("exit 1", missing_pos)
+        assert missing_pos < exit_pos
+
+    def test_unsigned_warning_branch_exists(self, workflow_content):
+        """Unsigned builds are allowed, but the workflow must say so clearly."""
+        assert "Warn — installer is unsigned" in workflow_content
+        assert "if: env.EV_CERT_PFX_BASE64 == ''" in workflow_content
 
     def test_unsigned_still_works(self, workflow_content):
         """Workflow should NOT require EV cert (unsigned builds should work)."""
