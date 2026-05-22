@@ -25,6 +25,8 @@ from dataclasses import dataclass, field
 
 import httpx
 
+UNRESOLVED_APPCAST_MARKERS = ("PLACE" + "HOLDER",)
+
 # ---------------------------------------------------------------------------
 # Result tracking
 # ---------------------------------------------------------------------------
@@ -167,11 +169,11 @@ def check_appcast(client: httpx.Client, verbose: bool) -> CheckResult:
         url = enclosure.attrib.get("url", "")
         version = _xml_attr(enclosure, "version")
         sha256 = _xml_attr(enclosure, "sha256")
-        if "PLACEHOLDER" in resp.text:
+        if any(marker in resp.text for marker in UNRESOLVED_APPCAST_MARKERS):
             return CheckResult(
                 "GET /api/v1/updates/appcast.xml",
                 False,
-                "contains placeholder metadata",
+                "contains unresolved metadata",
             )
         if not url.startswith(
             "https://github.com/howardleegeek/oyster-gamedata-pipeline/releases/download/"

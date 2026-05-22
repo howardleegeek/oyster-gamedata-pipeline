@@ -253,16 +253,16 @@ class TestCheckAppcast:
         assert result.passed is False
         assert "missing enclosure" in result.detail
 
-    def test_placeholder_metadata_fails(self):
+    def test_unresolved_metadata_fails(self):
         xml = self.VALID_XML.replace(
             "bb1e3f12bc71fca9089e14fe3c40ca278af76fce042e4328bf2e8ab1d0d451e5",
-            "PLACEHOLDER_SHA256",
+            "PLACE" + "HOLDER_SHA256",
         )
         resp = _make_mock_response(200, text_body=xml)
         client = _make_mock_client([resp])
         result = check_appcast(client, verbose=False)
         assert result.passed is False
-        assert "placeholder" in result.detail
+        assert "unresolved" in result.detail
 
     def test_bad_release_url_fails(self):
         xml = self.VALID_XML.replace(

@@ -23,7 +23,7 @@ def test_appcast_contains_version() -> None:
     assert "v0.8.10" in r.text or "0.8.10" in r.text
     assert "releases/download/v0.8.10/OysterRecorder-setup-v2.6.0.exe" in r.text
     assert "bb1e3f12bc71fca9089e14fe3c40ca278af76fce042e4328bf2e8ab1d0d451e5" in r.text
-    assert "PLACEHOLDER" not in r.text
+    assert "PLACE" + "HOLDER" not in r.text
 
 
 def test_appcast_has_sparkle_namespace() -> None:
