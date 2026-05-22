@@ -7,7 +7,9 @@ Endpoints:
   POST /api/v1/testers/{id}/approve   → approve + return signed download URL
   POST /api/v1/testers/{id}/reject    → reject application
 
-All data lives in memory.  No SMTP – the CLI prints a ready-to-send email.
+Data lives in memory by default.  The backend can install a persistence hook
+to save tester state after each write.  No SMTP – the CLI prints a
+ready-to-send email.
 """
 
 from __future__ import annotations
@@ -17,7 +19,8 @@ import re
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from threading import RLock
+from typing import Any, Callable, Dict, List, Optional
 
 from fastapi import APIRouter, Header, HTTPException, Request
 
@@ -47,6 +50,22 @@ class TesterRecord:
     approved_at: Optional[str] = None
     download_url: Optional[str] = None
 
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "TesterRecord":
+        status = str(data.get("status", "pending"))
+        if status not in VALID_STATUSES:
+            status = "pending"
+        return cls(
+            tester_id=str(data["tester_id"]),
+            email=str(data["email"]),
+            discord_user=str(data["discord_user"]),
+            why_interested=str(data.get("why_interested", "")),
+            status=status,
+            applied_at=data.get("applied_at"),
+            approved_at=data.get("approved_at"),
+            download_url=data.get("download_url"),
+        )
+
     def to_dict(self) -> Dict[str, Any]:
         d: Dict[str, Any] = {
             "tester_id": self.tester_id,
@@ -54,6 +73,7 @@ class TesterRecord:
             "discord_user": self.discord_user,
             "status": self.status,
             "applied_at": self.applied_at,
+            "why_interested": self.why_interested,
         }
         if self.approved_at:
             d["approved_at"] = self.approved_at
@@ -72,18 +92,44 @@ class TesterStore:
 
     def __init__(self) -> None:
         self._store: Dict[str, TesterRecord] = {}
+        self._lock = RLock()
+        self._on_change: Optional[Callable[[], None]] = None
+
+    def set_change_hook(self, hook: Optional[Callable[[], None]]) -> None:
+        self._on_change = hook
+
+    def mark_changed(self) -> None:
+        if self._on_change is not None:
+            self._on_change()
 
     def add(self, record: TesterRecord) -> None:
-        self._store[record.tester_id] = record
+        with self._lock:
+            self._store[record.tester_id] = record
+        self.mark_changed()
 
     def get(self, tester_id: str) -> Optional[TesterRecord]:
-        return self._store.get(tester_id)
+        with self._lock:
+            return self._store.get(tester_id)
 
     def list_all(self) -> List[TesterRecord]:
-        return list(self._store.values())
+        with self._lock:
+            return list(self._store.values())
+
+    def to_dicts(self) -> list[dict[str, Any]]:
+        return [record.to_dict() for record in self.list_all()]
+
+    def replace_all(self, records: list[dict[str, Any]]) -> None:
+        restored: Dict[str, TesterRecord] = {}
+        for item in records:
+            record = TesterRecord.from_dict(item)
+            restored[record.tester_id] = record
+        with self._lock:
+            self._store = restored
 
     def clear(self) -> None:
-        self._store.clear()
+        with self._lock:
+            self._store.clear()
+        self.mark_changed()
 
 
 # Global store instance (replaced in tests)
@@ -195,6 +241,7 @@ async def approve_tester(
     record.status = "approved"
     record.approved_at = datetime.now(timezone.utc).isoformat()
     record.download_url = _generate_signed_url(tester_id)
+    get_store().mark_changed()
 
     return {
         "tester_id": tester_id,
@@ -221,4 +268,5 @@ async def reject_tester(
         )
 
     record.status = "rejected"
+    get_store().mark_changed()
     return {"tester_id": tester_id, "status": "rejected"}

@@ -3,25 +3,38 @@
 from __future__ import annotations
 
 import datetime as _dt
+import json
 import uuid
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
-from backend_stub.main import _income_store, _sessions_store, _uploads_store, create_app
+from backend_stub import tester_invite as ti
+from backend_stub.main import (
+    _income_store,
+    _sessions_store,
+    _telemetry_store,
+    _uploads_store,
+    create_app,
+)
+
+
+def _clear_all_memory_without_persist() -> None:
+    ti.get_store().set_change_hook(None)
+    ti.get_store().clear()
+    _income_store.clear()
+    _sessions_store.clear()
+    _uploads_store.clear()
+    _telemetry_store.clear()
 
 
 @pytest.fixture(autouse=True)
 def clear_stores():
     """Clear in-memory stores before each test."""
-    _income_store.clear()
-    _sessions_store.clear()
-    _uploads_store.clear()
+    _clear_all_memory_without_persist()
     yield
-    _income_store.clear()
-    _sessions_store.clear()
-    _uploads_store.clear()
+    _clear_all_memory_without_persist()
 
 
 @pytest_asyncio.fixture
@@ -212,6 +225,85 @@ class TestSessions:
     async def test_401_without_bearer(self, client: AsyncClient):
         resp = await client.post("/api/v1/sessions", json={})
         assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Optional state persistence
+# ---------------------------------------------------------------------------
+
+
+class TestStatePersistence:
+    async def test_state_file_survives_app_restart(
+        self,
+        tmp_path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        state_file = tmp_path / "backend-state.json"
+        monkeypatch.setenv("OYSTER_BACKEND_STATE_FILE", str(state_file))
+
+        app1 = create_app()
+        transport1 = ASGITransport(app=app1)
+        async with AsyncClient(transport=transport1, base_url="http://test") as first:
+            tester_resp = await first.post(
+                "/api/v1/testers/apply",
+                json={
+                    "email": "persist@example.com",
+                    "discord_user": "persist#0001",
+                    "why_interested": "state should survive restart",
+                },
+            )
+            assert tester_resp.status_code == 200
+
+            signed_resp = await first.post(
+                "/api/v1/upload/signed-url",
+                headers={"Authorization": "Bearer tok"},
+                json={"key": "uploads/persisted.tar.gz"},
+            )
+            assert signed_resp.status_code == 200
+            put_resp = await first.put(signed_resp.json()["url"], content=b"session bytes")
+            assert put_resp.status_code == 200
+
+            session_resp = await first.post(
+                "/api/v1/sessions",
+                headers={"Authorization": "Bearer tok"},
+                json={
+                    "session_id": "persisted-session",
+                    "status": "BUYER_READY",
+                    "upload_key": "uploads/persisted.tar.gz",
+                },
+            )
+            assert session_resp.status_code == 200
+
+        assert state_file.exists()
+        persisted = json.loads(state_file.read_text(encoding="utf-8"))
+        assert persisted["sessions"]["persisted-session"]["income_status"] == "BUYER_READY"
+        assert persisted["uploads"]["uploads/persisted.tar.gz"]["size"] == len(b"session bytes")
+        assert persisted["testers"][0]["email"] == "persist@example.com"
+
+        _clear_all_memory_without_persist()
+
+        app2 = create_app()
+        transport2 = ASGITransport(app=app2)
+        async with AsyncClient(transport=transport2, base_url="http://test") as second:
+            income_resp = await second.get(
+                "/api/v1/income/today",
+                headers={"Authorization": "Bearer tok"},
+            )
+            assert income_resp.status_code == 200
+            income = income_resp.json()
+            assert income["total_usd"] == 0.50
+            assert income["sessions_uploaded"] == 1
+
+            testers_resp = await second.get(
+                "/api/v1/testers",
+                headers={"Authorization": "Bearer dev-admin-token"},
+            )
+            assert testers_resp.status_code == 200
+            testers = testers_resp.json()
+            assert len(testers) == 1
+            assert testers[0]["email"] == "persist@example.com"
+
+        assert _uploads_store["uploads/persisted.tar.gz"]["size"] == len(b"session bytes")
 
 
 # ---------------------------------------------------------------------------

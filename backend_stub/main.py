@@ -21,7 +21,11 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import json
+import os
+import tempfile
 import uuid
+from pathlib import Path
 from typing import Any, Dict
 from urllib.parse import quote
 
@@ -42,6 +46,7 @@ _uploads_store: Dict[str, Any] = {}
 _telemetry_store: list[dict[str, Any]] = []
 store = PayoutStore()
 ADMIN_TOKEN = "admin-secret-token"
+_state_file: Path | None = None
 
 _TELEMETRY_FIELDS = {
     "anon_id": str,
@@ -57,6 +62,100 @@ _TELEMETRY_FIELDS = {
 
 def _today_iso() -> str:
     return _dt.date.today().isoformat()
+
+
+def _state_file_from_env() -> Path | None:
+    raw_path = os.getenv("OYSTER_BACKEND_STATE_FILE", "").strip()
+    if not raw_path:
+        return None
+    return Path(raw_path).expanduser()
+
+
+def _state_payload() -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "saved_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
+        "income": _income_store,
+        "sessions": _sessions_store,
+        "uploads": _uploads_store,
+        "telemetry": _telemetry_store,
+        "testers": tester_invite.get_store().to_dicts(),
+    }
+
+
+def _restore_state(payload: dict[str, Any]) -> None:
+    _income_store.clear()
+    _sessions_store.clear()
+    _uploads_store.clear()
+    _telemetry_store.clear()
+
+    income = payload.get("income", {})
+    sessions = payload.get("sessions", {})
+    uploads = payload.get("uploads", {})
+    telemetry = payload.get("telemetry", [])
+    testers = payload.get("testers", [])
+
+    if isinstance(income, dict):
+        _income_store.update(income)
+    if isinstance(sessions, dict):
+        _sessions_store.update(sessions)
+    if isinstance(uploads, dict):
+        _uploads_store.update(uploads)
+    if isinstance(telemetry, list):
+        _telemetry_store.extend(item for item in telemetry if isinstance(item, dict))
+    if isinstance(testers, list):
+        tester_invite.get_store().replace_all([item for item in testers if isinstance(item, dict)])
+
+
+def _load_state_from_disk(path: Path) -> None:
+    if not path.exists():
+        return
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Invalid backend state file JSON: {path}") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"Invalid backend state file payload: {path}")
+    _restore_state(payload)
+
+
+def _persist_state() -> None:
+    if _state_file is None:
+        return
+
+    _state_file.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = ""
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=str(_state_file.parent),
+            prefix=f".{_state_file.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as tmp:
+            tmp_path = tmp.name
+            json.dump(_state_payload(), tmp, ensure_ascii=False, sort_keys=True)
+            tmp.write("\n")
+            tmp.flush()
+            os.fsync(tmp.fileno())
+        os.chmod(tmp_path, 0o600)
+        os.replace(tmp_path, _state_file)
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
+
+def _configure_persistence() -> None:
+    global _state_file
+    _state_file = _state_file_from_env()
+    tester_invite.get_store().set_change_hook(_persist_state if _state_file else None)
+    if _state_file is not None:
+        _load_state_from_disk(_state_file)
+
+
+def _persist_after_write() -> None:
+    _persist_state()
 
 
 def _session_income_status(body: dict[str, Any]) -> str:
@@ -118,6 +217,7 @@ def _validate_telemetry_payload(body: Any) -> dict[str, Any]:
 
 
 def create_app(accelerate: float = 1.0, interval: float = 300.0) -> FastAPI:
+    _configure_persistence()
     app = FastAPI(title="gamedata-pipeline backend stub", version="0.1.0")
     app.state.payout_accelerate = accelerate
     app.state.payout_interval = interval
@@ -137,7 +237,11 @@ def create_app(accelerate: float = 1.0, interval: float = 300.0) -> FastAPI:
     # ------------------------------------------------------------------
     @app.get("/healthz")
     async def healthz():
-        return {"status": "ok", "version": "0.1.0"}
+        return {
+            "status": "ok",
+            "version": "0.1.0",
+            "persistence": "enabled" if _state_file is not None else "memory",
+        }
 
     @app.get("/health")
     async def health():
@@ -219,6 +323,7 @@ def create_app(accelerate: float = 1.0, interval: float = 300.0) -> FastAPI:
             "content_type": request.headers.get("content-type"),
             "uploaded_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
         }
+        _persist_after_write()
         return Response(status_code=200)
 
     # ------------------------------------------------------------------
@@ -243,6 +348,7 @@ def create_app(accelerate: float = 1.0, interval: float = 300.0) -> FastAPI:
             "created_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
         }
         income = _recalculate_income(today)
+        _persist_after_write()
         return {
             "session_id": session_id,
             "status": "received",
@@ -321,6 +427,7 @@ def create_app(accelerate: float = 1.0, interval: float = 300.0) -> FastAPI:
         body = await request.json()
         record = _validate_telemetry_payload(body)
         _telemetry_store.append(record)
+        _persist_after_write()
         return {"status": "ok"}
 
     # ------------------------------------------------------------------
