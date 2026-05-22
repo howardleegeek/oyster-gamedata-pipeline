@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.8.13] - 2026-05-22
+
+### Other
+
+- ci(backend): sync appcast metadata on deploy (a66182c)
+
+
 ## [0.8.12] - 2026-05-22
 
 ### Fixed
