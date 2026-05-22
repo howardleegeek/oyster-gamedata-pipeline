@@ -147,7 +147,7 @@ def get_store() -> TesterStore:
 
 def _get_admin_token() -> str:
     """Read admin token from env at call time (so monkeypatch works in tests)."""
-    return os.environ.get("TESTER_ADMIN_TOKEN", "dev-admin-token")
+    return os.environ.get("TESTER_ADMIN_TOKEN", "").strip()
 
 
 def _validate_email(email: str) -> bool:
@@ -159,8 +159,11 @@ def _require_admin(authorization: str | None) -> None:
     """Raise 401/403 if the caller is not an admin."""
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid Bearer token")
+    admin_token = _get_admin_token()
+    if not admin_token:
+        raise HTTPException(status_code=403, detail="Admin token is not configured")
     token = authorization[7:]
-    if token != _get_admin_token():
+    if token != admin_token:
         raise HTTPException(status_code=403, detail="Admin token required")
 
 

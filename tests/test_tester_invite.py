@@ -146,6 +146,21 @@ class TestListTesters:
         resp = await client.get("/api/v1/testers")
         assert resp.status_code == 401
 
+    async def test_list_rejects_when_admin_token_not_configured(
+        self,
+        client: AsyncClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        monkeypatch.delenv("TESTER_ADMIN_TOKEN", raising=False)
+
+        resp = await client.get(
+            "/api/v1/testers",
+            headers={"Authorization": "Bearer dev-admin-token"},
+        )
+
+        assert resp.status_code == 403
+        assert "not configured" in resp.json()["detail"]
+
     async def test_list_wrong_token(self, client: AsyncClient):
         resp = await client.get(
             "/api/v1/testers",

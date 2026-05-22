@@ -240,6 +240,7 @@ class TestStatePersistence:
     ):
         state_file = tmp_path / "backend-state.json"
         monkeypatch.setenv("OYSTER_BACKEND_STATE_FILE", str(state_file))
+        monkeypatch.setenv("TESTER_ADMIN_TOKEN", "persist-admin-token")
 
         app1 = create_app()
         transport1 = ASGITransport(app=app1)
@@ -296,7 +297,7 @@ class TestStatePersistence:
 
             testers_resp = await second.get(
                 "/api/v1/testers",
-                headers={"Authorization": "Bearer dev-admin-token"},
+                headers={"Authorization": "Bearer persist-admin-token"},
             )
             assert testers_resp.status_code == 200
             testers = testers_resp.json()
