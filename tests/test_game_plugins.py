@@ -30,6 +30,12 @@ def test_p0_profiles_include_minecraft_and_single_player_scaffolds() -> None:
     }.issubset(names)
 
 
+def test_ci_contract_profiles_are_smoke_ready() -> None:
+    assert get_profile("beamng").support_tier == "smoke_ready"
+    assert get_profile("factorio").support_tier == "smoke_ready"
+    assert get_profile("stardew_valley").support_tier == "smoke_ready"
+
+
 def test_profiles_have_required_state_video_input_sources() -> None:
     for profile in BUILTIN_PROFILES.values():
         required_kinds = {source.kind for source in profile.data_sources if source.required}

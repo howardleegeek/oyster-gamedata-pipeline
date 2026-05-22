@@ -16,7 +16,7 @@ import json
 from dataclasses import asdict, dataclass, field
 from typing import Literal
 
-SupportTier = Literal["production", "scaffold", "planned", "degraded", "unsupported"]
+SupportTier = Literal["production", "smoke_ready", "scaffold", "planned", "degraded", "unsupported"]
 AntiCheatPolicy = Literal["official-only", "single-player-only", "replay-only", "unsupported"]
 
 
@@ -136,7 +136,7 @@ BUILTIN_PROFILES: dict[str, GamePluginProfile] = {
     "beamng": GamePluginProfile(
         game_id="beamng",
         display_name="BeamNG.drive",
-        support_tier="scaffold",
+        support_tier="smoke_ready",
         anti_cheat_policy="official-only",
         process_names=("BeamNG.drive.exe", "BeamNG.drive"),
         modes=("single-player", "scenario"),
@@ -150,12 +150,12 @@ BUILTIN_PROFILES: dict[str, GamePluginProfile] = {
         runbook="docs/runbooks/BEAMNG_RUNBOOK.md",
         adapter_module="src/oyster_agent_runner/environments/beamng_drive.py",
         setup_minutes=20,
-        notes="Best next vertical after Minecraft because native depth/pose are available.",
+        notes="CI/mock smoke-ready; real Windows BeamNGpy session still needs operator validation.",
     ),
     "factorio": GamePluginProfile(
         game_id="factorio",
         display_name="Factorio",
-        support_tier="scaffold",
+        support_tier="smoke_ready",
         anti_cheat_policy="official-only",
         process_names=("factorio.exe", "factorio"),
         modes=("single-player", "private-headless-server"),
@@ -171,14 +171,14 @@ BUILTIN_PROFILES: dict[str, GamePluginProfile] = {
             ),
         ),
         output_streams=COMMON_OUTPUT_STREAMS,
-        runbook="docs/SINGLE_PLAYER_GAMES.md#3-factorio--scaffolded",
+        runbook="docs/SINGLE_PLAYER_GAMES.md#3-factorio--smoke-ready",
         adapter_module="src/oyster_agent_runner/environments/factorio.py",
         setup_minutes=20,
     ),
     "stardew_valley": GamePluginProfile(
         game_id="stardew_valley",
         display_name="Stardew Valley",
-        support_tier="scaffold",
+        support_tier="smoke_ready",
         anti_cheat_policy="official-only",
         process_names=("Stardew Valley.exe", "Stardew Valley"),
         modes=("single-player",),
