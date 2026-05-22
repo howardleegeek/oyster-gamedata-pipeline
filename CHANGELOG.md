@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.8.14] - 2026-05-22
+
+### Fixed
+
+- persist stub state across restarts (f199d3b)
+
+
 ## [0.8.13] - 2026-05-22
 
 ### Other
