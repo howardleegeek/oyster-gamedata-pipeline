@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [0.8.12] - 2026-05-22
+
+### Fixed
+
+- align appcast with latest recorder release (4942868)
+
+### Other
+
+- ci(release): harden auto release race handling (cbdb980)
+
+
 ## [0.8.11] - 2026-05-22
 
 ### Other
