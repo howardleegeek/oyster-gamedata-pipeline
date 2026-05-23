@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [0.11.1] - 2026-05-23
+
+### Other
+
+- docs: align version docs with v0.11.0 (7c79a4d)
+- docs(release): codify channel fallback contract (2ebb1c4)
+
+
 ## [0.11.0] - 2026-05-22
 
 ### Added
