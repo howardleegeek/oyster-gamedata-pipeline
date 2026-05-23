@@ -9,6 +9,7 @@ def test_release_smoke_script_checks_installer_asset() -> None:
     script = (REPO_ROOT / "scripts" / "verify_latest_release_assets.sh").read_text()
 
     assert "OysterRecorder-[Ss]etup-" in script
+    assert "GameDataRecorder-Setup-recorder" not in script
     assert "SHA256SUMS.txt" in script
     assert "curl -fsSIL -L" in script
     assert "## Windows installer" in script

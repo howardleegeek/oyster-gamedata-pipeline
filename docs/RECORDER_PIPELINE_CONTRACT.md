@@ -20,6 +20,12 @@ Operationally: distribute from the latest verified release, develop from the
 latest pinned source. A new consumer release should only be cut after the
 recorder source pin has passed Windows build/installer smoke.
 
+Release assets have their own contract in
+[`docs/RELEASE_CHANNELS.md`](RELEASE_CHANNELS.md). The short rule is: `v0.x`
+consumer releases feed the public appcast, while the rc19 bundled recorder line
+is a QA/reference fallback until it is rebuilt and promoted through the normal
+consumer installer gates.
+
 ## Layouts
 
 | Layout | Owner | Required paths | Consumer |
