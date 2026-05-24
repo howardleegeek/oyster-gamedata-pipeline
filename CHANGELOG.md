@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [0.11.7] - 2026-05-24
+
+### Fixed
+
+- harden CI auto-record no-popup path (73a8e50)
+
+### Other
+
+- ci(recorder): maximize Minecraft in strict smoke (e29ef91)
+- ci(recorder): default Windows smokes to no-gui preflight (e2eafeb)
+
+
 ## [0.11.6] - 2026-05-24
 
 ### Other
