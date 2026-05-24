@@ -14,11 +14,12 @@ There are two version tracks and they must not be confused:
 | Component | Current release track | Current source track |
 |---|---|---|
 | `oyster-gamedata-pipeline` | Latest GitHub release remains `v0.11.0`; it carries the public Windows installer asset and checksum. | `main` continues after `v0.11.0` with architecture/CI contract fixes. Use `main` for development. |
-| `gamedata-recorder` | Latest recorder release remains `v2.6.0`; this is why the public installer asset is named `OysterRecorder-setup-v2.6.0.exe`. | `vendor/recorder` is pinned to recorder `main` commit `7de8a38` (`v2.6.0-26-g7de8a38`) so source development includes the newer tray/auth/updater/notify, route-type, auto-cap, UI-refusal, gamepad/action-camera, and engine-telemetry work. |
+| `gamedata-recorder` | Latest recorder release remains `v2.6.0`; this is why the public installer asset is named `OysterRecorder-setup-v2.6.0.exe`. | `vendor/recorder` is pinned to release-buildable commit `17233d3` (`v2.6.0-1-g17233d3`), based on the last successful Windows-build source plus a lockfile alignment fix. The newer recorder `main` commit `7de8a38` is not a consumer-release source until its tray/auth/updater/notify and libobs changes compile and pass Windows installer smoke. |
 
-Operationally: distribute from the latest verified release, develop from the
-latest pinned source. A new consumer release should only be cut after the
-recorder source pin has passed Windows build/installer smoke.
+Operationally: distribute from the latest verified release, rebuild from the
+release-buildable source pin, and keep newer recorder `main` work behind a
+promotion gate. A new consumer release should only be cut after the recorder
+source pin has passed Windows build/installer smoke.
 
 Release assets have their own contract in
 [`docs/RELEASE_CHANNELS.md`](RELEASE_CHANNELS.md). The short rule is: `v0.x`
@@ -81,11 +82,11 @@ It can move to `production` only after a clean Windows run proves:
 
 The release/distribution chain is real: latest verified public release is
 `v0.11.0`, the installer asset and SHA file exist, backend health/appcast are
-live, and smoke workflows are green. Source development is newer than that
-release: pipeline `main` is ahead of `v0.11.0`, and `vendor/recorder` is ahead
-of recorder `v2.6.0`. The remaining production risk is release/source drift
-plus data-contract drift while expanding from Minecraft into BeamNG, Factorio,
-Stardew Valley, and other single-player games.
+live, and smoke workflows are green. Pipeline `main` is ahead of `v0.11.0`,
+while `vendor/recorder` is deliberately held at the latest buildable release
+pin instead of recorder `main`. The remaining production risk is
+release/source drift plus data-contract drift while expanding from Minecraft
+into BeamNG, Factorio, Stardew Valley, and other single-player games.
 
 Keep new game work thin:
 

@@ -16,7 +16,7 @@
         3.  fetch_fabric.py        -> bundle/mc-instance/         (R05B)
         4.  build_oysterplay_exe   -> bundle/OysterPlay.exe       (R05C)
         5.  PyInstaller --onedir   -> bundle/OysterRecorder-onedir/
-        6.  copy 9 mod jars        -> bundle/mc-instance/mods/
+        6.  copy one matching mod jar -> bundle/mc-instance/mods/
         7.  ISCC.exe installer.iss -> dist/installer/...exe
         8.  size verification (400-1000 MB sanity gate; rc7 bundles asset objects)
 
@@ -91,6 +91,7 @@ $SupportedMcVersions = @(
     "1.20.1", "1.20.2", "1.20.4", "1.20.6",
     "1.21.1", "1.21.2", "1.21.3", "1.21.4", "1.21.5"
 )
+$BundledMcVersion = "1.21.4"
 
 # Size gate (bytes). Iron-law (rc7): asset objects (~390 MB) are now
 # bundled, pushing the expected installer up to ~800 MB. The 400 MB
@@ -280,10 +281,10 @@ if (-not $SkipDeps) {
 Test-RequiredPath (Join-Path $BundleDir "OysterRecorder-onedir") "OysterRecorder onedir must exist"
 
 # -------------------------------------------------------------------------
-# Stage 6: Copy mod jars (one per supported MC version)
+# Stage 6: Copy the single mod jar matching the bundled MC version
 # -------------------------------------------------------------------------
 if (-not $SkipDeps) {
-    Write-Stage 6 ("Stage {0} mod jars (one per supported MC version)" -f $SupportedMcVersions.Count)
+    Write-Stage 6 ("Stage recorder mod jar for MC {0}" -f $BundledMcVersion)
 
     $ModsDir = Join-Path $BundleDir "mc-instance\mods"
     New-Item -ItemType Directory -Force -Path $ModsDir | Out-Null
@@ -294,21 +295,27 @@ if (-not $SkipDeps) {
         throw ("Mod artifacts not found at {0} — run mc-mod gradlew build first." -f $ModBuildLibs)
     }
 
-    $copied = 0
-    foreach ($mcv in $SupportedMcVersions) {
-        # Match build-mc-mod.yml convention: oyster-recorder-mod-<modVer>+mc<MCV>.jar
-        $pattern = "oyster-recorder-mod-*+mc${mcv}.jar"
+    Remove-Item -Force (Join-Path $ModsDir "oyster-recorder-mod-*.jar") -ErrorAction SilentlyContinue
+    $patterns = @(
+        "oyster-recorder-mod-*+mc${BundledMcVersion}.jar",
+        "oyster-recorder-mod-*-mc${BundledMcVersion}.jar"
+    )
+    $found = $null
+    foreach ($pattern in $patterns) {
         $found = Get-ChildItem -Path $ModBuildLibs -Filter $pattern -ErrorAction SilentlyContinue |
                  Where-Object { $_.Name -notmatch "-(sources|javadoc)\.jar$" } |
                  Select-Object -First 1
-        if (-not $found) {
-            throw ("Missing mod jar for MC {0} (looked for {1} in {2})" -f $mcv, $pattern, $ModBuildLibs)
-        }
-        Copy-Item -Force $found.FullName $ModsDir
-        Write-Host ("    {0,-7} -> {1}" -f $mcv, $found.Name) -ForegroundColor DarkGray
-        $copied++
+        if ($found) { break }
     }
-    Write-Host ("    staged {0} mod jars" -f $copied) -ForegroundColor DarkGray
+    if (-not $found) {
+        throw ("Missing bundled mod jar for MC {0} (looked for {1} in {2})" -f $BundledMcVersion, ($patterns -join ", "), $ModBuildLibs)
+    }
+    Copy-Item -Force $found.FullName $ModsDir
+    $bundledMods = Get-ChildItem -Path $ModsDir -Filter "oyster-recorder-mod-*.jar"
+    if ($bundledMods.Count -ne 1) {
+        throw ("Expected exactly one bundled recorder mod, found {0}" -f $bundledMods.Count)
+    }
+    Write-Host ("    {0,-7} -> {1}" -f $BundledMcVersion, $found.Name) -ForegroundColor DarkGray
 }
 
 # -------------------------------------------------------------------------

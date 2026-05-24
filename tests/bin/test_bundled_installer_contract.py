@@ -30,4 +30,20 @@ def test_bundled_workflow_fails_if_matching_mod_is_absent() -> None:
 
     assert "Get-ChildItem 'bundle/mc-instance/mods' -Filter '*-mc1.21.4.jar'" in text
     assert "Could not find a 1.21.4 mod jar to bundle into the recorder onedir" in text
-    assert "$bundleCount -lt 9" in text
+    assert "Could not find a 1.21.4 mod jar to bundle into the Minecraft instance" in text
+    assert "$bundleRecorderMods.Count -ne 1" in text
+    assert "Expected exactly one bundled recorder mod" in text
+    assert "$extraCount -lt 9" in text
+    assert "$bundleCount -lt 9" not in text
+
+
+def test_local_bundled_build_stages_single_matching_mod() -> None:
+    text = (REPO_ROOT / "bin" / "build_bundled_installer" / "build_all.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert '$BundledMcVersion = "1.21.4"' in text
+    assert "Stage recorder mod jar for MC" in text
+    assert "Expected exactly one bundled recorder mod" in text
+    assert "oyster-recorder-mod-*+mc${BundledMcVersion}.jar" in text
+    assert "oyster-recorder-mod-*-mc${BundledMcVersion}.jar" in text

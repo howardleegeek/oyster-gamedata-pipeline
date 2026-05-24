@@ -4,10 +4,10 @@ import subprocess
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-RECORDER_SUBMODULE_COMMIT = "7de8a38b881214f3fb617d0644e21a709eecf3df"
+RECORDER_SUBMODULE_COMMIT = "17233d340fad0295d5e9a1de9ad48ac647cb5f0a"
 
 
-def test_recorder_submodule_is_pinned_to_current_main_commit() -> None:
+def test_recorder_submodule_is_pinned_to_release_buildable_commit() -> None:
     submodule_git = REPO_ROOT / "vendor" / "recorder" / ".git"
     if submodule_git.exists():
         result = subprocess.run(
@@ -36,5 +36,6 @@ def test_version_alignment_doc_distinguishes_release_from_source() -> None:
 
     assert "Latest GitHub release remains `v0.11.0`" in doc
     assert "Latest recorder release remains `v2.6.0`" in doc
-    assert "`vendor/recorder` is pinned to recorder `main` commit `7de8a38`" in doc
+    assert "`vendor/recorder` is pinned to release-buildable commit `17233d3`" in doc
+    assert "recorder `main` commit `7de8a38` is not a consumer-release source" in doc
     assert "docs/RELEASE_CHANNELS.md" in doc

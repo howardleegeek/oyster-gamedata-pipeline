@@ -48,7 +48,7 @@ python3 bin/sample_tarball_builder.py --output sample.tar.gz   # → 27 MB · li
 
 最新 verified release: [**v0.11.0**](https://github.com/howardleegeek/oyster-gamedata-pipeline/releases/tag/v0.11.0) — 带真实 `OysterRecorder-setup-v2.6.0.exe`、`SHA256SUMS.txt`，backend health/appcast + release/windows installer smokes 绿。
 
-当前开发口径使用最新源码：pipeline `main` 在 `v0.11.0` 之后继续推进；`vendor/recorder` 已 pin 到 `gamedata-recorder` main 的 `7de8a38` (`v2.6.0-26-g7de8a38`)。也就是说，下载/内测仍用已验证 release，继续开发和下一版 release 以两个项目最新 source 为准。
+当前发布口径使用 buildable source pin：pipeline `main` 在 `v0.11.0` 之后继续推进；`vendor/recorder` 已 pin 到 `gamedata-recorder` 的 release-buildable `17233d3` (`v2.6.0-1-g17233d3`)。recorder `main` 的 `7de8a38` 暂不进 consumer release，等 tray/auth/updater/notify + libobs 编译链修绿后再晋级。
 
 ## 🔬 真 E2E 一行验证(rc8 新增)
 

@@ -29,6 +29,7 @@ def test_release_smoke_workflow_runs_on_schedule_and_manual_dispatch() -> None:
 def test_windows_build_stages_obs_runtime_before_inno_compile() -> None:
     workflow = (REPO_ROOT / ".github/workflows/build-recorder-windows.yml").read_text()
 
+    assert "cargo build --release --locked" in workflow
     assert "vendor\\recorder\\tmp_install" in workflow
     assert "installer\\staging" in workflow
     assert "Staged installer runtime missing required OBS asset" in workflow

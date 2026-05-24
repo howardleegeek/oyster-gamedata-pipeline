@@ -316,14 +316,12 @@ jobs:
           if_no_artifact_found: fail
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Stage mod jars (all 9 into bundle + release-extras)
+      - name: Stage mod jars (single bundled + all release-extras)
         shell: pwsh
         run: |
-          # All 9 mod jars (one per supported MC version) go into the
-          # bundled mods dir so the bundled installer ships the full set —
-          # users can switch which MC version they target without
-          # re-downloading. The same 9 jars also go to release-extras/ for
-          # the standalone-mod-jar download path on the Release page.
+          # Only the 1.21.4 recorder mod goes into the bundled MC instance.
+          # All supported-version jars still go to release-extras/ for the
+          # standalone-mod-jar download path on the Release page.
           New-Item -ItemType Directory -Force -Path 'bundle/mc-instance/mods' | Out-Null
           New-Item -ItemType Directory -Force -Path 'release-extras' | Out-Null
           $allJars = Get-ChildItem -Recurse mod-jars -Filter '*.jar' `
@@ -339,14 +337,26 @@ jobs:
             if ($seen.ContainsKey($jar.Name)) { continue }
             $seen[$jar.Name] = $true
             Copy-Item $jar.FullName -Destination 'release-extras/' -Force
-            Copy-Item $jar.FullName -Destination 'bundle/mc-instance/mods/' -Force
           }
-          $bundleCount = (Get-ChildItem 'bundle/mc-instance/mods' -Filter '*.jar').Count
+          $bundleJar = $allJars |
+            Where-Object { $_.Name -match '-mc1\.21\.4\.jar$' } |
+            Select-Object -First 1
+          if (-not $bundleJar) {
+            Write-Error "Could not find a 1.21.4 mod jar to bundle into the Minecraft instance"
+            exit 1
+          }
+          Copy-Item $bundleJar.FullName -Destination 'bundle/mc-instance/mods/' -Force
+          $bundleRecorderMods = Get-ChildItem 'bundle/mc-instance/mods' `
+            -Filter 'oyster-recorder-mod-*.jar'
           $extraCount  = (Get-ChildItem 'release-extras' -Filter '*.jar').Count
-          Write-Host "Bundled mods: $bundleCount (in bundle/mc-instance/mods/)"
+          Write-Host "Bundled recorder mod: $($bundleJar.Name)"
           Write-Host "Release-extras: $extraCount (uploaded as standalone Release assets)"
-          if ($bundleCount -lt 9) {
-            Write-Error "After staging only $bundleCount mod jars in bundle, expected 9"
+          if ($bundleRecorderMods.Count -ne 1) {
+            Write-Error "Expected exactly one bundled recorder mod, found $($bundleRecorderMods.Count)"
+            exit 1
+          }
+          if ($extraCount -lt 9) {
+            Write-Error "After staging only $extraCount mod jars in release-extras, expected 9"
             exit 1
           }
 

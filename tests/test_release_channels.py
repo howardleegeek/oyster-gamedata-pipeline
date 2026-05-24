@@ -50,7 +50,7 @@ def test_known_anchors_capture_current_successful_lines() -> None:
     assert CURRENT_CONSUMER_INSTALLER == "OysterRecorder-setup-v2.6.0.exe"
     assert len(CURRENT_CONSUMER_SHA256) == 64
     assert BUNDLED_REFERENCE_TAG == "recorder-v0.28.0-rc19.0.3"
-    assert RECORDER_SOURCE_PIN.startswith("7de8a38")
+    assert RECORDER_SOURCE_PIN.startswith("17233d3")
 
 
 def test_fallback_order_is_explicit_and_ordered() -> None:
