@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.11.2] - 2026-05-24
+
+### Other
+
+- ci(installer): require OBS runtime in Windows package (775c23d)
+
+
 ## [0.11.1] - 2026-05-23
 
 ### Other
