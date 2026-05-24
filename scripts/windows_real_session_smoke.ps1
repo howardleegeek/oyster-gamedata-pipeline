@@ -109,6 +109,11 @@ $script:Report = [ordered]@{
         manifest = $null
         minecraft_launch_command = $MinecraftLaunchCommand
         recorder_config = $null
+        recorder_env = [ordered]@{
+            gamedata_ci_mode = $null
+            gamedata_output_dir = $null
+            rust_log = $null
+        }
     }
     steps = @()
     artifacts = [ordered]@{}
@@ -792,10 +797,14 @@ function Launch-Recorder {
     $exe = Join-Path $script:InstallDir "gamedata-recorder.exe"
     $env:GAMEDATA_API_URL = $BackendUrl
     $env:GAMEDATA_OUTPUT_DIR = $launchOutputDir
+    $env:GAMEDATA_CI_MODE = "1"
     if (-not $env:RUST_LOG) {
         $env:RUST_LOG = "gamedata_recorder=debug,info"
     }
     $env:RUST_BACKTRACE = "1"
+    $script:Report.real_session.recorder_env.gamedata_ci_mode = $env:GAMEDATA_CI_MODE
+    $script:Report.real_session.recorder_env.gamedata_output_dir = $env:GAMEDATA_OUTPUT_DIR
+    $script:Report.real_session.recorder_env.rust_log = $env:RUST_LOG
 
     $script:RecorderProcess = Start-Process `
         -FilePath $exe `

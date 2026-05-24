@@ -181,6 +181,10 @@ def test_strict_real_session_can_launch_minecraft_command():
 
 def test_recorder_launch_enables_targeted_debug_logs():
     text = _script()
+    assert '$env:GAMEDATA_CI_MODE = "1"' in text
+    assert "$script:Report.real_session.recorder_env.gamedata_ci_mode" in text
+    assert "$script:Report.real_session.recorder_env.gamedata_output_dir" in text
+    assert "$script:Report.real_session.recorder_env.rust_log" in text
     assert '$env:RUST_LOG = "gamedata_recorder=debug,info"' in text
     assert '$env:RUST_BACKTRACE = "1"' in text
 
@@ -196,6 +200,7 @@ def test_strict_real_session_artifact_report_is_machine_readable():
     assert "video = [ordered]@{" in text
     assert "manifest = [ordered]@{" in text
     assert "recorder_config = $null" in text
+    assert "recorder_env = [ordered]@{" in text
 
 
 def test_cleanup_only_touches_recorder_created_by_smoke_run():
