@@ -130,6 +130,7 @@ def test_strict_real_session_snapshots_and_validates_artifacts():
     assert "Get-RecorderArtifactRoots" in text
     assert "Documents\\OysterClips" in text
     assert "GameData Recorder\\recordings" in text
+    assert "Select-Object FullName, Name, Extension, Length, LastWriteTimeUtc" in text
     assert "Start-RealSessionArtifactSnapshot" in text
     assert "Verify-StrictRealSessionArtifacts" in text
     assert "game_state.jsonl" in text
@@ -158,6 +159,9 @@ def test_strict_real_session_forces_upload_config_temporarily():
 def test_strict_real_session_can_launch_minecraft_command():
     text = _script()
     assert "Start-MinecraftLaunchCommand" in text
+    assert "Focus-MinecraftWindow" in text
+    assert "SetForegroundWindow" in text
+    assert "minecraft-window-focus" in text
     assert "minecraft_launch_command = $MinecraftLaunchCommand" in text
     assert (
         'Start-Process -FilePath "cmd.exe" -ArgumentList @("/c", $MinecraftLaunchCommand)' in text

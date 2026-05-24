@@ -58,6 +58,7 @@ $script:RealSessionStartedAtUtc = $null
 $script:RealSessionBeforeFiles = @()
 $script:RecorderConfigPath = Join-Path $script:AppDataRoot "GameData Recorder\config.json"
 $script:RecorderConfigBackupPath = Join-Path $OutputDir "config.before-strict-real-session.json"
+$script:MinecraftWindowFocused = $false
 
 $hostOs = "unknown"
 if ($script:IsWindowsHost) {
@@ -278,7 +279,7 @@ function Get-RecorderSessionFiles {
                     $_.Name -like "*.tar.gz"
                 )
             } |
-            Select-Object FullName, Name, Length, LastWriteTimeUtc
+            Select-Object FullName, Name, Extension, Length, LastWriteTimeUtc
     }
     return $files
 }
@@ -362,6 +363,43 @@ function Start-MinecraftLaunchCommand {
     }
     Start-Process -FilePath "cmd.exe" -ArgumentList @("/c", $MinecraftLaunchCommand)
     Add-Step "minecraft-launch-command" "pass" $MinecraftLaunchCommand
+}
+
+function Focus-MinecraftWindow {
+    $process = Get-Process -Name "javaw" -ErrorAction SilentlyContinue |
+        Where-Object { $_.MainWindowHandle -and $_.MainWindowHandle -ne 0 } |
+        Sort-Object StartTime -Descending |
+        Select-Object -First 1
+    if (-not $process) {
+        return $false
+    }
+
+    try {
+        if (-not ([System.Management.Automation.PSTypeName]"OysterFocusNativeMethods").Type) {
+            Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public static class OysterFocusNativeMethods {
+    [DllImport("user32.dll")]
+    public static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")]
+    public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+}
+"@
+        }
+        [OysterFocusNativeMethods]::ShowWindow($process.MainWindowHandle, 9) | Out-Null
+        [OysterFocusNativeMethods]::SetForegroundWindow($process.MainWindowHandle) | Out-Null
+        if (-not $script:MinecraftWindowFocused) {
+            Add-Step "minecraft-window-focus" "pass" "pid=$($process.Id); hwnd=$($process.MainWindowHandle)"
+            $script:MinecraftWindowFocused = $true
+        }
+        return $true
+    } catch {
+        if (-not $script:MinecraftWindowFocused) {
+            Add-Step "minecraft-window-focus" "skip" $_.Exception.Message
+        }
+        return $false
+    }
 }
 
 function Start-RealSessionArtifactSnapshot {
@@ -475,6 +513,9 @@ function Copy-EvidenceFile {
 function Collect-Evidence {
     Copy-EvidenceFile -Path $installerDir
     Copy-EvidenceFile -Path $launchOutputDir
+    foreach ($root in Get-RecorderArtifactRoots) {
+        Copy-EvidenceFile -Path $root
+    }
     Copy-EvidenceFile -Path (Join-Path $script:AppDataRoot "GameData Recorder")
     Copy-EvidenceFile -Path (Join-Path $script:LocalAppDataRoot "GameData Recorder")
     Copy-EvidenceFile -Path $script:InstallDir
@@ -693,6 +734,7 @@ function Run-ManualSessionWindow {
     Add-Step "manual-session-window" "pass" "Play Minecraft now for $ManualSessionMinutes minute(s); the recorder should stay running"
     $deadline = (Get-Date).AddMinutes($ManualSessionMinutes)
     while ((Get-Date) -lt $deadline) {
+        Focus-MinecraftWindow | Out-Null
         Start-Sleep -Seconds 10
         if ($script:RecorderProcess -and $script:RecorderProcess.HasExited) {
             throw "Recorder exited during manual session window with code $($script:RecorderProcess.ExitCode)"
