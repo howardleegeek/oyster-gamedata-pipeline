@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [0.11.8] - 2026-05-24
+
+### Fixed
+
+- keep detected game handle send-safe (b64de9e)
+- align release contract with v0.11.7 (6b241e4)
+- clean stale recorder before strict session (81bc3d4)
+
+
 ## [0.11.7] - 2026-05-24
 
 ### Fixed
