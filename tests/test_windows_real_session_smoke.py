@@ -6,10 +6,15 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = REPO_ROOT / "scripts" / "windows_real_session_smoke.ps1"
+WORKFLOW = REPO_ROOT / ".github" / "workflows" / "windows-real-session-smoke.yml"
 
 
 def _script() -> str:
     return SCRIPT.read_text(encoding="utf-8")
+
+
+def _workflow() -> str:
+    return WORKFLOW.read_text(encoding="utf-8")
 
 
 def test_script_exists_and_targets_windows_real_session_flow():
@@ -17,6 +22,29 @@ def test_script_exists_and_targets_windows_real_session_flow():
     assert "windows_real_session_smoke.ps1 must run on Windows" in text
     assert "OysterRecorder-real-session-smoke" in text
     assert "ManualSessionMinutes" in text
+
+
+def test_manual_workflow_runs_only_on_dispatch_with_self_hosted_runner():
+    text = _workflow()
+    assert "workflow_dispatch:" in text
+    assert "schedule:" not in text
+    assert "push:" not in text
+    assert "runner_labels_json" in text
+    assert "runs-on: ${{ fromJSON(inputs.runner_labels_json) }}" in text
+    assert "timeout-minutes: 60" in text
+
+
+def test_manual_workflow_invokes_strict_real_session_script():
+    text = _workflow()
+    assert "scripts\\windows_real_session_smoke.ps1" in text
+    assert "-StrictRealSession" in text
+    assert "-ManualSessionMinutes" in text
+    assert "-AdminTokenEnv" in text
+    assert "TESTER_ADMIN_TOKEN: ${{ secrets.TESTER_ADMIN_TOKEN }}" in text
+    assert "-RequireUploadDelta" in text
+    assert "-MinimumGameStateRows" in text
+    assert "-MinimumVideoBytes" in text
+    assert "windows-real-session-evidence" in text
 
 
 def test_collects_host_metadata_without_preempting_windows_guard():

@@ -1,0 +1,82 @@
+name: Windows Real Session Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner_labels_json:
+        description: 'JSON array for the self-hosted Windows runner labels'
+        required: true
+        default: '["self-hosted","Windows"]'
+      backend_url:
+        description: 'Backend base URL'
+        required: true
+        default: 'http://136.109.41.170:8081'
+      manual_session_minutes:
+        description: 'Minutes to keep the manual Minecraft play window open'
+        required: true
+        default: '10'
+      minimum_game_state_rows:
+        description: 'Minimum fresh game_state/states JSONL rows'
+        required: true
+        default: '30'
+      minimum_video_bytes:
+        description: 'Minimum fresh MP4 size in bytes'
+        required: true
+        default: '102400'
+      keep_installed:
+        description: 'Keep the recorder installed after the smoke run'
+        required: true
+        type: boolean
+        default: true
+      require_signed_installer:
+        description: 'Fail if the installer is not Authenticode-signed'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  strict-real-session:
+    name: Strict real Windows session
+    runs-on: ${{ fromJSON(inputs.runner_labels_json) }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run strict real-session smoke
+        shell: pwsh
+        env:
+          TESTER_ADMIN_TOKEN: ${{ secrets.TESTER_ADMIN_TOKEN }}
+        run: |
+          $outputDir = Join-Path $env:RUNNER_TEMP "OysterRecorder-real-session-${{ github.run_id }}"
+          $args = @(
+            "-BackendUrl", "${{ inputs.backend_url }}",
+            "-OutputDir", $outputDir,
+            "-StrictRealSession",
+            "-ManualSessionMinutes", "${{ inputs.manual_session_minutes }}",
+            "-AdminTokenEnv", "TESTER_ADMIN_TOKEN",
+            "-RequireUploadDelta",
+            "-MinimumGameStateRows", "${{ inputs.minimum_game_state_rows }}",
+            "-MinimumVideoBytes", "${{ inputs.minimum_video_bytes }}"
+          )
+
+          if ("${{ inputs.keep_installed }}" -eq "true") {
+            $args += "-KeepInstalled"
+          }
+          if ("${{ inputs.require_signed_installer }}" -eq "true") {
+            $args += "-RequireSignedInstaller"
+          }
+
+          & "$env:GITHUB_WORKSPACE\scripts\windows_real_session_smoke.ps1" @args
+
+      - name: Upload real-session evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-real-session-evidence
+          path: |
+            ${{ runner.temp }}/OysterRecorder-real-session-*/real-session-report.json
+            ${{ runner.temp }}/OysterRecorder-real-session-*/OysterRecorder-real-session-evidence.zip
+          if-no-files-found: ignore
