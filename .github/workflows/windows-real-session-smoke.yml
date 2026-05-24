@@ -55,7 +55,7 @@ jobs:
           TESTER_ADMIN_TOKEN: ${{ secrets.TESTER_ADMIN_TOKEN }}
         run: |
           $outputDir = Join-Path $env:RUNNER_TEMP "OysterRecorder-real-session-${{ github.run_id }}"
-          $args = @(
+          $smokeArgs = @(
             "-BackendUrl", "${{ inputs.backend_url }}",
             "-OutputDir", $outputDir,
             "-StrictRealSession",
@@ -67,16 +67,16 @@ jobs:
           )
 
           if ("${{ inputs.minecraft_launch_command }}" -ne "") {
-            $args += @("-MinecraftLaunchCommand", "${{ inputs.minecraft_launch_command }}")
+            $smokeArgs += @("-MinecraftLaunchCommand", "${{ inputs.minecraft_launch_command }}")
           }
           if ("${{ inputs.keep_installed }}" -eq "true") {
-            $args += "-KeepInstalled"
+            $smokeArgs += "-KeepInstalled"
           }
           if ("${{ inputs.require_signed_installer }}" -eq "true") {
-            $args += "-RequireSignedInstaller"
+            $smokeArgs += "-RequireSignedInstaller"
           }
 
-          & "$env:GITHUB_WORKSPACE\scripts\windows_real_session_smoke.ps1" @args
+          & "$env:GITHUB_WORKSPACE\scripts\windows_real_session_smoke.ps1" @smokeArgs
 
       - name: Upload real-session evidence
         if: always()

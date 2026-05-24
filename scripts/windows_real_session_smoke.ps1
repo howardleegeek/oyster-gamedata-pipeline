@@ -143,7 +143,7 @@ function Get-AdminToken {
     $token = [Environment]::GetEnvironmentVariable($AdminTokenEnv)
     if (-not $token) {
         Add-Step "admin-token" "fail" "AdminTokenEnv '$AdminTokenEnv' is not set"
-        return ""
+        throw "AdminTokenEnv '$AdminTokenEnv' is not set"
     }
     $script:Report.admin_state.enabled = $true
     return $token.Trim()
@@ -530,9 +530,21 @@ function Download-ReleaseAssets {
     $shaPath = Join-Path $installerDir "SHA256SUMS.txt"
     Invoke-WebRequest -UseBasicParsing -Uri $Assets.installer.browser_download_url -OutFile $installerPath -TimeoutSec 300
     Invoke-WebRequest -UseBasicParsing -Uri $Assets.sha.browser_download_url -OutFile $shaPath -TimeoutSec 60
+    Unblock-ReleaseInstaller -InstallerPath $installerPath
     $script:InstallerPath = $installerPath
     Add-Step "download-assets" "pass" $installerPath
     return [ordered]@{ installer = $installerPath; sha = $shaPath }
+}
+
+function Unblock-ReleaseInstaller {
+    param([string]$InstallerPath)
+
+    try {
+        Unblock-File -Path $InstallerPath -ErrorAction Stop
+        Add-Step "unblock-installer" "pass" $InstallerPath
+    } catch {
+        Add-Step "unblock-installer" "skip" $_.Exception.Message
+    }
 }
 
 function Verify-Checksum {

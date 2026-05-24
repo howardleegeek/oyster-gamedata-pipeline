@@ -37,6 +37,9 @@ def test_manual_workflow_runs_only_on_dispatch_with_self_hosted_runner():
 def test_manual_workflow_invokes_strict_real_session_script():
     text = _workflow()
     assert "scripts\\windows_real_session_smoke.ps1" in text
+    assert "$smokeArgs = @(" in text
+    assert "@smokeArgs" in text
+    assert "$args = @(" not in text
     assert "-StrictRealSession" in text
     assert "-ManualSessionMinutes" in text
     assert "-AdminTokenEnv" in text
@@ -65,6 +68,8 @@ def test_resolves_latest_release_and_downloads_required_assets():
     assert "^OysterRecorder-[Ss]etup-.*\\.exe$" in text
     assert "SHA256SUMS.txt" in text
     assert "Invoke-WebRequest" in text
+    assert "Unblock-ReleaseInstaller" in text
+    assert "Unblock-File -Path $InstallerPath" in text
     assert "Verify-Checksum" in text
 
 
@@ -99,6 +104,7 @@ def test_admin_token_is_env_only_and_delta_is_optional():
     text = _script()
     assert "[string]$AdminTokenEnv" in text
     assert "GetEnvironmentVariable($AdminTokenEnv)" in text
+    assert 'throw "AdminTokenEnv' in text
     assert "Authorization" in text
     assert "Bearer $script:AdminToken" in text
     assert "RequireUploadDelta" in text
