@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [0.11.4] - 2026-05-24
+
+### Other
+
+- test(recorder): require strict real-session evidence (d9124fd)
+- ci(recorder): add strict Windows real-session workflow (9c4b6e8)
+- test(recorder): force upload config in strict session smoke (0fb396c)
+
+
 ## [0.11.2] - 2026-05-24
 
 ### Other
