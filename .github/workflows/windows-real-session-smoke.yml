@@ -23,6 +23,10 @@ on:
         description: 'Minimum fresh MP4 size in bytes'
         required: true
         default: '102400'
+      minecraft_launch_command:
+        description: 'Optional command to launch Minecraft at the start of the manual window'
+        required: false
+        default: ''
       keep_installed:
         description: 'Keep the recorder installed after the smoke run'
         required: true
@@ -62,6 +66,9 @@ jobs:
             "-MinimumVideoBytes", "${{ inputs.minimum_video_bytes }}"
           )
 
+          if ("${{ inputs.minecraft_launch_command }}" -ne "") {
+            $args += @("-MinecraftLaunchCommand", "${{ inputs.minecraft_launch_command }}")
+          }
           if ("${{ inputs.keep_installed }}" -eq "true") {
             $args += "-KeepInstalled"
           }

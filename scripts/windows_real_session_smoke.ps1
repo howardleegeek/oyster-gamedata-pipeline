@@ -9,6 +9,7 @@ param(
     [switch]$StrictRealSession,
     [int]$MinimumGameStateRows = 30,
     [int64]$MinimumVideoBytes = 102400,
+    [string]$MinecraftLaunchCommand = "",
     [switch]$InteractiveInstall,
     [switch]$RequireSignedInstaller,
     [switch]$SkipInstall,
@@ -55,6 +56,8 @@ $script:RecorderInstalledBySmoke = $false
 $script:RecorderLaunchedBySmoke = $false
 $script:RealSessionStartedAtUtc = $null
 $script:RealSessionBeforeFiles = @()
+$script:RecorderConfigPath = Join-Path $script:AppDataRoot "GameData Recorder\config.json"
+$script:RecorderConfigBackupPath = Join-Path $OutputDir "config.before-strict-real-session.json"
 
 $hostOs = "unknown"
 if ($script:IsWindowsHost) {
@@ -102,6 +105,8 @@ $script:Report = [ordered]@{
         game_state = $null
         video = $null
         manifest = $null
+        minecraft_launch_command = $MinecraftLaunchCommand
+        recorder_config = $null
     }
     steps = @()
     artifacts = [ordered]@{}
@@ -285,6 +290,78 @@ function Count-JsonlRows {
     Get-Content -LiteralPath $Path -ReadCount 1000 -ErrorAction Stop |
         ForEach-Object { $count += $_.Count }
     return $count
+}
+
+function Set-JsonProperty {
+    param(
+        [object]$Object,
+        [string]$Name,
+        [object]$Value
+    )
+    if ($Object.PSObject.Properties.Name -contains $Name) {
+        $Object.$Name = $Value
+        return
+    }
+    $Object | Add-Member -MemberType NoteProperty -Name $Name -Value $Value
+}
+
+function Enable-StrictRealSessionRecorderConfig {
+    if (-not $StrictRealSession) {
+        Add-Step "strict-recorder-config" "skip" "StrictRealSession not set"
+        return
+    }
+
+    $configDir = Split-Path $script:RecorderConfigPath -Parent
+    New-Item -ItemType Directory -Force -Path $configDir | Out-Null
+
+    if (Test-Path -LiteralPath $script:RecorderConfigPath) {
+        Copy-Item -LiteralPath $script:RecorderConfigPath -Destination $script:RecorderConfigBackupPath -Force
+        $config = Get-Content -LiteralPath $script:RecorderConfigPath -Raw | ConvertFrom-Json
+    } else {
+        $config = [pscustomobject]@{}
+    }
+
+    if ($config.PSObject.Properties.Name -notcontains "credentials" -or -not $config.credentials) {
+        Set-JsonProperty -Object $config -Name "credentials" -Value ([pscustomobject]@{})
+    }
+    Set-JsonProperty -Object $config.credentials -Name "hasConsented" -Value $true
+    if ($config.credentials.PSObject.Properties.Name -notcontains "consentGivenAtVersion") {
+        Set-JsonProperty -Object $config.credentials -Name "consentGivenAtVersion" -Value "strict-real-session-smoke"
+    }
+
+    if ($config.PSObject.Properties.Name -notcontains "preferences" -or -not $config.preferences) {
+        Set-JsonProperty -Object $config -Name "preferences" -Value ([pscustomobject]@{})
+    }
+    Set-JsonProperty -Object $config.preferences -Name "autoUploadOnCompletion" -Value $true
+    Set-JsonProperty -Object $config.preferences -Name "deleteUploadedFiles" -Value $false
+
+    $config | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath $script:RecorderConfigPath -Encoding UTF8
+    $script:Report.real_session.recorder_config = [ordered]@{
+        path = $script:RecorderConfigPath
+        backup_path = $(if (Test-Path -LiteralPath $script:RecorderConfigBackupPath) { $script:RecorderConfigBackupPath } else { $null })
+        auto_upload_on_completion = $true
+        delete_uploaded_files = $false
+    }
+    Add-Step "strict-recorder-config" "pass" "autoUploadOnCompletion=true; deleteUploadedFiles=false"
+}
+
+function Restore-StrictRealSessionRecorderConfig {
+    if (-not $StrictRealSession) {
+        return
+    }
+    if (Test-Path -LiteralPath $script:RecorderConfigBackupPath) {
+        Copy-Item -LiteralPath $script:RecorderConfigBackupPath -Destination $script:RecorderConfigPath -Force
+        Add-Step "restore-recorder-config" "pass" "restored $script:RecorderConfigPath"
+    }
+}
+
+function Start-MinecraftLaunchCommand {
+    if (-not $MinecraftLaunchCommand) {
+        Add-Step "minecraft-launch-command" "skip" "No MinecraftLaunchCommand configured"
+        return
+    }
+    Start-Process -FilePath "cmd.exe" -ArgumentList @("/c", $MinecraftLaunchCommand)
+    Add-Step "minecraft-launch-command" "pass" $MinecraftLaunchCommand
 }
 
 function Start-RealSessionArtifactSnapshot {
@@ -719,7 +796,9 @@ try {
 
     Install-Recorder -InstallerPath $downloaded.installer
     Verify-InstalledRecorder
+    Enable-StrictRealSessionRecorderConfig
     Launch-Recorder
+    Start-MinecraftLaunchCommand
     Run-ManualSessionWindow
     Verify-StrictRealSessionArtifacts
 
@@ -733,6 +812,12 @@ try {
         Stop-Recorder
     } catch {
         Add-Step "stop-recorder" "fail" $_.Exception.Message
+    }
+
+    try {
+        Restore-StrictRealSessionRecorderConfig
+    } catch {
+        Add-Step "restore-recorder-config" "fail" $_.Exception.Message
     }
 
     try {

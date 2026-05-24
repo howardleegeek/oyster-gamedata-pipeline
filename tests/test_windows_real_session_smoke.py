@@ -44,6 +44,8 @@ def test_manual_workflow_invokes_strict_real_session_script():
     assert "-RequireUploadDelta" in text
     assert "-MinimumGameStateRows" in text
     assert "-MinimumVideoBytes" in text
+    assert "minecraft_launch_command" in text
+    assert "-MinecraftLaunchCommand" in text
     assert "windows-real-session-evidence" in text
 
 
@@ -133,6 +135,33 @@ def test_strict_real_session_snapshots_and_validates_artifacts():
     assert "StrictRealSession did not find a fresh session manifest or metadata JSON" in text
 
 
+def test_strict_real_session_forces_upload_config_temporarily():
+    text = _script()
+    assert '[string]$MinecraftLaunchCommand = ""' in text
+    assert "Enable-StrictRealSessionRecorderConfig" in text
+    assert "Restore-StrictRealSessionRecorderConfig" in text
+    assert "GameData Recorder\\config.json" in text
+    assert "config.before-strict-real-session.json" in text
+    assert "autoUploadOnCompletion" in text
+    assert "deleteUploadedFiles" in text
+    assert '"autoUploadOnCompletion" -Value $true' in text
+    assert '"deleteUploadedFiles" -Value $false' in text
+    assert "restore-recorder-config" in text
+
+
+def test_strict_real_session_can_launch_minecraft_command():
+    text = _script()
+    assert "Start-MinecraftLaunchCommand" in text
+    assert "minecraft_launch_command = $MinecraftLaunchCommand" in text
+    assert (
+        'Start-Process -FilePath "cmd.exe" -ArgumentList @("/c", $MinecraftLaunchCommand)' in text
+    )
+    launch_call = text.rindex("Launch-Recorder")
+    minecraft_call = text.rindex("Start-MinecraftLaunchCommand")
+    manual_call = text.rindex("Run-ManualSessionWindow")
+    assert launch_call < minecraft_call < manual_call
+
+
 def test_strict_real_session_artifact_report_is_machine_readable():
     text = _script()
     assert "real_session = [ordered]@{" in text
@@ -143,6 +172,7 @@ def test_strict_real_session_artifact_report_is_machine_readable():
     assert "game_state = [ordered]@{" in text
     assert "video = [ordered]@{" in text
     assert "manifest = [ordered]@{" in text
+    assert "recorder_config = $null" in text
 
 
 def test_cleanup_only_touches_recorder_created_by_smoke_run():
