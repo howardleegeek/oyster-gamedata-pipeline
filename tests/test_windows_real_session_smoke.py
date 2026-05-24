@@ -160,16 +160,29 @@ def test_strict_real_session_can_launch_minecraft_command():
     text = _script()
     assert "Start-MinecraftLaunchCommand" in text
     assert "Focus-MinecraftWindow" in text
+    assert "Wait-ForMinecraftWindow" in text
     assert "SetForegroundWindow" in text
+    assert "GetForegroundWindow" in text
+    assert "AttachThreadInput" in text
     assert "minecraft-window-focus" in text
+    assert "minecraft-window-ready" in text
+    assert '$message = "Minecraft javaw window was not foreground within 90 seconds"' in text
+    assert 'throw "StrictRealSession $message"' in text
     assert "minecraft_launch_command = $MinecraftLaunchCommand" in text
     assert (
         'Start-Process -FilePath "cmd.exe" -ArgumentList @("/c", $MinecraftLaunchCommand)' in text
     )
     launch_call = text.rindex("Launch-Recorder")
     minecraft_call = text.rindex("Start-MinecraftLaunchCommand")
+    wait_call = text.rindex("Wait-ForMinecraftWindow")
     manual_call = text.rindex("Run-ManualSessionWindow")
-    assert launch_call < minecraft_call < manual_call
+    assert launch_call < minecraft_call < wait_call < manual_call
+
+
+def test_recorder_launch_enables_targeted_debug_logs():
+    text = _script()
+    assert '$env:RUST_LOG = "gamedata_recorder=debug,info"' in text
+    assert '$env:RUST_BACKTRACE = "1"' in text
 
 
 def test_strict_real_session_artifact_report_is_machine_readable():

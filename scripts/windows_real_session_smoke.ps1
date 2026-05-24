@@ -59,6 +59,7 @@ $script:RealSessionBeforeFiles = @()
 $script:RecorderConfigPath = Join-Path $script:AppDataRoot "GameData Recorder\config.json"
 $script:RecorderConfigBackupPath = Join-Path $OutputDir "config.before-strict-real-session.json"
 $script:MinecraftWindowFocused = $false
+$script:MinecraftWindowFocusFailureReported = $false
 
 $hostOs = "unknown"
 if ($script:IsWindowsHost) {
@@ -379,27 +380,110 @@ function Focus-MinecraftWindow {
             Add-Type @"
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 public static class OysterFocusNativeMethods {
     [DllImport("user32.dll")]
     public static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll")]
     public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+    [DllImport("kernel32.dll")]
+    public static extern uint GetCurrentThreadId();
+    [DllImport("user32.dll")]
+    public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+    [DllImport("user32.dll")]
+    public static extern bool BringWindowToTop(IntPtr hWnd);
+    [DllImport("user32.dll")]
+    public static extern IntPtr SetActiveWindow(IntPtr hWnd);
+    [DllImport("user32.dll")]
+    public static extern IntPtr SetFocus(IntPtr hWnd);
+    [DllImport("user32.dll")]
+    public static extern bool AllowSetForegroundWindow(int dwProcessId);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
 }
 "@
         }
+
+        $currentForeground = [OysterFocusNativeMethods]::GetForegroundWindow()
+        [uint32]$foregroundPid = 0
+        $foregroundThread = [OysterFocusNativeMethods]::GetWindowThreadProcessId($currentForeground, [ref]$foregroundPid)
+        [uint32]$targetPid = 0
+        $targetThread = [OysterFocusNativeMethods]::GetWindowThreadProcessId($process.MainWindowHandle, [ref]$targetPid)
+        $currentThread = [OysterFocusNativeMethods]::GetCurrentThreadId()
+        [OysterFocusNativeMethods]::AllowSetForegroundWindow(-1) | Out-Null
         [OysterFocusNativeMethods]::ShowWindow($process.MainWindowHandle, 9) | Out-Null
-        [OysterFocusNativeMethods]::SetForegroundWindow($process.MainWindowHandle) | Out-Null
-        if (-not $script:MinecraftWindowFocused) {
-            Add-Step "minecraft-window-focus" "pass" "pid=$($process.Id); hwnd=$($process.MainWindowHandle)"
-            $script:MinecraftWindowFocused = $true
+        $attachedCurrent = $false
+        $attachedForeground = $false
+        try {
+            if ($targetThread -ne 0 -and $currentThread -ne $targetThread) {
+                $attachedCurrent = [OysterFocusNativeMethods]::AttachThreadInput($currentThread, $targetThread, $true)
+            }
+            if ($targetThread -ne 0 -and $foregroundThread -ne 0 -and $foregroundThread -ne $targetThread) {
+                $attachedForeground = [OysterFocusNativeMethods]::AttachThreadInput($foregroundThread, $targetThread, $true)
+            }
+            [OysterFocusNativeMethods]::BringWindowToTop($process.MainWindowHandle) | Out-Null
+            [OysterFocusNativeMethods]::SetActiveWindow($process.MainWindowHandle) | Out-Null
+            [OysterFocusNativeMethods]::SetFocus($process.MainWindowHandle) | Out-Null
+            $setForeground = [OysterFocusNativeMethods]::SetForegroundWindow($process.MainWindowHandle)
+        } finally {
+            if ($attachedForeground) {
+                [OysterFocusNativeMethods]::AttachThreadInput($foregroundThread, $targetThread, $false) | Out-Null
+            }
+            if ($attachedCurrent) {
+                [OysterFocusNativeMethods]::AttachThreadInput($currentThread, $targetThread, $false) | Out-Null
+            }
         }
-        return $true
-    } catch {
+
+        Start-Sleep -Milliseconds 500
+        $verifiedForeground = [OysterFocusNativeMethods]::GetForegroundWindow()
+        [uint32]$verifiedPid = 0
+        [OysterFocusNativeMethods]::GetWindowThreadProcessId($verifiedForeground, [ref]$verifiedPid) | Out-Null
         if (-not $script:MinecraftWindowFocused) {
+            if ([int]$verifiedPid -eq [int]$process.Id) {
+                Add-Step "minecraft-window-focus" "pass" "pid=$($process.Id); hwnd=$($process.MainWindowHandle); foreground_pid=$verifiedPid"
+                $script:MinecraftWindowFocused = $true
+            } elseif (-not $script:MinecraftWindowFocusFailureReported) {
+                Add-Step "minecraft-window-focus" "skip" "target_pid=$($process.Id); foreground_pid=$verifiedPid; set_foreground=$setForeground"
+                $script:MinecraftWindowFocusFailureReported = $true
+            }
+        }
+        return ([int]$verifiedPid -eq [int]$process.Id)
+    } catch {
+        if (-not $script:MinecraftWindowFocused -and -not $script:MinecraftWindowFocusFailureReported) {
             Add-Step "minecraft-window-focus" "skip" $_.Exception.Message
+            $script:MinecraftWindowFocusFailureReported = $true
         }
         return $false
     }
+}
+
+function Wait-ForMinecraftWindow {
+    if (-not $MinecraftLaunchCommand) {
+        Add-Step "minecraft-window-ready" "skip" "No MinecraftLaunchCommand configured"
+        return
+    }
+
+    $deadline = (Get-Date).AddSeconds(90)
+    while ((Get-Date) -lt $deadline) {
+        if (Focus-MinecraftWindow) {
+            Add-Step "minecraft-window-ready" "pass" "javaw is foreground before manual session window"
+            return
+        }
+        if ($script:RecorderProcess -and $script:RecorderProcess.HasExited) {
+            throw "Recorder exited while waiting for Minecraft window with code $($script:RecorderProcess.ExitCode)"
+        }
+        Start-Sleep -Seconds 2
+    }
+
+    $message = "Minecraft javaw window was not foreground within 90 seconds"
+    if ($StrictRealSession) {
+        throw "StrictRealSession $message"
+    }
+    Add-Step "minecraft-window-ready" "skip" $message
 }
 
 function Start-RealSessionArtifactSnapshot {
@@ -708,6 +792,9 @@ function Launch-Recorder {
     $exe = Join-Path $script:InstallDir "gamedata-recorder.exe"
     $env:GAMEDATA_API_URL = $BackendUrl
     $env:GAMEDATA_OUTPUT_DIR = $launchOutputDir
+    if (-not $env:RUST_LOG) {
+        $env:RUST_LOG = "gamedata_recorder=debug,info"
+    }
     $env:RUST_BACKTRACE = "1"
 
     $script:RecorderProcess = Start-Process `
@@ -853,6 +940,7 @@ try {
     Enable-StrictRealSessionRecorderConfig
     Launch-Recorder
     Start-MinecraftLaunchCommand
+    Wait-ForMinecraftWindow
     Run-ManualSessionWindow
     Verify-StrictRealSessionArtifacts
 
