@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [0.11.5] - 2026-05-24
+
+### Other
+
+- ci(recorder): harden strict session smoke entry (cc78ec3)
+- ci(recorder): use named splatting for strict smoke (5ca076c)
+- test(recorder): focus Minecraft during strict smoke (f1ae232)
+
+
 ## [0.11.4] - 2026-05-24
 
 ### Other
