@@ -180,6 +180,7 @@ def test_strict_real_session_can_launch_minecraft_command():
     assert "Start-MinecraftLaunchCommand" in text
     assert "Focus-MinecraftWindow" in text
     assert "Wait-ForMinecraftWindow" in text
+    assert "if (-not $MinecraftLaunchCommand -and -not $StrictRealSession)" in text
     assert "SetForegroundWindow" in text
     assert "GetForegroundWindow" in text
     assert "GetClientRect" in text
@@ -203,6 +204,20 @@ def test_strict_real_session_can_launch_minecraft_command():
     verify_call = text.rindex("Verify-StrictRealSessionArtifacts")
     assert launch_call < minecraft_call < wait_call < hotkey_start_call < manual_call
     assert manual_call < hotkey_stop_call < verify_call
+
+
+def test_strict_real_session_cleans_stale_recorder_processes_before_launch():
+    text = _script()
+    assert "Stop-StaleRecorderProcesses" in text
+    assert "stale-recorder-cleanup" in text
+    assert '"gamedata-recorder", "OysterRecorder", "obs-ffmpeg-mux"' in text
+    assert "Stop-Process -Id $_.Id -Force" in text
+
+    no_gui_branch = text.index("if ($NoGuiPreflight) {")
+    cleanup_call = text.rindex("Stop-StaleRecorderProcesses")
+    admin_state_call = text.rindex('$script:AdminToken = Get-AdminToken')
+    install_call = text.rindex("Install-Recorder -InstallerPath")
+    assert no_gui_branch < cleanup_call < admin_state_call < install_call
 
 
 def test_strict_real_session_sends_f9_hotkeys_for_video_chain():

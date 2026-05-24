@@ -510,7 +510,7 @@ public static class OysterFocusNativeMethods {
 }
 
 function Wait-ForMinecraftWindow {
-    if (-not $MinecraftLaunchCommand) {
+    if (-not $MinecraftLaunchCommand -and -not $StrictRealSession) {
         Add-Step "minecraft-window-ready" "skip" "No MinecraftLaunchCommand configured"
         return
     }
@@ -532,6 +532,37 @@ function Wait-ForMinecraftWindow {
         throw "StrictRealSession $message"
     }
     Add-Step "minecraft-window-ready" "skip" $message
+}
+
+function Stop-StaleRecorderProcesses {
+    if ($NoGuiPreflight) {
+        Add-Step "stale-recorder-cleanup" "skip" "NoGuiPreflight set"
+        return
+    }
+
+    $names = @("gamedata-recorder", "OysterRecorder", "obs-ffmpeg-mux")
+    $stopped = @()
+    foreach ($name in $names) {
+        Get-Process -Name $name -ErrorAction SilentlyContinue |
+            ForEach-Object {
+                $detail = "$($_.ProcessName):$($_.Id)"
+                try {
+                    Stop-Process -Id $_.Id -Force -ErrorAction Stop
+                    $stopped += $detail
+                } catch {
+                    Add-Step "stale-recorder-cleanup" "fail" "could not stop ${detail}: $($_.Exception.Message)"
+                    throw
+                }
+            }
+    }
+
+    if ($stopped.Count -eq 0) {
+        Add-Step "stale-recorder-cleanup" "pass" "no stale recorder or OBS helper processes"
+        return
+    }
+
+    Start-Sleep -Seconds 1
+    Add-Step "stale-recorder-cleanup" "pass" ("stopped " + ($stopped -join ", "))
 }
 
 function Send-RecordingHotkey {
@@ -1030,6 +1061,7 @@ try {
     if ($NoGuiPreflight) {
         Add-Step "no-gui-preflight" "pass" "release, checksum, backend, and signature checks completed without executing installer or recorder"
     } else {
+        Stop-StaleRecorderProcesses
         $script:AdminToken = Get-AdminToken
         $script:BeforeAdminState = Get-AdminStateSnapshot -Label "before"
         $script:Report.admin_state.before = $script:BeforeAdminState
