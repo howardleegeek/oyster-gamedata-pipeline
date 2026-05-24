@@ -114,6 +114,11 @@ $script:Report = [ordered]@{
             gamedata_output_dir = $null
             rust_log = $null
         }
+        hotkey = [ordered]@{
+            start_sent = $false
+            stop_sent = $false
+            key = "F9"
+        }
     }
     steps = @()
     artifacts = [ordered]@{}
@@ -489,6 +494,49 @@ function Wait-ForMinecraftWindow {
         throw "StrictRealSession $message"
     }
     Add-Step "minecraft-window-ready" "skip" $message
+}
+
+function Send-RecordingHotkey {
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("start", "stop")]
+        [string]$Action
+    )
+
+    if (-not $StrictRealSession) {
+        Add-Step "recording-hotkey-$Action" "skip" "StrictRealSession not set"
+        return
+    }
+
+    $stepName = "recording-hotkey-$Action"
+    Focus-MinecraftWindow | Out-Null
+    try {
+        if (-not ([System.Management.Automation.PSTypeName]"OysterKeyboardNativeMethods").Type) {
+            Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public static class OysterKeyboardNativeMethods {
+    [DllImport("user32.dll")]
+    public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+}
+"@
+        }
+        $vkF9 = [byte]0x78
+        $keyEventFKeyUp = [uint32]0x0002
+        [OysterKeyboardNativeMethods]::keybd_event($vkF9, 0, 0, [UIntPtr]::Zero)
+        Start-Sleep -Milliseconds 120
+        [OysterKeyboardNativeMethods]::keybd_event($vkF9, 0, $keyEventFKeyUp, [UIntPtr]::Zero)
+        if ($Action -eq "start") {
+            $script:Report.real_session.hotkey.start_sent = $true
+        } else {
+            $script:Report.real_session.hotkey.stop_sent = $true
+        }
+        Add-Step $stepName "pass" "sent F9 $Action hotkey"
+        Start-Sleep -Seconds 2
+    } catch {
+        Add-Step $stepName "fail" $_.Exception.Message
+        throw
+    }
 }
 
 function Start-RealSessionArtifactSnapshot {
@@ -950,7 +998,9 @@ try {
     Launch-Recorder
     Start-MinecraftLaunchCommand
     Wait-ForMinecraftWindow
+    Send-RecordingHotkey -Action "start"
     Run-ManualSessionWindow
+    Send-RecordingHotkey -Action "stop"
     Verify-StrictRealSessionArtifacts
 
     $script:AfterAdminState = Get-AdminStateSnapshot -Label "after"

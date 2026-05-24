@@ -175,8 +175,23 @@ def test_strict_real_session_can_launch_minecraft_command():
     launch_call = text.rindex("Launch-Recorder")
     minecraft_call = text.rindex("Start-MinecraftLaunchCommand")
     wait_call = text.rindex("Wait-ForMinecraftWindow")
+    hotkey_start_call = text.rindex('Send-RecordingHotkey -Action "start"')
     manual_call = text.rindex("Run-ManualSessionWindow")
-    assert launch_call < minecraft_call < wait_call < manual_call
+    hotkey_stop_call = text.rindex('Send-RecordingHotkey -Action "stop"')
+    verify_call = text.rindex("Verify-StrictRealSessionArtifacts")
+    assert launch_call < minecraft_call < wait_call < hotkey_start_call < manual_call
+    assert manual_call < hotkey_stop_call < verify_call
+
+
+def test_strict_real_session_sends_f9_hotkeys_for_video_chain():
+    text = _script()
+    assert "Send-RecordingHotkey" in text
+    assert 'ValidateSet("start", "stop")' in text
+    assert "keybd_event" in text
+    assert "$vkF9 = [byte]0x78" in text
+    assert '$stepName = "recording-hotkey-$Action"' in text
+    assert "$script:Report.real_session.hotkey.start_sent = $true" in text
+    assert "$script:Report.real_session.hotkey.stop_sent = $true" in text
 
 
 def test_recorder_launch_enables_targeted_debug_logs():
@@ -201,6 +216,7 @@ def test_strict_real_session_artifact_report_is_machine_readable():
     assert "manifest = [ordered]@{" in text
     assert "recorder_config = $null" in text
     assert "recorder_env = [ordered]@{" in text
+    assert "hotkey = [ordered]@{" in text
 
 
 def test_cleanup_only_touches_recorder_created_by_smoke_run():
