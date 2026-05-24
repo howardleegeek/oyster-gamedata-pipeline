@@ -46,11 +46,11 @@ def test_appcast_is_consumer_installer_only() -> None:
 
 
 def test_known_anchors_capture_current_successful_lines() -> None:
-    assert CURRENT_CONSUMER_TAG == "v0.11.0"
+    assert CURRENT_CONSUMER_TAG == "v0.11.7"
     assert CURRENT_CONSUMER_INSTALLER == "OysterRecorder-setup-v2.6.0.exe"
     assert len(CURRENT_CONSUMER_SHA256) == 64
     assert BUNDLED_REFERENCE_TAG == "recorder-v0.28.0-rc19.0.3"
-    assert RECORDER_SOURCE_PIN.startswith("17233d3")
+    assert RECORDER_SOURCE_PIN.startswith("e171f20")
 
 
 def test_fallback_order_is_explicit_and_ordered() -> None:
