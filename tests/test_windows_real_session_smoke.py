@@ -215,7 +215,7 @@ def test_strict_real_session_cleans_stale_recorder_processes_before_launch():
 
     no_gui_branch = text.index("if ($NoGuiPreflight) {")
     cleanup_call = text.rindex("Stop-StaleRecorderProcesses")
-    admin_state_call = text.rindex('$script:AdminToken = Get-AdminToken')
+    admin_state_call = text.rindex("$script:AdminToken = Get-AdminToken")
     install_call = text.rindex("Install-Recorder -InstallerPath")
     assert no_gui_branch < cleanup_call < admin_state_call < install_call
 
