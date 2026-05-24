@@ -111,6 +111,39 @@ jobs:
             throw "Unexpected OysterRecorder Run value: $($run.OysterRecorder)"
           }
 
+      - name: Verify OBS runtime dependencies
+        shell: pwsh
+        run: |
+          $installDir = Join-Path $env:LOCALAPPDATA "OysterRecorder"
+          $requiredFiles = @(
+            "obs.dll",
+            "libobs-d3d11.dll",
+            "libobs-opengl.dll",
+            "libobs-winrt.dll",
+            "obs-ffmpeg-mux.exe"
+          )
+          foreach ($name in $requiredFiles) {
+            $path = Join-Path $installDir $name
+            if (-not (Test-Path $path)) {
+              Get-ChildItem -Recurse -Force $installDir -ErrorAction SilentlyContinue |
+                Select-Object -First 200 FullName, Length, LastWriteTime
+              throw "OBS runtime dependency missing: $name"
+            }
+          }
+
+          $requiredDirs = @(
+            "obs-plugins",
+            "data"
+          )
+          foreach ($name in $requiredDirs) {
+            $path = Join-Path $installDir $name
+            if (-not (Test-Path $path -PathType Container)) {
+              Get-ChildItem -Recurse -Force $installDir -ErrorAction SilentlyContinue |
+                Select-Object -First 200 FullName, Length, LastWriteTime
+              throw "OBS runtime directory missing: $name"
+            }
+          }
+
       - name: Launch installed recorder in tray mode
         shell: pwsh
         run: |

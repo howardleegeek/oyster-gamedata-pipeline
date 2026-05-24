@@ -102,6 +102,17 @@ Source: "{#SourceDir}\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "check_runtime.bat"; DestDir: "{tmp}"; Flags: dontcopy
 ; Accompanying DLLs (OBS, etc.) — skip if none present
 Source: "{#SourceDir}\*.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+; OBS runtime must be present for real desktop launch. These entries are
+; intentionally required: CI must fail before release if the staging step
+; forgets to include libobs or its plugin/data directories.
+Source: "{#SourceDir}\obs.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\libobs-d3d11.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\libobs-opengl.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\libobs-winrt.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\obs-ffmpeg-mux.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\obs-plugins\*"; DestDir: "{app}\obs-plugins"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#SourceDir}\data\*"; DestDir: "{app}\data"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#SourceDir}\assets\*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
 ; Any .pdb debug symbols — skip in release CI
 Source: "{#SourceDir}\*.pdb"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 

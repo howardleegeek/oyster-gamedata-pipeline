@@ -26,6 +26,22 @@ def test_release_smoke_workflow_runs_on_schedule_and_manual_dispatch() -> None:
     assert "bash scripts/verify_latest_release_assets.sh" in workflow
 
 
+def test_windows_build_stages_obs_runtime_before_inno_compile() -> None:
+    workflow = (REPO_ROOT / ".github/workflows/build-recorder-windows.yml").read_text()
+
+    assert "vendor\\recorder\\tmp_install" in workflow
+    assert "installer\\staging" in workflow
+    assert "Staged installer runtime missing required OBS asset" in workflow
+    assert "obs.dll" in workflow
+    assert "libobs-d3d11.dll" in workflow
+    assert "libobs-opengl.dll" in workflow
+    assert "libobs-winrt.dll" in workflow
+    assert "obs-ffmpeg-mux.exe" in workflow
+    assert "obs-plugins" in workflow
+    assert "data" in workflow
+    assert "/DSourceDir=$srcDir" in workflow
+
+
 def test_windows_installer_smoke_workflow_exercises_real_install_path() -> None:
     workflow = (REPO_ROOT / ".github/workflows/windows-installer-smoke.yml").read_text()
 
@@ -42,6 +58,14 @@ def test_windows_installer_smoke_workflow_exercises_real_install_path() -> None:
     assert "/VERYSILENT" in workflow
     assert "$env:LOCALAPPDATA" in workflow
     assert "gamedata-recorder.exe" in workflow
+    assert "Verify OBS runtime dependencies" in workflow
+    assert "obs.dll" in workflow
+    assert "libobs-d3d11.dll" in workflow
+    assert "libobs-opengl.dll" in workflow
+    assert "libobs-winrt.dll" in workflow
+    assert "obs-ffmpeg-mux.exe" in workflow
+    assert "OBS runtime dependency missing" in workflow
+    assert "OBS runtime directory missing" in workflow
     assert "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" in workflow
     assert "Start-Process" in workflow
     assert "GAMEDATA_CI_MODE" in workflow

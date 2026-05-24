@@ -231,6 +231,39 @@ class TestFilesSection:
             r"Flags:.*ignoreversion", iss_content, re.IGNORECASE
         ), "Files should have ignoreversion flag"
 
+    def test_obs_runtime_files_are_required(self, iss_content):
+        """OBS core DLLs must be explicit required installer inputs."""
+        required = [
+            "obs.dll",
+            "libobs-d3d11.dll",
+            "libobs-opengl.dll",
+            "libobs-winrt.dll",
+            "obs-ffmpeg-mux.exe",
+        ]
+        for name in required:
+            assert re.search(
+                rf'Source:\s*"\{{#SourceDir\}}\\{re.escape(name)}"',
+                iss_content,
+                re.IGNORECASE,
+            ), f"Installer must explicitly include required OBS runtime file {name}"
+
+    def test_obs_plugin_and_data_dirs_are_recursive(self, iss_content):
+        """OBS plugin/data directories must be shipped recursively."""
+        assert re.search(
+            r'Source:\s*"\{#SourceDir\}\\obs-plugins\\\*".*'
+            r'DestDir:\s*"\{app\}\\obs-plugins".*'
+            r"recursesubdirs.*createallsubdirs",
+            iss_content,
+            re.IGNORECASE | re.DOTALL,
+        ), "Installer must copy obs-plugins recursively"
+        assert re.search(
+            r'Source:\s*"\{#SourceDir\}\\data\\\*".*'
+            r'DestDir:\s*"\{app\}\\data".*'
+            r"recursesubdirs.*createallsubdirs",
+            iss_content,
+            re.IGNORECASE | re.DOTALL,
+        ), "Installer must copy OBS data recursively"
+
 
 # ---------------------------------------------------------------------------
 # [Run] section: post-install launch

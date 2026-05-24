@@ -215,6 +215,52 @@ jobs:
             Write-Error "Compiled recorder output directory not found"
             exit 1
           }
+          $stageDir = "installer\staging"
+          if (Test-Path $stageDir) {
+            Remove-Item -Recurse -Force $stageDir
+          }
+          New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
+
+          $runtimeDir = "vendor\recorder\tmp_install"
+          if (-not (Test-Path $runtimeDir)) {
+            Write-Error "OBS runtime staging directory missing: $runtimeDir"
+            exit 1
+          }
+          Copy-Item -Path (Join-Path $runtimeDir "*") `
+            -Destination $stageDir `
+            -Recurse `
+            -Force
+
+          $builtExe = Join-Path $srcDir "gamedata-recorder.exe"
+          if (-not (Test-Path $builtExe)) {
+            $builtExe = Join-Path $srcDir "oyster-recorder.exe"
+          }
+          if (-not (Test-Path $builtExe)) {
+            Write-Error "Built recorder exe missing from $srcDir"
+            exit 1
+          }
+          Copy-Item -Path $builtExe `
+            -Destination (Join-Path $stageDir "gamedata-recorder.exe") `
+            -Force
+
+          $requiredRuntime = @(
+            "gamedata-recorder.exe",
+            "obs.dll",
+            "libobs-d3d11.dll",
+            "libobs-opengl.dll",
+            "libobs-winrt.dll",
+            "obs-ffmpeg-mux.exe",
+            "obs-plugins",
+            "data"
+          )
+          foreach ($relative in $requiredRuntime) {
+            $candidate = Join-Path $stageDir $relative
+            if (-not (Test-Path $candidate)) {
+              Write-Error "Staged installer runtime missing required OBS asset: $relative"
+              exit 1
+            }
+          }
+          $srcDir = (Resolve-Path $stageDir).Path
           New-Item -ItemType Directory -Force `
             -Path "installer\output" | Out-Null
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
