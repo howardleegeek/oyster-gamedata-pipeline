@@ -392,6 +392,12 @@ using System;
 using System.Runtime.InteropServices;
 using System.Text;
 public static class OysterFocusNativeMethods {
+    public struct RECT {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
     [DllImport("user32.dll")]
     public static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll")]
@@ -412,6 +418,8 @@ public static class OysterFocusNativeMethods {
     public static extern IntPtr SetFocus(IntPtr hWnd);
     [DllImport("user32.dll")]
     public static extern bool AllowSetForegroundWindow(int dwProcessId);
+    [DllImport("user32.dll")]
+    public static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
 }
@@ -426,6 +434,7 @@ public static class OysterFocusNativeMethods {
         $currentThread = [OysterFocusNativeMethods]::GetCurrentThreadId()
         [OysterFocusNativeMethods]::AllowSetForegroundWindow(-1) | Out-Null
         [OysterFocusNativeMethods]::ShowWindow($process.MainWindowHandle, 9) | Out-Null
+        [OysterFocusNativeMethods]::ShowWindow($process.MainWindowHandle, 3) | Out-Null
         $attachedCurrent = $false
         $attachedForeground = $false
         try {
@@ -452,12 +461,19 @@ public static class OysterFocusNativeMethods {
         $verifiedForeground = [OysterFocusNativeMethods]::GetForegroundWindow()
         [uint32]$verifiedPid = 0
         [OysterFocusNativeMethods]::GetWindowThreadProcessId($verifiedForeground, [ref]$verifiedPid) | Out-Null
+        $clientRect = New-Object OysterFocusNativeMethods+RECT
+        $clientWidth = 0
+        $clientHeight = 0
+        if ([OysterFocusNativeMethods]::GetClientRect($process.MainWindowHandle, [ref]$clientRect)) {
+            $clientWidth = [Math]::Max(0, $clientRect.Right - $clientRect.Left)
+            $clientHeight = [Math]::Max(0, $clientRect.Bottom - $clientRect.Top)
+        }
         if (-not $script:MinecraftWindowFocused) {
             if ([int]$verifiedPid -eq [int]$process.Id) {
-                Add-Step "minecraft-window-focus" "pass" "pid=$($process.Id); hwnd=$($process.MainWindowHandle); foreground_pid=$verifiedPid"
+                Add-Step "minecraft-window-focus" "pass" "pid=$($process.Id); hwnd=$($process.MainWindowHandle); foreground_pid=$verifiedPid; client=${clientWidth}x${clientHeight}"
                 $script:MinecraftWindowFocused = $true
             } elseif (-not $script:MinecraftWindowFocusFailureReported) {
-                Add-Step "minecraft-window-focus" "skip" "target_pid=$($process.Id); foreground_pid=$verifiedPid; set_foreground=$setForeground"
+                Add-Step "minecraft-window-focus" "skip" "target_pid=$($process.Id); foreground_pid=$verifiedPid; set_foreground=$setForeground; client=${clientWidth}x${clientHeight}"
                 $script:MinecraftWindowFocusFailureReported = $true
             }
         }

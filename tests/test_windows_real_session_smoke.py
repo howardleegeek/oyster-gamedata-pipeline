@@ -163,8 +163,11 @@ def test_strict_real_session_can_launch_minecraft_command():
     assert "Wait-ForMinecraftWindow" in text
     assert "SetForegroundWindow" in text
     assert "GetForegroundWindow" in text
+    assert "GetClientRect" in text
     assert "AttachThreadInput" in text
     assert "minecraft-window-focus" in text
+    assert "client=${clientWidth}x${clientHeight}" in text
+    assert "[OysterFocusNativeMethods]::ShowWindow($process.MainWindowHandle, 3)" in text
     assert "minecraft-window-ready" in text
     assert '$message = "Minecraft javaw window was not foreground within 90 seconds"' in text
     assert 'throw "StrictRealSession $message"' in text
