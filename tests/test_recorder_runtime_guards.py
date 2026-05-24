@@ -23,9 +23,9 @@ def test_ci_auto_record_uses_detected_game_hwnd_not_foreground_helper() -> None:
     tokio_thread = (RECORDER / "src" / "tokio_thread.rs").read_text()
     recorder = (RECORDER / "src" / "record" / "recorder.rs").read_text()
 
-    assert "pub hwnd: HWND" in app_state
-    assert "hwnd," in tokio_thread
-    assert "game.hwnd" in tokio_thread
+    assert "pub hwnd_raw: isize" in app_state
+    assert "hwnd_raw: hwnd.0 as isize" in tokio_thread
+    assert "game.hwnd_raw" in tokio_thread
     assert "GetForegroundWindow" in tokio_thread
     assert "prefer known game processes" in recorder
     assert "if let Some(running_game) = find_running_game()?" in recorder
