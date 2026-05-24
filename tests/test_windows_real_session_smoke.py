@@ -77,6 +77,46 @@ def test_admin_token_is_env_only_and_delta_is_optional():
     assert "[string]$Token =" not in text
 
 
+def test_strict_real_session_mode_requires_hard_evidence():
+    text = _script()
+    assert "[switch]$StrictRealSession" in text
+    assert "[int]$MinimumGameStateRows = 30" in text
+    assert "[int64]$MinimumVideoBytes = 102400" in text
+    assert "Assert-StrictRealSessionConfig" in text
+    assert "StrictRealSession cannot be used with SkipInstall" in text
+    assert "StrictRealSession requires ManualSessionMinutes greater than 0" in text
+    assert "StrictRealSession requires RequireUploadDelta" in text
+    assert "StrictRealSession requires AdminTokenEnv" in text
+
+
+def test_strict_real_session_snapshots_and_validates_artifacts():
+    text = _script()
+    assert "Get-RecorderArtifactRoots" in text
+    assert "Documents\\OysterClips" in text
+    assert "GameData Recorder\\recordings" in text
+    assert "Start-RealSessionArtifactSnapshot" in text
+    assert "Verify-StrictRealSessionArtifacts" in text
+    assert "game_state.jsonl" in text
+    assert "states.jsonl" in text
+    assert "StrictRealSession did not find fresh game_state/states JSONL" in text
+    assert "StrictRealSession did not find a fresh MP4" in text
+    assert "session_manifest.json" in text
+    assert "metadata.json" in text
+    assert "StrictRealSession did not find a fresh session manifest or metadata JSON" in text
+
+
+def test_strict_real_session_artifact_report_is_machine_readable():
+    text = _script()
+    assert "real_session = [ordered]@{" in text
+    assert "minimum_game_state_rows = $MinimumGameStateRows" in text
+    assert "minimum_video_bytes = $MinimumVideoBytes" in text
+    assert "before_file_count" in text
+    assert "fresh_file_count" in text
+    assert "game_state = [ordered]@{" in text
+    assert "video = [ordered]@{" in text
+    assert "manifest = [ordered]@{" in text
+
+
 def test_cleanup_only_touches_recorder_created_by_smoke_run():
     text = _script()
     assert "$script:RecorderInstalledBySmoke = $false" in text

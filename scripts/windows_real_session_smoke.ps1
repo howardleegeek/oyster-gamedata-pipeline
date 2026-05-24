@@ -6,6 +6,9 @@ param(
     [int]$ManualSessionMinutes = 0,
     [string]$AdminTokenEnv = "",
     [switch]$RequireUploadDelta,
+    [switch]$StrictRealSession,
+    [int]$MinimumGameStateRows = 30,
+    [int64]$MinimumVideoBytes = 102400,
     [switch]$InteractiveInstall,
     [switch]$RequireSignedInstaller,
     [switch]$SkipInstall,
@@ -50,6 +53,8 @@ $script:AfterAdminState = $null
 $script:AdminToken = ""
 $script:RecorderInstalledBySmoke = $false
 $script:RecorderLaunchedBySmoke = $false
+$script:RealSessionStartedAtUtc = $null
+$script:RealSessionBeforeFiles = @()
 
 $hostOs = "unknown"
 if ($script:IsWindowsHost) {
@@ -85,6 +90,18 @@ $script:Report = [ordered]@{
         before = $null
         after = $null
         delta = $null
+    }
+    real_session = [ordered]@{
+        strict = [bool]$StrictRealSession
+        minimum_game_state_rows = $MinimumGameStateRows
+        minimum_video_bytes = $MinimumVideoBytes
+        started_at = $null
+        roots = @()
+        before_file_count = 0
+        fresh_file_count = 0
+        game_state = $null
+        video = $null
+        manifest = $null
     }
     steps = @()
     artifacts = [ordered]@{}
@@ -180,6 +197,170 @@ function Get-CountValue {
         return 0
     }
     return [int]$value
+}
+
+function Assert-StrictRealSessionConfig {
+    if (-not $StrictRealSession) {
+        return
+    }
+    if ($SkipInstall) {
+        throw "StrictRealSession cannot be used with SkipInstall"
+    }
+    if ($ManualSessionMinutes -le 0) {
+        throw "StrictRealSession requires ManualSessionMinutes greater than 0"
+    }
+    if (-not $RequireUploadDelta) {
+        throw "StrictRealSession requires RequireUploadDelta"
+    }
+    if (-not $AdminTokenEnv) {
+        throw "StrictRealSession requires AdminTokenEnv"
+    }
+    if ($MinimumGameStateRows -lt 1) {
+        throw "MinimumGameStateRows must be at least 1"
+    }
+    if ($MinimumVideoBytes -lt 1) {
+        throw "MinimumVideoBytes must be at least 1"
+    }
+    Add-Step "strict-real-session-config" "pass" "manual_minutes=$ManualSessionMinutes; upload_delta=required"
+}
+
+function Get-RecorderArtifactRoots {
+    $documents = ""
+    try {
+        $documents = [Environment]::GetFolderPath("MyDocuments")
+    } catch {
+        $documents = ""
+    }
+
+    $rawRoots = @(
+        $(if ($documents) { Join-Path $documents "OysterClips" }),
+        $(if ($env:USERPROFILE) { Join-Path $env:USERPROFILE "Documents\OysterClips" }),
+        $(if ($env:OneDrive) { Join-Path $env:OneDrive "Documents\OysterClips" }),
+        (Join-Path $script:LocalAppDataRoot "GameData Recorder\recordings"),
+        (Join-Path $script:AppDataRoot "GameData Recorder\recordings"),
+        $launchOutputDir
+    )
+
+    $seen = @{}
+    $roots = @()
+    foreach ($root in $rawRoots) {
+        if (-not $root) {
+            continue
+        }
+        $full = [System.IO.Path]::GetFullPath($root)
+        $key = $full.ToLowerInvariant()
+        if ($seen.ContainsKey($key)) {
+            continue
+        }
+        $seen[$key] = $true
+        $roots += $full
+    }
+    return $roots
+}
+
+function Get-RecorderSessionFiles {
+    param([datetime]$SinceUtc = [datetime]::MinValue)
+
+    $files = @()
+    foreach ($root in Get-RecorderArtifactRoots) {
+        if (-not (Test-Path -LiteralPath $root)) {
+            continue
+        }
+        $files += Get-ChildItem -LiteralPath $root -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.LastWriteTimeUtc -ge $SinceUtc -and (
+                    $_.Extension -in @(".jsonl", ".json", ".mp4", ".log", ".txt", ".gz") -or
+                    $_.Name -like "*.tar.gz"
+                )
+            } |
+            Select-Object FullName, Name, Length, LastWriteTimeUtc
+    }
+    return $files
+}
+
+function Count-JsonlRows {
+    param([string]$Path)
+
+    $count = 0
+    Get-Content -LiteralPath $Path -ReadCount 1000 -ErrorAction Stop |
+        ForEach-Object { $count += $_.Count }
+    return $count
+}
+
+function Start-RealSessionArtifactSnapshot {
+    if (-not $StrictRealSession) {
+        Add-Step "real-session-artifact-snapshot" "skip" "StrictRealSession not set"
+        return
+    }
+
+    $script:RealSessionStartedAtUtc = (Get-Date).ToUniversalTime().AddSeconds(-5)
+    $script:RealSessionBeforeFiles = @(Get-RecorderSessionFiles)
+    $roots = @(Get-RecorderArtifactRoots)
+    $script:Report.real_session.started_at = $script:RealSessionStartedAtUtc.ToString("o")
+    $script:Report.real_session.roots = $roots
+    $script:Report.real_session.before_file_count = $script:RealSessionBeforeFiles.Count
+    Add-Step "real-session-artifact-snapshot" "pass" "roots=$($roots.Count); before_files=$($script:RealSessionBeforeFiles.Count)"
+}
+
+function Verify-StrictRealSessionArtifacts {
+    if (-not $StrictRealSession) {
+        Add-Step "verify-real-session-artifacts" "skip" "StrictRealSession not set"
+        return
+    }
+    if (-not $script:RealSessionStartedAtUtc) {
+        throw "StrictRealSession artifact snapshot was not started"
+    }
+
+    Start-Sleep -Seconds 5
+    $freshFiles = @(Get-RecorderSessionFiles -SinceUtc $script:RealSessionStartedAtUtc)
+    $script:Report.real_session.fresh_file_count = $freshFiles.Count
+
+    $bestGameState = $null
+    $bestGameStateRows = 0
+    foreach ($file in ($freshFiles | Where-Object { $_.Name -in @("game_state.jsonl", "states.jsonl") })) {
+        $rows = Count-JsonlRows -Path $file.FullName
+        if ($rows -gt $bestGameStateRows) {
+            $bestGameState = $file
+            $bestGameStateRows = $rows
+        }
+    }
+    if (-not $bestGameState -or $bestGameStateRows -lt $MinimumGameStateRows) {
+        throw "StrictRealSession did not find fresh game_state/states JSONL with at least $MinimumGameStateRows rows"
+    }
+    $script:Report.real_session.game_state = [ordered]@{
+        path = $bestGameState.FullName
+        rows = $bestGameStateRows
+        size_bytes = $bestGameState.Length
+        last_write_utc = $bestGameState.LastWriteTimeUtc.ToString("o")
+    }
+
+    $video = $freshFiles |
+        Where-Object { $_.Extension -eq ".mp4" -and $_.Length -ge $MinimumVideoBytes } |
+        Sort-Object Length -Descending |
+        Select-Object -First 1
+    if (-not $video) {
+        throw "StrictRealSession did not find a fresh MP4 at least $MinimumVideoBytes bytes"
+    }
+    $script:Report.real_session.video = [ordered]@{
+        path = $video.FullName
+        size_bytes = $video.Length
+        last_write_utc = $video.LastWriteTimeUtc.ToString("o")
+    }
+
+    $manifest = $freshFiles |
+        Where-Object { $_.Name -in @("session_manifest.json", "manifest.json", "metadata.json", "MANIFEST.json", "MANIFEST.signed.json") } |
+        Sort-Object LastWriteTimeUtc -Descending |
+        Select-Object -First 1
+    if (-not $manifest) {
+        throw "StrictRealSession did not find a fresh session manifest or metadata JSON"
+    }
+    $script:Report.real_session.manifest = [ordered]@{
+        path = $manifest.FullName
+        size_bytes = $manifest.Length
+        last_write_utc = $manifest.LastWriteTimeUtc.ToString("o")
+    }
+
+    Add-Step "verify-real-session-artifacts" "pass" "fresh_files=$($freshFiles.Count); game_state_rows=$bestGameStateRows; video_bytes=$($video.Length)"
 }
 
 function Save-Report {
@@ -525,6 +706,7 @@ try {
         throw "windows_real_session_smoke.ps1 must run on Windows"
     }
 
+    Assert-StrictRealSessionConfig
     $script:AdminToken = Get-AdminToken
     $assets = Resolve-LatestRelease
     $downloaded = Download-ReleaseAssets -Assets $assets
@@ -533,11 +715,13 @@ try {
     Verify-Signature -InstallerPath $downloaded.installer
     $script:BeforeAdminState = Get-AdminStateSnapshot -Label "before"
     $script:Report.admin_state.before = $script:BeforeAdminState
+    Start-RealSessionArtifactSnapshot
 
     Install-Recorder -InstallerPath $downloaded.installer
     Verify-InstalledRecorder
     Launch-Recorder
     Run-ManualSessionWindow
+    Verify-StrictRealSessionArtifacts
 
     $script:AfterAdminState = Get-AdminStateSnapshot -Label "after"
     $script:Report.admin_state.after = $script:AfterAdminState
