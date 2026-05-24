@@ -67,6 +67,8 @@ def test_windows_installer_smoke_workflow_exercises_real_install_path() -> None:
     assert "obs-ffmpeg-mux.exe" in workflow
     assert "OBS runtime dependency missing" in workflow
     assert "OBS runtime directory missing" in workflow
+    assert "launch_tray_smoke" in workflow
+    assert "inputs.launch_tray_smoke == true" in workflow
     assert "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" in workflow
     assert "Start-Process" in workflow
     assert "GAMEDATA_CI_MODE" in workflow

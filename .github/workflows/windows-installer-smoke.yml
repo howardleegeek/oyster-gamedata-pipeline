@@ -2,6 +2,12 @@ name: Windows Installer Smoke
 
 on:
   workflow_dispatch:
+    inputs:
+      launch_tray_smoke:
+        description: 'Opt in to launching gamedata-recorder.exe after install'
+        required: true
+        type: boolean
+        default: false
   schedule:
     - cron: "23 10 * * *"
 
@@ -145,6 +151,7 @@ jobs:
           }
 
       - name: Launch installed recorder in tray mode
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.launch_tray_smoke == true }}
         shell: pwsh
         run: |
           $installDir = Join-Path $env:LOCALAPPDATA "OysterRecorder"

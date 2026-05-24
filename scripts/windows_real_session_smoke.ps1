@@ -12,6 +12,7 @@ param(
     [string]$MinecraftLaunchCommand = "",
     [switch]$InteractiveInstall,
     [switch]$RequireSignedInstaller,
+    [switch]$NoGuiPreflight,
     [switch]$SkipInstall,
     [switch]$KeepInstalled
 )
@@ -89,6 +90,7 @@ $script:Report = [ordered]@{
     backend_url = $BackendUrl
     release = $null
     installer = $null
+    no_gui_preflight = [bool]$NoGuiPreflight
     admin_state = [ordered]@{
         enabled = $false
         require_upload_delta = [bool]$RequireUploadDelta
@@ -220,6 +222,9 @@ function Assert-StrictRealSessionConfig {
     if (-not $StrictRealSession) {
         return
     }
+    if ($NoGuiPreflight) {
+        throw "StrictRealSession cannot be used with NoGuiPreflight"
+    }
     if ($SkipInstall) {
         throw "StrictRealSession cannot be used with SkipInstall"
     }
@@ -239,6 +244,23 @@ function Assert-StrictRealSessionConfig {
         throw "MinimumVideoBytes must be at least 1"
     }
     Add-Step "strict-real-session-config" "pass" "manual_minutes=$ManualSessionMinutes; upload_delta=required"
+}
+
+function Assert-NoGuiPreflightConfig {
+    if (-not $NoGuiPreflight) {
+        return
+    }
+    if ($InteractiveInstall) {
+        throw "NoGuiPreflight cannot be used with InteractiveInstall"
+    }
+    if ($MinecraftLaunchCommand) {
+        throw "NoGuiPreflight cannot be used with MinecraftLaunchCommand"
+    }
+    if ($LaunchSeconds -gt 0 -and -not $SkipInstall) {
+        Add-Step "no-gui-launch-disabled" "pass" "will not install, launch recorder, start Minecraft, or send hotkeys"
+        return
+    }
+    Add-Step "no-gui-launch-disabled" "pass" "will not install, launch recorder, start Minecraft, or send hotkeys"
 }
 
 function Get-RecorderArtifactRoots {
@@ -997,31 +1019,37 @@ try {
         throw "windows_real_session_smoke.ps1 must run on Windows"
     }
 
+    Assert-NoGuiPreflightConfig
     Assert-StrictRealSessionConfig
-    $script:AdminToken = Get-AdminToken
     $assets = Resolve-LatestRelease
     $downloaded = Download-ReleaseAssets -Assets $assets
     Verify-Checksum -InstallerPath $downloaded.installer -ShaPath $downloaded.sha
     Verify-Backend
     Verify-Signature -InstallerPath $downloaded.installer
-    $script:BeforeAdminState = Get-AdminStateSnapshot -Label "before"
-    $script:Report.admin_state.before = $script:BeforeAdminState
-    Start-RealSessionArtifactSnapshot
 
-    Install-Recorder -InstallerPath $downloaded.installer
-    Verify-InstalledRecorder
-    Enable-StrictRealSessionRecorderConfig
-    Launch-Recorder
-    Start-MinecraftLaunchCommand
-    Wait-ForMinecraftWindow
-    Send-RecordingHotkey -Action "start"
-    Run-ManualSessionWindow
-    Send-RecordingHotkey -Action "stop"
-    Verify-StrictRealSessionArtifacts
+    if ($NoGuiPreflight) {
+        Add-Step "no-gui-preflight" "pass" "release, checksum, backend, and signature checks completed without executing installer or recorder"
+    } else {
+        $script:AdminToken = Get-AdminToken
+        $script:BeforeAdminState = Get-AdminStateSnapshot -Label "before"
+        $script:Report.admin_state.before = $script:BeforeAdminState
+        Start-RealSessionArtifactSnapshot
 
-    $script:AfterAdminState = Get-AdminStateSnapshot -Label "after"
-    $script:Report.admin_state.after = $script:AfterAdminState
-    Verify-UploadDelta
+        Install-Recorder -InstallerPath $downloaded.installer
+        Verify-InstalledRecorder
+        Enable-StrictRealSessionRecorderConfig
+        Launch-Recorder
+        Start-MinecraftLaunchCommand
+        Wait-ForMinecraftWindow
+        Send-RecordingHotkey -Action "start"
+        Run-ManualSessionWindow
+        Send-RecordingHotkey -Action "stop"
+        Verify-StrictRealSessionArtifacts
+
+        $script:AfterAdminState = Get-AdminStateSnapshot -Label "after"
+        $script:Report.admin_state.after = $script:AfterAdminState
+        Verify-UploadDelta
+    }
 } catch {
     Add-Step "fatal" "fail" $_.Exception.Message
 } finally {

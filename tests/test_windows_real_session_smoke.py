@@ -40,10 +40,13 @@ def test_manual_workflow_invokes_strict_real_session_script():
     assert "$smokeArgs = @{" in text
     assert "@smokeArgs" in text
     assert "$args = @(" not in text
-    assert "StrictRealSession = $true" in text
-    assert "RequireUploadDelta = $true" in text
+    assert "allow_gui_launch" in text
+    assert '$allowGuiLaunch = "${{ inputs.allow_gui_launch }}" -eq "true"' in text
+    assert "$smokeArgs.StrictRealSession = $true" in text
+    assert "$smokeArgs.RequireUploadDelta = $true" in text
+    assert "$smokeArgs.NoGuiPreflight = $true" in text
     assert "ManualSessionMinutes = [int]" in text
-    assert 'AdminTokenEnv = "TESTER_ADMIN_TOKEN"' in text
+    assert '$smokeArgs.AdminTokenEnv = "TESTER_ADMIN_TOKEN"' in text
     assert "TESTER_ADMIN_TOKEN: ${{ secrets.TESTER_ADMIN_TOKEN }}" in text
     assert "MinimumGameStateRows = [int]" in text
     assert "MinimumVideoBytes = [int64]" in text
@@ -119,10 +122,26 @@ def test_strict_real_session_mode_requires_hard_evidence():
     assert "[int]$MinimumGameStateRows = 30" in text
     assert "[int64]$MinimumVideoBytes = 102400" in text
     assert "Assert-StrictRealSessionConfig" in text
+    assert "StrictRealSession cannot be used with NoGuiPreflight" in text
     assert "StrictRealSession cannot be used with SkipInstall" in text
     assert "StrictRealSession requires ManualSessionMinutes greater than 0" in text
     assert "StrictRealSession requires RequireUploadDelta" in text
     assert "StrictRealSession requires AdminTokenEnv" in text
+
+
+def test_no_gui_preflight_does_not_execute_installer_or_recorder():
+    text = _script()
+    assert "[switch]$NoGuiPreflight" in text
+    assert "no_gui_preflight = [bool]$NoGuiPreflight" in text
+    assert "Assert-NoGuiPreflightConfig" in text
+    assert "NoGuiPreflight cannot be used with InteractiveInstall" in text
+    assert "NoGuiPreflight cannot be used with MinecraftLaunchCommand" in text
+    assert "no-gui-launch-disabled" in text
+    assert "no-gui-preflight" in text
+    assert "without executing installer or recorder" in text
+    no_gui_branch = text.index("if ($NoGuiPreflight) {")
+    install_call = text.index("Install-Recorder -InstallerPath")
+    assert no_gui_branch < install_call
 
 
 def test_strict_real_session_snapshots_and_validates_artifacts():

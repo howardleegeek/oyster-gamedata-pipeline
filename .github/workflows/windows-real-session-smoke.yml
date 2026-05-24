@@ -27,6 +27,11 @@ on:
         description: 'Optional command to launch Minecraft at the start of the manual window'
         required: false
         default: ''
+      allow_gui_launch:
+        description: 'Opt in to launching recorder/Minecraft GUI; false runs no-GUI release preflight only'
+        required: true
+        type: boolean
+        default: false
       keep_installed:
         description: 'Keep the recorder installed after the smoke run'
         required: true
@@ -43,30 +48,36 @@ permissions:
 
 jobs:
   strict-real-session:
-    name: Strict real Windows session
+    name: Windows release preflight / strict real session
     runs-on: ${{ fromJSON(inputs.runner_labels_json) }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run strict real-session smoke
+      - name: Run no-GUI preflight or strict real-session smoke
         shell: pwsh
         env:
           TESTER_ADMIN_TOKEN: ${{ secrets.TESTER_ADMIN_TOKEN }}
         run: |
           $outputDir = Join-Path $env:RUNNER_TEMP "OysterRecorder-real-session-${{ github.run_id }}"
+          $allowGuiLaunch = "${{ inputs.allow_gui_launch }}" -eq "true"
           $smokeArgs = @{
             BackendUrl = "${{ inputs.backend_url }}"
             OutputDir = $outputDir
-            StrictRealSession = $true
             ManualSessionMinutes = [int]"${{ inputs.manual_session_minutes }}"
-            AdminTokenEnv = "TESTER_ADMIN_TOKEN"
-            RequireUploadDelta = $true
             MinimumGameStateRows = [int]"${{ inputs.minimum_game_state_rows }}"
             MinimumVideoBytes = [int64]"${{ inputs.minimum_video_bytes }}"
           }
 
-          if ("${{ inputs.minecraft_launch_command }}" -ne "") {
+          if ($allowGuiLaunch) {
+            $smokeArgs.StrictRealSession = $true
+            $smokeArgs.AdminTokenEnv = "TESTER_ADMIN_TOKEN"
+            $smokeArgs.RequireUploadDelta = $true
+          } else {
+            $smokeArgs.NoGuiPreflight = $true
+          }
+
+          if ($allowGuiLaunch -and "${{ inputs.minecraft_launch_command }}" -ne "") {
             $smokeArgs.MinecraftLaunchCommand = "${{ inputs.minecraft_launch_command }}"
           }
           if ("${{ inputs.keep_installed }}" -eq "true") {
