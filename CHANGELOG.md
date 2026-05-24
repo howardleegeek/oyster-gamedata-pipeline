@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [0.11.6] - 2026-05-24
+
+### Other
+
+- ci(recorder): verify Minecraft foreground in real session smoke (d17830e)
+- ci(recorder): enable CI capture mode for real session smoke (e8cf5c8)
+- ci(recorder): trigger F9 video chain in strict smoke (2719f58)
+
+
 ## [0.11.5] - 2026-05-24
 
 ### Other
