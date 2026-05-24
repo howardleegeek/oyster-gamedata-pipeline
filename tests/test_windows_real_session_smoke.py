@@ -37,18 +37,18 @@ def test_manual_workflow_runs_only_on_dispatch_with_self_hosted_runner():
 def test_manual_workflow_invokes_strict_real_session_script():
     text = _workflow()
     assert "scripts\\windows_real_session_smoke.ps1" in text
-    assert "$smokeArgs = @(" in text
+    assert "$smokeArgs = @{" in text
     assert "@smokeArgs" in text
     assert "$args = @(" not in text
-    assert "-StrictRealSession" in text
-    assert "-ManualSessionMinutes" in text
-    assert "-AdminTokenEnv" in text
+    assert "StrictRealSession = $true" in text
+    assert "RequireUploadDelta = $true" in text
+    assert "ManualSessionMinutes = [int]" in text
+    assert 'AdminTokenEnv = "TESTER_ADMIN_TOKEN"' in text
     assert "TESTER_ADMIN_TOKEN: ${{ secrets.TESTER_ADMIN_TOKEN }}" in text
-    assert "-RequireUploadDelta" in text
-    assert "-MinimumGameStateRows" in text
-    assert "-MinimumVideoBytes" in text
+    assert "MinimumGameStateRows = [int]" in text
+    assert "MinimumVideoBytes = [int64]" in text
     assert "minecraft_launch_command" in text
-    assert "-MinecraftLaunchCommand" in text
+    assert "MinecraftLaunchCommand" in text
     assert "windows-real-session-evidence" in text
 
 
