@@ -33,7 +33,8 @@ gh_release() {
   fi
 }
 
-tag="${1:-}"
+requested_tag="${1:-}"
+tag="$requested_tag"
 if [ -z "$tag" ]; then
   tag=$(gh_release list --limit 1 --json tagName --jq '.[0].tagName')
 fi
@@ -43,6 +44,32 @@ if [ -z "$tag" ]; then
 fi
 
 log "Checking release ${tag}"
+
+if [ -z "$requested_tag" ]; then
+  source_anchor=$(
+    python3 - <<'PY'
+from pathlib import Path
+import ast
+
+tree = ast.parse(Path("src/oyster_agent_runner/release_channels.py").read_text())
+for node in tree.body:
+    if (
+        isinstance(node, ast.Assign)
+        and any(getattr(target, "id", None) == "CURRENT_CONSUMER_TAG" for target in node.targets)
+        and isinstance(node.value, ast.Constant)
+    ):
+        print(node.value.value)
+        break
+PY
+  )
+  if [ -z "$source_anchor" ]; then
+    die "Could not read CURRENT_CONSUMER_TAG from release_channels.py"
+  fi
+  if [ "$source_anchor" != "$tag" ]; then
+    die "CURRENT_CONSUMER_TAG=${source_anchor} does not match latest release ${tag}"
+  fi
+  log "Verified source release anchor ${source_anchor}"
+fi
 
 installer_row=$(
   gh_release view "$tag" \

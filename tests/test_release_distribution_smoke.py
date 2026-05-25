@@ -11,6 +11,9 @@ def test_release_smoke_script_checks_installer_asset() -> None:
     assert "OysterRecorder-[Ss]etup-" in script
     assert "GameDataRecorder-Setup-recorder" not in script
     assert "SHA256SUMS.txt" in script
+    assert "CURRENT_CONSUMER_TAG" in script
+    assert "does not match latest release" in script
+    assert "Verified source release anchor" in script
     assert "curl -fsSIL -L" in script
     assert "## Windows installer" in script
     assert "SmartScreen" in script
