@@ -220,6 +220,24 @@ def test_strict_real_session_cleans_stale_recorder_processes_before_launch():
     assert no_gui_branch < cleanup_call < admin_state_call < install_call
 
 
+def test_strict_real_session_requires_game_window_before_recorder_launch_without_command():
+    text = _script()
+    assert "Assert-StrictGameWindowReady" in text
+    assert "strict-game-window-precheck" in text
+    assert "MinecraftLaunchCommand will launch the game" in text
+    assert "existing javaw window is ready" in text
+    assert (
+        "StrictRealSession requires an existing Minecraft javaw window when "
+        "MinecraftLaunchCommand is empty"
+    ) in text
+
+    cleanup_call = text.rindex("Stop-StaleRecorderProcesses")
+    precheck_call = text.rindex("Assert-StrictGameWindowReady")
+    admin_state_call = text.rindex("$script:AdminToken = Get-AdminToken")
+    install_call = text.rindex("Install-Recorder -InstallerPath")
+    assert cleanup_call < precheck_call < admin_state_call < install_call
+
+
 def test_strict_real_session_sends_f9_hotkeys_for_video_chain():
     text = _script()
     assert "Send-RecordingHotkey" in text

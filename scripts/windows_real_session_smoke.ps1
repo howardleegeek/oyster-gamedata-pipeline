@@ -534,6 +534,23 @@ function Wait-ForMinecraftWindow {
     Add-Step "minecraft-window-ready" "skip" $message
 }
 
+function Assert-StrictGameWindowReady {
+    if (-not $StrictRealSession) {
+        Add-Step "strict-game-window-precheck" "skip" "StrictRealSession not set"
+        return
+    }
+    if ($MinecraftLaunchCommand) {
+        Add-Step "strict-game-window-precheck" "skip" "MinecraftLaunchCommand will launch the game"
+        return
+    }
+    if (Focus-MinecraftWindow) {
+        Add-Step "strict-game-window-precheck" "pass" "existing javaw window is ready"
+        return
+    }
+
+    throw "StrictRealSession requires an existing Minecraft javaw window when MinecraftLaunchCommand is empty"
+}
+
 function Stop-StaleRecorderProcesses {
     if ($NoGuiPreflight) {
         Add-Step "stale-recorder-cleanup" "skip" "NoGuiPreflight set"
@@ -1062,6 +1079,7 @@ try {
         Add-Step "no-gui-preflight" "pass" "release, checksum, backend, and signature checks completed without executing installer or recorder"
     } else {
         Stop-StaleRecorderProcesses
+        Assert-StrictGameWindowReady
         $script:AdminToken = Get-AdminToken
         $script:BeforeAdminState = Get-AdminStateSnapshot -Label "before"
         $script:Report.admin_state.before = $script:BeforeAdminState
