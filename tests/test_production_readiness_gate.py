@@ -52,6 +52,7 @@ def _config(report: Path | None, **overrides) -> GateConfig:
         "backend_url": "https://api.oyster.test",
         "expected_release_tag": "v0.11.12",
         "real_session_report": report,
+        "installer_authenticode_status": "",
         "oauth_provider": "google",
         "storage_provider": "r2",
         "payout_provider": "stripe",
@@ -115,7 +116,18 @@ def test_production_mode_fails_without_real_session_report() -> None:
     report = evaluate_gate(_config(None))
 
     assert report.passed is False
-    assert "[FAIL] strict-real-session-report-present" in report.summary()
+    summary = report.summary()
+    assert "[FAIL] installer-authenticode-valid" in summary
+    assert "[FAIL] strict-real-session-report-present" in summary
+
+
+def test_production_mode_can_require_signed_installer_without_real_session_report() -> None:
+    report = evaluate_gate(_config(None, installer_authenticode_status="Valid"))
+
+    assert report.passed is False
+    summary = report.summary()
+    assert "[PASS] installer-authenticode-valid" in summary
+    assert "[FAIL] strict-real-session-report-present" in summary
 
 
 def test_production_mode_fails_for_no_gui_or_unsigned_or_missing_artifacts(tmp_path: Path) -> None:

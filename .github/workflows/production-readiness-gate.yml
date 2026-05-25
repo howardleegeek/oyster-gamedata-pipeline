@@ -34,6 +34,10 @@ on:
         description: Optional checked-out path to a strict real-session report JSON.
         required: false
         default: ""
+      installer_authenticode_status:
+        description: Latest installer Authenticode status. Production requires Valid.
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -48,6 +52,7 @@ jobs:
       STORAGE_PROVIDER: ${{ inputs.storage_provider || 'local' }}
       PAYOUT_PROVIDER: ${{ inputs.payout_provider || 'simulator' }}
       REAL_SESSION_REPORT_PATH: ${{ inputs.real_session_report_path || '' }}
+      INSTALLER_AUTHENTICODE_STATUS: ${{ inputs.installer_authenticode_status || '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -60,6 +65,7 @@ jobs:
             --oauth-provider "$OAUTH_PROVIDER"
             --storage-provider "$STORAGE_PROVIDER"
             --payout-provider "$PAYOUT_PROVIDER"
+            --installer-authenticode-status "$INSTALLER_AUTHENTICODE_STATUS"
           )
           if [ -n "$REAL_SESSION_REPORT_PATH" ]; then
             args+=(--real-session-report "$REAL_SESSION_REPORT_PATH")

@@ -28,3 +28,11 @@ def test_production_readiness_workflow_can_accept_strict_report_path() -> None:
     assert "real_session_report_path" in text
     assert "REAL_SESSION_REPORT_PATH" in text
     assert 'args+=(--real-session-report "$REAL_SESSION_REPORT_PATH")' in text
+
+
+def test_production_readiness_workflow_can_accept_installer_signature_status() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+
+    assert "installer_authenticode_status" in text
+    assert "INSTALLER_AUTHENTICODE_STATUS" in text
+    assert '--installer-authenticode-status "$INSTALLER_AUTHENTICODE_STATUS"' in text

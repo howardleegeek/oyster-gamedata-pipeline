@@ -39,6 +39,7 @@ class GateConfig:
     backend_url: str
     expected_release_tag: str
     real_session_report: Path | None
+    installer_authenticode_status: str
     oauth_provider: str
     storage_provider: str
     payout_provider: str
@@ -172,6 +173,9 @@ def evaluate_gate(config: GateConfig) -> GateReport:
 
     evidence_required = production
     if not config.real_session_report:
+        _add_installer_signature_check(
+            report, config.installer_authenticode_status, required=production
+        )
         status = "fail" if evidence_required else "warn"
         report.add(
             "strict-real-session-report-present",
@@ -181,6 +185,9 @@ def evaluate_gate(config: GateConfig) -> GateReport:
         )
         return report
     if not config.real_session_report.exists():
+        _add_installer_signature_check(
+            report, config.installer_authenticode_status, required=production
+        )
         status = "fail" if evidence_required else "warn"
         report.add(
             "strict-real-session-report-present",
@@ -196,6 +203,13 @@ def evaluate_gate(config: GateConfig) -> GateReport:
         "pass",
         str(config.real_session_report),
         required=evidence_required,
+    )
+
+    report_signature = str(_dict_at(payload, ("installer",)).get("authenticode_status", ""))
+    _add_installer_signature_check(
+        report,
+        config.installer_authenticode_status or report_signature,
+        required=production,
     )
 
     _add_report_bool(
@@ -219,18 +233,6 @@ def evaluate_gate(config: GateConfig) -> GateReport:
         "report.admin_state.require_upload_delta must be true",
         required=evidence_required,
     )
-
-    signature = _dict_at(payload, ("installer",)).get("authenticode_status", "")
-    if signature == "Valid":
-        report.add("installer-authenticode-valid", "pass", "Valid", required=evidence_required)
-    else:
-        status = "fail" if evidence_required else "warn"
-        report.add(
-            "installer-authenticode-valid",
-            status,
-            f"got {signature or '<missing>'}",
-            required=evidence_required,
-        )
 
     rows = _int_at(payload, ("real_session", "game_state", "rows"))
     if rows >= config.minimum_game_state_rows:
@@ -296,6 +298,20 @@ def _add_provider_check(report: GateReport, name: str, value: str, required: boo
     report.add(name, status, f"got {value or '<unset>'}", required=required)
 
 
+def _add_installer_signature_check(report: GateReport, value: str, required: bool) -> None:
+    status_value = value.strip()
+    if status_value == "Valid":
+        report.add("installer-authenticode-valid", "pass", status_value, required=required)
+        return
+    status = "fail" if required else "warn"
+    report.add(
+        "installer-authenticode-valid",
+        status,
+        f"got {status_value or '<missing>'}",
+        required=required,
+    )
+
+
 def _add_report_bool(
     report: GateReport,
     name: str,
@@ -319,6 +335,10 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--expected-release-tag", default="")
     parser.add_argument("--real-session-report", type=Path)
+    parser.add_argument(
+        "--installer-authenticode-status",
+        default=os.getenv("OYSTER_INSTALLER_AUTHENTICODE_STATUS", ""),
+    )
     parser.add_argument("--oauth-provider", default=os.getenv("GAMEDATA_OAUTH_PROVIDER", "mock"))
     parser.add_argument(
         "--storage-provider", default=os.getenv("GAMEDATA_STORAGE_PROVIDER", "local")
@@ -342,6 +362,7 @@ def main(argv: list[str] | None = None) -> int:
             backend_url=args.backend_url,
             expected_release_tag=expected_release_tag,
             real_session_report=args.real_session_report,
+            installer_authenticode_status=args.installer_authenticode_status,
             oauth_provider=args.oauth_provider,
             storage_provider=args.storage_provider,
             payout_provider=args.payout_provider,
