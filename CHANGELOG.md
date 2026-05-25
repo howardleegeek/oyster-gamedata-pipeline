@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.11.13] - 2026-05-25
+
+### Other
+
+- chore(prod): require installer signing in readiness gate (df1cbdd)
+
+
 ## [0.11.12] - 2026-05-25
 
 ### Fixed
