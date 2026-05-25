@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [0.11.10] - 2026-05-25
+
+### Other
+
+- chore(release): align consumer anchor to v0.11.9 (4537711)
+- chore(release): guard latest anchor drift (6e97b3b)
+- chore(prod): add production readiness gate (a41ac7f)
+
+
 ## [0.11.9] - 2026-05-25
 
 ### Fixed
