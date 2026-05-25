@@ -9,7 +9,7 @@ on:
       backend_url:
         description: Backend URL to smoke-test.
         required: false
-        default: http://136.109.41.170:8081
+        default: https://136-109-41-170.sslip.io
   schedule:
     - cron: "47 * * * *"
 
@@ -21,7 +21,7 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'release' || vars.BACKEND_SMOKE_URL != '' }}
     runs-on: ubuntu-latest
     env:
-      BACKEND_URL: ${{ inputs.backend_url || vars.BACKEND_SMOKE_URL || 'http://136.109.41.170:8081' }}
+      BACKEND_URL: ${{ inputs.backend_url || vars.BACKEND_SMOKE_URL || 'https://136-109-41-170.sslip.io' }}
       GH_TOKEN: ${{ github.token }}
       RELEASE_EVENT_TAG: ${{ github.event.release.tag_name }}
     steps:

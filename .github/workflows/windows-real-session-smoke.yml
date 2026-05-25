@@ -10,7 +10,7 @@ on:
       backend_url:
         description: 'Backend base URL'
         required: true
-        default: 'http://136.109.41.170:8081'
+        default: 'https://136-109-41-170.sslip.io'
       manual_session_minutes:
         description: 'Minutes to keep the manual Minecraft play window open'
         required: true

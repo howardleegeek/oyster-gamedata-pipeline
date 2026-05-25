@@ -6,7 +6,7 @@
 #
 # Environment:
 #   GCP_BACKEND_HOST          SSH host for the GCP backend (default: gamedata-backend)
-#   BACKEND_URL               Public backend URL (default: http://136.109.41.170:8081)
+#   BACKEND_URL               Public backend URL (default: https://136-109-41-170.sslip.io)
 #   SYSTEMD_SERVICE           systemd service name (default: oyster-backend-stub.service)
 #   SYSTEMD_UNIT              systemd unit path (default: /etc/systemd/system/oyster-backend-stub.service)
 #   RELEASE_ENV_FILE          remote env file to write release metadata
@@ -20,7 +20,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 GCP_BACKEND_HOST="${GCP_BACKEND_HOST:-gamedata-backend}"
-BACKEND_URL="${BACKEND_URL:-http://136.109.41.170:8081}"
+BACKEND_URL="${BACKEND_URL:-https://136-109-41-170.sslip.io}"
 SYSTEMD_SERVICE="${SYSTEMD_SERVICE:-oyster-backend-stub.service}"
 SYSTEMD_UNIT="${SYSTEMD_UNIT:-/etc/systemd/system/oyster-backend-stub.service}"
 RELEASE_ENV_FILE="${RELEASE_ENV_FILE:-/home/howardli/oyster-backend-stub/state/recorder-release.env}"

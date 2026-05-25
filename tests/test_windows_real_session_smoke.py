@@ -29,6 +29,7 @@ def test_manual_workflow_runs_only_on_dispatch_with_self_hosted_runner():
     assert "workflow_dispatch:" in text
     assert "schedule:" not in text
     assert "push:" not in text
+    assert "https://136-109-41-170.sslip.io" in text
     assert "runner_labels_json" in text
     assert "runs-on: ${{ fromJSON(inputs.runner_labels_json) }}" in text
     assert "timeout-minutes: 60" in text

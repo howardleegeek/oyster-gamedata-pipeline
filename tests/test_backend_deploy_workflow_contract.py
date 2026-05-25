@@ -82,9 +82,9 @@ def test_remote_smoke_supports_manual_dispatch_and_scheduled_guard() -> None:
         "${{ github.event_name == 'workflow_dispatch' || github.event_name == 'release' || vars.BACKEND_SMOKE_URL != '' }}"
     )
     smoke_text = SMOKE_WORKFLOW.read_text(encoding="utf-8")
-    assert "default: http://136.109.41.170:8081" in smoke_text
+    assert "default: https://136-109-41-170.sslip.io" in smoke_text
     assert (
-        "${{ inputs.backend_url || vars.BACKEND_SMOKE_URL || 'http://136.109.41.170:8081' }}"
+        "${{ inputs.backend_url || vars.BACKEND_SMOKE_URL || 'https://136-109-41-170.sslip.io' }}"
         in smoke_text
     )
 

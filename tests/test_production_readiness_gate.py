@@ -168,3 +168,10 @@ def test_cli_exits_nonzero_for_production_blockers(tmp_path: Path, capsys) -> No
 
     assert code == 1
     assert "installer-authenticode-valid" in capsys.readouterr().out
+
+
+def test_cli_default_backend_is_https(capsys) -> None:
+    code = main(["--mode", "internal"])
+
+    assert code == 0
+    assert "https://136-109-41-170.sslip.io" in capsys.readouterr().out

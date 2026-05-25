@@ -315,7 +315,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--mode", choices=["internal", "production"], default="internal")
     parser.add_argument(
         "--backend-url",
-        default=os.getenv("BACKEND_SMOKE_URL", "http://136.109.41.170:8081"),
+        default=os.getenv("BACKEND_SMOKE_URL", "https://136-109-41-170.sslip.io"),
     )
     parser.add_argument("--expected-release-tag", default="")
     parser.add_argument("--real-session-report", type=Path)

@@ -32,7 +32,7 @@ Do not commit Fly tokens or `.env` files.
 Configure this repository variable after the first successful public deploy:
 
 ```bash
-BACKEND_SMOKE_URL=http://136.109.41.170:8081
+BACKEND_SMOKE_URL=https://136-109-41-170.sslip.io
 ```
 
 ### Manual Deploy From GitHub Actions
@@ -42,7 +42,7 @@ Run the exact workflow named `Deploy Backend (Fly.io)` from GitHub Actions after
 
 ```bash
 gh workflow run deploy-backend-fly.yml \
-  -f backend_url=http://136.109.41.170:8081 \
+  -f backend_url=https://136-109-41-170.sslip.io \
   -f fly_app=oyster-backend-stub
 gh run watch
 ```
@@ -52,7 +52,7 @@ then immediately runs:
 
 ```bash
 python scripts/verify_deployed_backend.py \
-  --url http://136.109.41.170:8081 \
+  --url https://136-109-41-170.sslip.io \
   --verbose
 ```
 
@@ -66,7 +66,7 @@ secret present, it must deploy `backend_stub/` using `backend_stub/fly.toml` and
 After the first successful deploy, set the repo variable:
 
 ```bash
-gh variable set BACKEND_SMOKE_URL --body http://136.109.41.170:8081
+gh variable set BACKEND_SMOKE_URL --body https://136-109-41-170.sslip.io
 ```
 
 `backend-remote-smoke.yml` will then keep checking `/healthz`, tester apply,
@@ -84,7 +84,7 @@ public URL:
 
 ```bash
 python scripts/verify_deployed_backend.py \
-  --url http://136.109.41.170:8081 \
+  --url https://136-109-41-170.sslip.io \
   --verbose
 ```
 
@@ -126,12 +126,12 @@ If a local Fly CLI is authenticated, this also works:
 ```bash
 ./scripts/deploy_backend.sh
 python scripts/verify_deployed_backend.py \
-  --url http://136.109.41.170:8081 \
+  --url https://136-109-41-170.sslip.io \
   --verbose
 ```
 
-If `http://136.109.41.170:8081` does not resolve or connect, the backend is not
-publicly reachable. Check the GCP host, firewall, and backend process first.
+If `https://136-109-41-170.sslip.io` does not resolve or connect, the backend is
+not publicly reachable. Check Caddy, the GCP host, firewall, and backend process first.
 
 ---
 
