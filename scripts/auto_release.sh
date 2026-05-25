@@ -280,6 +280,79 @@ installer_release_notes() {
   echo "- Backend income/upload endpoints may still be test-mode until public deploy is complete."
 }
 
+sync_release_anchor_files() {
+  local previous_tag="$1"
+  local target_tag="$2"
+
+  log "Syncing release anchor files from ${previous_tag} to ${target_tag}"
+  python3 - "$previous_tag" "$target_tag" <<'PY'
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+previous_tag = sys.argv[1]
+target_tag = sys.argv[2]
+previous_version = previous_tag.removeprefix("v")
+target_version = target_tag.removeprefix("v")
+
+regex_replacements = {
+    Path("src/oyster_agent_runner/release_channels.py"): (
+        (r'CURRENT_CONSUMER_TAG = "v[0-9]+\.[0-9]+\.[0-9]+"', f'CURRENT_CONSUMER_TAG = "{target_tag}"'),
+    ),
+    Path("backend_stub/appcast_server.py"): (
+        (r'DEFAULT_RECORDER_VERSION = "[0-9]+\.[0-9]+\.[0-9]+"', f'DEFAULT_RECORDER_VERSION = "{target_version}"'),
+    ),
+}
+
+literal_replacement_files = (
+    Path("docs/RECORDER_PIPELINE_CONTRACT.md"),
+    Path("docs/RELEASE_CHANNELS.md"),
+    Path("tests/test_release_channels.py"),
+    Path("tests/test_appcast_server.py"),
+    Path("tests/test_component_version_alignment.py"),
+    Path("tests/test_production_readiness_gate.py"),
+)
+
+changed = []
+
+for path, replacements in regex_replacements.items():
+    if not path.exists():
+        continue
+    text = path.read_text(encoding="utf-8")
+    updated = text
+    for pattern, replacement in replacements:
+        updated, count = re.subn(pattern, replacement, updated)
+        if count != 1:
+            raise SystemExit(f"{path}: expected exactly one match for {pattern}, got {count}")
+    if updated != text:
+        path.write_text(updated, encoding="utf-8")
+        changed.append(str(path))
+
+for path in literal_replacement_files:
+    if not path.exists():
+        continue
+    text = path.read_text(encoding="utf-8")
+    updated = text.replace(previous_tag, target_tag).replace(previous_version, target_version)
+    if updated != text:
+        path.write_text(updated, encoding="utf-8")
+        changed.append(str(path))
+
+for path in changed:
+    print(path)
+PY
+}
+
+git_add_if_exists() {
+  local path
+  for path in "$@"; do
+    if [ -e "$path" ]; then
+      git add "$path"
+    fi
+  done
+}
+
 # ---------------------------------------------------------------------------
 # Pre-flight
 # ---------------------------------------------------------------------------
@@ -478,6 +551,7 @@ fi
 # directly to `gh release create` lets the CLI upload to a draft before publish.
 prepare_latest_installer_assets "$NEW_VERSION"
 RELEASE_BODY="${CHANGELOG_BODY}$(installer_release_notes "$NEW_VERSION")"
+sync_release_anchor_files "$CURRENT_VERSION" "$NEW_VERSION"
 
 # ---------------------------------------------------------------------------
 # Update CHANGELOG.md
@@ -524,6 +598,15 @@ log "CHANGELOG.md updated"
 
 # Commit CHANGELOG
 git add CHANGELOG.md
+git_add_if_exists \
+  src/oyster_agent_runner/release_channels.py \
+  backend_stub/appcast_server.py \
+  docs/RECORDER_PIPELINE_CONTRACT.md \
+  docs/RELEASE_CHANNELS.md \
+  tests/test_release_channels.py \
+  tests/test_appcast_server.py \
+  tests/test_component_version_alignment.py \
+  tests/test_production_readiness_gate.py
 git commit -m "chore(release): ${NEW_VERSION} [skip ci]" || true
 
 # Push the CHANGELOG commit first so the release tag remains reachable from

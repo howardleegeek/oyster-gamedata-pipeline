@@ -326,3 +326,15 @@ class TestReleaseRaceHardening:
     def test_release_script_uses_utc_changelog_date(self):
         script = _script_text()
         assert "TODAY=$(date -u +%Y-%m-%d)" in script
+
+    def test_release_script_syncs_source_anchor_before_tagging(self):
+        script = _script_text()
+        assert "sync_release_anchor_files" in script
+        assert 'sync_release_anchor_files "$CURRENT_VERSION" "$NEW_VERSION"' in script
+        assert 'CURRENT_CONSUMER_TAG = "{target_tag}"' in script
+        assert 'DEFAULT_RECORDER_VERSION = "{target_version}"' in script
+        assert "tests/test_release_channels.py" in script
+        assert script.index(
+            'sync_release_anchor_files "$CURRENT_VERSION" "$NEW_VERSION"'
+        ) < script.index("git tag -a")
+        assert script.index("git_add_if_exists") < script.index("git commit -m")
