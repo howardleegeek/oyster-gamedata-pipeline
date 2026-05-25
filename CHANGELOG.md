@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [0.11.11] - 2026-05-25
+
+### Fixed
+
+- sync source anchor before tagging (a9b9e5a)
+
+### Other
+
+- chore(release): align consumer anchor to v0.11.10 (2a32bdc)
+
+
 ## [0.11.10] - 2026-05-25
 
 ### Other
