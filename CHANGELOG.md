@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.11.12] - 2026-05-25
+
+### Fixed
+
+- make HTTPS backend the default gate (84a59eb)
+
+
 ## [0.11.11] - 2026-05-25
 
 ### Fixed
