@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [0.11.9] - 2026-05-25
+
+### Fixed
+
+- require game window before strict recorder launch (12d9e73)
+
+### Other
+
+- chore(ci): format windows smoke contract test (d12e4e4)
+
+
 ## [0.11.8] - 2026-05-24
 
 ### Fixed
