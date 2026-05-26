@@ -7,7 +7,7 @@ candidate path. They are related, but they are not interchangeable.
 
 | Channel | Current anchor | User surface | Status |
 |---|---|---|---|
-| Consumer installer | `v0.11.15` | `OysterRecorder-setup-v2.6.0.exe` + `SHA256SUMS.txt` | Latest public/internal distribution line. Appcast points here. |
+| Consumer installer | `v0.11.16` | `OysterRecorder-setup-v2.6.0.exe` + `SHA256SUMS.txt` | Latest public/internal distribution line. Appcast points here. |
 | Bundled recorder | `recorder-v0.28.0-rc19.0.3` | 1 GB bundled installer, `OysterRecorder.exe`, onedir zip, MC mod jars, `SHA-256-manifest.txt` | Strong historical recorder/reference line. Not an appcast target. |
 | Source candidate | `vendor/recorder` at `e171f20` | No direct user asset | Build input for the next release after Windows installer smoke. |
 
@@ -61,7 +61,7 @@ Every release asset must belong to exactly one operational bucket:
 
 ## Integration Direction
 
-Keep the current `v0.11.15` consumer path as the production baseline. Use
+Keep the current `v0.11.16` consumer path as the production baseline. Use
 `recorder-v0.28.0-rc19.0.3` as the recovery/reference bundle while rebuilding
 the next installer from the release-buildable `vendor/recorder` source pin.
 When that build is green, publish a new `v0.x` release with a normal

@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.11.16] - 2026-05-26
+
+### Fixed
+
+- guard production provider config (2013f8f)
+
+
 ## [0.11.15] - 2026-05-26
 
 ### Fixed
