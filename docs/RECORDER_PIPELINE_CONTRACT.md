@@ -13,7 +13,7 @@ There are two version tracks and they must not be confused:
 
 | Component | Current release track | Current source track |
 |---|---|---|
-| `oyster-gamedata-pipeline` | Latest GitHub release remains `v0.11.14`; it carries the public Windows installer asset and checksum. | `main` continues after `v0.11.14` with architecture/CI contract fixes. Use `main` for development. |
+| `oyster-gamedata-pipeline` | Latest GitHub release remains `v0.11.15`; it carries the public Windows installer asset and checksum. | `main` continues after `v0.11.15` with architecture/CI contract fixes. Use `main` for development. |
 | `gamedata-recorder` | Latest recorder release remains `v2.6.0`; this is why the public installer asset is named `OysterRecorder-setup-v2.6.0.exe`. | `vendor/recorder` is pinned to release-buildable commit `e171f20` (`release/v2.6.0-buildable`), based on the last successful Windows-build source plus no-popup runtime guards and detected-game HWND stabilization. Arbitrary recorder `main` changes are not consumer-release source until tray/auth/updater/notify/libobs changes compile and pass Windows installer smoke. |
 
 Operationally: distribute from the latest verified release, rebuild from the
@@ -81,8 +81,8 @@ It can move to `production` only after a clean Windows run proves:
 ## Current Architecture Read
 
 The release/distribution chain is real: latest verified public release is
-`v0.11.14`, the installer asset and SHA file exist, backend health/appcast are
-live, and smoke workflows are green. Pipeline `main` is ahead of `v0.11.14`,
+`v0.11.15`, the installer asset and SHA file exist, backend health/appcast are
+live, and smoke workflows are green. Pipeline `main` is ahead of `v0.11.15`,
 while `vendor/recorder` is deliberately held at the latest buildable release
 pin instead of recorder `main`. The remaining production risk is
 release/source drift plus data-contract drift while expanding from Minecraft

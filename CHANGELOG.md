@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.11.15] - 2026-05-26
+
+### Fixed
+
+- tolerate concurrent manual release (e16f3f8)
+
+
 ## [0.11.14] - 2026-05-26
 
 ### Other
