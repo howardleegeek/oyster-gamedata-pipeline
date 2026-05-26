@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.11.19] - 2026-05-26
+
+### Other
+
+- docs(specs): S130 — bundle VC++ Redist 2015-2022 x64 into installer (fix tester fresh-Windows crash) (0c8e4a2)
+
+
 ## [0.11.17] - 2026-05-26
 
 ### Other
