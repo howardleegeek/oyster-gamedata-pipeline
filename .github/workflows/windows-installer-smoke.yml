@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       launch_tray_smoke:
-        description: 'Opt in to launching gamedata-recorder.exe after install'
+        description: 'Launch gamedata-recorder.exe after install'
         required: true
         type: boolean
-        default: false
+        default: true
   schedule:
     - cron: "23 10 * * *"
 
@@ -150,8 +150,56 @@ jobs:
             }
           }
 
+      - name: Verify installed PE architecture
+        shell: pwsh
+        run: |
+          $installDir = Join-Path $env:LOCALAPPDATA "OysterRecorder"
+
+          function Get-PeMachine([string]$Path) {
+            $stream = [System.IO.File]::OpenRead($Path)
+            $reader = New-Object System.IO.BinaryReader($stream)
+            try {
+              $stream.Seek(0x3C, [System.IO.SeekOrigin]::Begin) | Out-Null
+              $peOffset = $reader.ReadInt32()
+              $stream.Seek($peOffset + 4, [System.IO.SeekOrigin]::Begin) | Out-Null
+              return $reader.ReadUInt16()
+            } finally {
+              $reader.Close()
+              $stream.Close()
+            }
+          }
+
+          $resolvedInstallDir = (Resolve-Path $installDir).Path
+          $allowedX86RuntimeHelpers = @(
+            "data\obs-plugins\win-capture\get-graphics-offsets32.exe",
+            "data\obs-plugins\win-capture\graphics-hook32.dll",
+            "data\obs-plugins\win-capture\inject-helper32.exe",
+            "data\obs-plugins\win-dshow\obs-virtualcam-module32.dll"
+          )
+          $peFiles = Get-ChildItem `
+            -Path $installDir `
+            -Recurse `
+            -Include *.exe, *.dll |
+            Where-Object { $_.Name -notlike "unins*.exe" }
+          foreach ($file in $peFiles) {
+            $machine = Get-PeMachine $file.FullName
+            $relativePath = [System.IO.Path]::GetRelativePath(
+              $resolvedInstallDir,
+              $file.FullName
+            ).Replace("/", "\")
+            if ($machine -eq 0x014C -and $allowedX86RuntimeHelpers -contains $relativePath) {
+              Write-Host "Allowed OBS 32-bit runtime helper: $relativePath"
+              continue
+            }
+            if ($machine -ne 0x8664) {
+              $machineHex = "0x{0:X4}" -f $machine
+              throw "Installed PE architecture mismatch: $($file.FullName) machine=$machineHex expected=0x8664 (x86-64)"
+            }
+          }
+          Write-Host "Verified installed PE architecture: x86-64"
+
       - name: Launch installed recorder in tray mode
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.launch_tray_smoke == true }}
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.launch_tray_smoke == true }}
         shell: pwsh
         run: |
           $installDir = Join-Path $env:LOCALAPPDATA "OysterRecorder"

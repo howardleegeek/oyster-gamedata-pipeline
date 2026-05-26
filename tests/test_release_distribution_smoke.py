@@ -33,9 +33,16 @@ def test_windows_build_stages_obs_runtime_before_inno_compile() -> None:
     workflow = (REPO_ROOT / ".github/workflows/build-recorder-windows.yml").read_text()
 
     assert "cargo build --release --locked" in workflow
-    assert "vendor\\recorder\\tmp_install" in workflow
+    assert "RECORDER_RUNTIME_REPO: howardleegeek/gamedata-recorder" in workflow
+    assert "RECORDER_RUNTIME_TAG: v2.6.0" in workflow
+    assert "RECORDER_RUNTIME_ASSET: gamedata-recorder-windows-x64.zip" in workflow
+    assert "gh release download $env:RECORDER_RUNTIME_TAG" in workflow
     assert "installer\\staging" in workflow
     assert "Staged installer runtime missing required OBS asset" in workflow
+    assert "Staged runtime PE architecture mismatch" in workflow
+    assert "allowedX86RuntimeHelpers" in workflow
+    assert "Allowed OBS 32-bit runtime helper" in workflow
+    assert "Verified staged runtime PE architecture: x86-64" in workflow
     assert "obs.dll" in workflow
     assert "libobs-d3d11.dll" in workflow
     assert "libobs-opengl.dll" in workflow
@@ -70,8 +77,15 @@ def test_windows_installer_smoke_workflow_exercises_real_install_path() -> None:
     assert "obs-ffmpeg-mux.exe" in workflow
     assert "OBS runtime dependency missing" in workflow
     assert "OBS runtime directory missing" in workflow
+    assert "Verify installed PE architecture" in workflow
+    assert "Installed PE architecture mismatch" in workflow
+    assert "allowedX86RuntimeHelpers" in workflow
+    assert "Allowed OBS 32-bit runtime helper" in workflow
+    assert 'Where-Object { $_.Name -notlike "unins*.exe" }' in workflow
     assert "launch_tray_smoke" in workflow
+    assert "default: true" in workflow
     assert "inputs.launch_tray_smoke == true" in workflow
+    assert "github.event_name != 'workflow_dispatch'" in workflow
     assert "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" in workflow
     assert "Start-Process" in workflow
     assert "GAMEDATA_CI_MODE" in workflow

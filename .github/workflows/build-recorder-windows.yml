@@ -44,6 +44,9 @@ on:
 env:
   CARGO_TERM_COLOR: always
   CARGO_TARGET_DIR: 'D:\a\cargo-target'
+  RECORDER_RUNTIME_REPO: howardleegeek/gamedata-recorder
+  RECORDER_RUNTIME_TAG: v2.6.0
+  RECORDER_RUNTIME_ASSET: gamedata-recorder-windows-x64.zip
 
 jobs:
   build-and-package:
@@ -200,6 +203,8 @@ jobs:
       # --------------------------------------------------------------
       - name: Compile installer
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $ver = "${{ steps.version.outputs.version }}"
           $srcDirs = @(
@@ -221,11 +226,37 @@ jobs:
           }
           New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
 
-          $runtimeDir = "vendor\recorder\tmp_install"
-          if (-not (Test-Path $runtimeDir)) {
-            Write-Error "OBS runtime staging directory missing: $runtimeDir"
+          $runtimeZip = Join-Path $env:RUNNER_TEMP $env:RECORDER_RUNTIME_ASSET
+          $runtimeExtract = Join-Path $env:RUNNER_TEMP "recorder-runtime-x64"
+          if (Test-Path $runtimeExtract) {
+            Remove-Item -Recurse -Force $runtimeExtract
+          }
+          New-Item -ItemType Directory -Force -Path $runtimeExtract | Out-Null
+
+          Write-Host "Downloading recorder runtime $env:RECORDER_RUNTIME_REPO@$env:RECORDER_RUNTIME_TAG/$env:RECORDER_RUNTIME_ASSET"
+          gh release download $env:RECORDER_RUNTIME_TAG `
+            --repo $env:RECORDER_RUNTIME_REPO `
+            --pattern $env:RECORDER_RUNTIME_ASSET `
+            --dir $env:RUNNER_TEMP `
+            --clobber
+
+          if (-not (Test-Path $runtimeZip)) {
+            Write-Error "Recorder runtime asset was not downloaded: $runtimeZip"
             exit 1
           }
+          Expand-Archive -Path $runtimeZip -DestinationPath $runtimeExtract -Force
+
+          $runtimeExe = Get-ChildItem `
+            -Path $runtimeExtract `
+            -Recurse `
+            -Filter "gamedata-recorder.exe" |
+            Select-Object -First 1
+          if (-not $runtimeExe) {
+            Write-Error "Downloaded recorder runtime does not contain gamedata-recorder.exe"
+            exit 1
+          }
+          $runtimeDir = Split-Path $runtimeExe.FullName -Parent
+          Write-Host "Staging recorder runtime from $runtimeDir"
           Copy-Item -Path (Join-Path $runtimeDir "*") `
             -Destination $stageDir `
             -Recurse `
@@ -260,6 +291,50 @@ jobs:
               exit 1
             }
           }
+
+          function Get-PeMachine([string]$Path) {
+            $stream = [System.IO.File]::OpenRead($Path)
+            $reader = New-Object System.IO.BinaryReader($stream)
+            try {
+              $stream.Seek(0x3C, [System.IO.SeekOrigin]::Begin) | Out-Null
+              $peOffset = $reader.ReadInt32()
+              $stream.Seek($peOffset + 4, [System.IO.SeekOrigin]::Begin) | Out-Null
+              return $reader.ReadUInt16()
+            } finally {
+              $reader.Close()
+              $stream.Close()
+            }
+          }
+
+          $resolvedStageDir = (Resolve-Path $stageDir).Path
+          $allowedX86RuntimeHelpers = @(
+            "data\obs-plugins\win-capture\get-graphics-offsets32.exe",
+            "data\obs-plugins\win-capture\graphics-hook32.dll",
+            "data\obs-plugins\win-capture\inject-helper32.exe",
+            "data\obs-plugins\win-dshow\obs-virtualcam-module32.dll"
+          )
+          $peFiles = Get-ChildItem `
+            -Path $stageDir `
+            -Recurse `
+            -Include *.exe, *.dll
+          foreach ($file in $peFiles) {
+            $machine = Get-PeMachine $file.FullName
+            $relativePath = [System.IO.Path]::GetRelativePath(
+              $resolvedStageDir,
+              $file.FullName
+            ).Replace("/", "\")
+            if ($machine -eq 0x014C -and $allowedX86RuntimeHelpers -contains $relativePath) {
+              Write-Host "Allowed OBS 32-bit runtime helper: $relativePath"
+              continue
+            }
+            if ($machine -ne 0x8664) {
+              $machineHex = "0x{0:X4}" -f $machine
+              Write-Error "Staged runtime PE architecture mismatch: $($file.FullName) machine=$machineHex expected=0x8664 (x86-64)"
+              exit 1
+            }
+          }
+          Write-Host "Verified staged runtime PE architecture: x86-64"
+
           $srcDir = (Resolve-Path $stageDir).Path
           New-Item -ItemType Directory -Force `
             -Path "installer\output" | Out-Null

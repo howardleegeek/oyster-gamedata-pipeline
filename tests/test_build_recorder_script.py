@@ -222,6 +222,21 @@ class TestWorkflowYAML:
     def test_cargo_build_release(self, workflow_content):
         assert "cargo build --release" in workflow_content
 
+    def test_windows_runtime_is_downloaded_from_x64_release(self, workflow_content):
+        assert "RECORDER_RUNTIME_REPO: howardleegeek/gamedata-recorder" in workflow_content
+        assert "RECORDER_RUNTIME_TAG: v2.6.0" in workflow_content
+        assert "RECORDER_RUNTIME_ASSET: gamedata-recorder-windows-x64.zip" in workflow_content
+        assert "gh release download $env:RECORDER_RUNTIME_TAG" in workflow_content
+        assert "vendor\\recorder\\tmp_install" not in workflow_content
+
+    def test_windows_runtime_architecture_guard(self, workflow_content):
+        assert "Get-PeMachine" in workflow_content
+        assert "allowedX86RuntimeHelpers" in workflow_content
+        assert "Allowed OBS 32-bit runtime helper" in workflow_content
+        assert "Staged runtime PE architecture mismatch" in workflow_content
+        assert "expected=0x8664 (x86-64)" in workflow_content
+        assert "Verified staged runtime PE architecture: x86-64" in workflow_content
+
     def test_iscc_action(self, workflow_content):
         assert "mareangler/iscc-action@v1" in workflow_content
 
