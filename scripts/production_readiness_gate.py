@@ -14,7 +14,7 @@ import ast
 import json
 import os
 import sys
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -79,6 +79,17 @@ class GateReport:
         passed = sum(1 for check in required if check.status == "pass")
         lines.append(f"\n  {passed}/{len(required)} required checks passed")
         return "\n".join(lines)
+
+    def to_dict(self) -> dict[str, Any]:
+        required = [check for check in self.checks if check.required]
+        passed_required = sum(1 for check in required if check.status == "pass")
+        return {
+            "mode": self.mode,
+            "passed": self.passed,
+            "required_checks_passed": passed_required,
+            "required_checks_total": len(required),
+            "checks": [asdict(check) for check in self.checks],
+        }
 
 
 def _normalise_provider(value: str) -> str:
@@ -349,6 +360,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--minimum-game-state-rows", type=int, default=30)
     parser.add_argument("--minimum-video-bytes", type=int, default=102400)
+    parser.add_argument(
+        "--json-output",
+        type=Path,
+        help="Optional path to write a machine-readable gate report JSON.",
+    )
     return parser
 
 
@@ -370,6 +386,12 @@ def main(argv: list[str] | None = None) -> int:
             minimum_video_bytes=args.minimum_video_bytes,
         )
     )
+    if args.json_output:
+        args.json_output.parent.mkdir(parents=True, exist_ok=True)
+        args.json_output.write_text(
+            json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
     print(report.summary())
     return 0 if report.passed else 1
 

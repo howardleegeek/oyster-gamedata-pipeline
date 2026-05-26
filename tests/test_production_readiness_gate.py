@@ -158,6 +158,7 @@ def test_production_mode_fails_for_no_gui_or_unsigned_or_missing_artifacts(tmp_p
 
 def test_cli_exits_nonzero_for_production_blockers(tmp_path: Path, capsys) -> None:
     report_path = _write_report(tmp_path, _strict_report(signed=False))
+    json_output = tmp_path / "gate-report.json"
 
     code = main(
         [
@@ -175,11 +176,32 @@ def test_cli_exits_nonzero_for_production_blockers(tmp_path: Path, capsys) -> No
             "r2",
             "--payout-provider",
             "stripe",
+            "--json-output",
+            str(json_output),
         ]
     )
 
     assert code == 1
     assert "installer-authenticode-valid" in capsys.readouterr().out
+    payload = json.loads(json_output.read_text(encoding="utf-8"))
+    assert payload["mode"] == "production"
+    assert payload["passed"] is False
+    assert payload["required_checks_passed"] < payload["required_checks_total"]
+    assert any(
+        check["name"] == "installer-authenticode-valid" and check["status"] == "fail"
+        for check in payload["checks"]
+    )
+
+
+def test_gate_report_dict_includes_required_counts(tmp_path: Path) -> None:
+    report_path = _write_report(tmp_path, _strict_report())
+
+    payload = evaluate_gate(_config(report_path)).to_dict()
+
+    assert payload["mode"] == "production"
+    assert payload["passed"] is True
+    assert payload["required_checks_passed"] == payload["required_checks_total"]
+    assert payload["checks"][0]["name"] == "release-anchor"
 
 
 def test_cli_default_backend_is_https(capsys) -> None:

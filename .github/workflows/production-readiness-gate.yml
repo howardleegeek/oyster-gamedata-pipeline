@@ -66,8 +66,16 @@ jobs:
             --storage-provider "$STORAGE_PROVIDER"
             --payout-provider "$PAYOUT_PROVIDER"
             --installer-authenticode-status "$INSTALLER_AUTHENTICODE_STATUS"
+            --json-output production-readiness-report.json
           )
           if [ -n "$REAL_SESSION_REPORT_PATH" ]; then
             args+=(--real-session-report "$REAL_SESSION_REPORT_PATH")
           fi
           python3 scripts/production_readiness_gate.py "${args[@]}"
+
+      - name: Upload production readiness report
+        if: ${{ always() && hashFiles('production-readiness-report.json') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-readiness-report
+          path: production-readiness-report.json

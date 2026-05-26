@@ -36,3 +36,11 @@ def test_production_readiness_workflow_can_accept_installer_signature_status() -
     assert "installer_authenticode_status" in text
     assert "INSTALLER_AUTHENTICODE_STATUS" in text
     assert '--installer-authenticode-status "$INSTALLER_AUTHENTICODE_STATUS"' in text
+
+
+def test_production_readiness_workflow_uploads_machine_readable_report() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+
+    assert "--json-output production-readiness-report.json" in text
+    assert "actions/upload-artifact@v4" in text
+    assert "production-readiness-report" in text
