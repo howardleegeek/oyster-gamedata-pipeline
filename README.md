@@ -46,9 +46,9 @@ python3 bin/sample_tarball_builder.py --output sample.tar.gz   # → 27 MB · li
 | macOS 26.3 (mac-1) | 3.14 | 28.2 MB | **0 issues, PASS=True** ✅ |
 | Windows 11 + WSL2 Ubuntu 22.04 (minipc) | 3.10.12 | 26.9 MB | **0 issues, PASS=True** ✅ |
 
-最新 verified release: [**v0.11.0**](https://github.com/howardleegeek/oyster-gamedata-pipeline/releases/tag/v0.11.0) — 带真实 `OysterRecorder-setup-v2.6.0.exe`、`SHA256SUMS.txt`，backend health/appcast + release/windows installer smokes 绿。
+最新 verified release: [**v0.11.18**](https://github.com/howardleegeek/oyster-gamedata-pipeline/releases/tag/v0.11.18) — 带真实 `OysterRecorder-setup-v2.6.0.exe`、`SHA256SUMS.txt`，backend health/appcast + release/windows installer smokes 绿；Windows 安装包使用已验证的 x64 recorder runtime，避免 ARM64 OBS DLL 混入导致 `0xc000007b`。
 
-当前发布口径使用 buildable source pin：pipeline `main` 在 `v0.11.0` 之后继续推进；`vendor/recorder` 已 pin 到 `gamedata-recorder` 的 release-buildable `17233d3` (`v2.6.0-1-g17233d3`)。recorder `main` 的 `7de8a38` 暂不进 consumer release，等 tray/auth/updater/notify + libobs 编译链修绿后再晋级。
+当前发布口径使用 buildable source pin：pipeline `main` 在 `v0.11.18` 之后继续推进；`vendor/recorder` 已 pin 到 `gamedata-recorder` 的 release-buildable `e171f20` (`release/v2.6.0-buildable`)。recorder `main` 暂不进 consumer release，等 tray/auth/updater/notify + libobs 编译链修绿后再晋级。
 
 ## 🔬 真 E2E 一行验证(rc8 新增)
 

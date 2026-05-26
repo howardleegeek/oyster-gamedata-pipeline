@@ -20,9 +20,9 @@ def test_appcast_returns_xml() -> None:
 
 def test_appcast_contains_version() -> None:
     r = _client().get("/api/v1/updates/appcast.xml")
-    assert "v0.11.17" in r.text or "0.11.17" in r.text
-    assert "releases/download/v0.11.17/OysterRecorder-setup-v2.6.0.exe" in r.text
-    assert "c31c3c6d59ab661f839e4b07ec73d3196d3729faef638650db92a50f6f002eb9" in r.text
+    assert "v0.11.18" in r.text or "0.11.18" in r.text
+    assert "releases/download/v0.11.18/OysterRecorder-setup-v2.6.0.exe" in r.text
+    assert "7e99f1469513ab7dcbfda79798e88d82eb897d4c12108cb88f33af91559c29ac" in r.text
     assert "PLACE" + "HOLDER" not in r.text
 
 

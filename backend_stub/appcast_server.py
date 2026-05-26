@@ -9,8 +9,8 @@ from fastapi import APIRouter, Response
 
 router = APIRouter()
 
-DEFAULT_RECORDER_VERSION = "0.11.17"
-DEFAULT_RECORDER_SHA256 = "c31c3c6d59ab661f839e4b07ec73d3196d3729faef638650db92a50f6f002eb9"
+DEFAULT_RECORDER_VERSION = "0.11.18"
+DEFAULT_RECORDER_SHA256 = "7e99f1469513ab7dcbfda79798e88d82eb897d4c12108cb88f33af91559c29ac"
 DEFAULT_INSTALLER_NAME = "OysterRecorder-setup-v2.6.0.exe"
 RELEASE_BASE_URL = "https://github.com/howardleegeek/oyster-gamedata-pipeline/releases/download"
 

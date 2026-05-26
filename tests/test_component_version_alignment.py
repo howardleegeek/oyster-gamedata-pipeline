@@ -34,8 +34,8 @@ def test_recorder_submodule_is_pinned_to_release_buildable_commit() -> None:
 def test_version_alignment_doc_distinguishes_release_from_source() -> None:
     doc = (REPO_ROOT / "docs" / "RECORDER_PIPELINE_CONTRACT.md").read_text(encoding="utf-8")
 
-    assert "Latest GitHub release remains `v0.11.17`" in doc
+    assert "Latest GitHub release remains `v0.11.18`" in doc
     assert "Latest recorder release remains `v2.6.0`" in doc
     assert "`vendor/recorder` is pinned to release-buildable commit `e171f20`" in doc
-    assert "no-popup runtime guards" in doc
+    assert "verified x64 recorder runtime" in doc
     assert "docs/RELEASE_CHANNELS.md" in doc

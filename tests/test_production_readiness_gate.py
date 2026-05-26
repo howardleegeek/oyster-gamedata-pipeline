@@ -50,7 +50,7 @@ def _config(report: Path | None, **overrides) -> GateConfig:
     values = {
         "mode": "production",
         "backend_url": "https://api.oyster.test",
-        "expected_release_tag": "v0.11.17",
+        "expected_release_tag": "v0.11.18",
         "real_session_report": report,
         "installer_authenticode_status": "",
         "oauth_provider": "google",
@@ -167,7 +167,7 @@ def test_cli_exits_nonzero_for_production_blockers(tmp_path: Path, capsys) -> No
             "--backend-url",
             "https://api.oyster.test",
             "--expected-release-tag",
-            "v0.11.17",
+            "v0.11.18",
             "--real-session-report",
             str(report_path),
             "--oauth-provider",

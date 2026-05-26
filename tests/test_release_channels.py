@@ -46,8 +46,9 @@ def test_appcast_is_consumer_installer_only() -> None:
 
 
 def test_known_anchors_capture_current_successful_lines() -> None:
-    assert CURRENT_CONSUMER_TAG == "v0.11.17"
+    assert CURRENT_CONSUMER_TAG == "v0.11.18"
     assert CURRENT_CONSUMER_INSTALLER == "OysterRecorder-setup-v2.6.0.exe"
+    assert CURRENT_CONSUMER_SHA256 == "7e99f1469513ab7dcbfda79798e88d82eb897d4c12108cb88f33af91559c29ac"
     assert len(CURRENT_CONSUMER_SHA256) == 64
     assert BUNDLED_REFERENCE_TAG == "recorder-v0.28.0-rc19.0.3"
     assert RECORDER_SOURCE_PIN.startswith("e171f20")
