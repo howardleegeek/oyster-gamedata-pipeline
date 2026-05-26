@@ -50,6 +50,20 @@ store = PayoutStore()
 ADMIN_TOKEN = "admin-secret-token"
 _state_file: Path | None = None
 
+STUB_PROVIDER_VALUES = {
+    "",
+    "dev",
+    "demo",
+    "fake",
+    "local",
+    "mock",
+    "none",
+    "sim",
+    "simulator",
+    "stub",
+    "test",
+}
+
 _TELEMETRY_FIELDS = {
     "anon_id": str,
     "version": str,
@@ -63,7 +77,43 @@ _TELEMETRY_FIELDS = {
 
 
 def _today_iso() -> str:
-    return _dt.date.today().isoformat()
+    return _dt.datetime.now(_dt.timezone.utc).date().isoformat()
+
+
+def _normalise_provider(value: str) -> str:
+    return value.strip().lower().replace("_", "-")
+
+
+def _backend_mode() -> str:
+    return os.getenv("OYSTER_BACKEND_MODE", "internal").strip().lower() or "internal"
+
+
+def _provider_config() -> dict[str, str]:
+    return {
+        "oauth": os.getenv("GAMEDATA_OAUTH_PROVIDER", "mock").strip() or "mock",
+        "storage": os.getenv("GAMEDATA_STORAGE_PROVIDER", "local").strip() or "local",
+        "payout": os.getenv("GAMEDATA_PAYOUT_PROVIDER", "simulator").strip() or "simulator",
+    }
+
+
+def _validate_production_backend_config() -> None:
+    if _backend_mode() != "production":
+        return
+
+    provider_config = _provider_config()
+    stubbed = [
+        name
+        for name, value in provider_config.items()
+        if _normalise_provider(value) in STUB_PROVIDER_VALUES
+    ]
+    if not stubbed:
+        return
+
+    details = ", ".join(f"{name}={provider_config[name]}" for name in stubbed)
+    raise RuntimeError(
+        "OYSTER_BACKEND_MODE=production requires real providers; "
+        f"stub provider config is not allowed: {details}"
+    )
 
 
 def _state_file_from_env() -> Path | None:
@@ -266,6 +316,7 @@ def _admin_state_summary() -> dict[str, Any]:
 
 def create_app(accelerate: float = 1.0, interval: float = 300.0) -> FastAPI:
     _configure_persistence()
+    _validate_production_backend_config()
     app = FastAPI(title="gamedata-pipeline backend stub", version="0.1.0")
     app.state.payout_accelerate = accelerate
     app.state.payout_interval = interval
@@ -289,6 +340,8 @@ def create_app(accelerate: float = 1.0, interval: float = 300.0) -> FastAPI:
             "status": "ok",
             "version": "0.1.0",
             "persistence": "enabled" if _state_file is not None else "memory",
+            "mode": _backend_mode(),
+            "providers": _provider_config(),
         }
 
     @app.get("/health")

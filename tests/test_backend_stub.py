@@ -20,6 +20,10 @@ from backend_stub.main import (
 )
 
 
+def _today_utc_iso() -> str:
+    return _dt.datetime.now(_dt.timezone.utc).date().isoformat()
+
+
 def _clear_all_memory_without_persist() -> None:
     ti.get_store().set_change_hook(None)
     ti.get_store().clear()
@@ -72,6 +76,43 @@ class TestAuthGoogleExchange:
 
 
 # ---------------------------------------------------------------------------
+# Health / production config guard
+# ---------------------------------------------------------------------------
+class TestHealthAndProductionConfig:
+    async def test_healthz_reports_safe_provider_names(self, client: AsyncClient):
+        resp = await client.get("/healthz")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "ok"
+        assert body["mode"] == "internal"
+        assert body["providers"] == {
+            "oauth": "mock",
+            "storage": "local",
+            "payout": "simulator",
+        }
+
+    def test_production_mode_rejects_stub_providers(self, monkeypatch):
+        monkeypatch.setenv("OYSTER_BACKEND_MODE", "production")
+        monkeypatch.setenv("GAMEDATA_OAUTH_PROVIDER", "mock")
+        monkeypatch.setenv("GAMEDATA_STORAGE_PROVIDER", "local")
+        monkeypatch.setenv("GAMEDATA_PAYOUT_PROVIDER", "simulator")
+
+        with pytest.raises(RuntimeError, match="OYSTER_BACKEND_MODE=production"):
+            create_app()
+
+    def test_production_mode_allows_real_provider_names(self, monkeypatch):
+        monkeypatch.setenv("OYSTER_BACKEND_MODE", "production")
+        monkeypatch.setenv("GAMEDATA_OAUTH_PROVIDER", "google")
+        monkeypatch.setenv("GAMEDATA_STORAGE_PROVIDER", "r2")
+        monkeypatch.setenv("GAMEDATA_PAYOUT_PROVIDER", "stripe")
+
+        app = create_app()
+
+        assert app.title == "gamedata-pipeline backend stub"
+
+
+# ---------------------------------------------------------------------------
 # Auth: Discord exchange
 # ---------------------------------------------------------------------------
 class TestAuthDiscordExchange:
@@ -100,7 +141,7 @@ class TestIncomeToday:
         assert data["currency"] == "USD"
         assert data["total_usd"] == 0.0
         assert data["sessions_uploaded"] == 0
-        assert data["date"] == _dt.date.today().isoformat()
+        assert data["date"] == _today_utc_iso()
 
     async def test_401_without_bearer(self, client: AsyncClient):
         resp = await client.get("/api/v1/income/today")
