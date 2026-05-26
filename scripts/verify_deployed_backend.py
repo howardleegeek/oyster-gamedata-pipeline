@@ -29,6 +29,19 @@ from dataclasses import dataclass, field
 import httpx
 
 UNRESOLVED_APPCAST_MARKERS = ("PLACE" + "HOLDER",)
+STUB_PROVIDER_VALUES = {
+    "",
+    "dev",
+    "demo",
+    "fake",
+    "local",
+    "mock",
+    "none",
+    "sim",
+    "simulator",
+    "stub",
+    "test",
+}
 
 # ---------------------------------------------------------------------------
 # Result tracking
@@ -72,7 +85,16 @@ class SmokeReport:
 # ---------------------------------------------------------------------------
 
 
-def check_healthz(client: httpx.Client, verbose: bool) -> CheckResult:
+def _normalise_provider(value: str) -> str:
+    return value.strip().lower().replace("_", "-")
+
+
+def check_healthz(
+    client: httpx.Client,
+    verbose: bool,
+    expected_backend_mode: str | None = None,
+    require_real_providers: bool = False,
+) -> CheckResult:
     """GET /healthz → 200 + {"status": "ok"}"""
     if verbose:
         print("  → GET /healthz")
@@ -83,6 +105,29 @@ def check_healthz(client: httpx.Client, verbose: bool) -> CheckResult:
         body = resp.json()
         if body.get("status") != "ok":
             return CheckResult("GET /healthz", False, f"unexpected body: {json.dumps(body)}")
+        if expected_backend_mode:
+            actual_mode = str(body.get("mode", ""))
+            if actual_mode != expected_backend_mode:
+                return CheckResult(
+                    "GET /healthz",
+                    False,
+                    f"expected backend mode {expected_backend_mode}, got {actual_mode or '<missing>'}",
+                )
+        if require_real_providers:
+            providers = body.get("providers")
+            if not isinstance(providers, dict):
+                return CheckResult("GET /healthz", False, "missing providers object")
+            stubbed = [
+                f"{name}={value}"
+                for name, value in providers.items()
+                if _normalise_provider(str(value)) in STUB_PROVIDER_VALUES
+            ]
+            if stubbed:
+                return CheckResult(
+                    "GET /healthz",
+                    False,
+                    "stub providers: " + ", ".join(stubbed),
+                )
         return CheckResult("GET /healthz", True)
     except Exception as exc:
         return CheckResult("GET /healthz", False, str(exc))
@@ -330,6 +375,8 @@ def run(
     admin_token_env: str | None = None,
     appcast_retry_seconds: float = 0.0,
     appcast_retry_interval: float = 5.0,
+    expected_backend_mode: str | None = None,
+    require_real_providers: bool = False,
 ) -> int:
     """Run all smoke checks against *url*. Returns exit code."""
     report = SmokeReport()
@@ -338,7 +385,16 @@ def run(
         print(f"Smoke-testing {url}\n")
 
     with httpx.Client(base_url=url.rstrip("/"), timeout=15) as client:
-        report.add(*_unwrap(check_healthz(client, verbose)))
+        report.add(
+            *_unwrap(
+                check_healthz(
+                    client,
+                    verbose,
+                    expected_backend_mode=expected_backend_mode,
+                    require_real_providers=require_real_providers,
+                )
+            )
+        )
         report.add(*_unwrap(check_testers_apply(client, verbose)))
         report.add(*_unwrap(check_income_today(client, verbose)))
         report.add(
@@ -420,6 +476,17 @@ def main() -> None:
         default=float(os.getenv("APPCAST_RETRY_INTERVAL_SECONDS", "5")),
         help="Seconds to wait between appcast retry attempts.",
     )
+    parser.add_argument(
+        "--expected-backend-mode",
+        default=os.getenv("EXPECTED_BACKEND_MODE", ""),
+        help="Optional backend /healthz mode value to require, e.g. production.",
+    )
+    parser.add_argument(
+        "--require-real-providers",
+        action="store_true",
+        default=os.getenv("REQUIRE_REAL_PROVIDERS", "").lower() == "true",
+        help="Fail if /healthz reports mock/local/simulator providers.",
+    )
     args = parser.parse_args()
     sys.exit(
         run(
@@ -429,6 +496,8 @@ def main() -> None:
             args.admin_token_env,
             args.appcast_retry_seconds,
             args.appcast_retry_interval,
+            args.expected_backend_mode or None,
+            args.require_real_providers,
         )
     )
 

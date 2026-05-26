@@ -97,6 +97,53 @@ class TestCheckHealthz:
         assert result.passed is True
         assert result.name == "GET /healthz"
 
+    def test_success_with_expected_mode_and_real_providers(self):
+        resp = _make_mock_response(
+            200,
+            {
+                "status": "ok",
+                "mode": "production",
+                "providers": {"oauth": "google", "storage": "r2", "payout": "stripe"},
+            },
+        )
+        client = _make_mock_client([resp])
+        result = check_healthz(
+            client,
+            verbose=False,
+            expected_backend_mode="production",
+            require_real_providers=True,
+        )
+        assert result.passed is True
+
+    def test_expected_mode_mismatch_fails(self):
+        resp = _make_mock_response(200, {"status": "ok", "mode": "internal"})
+        client = _make_mock_client([resp])
+        result = check_healthz(client, verbose=False, expected_backend_mode="production")
+        assert result.passed is False
+        assert "expected backend mode production" in result.detail
+
+    def test_real_provider_requirement_rejects_stub_providers(self):
+        resp = _make_mock_response(
+            200,
+            {
+                "status": "ok",
+                "mode": "internal",
+                "providers": {"oauth": "mock", "storage": "local", "payout": "simulator"},
+            },
+        )
+        client = _make_mock_client([resp])
+        result = check_healthz(client, verbose=False, require_real_providers=True)
+        assert result.passed is False
+        assert "stub providers" in result.detail
+        assert "oauth=mock" in result.detail
+
+    def test_real_provider_requirement_fails_without_provider_object(self):
+        resp = _make_mock_response(200, {"status": "ok"})
+        client = _make_mock_client([resp])
+        result = check_healthz(client, verbose=False, require_real_providers=True)
+        assert result.passed is False
+        assert "missing providers object" in result.detail
+
     def test_wrong_status(self):
         resp = _make_mock_response(500, {"status": "error"})
         client = _make_mock_client([resp])
@@ -599,6 +646,10 @@ class TestBackendRemoteSmokeWorkflow:
         assert "BACKEND_SMOKE_URL" in text
         assert "scripts/verify_deployed_backend.py" in text
         assert '--url "$BACKEND_URL"' in text
+        assert "expected_backend_mode" in text
+        assert "--expected-backend-mode" in text
+        assert "require_real_providers" in text
+        assert "--require-real-providers" in text
         assert "--appcast-retry-seconds 120" in text
 
     def test_scheduled_run_skips_without_backend_url_variable(self):

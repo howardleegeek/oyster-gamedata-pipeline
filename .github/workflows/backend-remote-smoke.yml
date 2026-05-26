@@ -10,6 +10,15 @@ on:
         description: Backend URL to smoke-test.
         required: false
         default: https://136-109-41-170.sslip.io
+      expected_backend_mode:
+        description: Optional /healthz mode to require, e.g. production.
+        required: false
+        default: ""
+      require_real_providers:
+        description: Fail if /healthz reports mock/local/simulator providers.
+        required: false
+        type: boolean
+        default: false
   schedule:
     - cron: "47 * * * *"
 
@@ -24,6 +33,8 @@ jobs:
       BACKEND_URL: ${{ inputs.backend_url || vars.BACKEND_SMOKE_URL || 'https://136-109-41-170.sslip.io' }}
       GH_TOKEN: ${{ github.token }}
       RELEASE_EVENT_TAG: ${{ github.event.release.tag_name }}
+      EXPECTED_BACKEND_MODE: ${{ inputs.expected_backend_mode || '' }}
+      REQUIRE_REAL_PROVIDERS: ${{ inputs.require_real_providers || 'false' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -44,13 +55,22 @@ jobs:
           fi
 
       - name: Smoke-test backend
-        run: >-
-          python scripts/verify_deployed_backend.py
-          --url "$BACKEND_URL"
-          --verbose
-          --expected-recorder-tag "$RECORDER_RELEASE_TAG"
-          --appcast-retry-seconds 120
-          --appcast-retry-interval 5
+        run: |
+          set -euo pipefail
+          args=(
+            --url "$BACKEND_URL"
+            --verbose
+            --expected-recorder-tag "$RECORDER_RELEASE_TAG"
+            --appcast-retry-seconds 120
+            --appcast-retry-interval 5
+          )
+          if [ -n "$EXPECTED_BACKEND_MODE" ]; then
+            args+=(--expected-backend-mode "$EXPECTED_BACKEND_MODE")
+          fi
+          if [ "$REQUIRE_REAL_PROVIDERS" = "true" ]; then
+            args+=(--require-real-providers)
+          fi
+          python scripts/verify_deployed_backend.py "${args[@]}"
 
       - name: Run recorder backend E2E
         run: python bin/remote_recorder_backend_e2e.py --backend-url "$BACKEND_URL"
