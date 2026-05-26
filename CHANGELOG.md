@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.11.17] - 2026-05-26
+
+### Other
+
+- ci(backend): add production provider smoke guard (9039e50)
+
+
 ## [0.11.16] - 2026-05-26
 
 ### Fixed
