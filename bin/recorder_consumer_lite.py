@@ -15,9 +15,9 @@ What it does:
   1. Tester double-clicks OysterRecorder.exe
   2. Window opens with: "请打开 Minecraft 开始游戏，自动开始录制"
   3. Background thread polls Windows process list every 2s for
-     javaw.exe (Minecraft Java launcher) or Minecraft.exe (Bedrock)
-  4. When MC detected → spawns bundled ffmpeg.exe to record the
-     Minecraft window with H.265, saving to
+     javaw.exe/java.exe (Minecraft Java game) or Minecraft.exe (Bedrock)
+  4. When a real Minecraft game window is visible and stable → spawns
+     bundled ffmpeg.exe to record the Minecraft window with H.265, saving to
      %USERPROFILE%\\Documents\\OysterClips\\clip-YYYYMMDD-HHMMSS.mp4
   5. Window updates: "正在录制 — 玩你的 Minecraft 即可"
   6. When MC process exits → kills ffmpeg → finalizes mp4 →
@@ -54,7 +54,7 @@ import time
 import traceback
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 # ---- Startup tracing (runs BEFORE any heavyweight import) -----------------
 # Howard tester 2026-05-05: "反馈过来一点就闪退" — v0.1.0 silently crashed
@@ -511,15 +511,71 @@ def _detect_gpu_available() -> bool:
 
 
 # Process names treated as "Minecraft" — both Java and Bedrock variants.
-MC_PROCESS_NAMES = {"javaw.exe", "java.exe", "Minecraft.exe", "MinecraftLauncher.exe"}
+# Critical: do NOT include MinecraftLauncher.exe here. The launcher is a
+# pre-game surface; recording it creates empty/false sessions and misses
+# actual gameplay.
+MC_PROCESS_NAMES = {"javaw.exe", "java.exe", "Minecraft.exe"}
+MC_LAUNCHER_PROCESS_NAMES = {"minecraftlauncher.exe"}
+MC_WINDOW_TITLE_EXCLUDE_MARKERS = ("launcher", "启动器")
+MIN_MC_WINDOW_WIDTH = 640
+MIN_MC_WINDOW_HEIGHT = 360
 
 
-def _get_minecraft_window_rect() -> Optional[dict[str, int]]:
+def _normalise_process_name(name: str) -> str:
+    return name.strip().casefold()
+
+
+def _is_supported_minecraft_process_name(name: str) -> bool:
+    """Return True for game processes only, never the launcher."""
+    normalized = _normalise_process_name(name)
+    if normalized in MC_LAUNCHER_PROCESS_NAMES:
+        return False
+    return normalized in {_normalise_process_name(n) for n in MC_PROCESS_NAMES}
+
+
+def _is_real_minecraft_window_title(title: str) -> bool:
+    """True only for gameplay windows, not Minecraft Launcher/pre-game UI."""
+    normalized = title.strip().casefold()
+    if "minecraft" not in normalized:
+        return False
+    return not any(marker in normalized for marker in MC_WINDOW_TITLE_EXCLUDE_MARKERS)
+
+
+def _is_real_minecraft_window_geometry(width: int, height: int) -> bool:
+    """Reject tiny splash/login surfaces before starting ffmpeg."""
+    return width >= MIN_MC_WINDOW_WIDTH and height >= MIN_MC_WINDOW_HEIGHT
+
+
+def _windows_process_name_for_pid(pid: int) -> Optional[str]:
+    """Return Windows image name for a PID, or None if tasklist lookup fails."""
+    if os.name != "nt" or pid <= 0:
+        return None
+    try:
+        out = subprocess.check_output(
+            ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=5,
+            creationflags=0x08000000,  # CREATE_NO_WINDOW
+        )
+    except Exception:  # noqa: BLE001
+        return None
+    for line in out.splitlines():
+        if line.startswith('"'):
+            try:
+                return line.split('","', 1)[0].lstrip('"')
+            except Exception:
+                return None
+    return None
+
+
+def _get_minecraft_window_rect() -> Optional[dict[str, Any]]:
     """Return Minecraft window geometry on Windows, or None if not found.
 
     Uses Win32 EnumWindows + GetWindowText + GetWindowRect via ctypes
     (no extra deps, built into Python). We scan all top-level windows
-    and pick the first whose title contains 'Minecraft'. PRD requires
+    and pick the first game-sized Minecraft window that is not the
+    launcher/pre-game surface. PRD requires
     gameProcessName / x / y / width / height / recordDpi (criterion 8),
     so this powers the real systeminfo.json.
 
@@ -541,12 +597,15 @@ def _get_minecraft_window_rect() -> Optional[dict[str, int]]:
     GetWindowTextLength = user32.GetWindowTextLengthW
     IsWindowVisible = user32.IsWindowVisible
     GetWindowRect = user32.GetWindowRect
+    GetWindowThreadProcessId = user32.GetWindowThreadProcessId
     GetDpiForWindow = getattr(user32, "GetDpiForWindow", None)
 
     EnumWindowsProc = ctypes.WINFUNCTYPE(ctypes.c_bool, wt.HWND, wt.LPARAM)
 
     found_hwnd: list[int] = []
     found_title: list[str] = []
+    found_process_name: list[str | None] = []
+    ignored_titles: list[str] = []
 
     def _callback(hwnd, _lparam):
         if not IsWindowVisible(hwnd):
@@ -557,15 +616,42 @@ def _get_minecraft_window_rect() -> Optional[dict[str, int]]:
         buf = ctypes.create_unicode_buffer(ln + 1)
         GetWindowText(hwnd, buf, ln + 1)
         title = buf.value
-        if "minecraft" in title.lower():
-            found_hwnd.append(hwnd)
-            found_title.append(title)
-            return False  # stop iteration
-        return True
+        if "minecraft" not in title.casefold():
+            return True
+
+        if not _is_real_minecraft_window_title(title):
+            ignored_titles.append(title)
+            return True
+
+        pid = wt.DWORD()
+        GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        process_name = _windows_process_name_for_pid(int(pid.value))
+        if process_name is not None and not _is_supported_minecraft_process_name(process_name):
+            ignored_titles.append(f"{title} [{process_name}]")
+            return True
+
+        rect = wt.RECT()
+        if not GetWindowRect(hwnd, ctypes.byref(rect)):
+            return True
+        width = int(rect.right - rect.left)
+        height = int(rect.bottom - rect.top)
+        if not _is_real_minecraft_window_geometry(width, height):
+            ignored_titles.append(f"{title} ({width}x{height})")
+            return True
+
+        found_hwnd.append(hwnd)
+        found_title.append(title)
+        found_process_name.append(process_name)
+        return False  # stop iteration
 
     EnumWindows(EnumWindowsProc(_callback), 0)
 
     if not found_hwnd:
+        if ignored_titles:
+            _trace(
+                "minecraft_window_gate: ignored non-game windows: "
+                + "; ".join(ignored_titles[:3])
+            )
         return None
 
     rect = wt.RECT()
@@ -580,13 +666,54 @@ def _get_minecraft_window_rect() -> Optional[dict[str, int]]:
             dpi = 96
 
     return {
+        "hwnd": int(found_hwnd[0]),
         "title": found_title[0],
+        "processName": found_process_name[0],
         "x": int(rect.left),
         "y": int(rect.top),
         "width": int(rect.right - rect.left),
         "height": int(rect.bottom - rect.top),
         "recordDpi": dpi,
     }
+
+
+def _wait_for_stable_minecraft_window(
+    *,
+    timeout_sec: int = 120,
+    stable_polls: int = 3,
+    poll_interval: float = 1.0,
+    should_abort: Optional[Callable[[], bool]] = None,
+) -> Optional[dict[str, Any]]:
+    """Wait until the real game window is visible and stable across polls."""
+    deadline = time.time() + timeout_sec
+    last_signature: Optional[tuple[Any, ...]] = None
+    stable_count = 0
+
+    while time.time() < deadline:
+        if should_abort is not None and should_abort():
+            return None
+        rect = _get_minecraft_window_rect()
+        if rect is None:
+            last_signature = None
+            stable_count = 0
+        else:
+            signature = (
+                rect.get("hwnd"),
+                rect.get("title"),
+                rect.get("x"),
+                rect.get("y"),
+                rect.get("width"),
+                rect.get("height"),
+            )
+            if signature == last_signature:
+                stable_count += 1
+            else:
+                last_signature = signature
+                stable_count = 1
+            if stable_count >= stable_polls:
+                return rect
+        time.sleep(poll_interval)
+    return None
 
 
 import re as _re  # noqa: E402
@@ -821,7 +948,7 @@ def _list_windows_processes() -> set[str]:
 
 def _minecraft_running() -> bool:
     """True iff any process matching MC_PROCESS_NAMES is alive."""
-    return bool(MC_PROCESS_NAMES & _list_windows_processes())
+    return any(_is_supported_minecraft_process_name(name) for name in _list_windows_processes())
 
 
 # ---- Recorder app ----------------------------------------------------------
@@ -1741,21 +1868,55 @@ class RecorderApp(tk.Tk):
             _trace("watch_loop: stopped before recording")
             return
 
-        # 5-second settle delay. Lets MC fully transition out of any
-        # loading screen / world generation before ffmpeg attaches to
-        # its window or grabs the desktop. Reported MC crashes were
-        # likely caused by GDI capture starting mid-loading.
-        _trace("watch_loop: 5s settle before ffmpeg")
-        self._set("● 即将开始", ORANGE, "5 秒后开始录制（让 Minecraft 稳定）…")
-        for _ in range(5):
+        # Wait for the real gameplay window, not the Mojang/Minecraft
+        # Launcher. Tester report 2026-05-26: old builds generated many
+        # sessions and recorded pre-game launcher frames because the window
+        # gate accepted any title containing "Minecraft".
+        _trace("watch_loop: waiting for stable real MC game window")
+        self._set(
+            "⏳ 等待进入游戏窗口",
+            ORANGE,
+            "游戏已启动。录制器会等真实 Minecraft 游戏窗口稳定后自动开始，"
+            "不会录启动器。",
+        )
+        self._mc_window_rect = _wait_for_stable_minecraft_window(
+            timeout_sec=120,
+            stable_polls=3,
+            poll_interval=1.0,
+            should_abort=lambda: (
+                self._stop_event.is_set()
+                or not self._record_armed
+                or not _minecraft_running()
+            ),
+        )
+        _trace(f"watch_loop: gated mc_window={self._mc_window_rect}")
+        if self._mc_window_rect is None:
             if self._stop_event.is_set() or not self._record_armed:
-                _trace("watch_loop: aborted during settle")
+                _trace("watch_loop: aborted before real MC window")
+                return
+            if not _minecraft_running():
+                self._set(
+                    "⏸ Minecraft 已退出",
+                    ORANGE,
+                    "还没看到真实游戏窗口，Minecraft 就退出了；没有生成空录制。",
+                )
+                _trace("watch_loop: MC exited before real window; no empty session")
+                return
+            self._set(
+                "⏸ 还没进入游戏",
+                ORANGE,
+                "只检测到启动器/加载窗口，没有开始录制。请用 Oyster Recording "
+                "自动打开游戏，或进入世界后再试。",
+            )
+            _trace("watch_loop: timed out waiting for real MC window; no empty session")
+            return
+
+        # Short settle after the real game window is stable.
+        for _ in range(2):
+            if self._stop_event.is_set() or not self._record_armed:
+                _trace("watch_loop: aborted during real-window settle")
                 return
             time.sleep(1.0)
-
-        # Capture window geometry (if visible) for systeminfo.json.
-        self._mc_window_rect = _get_minecraft_window_rect()
-        _trace(f"watch_loop: mc_window={self._mc_window_rect}")
 
         # Phase 2: start recording into a temp dir; we'll package it as
         # a 5-file PRD-shaped tarball after MC exits.

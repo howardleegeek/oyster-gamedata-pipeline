@@ -477,18 +477,21 @@ def run_session(
     sess.javaw_proc = launcher.launch_javaw(plan, detach=False)
     logger.info("javaw started (pid=%d)", sess.javaw_proc.pid)
 
-    # Step 5: wait for MC ready signal in latest.log
+    # Step 5: wait for MC ready signal in latest.log. This signal is helpful
+    # but not authoritative; recorder_consumer_lite now gates on the real
+    # gameplay window, so we still auto-arm when the marker is absent.
     log_path = launcher.latest_log_path(install_root_path)
     ready = launcher.wait_for_mc_ready(log_path, timeout_sec=ready_timeout_sec)
     if not ready:
         logger.warning(
-            "MC ready marker not seen in %.0fs — continuing anyway",
+            "MC ready marker not seen in %.0fs — auto-arming anyway; "
+            "recorder waits for the real game window",
             ready_timeout_sec,
         )
 
     # Step 6: locate recorder window + click ▶ 开始录制
     sess.recorder_window = wait_for_recorder_window(timeout_sec=20.0)
-    if sess.recorder_window is not None and ready:
+    if sess.recorder_window is not None:
         sess.armed = click_recorder_button(sess.recorder_window)
         if sess.armed:
             logger.info("recorder armed via UIA")
