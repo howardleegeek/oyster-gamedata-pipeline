@@ -16,6 +16,16 @@ def test_bundled_installer_shortcuts_point_to_oysterplay_only() -> None:
     assert "launch_mc_fabric.py" not in text
 
 
+def test_bundled_installer_launches_oysterplay_after_install_by_default() -> None:
+    text = ISS.read_text(encoding="utf-8")
+    run_section = text.split("[Run]", 1)[1].split("[UninstallDelete]", 1)[0]
+
+    assert 'Filename: "{app}\\\\{#AppExeName}"' in run_section
+    assert 'Description: "Launch {#AppName} now"' in run_section
+    assert "nowait postinstall skipifsilent" in run_section
+    assert "unchecked" not in run_section
+
+
 def test_bundled_installer_installs_only_matching_minecraft_mod() -> None:
     text = ISS.read_text(encoding="utf-8")
 

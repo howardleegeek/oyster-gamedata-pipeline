@@ -639,7 +639,7 @@ jobs:
           {
             echo "# Oyster Recorder ${RELEASE_TAG}"
             echo
-            echo "Single-file Windows installer with bundled JRE + Minecraft 1.21.4 + Fabric loader + Oyster recording mod. Double-click \`OysterRecorder-Setup-${RELEASE_TAG}.exe\` to install (no admin required, installs to \`%LOCALAPPDATA%\\OysterRecorder\\\`)."
+            echo "Single-file Windows installer with bundled JRE + Minecraft 1.21.4 + Fabric loader + Oyster recording mod. Double-click \`OysterRecorder-Setup-${RELEASE_TAG}.exe\` to install (no admin required, installs to \`%LOCALAPPDATA%\\OysterRecorder\\\`). The installer launches OysterPlay by default on Finish, and OysterPlay opens the bundled Minecraft instance."
             echo
             echo "## What's in this release"
             echo

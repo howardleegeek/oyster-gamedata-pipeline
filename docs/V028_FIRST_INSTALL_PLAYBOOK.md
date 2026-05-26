@@ -18,6 +18,7 @@ What happens:
 2. Minipc downloads `OysterRecorder-Setup-recorder-v0.28.0-rc<N>.exe` directly
 3. Minipc verifies SHA-256 against the manifest (hard-fail if mismatch)
 4. Installer wizard appears in your Session 1 — **click Next → Install → Finish**
+   The Finish page launches `OysterPlay.exe` by default.
 5. Mac polls minipc until install completes
 
 **Green signal**: orchestrator prints `[OK] install complete` + post-install paths exist.
@@ -38,7 +39,8 @@ OysterPlay.exe                                        # NEW one-button launcher
 **Red signal**: any path missing → tell me exactly which, I'll patch + rc<N+1>.
 
 ## Stage 3 — First Launch (~2 min)
-**Double-click `Oyster Recording` on your desktop.**
+If the Finish-page launch was not cancelled, this starts automatically.
+Otherwise, double-click `Oyster Recording` on your desktop.
 
 What happens (visible to you):
 1. (~5 sec) brief "loading" — pythonw spawns OysterPlay

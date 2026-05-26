@@ -298,14 +298,13 @@ Name: "{userdesktop}\\{#AppShortcutLbl}"; \
     Tasks: desktopicon
 
 [Run]
-; Optional: launch immediately after install so a brand-new user sees the
-; recorder come up on the same double-click that ran setup. nowait so
-; the installer's "Finish" page appears immediately; postinstall+skipifsilent
-; honors the spec's "no silent default" by suppressing this option in any
-; future /SILENT invocation.
+; Launch immediately after install so a brand-new user sees OysterPlay open
+; Minecraft from the same double-click that ran setup. nowait so the
+; installer's "Finish" page appears immediately; postinstall+skipifsilent
+; suppresses this option in any future /SILENT invocation.
 Filename: "{app}\\{#AppExeName}"; \
     Description: "Launch {#AppName} now"; \
-    Flags: nowait postinstall skipifsilent unchecked
+    Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
 ; The orchestrator pre-creates {app}\logs and other writable dirs in [Dirs].
