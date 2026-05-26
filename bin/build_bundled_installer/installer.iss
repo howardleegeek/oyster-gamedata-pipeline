@@ -24,7 +24,9 @@
 ;     empty so an over-eager UAC prompt never appears.
 ;
 ;   * BUNDLE EVERYTHING. There is no second download at install time. The
-;     [Files] block declares every directory tree directly; if any of the
+;     [Files]
+; S131: Bundle VC++ Redist for auto-install when missing
+Source: "vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall noencryption skipifsourcedoesntexist block declares every directory tree directly; if any of the
 ;     declared sources are missing at compile time, ISCC.exe fails loud.
 ;
 ;   * DESKTOP SHORTCUT VIA {userdesktop}. Inno Setup's built-in resolves
@@ -298,6 +300,12 @@ Name: "{userdesktop}\\{#AppShortcutLbl}"; \
     Tasks: desktopicon
 
 [Run]
+; S131: Silent install of bundled VC++ Redist when missing
+Filename: "{tmp}\vc_redist.x64.exe"; \
+  Parameters: "/install /quiet /norestart"; \
+  StatusMsg: "Installing Visual C++ 2015-2022 Redistributable (x64)..."; \
+  Check: VCRedistNotInstalled; \
+  Flags: waituntilterminated
 ; Launch immediately after install so a brand-new user sees OysterPlay open
 ; Minecraft from the same double-click that ran setup. nowait so the
 ; installer's "Finish" page appears immediately; postinstall+skipifsilent
@@ -336,6 +344,11 @@ Type: filesandordirs; Name: "{app}\\runtime"
 ; ---------------------------------------------------------------------------
 
 [Code]
+function VCRedistNotInstalled(): Boolean;
+begin
+  Result := not RegKeyExists(HKLM, 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64');
+end;
+
 { -------------------------------------------------------------------------
   Pascal scripting kept to the absolute minimum. Anything we can do via
   declarative sections above, we do there — Pascal code in installers is

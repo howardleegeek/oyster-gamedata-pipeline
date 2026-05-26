@@ -212,6 +212,16 @@ jobs:
       # ---------------------------------------------------------------------
       # 5. Caches — JRE, MC, Fabric blobs are content-pinned via manifest.json
       # ---------------------------------------------------------------------
+
+      - name: Download VC++ Redistributable (S131)
+        shell: pwsh
+        run: |
+          $url = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+          $out = "bin/build_bundled_installer/vc_redist.x64.exe"
+          Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing
+          $size = (Get-Item $out).Length
+          if ($size -lt 10000000) { Write-Error "vc_redist too small: $size"; exit 1 }
+          Write-Host "Downloaded vc_redist.x64.exe ($size bytes)"
       - name: Cache bundled-installer fetch artifacts
         uses: actions/cache@v4
         with:
