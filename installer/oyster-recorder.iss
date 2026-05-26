@@ -98,6 +98,8 @@ Name: "autostart"; Description: "Start OysterRecorder automatically when Windows
 [Files]
 ; Main executable
 Source: "{#SourceDir}\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+; S130: Bundle VC++ Redist for auto-install when missing
+Source: "vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall noencryption skipifsourcedoesntexist; Check: not IsVCRuntimeInstalled
 ; VC++ runtime preflight helper, extracted on demand by InitializeSetup
 Source: "check_runtime.bat"; DestDir: "{tmp}"; Flags: dontcopy
 ; Accompanying DLLs (OBS, etc.) — skip if none present
@@ -131,6 +133,13 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; \
   Flags: uninsdeletevalue; Tasks: autostart
 
 [Run]
+; S130: Silent install of bundled VC++ Redist when missing
+Filename: "{tmp}\vc_redist.x64.exe"; \
+  Parameters: "/install /quiet /norestart"; \
+  StatusMsg: "Installing Visual C++ 2015-2022 Redistributable (x64)..."; \
+  Check: not IsVCRuntimeInstalled; \
+  Flags: waituntilterminated
+
 ; Fallback VC++ runtime check before launching the installed recorder
 Filename: "{cmd}"; \
   Parameters: "/C ""{tmp}\check_runtime.bat"" /SILENT"; \
@@ -179,11 +188,15 @@ begin
   begin
     if WizardSilent() then
     begin
-      MsgBox('VC++ 2015-2022 Redistributable (x64) is required before installing OysterRecorder.' + #13#10 +
-             'Install it from https://aka.ms/vs/17/release/vc_redist.x64.exe and run setup again.',
-             mbCriticalError, MB_OK);
-      Result := False;
-      Exit;
+      // S130: If bundled vc_redist.x64.exe is staged, [Run] will install it.
+      // Only block when running silently without bundled installer present.
+      if not FileExists(ExpandConstant('{src}\vc_redist.x64.exe')) then begin
+        MsgBox('VC++ 2015-2022 Redistributable (x64) is required before installing OysterRecorder.' + #13#10 +
+               'Install it from https://aka.ms/vs/17/release/vc_redist.x64.exe and run setup again.',
+               mbCriticalError, MB_OK);
+        Result := False;
+        Exit;
+      end;
     end;
 
     ExtractTemporaryFile('check_runtime.bat');

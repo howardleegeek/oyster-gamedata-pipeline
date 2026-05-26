@@ -197,6 +197,22 @@ jobs:
           "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Append
 
       # --------------------------------------------------------------
+      # 6b. Download VC++ Redistributable for bundling (S130)
+      # --------------------------------------------------------------
+      - name: Download VC++ Redistributable
+        shell: pwsh
+        run: |
+          $url = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+          $out = "installer/vc_redist.x64.exe"
+          Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing
+          $size = (Get-Item $out).Length
+          if ($size -lt 10000000) {
+            Write-Error "vc_redist.x64.exe download too small: $size bytes"
+            exit 1
+          }
+          Write-Host "Downloaded vc_redist.x64.exe ($size bytes)"
+
+      # --------------------------------------------------------------
       # 7. Compile Inno Setup installer
       # Compatible with mareangler/iscc-action@v1; direct ISCC keeps signing
       # and artifact path checks explicit in one PowerShell flow.
