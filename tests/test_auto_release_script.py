@@ -327,6 +327,13 @@ class TestReleaseRaceHardening:
         script = _script_text()
         assert "TODAY=$(date -u +%Y-%m-%d)" in script
 
+    def test_release_script_treats_concurrent_existing_release_as_complete(self):
+        script = _script_text()
+        assert "checking for concurrent release" in script
+        assert 'gh release view "$NEW_VERSION"' in script
+        assert "Concurrent release ${NEW_VERSION} already exists" in script
+        assert "Could not push release commit for ${NEW_VERSION}" in script
+
     def test_release_script_syncs_source_anchor_before_tagging(self):
         script = _script_text()
         assert "sync_release_anchor_files" in script

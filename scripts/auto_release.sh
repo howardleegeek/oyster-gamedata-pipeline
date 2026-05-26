@@ -612,7 +612,15 @@ git commit -m "chore(release): ${NEW_VERSION} [skip ci]" || true
 # Push the CHANGELOG commit first so the release tag remains reachable from
 # main. If main advanced meanwhile, this non-force push fails and the workflow
 # retries on the next push rather than creating another orphaned release tag.
-git push origin HEAD:main
+if ! git push origin HEAD:main; then
+  log "WARN: push rejected while publishing ${NEW_VERSION}; checking for concurrent release"
+  git fetch origin main --tags >/dev/null 2>&1 || true
+  if remote_tag_exists "$NEW_VERSION" || gh release view "$NEW_VERSION" >/dev/null 2>&1; then
+    log "Concurrent release ${NEW_VERSION} already exists; treating this run as complete"
+    exit 0
+  fi
+  die "Could not push release commit for ${NEW_VERSION}; origin/main advanced before release publication"
+fi
 
 # Create and push tag
 git tag -a "$NEW_VERSION" -m "Release ${NEW_VERSION}"
