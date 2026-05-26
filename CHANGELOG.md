@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [0.11.20] - 2026-05-26
+
+### Fixed
+
+- bundle VC++ Redist 2015-2022 (x64) into installer (#100) (76b1894)
+- bundle VC++ Redist in bundled installer pipeline (R05E) (bfc6364)
+
+### Other
+
+- docs: PERFECT_VERSION_INTEGRATION.md — v0.11.20 integration manifest (S131+launcher+MC+JRE+VC++) (417eb05)
+
+
 ## [0.11.19] - 2026-05-26
 
 ### Other
