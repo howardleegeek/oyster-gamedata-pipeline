@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [0.15.0] - 2026-05-27
+
+### Added
+
+- backend/codex_api.py — Codex CLI HTTP wrapper (parallel dispatch) (c0aab26)
+
+### Other
+
+- chore(submodule): bump vendor/recorder e171f20 → 7de8a38 (+26 commits) (f4d38ed)
+- docs: investigate OBS audio silence (87b54ca)
+
+
 ## [0.14.0] - 2026-05-27
 
 ### Added
