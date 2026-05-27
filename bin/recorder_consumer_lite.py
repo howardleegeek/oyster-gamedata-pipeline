@@ -2430,9 +2430,12 @@ class RecorderApp(tk.Tk):
         import generate_gameinfo_xlsx as ggx  # noqa: PLC0415
 
         video_dur = max(0.0, time.time() - self._record_started_at)
+        mc_version = ggx.parse_game_version_from_window_title(str(rect.get("title", "")))
+        if mc_version is None:
+            _trace("gameinfo: Minecraft version not detected; leaving game_version blank")
         game_info = ggx.build_gameinfo_dict(
             game_name="Minecraft",
-            game_version="1.20.4",
+            game_version=mc_version,
             platform="Java Edition",
             scene_name="overworld",
             weather="clear",
