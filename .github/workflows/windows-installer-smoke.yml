@@ -266,7 +266,7 @@ jobs:
 
           $process = Start-Process `
             -FilePath $env:RECORDER_EXE `
-            -ArgumentList @("--tray", "--allow-placeholder") `
+            -ArgumentList @("--tray") `
             -WorkingDirectory $env:RECORDER_WORKDIR `
             -PassThru
 
