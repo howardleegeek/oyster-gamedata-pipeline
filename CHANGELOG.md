@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [0.14.0] - 2026-05-27
+
+### Added
+
+- bin/audit_lift_post_patches.py — fix 5 audit fails post-process (3b24358)
+
+### Other
+
+- ci(installer): accept bundled installer layout in smoke (fa0efe3)
+- ci(installer): remove placeholder smoke arg (5d53203)
+
+
 ## [0.13.1] - 2026-05-27
 
 ### Fixed
