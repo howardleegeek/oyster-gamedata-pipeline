@@ -604,21 +604,67 @@ def main() -> int:
         print(f"ERROR: not a directory: {sess}", file=sys.stderr)
         return 2
 
-    step1_transform(sess)
-    step2_trim_mp4(sess, start_offset=args.start_offset)
-    step3_extract_audio(sess)
-    step4_denormalize_inputs(sess)
-    step5_companion_files(sess, args.operator_id)
-    step6_append_x_extras(sess)
-    step7_synth_frames(sess)
-    step8_depth(sess, skip=args.skip_depth)
-    step9_patch_metadata(sess)
-    score = step10_manifest_audit(sess, target_score=args.target_score)
-    step11_input_latency(sess)
+    # D-1 robustness fix (v0.12.4): each step is independent. Failures are
+    # captured but don't abort downstream steps — this lets a partial session
+    # (e.g. missing game_state.jsonl but mp4 present) still produce depth/,
+    # MANIFEST.json, and a real audit score instead of dying at step 1.
+    # Failed-step list lands in MANIFEST.json["pipeline_failures"] by
+    # step10_manifest_audit so the audit knows what was skipped.
+    failed_steps: list[dict] = []
+
+    def _try(step_id: str, fn, *args_, **kwargs_) -> bool:
+        """Run a step. Capture failures into failed_steps. Return success."""
+        try:
+            fn(*args_, **kwargs_)
+            return True
+        except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError,
+                ValueError, OSError, Exception) as exc:  # noqa: BLE001
+            err = f"{type(exc).__name__}: {str(exc)[:200]}"
+            print(f"  ⚠ {step_id} FAILED — continuing: {err}")
+            failed_steps.append({"step": step_id, "error": err})
+            return False
+
+    _try("step1_transform", step1_transform, sess)
+    _try("step2_trim_mp4", step2_trim_mp4, sess, start_offset=args.start_offset)
+    _try("step3_extract_audio", step3_extract_audio, sess)
+    _try("step4_denormalize_inputs", step4_denormalize_inputs, sess)
+    _try("step5_companion_files", step5_companion_files, sess, args.operator_id)
+    _try("step6_append_x_extras", step6_append_x_extras, sess)
+    _try("step7_synth_frames", step7_synth_frames, sess)
+    _try("step8_depth", step8_depth, sess, skip=args.skip_depth)
+    _try("step9_patch_metadata", step9_patch_metadata, sess)
+
+    # step10 (audit) is the LAST step that depends on prior output; run no matter
+    # what — even a session with 8 failed steps deserves an honest audit score.
+    score = 0
+    try:
+        score = step10_manifest_audit(sess, target_score=args.target_score)
+    except Exception as exc:  # noqa: BLE001
+        print(f"  ⚠ step10_manifest_audit crashed: {exc}")
+        failed_steps.append({"step": "step10_manifest_audit", "error": str(exc)[:200]})
+
+    _try("step11_input_latency", step11_input_latency, sess)
+
+    # Inject pipeline_failures into MANIFEST so audit + downstream tools see them
+    if failed_steps:
+        mf = sess / "MANIFEST.json"
+        if mf.exists():
+            try:
+                data = json.loads(mf.read_text())
+                data["pipeline_failures"] = failed_steps
+                mf.write_text(json.dumps(data, indent=2))
+                print(f"\n  ⚠ MANIFEST.json updated with {len(failed_steps)} failed step(s)")
+            except (json.JSONDecodeError, OSError) as exc:
+                print(f"  ⚠ could not update MANIFEST.json: {exc}")
 
     strict_allowed = True
     if args.strict:
         strict_allowed, blocked = step12_upload_gate_strict(sess)
+
+    if failed_steps:
+        print(f"\n  Pipeline completed with {len(failed_steps)} failure(s):")
+        for f in failed_steps:
+            print(f"    - {f['step']}: {f['error'][:80]}")
 
     if args.target_score is not None and score < args.target_score:
         return 1
