@@ -69,8 +69,13 @@ def test_windows_installer_smoke_workflow_exercises_real_install_path() -> None:
     assert "/VERYSILENT" in workflow
     assert "$env:LOCALAPPDATA" in workflow
     assert "gamedata-recorder.exe" in workflow
+    assert "OysterPlay.exe" in workflow
+    assert "OysterRecorder-onedir\\OysterRecorder-onedir.exe" in workflow
+    assert "INSTALL_LAYOUT=$layout" in workflow
     assert "Verify OBS runtime dependencies" in workflow
     assert "obs.dll" in workflow
+    assert "Bundled runtime dependency missing" in workflow
+    assert "Bundled recorder ffmpeg.exe missing" in workflow
     assert "libobs-d3d11.dll" in workflow
     assert "libobs-opengl.dll" in workflow
     assert "libobs-winrt.dll" in workflow

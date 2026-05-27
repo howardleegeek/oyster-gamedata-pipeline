@@ -100,27 +100,82 @@ jobs:
             throw "Installer exited with $($process.ExitCode)"
           }
 
-      - name: Verify installed files and autostart
+      - name: Resolve installed layout
         shell: pwsh
         run: |
           $installDir = Join-Path $env:LOCALAPPDATA "OysterRecorder"
-          $exe = Join-Path $installDir "gamedata-recorder.exe"
-          if (-not (Test-Path $exe)) {
+          $legacyExe = Join-Path $installDir "gamedata-recorder.exe"
+          $bundledLauncher = Join-Path $installDir "OysterPlay.exe"
+          $bundledRecorder = Join-Path $installDir "OysterRecorder-onedir\OysterRecorder-onedir.exe"
+
+          if (Test-Path $legacyExe) {
+            $layout = "legacy"
+            $recorderExe = $legacyExe
+            $recorderWorkDir = $installDir
+          } elseif ((Test-Path $bundledLauncher) -and (Test-Path $bundledRecorder)) {
+            $layout = "bundled"
+            $recorderExe = $bundledRecorder
+            $recorderWorkDir = Split-Path -Parent $bundledRecorder
+          } else {
             Get-ChildItem -Recurse -Force $installDir -ErrorAction SilentlyContinue
-            throw "Installed recorder exe missing: $exe"
+            throw "Installed recorder entrypoint missing: $legacyExe or $bundledRecorder"
           }
+
+          "INSTALL_LAYOUT=$layout" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "RECORDER_EXE=$recorderExe" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "RECORDER_WORKDIR=$recorderWorkDir" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "Resolved install layout: $layout"
+          Write-Host "Recorder exe: $recorderExe"
+
           $run = Get-ItemProperty `
             -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" `
             -Name "OysterRecorder" `
-            -ErrorAction Stop
-          if ($run.OysterRecorder -notmatch "gamedata-recorder\.exe" -or $run.OysterRecorder -notmatch "--tray") {
-            throw "Unexpected OysterRecorder Run value: $($run.OysterRecorder)"
+            -ErrorAction SilentlyContinue
+          if ($layout -eq "legacy") {
+            if (-not $run) {
+              throw "Legacy installer did not create HKCU Run value"
+            }
+            if ($run.OysterRecorder -notmatch "gamedata-recorder\.exe" -or $run.OysterRecorder -notmatch "--tray") {
+              throw "Unexpected OysterRecorder Run value: $($run.OysterRecorder)"
+            }
+          } elseif ($run) {
+            throw "Bundled installer should not create legacy HKCU Run value: $($run.OysterRecorder)"
           }
 
       - name: Verify OBS runtime dependencies
         shell: pwsh
         run: |
           $installDir = Join-Path $env:LOCALAPPDATA "OysterRecorder"
+          if ($env:INSTALL_LAYOUT -eq "bundled") {
+            $requiredPaths = @(
+              "OysterPlay.exe",
+              "OysterRecorder-onedir\OysterRecorder-onedir.exe",
+              "jre\bin\javaw.exe",
+              "mc-instance\versions\1.21.4\1.21.4.jar",
+              "mc-instance\versions\fabric-loader-0.16.10-1.21.4\fabric-loader-0.16.10-1.21.4.json",
+              "mc-instance\mods"
+            )
+            foreach ($relative in $requiredPaths) {
+              $path = Join-Path $installDir $relative
+              if (-not (Test-Path $path)) {
+                Get-ChildItem -Recurse -Force $installDir -ErrorAction SilentlyContinue |
+                  Select-Object -First 200 FullName, Length, LastWriteTime
+                throw "Bundled runtime dependency missing: $relative"
+              }
+            }
+
+            $onedir = Join-Path $installDir "OysterRecorder-onedir"
+            $ffmpeg = Get-ChildItem -Path $onedir -Recurse -Filter "ffmpeg.exe" |
+              Select-Object -First 1
+            if (-not $ffmpeg) {
+              Get-ChildItem -Recurse -Force $onedir -ErrorAction SilentlyContinue |
+                Select-Object -First 200 FullName, Length, LastWriteTime
+              throw "Bundled recorder ffmpeg.exe missing"
+            }
+            Write-Host "Verified bundled runtime dependencies"
+            return
+          }
+
           $requiredFiles = @(
             "obs.dll",
             "libobs-d3d11.dll",
@@ -202,8 +257,6 @@ jobs:
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.launch_tray_smoke == true }}
         shell: pwsh
         run: |
-          $installDir = Join-Path $env:LOCALAPPDATA "OysterRecorder"
-          $exe = Join-Path $installDir "gamedata-recorder.exe"
           $launchOutputDir = Join-Path $env:TEMP "OysterRecorder-ci-output"
           New-Item -ItemType Directory -Force -Path $launchOutputDir | Out-Null
 
@@ -212,9 +265,9 @@ jobs:
           $env:RUST_BACKTRACE = "1"
 
           $process = Start-Process `
-            -FilePath $exe `
-            -ArgumentList @("--tray") `
-            -WorkingDirectory $installDir `
+            -FilePath $env:RECORDER_EXE `
+            -ArgumentList @("--tray", "--allow-placeholder") `
+            -WorkingDirectory $env:RECORDER_WORKDIR `
             -PassThru
 
           Start-Sleep -Seconds 12
@@ -233,7 +286,7 @@ jobs:
           }
 
           "RECORDER_PID=$($process.Id)" | Out-File -FilePath $env:GITHUB_ENV -Append
-          Write-Host "Recorder tray process is running with pid $($process.Id)"
+          Write-Host "Recorder process is running with pid $($process.Id)"
 
       - name: Silent uninstall
         if: always()
@@ -243,6 +296,10 @@ jobs:
             Stop-Process -Id ([int]$env:RECORDER_PID) -Force -ErrorAction SilentlyContinue
           }
           Get-Process -Name "gamedata-recorder" -ErrorAction SilentlyContinue |
+            Stop-Process -Force -ErrorAction SilentlyContinue
+          Get-Process -Name "OysterRecorder-onedir" -ErrorAction SilentlyContinue |
+            Stop-Process -Force -ErrorAction SilentlyContinue
+          Get-Process -Name "OysterPlay" -ErrorAction SilentlyContinue |
             Stop-Process -Force -ErrorAction SilentlyContinue
 
           $installDir = Join-Path $env:LOCALAPPDATA "OysterRecorder"
@@ -270,9 +327,15 @@ jobs:
         shell: pwsh
         run: |
           $installDir = Join-Path $env:LOCALAPPDATA "OysterRecorder"
-          $exe = Join-Path $installDir "gamedata-recorder.exe"
-          if (Test-Path $exe) {
-            throw "Recorder exe still exists after uninstall: $exe"
+          $entrypoints = @(
+            (Join-Path $installDir "gamedata-recorder.exe"),
+            (Join-Path $installDir "OysterPlay.exe"),
+            (Join-Path $installDir "OysterRecorder-onedir\OysterRecorder-onedir.exe")
+          )
+          foreach ($exe in $entrypoints) {
+            if (Test-Path $exe) {
+              throw "Recorder entrypoint still exists after uninstall: $exe"
+            }
           }
           $run = Get-ItemProperty `
             -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" `
