@@ -30,8 +30,15 @@ import subprocess
 import sys
 from typing import Optional
 
-REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
-BIN = REPO_ROOT / "bin"
+# BUG-1 fix (v0.12.2): self-locating, supports both layouts
+#   1. Git-clone dev:    <repo>/bin/canonical_pipeline.py → siblings in <repo>/bin/
+#   2. Bundled install:  <app>/tools/canonical_pipeline.py → siblings in <app>/tools/
+# In both layouts the sibling scripts live in the SAME directory as __file__,
+# so resolve from __file__.parent. The old "REPO_ROOT/bin" broke the bundled
+# tester install where <app>/bin/ does not exist.
+_HERE = pathlib.Path(__file__).resolve().parent
+REPO_ROOT = _HERE.parent  # kept for any code that still references it
+BIN = _HERE  # ← key change: BIN is now the directory containing THIS file
 
 
 def step(msg: str) -> None:

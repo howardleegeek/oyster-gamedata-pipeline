@@ -286,11 +286,22 @@ Source: "vc_redist.x64.exe"; \
     DestDir: "{tmp}"; \
     Flags: deleteafterinstall noencryption skipifsourcedoesntexist
 
-; --- (7) Python self-audit tools for testers (v0.11.21) ------------------
-; ~80 KB total. Lets the internal tester run prd_compliance_audit + the
+; --- (7) Python self-audit tools for testers (v0.12.2) -------------------
+; ~150 KB total. Lets the internal tester run prd_compliance_audit + the
 ; tester_preflight wrapper without git-cloning the repo. Tester needs
 ; Python 3.11+ pre-installed (documented in TESTER_HANDOFF_v0.11.20.md).
 ; Lives at {app}\tools\ so the install layout stays clean.
+;
+; All 9 .py scripts are pure stdlib — no pip-install needed. Specifically:
+;   - tester_preflight.py     — entry point (BUG-1 fix: co-located lookup)
+;   - prd_compliance_audit.py — 105-check PRD compliance auditor
+;   - audit_quality_metrics.py — QM1-QM10 quality metrics (statistics)
+;   - canonical_pipeline.py   — orchestrator (calls the 5 below in order)
+;   - transform_game_state_to_action_camera.py
+;   - generate_gameinfo_xlsx.py  (writes .xlsx via stdlib zipfile)
+;   - generate_systeminfo_json.py
+;   - input_latency_telemetry.py
+;   - prd_compliance_audit_H8_patch.py
 Source: "..\\tester_preflight.py"; \
     DestDir: "{app}\\tools"; \
     Flags: ignoreversion
@@ -303,6 +314,21 @@ Source: "..\\audit_quality_metrics.py"; \
 Source: "..\\canonical_pipeline.py"; \
     DestDir: "{app}\\tools"; \
     Flags: ignoreversion
+Source: "..\\transform_game_state_to_action_camera.py"; \
+    DestDir: "{app}\\tools"; \
+    Flags: ignoreversion
+Source: "..\\generate_gameinfo_xlsx.py"; \
+    DestDir: "{app}\\tools"; \
+    Flags: ignoreversion
+Source: "..\\generate_systeminfo_json.py"; \
+    DestDir: "{app}\\tools"; \
+    Flags: ignoreversion
+Source: "..\\input_latency_telemetry.py"; \
+    DestDir: "{app}\\tools"; \
+    Flags: ignoreversion
+Source: "..\\prd_compliance_audit_H8_patch.py"; \
+    DestDir: "{app}\\tools"; \
+    Flags: ignoreversion skipifsourcedoesntexist
 
 [Icons]
 ; ---- Start-menu group (always created) ------------------------------------

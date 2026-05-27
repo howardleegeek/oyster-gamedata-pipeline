@@ -46,10 +46,17 @@ AUDIT_TOTAL_EXPECTED = 105  # current PRD audit total
 REQUIRED_RAW_FILES = ("recording.mp4", "game_state.jsonl", "inputs.jsonl", "metadata.json")
 POST_PIPELINE_FILES = ("MANIFEST.json", "gameinfo.xlsx", "audio_check.json")
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-BIN = REPO_ROOT / "bin"
-AUDIT_SCRIPT = BIN / "prd_compliance_audit.py"
-CANONICAL_PIPELINE = BIN / "canonical_pipeline.py"
+# BUG-1 fix (v0.12.2): support BOTH layouts
+#   1. Git-clone dev layout: this file at <repo>/bin/tester_preflight.py
+#      → siblings live in <repo>/bin/ (same dir)
+#   2. Bundled install layout: this file at <app>/tools/tester_preflight.py
+#      → siblings live in <app>/tools/ (same dir)
+# In BOTH cases siblings are in the same directory as __file__, so resolve
+# from there. The old "REPO_ROOT.parent / 'bin'" assumed git-clone only and
+# broke the bundled install where there is no <app>/bin/ directory.
+_HERE = Path(__file__).resolve().parent
+AUDIT_SCRIPT = _HERE / "prd_compliance_audit.py"
+CANONICAL_PIPELINE = _HERE / "canonical_pipeline.py"
 
 # Per-failure-category hint shown to tester
 NEXT_STEP_HINTS = {
@@ -184,7 +191,12 @@ def run_canonical_pipeline(session: Path) -> tuple[bool, str]:
     if not missing:
         return True, "post-processing 产物已存在 — 跳过 canonical_pipeline"
 
-    cmd = [sys.executable, str(CANONICAL_PIPELINE), str(session)]
+    # BUG-2 fix (v0.12.2): --skip-depth because DA-V2 (PyTorch + 1.3GB weights)
+    # is NOT bundled in the installer. Without --skip-depth, step 8/10 hard-fails
+    # on missing run_da_v2_depth.py. The audit will see no depth/*.exr and mark
+    # H1-H8 as expected fails — that's acceptable for the GREEN target (≥95/105
+    # allows 10 fails). For full depth, tester must run on Howard's mac1.
+    cmd = [sys.executable, str(CANONICAL_PIPELINE), str(session), "--skip-depth"]
     try:
         proc = subprocess.run(
             cmd, capture_output=True, text=True, timeout=600, check=False
