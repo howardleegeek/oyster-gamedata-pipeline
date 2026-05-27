@@ -17,7 +17,9 @@ concurrency:
 jobs:
   auto-release:
     runs-on: ubuntu-latest
-    if: github.repository_owner != ''
+    # 2026-05-27 DISABLED — too aggressive (12 releases in 9h overnight).
+    # Re-enable via repo var AUTO_RELEASE_ENABLED=true, or use manual workflow_dispatch + git tag.
+    if: vars.AUTO_RELEASE_ENABLED == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
