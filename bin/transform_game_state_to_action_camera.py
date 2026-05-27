@@ -18,7 +18,8 @@ buyer-pipeline requires 20 named fields per row of action_camera.json:
 
 This script does the structural transformation. Inputs.jsonl (Win32
 keyboard/mouse) is merged when present; missing fields are filled with
-PRD-acceptable defaults (mouse_x/y from look_vec normalization, keyCode=0,
+PRD-acceptable defaults (mouse_x/y from metadata-normalized absolute cursor
+coordinates when present, otherwise yaw/pitch fallback, keyCode=0,
 camera_intrinsics defaults from 1920x1080 @ 70° FOV, etc.).
 
 Usage:
@@ -27,32 +28,96 @@ Usage:
 Reads <session_dir>/game_state.jsonl (and optionally inputs.jsonl) and
 writes <session_dir>/action_camera.json with the 20 PRD fields.
 """
+
 from __future__ import annotations
+
 import json
 import math
 import sys
 from pathlib import Path
 from typing import Any
 
-
 # ─── PRD constants ────────────────────────────────────────────────────────
-MC_TICKS_PER_SECOND = 20.0        # MC native TPS; convert tick→video frame
-VIDEO_FPS = 30.0                  # PRD-mandated video fps
-MC_BLOCKS_TO_METERS = 1.0         # 1 block = 1 meter in MC
-MC_GRAVITY_MPS2 = 32.0            # PRD §4.2 (MC physics: 32 m/s² not Earth's 9.8)
-DEFAULT_FOV_DEG = 70.0            # MC default field of view
+MC_TICKS_PER_SECOND = 20.0  # MC native TPS; convert tick→video frame
+VIDEO_FPS = 30.0  # PRD-mandated video fps
+MC_BLOCKS_TO_METERS = 1.0  # 1 block = 1 meter in MC
+MC_GRAVITY_MPS2 = 32.0  # PRD §4.2 (MC physics: 32 m/s² not Earth's 9.8)
+DEFAULT_FOV_DEG = 70.0  # MC default field of view
 
 # Camera intrinsics for 1920×1080 @ 70° FOV — derive fx, fy, Cx, Cy
 # fx = fy = (W/2) / tan(fov/2);  Cx = W/2; Cy = H/2
 _W, _H = 1920, 1080
+DEFAULT_SCREEN_WIDTH = _W
+DEFAULT_SCREEN_HEIGHT = _H
 _FOV_RAD = math.radians(DEFAULT_FOV_DEG)
 _FX = (_W / 2.0) / math.tan(_FOV_RAD / 2.0)
 DEFAULT_INTRINSICS = {
     "fx": round(_FX, 3),
     "fy": round(_FX, 3),
-    "Cx": _W / 2.0,           # literal capital — PRD iron-law
+    "Cx": _W / 2.0,  # literal capital — PRD iron-law
     "Cy": _H / 2.0,
 }
+
+
+def _first_number(data: dict, keys: tuple[str, ...]) -> float | None:
+    """Return the first numeric field value found under any of ``keys``."""
+    for key in keys:
+        value = data.get(key)
+        if isinstance(value, (int, float)):
+            return float(value)
+    return None
+
+
+def _unit_interval(value: float) -> float:
+    return max(0.0, min(1.0, value))
+
+
+def _normalize_pixel_coordinate(value: float, extent: int | float) -> float:
+    return _unit_interval(value / max(float(extent), 1.0))
+
+
+def _parse_resolution_value(value: Any) -> tuple[int, int] | None:
+    """Parse common metadata resolution shapes into ``(width, height)``."""
+    if isinstance(value, (list, tuple)) and len(value) >= 2:
+        width, height = value[0], value[1]
+    elif isinstance(value, dict):
+        width = value.get("width", value.get("w"))
+        height = value.get("height", value.get("h"))
+    elif isinstance(value, str):
+        parts = value.lower().replace(" ", "").split("x", 1)
+        if len(parts) != 2:
+            return None
+        width, height = parts
+    else:
+        return None
+
+    try:
+        parsed_width = int(float(width))
+        parsed_height = int(float(height))
+    except (TypeError, ValueError):
+        return None
+    if parsed_width <= 0 or parsed_height <= 0:
+        return None
+    return parsed_width, parsed_height
+
+
+def load_game_resolution(session: Path) -> tuple[int, int]:
+    """Read metadata.json.game_resolution, falling back to 1920x1080."""
+    metadata_path = session / "metadata.json"
+    if not metadata_path.is_file():
+        return DEFAULT_SCREEN_WIDTH, DEFAULT_SCREEN_HEIGHT
+    try:
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return DEFAULT_SCREEN_WIDTH, DEFAULT_SCREEN_HEIGHT
+    if not isinstance(metadata, dict):
+        return DEFAULT_SCREEN_WIDTH, DEFAULT_SCREEN_HEIGHT
+
+    for key in ("game_resolution", "capture_resolution", "screen_resolution", "resolution"):
+        parsed = _parse_resolution_value(metadata.get(key))
+        if parsed is not None:
+            return parsed
+    return DEFAULT_SCREEN_WIDTH, DEFAULT_SCREEN_HEIGHT
 
 
 def euler_to_quat_xyzw(yaw_deg: float, pitch_deg: float, roll_deg: float = 0.0) -> list[float]:
@@ -80,6 +145,8 @@ def transform_tick_to_action_camera_row(
     eye_offset_y: float = 1.62,
     metric_scale: float = MC_BLOCKS_TO_METERS,
     route_type: int = 1,
+    screen_width: int = DEFAULT_SCREEN_WIDTH,
+    screen_height: int = DEFAULT_SCREEN_HEIGHT,
 ) -> dict:
     """Convert one game_state.jsonl tick into a PRD-20-field action_camera row.
 
@@ -115,9 +182,20 @@ def transform_tick_to_action_camera_row(
     cam_quat = euler_to_quat_xyzw(yaw, pitch, 0.0)
     player_quat = list(cam_quat)
 
-    # mouse_x/y normalized from look-vector — yaw→[0,1] mouse_x, pitch→[0,1] mouse_y
-    mouse_x = (yaw % 360.0) / 360.0
-    mouse_y = (pitch + 90.0) / 180.0
+    # Prefer absolute cursor pixel coordinates from game_state.jsonl when the
+    # recorder/mod provides them. PRD D5 requires normalized [0,1] values.
+    # Older Minecraft captures have no cursor fields, so keep the yaw/pitch
+    # fallback for backward-compatible real-session audits.
+    raw_mouse_x = _first_number(tick_data, ("mouse_x", "mouseX"))
+    raw_mouse_y = _first_number(tick_data, ("mouse_y", "mouseY"))
+    if raw_mouse_x is not None:
+        mouse_x = _normalize_pixel_coordinate(raw_mouse_x, screen_width)
+    else:
+        mouse_x = _unit_interval((yaw % 360.0) / 360.0)
+    if raw_mouse_y is not None:
+        mouse_y = _normalize_pixel_coordinate(raw_mouse_y, screen_height)
+    else:
+        mouse_y = _unit_interval((pitch + 90.0) / 180.0)
 
     # Time = tick / 20 (MC TPS)
     time_s = frame_idx / VIDEO_FPS
@@ -129,19 +207,19 @@ def transform_tick_to_action_camera_row(
         "route_type": route_type,
         "mouse_x": round(mouse_x, 6),
         "mouse_y": round(mouse_y, 6),
-        "mouse_dx": 0.0,   # filled if inputs.jsonl present
+        "mouse_dx": 0.0,  # filled if inputs.jsonl present
         "mouse_dy": 0.0,
-        "keyCode": 0,      # filled if inputs.jsonl present
+        "keyCode": 0,  # filled if inputs.jsonl present
         "camera_position": [cam_x, cam_y, cam_z],
         "camera_rotation_oula": cam_rot_oula,
         "camera_rotation_quaternion": cam_quat,
-        "camera_Follow Offset": [0.0, 0.0, 0.0],   # literal SPACE + capital F
+        "camera_Follow Offset": [0.0, 0.0, 0.0],  # literal SPACE + capital F
         "camera_intrinsics": DEFAULT_INTRINSICS,
-        "camera_speed": [vx, vy, vz],   # m/s
+        "camera_speed": [vx, vy, vz],  # m/s
         "player_position": [x, y, z],
         "player_rotation_oula": player_rot_oula,
         "player_rotation_quaternion": player_quat,
-        "player_speed": [vx, vy, vz],   # in MC, head and body move together
+        "player_speed": [vx, vy, vz],  # in MC, head and body move together
         "metric_scale": metric_scale,
     }
 
@@ -176,6 +254,7 @@ def resample_to_video_grid(ticks: list[dict], target_count: int = 9000) -> list[
         target_t = t_min + (span_ms * i / max(1, target_count - 1))
         # Binary search for nearest tick
         import bisect
+
         pos = bisect.bisect_left(tick_times, target_t)
         if pos == 0:
             output.append(dict(ticks[0]))
@@ -187,9 +266,19 @@ def resample_to_video_grid(ticks: list[dict], target_count: int = 9000) -> list[
             # Lerp continuous fields
             alpha = (target_t - t_before) / (t_after - t_before) if t_after > t_before else 0
             row = dict(ticks[pos - 1])  # discrete fields from earlier tick (nearest-neighbor)
-            for key in ("x", "y", "z", "yaw_deg", "pitch_deg",
-                        "look_x", "look_y", "look_z",
-                        "velocity_x", "velocity_y", "velocity_z"):
+            for key in (
+                "x",
+                "y",
+                "z",
+                "yaw_deg",
+                "pitch_deg",
+                "look_x",
+                "look_y",
+                "look_z",
+                "velocity_x",
+                "velocity_y",
+                "velocity_z",
+            ):
                 a = ticks[pos - 1].get(key, 0)
                 b = ticks[pos].get(key, 0)
                 row[key] = a + alpha * (b - a)
@@ -198,7 +287,9 @@ def resample_to_video_grid(ticks: list[dict], target_count: int = 9000) -> list[
     return output
 
 
-def merge_inputs(action_camera_rows: list[dict], inputs_path: Path, session_start_unix: float = None) -> int:
+def merge_inputs(
+    action_camera_rows: list[dict], inputs_path: Path, session_start_unix: float = None
+) -> int:
     """Overlay mouse_dx/dy + keyCode from inputs.jsonl onto action_camera rows.
 
     Bug-fix 2026-05-17 (precision audit P2): previous implementation had TWO
@@ -239,9 +330,15 @@ def merge_inputs(action_camera_rows: list[dict], inputs_path: Path, session_star
     # input event timestamp (less accurate — may include pre-game lifecycle).
     if session_start_unix is None:
         # Use first MOUSE_MOVE or KEYBOARD event (skip lifecycle markers)
-        gameplay = [e for e in events if e.get("event_type") in ("MOUSE_MOVE", "KEYBOARD", "MOUSE_BUTTON")]
+        gameplay = [
+            e for e in events if e.get("event_type") in ("MOUSE_MOVE", "KEYBOARD", "MOUSE_BUTTON")
+        ]
         if gameplay:
-            session_start_unix = min(e.get("timestamp", 0) for e in gameplay if isinstance(e.get("timestamp"), (int, float)))
+            session_start_unix = min(
+                e.get("timestamp", 0)
+                for e in gameplay
+                if isinstance(e.get("timestamp"), (int, float))
+            )
         else:
             return 0
 
@@ -363,7 +460,19 @@ def main(argv: list[str]) -> int:
     print(f"[transform] resampled to {len(resampled)} rows ({target} target)")
 
     # Convert each tick → action_camera row
-    rows = [transform_tick_to_action_camera_row(t, i) for i, t in enumerate(resampled)]
+    screen_width, screen_height = load_game_resolution(session)
+    print(
+        f"[transform] using game_resolution {screen_width}x{screen_height} for mouse normalization"
+    )
+    rows = [
+        transform_tick_to_action_camera_row(
+            t,
+            i,
+            screen_width=screen_width,
+            screen_height=screen_height,
+        )
+        for i, t in enumerate(resampled)
+    ]
 
     # Optional: merge inputs.jsonl
     inputs_path = session / "inputs.jsonl"
@@ -375,7 +484,9 @@ def main(argv: list[str]) -> int:
         # time=0..300 (relative) against timestamp=~1778e9 (absolute Unix).
         session_start_unix = ticks[0].get("timestamp_ms", 0) / 1000.0
         n = merge_inputs(rows, inputs_path, session_start_unix=session_start_unix)
-        print(f"[transform] merged {n} input events (anchored to game_state t0={session_start_unix:.3f})")
+        print(
+            f"[transform] merged {n} input events (anchored to game_state t0={session_start_unix:.3f})"
+        )
 
     # Write action_camera.json
     out_path = session / "action_camera.json"
