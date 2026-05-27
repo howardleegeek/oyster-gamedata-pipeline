@@ -3,7 +3,12 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from backend_stub.appcast_server import router
+from backend_stub.appcast_server import (
+    DEFAULT_INSTALLER_NAME,
+    DEFAULT_RECORDER_SHA256,
+    DEFAULT_RECORDER_VERSION,
+    router,
+)
 
 
 def _client() -> TestClient:
@@ -20,9 +25,9 @@ def test_appcast_returns_xml() -> None:
 
 def test_appcast_contains_version() -> None:
     r = _client().get("/api/v1/updates/appcast.xml")
-    assert "v0.12.0" in r.text or "0.12.0" in r.text
-    assert "releases/download/v0.12.0/OysterRecorder-setup-v2.6.0.exe" in r.text
-    assert "7e99f1469513ab7dcbfda79798e88d82eb897d4c12108cb88f33af91559c29ac" in r.text
+    assert f"v{DEFAULT_RECORDER_VERSION}" in r.text or DEFAULT_RECORDER_VERSION in r.text
+    assert f"releases/download/v{DEFAULT_RECORDER_VERSION}/{DEFAULT_INSTALLER_NAME}" in r.text
+    assert DEFAULT_RECORDER_SHA256 in r.text
     assert "PLACE" + "HOLDER" not in r.text
 
 
@@ -41,5 +46,5 @@ def test_appcast_supports_release_metadata_env_override(monkeypatch) -> None:
 
     assert r.status_code == 200
     assert "v9.1.2" in r.text
-    assert "releases/download/v9.1.2/OysterRecorder-setup-v2.6.0.exe" in r.text
+    assert f"releases/download/v9.1.2/{DEFAULT_INSTALLER_NAME}" in r.text
     assert f'sparkle:sha256="{expected_sha}"' in r.text

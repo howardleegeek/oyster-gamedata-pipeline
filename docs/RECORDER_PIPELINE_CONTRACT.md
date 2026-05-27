@@ -17,8 +17,8 @@ There are two version tracks and they must not be confused:
 
 | Component | Current release track | Current source track |
 |---|---|---|
-| `oyster-gamedata-pipeline` | Latest GitHub release remains `v0.12.0`; it carries the public Windows installer asset and checksum. | `main` continues from `v0.12.0` with architecture/CI contract fixes. Use `main` for development. |
-| `gamedata-recorder` | Latest recorder release remains `v2.6.0`; this is why the public installer asset is named `OysterRecorder-setup-v2.6.0.exe`. | `vendor/recorder` is pinned to release-buildable commit `e171f20` (`release/v2.6.0-buildable`), based on the last successful Windows-build source plus no-popup runtime guards and detected-game HWND stabilization. Arbitrary recorder `main` changes are not consumer-release source until tray/auth/updater/notify/libobs changes compile and pass Windows installer smoke. |
+| `oyster-gamedata-pipeline` | Latest GitHub release remains `v0.13.0`; it carries the public Windows installer asset and checksum. | `main` continues from `v0.13.0` with architecture/CI contract fixes. Use `main` for development. |
+| `gamedata-recorder` | Latest recorder release remains `v2.6.0`; the current public installer asset is `OysterRecorder-Setup-v0.12.3.exe` because v0.13.0 republished the last known-good bundled installer binary. | `vendor/recorder` is pinned to release-buildable commit `e171f20` (`release/v2.6.0-buildable`), based on the last successful Windows-build source plus no-popup runtime guards and detected-game HWND stabilization. Arbitrary recorder `main` changes are not consumer-release source until tray/auth/updater/notify/libobs changes compile and pass Windows installer smoke. |
 
 Operationally: distribute from the latest verified release, rebuild from the
 release-buildable source pin, and keep newer recorder `main` work behind a
@@ -101,7 +101,7 @@ It can move to `production` only after a clean Windows run proves:
 ## Current Architecture Read
 
 The release/distribution chain is real: latest verified public release is
-`v0.12.0`, the installer asset and SHA file exist, backend health/appcast are
+`v0.13.0`, the installer asset and SHA file exist, backend health/appcast are
 live, and smoke workflows are green. The Windows installer is built from the
 release-buildable source pin plus the verified x64 recorder runtime, with PE
 architecture guards to prevent ARM64 DLLs from entering the setup payload. The
