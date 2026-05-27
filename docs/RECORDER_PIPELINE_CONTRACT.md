@@ -6,6 +6,10 @@ This repo is the integration hub between two real systems:
 2. **oyster-gamedata-pipeline** normalizes those sessions into buyer-spec bundles, runs gates, signs provenance, and uploads/verifies distribution.
 
 The product works only if both sides agree on the session bundle surface. The authoritative code contract is `src/oyster_agent_runner/session_contract.py`.
+The capture-vs-processing split is codified in
+`src/oyster_agent_runner/capture_architecture.py`: clients capture raw evidence;
+servers generate linear depth, OpenEXR, alternate depth encodings, and
+buyer-specific packages.
 
 ## Version Alignment
 
@@ -63,6 +67,22 @@ buyer_prd/
   gameinfo.xlsx
   depth/*.exr
 ```
+
+## Raw Capture / Server Postprocess Rule
+
+The Windows client and Minecraft mod must stay on the raw-capture side of the
+boundary. They may record video, camera/game/input telemetry, timestamps,
+manifests, and optionally raw non-linear depth buffers. They must not perform
+client-side linear depth conversion, OpenEXR float32 generation, or buyer-specific
+depth packaging on normal tester machines.
+
+Those heavier steps belong to the server post-processing tier. This lowers crash
+risk across mixed AMD/NVIDIA GPUs, driver versions, missing dependencies, and low
+VRAM contributor machines. It also lets us support different buyer depth specs
+without rebuilding the recorder.
+
+See [`docs/RAW_CAPTURE_POSTPROCESS_ARCHITECTURE.md`](RAW_CAPTURE_POSTPROCESS_ARCHITECTURE.md)
+for the current Minecraft POC decision.
 
 ## Promotion Rule For New Games
 

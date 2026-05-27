@@ -40,6 +40,7 @@ Built into a single Windows .exe by .github/workflows/build-recorder-exe.yml
 using PyInstaller --onefile --windowed with bundled ffmpeg.exe (added via
 --add-binary). No Python, no admin, no extra installs needed by tester.
 """
+
 from __future__ import annotations
 
 import json
@@ -90,16 +91,43 @@ RECORDER_VERSION = "lite-v0.28.0-rc9"
 # R01 iron-law: supported MC versions for real game-state Fabric mod.
 # Kept in sync with .github/workflows/build-mc-mod.yml matrix.
 SUPPORTED_MC_VERSIONS = [
-    "1.20.1", "1.20.2", "1.20.4", "1.20.6",
-    "1.21.1", "1.21.2", "1.21.3", "1.21.4", "1.21.5",
+    "1.20.1",
+    "1.20.2",
+    "1.20.4",
+    "1.20.6",
+    "1.21.1",
+    "1.21.2",
+    "1.21.3",
+    "1.21.4",
+    "1.21.5",
 ]
+
+
+def _depth_mode() -> str:
+    """Return the depth processing mode for this recorder process."""
+
+    return os.environ.get("OYSTER_DEPTH_MODE", "server").strip().lower()
+
+
+def _client_depth_inference_enabled() -> bool:
+    """Only allow legacy local depth when explicitly requested by engineers."""
+
+    if os.environ.get("OYSTER_ALLOW_CLIENT_DEPTH", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "legacy-local",
+    }:
+        return True
+    return _depth_mode() in {"client", "local", "legacy-local"}
 
 
 class RecorderError(RuntimeError):
     """Hard-fail error for iron-law violations (no silent fallback)."""
+
+
 RELEASES_API = (
-    "https://api.github.com/repos/howardleegeek/oyster-gamedata-pipeline"
-    "/releases?per_page=20"
+    "https://api.github.com/repos/howardleegeek/oyster-gamedata-pipeline" "/releases?per_page=20"
 )
 
 
@@ -129,6 +157,7 @@ def _is_onedir_install() -> bool:
 # Tester sees the recorder briefly close + reopen — every ~5 min when
 # we ship a new release, never has to touch the file manually again.
 
+
 def _current_version_tag() -> str:
     """Return the recorder-vX.Y.Z tag derived from RECORDER_VERSION."""
     # RECORDER_VERSION = "lite-v0.8.0" → tag = "recorder-v0.8.0"
@@ -143,6 +172,7 @@ def _latest_release_tag_and_url() -> tuple[Optional[str], Optional[str]]:
     """
     try:
         import urllib.request
+
         req = urllib.request.Request(
             RELEASES_API,
             headers={"User-Agent": "OysterRecorder/lite", "Accept": "application/vnd.github+json"},
@@ -166,6 +196,7 @@ def _latest_release_tag_and_url() -> tuple[Optional[str], Optional[str]]:
 
 def _is_newer_tag(latest: str, current: str) -> bool:
     """Compare recorder-vA.B.C semver-ish tags. Returns True if latest > current."""
+
     def _key(t: str) -> tuple[int, ...]:
         v = t.replace("recorder-v", "").split(".")
         out = []
@@ -175,6 +206,7 @@ def _is_newer_tag(latest: str, current: str) -> bool:
             except ValueError:
                 out.append(0)
         return tuple(out)
+
     return _key(latest) > _key(current)
 
 
@@ -198,19 +230,23 @@ def _stage_self_update(new_exe_url: str) -> bool:
         _trace("update: SKIP — not running as packaged .exe (dev mode)")
         return False
     if _is_onedir_install():
-        _trace("update: SKIP — onedir bundle, refuses single-.exe overwrite (would orphan _internal/)")
+        _trace(
+            "update: SKIP — onedir bundle, refuses single-.exe overwrite (would orphan _internal/)"
+        )
         return False
     try:
         import urllib.request
+
         new_path = Path(tempfile.gettempdir()) / "OysterRecorder-update.exe"
         _trace(f"update: downloading {new_exe_url} -> {new_path}")
-        with urllib.request.urlopen(new_exe_url, timeout=120) as resp, \
-                new_path.open("wb") as fh:
+        with urllib.request.urlopen(new_exe_url, timeout=120) as resp, new_path.open("wb") as fh:
             shutil.copyfileobj(resp, fh)
         size = new_path.stat().st_size
         _trace(f"update: downloaded {size} bytes")
         if size < 1_000_000:  # under 1 MB is suspicious — likely a 4xx error page
-            _trace(f"update: ABORT — downloaded file too small ({size} bytes), likely error page not exe")
+            _trace(
+                f"update: ABORT — downloaded file too small ({size} bytes), likely error page not exe"
+            )
             return False
     except Exception as e:
         # v0.20.1: explicit exception type for diagnostic clarity
@@ -252,6 +288,7 @@ def _stage_self_update(new_exe_url: str) -> bool:
 
 def _check_for_update_in_background(on_done=None) -> None:
     """Fire-and-forget update check. Calls on_done(tag, url, is_newer)."""
+
     def _go():
         latest_tag, exe_url = _latest_release_tag_and_url()
         current_tag = _current_version_tag()
@@ -264,6 +301,7 @@ def _check_for_update_in_background(on_done=None) -> None:
         _trace(f"update_check: current={current_tag} latest={latest_tag} newer={is_newer}")
         if on_done:
             on_done(latest_tag, exe_url, is_newer)
+
     threading.Thread(target=_go, daemon=True).start()
 
 
@@ -296,7 +334,9 @@ def _build_diagnostic_zip() -> Optional[Path]:
     upload fails. Returns the zip path on success, None on failure.
     """
     try:
-        import zipfile, platform
+        import platform
+        import zipfile
+
         zip_path = _desktop_path() / DIAGNOSTIC_ZIP_NAME
         sys_info_lines = [
             f"recorder_version: {RECORDER_VERSION}",
@@ -345,6 +385,7 @@ def _upload_log_remote() -> Optional[str]:
         # Build a minimal multipart body with stdlib (no `requests` dep).
         import urllib.request
         import uuid
+
         boundary = f"----OysterBoundary{uuid.uuid4().hex}"
         crlf = "\r\n"
         head = (
@@ -381,6 +422,7 @@ def _upload_log_remote() -> Optional[str]:
 
 def _upload_log_in_background(callback=None) -> None:
     """Fire-and-forget upload; optional callback receives the URL or None."""
+
     def _go():
         url = _upload_log_remote()
         if callback is not None:
@@ -388,12 +430,15 @@ def _upload_log_in_background(callback=None) -> None:
                 callback(url)
             except Exception:
                 pass
+
     threading.Thread(target=_go, daemon=True).start()
+
 
 try:
     _trace("importing tkinter…")
     import tkinter as tk
     from tkinter import messagebox, ttk  # ttk: rc9 depth-progress bar
+
     _trace("tkinter ok")
 except Exception:
     _trace(f"tkinter FAILED:\n{traceback.format_exc()}")
@@ -418,6 +463,7 @@ if not _FFMPEG.exists():
     found = shutil.which("ffmpeg")
     _FFMPEG = Path(found) if found else _FFMPEG  # may not exist on dev box
 
+
 # Tester output directory: ~/Documents/OysterClips/
 #
 # rc8 fix: on Windows, "Documents" can be redirected to OneDrive (common
@@ -432,6 +478,7 @@ def _real_documents_dir() -> Path:
         return Path.home() / "Documents"
     try:
         import winreg  # noqa: PLC0415 — Windows-only stdlib
+
         with winreg.OpenKey(
             winreg.HKEY_CURRENT_USER,
             r"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders",
@@ -649,8 +696,7 @@ def _get_minecraft_window_rect() -> Optional[dict[str, Any]]:
     if not found_hwnd:
         if ignored_titles:
             _trace(
-                "minecraft_window_gate: ignored non-game windows: "
-                + "; ".join(ignored_titles[:3])
+                "minecraft_window_gate: ignored non-game windows: " + "; ".join(ignored_titles[:3])
             )
         return None
 
@@ -739,6 +785,7 @@ def _recorder_version_tuple() -> tuple[int, ...]:
     "lite-v0.27.0-iron-law-strict" → (0, 27, 0)
     """
     import re  # noqa: PLC0415
+
     nums = re.findall(r"\d+", RECORDER_VERSION.split("-v")[-1].split("-")[0])
     return tuple(int(n) for n in nums)
 
@@ -784,30 +831,30 @@ class InputCapture:
 
         def on_move(x, y):  # noqa: ANN001
             with self._lock:
-                self.events.append({
-                    "timestamp_ms": self._now_ms(),
-                    "event_type": "mouse_move",
-                    "mouseX": int(x),
-                    "mouseY": int(y),
-                })
+                self.events.append(
+                    {
+                        "timestamp_ms": self._now_ms(),
+                        "event_type": "mouse_move",
+                        "mouseX": int(x),
+                        "mouseY": int(y),
+                    }
+                )
 
         def on_click(x, y, button, pressed):  # noqa: ANN001
             with self._lock:
-                self.events.append({
-                    "timestamp_ms": self._now_ms(),
-                    "event_type": "mouse_click",
-                    "mouseX": int(x),
-                    "mouseY": int(y),
-                    "button": str(button),
-                    "pressed": bool(pressed),
-                })
+                self.events.append(
+                    {
+                        "timestamp_ms": self._now_ms(),
+                        "event_type": "mouse_click",
+                        "mouseX": int(x),
+                        "mouseY": int(y),
+                        "button": str(button),
+                        "pressed": bool(pressed),
+                    }
+                )
 
-        self._kbd_listener = keyboard.Listener(
-            on_press=on_press, on_release=on_release
-        )
-        self._mouse_listener = mouse.Listener(
-            on_move=on_move, on_click=on_click
-        )
+        self._kbd_listener = keyboard.Listener(on_press=on_press, on_release=on_release)
+        self._mouse_listener = mouse.Listener(on_move=on_move, on_click=on_click)
         self._kbd_listener.start()
         self._mouse_listener.start()
         return True
@@ -833,11 +880,13 @@ class InputCapture:
         except Exception:
             kc = -1
         with self._lock:
-            self.events.append({
-                "timestamp_ms": self._now_ms(),
-                "event_type": event_type,
-                "keyCode": kc,
-            })
+            self.events.append(
+                {
+                    "timestamp_ms": self._now_ms(),
+                    "event_type": event_type,
+                    "keyCode": kc,
+                }
+            )
 
     def realtime_check(self, last_n: int = 100) -> dict[str, Any]:
         """v0.22.0 (Howard '录的时候确保数据的精确度'): lightweight per-tick
@@ -876,18 +925,23 @@ class InputCapture:
             prev = ts
         # Invalid keyCodes (failed VK mapping)
         invalid_kc = sum(
-            1 for ev in sample
-            if ev.get("event_type", "").startswith("key_")
-            and ev.get("keyCode", -1) == -1
+            1
+            for ev in sample
+            if ev.get("event_type", "").startswith("key_") and ev.get("keyCode", -1) == -1
         )
         # Mouse out-of-bounds (primary screen heuristic)
         # NOTE: multi-monitor setups can legitimately have negative coords;
         # we use a generous ±5000 envelope to avoid false alarms.
         mouse_oob = sum(
-            1 for ev in sample
+            1
+            for ev in sample
             if ev.get("event_type", "").startswith("mouse_")
-            and (ev.get("mouseX", 0) < -5000 or ev.get("mouseX", 0) > 10000
-                 or ev.get("mouseY", 0) < -5000 or ev.get("mouseY", 0) > 10000)
+            and (
+                ev.get("mouseX", 0) < -5000
+                or ev.get("mouseX", 0) > 10000
+                or ev.get("mouseY", 0) < -5000
+                or ev.get("mouseY", 0) > 10000
+            )
         )
         last_age = self._now_ms() - sample[-1].get("timestamp_ms", 0)
         healthy = monotonic and invalid_kc == 0 and mouse_oob == 0 and last_age < 5000
@@ -1093,21 +1147,33 @@ class RecorderApp(tk.Tk):
         helpbar = tk.Frame(self, bg="white")
         helpbar.pack(pady=(0, 8))
         tk.Button(
-            helpbar, text="打开日志文件夹",
-            font=("Helvetica", 8), bg="white", fg="#666",
-            bd=0, cursor="hand2",
+            helpbar,
+            text="打开日志文件夹",
+            font=("Helvetica", 8),
+            bg="white",
+            fg="#666",
+            bd=0,
+            cursor="hand2",
             command=lambda: self._open_path(_STARTUP_LOG.parent),
         ).pack(side="left", padx=4)
         tk.Button(
-            helpbar, text="复制日志路径",
-            font=("Helvetica", 8), bg="white", fg="#666",
-            bd=0, cursor="hand2",
+            helpbar,
+            text="复制日志路径",
+            font=("Helvetica", 8),
+            bg="white",
+            fg="#666",
+            bd=0,
+            cursor="hand2",
             command=lambda: self._copy_to_clipboard(str(_STARTUP_LOG)),
         ).pack(side="left", padx=4)
         tk.Button(
-            helpbar, text="导出诊断包到桌面",
-            font=("Helvetica", 8), bg="white", fg="#666",
-            bd=0, cursor="hand2",
+            helpbar,
+            text="导出诊断包到桌面",
+            font=("Helvetica", 8),
+            bg="white",
+            fg="#666",
+            bd=0,
+            cursor="hand2",
             command=self._export_diagnostic_only,
         ).pack(side="left", padx=4)
         # rc8: prominent "View My Recordings" button — opens the OysterClips
@@ -1115,18 +1181,27 @@ class RecorderApp(tk.Tk):
         # where session tarballs actually live. Bigger / styled vs the other
         # helpbar buttons because this is the action testers ask for first.
         tk.Button(
-            helpbar, text="📂 我的录像",
-            font=("Helvetica", 9, "bold"), bg="#1976d2", fg="white",
-            activebackground="#1565c0", activeforeground="white",
-            bd=0, padx=10, pady=3, cursor="hand2",
+            helpbar,
+            text="📂 我的录像",
+            font=("Helvetica", 9, "bold"),
+            bg="#1976d2",
+            fg="white",
+            activebackground="#1565c0",
+            activeforeground="white",
+            bd=0,
+            padx=10,
+            pady=3,
+            cursor="hand2",
             command=lambda: self._open_path(_output_dir()),
         ).pack(side="left", padx=4)
 
     def _export_diagnostic_only(self) -> None:
         """Build diagnostic zip and open the Desktop folder. No network."""
         _trace("user clicked export-diagnostic button")
+
         def _go():
             zp = _build_diagnostic_zip()
+
             def apply():
                 if zp:
                     self._hint.config(
@@ -1139,7 +1214,9 @@ class RecorderApp(tk.Tk):
                         text="导出失败，请截屏后联系工程师",
                         fg="#dc2626",
                     )
+
             self.after(0, apply)
+
         threading.Thread(target=_go, daemon=True).start()
 
     def _upload_log_now(self) -> None:
@@ -1187,6 +1264,7 @@ class RecorderApp(tk.Tk):
                         text=f"上传 + 打包都失败。请手动发送:\n{_STARTUP_LOG}",
                         fg="#dc2626",  # red
                     )
+
             self.after(0, apply)
 
         threading.Thread(target=_go, daemon=True).start()
@@ -1219,6 +1297,7 @@ class RecorderApp(tk.Tk):
         24-criteria PRD result inline. Runs on a daemon thread so the
         UI stays responsive while numpy/PIL spin up.
         """
+
         def _go():
             try:
                 # Lazy import — keeps recorder cold-start fast.
@@ -1259,10 +1338,7 @@ class RecorderApp(tk.Tk):
                             f"已收的部分可以先用。",
                         )
                     # Detail in hint label.
-                    fail_names = [
-                        f"#{r.criterion_id}"
-                        for r in rpt.results if not r.passed
-                    ][:8]
+                    fail_names = [f"#{r.criterion_id}" for r in rpt.results if not r.passed][:8]
                     self._hint.config(
                         text=(
                             f"已保存: {tarball}\n"
@@ -1270,13 +1346,17 @@ class RecorderApp(tk.Tk):
                         ),
                         fg=ORANGE if rpt.failed_count else GREEN,
                     )
+
                 self.after(0, _ui)
             except Exception as exc:  # noqa: BLE001
                 _trace(f"auto_lint failed: {exc}\n{traceback.format_exc()}")
-                self.after(0, lambda: self._hint.config(
-                    text=f"已保存: {tarball}\n（自动验证失败 — 见远程日志）",
-                    fg=ORANGE,
-                ))
+                self.after(
+                    0,
+                    lambda: self._hint.config(
+                        text=f"已保存: {tarball}\n（自动验证失败 — 见远程日志）",
+                        fg=ORANGE,
+                    ),
+                )
 
         threading.Thread(target=_go, daemon=True).start()
 
@@ -1291,13 +1371,15 @@ class RecorderApp(tk.Tk):
 
         Howard's "shift-left" ask: 数据对的最强保证 = recorder 自验。
         """
+
         def _go():
             try:
                 # Lazy import — keeps cold-start fast.
                 if getattr(sys, "frozen", False):
                     sys.path.insert(0, str(_BUNDLE_ROOT))
-                from bin.bft_orchestrator import orchestrator as orch  # noqa: PLC0415
                 import json  # noqa: PLC0415
+
+                from bin.bft_orchestrator import orchestrator as orch  # noqa: PLC0415
 
                 # Extract tarball + read action_camera.json.
                 with tempfile.TemporaryDirectory() as td:
@@ -1312,12 +1394,11 @@ class RecorderApp(tk.Tk):
                         target = td_path
                     else:
                         inner = [p for p in td_path.iterdir() if p.is_dir()]
-                        candidates = [
-                            p for p in inner
-                            if (p / "action_camera.json").exists()
-                        ]
-                        target = candidates[0] if candidates else (
-                            inner[0] if len(inner) == 1 else td_path
+                        candidates = [p for p in inner if (p / "action_camera.json").exists()]
+                        target = (
+                            candidates[0]
+                            if candidates
+                            else (inner[0] if len(inner) == 1 else td_path)
                         )
                     ac_path = target / "action_camera.json"
                     if not ac_path.exists():
@@ -1374,10 +1455,7 @@ class RecorderApp(tk.Tk):
                         vc = stats.get("VIEW_CHANGE", 0)
                         if rej == 0 and vc == 0:
                             continue
-                        tag = (
-                            f"{rname}({rej}REJ)" if rej > 0
-                            else f"{rname}({vc}VC)"
-                        )
+                        tag = f"{rname}({rej}REJ)" if rej > 0 else f"{rname}({vc}VC)"
                         if rname.startswith(multimodal_prefixes):
                             multimodal_bad.append(tag)
                         else:
@@ -1396,20 +1474,15 @@ class RecorderApp(tk.Tk):
                         bad_combined = multimodal_bad + single_bad
                         detail_lines = []
                         if multimodal_bad:
-                            detail_lines.append(
-                                f"多模态失败: {', '.join(multimodal_bad[:5])}"
-                            )
+                            detail_lines.append(f"多模态失败: {', '.join(multimodal_bad[:5])}")
                         if single_bad:
-                            detail_lines.append(
-                                f"单模态失败: {', '.join(single_bad[:5])}"
-                            )
+                            detail_lines.append(f"单模态失败: {', '.join(single_bad[:5])}")
                         if not detail_lines:
                             detail_lines.append("(详情见日志)")
                         self._set(
                             f"⚠️ BFT 共识 FAIL ({decision})",
                             ORANGE,
-                            "\n".join(detail_lines)
-                            + "\n建议重录或检查 producer。",
+                            "\n".join(detail_lines) + "\n建议重录或检查 producer。",
                         )
                         self._hint.config(
                             text=(
@@ -1419,6 +1492,7 @@ class RecorderApp(tk.Tk):
                             ),
                             fg=ORANGE,
                         )
+
                 self.after(0, _ui)
             except Exception as exc:
                 _trace(f"auto_bft failed: {exc}\n{traceback.format_exc()}")
@@ -1428,26 +1502,36 @@ class RecorderApp(tk.Tk):
     def _on_update_check(self, latest_tag, exe_url, is_newer):
         """Self-update callback. If newer release found, stage + restart."""
         if not is_newer or not exe_url:
-            self.after(0, lambda: self._hint.config(
-                text=f"已经是最新版 ({_current_version_tag()})\n如果出问题，请把 {_STARTUP_LOG} 截图给工程师。",
-                fg=TEXT_GRAY,
-            ))
+            self.after(
+                0,
+                lambda: self._hint.config(
+                    text=f"已经是最新版 ({_current_version_tag()})\n如果出问题，请把 {_STARTUP_LOG} 截图给工程师。",
+                    fg=TEXT_GRAY,
+                ),
+            )
             return
         # Don't auto-replace mid-recording; wait until tester is idle.
         if self._record_armed:
-            _trace(f"update: deferred — recording in progress, will retry on close")
+            _trace("update: deferred — recording in progress, will retry on close")
             return
         _trace(f"update: staging {latest_tag}")
-        self.after(0, lambda: self._set("⏳ 自动更新中…", ORANGE,
-                                         f"正在下载 {latest_tag}，几秒后会自动重启。"))
+        self.after(
+            0,
+            lambda: self._set(
+                "⏳ 自动更新中…", ORANGE, f"正在下载 {latest_tag}，几秒后会自动重启。"
+            ),
+        )
         if _stage_self_update(exe_url):
             _trace("update: staged ok, exiting for relaunch")
             self.after(2000, self._on_close)
         else:
-            self.after(0, lambda: self._hint.config(
-                text=f"自动更新失败 — 见 {_STARTUP_LOG}",
-                fg=ORANGE,
-            ))
+            self.after(
+                0,
+                lambda: self._hint.config(
+                    text=f"自动更新失败 — 见 {_STARTUP_LOG}",
+                    fg=ORANGE,
+                ),
+            )
 
     def _tick_recording_status(self) -> None:
         """v0.12.0: tick once per second while ffmpeg is alive, updating
@@ -1563,9 +1647,11 @@ class RecorderApp(tk.Tk):
             pass
 
         # Top-level status text — replaces the verdict banner.
-        self._set("📊 处理深度图中…", "#1976d2",
-                  "录制已结束，正在生成每帧深度图。\n"
-                  "深度图完成后会打包成最终 tarball。")
+        self._set(
+            "📊 处理深度图中…",
+            "#1976d2",
+            "录制已结束，正在生成每帧深度图。\n" "深度图完成后会打包成最终 tarball。",
+        )
 
         # Build the progress widgets. We keep refs in a list so
         # _hide_depth_progress_ui can tear them down cleanly.
@@ -1648,8 +1734,14 @@ class RecorderApp(tk.Tk):
             _trace("depth_progress: default-skip armed (no GPU detected)")
 
         self._depth_progress_widgets = [
-            progress_frame, counter, bar, eta_label,
-            skip_row, skip_check, skip_btn, skip_var,
+            progress_frame,
+            counter,
+            bar,
+            eta_label,
+            skip_row,
+            skip_check,
+            skip_btn,
+            skip_var,
         ]
 
     def _on_skip_depth_toggle(self, checked: bool) -> None:
@@ -1667,8 +1759,7 @@ class RecorderApp(tk.Tk):
         self._skip_depth_flag.set()
         # Replace the inline status text so the tester immediately sees
         # the click landed even before the inference loop polls the flag.
-        self._set("⏳ 正在收尾跳过…", "#d97706",
-                  "等当前帧推断完，就会打包不带深度图的 tarball。")
+        self._set("⏳ 正在收尾跳过…", "#d97706", "等当前帧推断完，就会打包不带深度图的 tarball。")
 
     def _on_depth_progress(self, frames_done: int, total_frames: int) -> None:
         """Called from the depth runner thread — marshal to Tk via after().
@@ -1794,8 +1885,7 @@ class RecorderApp(tk.Tk):
         loop down for good (via self._stop_event when _on_close fires).
         """
         if not _FFMPEG.exists():
-            self._set("⚠️ 缺少 ffmpeg", ORANGE,
-                      "ffmpeg.exe 没有打包进来，请联系工程师。")
+            self._set("⚠️ 缺少 ffmpeg", ORANGE, "ffmpeg.exe 没有打包进来，请联系工程师。")
             return
 
         while not self._stop_event.is_set():
@@ -1834,8 +1924,11 @@ class RecorderApp(tk.Tk):
         # to '■ 停止录制' → but if MC wasn't running, watch_loop sat in
         # silent Phase 1 sleep forever and 'time stays 0' = '时间不动'.
         _trace("watch_loop: waiting for arm + MC")
-        self._set("准备好", TEXT_GRAY,
-                  "先打开 Minecraft 玩一会儿确认它不崩。\n确认后再点上面 ▶ 开始录制。")
+        self._set(
+            "准备好",
+            TEXT_GRAY,
+            "先打开 Minecraft 玩一会儿确认它不崩。\n确认后再点上面 ▶ 开始录制。",
+        )
         arm_announced_at = None
         last_status_update = 0.0
         while not self._stop_event.is_set():
@@ -1853,16 +1946,24 @@ class RecorderApp(tk.Tk):
                 last_status_update = now
                 if armed and not mc_alive:
                     waited = int(now - (arm_announced_at or now))
-                    self._set("⏸ 已 arm — 请打开 Minecraft", ORANGE,
-                              f"录制器在等 Minecraft 启动…（已等 {waited} 秒）\n"
-                              f"打开 Minecraft 后 1-2 秒会自动开始录")
+                    self._set(
+                        "⏸ 已 arm — 请打开 Minecraft",
+                        ORANGE,
+                        f"录制器在等 Minecraft 启动…（已等 {waited} 秒）\n"
+                        f"打开 Minecraft 后 1-2 秒会自动开始录",
+                    )
                 elif not armed and mc_alive:
-                    self._set("Minecraft 已开 — 等你点 ▶ 开始录制", TEXT_GRAY,
-                              "MC 检测到了，点上面蓝色按钮就开始录")
+                    self._set(
+                        "Minecraft 已开 — 等你点 ▶ 开始录制",
+                        TEXT_GRAY,
+                        "MC 检测到了，点上面蓝色按钮就开始录",
+                    )
                 elif not armed and not mc_alive:
-                    self._set("准备好", TEXT_GRAY,
-                              "先打开 Minecraft 玩一会儿确认它不崩。\n"
-                              "确认后再点上面 ▶ 开始录制。")
+                    self._set(
+                        "准备好",
+                        TEXT_GRAY,
+                        "先打开 Minecraft 玩一会儿确认它不崩。\n" "确认后再点上面 ▶ 开始录制。",
+                    )
             time.sleep(0.5)
         if self._stop_event.is_set():
             _trace("watch_loop: stopped before recording")
@@ -1876,17 +1977,14 @@ class RecorderApp(tk.Tk):
         self._set(
             "⏳ 等待进入游戏窗口",
             ORANGE,
-            "游戏已启动。录制器会等真实 Minecraft 游戏窗口稳定后自动开始，"
-            "不会录启动器。",
+            "游戏已启动。录制器会等真实 Minecraft 游戏窗口稳定后自动开始，" "不会录启动器。",
         )
         self._mc_window_rect = _wait_for_stable_minecraft_window(
             timeout_sec=120,
             stable_polls=3,
             poll_interval=1.0,
             should_abort=lambda: (
-                self._stop_event.is_set()
-                or not self._record_armed
-                or not _minecraft_running()
+                self._stop_event.is_set() or not self._record_armed or not _minecraft_running()
             ),
         )
         _trace(f"watch_loop: gated mc_window={self._mc_window_rect}")
@@ -1928,12 +2026,12 @@ class RecorderApp(tk.Tk):
         # session_manifest.json + every action_camera frame + inputs.jsonl
         # session_start. Closes red-team B-05 (Frankenstein splice).
         import uuid as _uuid_mod
+
         self._session_id = str(_uuid_mod.uuid4())
         try:
             self._start_ffmpeg(self._video_path)
         except Exception as exc:  # noqa: BLE001
-            self._set("⚠️ 录制启动失败", ORANGE,
-                      f"{type(exc).__name__}: {exc}")
+            self._set("⚠️ 录制启动失败", ORANGE, f"{type(exc).__name__}: {exc}")
             return
 
         # Start input capture in parallel with video. If pynput fails
@@ -1942,12 +2040,13 @@ class RecorderApp(tk.Tk):
         self._input_capture = InputCapture()
         input_ok = self._input_capture.start()
         if input_ok:
-            self._set("● 正在录制", RED,
-                      "玩你的 Minecraft 即可，退出游戏会自动停止录制。"
-                      "（视频 + 键鼠输入同步采集中）")
+            self._set(
+                "● 正在录制",
+                RED,
+                "玩你的 Minecraft 即可，退出游戏会自动停止录制。" "（视频 + 键鼠输入同步采集中）",
+            )
         else:
-            self._set("● 正在录制（仅视频）", RED,
-                      "键鼠采集未启动，仅录制视频。继续玩游戏即可。")
+            self._set("● 正在录制（仅视频）", RED, "键鼠采集未启动，仅录制视频。继续玩游戏即可。")
 
         # v0.12.0: live progress ticker so the tester knows recording is
         # actually working. Updates every second with elapsed seconds +
@@ -1980,8 +2079,7 @@ class RecorderApp(tk.Tk):
                 break
             elapsed = time.time() - self._record_started_at
             if elapsed >= MAX_RECORD_SECONDS:
-                self._set("⏱ 已到 6 分钟，自动停止", ORANGE,
-                          "PRD 规格要求 5-6 分钟，正在收尾…")
+                self._set("⏱ 已到 6 分钟，自动停止", ORANGE, "PRD 规格要求 5-6 分钟，正在收尾…")
                 break
             time.sleep(2.0)
 
@@ -2000,15 +2098,16 @@ class RecorderApp(tk.Tk):
         try:
             output_tar = self._package_tarball(ts)
         except Exception as exc:  # noqa: BLE001
-            self._set("⚠️ 打包失败", ORANGE,
-                      f"{type(exc).__name__}: {exc}")
+            self._set("⚠️ 打包失败", ORANGE, f"{type(exc).__name__}: {exc}")
             return
 
         if output_tar.exists():
             size_mb = output_tar.stat().st_size / (1024 * 1024)
-            self._set("✓ 录制完成", GREEN,
-                      f"{output_tar.name} ({size_mb:.1f} MB) 已保存。"
-                      f"正在验证买家规格…")
+            self._set(
+                "✓ 录制完成",
+                GREEN,
+                f"{output_tar.name} ({size_mb:.1f} MB) 已保存。" f"正在验证买家规格…",
+            )
             self._hint.config(
                 text=f"已保存: {output_tar}",
                 fg=GREEN,
@@ -2030,19 +2129,23 @@ class RecorderApp(tk.Tk):
             # across 4 independent verifiers and surfaces specific
             # disagreements so tester knows what to re-record.
             self._auto_bft(output_tar)
+
             # Engineer-side telemetry: push the full session log to a
             # remote pastebin so engineering can curl <url> and see what
             # happened on tester's machine without asking for files.
             def _on_url(url: Optional[str]) -> None:
                 if url:
-                    self.after(0, lambda: self._hint.config(
-                        text=f"已保存: {output_tar}\n远程日志: {url}",
-                        fg=GREEN,
-                    ))
+                    self.after(
+                        0,
+                        lambda: self._hint.config(
+                            text=f"已保存: {output_tar}\n远程日志: {url}",
+                            fg=GREEN,
+                        ),
+                    )
+
             _upload_log_in_background(_on_url)
         else:
-            self._set("⚠️ 录制结束但文件未生成", ORANGE,
-                      "请联系工程师并截图本窗口。")
+            self._set("⚠️ 录制结束但文件未生成", ORANGE, "请联系工程师并截图本窗口。")
 
     def _package_tarball(self, ts: str) -> Path:
         """Package the recording into a 5-file PRD-shaped tarball.
@@ -2079,6 +2182,7 @@ class RecorderApp(tk.Tk):
         rect = self._mc_window_rect or {}
         try:
             import generate_systeminfo_json as gsi  # noqa: PLC0415
+
             sys_info = gsi.build_systeminfo(
                 game_process_name="javaw.exe",
                 x=int(rect.get("x", 0)),
@@ -2102,15 +2206,14 @@ class RecorderApp(tk.Tk):
                 "recordedAt": ts,
                 "recorderVersion": "lite-v0.10.0-fallback",
             }
-        (clip_dir / "systeminfo.json").write_text(
-            json.dumps(sys_info, indent=2), encoding="utf-8"
-        )
+        (clip_dir / "systeminfo.json").write_text(json.dumps(sys_info, indent=2), encoding="utf-8")
 
         # 3. action_camera.json — v0.19.0 BIG REWRITE: PRD-aligned schema
         # was event-based with mouseX/cameraX scalars; PRD wants 9000
         # frame-aligned records at 30Hz. Sample/sample_tarball_builder.py
         # is the canonical schema reference.
-        from datetime import datetime as _dt, timedelta as _td  # noqa: PLC0415
+        from datetime import datetime as _dt  # noqa: PLC0415
+        from datetime import timedelta as _td
 
         FPS = 30.0
         target_frame_count = int(elapsed_sec * FPS) if elapsed_sec > 0 else 9000
@@ -2130,20 +2233,23 @@ class RecorderApp(tk.Tk):
         # Use intrinsics computed from window geometry (recorder.intrinsics.yaml
         # FOV 70° → fy = 540 / tan(35°) ≈ 771.4).
         fy = 540.0 / 0.7002075382097097  # tan(35°) = 0.7002...
-        intrinsics = {"fx": round(fy, 3), "fy": round(fy, 3),
-                      "cx": 960.0, "cy": 540.0}
+        intrinsics = {"fx": round(fy, 3), "fy": round(fy, 3), "cx": 960.0, "cy": 540.0}
 
         # R01 iron-law: load real game-state from Fabric mod JSONL.
         # On v0.26.0+ this is MANDATORY — hard-fail if missing, unless
         # --allow-placeholder was explicitly passed.
         try:
-            from game_state_overlay import load as _gs_load, lookup_at_ms as _gs_lookup, apply_to_record as _gs_apply  # type: ignore  # noqa: PLC0415
+            from game_state_overlay import apply_to_record as _gs_apply
+            from game_state_overlay import load as _gs_load  # type: ignore  # noqa: PLC0415
+            from game_state_overlay import lookup_at_ms as _gs_lookup
         except ImportError:
             _gs_load = _gs_lookup = _gs_apply = None  # type: ignore
 
         _gs_samples = _gs_load() if _gs_load else None
         if _gs_samples:
-            _trace(f"package: real game-state JSONL found, {len(_gs_samples)} samples — overlay enabled")
+            _trace(
+                f"package: real game-state JSONL found, {len(_gs_samples)} samples — overlay enabled"
+            )
         else:
             ver = _recorder_version_tuple()
             allow_placeholder = getattr(self, "_allow_placeholder", False)
@@ -2154,13 +2260,18 @@ class RecorderApp(tk.Tk):
                     f"Detected MC version: {_parse_mc_version_from_title((self._mc_window_rect or {}).get('title', '')) or 'unknown'}\n"
                     f"Supported mod builds:  {supported_str}\n"
                     "Download from:        https://github.com/howardleegeek/oyster-gamedata-pipeline/releases/latest\n"
-                    r"Install path:         %APPDATA%\.minecraft\mods" "\n"
+                    r"Install path:         %APPDATA%\.minecraft\mods"
+                    "\n"
                     "Tarball NOT created."
                 )
             if allow_placeholder:
-                _trace("package: --allow-placeholder active — using placeholder camera/player fields")
+                _trace(
+                    "package: --allow-placeholder active — using placeholder camera/player fields"
+                )
             else:
-                _trace("package: no game-state JSONL — using placeholder camera/player fields (pre-v0.26.0)")
+                _trace(
+                    "package: no game-state JSONL — using placeholder camera/player fields (pre-v0.26.0)"
+                )
 
         action_records = []
         for f in range(target_frame_count):
@@ -2249,15 +2360,20 @@ class RecorderApp(tk.Tk):
         try:
             with (clip_dir / "inputs.jsonl").open("w", encoding="utf-8") as fh:
                 # First line: session_start sentinel (frame-time alignment).
-                fh.write(json.dumps({
-                    "event_type": "session_start",
-                    "timestamp_ms": 0,
-                    "fps": FPS,
-                    "frame_count": target_frame_count,
-                    # R18: session_id ties this inputs.jsonl to the same
-                    # session_manifest.json that action_camera frames cite.
-                    "session_id": getattr(self, "_session_id", ""),
-                }) + "\n")
+                fh.write(
+                    json.dumps(
+                        {
+                            "event_type": "session_start",
+                            "timestamp_ms": 0,
+                            "fps": FPS,
+                            "frame_count": target_frame_count,
+                            # R18: session_id ties this inputs.jsonl to the same
+                            # session_manifest.json that action_camera frames cite.
+                            "session_id": getattr(self, "_session_id", ""),
+                        }
+                    )
+                    + "\n"
+                )
                 for ev in self._captured_events:
                     fh.write(json.dumps(ev, ensure_ascii=False) + "\n")
             _trace(f"package: wrote inputs.jsonl ({len(self._captured_events)} events)")
@@ -2270,13 +2386,16 @@ class RecorderApp(tk.Tk):
         # to a single recording. Closes red-team B-05 (Frankenstein splice).
         try:
             (clip_dir / "session_manifest.json").write_text(
-                json.dumps({
-                    "session_id": getattr(self, "_session_id", ""),
-                    "recorder_version": "lite-v0.21.0",
-                    "start_time": _dt.fromtimestamp(self._record_started_at).isoformat(),
-                    "frame_count": target_frame_count,
-                    "fps": FPS,
-                }, indent=2),
+                json.dumps(
+                    {
+                        "session_id": getattr(self, "_session_id", ""),
+                        "recorder_version": "lite-v0.21.0",
+                        "start_time": _dt.fromtimestamp(self._record_started_at).isoformat(),
+                        "frame_count": target_frame_count,
+                        "fps": FPS,
+                    },
+                    indent=2,
+                ),
                 encoding="utf-8",
             )
             _trace("package: wrote session_manifest.json")
@@ -2289,6 +2408,7 @@ class RecorderApp(tk.Tk):
         # FALLBACK. If the helper fails, the clip is unusable; fail loud
         # so the tester can re-run rather than ship a stub.
         import generate_gameinfo_xlsx as ggx  # noqa: PLC0415
+
         video_dur = max(0.0, time.time() - self._record_started_at)
         game_info = ggx.build_gameinfo_dict(
             game_name="Minecraft",
@@ -2307,70 +2427,80 @@ class RecorderApp(tk.Tk):
         )
         ggx.write_xlsx(game_info, str(clip_dir / "gameinfo.xlsx"))
 
-        # 5. depth/ — Howard 2026-05-07: REAL DepthAnything V2 inference on
-        # the recorded video.mp4. Iron Law: NO PLACEHOLDER. The .exe is
-        # built with torch + transformers + DepthAnything model bundled via
-        # PyInstaller (build-recorder-exe.yml --add-data). Inference runs
-        # CPU-side on the local machine; ~1-3 sec/frame at 256×256.
-        #
-        # If the bundled model fails to load (corrupted weights, missing
-        # torch), the recording ABORTS the tarball — we refuse to ship
-        # without real depth.
-        #
-        # rc9 (Howard 2026-05-09): show a depth-progress UI to the tester
-        # so they don't think the recorder is hung during the 30-60 min
-        # CPU pass. Also honour the cooperative skip flag — if the tester
-        # clicks "跳过深度图" (or no GPU was detected and the default-skip
-        # was left armed), we ship the tarball WITHOUT a depth/ directory.
-        # Iron-law-compatible: a skipped tarball is partial-by-choice, not
-        # a placeholder; downstream lint will FAIL on missing depth which
-        # is the correct behaviour.
-        depth_skipped = False
-        try:
-            from depth_anything_v2_inference import infer_depth_for_video  # noqa: PLC0415
-            video_path = clip_dir / "video.mp4"
-            depth_dir = clip_dir / "depth"
-            _trace(f"depth: running DepthAnything V2 inference on {video_path}")
-            self.after(0, self._show_depth_progress_ui)
+        # 5. depth/ — production clients do NOT run DepthAnything/OpenEXR
+        # locally. The recorder captures raw evidence and writes a manifest
+        # telling the backend to produce linear depth / EXR during
+        # post-processing. Legacy local inference is kept only for explicit
+        # engineering runs via OYSTER_DEPTH_MODE=local or
+        # OYSTER_ALLOW_CLIENT_DEPTH=1.
+        video_path = clip_dir / "video.mp4"
+        depth_dir = clip_dir / "depth"
+        if _client_depth_inference_enabled():
+            depth_skipped = False
             try:
-                manifest = infer_depth_for_video(
-                    video_path,
-                    depth_dir,
-                    model_variant="vits",
-                    device="cpu",
-                    progress_callback=self._on_depth_progress,
-                    should_skip=self._skip_depth_flag.is_set,
-                )
-                _trace(f"depth: rendered {len(manifest)} REAL EXR frames")
-                if self._skip_depth_flag.is_set():
-                    # Cooperative skip raced past the loop's last poll.
-                    depth_skipped = True
-                    _trace("depth: skip flag observed after loop — treating as user skip")
-            finally:
-                self.after(0, self._hide_depth_progress_ui)
-            if depth_skipped:
-                # Drop the partial depth dir so the tarball cleanly OMITS
-                # depth/ rather than shipping a half-finished version.
+                from depth_anything_v2_inference import infer_depth_for_video  # noqa: PLC0415
+
+                _trace(f"depth: LEGACY local DepthAnything inference on {video_path}")
+                self.after(0, self._show_depth_progress_ui)
                 try:
-                    if depth_dir.exists():
-                        shutil.rmtree(depth_dir, ignore_errors=True)
-                except Exception:
-                    pass
-                _trace("package: depth skipped by user — partial tarball")
-                # Surface the result to the tester before the lint runs.
-                self._set("⚠️ 已跳过深度图", "#d97706",
-                          "tarball 完成，但深度数据未包含。\n"
-                          "下游买家规格会在深度项标记 FAIL。")
-        except Exception as e:
-            self.after(0, self._hide_depth_progress_ui)
-            _trace(f"depth: DepthAnything inference FAILED: {e!r}")
-            # No fake fallback — abort the entire packaging. The tester
-            # sees a clear error in the log; we never ship placeholder.
-            raise RuntimeError(
-                f"Depth inference failed: {e}. The recorder refuses to "
-                f"ship a tarball with placeholder depth. See "
-                f"~/OysterRecorder.log for details."
+                    manifest = infer_depth_for_video(
+                        video_path,
+                        depth_dir,
+                        model_variant="vits",
+                        device="cpu",
+                        progress_callback=self._on_depth_progress,
+                        should_skip=self._skip_depth_flag.is_set,
+                    )
+                    _trace(f"depth: rendered {len(manifest)} local EXR frames")
+                    if self._skip_depth_flag.is_set():
+                        # Cooperative skip raced past the loop's last poll.
+                        depth_skipped = True
+                        _trace("depth: skip flag observed after loop — treating as user skip")
+                finally:
+                    self.after(0, self._hide_depth_progress_ui)
+                if depth_skipped:
+                    # Drop the partial depth dir so the tarball cleanly OMITS
+                    # depth/ rather than shipping a half-finished version.
+                    try:
+                        if depth_dir.exists():
+                            shutil.rmtree(depth_dir, ignore_errors=True)
+                    except Exception:
+                        pass
+                    _trace("package: depth skipped by user — partial tarball")
+                    self._set(
+                        "⚠️ 已跳过深度图",
+                        "#d97706",
+                        "tarball 完成，但深度数据未包含。\n" "下游买家规格会在深度项标记 FAIL。",
+                    )
+            except Exception as e:
+                self.after(0, self._hide_depth_progress_ui)
+                _trace(f"depth: local DepthAnything inference FAILED: {e!r}")
+                raise RuntimeError(
+                    f"Local depth inference failed: {e}. Production tester builds "
+                    f"should use OYSTER_DEPTH_MODE=server. See ~/OysterRecorder.log "
+                    f"for details."
+                )
+        else:
+            postprocess_manifest = {
+                "mode": _depth_mode(),
+                "status": "pending_server_postprocess",
+                "client_depth_inference": False,
+                "source_video": "video.mp4",
+                "server_outputs": [
+                    "linear_depth",
+                    "openexr_depth",
+                    "depth_uint16",
+                ],
+                "note": (
+                    "Production clients capture raw evidence only. Depth "
+                    "linearization and OpenEXR generation run server-side."
+                ),
+            }
+            (clip_dir / "depth_postprocess.json").write_text(
+                json.dumps(postprocess_manifest, indent=2),
+                encoding="utf-8",
             )
+            _trace("depth: local inference disabled; wrote depth_postprocess.json")
 
         # R22 (D-04 defense): hash every *.exr in depth/ and write
         # depth_manifest.json next to the directory. Stop-gap path
@@ -2379,6 +2509,7 @@ class RecorderApp(tk.Tk):
         # ABSTAIN once the full recorder ships EXR frames.
         try:
             import hashlib as _hashlib  # noqa: PLC0415
+
             depth_dir_path = clip_dir / "depth"
             depth_manifest: dict[str, str] = {}
             for exr_path in sorted(depth_dir_path.glob("*.exr")):
@@ -2405,6 +2536,7 @@ class RecorderApp(tk.Tk):
         # MC's actual FOV is user-settable so this is a default; full
         # Rust recorder will read FOV from game config.
         import math  # noqa: PLC0415 — local import keeps cold-start fast
+
         fov_v_deg = 70.0
         focal = (1080 / 2) / math.tan(math.radians(fov_v_deg / 2))
         intrinsics = {
@@ -2421,6 +2553,7 @@ class RecorderApp(tk.Tk):
         }
         try:
             import yaml  # noqa: PLC0415
+
             (clip_dir / "intrinsics.yaml").write_text(
                 yaml.safe_dump(intrinsics, sort_keys=False),
                 encoding="utf-8",
@@ -2440,9 +2573,7 @@ class RecorderApp(tk.Tk):
         sys_info["actual_duration_sec"] = round(elapsed_sec, 1)
         sys_info["partial"] = elapsed_sec < 300.0  # <5 min
         # Re-write systeminfo.json with the new fields.
-        (clip_dir / "systeminfo.json").write_text(
-            json.dumps(sys_info, indent=2), encoding="utf-8"
-        )
+        (clip_dir / "systeminfo.json").write_text(json.dumps(sys_info, indent=2), encoding="utf-8")
 
         # R01: if --allow-placeholder is active and JSONL was missing,
         # stamp metadata.json with data_authenticity='placeholder' so
@@ -2452,9 +2583,7 @@ class RecorderApp(tk.Tk):
                 "data_authenticity": "placeholder",
                 "warning": "camera/player fields are constant [0.0, 64.0, 0.0]",
             }
-            (clip_dir / "metadata.json").write_text(
-                json.dumps(meta, indent=2), encoding="utf-8"
-            )
+            (clip_dir / "metadata.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
             _trace("package: wrote metadata.json with data_authenticity=placeholder")
 
         # Write the tarball into the user's Documents/OysterClips/.
@@ -2480,9 +2609,19 @@ class RecorderApp(tk.Tk):
             return None
         try:
             res = subprocess.run(
-                [str(_FFMPEG), "-hide_banner", "-list_devices", "true",
-                 "-f", "dshow", "-i", "dummy"],
-                capture_output=True, timeout=8, text=True,
+                [
+                    str(_FFMPEG),
+                    "-hide_banner",
+                    "-list_devices",
+                    "true",
+                    "-f",
+                    "dshow",
+                    "-i",
+                    "dummy",
+                ],
+                capture_output=True,
+                timeout=8,
+                text=True,
                 creationflags=0x08000000 if os.name == "nt" else 0,
             )
             # ffmpeg writes device list to stderr
@@ -2526,9 +2665,7 @@ class RecorderApp(tk.Tk):
         """
         # R01 iron-law: hard-fail if Minecraft window not detected.
         if self._mc_window_rect is None:
-            raise RecorderError(
-                "Minecraft window not detected. Is Minecraft running and visible?"
-            )
+            raise RecorderError("Minecraft window not detected. Is Minecraft running and visible?")
 
         rect = self._mc_window_rect
         mc_title = rect.get("title", "")
@@ -2561,30 +2698,40 @@ class RecorderApp(tk.Tk):
         # R01 v2: always cropped-desktop capture using detected geometry.
         # locale-blind — title encoding never participates in the ffmpeg cmd.
         video_input = [
-            "-f", "gdigrab",
-            "-framerate", "30",
-            "-draw_mouse", "0",
-            "-offset_x", str(x),
-            "-offset_y", str(y),
-            "-video_size", f"{w}x{h}",
-            "-i", "desktop",
+            "-f",
+            "gdigrab",
+            "-framerate",
+            "30",
+            "-draw_mouse",
+            "0",
+            "-offset_x",
+            str(x),
+            "-offset_y",
+            str(y),
+            "-video_size",
+            f"{w}x{h}",
+            "-i",
+            "desktop",
         ]
-        _trace(
-            f"ffmpeg: window-area capture title='{mc_title}' "
-            f"geometry={x},{y},{w},{h}"
-        )
+        _trace(f"ffmpeg: window-area capture title='{mc_title}' " f"geometry={x},{y},{w},{h}")
 
         cmd = [
             str(_FFMPEG),
             *video_input,
             *audio_inputs,
-            "-vf", "scale=1920:1080:flags=lanczos",
-            "-c:v", "libx265",
-            "-preset", "ultrafast",
-            "-pix_fmt", "yuv420p",
+            "-vf",
+            "scale=1920:1080:flags=lanczos",
+            "-c:v",
+            "libx265",
+            "-preset",
+            "ultrafast",
+            "-pix_fmt",
+            "yuv420p",
             *audio_codec,
-            "-r", "30",
-            "-t", "360",
+            "-r",
+            "30",
+            "-t",
+            "360",
             "-y",
             str(out_path),
         ]
@@ -2637,6 +2784,7 @@ class RecorderApp(tk.Tk):
         def apply():
             self._verdict.config(text=big, fg=color)
             self._subtitle.config(text=sub, fg=color)
+
         # Tk requires UI updates from the main thread.
         try:
             self.after(0, apply)
@@ -2659,20 +2807,14 @@ def _emergency_error_box(exc: BaseException) -> None:
     try:
         root = tk.Tk()
         root.withdraw()
-        msg = (
-            "录制器启动失败。\n\n"
-            f"{type(exc).__name__}: {exc}\n\n"
-        )
+        msg = "录制器启动失败。\n\n" f"{type(exc).__name__}: {exc}\n\n"
         if remote_url:
             msg += (
                 f"日志已自动上传，工程师可访问：\n{remote_url}\n\n"
                 "你不用做任何事，工程师会从这个链接看到出错原因。"
             )
         else:
-            msg += (
-                f"日志在本机：{_STARTUP_LOG}\n"
-                "如果方便，把这个文件发给工程师。"
-            )
+            msg += f"日志在本机：{_STARTUP_LOG}\n" "如果方便，把这个文件发给工程师。"
         messagebox.showerror(
             title="Oyster 录制器 — 启动错误",
             message=msg,
@@ -2714,6 +2856,7 @@ def _try_install_mod_first_launch() -> None:
         # not in legacy contexts.
         sys.path.insert(0, str(bundle))
         from install_fabric_loader import ensure_installed  # type: ignore
+
         result = ensure_installed(fabric_installer, mod_jar)
         _trace(f"mod-install: {result.to_dict()}")
     except Exception as e:  # noqa: BLE001 — never crash recorder
@@ -2725,6 +2868,7 @@ def _try_install_mod_first_launch() -> None:
 
 def main() -> int:
     import argparse  # noqa: PLC0415
+
     parser = argparse.ArgumentParser(description="OysterRecorder")
     parser.add_argument(
         "--allow-placeholder",

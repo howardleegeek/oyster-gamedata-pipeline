@@ -88,6 +88,22 @@ def test_recorder_requires_game_sized_window_before_recording() -> None:
     assert m._is_real_minecraft_window_geometry(320, 240) is False
 
 
+def test_recorder_depth_mode_defaults_to_server_postprocess(monkeypatch) -> None:
+    monkeypatch.delenv("OYSTER_DEPTH_MODE", raising=False)
+    monkeypatch.delenv("OYSTER_ALLOW_CLIENT_DEPTH", raising=False)
+    m = _import_recorder_module()
+
+    assert m._depth_mode() == "server"
+    assert m._client_depth_inference_enabled() is False
+
+    monkeypatch.setenv("OYSTER_DEPTH_MODE", "local")
+    assert m._client_depth_inference_enabled() is True
+
+    monkeypatch.setenv("OYSTER_DEPTH_MODE", "server")
+    monkeypatch.setenv("OYSTER_ALLOW_CLIENT_DEPTH", "1")
+    assert m._client_depth_inference_enabled() is True
+
+
 def test_oysterplay_auto_arms_recorder_even_when_log_ready_marker_is_missing(
     monkeypatch, tmp_path: Path
 ) -> None:

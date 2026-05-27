@@ -12,6 +12,11 @@ The missing 15 points are depth-related items that require DA-V2 monocular depth
 which has complex dependencies (PyTorch, CUDA, etc.) that are difficult to set up on
 contributor machines, especially Windows.
 
+2026-05-26 architecture update: the consumer recorder must not run local
+DepthAnything/OpenEXR as the default path. The client captures raw video,
+telemetry, timestamps, manifests, and optional raw non-linear depth buffers; the
+server post-processing tier produces linear depth and OpenEXR deliverables.
+
 ## Server Options
 
 | Option | Setup cost | Per-inference cost | Latency | Best for |
