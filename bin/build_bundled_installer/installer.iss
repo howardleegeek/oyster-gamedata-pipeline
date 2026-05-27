@@ -24,9 +24,7 @@
 ;     empty so an over-eager UAC prompt never appears.
 ;
 ;   * BUNDLE EVERYTHING. There is no second download at install time. The
-;     [Files]
-; S131: Bundle VC++ Redist for auto-install when missing
-Source: "vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall noencryption skipifsourcedoesntexist block declares every directory tree directly; if any of the
+;     [Files] block declares every directory tree directly; if any of the
 ;     declared sources are missing at compile time, ISCC.exe fails loud.
 ;
 ;   * DESKTOP SHORTCUT VIA {userdesktop}. Inno Setup's built-in resolves
@@ -275,6 +273,35 @@ Source: "{#BundleRoot}\\OysterPlay.exe"; \
 Source: "{#BundleRoot}\\manifest.json"; \
     DestDir: "{app}"; \
     DestName: "manifest.json"; \
+    Flags: ignoreversion
+
+; --- (6) VC++ Redist 2015-2022 x64 (S131) ---------------------------------
+; ~25 MB. Downloaded by the CI workflow's "Download VC++ Redistributable"
+; step into the same dir as this .iss. Goes to {tmp} so it's removed after
+; the [Run] entry silently installs it on first-run testers' machines.
+; skipifsourcedoesntexist is BELT-AND-SUSPENDERS: if CI failed to download
+; it, the build still succeeds and the recorder simply assumes the user
+; already has VC++ Redist installed (most modern Windows 10/11 do).
+Source: "vc_redist.x64.exe"; \
+    DestDir: "{tmp}"; \
+    Flags: deleteafterinstall noencryption skipifsourcedoesntexist
+
+; --- (7) Python self-audit tools for testers (v0.11.21) ------------------
+; ~80 KB total. Lets the internal tester run prd_compliance_audit + the
+; tester_preflight wrapper without git-cloning the repo. Tester needs
+; Python 3.11+ pre-installed (documented in TESTER_HANDOFF_v0.11.20.md).
+; Lives at {app}\tools\ so the install layout stays clean.
+Source: "..\\tester_preflight.py"; \
+    DestDir: "{app}\\tools"; \
+    Flags: ignoreversion
+Source: "..\\prd_compliance_audit.py"; \
+    DestDir: "{app}\\tools"; \
+    Flags: ignoreversion
+Source: "..\\audit_quality_metrics.py"; \
+    DestDir: "{app}\\tools"; \
+    Flags: ignoreversion
+Source: "..\\canonical_pipeline.py"; \
+    DestDir: "{app}\\tools"; \
     Flags: ignoreversion
 
 [Icons]

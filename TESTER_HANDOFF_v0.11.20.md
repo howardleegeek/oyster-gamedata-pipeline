@@ -53,13 +53,23 @@ SHA256 校验（PowerShell 可选）：
 
 ## 第 4 步：自检（**这是最重要的一步**）
 
-打开命令行（cmd 或 PowerShell），切到 OysterRecorder 安装目录里（含 `tester_preflight.py`），运行：
+打开命令行（cmd 或 PowerShell），运行：
 
 ```cmd
-python bin\tester_preflight.py
+cd %LOCALAPPDATA%\OysterRecorder\tools
+python tester_preflight.py
 ```
 
 **自动找最新 session，跑 104+ 项 PRD 检查，给一行红黄绿判决。**
+
+> **注**：如果你的版本是 v0.11.20（最早一批），`tools\` 目录不存在。
+> 单独下载这两个脚本到任意目录运行：
+>
+> https://raw.githubusercontent.com/howardleegeek/oyster-gamedata-pipeline/main/bin/tester_preflight.py
+> https://raw.githubusercontent.com/howardleegeek/oyster-gamedata-pipeline/main/bin/prd_compliance_audit.py
+> https://raw.githubusercontent.com/howardleegeek/oyster-gamedata-pipeline/main/bin/audit_quality_metrics.py
+>
+> v0.11.21+ 已经把这些工具打进 `.exe`，不再需要单独下载。
 
 | 判决 | 含义 | 你做什么 |
 |------|------|---------|
