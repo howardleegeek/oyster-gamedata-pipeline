@@ -59,7 +59,7 @@ class FallbackStep:
     gate: str
 
 
-CURRENT_CONSUMER_TAG = "v0.15.0"
+CURRENT_CONSUMER_TAG = "v0.16.0"
 CURRENT_CONSUMER_INSTALLER = "OysterRecorder-Setup-v0.13.2.exe"
 CURRENT_CONSUMER_SHA256 = "aaf65aec8e54ef27adcb5e50d6aeb1e45d5f6871d61be77fb283b80376d98a00"
 BUNDLED_REFERENCE_TAG = "recorder-v0.28.0-rc19.0.3"

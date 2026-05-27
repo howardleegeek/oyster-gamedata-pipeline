@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## [0.16.0] - 2026-05-27
+
+### Added
+
+- linearize engine zbuffer depth (ed650c0)
+
+### Fixed
+
+- skip trim for short recordings (4ae9f76)
+- normalize raw mouse pixels (72f12a4)
+
+### Other
+
+- ci(installer): add minimal recorder installer (6fbe421)
+
+
 ## [0.15.0] - 2026-05-27
 
 ### Added
