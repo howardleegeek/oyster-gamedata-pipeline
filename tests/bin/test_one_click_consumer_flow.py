@@ -88,6 +88,14 @@ def test_recorder_requires_game_sized_window_before_recording() -> None:
     assert m._is_real_minecraft_window_geometry(320, 240) is False
 
 
+def test_recorder_does_not_iconify_after_ffmpeg_start() -> None:
+    src = (BIN_DIR / "recorder_consumer_lite.py").read_text(encoding="utf-8")
+
+    assert "window " "iconified to taskbar" not in src
+    assert "self.after(0, self." "iconify)" not in src
+    assert "post-ffmpeg iconify skipped" in src
+
+
 def test_recorder_depth_mode_defaults_to_server_postprocess(monkeypatch) -> None:
     monkeypatch.delenv("OYSTER_DEPTH_MODE", raising=False)
     monkeypatch.delenv("OYSTER_ALLOW_CLIENT_DEPTH", raising=False)

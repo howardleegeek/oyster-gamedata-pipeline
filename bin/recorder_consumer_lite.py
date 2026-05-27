@@ -723,6 +723,33 @@ def _get_minecraft_window_rect() -> Optional[dict[str, Any]]:
     }
 
 
+def _restore_minecraft_window_for_capture(rect: Optional[dict[str, Any]]) -> None:
+    """Best-effort restore/foreground the captured Minecraft window."""
+    if os.name != "nt" or not rect:
+        return
+    try:
+        hwnd = int(rect.get("hwnd") or 0)
+    except Exception:
+        hwnd = 0
+    if hwnd <= 0:
+        return
+
+    try:
+        import ctypes
+
+        user32 = ctypes.windll.user32
+        SW_RESTORE = 9
+        # Never minimize the capture target. Windows stops rendering
+        # minimized game windows, and gdigrab then records the last visible
+        # frame forever, producing a frozen-looking video.
+        user32.ShowWindow(hwnd, SW_RESTORE)
+        user32.BringWindowToTop(hwnd)
+        user32.SetForegroundWindow(hwnd)
+        _trace("minecraft window restored/foregrounded for gdigrab capture")
+    except Exception as exc:  # noqa: BLE001
+        _trace(f"minecraft foreground restore failed: {exc}")
+
+
 def _wait_for_stable_minecraft_window(
     *,
     timeout_sec: int = 120,
@@ -1839,12 +1866,10 @@ class RecorderApp(tk.Tk):
     def _toggle_arm(self) -> None:
         """Tester clicked the arm button. Toggle recording state.
 
-        v0.6.0: Howard 反馈 '界面 影响玩游戏'. As soon as recording is
-        armed we minimize ourselves to the taskbar so MC reclaims full
-        screen focus. Critical for exclusive-fullscreen MC sessions
-        where our window stealing focus could crash MC. The user can
-        click the taskbar icon any time to bring us back and click
-        '停止录制'.
+        Keep the recorder UI visible while waiting for Minecraft. Once
+        recording starts, the watcher foregrounds the Minecraft HWND
+        without minimizing it, because gdigrab freezes on the last visible
+        frame if Windows stops rendering a minimized game window.
         """
         if not self._record_armed:
             # Arm
@@ -1855,13 +1880,8 @@ class RecorderApp(tk.Tk):
                 activebackground="#b71c1c",
             )
             _trace("recording armed by user click")
-            # v0.17.0 BUG FIX: do NOT iconify here. Earlier versions
-            # iconified the window the moment ▶ was clicked, hiding the
-            # GUI before the watch_loop's Phase-1 status messages
-            # ('⏸ 已 arm — 请打开 Minecraft') could be seen. Tester saw
-            # window vanish and assumed crash. v0.17.0 defers iconify to
-            # the moment ffmpeg actually starts (in _run_one_session, see
-            # 'iconify after ffmpeg starts' marker).
+            # Do not minimize/iconify on arm. The tester needs the Phase-1
+            # status messages, and the capture target must remain rendered.
         else:
             # Disarm — request the watcher to stop any in-flight ffmpeg.
             self._record_armed = False
@@ -2028,6 +2048,10 @@ class RecorderApp(tk.Tk):
         import uuid as _uuid_mod
 
         self._session_id = str(_uuid_mod.uuid4())
+        # Bug fix: leave Minecraft visible/foreground for gdigrab. If the
+        # captured game window is minimized after ffmpeg starts, Windows
+        # stops rendering it and ffmpeg records one stale frame forever.
+        _restore_minecraft_window_for_capture(self._mc_window_rect)
         try:
             self._start_ffmpeg(self._video_path)
         except Exception as exc:  # noqa: BLE001
@@ -2053,14 +2077,10 @@ class RecorderApp(tk.Tk):
         # current video file size. Self-stops when ffmpeg ends.
         self.after(0, self._tick_recording_status)
 
-        # v0.17.0: iconify after ffmpeg starts marker — moved here from
-        # _toggle_arm. Now Phase 1 status messages stay visible until
-        # recording actually begins.
-        try:
-            self.after(0, self.iconify)
-            _trace("window iconified to taskbar (after ffmpeg start)")
-        except Exception as e:
-            _trace(f"iconify failed: {e}")
+        # Do not iconify/minimize anything after ffmpeg starts. The recorder
+        # UI stays available for Stop, and Minecraft stays visible so gdigrab
+        # keeps receiving fresh rendered frames.
+        _trace("post-ffmpeg iconify skipped; Minecraft left visible for capture")
 
         # Phase 3: wait for MC to exit OR for 6 minutes elapsed (PRD cap)
         # OR for the user to disarm.
