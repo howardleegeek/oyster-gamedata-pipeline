@@ -82,7 +82,7 @@ def test_validates_public_backend_health_and_appcast_path():
     assert 'Join-BackendUrl "/healthz"' in text
     assert 'Join-BackendUrl "/api/v1/updates/appcast.xml"' in text
     assert "$script:ReleaseTag" in text
-    assert "OysterRecorder-Setup-v0.12.3.exe" in text
+    assert "OysterRecorder-Setup-v0.13.2.exe" in text
 
 
 def test_reports_signature_but_only_requires_it_when_flag_set():

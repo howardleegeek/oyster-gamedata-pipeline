@@ -848,7 +848,7 @@ function Verify-Backend {
     if (-not $appcast.Contains($script:ReleaseTag)) {
         throw "Appcast does not reference $script:ReleaseTag"
     }
-    if (-not $appcast.Contains("OysterRecorder-Setup-v0.12.3.exe")) {
+    if (-not $appcast.Contains("OysterRecorder-Setup-v0.13.2.exe")) {
         throw "Appcast does not reference the OysterRecorder installer"
     }
     Add-Step "backend-appcast" "pass" "points to $script:ReleaseTag"
