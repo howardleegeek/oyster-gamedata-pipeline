@@ -46,7 +46,7 @@ def test_appcast_is_consumer_installer_only() -> None:
 
 
 def test_known_anchors_capture_current_successful_lines() -> None:
-    assert CURRENT_CONSUMER_TAG == "v0.13.0"
+    assert CURRENT_CONSUMER_TAG == "v0.13.1"
     assert CURRENT_CONSUMER_INSTALLER == "OysterRecorder-Setup-v0.12.3.exe"
     assert (
         CURRENT_CONSUMER_SHA256

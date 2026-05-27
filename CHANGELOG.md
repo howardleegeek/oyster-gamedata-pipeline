@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [0.13.1] - 2026-05-27
+
+### Fixed
+
+- align appcast with v0.13.0 asset (26a8a7c)
+
+### Other
+
+- chore(ci): format vcredist installer test (64a3f9f)
+- docs(spec): SPEC_engine_zbuffer_hook.md — Tier 3 metric depth (A2 P0) (7f034fe)
+
+
 ## [0.13.0] - 2026-05-27
 
 ### Added
