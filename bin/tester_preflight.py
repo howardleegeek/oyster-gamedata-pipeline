@@ -110,32 +110,76 @@ def bold(s: str) -> str:
 
 
 def discover_session(explicit: Path | None) -> Path | None:
-    """Locate the newest session_* under OysterClips, or honor the explicit path."""
+    """Locate the newest tester session across all known recorder output layouts.
+
+    BUG-3 fix (v0.12.2): the v0.12.x recorder writes EITHER
+      (a) ~/Documents/OysterClips/clip-YYYYMMDD-HHMMSS.tar.gz   (consumer build, finalized)
+      (b) ~/Documents/OysterClips/active_session/               (work-in-progress)
+      (c) ~/Documents/OysterClips/session_<ts>_<hash>/          (dev-direct)
+      (d) %LOCALAPPDATA%/OysterRecorder/recordings/session_*/   (legacy + Rust-side)
+      (e) %LOCALAPPDATA%/GameData Recorder/recordings/session_*/ (pre-rebrand legacy)
+
+    If (a) a tarball — extract to a temp dir and return that.
+    If (b)-(e) a directory with at least recording.mp4 OR game_state.jsonl,
+    return it directly.
+    Newest by mtime wins.
+    """
     if explicit is not None:
         return explicit if explicit.is_dir() else None
 
-    candidates: list[Path] = []
-    # Windows default
+    roots: list[Path] = []
     userprofile = os.environ.get("USERPROFILE")
-    if userprofile:
-        candidates.append(Path(userprofile) / "Documents" / "OysterClips")
-    # POSIX dev fallback
+    local_appdata = os.environ.get("LOCALAPPDATA")
     home = Path.home()
-    candidates.append(home / "Documents" / "OysterClips")
-    candidates.append(home / "Downloads" / "OysterClips")
+    if userprofile:
+        roots.append(Path(userprofile) / "Documents" / "OysterClips")
+    if local_appdata:
+        roots.append(Path(local_appdata) / "OysterRecorder" / "recordings")
+        roots.append(Path(local_appdata) / "GameData Recorder" / "recordings")
+    roots.append(home / "Documents" / "OysterClips")
+    roots.append(home / "Downloads" / "OysterClips")
 
-    for root in candidates:
+    candidates: list[tuple[float, Path, str]] = []  # (mtime, path, kind)
+    for root in roots:
         if not root.is_dir():
             continue
-        sessions = sorted(
-            (p for p in root.glob("session_*") if p.is_dir()),
-            key=lambda p: p.stat().st_mtime,
-            reverse=True,
-        )
-        if sessions:
-            return sessions[0]
+        # (a) tarballs in OysterClips
+        for tgz in root.glob("clip-*.tar.gz"):
+            candidates.append((tgz.stat().st_mtime, tgz, "tarball"))
+        # (b)-(e) directories
+        for d in root.glob("session_*"):
+            if d.is_dir():
+                candidates.append((d.stat().st_mtime, d, "dir"))
+        active = root / "active_session"
+        if active.is_dir():
+            candidates.append((active.stat().st_mtime, active, "active"))
 
-    return None
+    if not candidates:
+        return None
+
+    candidates.sort(reverse=True)  # newest first
+    mtime, path, kind = candidates[0]
+
+    if kind == "tarball":
+        import tarfile
+        extract_root = Path.home() / ".oyster_preflight_extracted"
+        extract_root.mkdir(exist_ok=True)
+        target = extract_root / path.stem.replace(".tar", "")
+        if not target.exists():
+            target.mkdir()
+            try:
+                with tarfile.open(path) as tf:
+                    tf.extractall(target)
+            except (tarfile.TarError, OSError) as exc:
+                print(red(f"❌ 解压 {path.name} 失败: {exc}"))
+                return None
+        # Look for the inner session dir (might be wrapped)
+        inner = [p for p in target.iterdir() if p.is_dir()]
+        if len(inner) == 1:
+            return inner[0]
+        return target
+
+    return path
 
 
 # ---------------------------------------------------------------------------
