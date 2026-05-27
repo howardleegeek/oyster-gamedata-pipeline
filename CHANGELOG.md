@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [0.13.0] - 2026-05-27
+
+### Added
+
+- bin/upload_session.py one-click tester session upload (v0.12.4) (6fd99a8)
+
+### Fixed
+
+- canonical_pipeline.py robustness — partial-success mode (+46 points) (607d3ce)
+- move consumer depth to server postprocess contract (30abd90)
+
+
 ## [0.12.2] - 2026-05-27
 
 ### Fixed
