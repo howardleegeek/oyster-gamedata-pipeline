@@ -53,9 +53,11 @@ import tempfile
 import threading
 import time
 import traceback
+import types
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Sequence
 
 # ---- Startup tracing (runs BEFORE any heavyweight import) -----------------
 # Howard tester 2026-05-05: "反馈过来一点就闪退" — v0.1.0 silently crashed
@@ -440,9 +442,27 @@ try:
     from tkinter import messagebox, ttk  # ttk: rc9 depth-progress bar
 
     _trace("tkinter ok")
-except Exception:
+except Exception as _tk_exc:
     _trace(f"tkinter FAILED:\n{traceback.format_exc()}")
-    raise
+    _TK_IMPORT_ERROR = _tk_exc
+
+    class _MissingTkWidget:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            raise RuntimeError(f"tkinter unavailable: {_TK_IMPORT_ERROR}") from _TK_IMPORT_ERROR
+
+        def __getattr__(self, _name: str) -> Any:
+            return lambda *a, **kw: None
+
+    tk = types.SimpleNamespace(  # type: ignore[assignment]
+        Tk=_MissingTkWidget,
+        Frame=_MissingTkWidget,
+        Label=_MissingTkWidget,
+        Button=_MissingTkWidget,
+        Checkbutton=_MissingTkWidget,
+        BooleanVar=_MissingTkWidget,
+    )
+    messagebox = types.SimpleNamespace(showerror=lambda *a, **kw: None)
+    ttk = types.SimpleNamespace(Progressbar=_MissingTkWidget)
 
 # pynput is lazily imported in InputCapture.start() so that startup of
 # the .exe doesn't fail if pynput's hooks misbehave on a tester's box.
@@ -493,6 +513,336 @@ def _output_dir() -> Path:
     docs = _real_documents_dir() / "OysterClips"
     docs.mkdir(parents=True, exist_ok=True)
     return docs
+
+
+class AudioCaptureMode:
+    """Recorder audio source identifiers, ordered from most to least precise."""
+
+    APPLICATION = "application_audio_capture"
+    DESKTOP = "desktop_audio_output"
+    INPUT = "input_device"
+    NONE = "none"
+
+
+@dataclass(frozen=True)
+class AudioSourceProbe:
+    """One attempted audio source in the ffmpeg priority chain."""
+
+    mode: str
+    label: str
+    available: bool
+    ffmpeg_args: tuple[str, ...] = ()
+    device: Optional[str] = None
+    reason: str = ""
+    fallback_used: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "mode": self.mode,
+            "label": self.label,
+            "available": self.available,
+            "device": self.device,
+            "reason": self.reason,
+            "fallback_used": self.fallback_used,
+            "ffmpeg_args": list(self.ffmpeg_args),
+        }
+
+
+@dataclass(frozen=True)
+class AudioProbeReport:
+    """Full result from probing the recorder audio chain."""
+
+    process_name: str
+    selected: Optional[AudioSourceProbe]
+    probes: list[AudioSourceProbe] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "process_name": self.process_name,
+            "selected": self.selected.to_dict() if self.selected else None,
+            "probes": [p.to_dict() for p in self.probes],
+        }
+
+
+_DSHOW_LOOPBACK_HINTS = (
+    "virtual-audio-capturer",
+    "stereo mix",
+    "stereomix",
+    "what u hear",
+    "what you hear",
+    "vb-audio virtual cable",
+    "voicemeeter output",
+    "cable output",
+)
+
+_APPLICATION_AUDIO_HINTS = (
+    "application audio capture",
+    "application loopback",
+    "process loopback",
+    "process audio",
+)
+
+
+def _run_ffmpeg_probe(args: Sequence[str], timeout: float = 8.0) -> tuple[int, str]:
+    """Run an ffmpeg probe and return (returncode, combined output)."""
+
+    try:
+        res = subprocess.run(
+            [str(_FFMPEG), *args],
+            capture_output=True,
+            timeout=timeout,
+            text=True,
+            creationflags=0x08000000 if os.name == "nt" else 0,
+        )
+    except Exception as e:  # noqa: BLE001 - diagnostics must not crash recorder startup
+        return 127, f"{type(e).__name__}: {e}"
+    return res.returncode, (res.stdout or "") + (res.stderr or "")
+
+
+def _list_ffmpeg_devices(demuxer: str) -> str:
+    """Return ffmpeg -list_devices output for a Windows demuxer."""
+
+    _rc, output = _run_ffmpeg_probe(
+        ["-hide_banner", "-list_devices", "true", "-f", demuxer, "-i", "dummy"]
+    )
+    return output
+
+
+def _ffmpeg_supports_device(demuxer: str) -> bool:
+    """Return True if ffmpeg -devices lists a demuxing device by name."""
+
+    _rc, output = _run_ffmpeg_probe(["-hide_banner", "-devices"])
+    needle = demuxer.lower()
+    for line in output.lower().splitlines():
+        parts = line.split()
+        if len(parts) >= 2 and parts[0].startswith("d") and parts[1] == needle:
+            return True
+    return False
+
+
+def _windows_supports_application_audio_capture() -> bool:
+    """Windows 10 2004 (build 19041) introduced process loopback capture."""
+
+    if os.name != "nt":
+        return False
+    getwindowsversion = getattr(sys, "getwindowsversion", None)
+    if getwindowsversion is None:
+        return False
+    try:
+        return int(getwindowsversion().build) >= 19041
+    except Exception:
+        return False
+
+
+def _parse_dshow_audio_devices(output: str) -> list[str]:
+    """Parse DirectShow audio device names from ffmpeg -list_devices output."""
+
+    devices: list[str] = []
+    in_audio = False
+    for raw in output.splitlines():
+        line = raw.strip()
+        lower = line.lower()
+        if "directshow audio devices" in lower:
+            in_audio = True
+            continue
+        if "directshow video devices" in lower:
+            in_audio = False
+            continue
+        if not in_audio:
+            continue
+        if "alternative name" in lower:
+            continue
+        start = line.find('"')
+        end = line.find('"', start + 1)
+        if start >= 0 and end > start:
+            devices.append(line[start + 1 : end])
+    return devices
+
+
+def _parse_wasapi_output_devices(output: str) -> list[str]:
+    """Best-effort parse for WASAPI render/output endpoints."""
+
+    devices: list[str] = []
+    section = ""
+    for raw in output.splitlines():
+        line = raw.strip()
+        lower = line.lower()
+        if any(
+            token in lower for token in ("output devices", "render devices", "playback devices")
+        ):
+            section = "output"
+            continue
+        if any(
+            token in lower for token in ("input devices", "capture devices", "recording devices")
+        ):
+            section = "input"
+            continue
+        if section != "output":
+            continue
+        start = line.find('"')
+        end = line.find('"', start + 1)
+        if start >= 0 and end > start:
+            devices.append(line[start + 1 : end])
+    return devices
+
+
+def _find_device_by_hints(devices: Sequence[str], hints: Sequence[str]) -> Optional[str]:
+    for device in devices:
+        low = device.lower()
+        if any(hint in low for hint in hints):
+            return device
+    return None
+
+
+def _probe_application_audio_capture(
+    process_name: str, dshow_devices: Sequence[str]
+) -> AudioSourceProbe:
+    """Try a process/application-specific audio source for javaw.exe."""
+
+    if not _windows_supports_application_audio_capture():
+        return AudioSourceProbe(
+            mode=AudioCaptureMode.APPLICATION,
+            label=f"Application Audio Capture ({process_name})",
+            available=False,
+            reason="Windows build does not expose process loopback capture",
+        )
+
+    process_low = process_name.lower()
+    process_stem = process_low.removesuffix(".exe")
+    for device in dshow_devices:
+        low = device.lower()
+        looks_like_app_audio = any(hint in low for hint in _APPLICATION_AUDIO_HINTS)
+        matches_process = process_low in low or process_stem in low
+        if looks_like_app_audio and matches_process:
+            return AudioSourceProbe(
+                mode=AudioCaptureMode.APPLICATION,
+                label=f"Application Audio Capture ({process_name})",
+                available=True,
+                ffmpeg_args=("-f", "dshow", "-i", f"audio={device}"),
+                device=device,
+                reason="matched process-specific DirectShow application audio device",
+            )
+
+    return AudioSourceProbe(
+        mode=AudioCaptureMode.APPLICATION,
+        label=f"Application Audio Capture ({process_name})",
+        available=False,
+        reason="no process-specific application audio device found in ffmpeg list_devices",
+    )
+
+
+def _probe_desktop_audio_output(
+    wasapi_output: str, dshow_devices: Sequence[str]
+) -> AudioSourceProbe:
+    """Try system audio via WASAPI loopback, then known DirectShow loopback shims."""
+
+    wasapi_supported = _ffmpeg_supports_device("wasapi")
+    wasapi_outputs = _parse_wasapi_output_devices(wasapi_output)
+    if wasapi_supported or wasapi_outputs or "loopback" in wasapi_output.lower():
+        device = "loopback"
+        if wasapi_outputs:
+            device = wasapi_outputs[0]
+        return AudioSourceProbe(
+            mode=AudioCaptureMode.DESKTOP,
+            label="Desktop Audio Output (WASAPI loopback)",
+            available=True,
+            ffmpeg_args=("-f", "wasapi", "-i", "loopback"),
+            device=device,
+            reason="WASAPI loopback available for default playback device",
+            fallback_used=True,
+        )
+
+    loopback = _find_device_by_hints(dshow_devices, _DSHOW_LOOPBACK_HINTS)
+    if loopback:
+        return AudioSourceProbe(
+            mode=AudioCaptureMode.DESKTOP,
+            label="Desktop Audio Output (DirectShow loopback)",
+            available=True,
+            ffmpeg_args=("-f", "dshow", "-i", f"audio={loopback}"),
+            device=loopback,
+            reason="matched DirectShow loopback/virtual cable device",
+            fallback_used=True,
+        )
+
+    return AudioSourceProbe(
+        mode=AudioCaptureMode.DESKTOP,
+        label="Desktop Audio Output (WASAPI loopback)",
+        available=False,
+        reason="no WASAPI loopback or DirectShow loopback device found",
+        fallback_used=True,
+    )
+
+
+def _probe_any_input_device(dshow_devices: Sequence[str]) -> AudioSourceProbe:
+    """Last resort: any ffmpeg-visible DirectShow input device."""
+
+    if dshow_devices:
+        device = dshow_devices[0]
+        return AudioSourceProbe(
+            mode=AudioCaptureMode.INPUT,
+            label="Any audio input device",
+            available=True,
+            ffmpeg_args=("-f", "dshow", "-i", f"audio={device}"),
+            device=device,
+            reason="fallback to first DirectShow audio input device",
+            fallback_used=True,
+        )
+    return AudioSourceProbe(
+        mode=AudioCaptureMode.INPUT,
+        label="Any audio input device",
+        available=False,
+        reason="no DirectShow audio input devices found",
+        fallback_used=True,
+    )
+
+
+def probe_audio_source_chain(process_name: str = "javaw.exe") -> AudioProbeReport:
+    """Probe recorder audio sources in app -> desktop -> input order."""
+
+    if os.name != "nt":
+        probe = AudioSourceProbe(
+            mode=AudioCaptureMode.NONE,
+            label="Windows recorder audio chain",
+            available=False,
+            reason="non-Windows host; Windows ffmpeg devices unavailable",
+            fallback_used=True,
+        )
+        return AudioProbeReport(process_name=process_name, selected=None, probes=[probe])
+
+    dshow_output = _list_ffmpeg_devices("dshow")
+    wasapi_output = _list_ffmpeg_devices("wasapi")
+    dshow_devices = _parse_dshow_audio_devices(dshow_output)
+
+    probes = [
+        _probe_application_audio_capture(process_name, dshow_devices),
+        _probe_desktop_audio_output(wasapi_output, dshow_devices),
+        _probe_any_input_device(dshow_devices),
+    ]
+    selected = next((probe for probe in probes if probe.available), None)
+    return AudioProbeReport(process_name=process_name, selected=selected, probes=probes)
+
+
+def _print_audio_probe_report(report: AudioProbeReport, *, as_json: bool = False) -> None:
+    """Emit the audio-chain probe result for CLI diagnostics."""
+
+    if as_json:
+        print(json.dumps(report.to_dict(), indent=2, ensure_ascii=False))
+        return
+
+    print(f"process: {report.process_name}")
+    for idx, probe in enumerate(report.probes, start=1):
+        status = "OK" if probe.available else "MISS"
+        print(f"{idx}. {status} {probe.label}")
+        if probe.device:
+            print(f"   device: {probe.device}")
+        if probe.reason:
+            print(f"   reason: {probe.reason}")
+        if probe.available:
+            print(f"   ffmpeg: {' '.join(probe.ffmpeg_args)}")
+    if report.selected:
+        print(f"selected: {report.selected.mode}")
+    else:
+        print("selected: none")
 
 
 def _detect_gpu_available() -> bool:
@@ -2621,58 +2971,6 @@ class RecorderApp(tk.Tk):
             pass
         return out_tar
 
-    def _detect_audio_device(self) -> Optional[str]:
-        """Probe ffmpeg dshow for the first audio input device.
-
-        Returns the alt-name for use as `-i audio=<name>`. Returns None
-        if no device found or probe fails — caller should record video
-        only in that case. v0.11.0.
-        """
-        if os.name != "nt":
-            return None
-        try:
-            res = subprocess.run(
-                [
-                    str(_FFMPEG),
-                    "-hide_banner",
-                    "-list_devices",
-                    "true",
-                    "-f",
-                    "dshow",
-                    "-i",
-                    "dummy",
-                ],
-                capture_output=True,
-                timeout=8,
-                text=True,
-                creationflags=0x08000000 if os.name == "nt" else 0,
-            )
-            # ffmpeg writes device list to stderr
-            output = res.stderr or res.stdout or ""
-        except Exception as e:
-            _trace(f"audio_probe: ffmpeg list_devices failed: {e}")
-            return None
-
-        # Parse "DirectShow audio devices" section, capture device names.
-        # Format: [dshow @ 0x...]  "Microphone (Realtek...)" (audio)
-        in_audio = False
-        first_audio = None
-        for line in output.splitlines():
-            if "DirectShow audio devices" in line:
-                in_audio = True
-                continue
-            if in_audio:
-                if "DirectShow video devices" in line:
-                    break
-                # Match: '"<device-name>"'
-                if '"' in line and "Alternative name" not in line:
-                    name = line.split('"')[1] if '"' in line else None
-                    if name and first_audio is None:
-                        first_audio = name
-                        break
-        _trace(f"audio_probe: device={first_audio!r}")
-        return first_audio
-
     def _start_ffmpeg(self, out_path: Path) -> None:
         """Spawn ffmpeg with gdigrab to record the Minecraft window.
 
@@ -2682,9 +2980,10 @@ class RecorderApp(tk.Tk):
         fully locale-blind. Hard-fails if mc_window is None (no window
         detected). The old title-based branch has been removed.
 
-        v0.11.0: also captures audio via dshow if a device is detected.
-        Falls back to video-only if no audio device or audio capture
-        fails to start.
+        v0.29.0: captures audio via an explicit priority chain:
+        Application Audio Capture(javaw.exe) -> Desktop Audio Output ->
+        any DirectShow input fallback. Never chooses microphone before
+        system audio when a loopback source is available.
         """
         # R01 iron-law: hard-fail if Minecraft window not detected.
         if self._mc_window_rect is None:
@@ -2707,16 +3006,34 @@ class RecorderApp(tk.Tk):
                 "to a supported version OR pass --allow-placeholder."
             )
 
-        # Audio probe.
-        audio_dev = self._detect_audio_device()
+        # Audio probe. The old implementation only scanned DirectShow input
+        # devices, so machines with no microphone produced device=None and a
+        # video-only ffmpeg command. Dedicated minipc collectors need system
+        # audio even when no capture input is present.
+        audio_report = probe_audio_source_chain("javaw.exe")
+        audio_source = audio_report.selected
         audio_inputs = []
         audio_codec = []
-        if audio_dev:
-            audio_inputs = ["-f", "dshow", "-i", f"audio={audio_dev}"]
+        for probe in audio_report.probes:
+            _trace(
+                "audio_probe: "
+                f"mode={probe.mode} available={probe.available} "
+                f"device={probe.device!r} reason={probe.reason}"
+            )
+        if audio_source:
+            audio_inputs = list(audio_source.ffmpeg_args)
             audio_codec = ["-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2"]
-            _trace(f"ffmpeg: capturing audio from '{audio_dev}'")
+            _trace(
+                "ffmpeg: capturing audio "
+                f"mode={audio_source.mode} device={audio_source.device!r} "
+                f"args={' '.join(audio_inputs)}"
+            )
         else:
-            _trace("ffmpeg: no audio device found, recording video only")
+            _trace(
+                "WARNING: audio_probe all sources failed; no ffmpeg audio source is "
+                "available. Recording video-only because there is no system loopback "
+                "or input device to attach."
+            )
 
         # R01 v2: always cropped-desktop capture using detected geometry.
         # locale-blind — title encoding never participates in the ffmpeg cmd.
@@ -2888,7 +3205,7 @@ def _try_install_mod_first_launch() -> None:
             pass
 
 
-def main() -> int:
+def main(argv: Optional[Sequence[str]] = None) -> int:
     import argparse  # noqa: PLC0415
 
     parser = argparse.ArgumentParser(description="OysterRecorder")
@@ -2898,7 +3215,36 @@ def main() -> int:
         default=False,
         help="Allow placeholder camera/player fields (marks tarball as non-real)",
     )
-    args, _unknown = parser.parse_known_args()
+    parser.add_argument(
+        "--probe-audio-chain",
+        action="store_true",
+        default=False,
+        help="Probe ffmpeg audio sources and exit without launching the recorder UI",
+    )
+    parser.add_argument(
+        "--probe-audio-chain-json",
+        action="store_true",
+        default=False,
+        help="Emit --probe-audio-chain diagnostics as JSON",
+    )
+    parser.add_argument(
+        "--audio-process-name",
+        default="javaw.exe",
+        help="Process name to target for application audio probing (default: javaw.exe)",
+    )
+    args, _unknown = parser.parse_known_args(argv)
+
+    if args.probe_audio_chain or args.probe_audio_chain_json:
+        report = probe_audio_source_chain(args.audio_process_name)
+        _print_audio_probe_report(report, as_json=args.probe_audio_chain_json)
+        if report.selected is None:
+            _trace("audio_probe_cli: selected=None")
+        else:
+            _trace(
+                "audio_probe_cli: "
+                f"selected={report.selected.mode} device={report.selected.device!r}"
+            )
+        return 0
 
     # R01 D section: print supported MC versions at startup.
     supported_str = ", ".join(SUPPORTED_MC_VERSIONS)
