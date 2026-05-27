@@ -336,6 +336,16 @@ Source: "..\\prd_compliance_audit_H8_patch.py"; \
     DestDir: "{app}\\tools"; \
     Flags: ignoreversion skipifsourcedoesntexist
 
+; --- (7b) One-click session uploader (v0.12.4) ---------------------------
+; ~7 KB. Lets tester upload their session to our S3 bucket via the
+; production backend (http://136.109.41.170:8081) with ONE command:
+;   python {app}\tools\upload_session.py --token <token>
+; Replaces the tar+网盘+微信 chain. Pure stdlib (urllib + zipfile).
+; Requires Bearer token (issued via Discord OAuth or admin helper).
+Source: "..\\upload_session.py"; \
+    DestDir: "{app}\\tools"; \
+    Flags: ignoreversion
+
 ; --- (8) Defender pre-install fix scripts (v0.12.3) ---------------------
 ; ~5 KB total. Two .cmd files (English + Chinese) that the tester can run
 ; as Administrator to add %LOCALAPPDATA%\OysterRecorder\ to Windows
