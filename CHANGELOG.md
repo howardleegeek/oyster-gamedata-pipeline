@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## [0.12.0] - 2026-05-27
+
+### Added
+
+- preflight self-audit + Chinese handoff doc for v0.11.20 (6fe8ce0)
+
+### Fixed
+
+- remove stale Mojang asset 01bbb775 from post-fetch checklist (2090aff)
+
+### Other
+
+- docs: PERFECT_VERSION_INTEGRATION — v0.11.20 verified, all 8 criteria ✅ (45a481d)
+
+
 ## [0.11.20] - 2026-05-26
 
 ### Fixed
