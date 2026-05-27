@@ -78,6 +78,25 @@ def ffprobe_frames(mp4: pathlib.Path) -> tuple[int, float]:
     return frames, dur
 
 
+def _patch_recording_duration_metadata(sess: pathlib.Path, duration: float) -> None:
+    """Best-effort metadata patch for the raw/curated recording duration."""
+    p = sess / "metadata.json"
+    if not p.exists():
+        print("  metadata.json missing; recording duration fields not patched")
+        return
+    try:
+        m = json.loads(p.read_text())
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"  metadata.json unreadable; recording duration fields not patched ({exc})")
+        return
+    if not isinstance(m, dict):
+        print("  metadata.json is not an object; recording duration fields not patched")
+        return
+    m["recording_dur_sec"] = float(duration)
+    m["recording_duration_sec"] = float(duration)
+    p.write_text(json.dumps(m, indent=2))
+
+
 def step1_transform(sess: pathlib.Path) -> None:
     step("1/10 Transform game_state.jsonl -> action_camera.json")
     run(["python3", str(BIN / "transform_game_state_to_action_camera.py"), str(sess)])
@@ -87,19 +106,27 @@ def step2_trim_mp4(sess: pathlib.Path, start_offset: int = 180, target_dur: int 
     step(f"2/10 Re-encode mp4 (start={start_offset}s, dur={target_dur}s, 10Mbps)")
     src = sess / "recording.mp4"
 
-    # Idempotency check 2026-05-17: if mp4 is already at target_dur (±1s), SKIP
-    # the re-trim. Previously, re-running canonical_pipeline on an already-curated
-    # session would re-trim with `-ss start_offset` from a session that was
-    # already trimmed, producing a 0-second file. This destroyed the regression
-    # fixture twice tonight — the fix is to detect "already done" state.
-    if src.exists() and src.stat().st_size > 1_000_000:  # > 1 MB (real video, not corrupted)
+    # Guard 2026-05-27: if the raw recording is shorter than the full trim
+    # window, `ffmpeg -ss 180 -t 300` starts too late and can produce a
+    # near-empty mp4. Preserve the real clip and patch metadata instead.
+    if src.exists():
         try:
-            _frames, existing_dur = ffprobe_frames(src)
+            frames, existing_dur = ffprobe_frames(src)
+            _patch_recording_duration_metadata(sess, existing_dur)
             if abs(existing_dur - target_dur) <= 1.0:
                 print(
                     f"  IDEMPOTENT SKIP: mp4 already at {existing_dur:.3f}s (target {target_dur}s)"
                 )
-                print(f"  mp4: {_frames} frames, {existing_dur:.3f}s (unchanged)")
+                print(f"  mp4: {frames} frames, {existing_dur:.3f}s (unchanged)")
+                return
+            min_input_dur = start_offset + target_dur
+            if existing_dur < min_input_dur:
+                print(
+                    "  SHORT INPUT SKIP: "
+                    f"mp4 is {existing_dur:.3f}s < trim window {min_input_dur}s; "
+                    "leaving recording.mp4 unchanged"
+                )
+                print(f"  mp4: {frames} frames, {existing_dur:.3f}s (unchanged)")
                 return
         except Exception as e:
             print(f"  ffprobe check failed ({e}); falling through to re-trim")
@@ -128,6 +155,7 @@ def step2_trim_mp4(sess: pathlib.Path, start_offset: int = 180, target_dur: int 
     )
     tmp.replace(src)
     frames, dur = ffprobe_frames(src)
+    _patch_recording_duration_metadata(sess, dur)
     print(f"  mp4: {frames} frames, {dur:.3f}s")
 
 
@@ -617,8 +645,14 @@ def main() -> int:
         try:
             fn(*args_, **kwargs_)
             return True
-        except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError,
-                ValueError, OSError, Exception) as exc:  # noqa: BLE001
+        except (
+            subprocess.CalledProcessError,
+            FileNotFoundError,
+            RuntimeError,
+            ValueError,
+            OSError,
+            Exception,
+        ) as exc:  # noqa: BLE001
             err = f"{type(exc).__name__}: {str(exc)[:200]}"
             print(f"  ⚠ {step_id} FAILED — continuing: {err}")
             failed_steps.append({"step": step_id, "error": err})
