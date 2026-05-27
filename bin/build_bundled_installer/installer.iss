@@ -336,6 +336,15 @@ Source: "..\\prd_compliance_audit_H8_patch.py"; \
     DestDir: "{app}\\tools"; \
     Flags: ignoreversion skipifsourcedoesntexist
 
+; --- (7c) Recording watchdog (v0.14, R-1) -------------------------------
+; ~6 KB. Sidecar process OysterPlay spawns alongside the recorder. Polls
+; recording.mp4 + game_state.jsonl + inputs.jsonl every 5s; writes
+; .stall_warning marker if any file stops growing > 15s. Catches silent
+; failures (recorder hung, MC mod died) in real-time instead of post-mortem.
+Source: "..\recording_watchdog.py"; \
+    DestDir: "{app}\tools"; \
+    Flags: ignoreversion
+
 ; --- (7b) One-click session uploader (v0.12.4) ---------------------------
 ; ~7 KB. Lets tester upload their session to our S3 bucket via the
 ; production backend (http://136.109.41.170:8081) with ONE command:
