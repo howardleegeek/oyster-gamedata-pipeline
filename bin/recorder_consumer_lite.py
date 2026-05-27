@@ -2697,6 +2697,7 @@ class RecorderApp(tk.Tk):
 
         # R01 v2: always cropped-desktop capture using detected geometry.
         # locale-blind — title encoding never participates in the ffmpeg cmd.
+        desktop_input = ["-i", "desktop"]
         video_input = [
             "-f",
             "gdigrab",
@@ -2710,9 +2711,7 @@ class RecorderApp(tk.Tk):
             str(y),
             "-video_size",
             f"{w}x{h}",
-            "-i",
-            "desktop",
-        ]
+        ] + desktop_input
         _trace(f"ffmpeg: window-area capture title='{mc_title}' " f"geometry={x},{y},{w},{h}")
 
         cmd = [
