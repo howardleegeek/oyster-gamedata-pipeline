@@ -126,6 +126,12 @@ DefaultGroupName={#AppName}
 DisableProgramGroupPage=auto
 DisableDirPage=no
 
+; BUG-14 fix (v0.12.2): require ~2 GB free for the bundle extraction.
+; Inno will refuse to install if {app} disk has less than this — with a
+; clear "disk full" dialog instead of a confusing mid-extraction failure.
+; 2048 MB = 800 MB final + ~600 MB temp during extraction + 600 MB safety.
+ExtraDiskSpaceRequired=2147483648
+
 ; Per-user uninstaller — registered under HKCU so it shows in
 ; "Apps & features" / "Add/Remove Programs" without admin.
 UninstallDisplayIcon={app}\{#AppExeName}
