@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [0.12.2] - 2026-05-27
+
+### Fixed
+
+- self-locating paths + bundle 5 missing scripts (v0.12.2) (ff44036)
+- multi-layout session discovery (BUG-3, v0.12.2) (750275a)
+- ExtraDiskSpaceRequired=2GB to catch low-disk testers (BUG-14) (9c93743)
+
+
 ## [0.12.0] - 2026-05-27
 
 ### Added
