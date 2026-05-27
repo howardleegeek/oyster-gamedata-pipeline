@@ -336,6 +336,23 @@ Source: "..\\prd_compliance_audit_H8_patch.py"; \
     DestDir: "{app}\\tools"; \
     Flags: ignoreversion skipifsourcedoesntexist
 
+; --- (8) Defender pre-install fix scripts (v0.12.3) ---------------------
+; ~5 KB total. Two .cmd files (English + Chinese) that the tester can run
+; as Administrator to add %LOCALAPPDATA%\OysterRecorder\ to Windows
+; Defender exclusions BEFORE installing. This prevents Defender from
+; quarantining bundled javaw.exe + Minecraft .jar files (the "install
+; corrupted" bug seen by tester bingd on v0.12.0/v0.12.1/v0.12.2).
+;
+; oyster_play.py's "Install incomplete" dialog points users to:
+;   {app}\fix-scripts\INSTALL-FIRST.cmd
+; with instructions to right-click → "Run as administrator", then reinstall.
+Source: "..\\..\\installer\\fix-scripts\\INSTALL-FIRST.cmd"; \
+    DestDir: "{app}\\fix-scripts"; \
+    Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\\..\\installer\\fix-scripts\\请先双击我.cmd"; \
+    DestDir: "{app}\\fix-scripts"; \
+    Flags: ignoreversion skipifsourcedoesntexist
+
 [Icons]
 ; ---- Start-menu group (always created) ------------------------------------
 Name: "{group}\\{#AppShortcutLbl}"; \

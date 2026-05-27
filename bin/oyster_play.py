@@ -430,13 +430,37 @@ def run_session(
     # Step 1: install integrity check
     status = launcher.verify_install(install_root_path, profile_name)
     if not status.ok:
+        # Defender / antivirus is the #1 cause of these missing files
+        # (Java + Minecraft .jar are high-FP triggers on fresh Windows).
+        # Tell the user that in plain language and point them to the
+        # bundled fix script before suggesting reinstall.
+        fix_script_path = install_root_path / "fix-scripts" / "INSTALL-FIRST.cmd"
+
+        # Bilingual message — Chinese first because most testers are CN.
         sess.failure_reason = (
-            "Install incomplete. Please reinstall.\nMissing:\n  " +
-            "\n  ".join(status.missing)
+            "安装不完整。最常见原因: Windows Defender 误删了 Java + Minecraft 文件。\n\n"
+            "Install incomplete. Most common cause: Windows Defender quarantined the\n"
+            "bundled Java runtime + Minecraft files (high false-positive rate on\n"
+            "unsigned Java + Minecraft jar combos).\n\n"
+            "缺失文件 / Missing files:\n  " +
+            "\n  ".join(status.missing) +
+            "\n\n"
+            "─────────────────────────────────────────────────────────────────\n"
+            "解决方案 / Fix (3 步):\n"
+            "  1) 右键此文件, 选 '以管理员身份运行':\n"
+            f"     {fix_script_path}\n"
+            "  2) 在控制面板卸载 Oyster Recorder.\n"
+            "  3) 重新双击 OysterRecorder-Setup-*.exe 安装.\n\n"
+            "English (3 steps):\n"
+            "  1) Right-click + 'Run as administrator':\n"
+            f"     {fix_script_path}\n"
+            "  2) Uninstall Oyster Recorder via Control Panel.\n"
+            "  3) Re-run OysterRecorder-Setup-*.exe.\n"
         )
         if not dry_run:
             launcher._show_messagebox(  # noqa: SLF001 — internal helper
-                "Oyster Recorder — install corrupted", sess.failure_reason,
+                "Oyster Recorder — install corrupted (Defender?)",
+                sess.failure_reason,
             )
         return sess
 
