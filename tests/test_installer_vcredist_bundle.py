@@ -1,4 +1,5 @@
 """S130: validate VC++ Redist bundle wiring in installer."""
+
 from pathlib import Path
 
 
