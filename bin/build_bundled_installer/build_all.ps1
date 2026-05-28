@@ -275,6 +275,10 @@ if (-not $SkipDeps) {
         "--workpath", (Join-Path $RepoRoot "build\OysterRecorder-onedir"),
         "--specpath", (Join-Path $RepoRoot "build\OysterRecorder-onedir"),
         "--paths", (Join-Path $RepoRoot "bin"),
+        "--collect-all", "windows_capture",
+        "--collect-all", "mss",
+        "--hidden-import", "windows_capture",
+        "--hidden-import", "mss",
         $RecorderEntry
     )
 }

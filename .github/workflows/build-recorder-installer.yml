@@ -178,6 +178,7 @@ jobs:
           # --collect-all directives, not pinned at the workflow level.
           pip install "pyinstaller>=6.0"
           pip install pynput pillow numpy pyyaml
+          pip install -r bin/build_bundled_installer/requirements-recorder.txt
           pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
           pip install transformers "imageio[ffmpeg]" OpenEXR Imath huggingface_hub
           python -c "import PyInstaller, sys; print(f'PyInstaller {PyInstaller.__version__} on Python {sys.version.split()[0]}')"
@@ -434,6 +435,8 @@ jobs:
             --collect-all numpy `
             --collect-all PIL `
             --collect-all yaml `
+            --collect-all windows_capture `
+            --collect-all mss `
             --collect-all torch `
             --collect-all transformers `
             --collect-all OpenEXR `
@@ -448,6 +451,8 @@ jobs:
             --hidden-import depth_anything_v2_inference `
             --hidden-import install_fabric_loader `
             --hidden-import game_state_overlay `
+            --hidden-import windows_capture `
+            --hidden-import mss `
             --hidden-import PIL.Image `
             bin/recorder_consumer_lite.py
           if (-not (Test-Path 'bundle/OysterRecorder-onedir/OysterRecorder-onedir.exe')) {

@@ -67,6 +67,10 @@ class _ExitedProc:
         return self.returncode
 
 
+def _force_windows(m: Any) -> mock._patch:
+    return mock.patch.object(m.os, "name", "nt")
+
+
 def test_recorder_ffmpeg_cmd_pins_h265_bitrate(tmp_path: Path) -> None:
     m = _import_recorder_module()
     app = object.__new__(m.RecorderApp)
@@ -91,6 +95,9 @@ def test_recorder_ffmpeg_cmd_pins_h265_bitrate(tmp_path: Path) -> None:
     )
 
     with (
+        _force_windows(m),
+        mock.patch.object(m, "_CAPTURE_MODE", "ddagrab"),
+        mock.patch.object(m, "_VIDEO_LAYER_INIT_TIMEOUT_SEC", 0.0),
         mock.patch.object(m, "_FFMPEG", tmp_path / "ffmpeg.exe"),
         mock.patch.object(m, "probe_audio_source_chain", return_value=audio_report),
         mock.patch.object(m.subprocess, "Popen", return_value=_LiveProc()) as popen,
@@ -117,8 +124,10 @@ def test_recorder_ffmpeg_cmd_prefers_ddagrab_in_auto_mode(tmp_path: Path) -> Non
     audio_report = m.AudioProbeReport(process_name="javaw.exe", selected=None, probes=[])
 
     with (
+        _force_windows(m),
         mock.patch.object(m, "_CAPTURE_MODE", "auto"),
-        mock.patch.object(m, "_CAPTURE_STARTUP_CHECK_SEC", 0.0),
+        mock.patch.object(m, "_VIDEO_AUTO_LAYERS", ("ddagrab", "gdigrab")),
+        mock.patch.object(m, "_VIDEO_LAYER_INIT_TIMEOUT_SEC", 0.0),
         mock.patch.object(m, "_FFMPEG", tmp_path / "ffmpeg.exe"),
         mock.patch.object(m, "probe_audio_source_chain", return_value=audio_report),
         mock.patch.object(m.subprocess, "Popen", return_value=_LiveProc()) as popen,
@@ -148,8 +157,10 @@ def test_recorder_ffmpeg_cmd_falls_back_to_gdigrab_when_ddagrab_exits(
     audio_report = m.AudioProbeReport(process_name="javaw.exe", selected=None, probes=[])
 
     with (
+        _force_windows(m),
         mock.patch.object(m, "_CAPTURE_MODE", "auto"),
-        mock.patch.object(m, "_CAPTURE_STARTUP_CHECK_SEC", 0.0),
+        mock.patch.object(m, "_VIDEO_AUTO_LAYERS", ("ddagrab", "gdigrab")),
+        mock.patch.object(m, "_VIDEO_LAYER_INIT_TIMEOUT_SEC", 0.0),
         mock.patch.object(m, "_FFMPEG", tmp_path / "ffmpeg.exe"),
         mock.patch.object(m, "probe_audio_source_chain", return_value=audio_report),
         mock.patch.object(

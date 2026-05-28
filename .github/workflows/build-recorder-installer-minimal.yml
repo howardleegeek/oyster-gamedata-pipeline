@@ -179,6 +179,7 @@ jobs:
           # OpenEXR/huggingface_hub are intentionally not installed here.
           pip install "pyinstaller>=6.0"
           pip install pynput pillow numpy pyyaml
+          pip install -r bin/build_bundled_installer/requirements-recorder.txt
           python -c "import PyInstaller, sys; print(f'PyInstaller {PyInstaller.__version__} on Python {sys.version.split()[0]}')"
 
       # ---------------------------------------------------------------------
@@ -432,6 +433,8 @@ jobs:
             --collect-all numpy `
             --collect-all PIL `
             --collect-all yaml `
+            --collect-all windows_capture `
+            --collect-all mss `
             --hidden-import pynput.keyboard._win32 `
             --hidden-import pynput.mouse._win32 `
             --hidden-import lint_v3_prd_grounded `
@@ -439,6 +442,8 @@ jobs:
             --hidden-import generate_gameinfo_xlsx `
             --hidden-import install_fabric_loader `
             --hidden-import game_state_overlay `
+            --hidden-import windows_capture `
+            --hidden-import mss `
             --hidden-import PIL.Image `
             --exclude-module depth_anything_v2_inference `
             --exclude-module torch `

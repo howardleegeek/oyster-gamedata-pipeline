@@ -43,6 +43,7 @@ using PyInstaller --onefile --windowed with bundled ffmpeg.exe (added via
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
@@ -500,18 +501,25 @@ _FFMPEG_FORCE_STOP_TIMEOUT_SEC = 3.0
 _MP4_REMUX_REPAIR_TIMEOUT_SEC = 180.0
 _FFMPEG_DURATION_ARG = "-t"
 _CAPTURE_MODE_ENV = "OYSTER_CAPTURE_MODE"
-_VALID_CAPTURE_MODES = {"auto", "ddagrab", "gdigrab"}
-_CAPTURE_STARTUP_CHECK_SEC = 0.75
-_CAPTURE_ENTROPY_DELAY_SEC = 5.0
-_CAPTURE_ENTROPY_SAMPLE_SEC = 5.0
-_CAPTURE_ENTROPY_SAMPLE_FRAMES = 5
-_CAPTURE_ENTROPY_WIDTH = 160
-_CAPTURE_ENTROPY_HEIGHT = 90
-_CAPTURE_ENTROPY_THRESHOLD_BITS = 1.0
+_VIDEO_AUTO_LAYERS = ("windows-capture", "mss", "ddagrab", "gdigrab")
+_CAPTURE_MODE_ALIASES = {
+    "wgc": "windows-capture",
+    "windows_capture": "windows-capture",
+    "windowscapture": "windows-capture",
+}
+_VALID_CAPTURE_MODES = {"auto", "none", *_VIDEO_AUTO_LAYERS, *_CAPTURE_MODE_ALIASES}
+_VIDEO_LAYER_INIT_TIMEOUT_SEC = 3.0
+_VIDEO_VALIDATION_MIN_DURATION_SEC = 5.0
+_VIDEO_VALIDATION_SAMPLE_FRACTIONS = (0.1, 0.3, 0.5, 0.7, 0.9)
+_VIDEO_VALIDATION_WIDTH = 160
+_VIDEO_VALIDATION_HEIGHT = 90
+_VIDEO_VALIDATION_LOW_ENTROPY_BITS = 2.0
+_CAPTURE_STARTUP_CHECK_SEC = _VIDEO_LAYER_INIT_TIMEOUT_SEC
 
 
 def _normalize_capture_mode(value: Optional[str]) -> str:
     raw = (value or "auto").strip().lower()
+    raw = _CAPTURE_MODE_ALIASES.get(raw, raw)
     if raw in _VALID_CAPTURE_MODES:
         return raw
     _trace(f"WARNING: invalid {_CAPTURE_MODE_ENV}={value!r}; defaulting to auto")
@@ -519,6 +527,109 @@ def _normalize_capture_mode(value: Optional[str]) -> str:
 
 
 _CAPTURE_MODE = _normalize_capture_mode(os.environ.get(_CAPTURE_MODE_ENV, "auto"))
+
+
+def _byte_entropy_bits(data: bytes) -> float:
+    if not data:
+        return 0.0
+    counts = [0] * 256
+    for value in data:
+        counts[value] += 1
+    total = float(len(data))
+    entropy = 0.0
+    for count in counts:
+        if count:
+            probability = count / total
+            entropy -= probability * math.log2(probability)
+    return entropy
+
+
+def _validate_recorded_video(
+    video_path: Path,
+    min_duration_sec: float = _VIDEO_VALIDATION_MIN_DURATION_SEC,
+) -> tuple[bool, str]:
+    """Sanity check the captured video. Returns (is_valid, reason)."""
+
+    if not video_path.exists():
+        return False, "video.mp4 does not exist"
+
+    try:
+        proc = subprocess.run(
+            [
+                str(_FFPROBE),
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "csv=p=0",
+                str(video_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return False, f"ffprobe failed: {exc}"
+    try:
+        duration = float(proc.stdout.strip())
+    except (ValueError, AttributeError):
+        return False, "cannot parse duration"
+    if duration < min_duration_sec:
+        return False, f"duration {duration:.1f}s < {min_duration_sec}s"
+
+    frame_hashes: set[str] = set()
+    frame_entropies: list[float] = []
+    for fraction in _VIDEO_VALIDATION_SAMPLE_FRACTIONS:
+        timestamp = duration * fraction
+        try:
+            proc = subprocess.run(
+                [
+                    str(_FFMPEG),
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-ss",
+                    str(timestamp),
+                    "-i",
+                    str(video_path),
+                    "-vframes",
+                    "1",
+                    "-vf",
+                    (
+                        f"scale={_VIDEO_VALIDATION_WIDTH}:{_VIDEO_VALIDATION_HEIGHT}:"
+                        "flags=bilinear,format=gray"
+                    ),
+                    "-f",
+                    "rawvideo",
+                    "-pix_fmt",
+                    "gray",
+                    "-",
+                ],
+                capture_output=True,
+                timeout=15,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        if proc.returncode != 0 or not proc.stdout:
+            continue
+        frame_hashes.add(hashlib.sha256(proc.stdout).hexdigest())
+        frame_entropies.append(_byte_entropy_bits(proc.stdout))
+
+    sample_count = len(_VIDEO_VALIDATION_SAMPLE_FRACTIONS)
+    if len(frame_hashes) <= 1:
+        return (
+            False,
+            f"all {sample_count} sampled frames identical (SHA256 match) - capture was static",
+        )
+    if frame_entropies and max(frame_entropies) < _VIDEO_VALIDATION_LOW_ENTROPY_BITS:
+        return (
+            False,
+            f"all frames very low entropy ({max(frame_entropies):.2f} bits) - likely black/uniform",
+        )
+    return True, f"{len(frame_hashes)} unique frames across {sample_count} samples"
 
 
 def _mp4_has_moov_atom(mp4_path: Path) -> bool:
@@ -645,6 +756,12 @@ def _output_dir() -> Path:
     return docs
 
 
+def _active_session_dir() -> Path:
+    """Canonical live mod output dir: ~/Documents/OysterClips/active_session."""
+
+    return _output_dir() / "active_session"
+
+
 def _fsync_dir(path: Path) -> None:
     """Best-effort directory fsync after atomic rename."""
 
@@ -706,6 +823,177 @@ def _atomic_write_json(path: Path, data: Any, *, indent: int | None = 2) -> None
 def _atomic_write_jsonl(path: Path, rows: Sequence[dict[str, Any]]) -> None:
     body = "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows)
     _atomic_write_text(path, body, encoding="utf-8")
+
+
+def _active_session_has_payload(active_dir: Path) -> bool:
+    """Return True iff active_session contains recoverable data, not just markers."""
+
+    if not active_dir.exists() or not active_dir.is_dir():
+        return False
+    for path in active_dir.rglob("*"):
+        if path.name in {".session_id", ".session_complete"}:
+            continue
+        if path.is_file():
+            try:
+                if path.stat().st_size > 0:
+                    return True
+            except OSError:
+                return True
+        elif path.is_dir():
+            try:
+                if any(path.iterdir()):
+                    return True
+            except OSError:
+                return True
+    return False
+
+
+def _copy_active_session_into_clip(active_dir: Path, clip_dir: Path) -> None:
+    """Copy mod-side active_session artifacts into the final clip dir.
+
+    The live Fabric mod always writes to active_session. We copy instead of
+    moving while packaging so a failed tarball build never destroys the raw
+    JSONL evidence.
+    """
+
+    if not active_dir.exists() or not active_dir.is_dir():
+        return
+    for src in active_dir.rglob("*"):
+        rel = src.relative_to(active_dir)
+        dst = clip_dir / rel
+        if src.is_dir():
+            dst.mkdir(parents=True, exist_ok=True)
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            shutil.copy2(src, dst)
+        except OSError as exc:
+            _trace(f"active_session: copy skipped {src} -> {dst}: {exc}")
+    _fsync_dir(clip_dir)
+
+
+def _reset_active_session_dir(active_dir: Path) -> None:
+    """Clear active_session only after a successful package preserved it."""
+
+    try:
+        if active_dir.exists():
+            shutil.rmtree(active_dir)
+        active_dir.mkdir(parents=True, exist_ok=True)
+        _fsync_dir(active_dir.parent)
+        _trace(f"active_session: reset {active_dir}")
+    except Exception as exc:  # noqa: BLE001
+        _trace(f"active_session: reset failed for {active_dir}: {exc}")
+
+
+def _read_session_id_marker(active_dir: Path) -> dict[str, Any]:
+    marker = active_dir / ".session_id"
+    try:
+        data = json.loads(marker.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _package_orphaned_active_session(
+    active_dir: Path,
+    *,
+    output_dir: Optional[Path] = None,
+    ts: Optional[str] = None,
+) -> Optional[Path]:
+    """Idempotently package stale active_session data left by a prior crash.
+
+    This intentionally does not require video.mp4. If packaging fails, the raw
+    active_session directory is left untouched so the next boot can retry.
+    """
+
+    if not _active_session_has_payload(active_dir):
+        return None
+
+    out_dir = output_dir or _output_dir()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    marker = _read_session_id_marker(active_dir)
+    ts = ts or datetime.now().strftime("%Y%m%d-%H%M%S")
+    tmp_root = Path(tempfile.mkdtemp(prefix=f"oyster-orphan-{ts}-"))
+    clip_name = f"clip-{ts}"
+    clip_dir = tmp_root / clip_name
+    try:
+        clip_dir.mkdir(parents=True, exist_ok=True)
+        _copy_active_session_into_clip(active_dir, clip_dir)
+        metadata_path = clip_dir / "metadata.json"
+        metadata: dict[str, Any] = {}
+        if metadata_path.exists():
+            try:
+                loaded = json.loads(metadata_path.read_text(encoding="utf-8"))
+                if isinstance(loaded, dict):
+                    metadata.update(loaded)
+            except Exception:
+                pass
+        attempts = metadata.get("video_capture", {}).get("attempts_failed", [])
+        if not isinstance(attempts, list):
+            attempts = []
+        existing_reasons = metadata.get("partial_reasons", [])
+        if not isinstance(existing_reasons, list):
+            existing_reasons = [str(existing_reasons)]
+        metadata.update(
+            {
+                "session_id": marker.get("session_id") or marker.get("id") or "",
+                "session_complete": False,
+                "partial": True,
+                "partial_reasons": sorted(
+                    set(
+                        [
+                            *existing_reasons,
+                            "orphaned_active_session_recovered",
+                            "video_missing",
+                        ]
+                    )
+                ),
+                "orphaned_active_session_recovered": True,
+                "video_capture": {
+                    **(
+                        metadata.get("video_capture", {})
+                        if isinstance(metadata.get("video_capture"), dict)
+                        else {}
+                    ),
+                    "selected_mode": "none",
+                    "selected_layer": "none",
+                    "attempts_failed": attempts
+                    or [
+                        {
+                            "layer": "unknown",
+                            "status": "not_started",
+                            "error": "previous recorder exit left active_session unfinalized",
+                        }
+                    ],
+                },
+            }
+        )
+        _atomic_write_json(metadata_path, metadata)
+
+        out_tar = out_dir / f"{clip_name}.tar.gz"
+        tmp_tar = out_tar.with_name(f".{out_tar.name}.tmp")
+        try:
+            with tarfile.open(tmp_tar, "w:gz") as tf:
+                tf.add(clip_dir, arcname=clip_name)
+            _fsync_file(tmp_tar)
+            os.replace(tmp_tar, out_tar)
+            _fsync_dir(out_tar.parent)
+            _reset_active_session_dir(active_dir)
+        except Exception:
+            try:
+                tmp_tar.unlink()
+            except OSError:
+                pass
+            raise
+
+        _reset_active_session_dir(active_dir)
+        _trace(f"active_session: orphan packaged to {out_tar}")
+        return out_tar
+    except Exception as exc:  # noqa: BLE001
+        _trace(f"active_session: orphan package failed; preserving raw dir: {exc}")
+        return None
+    finally:
+        shutil.rmtree(tmp_root, ignore_errors=True)
 
 
 def _ensure_recording_mp4_alias(clip_dir: Path) -> Path:
@@ -851,6 +1139,88 @@ def _generate_silent_audio_fallback(session_dir: Path, video_path: Path) -> None
     _trace(f"silent_audio_fallback: wrote {duration:.1f}s silent FLAC")
 
 
+def _generate_silent_audio_fallback_for_duration(
+    session_dir: Path,
+    *,
+    duration: float,
+    reason: str,
+) -> None:
+    """Write a silent FLAC when video is unavailable and ffprobe cannot derive duration."""
+
+    duration = max(0.1, float(duration))
+
+    def _fail(error: str) -> None:
+        _atomic_write_json(
+            session_dir / "audio_check.json",
+            {
+                "audio_source": "failed",
+                "reason": "silent audio fallback generation failed",
+                "audio_file": "audio.flac",
+                "duration_sec": duration,
+                "size_bytes": 0,
+                "error": error,
+                "method": "ffmpeg lavfi anullsrc fallback (duration)",
+            },
+        )
+        _trace(f"silent_audio_fallback_duration: failed ({error})")
+        raise RecorderError(f"silent audio fallback failed: {error}")
+
+    out_path = session_dir / "audio.flac"
+    try:
+        result = subprocess.run(
+            [
+                str(_FFMPEG),
+                "-hide_banner",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "anullsrc=channel_layout=stereo:sample_rate=48000",
+                _FFMPEG_DURATION_ARG,
+                str(duration),
+                "-c:a",
+                "flac",
+                str(out_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        _fail(f"ffmpeg failed: {exc}")
+
+    if result.returncode != 0:
+        stderr = (result.stderr or "").strip()
+        _fail(stderr or f"ffmpeg exited with code {result.returncode}")
+
+    size_bytes = out_path.stat().st_size if out_path.is_file() else 0
+    if size_bytes <= 0:
+        stderr = (result.stderr or "").strip()
+        detail = stderr or "ffmpeg exited successfully but audio.flac is missing or empty"
+        _fail(detail)
+
+    _atomic_write_json(
+        session_dir / "audio_check.json",
+        {
+            "audio_source": "silent_fallback",
+            "reason": reason,
+            "audio_file": "audio.flac",
+            "duration_sec": duration,
+            "size_bytes": size_bytes,
+            "rms_db": -120.0,
+            "peak_db": -120.0,
+            "snr_db": 0.0,
+            "is_silent": True,
+            "continuous": True,
+            "max_silence_gap_s": duration,
+            "longest_silence_s": duration,
+            "method": "ffmpeg lavfi anullsrc fallback (duration)",
+        },
+    )
+    _trace(f"silent_audio_fallback_duration: wrote {duration:.1f}s silent FLAC")
+
+
 class AudioCaptureMode:
     """Recorder audio source identifiers, ordered from most to least precise."""
 
@@ -907,28 +1277,10 @@ class VideoCapturePlan:
     mode: str
     input_args: tuple[str, ...]
     pre_encode_filters: tuple[str, ...] = ()
+    warning: Optional[str] = None
 
     def encode_filter(self) -> str:
         return ",".join((*self.pre_encode_filters, "scale=1920:1080:flags=lanczos"))
-
-    def entropy_probe_filter(self) -> str:
-        return ",".join(
-            (
-                *self.pre_encode_filters,
-                "fps=1",
-                f"scale={_CAPTURE_ENTROPY_WIDTH}:{_CAPTURE_ENTROPY_HEIGHT}:flags=bilinear",
-                "format=gray",
-            )
-        )
-
-
-@dataclass(frozen=True)
-class CaptureEntropyResult:
-    """Low-cost diagnostic from sampling the live capture source."""
-
-    average_bits: float
-    frames_sampled: int
-    unique_frames: int
 
 
 def _build_video_capture_plan(mode: str, *, x: int, y: int, w: int, h: int) -> VideoCapturePlan:
@@ -968,88 +1320,771 @@ def _build_video_capture_plan(mode: str, *, x: int, y: int, w: int, h: int) -> V
                 "-i",
                 "desktop",
             ),
+            warning="known_static_frames_on_hardware_accel_mc",
         )
     raise ValueError(f"unsupported capture mode: {mode}")
 
 
-def _capture_mode_candidates(
-    requested_mode: str, *, x: int, y: int, w: int, h: int
-) -> list[VideoCapturePlan]:
-    requested_mode = _normalize_capture_mode(requested_mode)
-    modes = ("ddagrab", "gdigrab") if requested_mode == "auto" else (requested_mode,)
-    return [_build_video_capture_plan(mode, x=x, y=y, w=w, h=h) for mode in modes]
+@dataclass(frozen=True)
+class MonitorBounds:
+    index: int
+    left: int
+    top: int
+    width: int
+    height: int
+    is_primary: bool = False
 
 
-def _byte_entropy_bits(data: bytes) -> float:
-    if not data:
-        return 0.0
-    counts = [0] * 256
-    for value in data:
-        counts[value] += 1
-    total = float(len(data))
-    entropy = 0.0
-    for count in counts:
-        if count:
-            probability = count / total
-            entropy -= probability * math.log2(probability)
-    return entropy
+@dataclass
+class VideoCaptureHandle:
+    """Lifecycle state for one active video capture layer."""
+
+    layer: str
+    out_path: Path
+    stdin_kind: str
+    proc: Optional[subprocess.Popen] = None
+    thread: Optional[threading.Thread] = None
+    stderr_thread: Optional[threading.Thread] = None
+    stop_event: threading.Event = field(default_factory=threading.Event)
+    first_frame_event: threading.Event = field(default_factory=threading.Event)
+    error_event: threading.Event = field(default_factory=threading.Event)
+    done_event: threading.Event = field(default_factory=threading.Event)
+    stderr_lines: list[str] = field(default_factory=list)
+    stderr_path: Optional[Path] = None
+    error_messages: list[str] = field(default_factory=list)
+    capture_control: Any = None
+    frames_written: int = 0
+    warning: Optional[str] = None
+    extra: dict[str, Any] = field(default_factory=dict)
+
+    def is_alive(self) -> bool:
+        proc = self.proc
+        if proc is None or proc.poll() is not None:
+            return False
+        if self.thread is not None and self.done_event.is_set():
+            return False
+        return True
 
 
-def _measure_capture_entropy(plan: VideoCapturePlan) -> Optional[CaptureEntropyResult]:
-    """Sample the live capture source after startup and flag flat/static frames."""
+def _video_capture_stderr_path(out_path: Path, layer: str) -> Path:
+    safe_layer = layer.replace("-", "_")
+    return out_path.with_name(f"{out_path.stem}.{safe_layer}.stderr.log")
 
-    frame_size = _CAPTURE_ENTROPY_WIDTH * _CAPTURE_ENTROPY_HEIGHT
-    cmd = [
+
+def _start_stderr_reader(handle: VideoCaptureHandle) -> None:
+    stream = getattr(handle.proc, "stderr", None)
+    if stream is None:
+        return
+
+    def _read() -> None:
+        try:
+            while True:
+                chunk = stream.readline()
+                if not chunk:
+                    break
+                if isinstance(chunk, bytes):
+                    text = chunk.decode("utf-8", errors="replace")
+                else:
+                    text = str(chunk)
+                handle.stderr_lines.append(text)
+        except Exception as exc:  # noqa: BLE001
+            handle.error_messages.append(f"stderr reader failed: {exc}")
+
+    thread = threading.Thread(
+        target=_read,
+        daemon=True,
+        name=f"video-{handle.layer}-stderr",
+    )
+    handle.stderr_thread = thread
+    thread.start()
+
+
+def _video_capture_stderr_text(handle: VideoCaptureHandle) -> str:
+    return "".join(handle.stderr_lines)
+
+
+def _flush_video_capture_stderr(handle: VideoCaptureHandle) -> None:
+    if handle.stderr_path is None:
+        return
+    if handle.stderr_thread is not None and handle.stderr_thread.is_alive():
+        handle.stderr_thread.join(timeout=0.5)
+    text = _video_capture_stderr_text(handle)
+    try:
+        _atomic_write_text(handle.stderr_path, text, encoding="utf-8")
+        _trace(f"video_capture: layer={handle.layer} stderr_log={handle.stderr_path}")
+    except Exception as exc:  # noqa: BLE001
+        _trace(f"video_capture: layer={handle.layer} stderr log write failed: {exc}")
+
+
+def _stderr_has_ffmpeg_error(stderr: str) -> bool:
+    lowered = stderr.casefold()
+    markers = (
+        "error",
+        "failed",
+        "failure",
+        "could not",
+        "cannot",
+        "invalid",
+        "not found",
+        "no such",
+        "access is denied",
+    )
+    return any(marker in lowered for marker in markers)
+
+
+def _build_video_encoder_cmd(
+    out_path: Path,
+    *,
+    input_args: Sequence[str],
+    audio_inputs: Sequence[str],
+    audio_codec: Sequence[str],
+    vf: str,
+) -> list[str]:
+    return [
         str(_FFMPEG),
         "-hide_banner",
-        "-loglevel",
-        "error",
-        *plan.input_args,
-        _FFMPEG_DURATION_ARG,
-        f"{_CAPTURE_ENTROPY_SAMPLE_SEC:.1f}",
+        *input_args,
+        *audio_inputs,
         "-vf",
-        plan.entropy_probe_filter(),
-        "-frames:v",
-        str(_CAPTURE_ENTROPY_SAMPLE_FRAMES),
-        "-f",
-        "rawvideo",
+        vf,
+        "-c:v",
+        "libx265",
+        "-preset",
+        "ultrafast",
+        # libx265 defaults to CRF 28 if no bitrate/CRF is specified. On
+        # static game scenes that collapsed clips to ~67 kbps and looked frozen.
+        "-b:v",
+        "10M",
+        "-maxrate",
+        "12M",
+        "-bufsize",
+        "20M",
         "-pix_fmt",
-        "gray",
-        "pipe:1",
+        "yuv420p",
+        *audio_codec,
+        "-r",
+        "30",
+        "-y",
+        str(out_path),
     ]
-    flags = 0x08000000 if os.name == "nt" else 0
+
+
+def _build_rawvideo_encoder_cmd(
+    out_path: Path,
+    *,
+    width: int,
+    height: int,
+    audio_inputs: Sequence[str],
+    audio_codec: Sequence[str],
+    pre_encode_filters: Sequence[str] = (),
+) -> list[str]:
+    return _build_video_encoder_cmd(
+        out_path,
+        input_args=(
+            "-f",
+            "rawvideo",
+            "-pixel_format",
+            "bgra",
+            "-video_size",
+            f"{int(width)}x{int(height)}",
+            "-framerate",
+            "30",
+            "-i",
+            "pipe:",
+        ),
+        audio_inputs=audio_inputs,
+        audio_codec=audio_codec,
+        vf=",".join((*pre_encode_filters, "scale=1920:1080:flags=lanczos")),
+    )
+
+
+def _spawn_video_encoder(
+    handle: VideoCaptureHandle,
+    cmd: Sequence[str],
+    *,
+    creationflags: int,
+) -> subprocess.Popen:
+    proc = subprocess.Popen(
+        list(cmd),
+        stdin=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        creationflags=creationflags,
+    )
+    handle.proc = proc
+    _start_stderr_reader(handle)
+    return proc
+
+
+def _wait_for_video_layer_init(handle: VideoCaptureHandle, timeout_sec: float) -> None:
+    deadline = time.time() + max(0.0, timeout_sec)
+    while time.time() < deadline:
+        if handle.first_frame_event.is_set():
+            return
+        if handle.error_event.is_set() or handle.done_event.is_set():
+            break
+        proc = handle.proc
+        if proc is not None and proc.poll() is not None:
+            break
+        time.sleep(0.02)
+    if handle.first_frame_event.is_set():
+        return
+    if handle.error_messages:
+        raise RuntimeError("; ".join(handle.error_messages))
+    raise RuntimeError(f"no first frame within {timeout_sec:.1f}s")
+
+
+def _stop_video_capture_handle(
+    handle: VideoCaptureHandle,
+    *,
+    clean_timeout: float = _FFMPEG_CLEAN_QUIT_TIMEOUT_SEC,
+    force_timeout: float = _FFMPEG_FORCE_STOP_TIMEOUT_SEC,
+) -> bool:
+    """Stop a capture layer. Returns True when ffmpeg needed force termination."""
+
+    handle.stop_event.set()
+    capture_control = handle.capture_control
+    if capture_control is not None:
+        try:
+            capture_control.stop()
+        except Exception:
+            pass
+
+    if handle.thread is not None and handle.thread.is_alive():
+        handle.thread.join(timeout=2.0)
+
+    proc = handle.proc
+    if proc is None:
+        _flush_video_capture_stderr(handle)
+        return False
+
+    forced_stop = False
+    if proc.poll() is None:
+        if handle.stdin_kind == "control":
+            try:
+                if proc.stdin:
+                    proc.stdin.write(b"q\n")
+                    proc.stdin.flush()
+            except Exception:
+                pass
+        elif handle.stdin_kind == "rawvideo":
+            try:
+                if proc.stdin:
+                    proc.stdin.close()
+            except Exception:
+                pass
+        try:
+            proc.wait(timeout=clean_timeout)
+        except subprocess.TimeoutExpired:
+            forced_stop = True
+            _trace(
+                "video_capture: clean stop timed out "
+                f"layer={handle.layer} after {clean_timeout:.1f}s; terminating"
+            )
+            proc.terminate()
+            try:
+                proc.wait(timeout=force_timeout)
+            except subprocess.TimeoutExpired:
+                _trace(f"video_capture: terminate timed out layer={handle.layer}; killing")
+                proc.kill()
+                try:
+                    proc.wait(timeout=force_timeout)
+                except subprocess.TimeoutExpired:
+                    _trace(f"video_capture: kill did not complete layer={handle.layer}")
+
+    _flush_video_capture_stderr(handle)
+    return forced_stop
+
+
+def _get_windows_monitor_bounds() -> list[MonitorBounds]:
+    if os.name != "nt":
+        return []
     try:
-        result = subprocess.run(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=_CAPTURE_ENTROPY_SAMPLE_SEC + 10.0,
-            creationflags=flags,
+        import ctypes
+        import ctypes.wintypes as wt
+    except Exception:
+        return []
+
+    try:
+        user32 = ctypes.windll.user32
+    except Exception:
+        return []
+    monitors: list[MonitorBounds] = []
+
+    class _MonitorInfo(ctypes.Structure):
+        _fields_ = [
+            ("cbSize", wt.DWORD),
+            ("rcMonitor", wt.RECT),
+            ("rcWork", wt.RECT),
+            ("dwFlags", wt.DWORD),
+        ]
+
+    hmonitor_t = getattr(wt, "HMONITOR", wt.HANDLE)
+    hdc_t = getattr(wt, "HDC", wt.HANDLE)
+    enum_proc = ctypes.WINFUNCTYPE(
+        ctypes.c_bool,
+        hmonitor_t,
+        hdc_t,
+        ctypes.POINTER(wt.RECT),
+        wt.LPARAM,
+    )
+
+    def _callback(hmonitor, _hdc, _rect, _lparam):
+        info = _MonitorInfo()
+        info.cbSize = ctypes.sizeof(_MonitorInfo)
+        if not user32.GetMonitorInfoW(hmonitor, ctypes.byref(info)):
+            return True
+        rect = info.rcMonitor
+        monitors.append(
+            MonitorBounds(
+                index=len(monitors) + 1,
+                left=int(rect.left),
+                top=int(rect.top),
+                width=int(rect.right - rect.left),
+                height=int(rect.bottom - rect.top),
+                is_primary=bool(info.dwFlags & 1),
+            )
+        )
+        return True
+
+    try:
+        user32.EnumDisplayMonitors(0, None, enum_proc(_callback), 0)
+    except Exception as exc:  # noqa: BLE001
+        _trace(f"video_capture: EnumDisplayMonitors failed: {exc}")
+        return []
+    return monitors
+
+
+def _intersection_area(
+    ax: int,
+    ay: int,
+    aw: int,
+    ah: int,
+    bx: int,
+    by: int,
+    bw: int,
+    bh: int,
+) -> int:
+    left = max(ax, bx)
+    top = max(ay, by)
+    right = min(ax + aw, bx + bw)
+    bottom = min(ay + ah, by + bh)
+    if right <= left or bottom <= top:
+        return 0
+    return int((right - left) * (bottom - top))
+
+
+def _best_monitor_for_rect(
+    monitors: Sequence[MonitorBounds],
+    *,
+    x: int,
+    y: int,
+    w: int,
+    h: int,
+) -> Optional[MonitorBounds]:
+    best: Optional[MonitorBounds] = None
+    best_area = -1
+    for monitor in monitors:
+        area = _intersection_area(
+            x,
+            y,
+            w,
+            h,
+            monitor.left,
+            monitor.top,
+            monitor.width,
+            monitor.height,
+        )
+        if area > best_area:
+            best = monitor
+            best_area = area
+    if best is not None and best_area > 0:
+        return best
+    for monitor in monitors:
+        if monitor.is_primary:
+            return monitor
+    return monitors[0] if monitors else None
+
+
+def _crop_filter_for_monitor(rect: tuple[int, int, int, int], monitor: MonitorBounds) -> str:
+    x, y, w, h = rect
+    crop_x = max(0, int(x) - int(monitor.left))
+    crop_y = max(0, int(y) - int(monitor.top))
+    crop_w = max(1, min(int(w), int(monitor.width) - crop_x))
+    crop_h = max(1, min(int(h), int(monitor.height) - crop_y))
+    return f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y}"
+
+
+def _mss_region_for_rect(
+    monitors: Sequence[dict[str, Any]],
+    *,
+    x: int,
+    y: int,
+    w: int,
+    h: int,
+) -> dict[str, int]:
+    bounds = [
+        MonitorBounds(
+            index=idx,
+            left=int(mon.get("left", 0)),
+            top=int(mon.get("top", 0)),
+            width=int(mon.get("width", 0)),
+            height=int(mon.get("height", 0)),
+            is_primary=bool(mon.get("is_primary", False)),
+        )
+        for idx, mon in enumerate(monitors[1:], start=1)
+    ]
+    monitor = _best_monitor_for_rect(bounds, x=x, y=y, w=w, h=h)
+    if monitor is None:
+        return {"left": int(x), "top": int(y), "width": int(w), "height": int(h)}
+    left = max(int(x), monitor.left)
+    top = max(int(y), monitor.top)
+    right = min(int(x) + int(w), monitor.left + monitor.width)
+    bottom = min(int(y) + int(h), monitor.top + monitor.height)
+    if right <= left or bottom <= top:
+        left, top, right, bottom = int(x), int(y), int(x) + int(w), int(y) + int(h)
+    return {
+        "left": int(left),
+        "top": int(top),
+        "width": max(1, int(right - left)),
+        "height": max(1, int(bottom - top)),
+    }
+
+
+def _start_windows_capture_layer(
+    out_path: Path,
+    *,
+    x: int,
+    y: int,
+    w: int,
+    h: int,
+    audio_inputs: Sequence[str],
+    audio_codec: Sequence[str],
+    creationflags: int,
+    init_timeout_sec: float = _VIDEO_LAYER_INIT_TIMEOUT_SEC,
+) -> Optional[VideoCaptureHandle]:
+    if os.name != "nt":
+        return None
+    try:
+        from windows_capture import WindowsCapture  # type: ignore[import-not-found]
+    except Exception as exc:  # noqa: BLE001
+        _trace(f"video_capture: windows-capture unavailable: {exc}")
+        return None
+
+    monitors = _get_windows_monitor_bounds()
+    monitor = _best_monitor_for_rect(monitors, x=x, y=y, w=w, h=h)
+    # windows-capture's Python examples historically used 1-indexed monitor
+    # IDs, while bingd's failing build request specified 0. Use zero-based
+    # from our Win32 enumeration so primary monitor becomes 0; MSS/ddagrab
+    # remain behind it if this package rejects the index.
+    monitor_index = max(0, (monitor.index - 1) if monitor else 0)
+    pre_filters: tuple[str, ...] = ()
+    if monitor is not None:
+        pre_filters = (_crop_filter_for_monitor((x, y, w, h), monitor),)
+
+    handle = VideoCaptureHandle(
+        layer="windows-capture",
+        out_path=out_path,
+        stdin_kind="rawvideo",
+        stderr_path=_video_capture_stderr_path(out_path, "windows-capture"),
+        extra={"monitor_index": monitor_index},
+    )
+
+    try:
+        capture = WindowsCapture(
+            cursor_capture=False,
+            draw_border=False,
+            monitor_index=monitor_index,
         )
     except Exception as exc:  # noqa: BLE001
-        _trace(f"capture_entropy: probe failed to run mode={plan.mode}: {exc}")
-        return None
-    if result.returncode != 0:
-        stderr = result.stderr.decode("utf-8", errors="replace").strip()
-        _trace(f"capture_entropy: probe exited rc={result.returncode} mode={plan.mode}: {stderr}")
-        return None
+        raise RuntimeError(
+            f"WindowsCapture init failed monitor_index={monitor_index}: {exc}"
+        ) from exc
 
-    frames = [
-        result.stdout[offset : offset + frame_size]
-        for offset in range(0, len(result.stdout), frame_size)
-        if len(result.stdout[offset : offset + frame_size]) == frame_size
-    ]
-    if not frames:
-        _trace(f"capture_entropy: no frames sampled mode={plan.mode}")
-        return None
+    def _ensure_proc(frame_width: int, frame_height: int) -> Optional[subprocess.Popen]:
+        proc = handle.proc
+        if proc is not None:
+            return proc
+        cmd = _build_rawvideo_encoder_cmd(
+            out_path,
+            width=frame_width,
+            height=frame_height,
+            audio_inputs=audio_inputs,
+            audio_codec=audio_codec,
+            pre_encode_filters=pre_filters,
+        )
+        _trace(
+            "video_capture: windows-capture encoder "
+            f"monitor_index={monitor_index} size={frame_width}x{frame_height} "
+            f"cmd={' '.join(cmd)}"
+        )
+        try:
+            return _spawn_video_encoder(handle, cmd, creationflags=creationflags)
+        except Exception as exc:  # noqa: BLE001
+            handle.error_messages.append(f"rawvideo ffmpeg spawn failed: {exc}")
+            handle.error_event.set()
+            return None
 
-    average = sum(_byte_entropy_bits(frame) for frame in frames) / len(frames)
-    unique_frames = len({frame for frame in frames})
-    return CaptureEntropyResult(
-        average_bits=average,
-        frames_sampled=len(frames),
-        unique_frames=unique_frames,
+    @capture.event
+    def on_frame_arrived(frame: Any, capture_control: Any) -> None:
+        handle.capture_control = capture_control
+        if handle.stop_event.is_set():
+            try:
+                capture_control.stop()
+            except Exception:
+                pass
+            return
+        try:
+            image = frame.to_numpy()
+            frame_height = int(image.shape[0])
+            frame_width = int(image.shape[1])
+            proc = _ensure_proc(frame_width, frame_height)
+            if proc is None or proc.stdin is None or proc.poll() is not None:
+                handle.error_messages.append("rawvideo ffmpeg unavailable")
+                handle.error_event.set()
+                return
+            if not getattr(image, "flags", None) or not image.flags["C_CONTIGUOUS"]:
+                import numpy as _np  # noqa: PLC0415
+
+                image = _np.ascontiguousarray(image)
+            proc.stdin.write(image.tobytes())
+            handle.frames_written += 1
+            handle.first_frame_event.set()
+        except BrokenPipeError:
+            handle.stop_event.set()
+            handle.done_event.set()
+        except Exception as exc:  # noqa: BLE001
+            handle.error_messages.append(f"windows-capture frame failed: {exc}")
+            handle.error_event.set()
+
+    @capture.event
+    def on_closed() -> None:
+        handle.done_event.set()
+
+    def _run_capture() -> None:
+        try:
+            capture.start()
+        except Exception as exc:  # noqa: BLE001
+            handle.error_messages.append(f"WindowsCapture start failed: {exc}")
+            handle.error_event.set()
+        finally:
+            handle.done_event.set()
+            try:
+                if handle.proc is not None and handle.proc.stdin:
+                    handle.proc.stdin.close()
+            except Exception:
+                pass
+
+    thread = threading.Thread(
+        target=_run_capture,
+        daemon=True,
+        name="video-windows-capture",
     )
+    handle.thread = thread
+    thread.start()
+    try:
+        _wait_for_video_layer_init(handle, init_timeout_sec)
+    except Exception:
+        _stop_video_capture_handle(handle, clean_timeout=0.5, force_timeout=0.5)
+        raise
+    return handle
+
+
+def _start_mss_layer(
+    out_path: Path,
+    *,
+    x: int,
+    y: int,
+    w: int,
+    h: int,
+    audio_inputs: Sequence[str],
+    audio_codec: Sequence[str],
+    creationflags: int,
+    init_timeout_sec: float = _VIDEO_LAYER_INIT_TIMEOUT_SEC,
+) -> Optional[VideoCaptureHandle]:
+    if os.name != "nt":
+        return None
+    try:
+        import mss  # type: ignore[import-not-found]
+    except Exception as exc:  # noqa: BLE001
+        _trace(f"video_capture: mss unavailable: {exc}")
+        return None
+
+    handle = VideoCaptureHandle(
+        layer="mss",
+        out_path=out_path,
+        stdin_kind="rawvideo",
+        stderr_path=_video_capture_stderr_path(out_path, "mss"),
+    )
+
+    def _run() -> None:
+        try:
+            with mss.mss() as sct:
+                region = _mss_region_for_rect(sct.monitors, x=x, y=y, w=w, h=h)
+                handle.extra["region"] = dict(region)
+                cmd = _build_rawvideo_encoder_cmd(
+                    out_path,
+                    width=int(region["width"]),
+                    height=int(region["height"]),
+                    audio_inputs=audio_inputs,
+                    audio_codec=audio_codec,
+                )
+                _trace("video_capture: mss encoder " f"region={region} cmd={' '.join(cmd)}")
+                proc = _spawn_video_encoder(handle, cmd, creationflags=creationflags)
+                next_frame_at = time.perf_counter()
+                frame_interval = 1.0 / 30.0
+                while not handle.stop_event.is_set() and proc.poll() is None:
+                    img = sct.grab(region)
+                    if proc.stdin is None:
+                        raise RuntimeError("ffmpeg stdin closed")
+                    proc.stdin.write(img.bgra)
+                    handle.frames_written += 1
+                    handle.first_frame_event.set()
+                    next_frame_at += frame_interval
+                    sleep_for = next_frame_at - time.perf_counter()
+                    if sleep_for > 0:
+                        time.sleep(min(sleep_for, frame_interval))
+                    else:
+                        next_frame_at = time.perf_counter()
+        except BrokenPipeError:
+            handle.stop_event.set()
+        except Exception as exc:  # noqa: BLE001
+            handle.error_messages.append(f"mss capture failed: {exc}")
+            handle.error_event.set()
+        finally:
+            handle.done_event.set()
+            try:
+                if handle.proc is not None and handle.proc.stdin:
+                    handle.proc.stdin.close()
+            except Exception:
+                pass
+
+    thread = threading.Thread(target=_run, daemon=True, name="video-mss")
+    handle.thread = thread
+    thread.start()
+    try:
+        _wait_for_video_layer_init(handle, init_timeout_sec)
+    except Exception:
+        _stop_video_capture_handle(handle, clean_timeout=0.5, force_timeout=0.5)
+        raise
+    return handle
+
+
+def _start_ffmpeg_capture_layer(
+    layer: str,
+    out_path: Path,
+    *,
+    x: int,
+    y: int,
+    w: int,
+    h: int,
+    audio_inputs: Sequence[str],
+    audio_codec: Sequence[str],
+    creationflags: int,
+    init_timeout_sec: float = _VIDEO_LAYER_INIT_TIMEOUT_SEC,
+) -> Optional[VideoCaptureHandle]:
+    plan = _build_video_capture_plan(layer, x=x, y=y, w=w, h=h)
+    handle = VideoCaptureHandle(
+        layer=layer,
+        out_path=out_path,
+        stdin_kind="control",
+        stderr_path=_video_capture_stderr_path(out_path, layer),
+        warning=plan.warning,
+    )
+    cmd = _build_video_encoder_cmd(
+        out_path,
+        input_args=plan.input_args,
+        audio_inputs=audio_inputs,
+        audio_codec=audio_codec,
+        vf=plan.encode_filter(),
+    )
+    _trace(
+        "video_capture: ffmpeg layer "
+        f"selected={layer} geometry={x},{y},{w},{h} cmd={' '.join(cmd)}"
+    )
+    try:
+        proc = _spawn_video_encoder(handle, cmd, creationflags=creationflags)
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(f"{layer} spawn failed: {exc}") from exc
+
+    if layer == "ddagrab":
+        deadline = time.time() + max(0.0, init_timeout_sec)
+        while time.time() < deadline and proc.poll() is None:
+            if _stderr_has_ffmpeg_error(_video_capture_stderr_text(handle)):
+                break
+            time.sleep(0.05)
+        stderr = _video_capture_stderr_text(handle)
+        returncode = proc.poll()
+        if returncode is not None:
+            _flush_video_capture_stderr(handle)
+            raise RuntimeError(
+                f"ddagrab exited during init rc={returncode}; stderr_log={handle.stderr_path}"
+            )
+        if _stderr_has_ffmpeg_error(stderr):
+            _stop_video_capture_handle(handle, clean_timeout=0.5, force_timeout=0.5)
+            raise RuntimeError(f"ddagrab stderr reported error; stderr_log={handle.stderr_path}")
+    elif layer == "gdigrab":
+        _trace(
+            "WARNING: video_capture selected gdigrab; hardware-accelerated "
+            "Minecraft may record static frames."
+        )
+    return handle
+
+
+def _start_layer(
+    layer: str,
+    out_path: Path,
+    *,
+    x: int,
+    y: int,
+    w: int,
+    h: int,
+    audio_inputs: Sequence[str],
+    audio_codec: Sequence[str],
+    creationflags: int,
+    init_timeout_sec: float = _VIDEO_LAYER_INIT_TIMEOUT_SEC,
+) -> Optional[VideoCaptureHandle]:
+    layer = _normalize_capture_mode(layer)
+    if layer == "none":
+        return None
+    if layer == "windows-capture":
+        return _start_windows_capture_layer(
+            out_path,
+            x=x,
+            y=y,
+            w=w,
+            h=h,
+            audio_inputs=audio_inputs,
+            audio_codec=audio_codec,
+            creationflags=creationflags,
+            init_timeout_sec=init_timeout_sec,
+        )
+    if layer == "mss":
+        return _start_mss_layer(
+            out_path,
+            x=x,
+            y=y,
+            w=w,
+            h=h,
+            audio_inputs=audio_inputs,
+            audio_codec=audio_codec,
+            creationflags=creationflags,
+            init_timeout_sec=init_timeout_sec,
+        )
+    if layer in {"ddagrab", "gdigrab"}:
+        return _start_ffmpeg_capture_layer(
+            layer,
+            out_path,
+            x=x,
+            y=y,
+            w=w,
+            h=h,
+            audio_inputs=audio_inputs,
+            audio_codec=audio_codec,
+            creationflags=creationflags,
+            init_timeout_sec=init_timeout_sec,
+        )
+    raise ValueError(f"unsupported video capture layer: {layer}")
 
 
 _DSHOW_LOOPBACK_HINTS = (
@@ -2064,6 +3099,18 @@ class RecorderApp(tk.Tk):
             _trace(f"toolwindow attribute failed: {exc}")
 
         self._ffmpeg_proc: Optional[subprocess.Popen] = None
+        self._video_capture_handle: Optional[VideoCaptureHandle] = None
+        self._video_capture_mode = "unknown"
+        self._video_capture_requested_mode = _CAPTURE_MODE
+        self._video_capture_attempt_log: list[dict[str, Any]] = []
+        self._video_capture_failed_layers: set[str] = set()
+        self._video_validation_checked = False
+        self._video_validation_passed: Optional[bool] = None
+        self._video_validation_failed = False
+        self._video_validation_reason = "not_checked"
+        self._video_started = False
+        self._recording_active = False
+        self._active_session_dir = _active_session_dir()
         self._output_path: Optional[Path] = None
         self._stop_event = threading.Event()
         self._input_capture: Optional[InputCapture] = None
@@ -2109,6 +3156,7 @@ class RecorderApp(tk.Tk):
         self._depth_progress_started_at: float = 0.0
 
         self._build_ui()
+        self._recover_orphaned_active_session_on_boot()
         _ensure_known_mc_instances_focus_loss_safe()
         # Start background watcher immediately — testers do not click anything.
         threading.Thread(target=self._watch_loop, daemon=True).start()
@@ -2592,8 +3640,10 @@ class RecorderApp(tk.Tk):
         the subtitle with elapsed time + current video file size.
         Self-stops when ffmpeg dies.
         """
-        if self._ffmpeg_proc is None or self._ffmpeg_proc.poll() is not None:
-            return  # ffmpeg has exited; let watch_loop's finalizer take over
+        proc = self._ffmpeg_proc
+        video_alive = proc is not None and proc.poll() is None
+        if not video_alive and not getattr(self, "_recording_active", False):
+            return  # finalizer has taken over
         try:
             elapsed = max(0.0, time.time() - self._record_started_at)
         except Exception:
@@ -2601,11 +3651,10 @@ class RecorderApp(tk.Tk):
         # Format mm:ss
         mm = int(elapsed // 60)
         ss = int(elapsed % 60)
-        # Read current video file size; the file may not exist for the
-        # first ~1s as ffmpeg sets up its container.
-        size_str = "—"
+        # Read current video file size; data-only sessions have no mp4.
+        size_str = "无视频"
         try:
-            if self._video_path and self._video_path.exists():
+            if video_alive and self._video_path and self._video_path.exists():
                 mb = self._video_path.stat().st_size / (1024 * 1024)
                 size_str = f"{mb:.1f} MB"
         except Exception:
@@ -2636,7 +3685,7 @@ class RecorderApp(tk.Tk):
         try:
             self._subtitle.config(
                 text=f"⏱  {mm}分{ss:02d}秒\n📦 视频文件 {size_str}{quality_line}",
-                fg=RED,
+                fg=RED if video_alive else ORANGE,
             )
         except Exception:
             pass
@@ -2954,6 +4003,28 @@ class RecorderApp(tk.Tk):
         except Exception:
             pass
 
+    def _recover_orphaned_active_session_on_boot(self) -> None:
+        """Package stale mod output from a previous crash before recording again."""
+
+        active_dir = getattr(self, "_active_session_dir", _active_session_dir())
+        packaged = _package_orphaned_active_session(active_dir)
+        if packaged is not None:
+            _trace(f"active_session: recovered orphan on boot -> {packaged}")
+
+    def _mark_session_started(self, ts: str) -> None:
+        """Publish the session id before video starts so mod data is recoverable."""
+
+        active_dir = getattr(self, "_active_session_dir", _active_session_dir())
+        active_dir.mkdir(parents=True, exist_ok=True)
+        marker = {
+            "session_id": getattr(self, "_session_id", ""),
+            "clip": f"clip-{ts}",
+            "started_at": datetime.now().isoformat(timespec="seconds"),
+            "recorder_version": RECORDER_VERSION,
+        }
+        _atomic_write_json(active_dir / ".session_id", marker)
+        _trace(f"active_session: marked session start {marker['session_id']} -> clip-{ts}")
+
     def _watch_mc_focus_alive(self, *, force: bool = False) -> None:
         """Best-effort keep the captured Minecraft HWND foregrounded while recording."""
 
@@ -3232,32 +4303,59 @@ class RecorderApp(tk.Tk):
         import uuid as _uuid_mod
 
         self._session_id = str(_uuid_mod.uuid4())
+        self._recording_active = True
+        self._mark_session_started(ts)
+
+        # Start input capture before video. Data capture is the required
+        # signal; video is an optional enrichment layer.
+        self._input_capture = InputCapture()
+        try:
+            input_ok = self._input_capture.start()
+        except Exception as exc:  # noqa: BLE001
+            input_ok = False
+            _trace(f"WARNING: input capture failed to start: {exc}")
+        if not input_ok:
+            _trace("WARNING: input capture failed to start — continuing with video-only")
+
         # Bug fix: leave Minecraft visible/foreground for screen capture. If the
         # captured game window is minimized after ffmpeg starts, Windows
         # stops rendering it and ffmpeg records one stale frame forever.
         _restore_minecraft_window_for_capture(self._mc_window_rect)
         self._watch_mc_focus_alive(force=True)
         self._make_window_non_focus_stealing()
-        try:
-            self._start_ffmpeg(self._video_path)
-        except Exception as exc:  # noqa: BLE001
-            self._restore_window_activatable()
-            self._set("⚠️ 录制启动失败", ORANGE, f"{type(exc).__name__}: {exc}")
-            return
 
-        # Start input capture in parallel with video. If pynput fails
-        # (rare — e.g. tester hardened OS), record video only and note
-        # in subtitle so the tester knows.
-        self._input_capture = InputCapture()
-        input_ok = self._input_capture.start()
-        if input_ok:
+        try:
+            self._start_video_capture(self._video_path)
+            self._video_started = getattr(self, "_video_capture_mode", "none") != "none"
+        except Exception as exc:  # noqa: BLE001
+            _trace(f"video capture failed at all 4 layers: {exc}")
+            self._video_started = False
+            self._video_capture_mode = "none"
+            self._video_capture_attempt_log.append(
+                {"layer": "all", "status": "failed", "error": str(exc)}
+            )
+            self._set("⚠️ 仅数据采集（视频不可用）", ORANGE, str(exc)[:80])
+
+        if self._video_started and input_ok:
             self._set(
                 "● 正在录制",
                 RED,
                 "玩你的 Minecraft 即可，退出游戏会自动停止录制。" "（视频 + 键鼠输入同步采集中）",
             )
-        else:
+        elif self._video_started:
             self._set("● 正在录制（仅视频）", RED, "键鼠采集未启动，仅录制视频。继续玩游戏即可。")
+        elif input_ok:
+            self._set(
+                "● 正在采集数据",
+                ORANGE,
+                "视频捕获不可用；仍在采集游戏状态与键鼠输入，退出游戏会自动打包。",
+            )
+        else:
+            self._set(
+                "● 正在采集游戏状态",
+                ORANGE,
+                "视频和键鼠采集不可用；仍会保留 game_state.jsonl 等可用数据。",
+            )
 
         # v0.12.0: live progress ticker so the tester knows recording is
         # actually working. Updates every second with elapsed seconds +
@@ -3296,6 +4394,7 @@ class RecorderApp(tk.Tk):
         if self._input_capture is not None:
             self._captured_events = self._input_capture.stop()
             self._input_capture_diagnostics = self._input_capture.raw_input_diagnostics()
+            self._input_capture = None
         else:
             self._captured_events = []
             self._input_capture_diagnostics = {
@@ -3303,6 +4402,7 @@ class RecorderApp(tk.Tk):
                 "wm_input_total": 0,
                 "get_raw_input_data_failures": 0,
             }
+        self._recording_active = False
         try:
             output_tar = self._package_tarball(ts)
         except Exception as exc:  # noqa: BLE001
@@ -3372,6 +4472,7 @@ class RecorderApp(tk.Tk):
         """
         clip_dir = self._tmp_dir / f"clip-{ts}"
         clip_dir.mkdir(parents=True, exist_ok=True)
+        active_dir = self.__dict__.get("_active_session_dir") or _active_session_dir()
 
         # Compute recording duration once, up front: the frame-count math
         # below (action_camera.json) and the partial-duration check at the
@@ -3385,6 +4486,12 @@ class RecorderApp(tk.Tk):
             os.replace(self._video_path, video_target)
             _fsync_file(video_target)
             _fsync_dir(clip_dir)
+        else:
+            _trace("package: video.mp4 missing; continuing with data-only session")
+
+        # Preserve all mod-side raw artifacts before transforms. This is a
+        # copy, not a move, so active_session survives any later package error.
+        _copy_active_session_into_clip(active_dir, clip_dir)
 
         # 2. systeminfo.json — v0.10.0: now uses the proper engineering
         # helper bin/generate_systeminfo_json.build_systeminfo() rather
@@ -3458,36 +4565,50 @@ class RecorderApp(tk.Tk):
             _gs_load = _gs_lookup = _gs_apply = None  # type: ignore
             _gs_jsonl_path = None  # type: ignore
 
-        _gs_samples = _gs_load() if _gs_load else None
+        gs_target = clip_dir / "game_state.jsonl"
+        gs_source: Optional[Path] = gs_target if gs_target.exists() else None
+        if gs_source is None and _gs_jsonl_path:
+            try:
+                candidate = Path(_gs_jsonl_path())
+                if candidate.exists():
+                    gs_source = candidate
+            except Exception:
+                gs_source = None
+
+        _gs_samples = _gs_load(gs_source) if (_gs_load and gs_source) else None
+        game_state_partial_reason: Optional[str] = None
         if _gs_samples:
             _trace(
                 f"package: real game-state JSONL found, {len(_gs_samples)} samples — overlay enabled"
             )
-            if not _gs_jsonl_path:
+            if gs_source is None:
                 raise RecorderError(
                     "Real game-state samples loaded but raw game_state.jsonl source is unknown; "
                     "refusing to package unauditable data."
                 )
-            gs_source = Path(_gs_jsonl_path())
-            gs_target = clip_dir / "game_state.jsonl"
-            shutil.copy2(gs_source, gs_target)
-            _trace(
-                "package: copied raw game_state.jsonl "
-                f"from {gs_source} ({gs_target.stat().st_size} bytes)"
-            )
+            if gs_source != gs_target:
+                shutil.copy2(gs_source, gs_target)
+                _trace(
+                    "package: copied raw game_state.jsonl "
+                    f"from {gs_source} ({gs_target.stat().st_size} bytes)"
+                )
         else:
             ver = _recorder_version_tuple()
             allow_placeholder = getattr(self, "_allow_placeholder", False)
             if ver >= (0, 26, 0) and not allow_placeholder:
                 supported_str = ", ".join(SUPPORTED_MC_VERSIONS)
-                raise RecorderError(
+                game_state_partial_reason = (
                     "Real game-state Fabric mod not loaded.\n"
                     f"Detected MC version: {_parse_mc_version_from_title((self._mc_window_rect or {}).get('title', '')) or 'unknown'}\n"
                     f"Supported mod builds:  {supported_str}\n"
                     "Download from:        https://github.com/howardleegeek/oyster-gamedata-pipeline/releases/latest\n"
                     r"Install path:         %APPDATA%\.minecraft\mods"
                     "\n"
-                    "Tarball NOT created."
+                    "Tarball marked partial."
+                )
+                _trace(
+                    "WARNING: package: real game-state missing; writing partial tarball "
+                    "instead of dropping captured inputs"
                 )
             if allow_placeholder:
                 _trace(
@@ -3657,7 +4778,7 @@ class RecorderApp(tk.Tk):
         # OYSTER_ALLOW_CLIENT_DEPTH=1.
         video_path = clip_dir / "video.mp4"
         depth_dir = clip_dir / "depth"
-        if _client_depth_inference_enabled():
+        if _client_depth_inference_enabled() and video_path.is_file():
             depth_skipped = False
             try:
                 from depth_anything_v2_inference import infer_depth_for_video  # noqa: PLC0415
@@ -3793,10 +4914,28 @@ class RecorderApp(tk.Tk):
         # Re-write systeminfo.json with the new fields.
         _atomic_write_json(clip_dir / "systeminfo.json", sys_info)
 
+        video_file = clip_dir / "video.mp4"
+        has_video = video_file.is_file()
+        has_real_game_state = bool(_gs_samples)
+        partial_reasons: list[str] = []
+        if elapsed_sec < 300.0:
+            partial_reasons.append("duration_below_5min")
+        if not has_video:
+            partial_reasons.append("video_missing")
+        if not has_real_game_state:
+            partial_reasons.append("real_game_state_missing")
+        if game_state_partial_reason:
+            partial_reasons.append("mod_jsonl_missing")
+        session_complete = has_video and has_real_game_state
+
         # R01: if --allow-placeholder is active and JSONL was missing,
         # stamp metadata.json with data_authenticity='placeholder' so
         # buyers can identify non-real game-state tarballs.
         metadata: dict[str, Any] = {
+            "session_id": getattr(self, "_session_id", ""),
+            "session_complete": session_complete,
+            "partial": bool(partial_reasons),
+            "partial_reasons": partial_reasons,
             "input_capture_diagnostics": self.__dict__.get(
                 "_input_capture_diagnostics",
                 {
@@ -3806,10 +4945,36 @@ class RecorderApp(tk.Tk):
                 },
             ),
             "video_capture": {
-                "requested_mode": _CAPTURE_MODE,
+                "requested_mode": self.__dict__.get(
+                    "_video_capture_requested_mode",
+                    _CAPTURE_MODE,
+                ),
                 "selected_mode": self.__dict__.get("_video_capture_mode", "unknown"),
+                "selected_layer": self.__dict__.get("_video_capture_mode", "unknown"),
+                "layer_attempt_log": self.__dict__.get("_video_capture_attempt_log", []),
+                "attempts_failed": [
+                    attempt
+                    for attempt in self.__dict__.get("_video_capture_attempt_log", [])
+                    if attempt.get("status") in {"failed", "unavailable", "not_started"}
+                ],
             },
         }
+        video_capture_warnings: list[str] = []
+        if self.__dict__.get("_video_capture_mode") == "gdigrab":
+            video_capture_warnings.append("known_static_frames_on_hardware_accel_mc")
+        if not has_video:
+            video_capture_warnings.append("video_missing_data_only_session")
+            metadata["video_capture"]["selected_mode"] = "none"
+            metadata["video_capture"]["selected_layer"] = "none"
+        if video_capture_warnings:
+            metadata["video_capture"]["warning"] = "; ".join(video_capture_warnings)
+            metadata["video_capture"]["warnings"] = video_capture_warnings
+        if game_state_partial_reason:
+            metadata["game_state_capture"] = {
+                "status": "missing",
+                "required": True,
+                "error": game_state_partial_reason,
+            }
         if getattr(self, "_allow_placeholder", False) and not _gs_samples:
             metadata.update(
                 {
@@ -3820,14 +4985,25 @@ class RecorderApp(tk.Tk):
         _atomic_write_json(clip_dir / "metadata.json", metadata)
         _trace("package: wrote metadata.json with input capture diagnostics")
 
-        if not (clip_dir / "video.mp4").is_file():
-            raise RecorderError("video.mp4 missing after ffmpeg finalize; session not complete")
-        if getattr(self, "_audio_probe_failed", False):
+        if video_file.is_file() and getattr(self, "_audio_probe_failed", False):
             _generate_silent_audio_fallback(clip_dir, clip_dir / "video.mp4")
-        _ensure_recording_mp4_alias(clip_dir)
+        elif not video_file.is_file():
+            try:
+                _generate_silent_audio_fallback_for_duration(
+                    clip_dir,
+                    duration=elapsed_sec,
+                    reason="video capture unavailable; synthetic silent audio preserves session timeline",
+                )
+            except RecorderError as exc:
+                _trace(f"WARNING: data-only audio fallback failed nonfatally: {exc}")
+        if video_file.is_file():
+            _ensure_recording_mp4_alias(clip_dir)
 
-        _write_session_complete_marker(clip_dir)
-        _trace("package: wrote .session_complete marker")
+        if session_complete:
+            _write_session_complete_marker(clip_dir)
+            _trace("package: wrote .session_complete marker")
+        else:
+            _trace(f"package: partial session; no .session_complete marker ({partial_reasons})")
 
         # Write the tarball into the user's Documents/OysterClips/.
         out_tar = _output_dir() / f"clip-{ts}.tar.gz"
@@ -3852,34 +5028,31 @@ class RecorderApp(tk.Tk):
             pass
         return out_tar
 
-    def _start_ffmpeg(self, out_path: Path) -> None:
-        """Spawn ffmpeg to record the Minecraft window.
+    def _start_video_capture(self, out_path: Path) -> None:
+        """Start video capture through the nonfatal four-layer fallback chain."""
 
-        R01 v3 (iron-law-strict): prefer DXGI Desktop Duplication
-        (ddagrab) full-output capture cropped to the Minecraft geometry.
-        The gdigrab geometry path remains only as an auto fallback for
-        older Windows hosts where ddagrab exits during startup. Title
-        encoding is irrelevant in both paths. Hard-fails if mc_window is
-        None (no window detected). The old title-based branch has been
-        removed.
+        self._video_capture_handle = None
+        self._ffmpeg_proc = None
+        self._video_capture_mode = "none"
+        requested_capture_mode = _normalize_capture_mode(_CAPTURE_MODE)
+        self._video_capture_requested_mode = requested_capture_mode
+        self._video_capture_attempt_log = []
 
-        v0.29.0: captures audio via an explicit priority chain:
-        Application Audio Capture(javaw.exe) -> Desktop Audio Output ->
-        any DirectShow input fallback. Never chooses microphone before
-        system audio when a loopback source is available.
-        """
-        # R01 iron-law: hard-fail if Minecraft window not detected.
         if self._mc_window_rect is None:
-            raise RecorderError("Minecraft window not detected. Is Minecraft running and visible?")
+            message = "Minecraft window not detected; continuing session without video"
+            self._video_capture_attempt_log.append(
+                {"layer": "none", "status": "failed", "error": message}
+            )
+            _trace(f"WARNING: video_capture: {message}")
+            return
 
         rect = self._mc_window_rect
-        mc_title = rect.get("title", "")
-        x = rect.get("x", 0)
-        y = rect.get("y", 0)
-        w = rect.get("width", 1920)
-        h = rect.get("height", 1080)
+        mc_title = str(rect.get("title", ""))
+        x = int(rect.get("x", 0))
+        y = int(rect.get("y", 0))
+        w = int(rect.get("width", 1920))
+        h = int(rect.get("height", 1080))
 
-        # R01 D section: parse MC version from title and warn if unsupported.
         mc_ver = _parse_mc_version_from_title(mc_title)
         if mc_ver and mc_ver not in SUPPORTED_MC_VERSIONS:
             _trace(
@@ -3889,202 +5062,121 @@ class RecorderApp(tk.Tk):
                 "to a supported version OR pass --allow-placeholder."
             )
 
-        # Audio probe. The old implementation only scanned DirectShow input
-        # devices, so machines with no microphone produced device=None and a
-        # video-only ffmpeg command. Dedicated minipc collectors need system
-        # audio even when no capture input is present.
-        audio_report = probe_audio_source_chain("javaw.exe")
-        audio_source = audio_report.selected
-        self._audio_probe_failed = audio_source is None
-        audio_inputs = []
-        audio_codec = []
-        for probe in audio_report.probes:
-            _trace(
-                "audio_probe: "
-                f"mode={probe.mode} available={probe.available} "
-                f"device={probe.device!r} reason={probe.reason}"
-            )
-        if audio_source:
-            audio_inputs = list(audio_source.ffmpeg_args)
-            audio_codec = ["-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2"]
-            _trace(
-                "ffmpeg: capturing audio "
-                f"mode={audio_source.mode} device={audio_source.device!r} "
-                f"args={' '.join(audio_inputs)}"
-            )
-        else:
-            _trace(
-                "WARNING: audio_probe all sources failed; no ffmpeg audio source is "
-                "available. Recording video-only because there is no system loopback "
-                "or input device to attach."
-            )
+        audio_inputs: list[str] = []
+        audio_codec: list[str] = []
+        try:
+            audio_report = probe_audio_source_chain("javaw.exe")
+            audio_source = audio_report.selected
+            self._audio_probe_failed = audio_source is None
+            for probe in audio_report.probes:
+                _trace(
+                    "audio_probe: "
+                    f"mode={probe.mode} available={probe.available} "
+                    f"device={probe.device!r} reason={probe.reason}"
+                )
+            if audio_source:
+                audio_inputs = list(audio_source.ffmpeg_args)
+                audio_codec = ["-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2"]
+                _trace(
+                    "video_capture: capturing audio "
+                    f"mode={audio_source.mode} device={audio_source.device!r} "
+                    f"args={' '.join(audio_inputs)}"
+                )
+            else:
+                _trace(
+                    "WARNING: audio_probe all sources failed; no ffmpeg audio source is "
+                    "available. Recording video-only because there is no system loopback "
+                    "or input device to attach."
+                )
+        except Exception as exc:  # noqa: BLE001
+            self._audio_probe_failed = True
+            _trace(f"WARNING: audio_probe failed unexpectedly: {exc}")
 
-        # On Windows, CREATE_NO_WINDOW (0x08000000) hides the ffmpeg
-        # console window so the tester only sees our Tk window.
         flags = 0x08000000 if os.name == "nt" else 0
-        requested_capture_mode = _normalize_capture_mode(_CAPTURE_MODE)
-        plans = _capture_mode_candidates(
-            requested_capture_mode,
-            x=int(x),
-            y=int(y),
-            w=int(w),
-            h=int(h),
+        layers = (
+            list(_VIDEO_AUTO_LAYERS)
+            if requested_capture_mode == "auto"
+            else [requested_capture_mode]
         )
-        startup_errors: list[str] = []
-        for plan in plans:
+        errors: list[str] = []
+        for layer in layers:
+            if layer == "none":
+                continue
             _trace(
-                "ffmpeg: capture "
-                f"requested={requested_capture_mode} selected={plan.mode} "
+                "video_capture: trying "
+                f"requested={requested_capture_mode} layer={layer} "
                 f"title='{mc_title}' geometry={x},{y},{w},{h}"
             )
-            if plan.mode == "gdigrab":
-                _trace(
-                    "WARNING: ffmpeg capture_mode=gdigrab uses GDI-layer capture; "
-                    "hardware-accelerated Minecraft may record a static frame. "
-                    f"Prefer {_CAPTURE_MODE_ENV}=ddagrab on Windows 8+."
-                )
-
-            cmd = [
-                str(_FFMPEG),
-                "-hide_banner",
-                *plan.input_args,
-                *audio_inputs,
-                "-vf",
-                plan.encode_filter(),
-                "-c:v",
-                "libx265",
-                "-preset",
-                "ultrafast",
-                # libx265 defaults to CRF 28 if no bitrate/CRF is specified. On
-                # static game scenes that collapsed clips to ~67 kbps and looked frozen.
-                "-b:v",
-                "10M",
-                "-maxrate",
-                "12M",
-                "-bufsize",
-                "20M",
-                "-pix_fmt",
-                "yuv420p",
-                *audio_codec,
-                "-r",
-                "30",
-                "-y",
-                str(out_path),
-            ]
             try:
-                proc = subprocess.Popen(
-                    cmd,
-                    stdin=subprocess.PIPE,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
+                handle = _start_layer(
+                    layer,
+                    out_path,
+                    x=x,
+                    y=y,
+                    w=w,
+                    h=h,
+                    audio_inputs=audio_inputs,
+                    audio_codec=audio_codec,
                     creationflags=flags,
+                    init_timeout_sec=_VIDEO_LAYER_INIT_TIMEOUT_SEC,
                 )
-            except Exception as exc:  # noqa: BLE001
-                startup_errors.append(f"{plan.mode} spawn failed: {exc}")
-                _trace(f"ffmpeg: capture_mode={plan.mode} spawn failed: {exc}")
-                continue
-
-            if requested_capture_mode == "auto" and plan.mode == "ddagrab":
-                time.sleep(_CAPTURE_STARTUP_CHECK_SEC)
-                returncode = proc.poll()
-                if returncode is not None:
-                    startup_errors.append(f"ddagrab exited during startup rc={returncode}")
-                    _trace(
-                        "WARNING: ffmpeg ddagrab exited during startup "
-                        f"rc={returncode}; falling back to gdigrab. "
-                        "Fallback may record static frames for hardware-accelerated MC."
+                if handle is None:
+                    self._video_capture_attempt_log.append(
+                        {"layer": layer, "status": "unavailable"}
                     )
+                    _trace(f"video_capture: layer={layer} unavailable")
                     continue
-
-            self._ffmpeg_proc = proc
-            self._video_capture_mode = plan.mode
-            self._video_capture_plan = plan
-            self._start_capture_entropy_monitor(plan)
-            return
-
-        detail = "; ".join(startup_errors) or "no capture candidates were available"
-        raise RecorderError(f"ffmpeg capture startup failed: {detail}")
-
-    def _start_capture_entropy_monitor(self, plan: VideoCapturePlan) -> None:
-        """After startup, sample live capture frames and warn on static output."""
-
-        if os.name != "nt":
-            return
-
-        proc = self._ffmpeg_proc
-        if proc is None:
-            return
-
-        def _go() -> None:
-            time.sleep(_CAPTURE_ENTROPY_DELAY_SEC)
-            current_proc = self._ffmpeg_proc
-            if current_proc is None or current_proc is not proc or current_proc.poll() is not None:
+                self._video_capture_mode = layer
+                self._video_capture_handle = handle
+                self._ffmpeg_proc = handle.proc
+                self._video_capture_attempt_log.append(
+                    {
+                        "layer": layer,
+                        "status": "selected",
+                        "warning": handle.warning,
+                        "extra": handle.extra,
+                    }
+                )
+                _trace(f"video_capture: selected layer={layer}")
                 return
-            result = _measure_capture_entropy(plan)
-            if result is None:
-                return
-            _trace(
-                "capture_entropy: "
-                f"mode={plan.mode} avg_bits={result.average_bits:.3f} "
-                f"frames={result.frames_sampled} unique={result.unique_frames}"
-            )
-            looks_static = result.average_bits < _CAPTURE_ENTROPY_THRESHOLD_BITS or (
-                result.frames_sampled >= 2 and result.unique_frames <= 1
-            )
-            if not looks_static:
-                return
-            _trace(
-                "WARNING: capture_entropy indicates possibly static video "
-                f"mode={plan.mode} avg_bits={result.average_bits:.3f} "
-                f"unique={result.unique_frames}/{result.frames_sampled}"
-            )
-            try:
-                self.after(0, lambda: self._offer_capture_mode_switch(plan.mode, result))
-            except RuntimeError:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                error = f"{layer}: {exc}"
+                errors.append(error)
+                self._video_capture_attempt_log.append(
+                    {"layer": layer, "status": "failed", "error": str(exc)}
+                )
+                _trace(f"video_capture: layer={layer} failed: {exc}")
 
-        threading.Thread(target=_go, daemon=True, name="capture-entropy-monitor").start()
+        _trace("WARNING: ALL video capture layers failed: " f"{errors}. Continuing with NO video.")
+        self._video_capture_mode = "none"
+        self._video_capture_handle = None
+        self._ffmpeg_proc = None
 
-    def _offer_capture_mode_switch(self, mode: str, result: CaptureEntropyResult) -> None:
-        alternate = "gdigrab" if mode == "ddagrab" else "ddagrab"
-        warning = (
-            "视频捕获看起来可能是静止画面。\n"
-            f"mode={mode}, entropy={result.average_bits:.2f}, "
-            f"unique={result.unique_frames}/{result.frames_sampled}\n"
-            f"是否停止当前录制并切换到 {alternate}？"
-        )
-        self._set(
-            "⚠️ 视频可能卡帧",
-            ORANGE,
-            f"检测到捕获画面可能是静止的。当前模式: {mode}；可切换到 {alternate} 后重录。",
-        )
-        ask_yes_no = getattr(messagebox, "askyesno", None)
-        if not callable(ask_yes_no):
-            _trace("capture_entropy: messagebox.askyesno unavailable; warning shown in UI only")
-            return
-        try:
-            switch = ask_yes_no("OysterRecorder 捕获模式", warning)
-        except Exception as exc:  # noqa: BLE001
-            _trace(f"capture_entropy: switch prompt failed: {exc}")
-            return
-        if not switch:
-            _trace("capture_entropy: user kept current capture mode")
-            return
+    def _start_ffmpeg(self, out_path: Path) -> None:
+        """Compatibility wrapper for older tests/callers."""
 
-        global _CAPTURE_MODE
-        _CAPTURE_MODE = alternate
-        os.environ[_CAPTURE_MODE_ENV] = alternate
-        _trace(f"capture_entropy: user switched capture mode to {alternate}; stopping current clip")
-        self._record_armed = False
-        self._stop_ffmpeg()
-        self._set(
-            "⚠️ 已切换捕获模式",
-            ORANGE,
-            f"当前录制已停止。已切换到 {alternate}，请重新点击 ▶ 开始录制。",
-        )
+        self._start_video_capture(out_path)
 
     def _stop_ffmpeg(self) -> None:
         """Send 'q' to ffmpeg's stdin and wait for MP4 finalization."""
+        handle = getattr(self, "_video_capture_handle", None)
+        if isinstance(handle, VideoCaptureHandle):
+            forced_stop = _stop_video_capture_handle(handle)
+            self._video_capture_handle = None
+            self._ffmpeg_proc = None
+            self._restore_window_activatable()
+            video_path = getattr(self, "_video_path", None)
+            if (
+                forced_stop
+                and isinstance(video_path, Path)
+                and video_path.exists()
+                and not _mp4_has_moov_atom(video_path)
+            ):
+                _attempt_mp4_remux_repair(video_path)
+            if isinstance(video_path, Path) and video_path.exists():
+                _fsync_file(video_path)
+            return
+
         proc = self._ffmpeg_proc
         if proc is None:
             self._restore_window_activatable()
@@ -4258,7 +5350,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         choices=sorted(_VALID_CAPTURE_MODES),
         default=None,
         help=(
-            "Video capture mode: auto tries ddagrab then gdigrab; "
+            "Video capture mode: auto tries windows-capture, mss, ddagrab, then gdigrab; "
             f"default comes from {_CAPTURE_MODE_ENV} or auto"
         ),
     )
