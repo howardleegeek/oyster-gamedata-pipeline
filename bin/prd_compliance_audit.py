@@ -56,6 +56,16 @@ GAMEINFO_FIELDS_14 = [
     "notes",
 ]
 VIDEO_CANDIDATES = ("recording.mp4", "video.mp4", "screen.mp4")
+VALID_INPUT_SIGNAL_EVENT_TYPES = {
+    "KEYBOARD",
+    "MOUSE_BUTTON",
+    "MOUSE_MOVE",
+    "key_down",
+    "key_up",
+    "mouse_click",
+    "mouse_move",
+    "mouse_raw_delta",
+}
 
 
 def _result(id_: str, ok: bool, evidence: str) -> dict:
@@ -1020,8 +1030,12 @@ def audit_group_q_operator(session: Path) -> list[dict]:
             # Now require ≥50 total events as a floor before crediting the
             # absence-checks; without min activity the session is non-gameplay.
             total_events = len(events)
+            valid_input_events = [
+                e for e in events if e.get("event_type") in VALID_INPUT_SIGNAL_EVENT_TYPES
+            ]
+            valid_input_count = len(valid_input_events)
             min_events = 50
-            activity_floor_ok = total_events >= min_events
+            activity_floor_ok = valid_input_count >= min_events
 
             # Q1 — no inventory (E key, vk_code 69) — only credit absence if activity present
             e_keys = [
@@ -1035,7 +1049,8 @@ def audit_group_q_operator(session: Path) -> list[dict]:
                 _result(
                     "Q1",
                     q1_ok,
-                    f"E (inventory) keypresses: {len(e_keys)}, total_events={total_events} "
+                    f"E (inventory) keypresses: {len(e_keys)}, "
+                    f"valid_input_events={valid_input_count}, total_events={total_events} "
                     f"(PRD: 0 inventory + >={min_events} total)",
                 )
             )
@@ -1051,7 +1066,8 @@ def audit_group_q_operator(session: Path) -> list[dict]:
                 _result(
                     "Q2",
                     q2_ok,
-                    f"F5 (perspective) keypresses: {len(f5_keys)}, total_events={total_events} "
+                    f"F5 (perspective) keypresses: {len(f5_keys)}, "
+                    f"valid_input_events={valid_input_count}, total_events={total_events} "
                     f"(PRD: 0 F5 + >={min_events} total)",
                 )
             )

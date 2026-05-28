@@ -199,7 +199,7 @@ def step3_extract_audio(sess: pathlib.Path) -> None:
 
 
 def step4_denormalize_inputs(sess: pathlib.Path) -> None:
-    step("4/10 Denormalize inputs.jsonl (lift vk_code/pressed)")
+    step("4/10 Denormalize inputs.jsonl (lift vk_code/pressed/mouse deltas)")
     p = sess / "inputs.jsonl"
     lines = p.read_text().splitlines()
     out: list[str] = []
@@ -209,6 +209,10 @@ def step4_denormalize_inputs(sess: pathlib.Path) -> None:
         ts = d.get("timestamp")
         if isinstance(ts, (int, float)):
             d["timestamp_ns"] = int(ts * 1e9)
+        else:
+            ts_ms = d.get("timestamp_ms")
+            if isinstance(ts_ms, (int, float)):
+                d["timestamp_ns"] = int(ts_ms * 1_000_000)
         ev = d.get("event_type")
         ea = d.get("event_args")
         if ev == "KEYBOARD" and isinstance(ea, list) and len(ea) >= 2:
@@ -223,6 +227,12 @@ def step4_denormalize_inputs(sess: pathlib.Path) -> None:
         elif ev == "MOUSE_MOVE" and isinstance(ea, list) and len(ea) >= 2:
             d["mouse_dx"] = ea[0]
             d["mouse_dy"] = ea[1]
+        elif ev == "mouse_raw_delta":
+            dx = d.get("mouse_dx", d.get("dx"))
+            dy = d.get("mouse_dy", d.get("dy"))
+            if isinstance(dx, (int, float)) and isinstance(dy, (int, float)):
+                d["mouse_dx"] = dx
+                d["mouse_dy"] = dy
         out.append(json.dumps(d))
     p.write_text("\n".join(out) + "\n")
     print(f"  rewrote {len(out)} events, WASD={wasd}")

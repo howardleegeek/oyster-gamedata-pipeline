@@ -58,6 +58,10 @@ DEFAULT_INTRINSICS = {
     "Cy": _H / 2.0,
 }
 
+_ABS_UNIX_SECONDS_FLOOR = 1_000_000_000.0
+_ABS_UNIX_MILLISECONDS_FLOOR = 1_000_000_000_000.0
+_ABS_UNIX_NANOSECONDS_FLOOR = 1_000_000_000_000_000_000.0
+
 
 def _first_number(data: dict, keys: tuple[str, ...]) -> float | None:
     """Return the first numeric field value found under any of ``keys``."""
@@ -65,6 +69,51 @@ def _first_number(data: dict, keys: tuple[str, ...]) -> float | None:
         value = data.get(key)
         if isinstance(value, (int, float)):
             return float(value)
+    return None
+
+
+def _event_time_relative_seconds(ev: dict, session_start_unix: float | None) -> float | None:
+    """Normalize supported input timestamp shapes to session-relative seconds."""
+
+    ts = ev.get("timestamp")
+    if isinstance(ts, (int, float)):
+        ts_s = float(ts)
+        if session_start_unix is not None and ts_s >= _ABS_UNIX_SECONDS_FLOOR:
+            return ts_s - session_start_unix
+        return ts_s
+
+    ts_ms = ev.get("timestamp_ms")
+    if isinstance(ts_ms, (int, float)):
+        ts_s = float(ts_ms) / 1000.0
+        if session_start_unix is not None and float(ts_ms) >= _ABS_UNIX_MILLISECONDS_FLOOR:
+            return ts_s - session_start_unix
+        return ts_s
+
+    ts_ns = ev.get("timestamp_ns")
+    if isinstance(ts_ns, (int, float)):
+        ts_s = float(ts_ns) / 1_000_000_000.0
+        if session_start_unix is not None and float(ts_ns) >= _ABS_UNIX_NANOSECONDS_FLOOR:
+            return ts_s - session_start_unix
+        return ts_s
+
+    return None
+
+
+def _extract_mouse_delta(ev: dict) -> tuple[float, float] | None:
+    """Extract relative mouse deltas from canonical and raw-input event shapes."""
+
+    dx = ev.get("mouse_dx")
+    dy = ev.get("mouse_dy")
+    if dx is None or dy is None:
+        dx = ev.get("dx")
+        dy = ev.get("dy")
+    if dx is None or dy is None:
+        ea = ev.get("event_args")
+        if isinstance(ea, list) and len(ea) >= 2:
+            dx = ea[0]
+            dy = ea[1]
+    if isinstance(dx, (int, float)) and isinstance(dy, (int, float)):
+        return float(dx), float(dy)
     return None
 
 
@@ -322,6 +371,7 @@ def merge_inputs(
     inputs.jsonl format (recorder, post-denormalize):
       {"timestamp": <unix>, "timestamp_ns": <unix*1e9>, "event_type": "MOUSE_MOVE",
        "event_args": [dx, dy], "mouse_dx": <dx>, "mouse_dy": <dy>}
+      {"timestamp_ms": <relative_ms>, "event_type": "mouse_raw_delta", "dx": <dx>, "dy": <dy>}
       {"timestamp": <unix>, "event_type": "KEYBOARD", "vk_code": 87, "pressed": true}
     """
     if not inputs_path.exists():
@@ -342,41 +392,45 @@ def merge_inputs(
     # Establish session_start anchor if not provided. Falls back to first
     # input event timestamp (less accurate — may include pre-game lifecycle).
     if session_start_unix is None:
-        # Use first MOUSE_MOVE or KEYBOARD event (skip lifecycle markers)
+        # Use first absolute-timestamp gameplay event (skip lifecycle markers).
+        # Relative timestamp_ms events are already session-relative.
         gameplay = [
-            e for e in events if e.get("event_type") in ("MOUSE_MOVE", "KEYBOARD", "MOUSE_BUTTON")
+            e
+            for e in events
+            if e.get("event_type") in ("MOUSE_MOVE", "KEYBOARD", "MOUSE_BUTTON", "mouse_raw_delta")
         ]
-        if gameplay:
-            session_start_unix = min(
-                e.get("timestamp", 0)
-                for e in gameplay
-                if isinstance(e.get("timestamp"), (int, float))
-            )
+        absolute_starts = []
+        for e in gameplay:
+            ts = e.get("timestamp")
+            if isinstance(ts, (int, float)) and float(ts) >= _ABS_UNIX_SECONDS_FLOOR:
+                absolute_starts.append(float(ts))
+            ts_ms = e.get("timestamp_ms")
+            if isinstance(ts_ms, (int, float)) and float(ts_ms) >= _ABS_UNIX_MILLISECONDS_FLOOR:
+                absolute_starts.append(float(ts_ms) / 1000.0)
+            ts_ns = e.get("timestamp_ns")
+            if isinstance(ts_ns, (int, float)) and float(ts_ns) >= _ABS_UNIX_NANOSECONDS_FLOOR:
+                absolute_starts.append(float(ts_ns) / 1_000_000_000.0)
+        if absolute_starts:
+            session_start_unix = min(absolute_starts)
+        elif gameplay:
+            session_start_unix = None
         else:
             return 0
 
-    # Index MOUSE_MOVE events by their session-relative time (seconds)
+    # Index mouse-delta events by their session-relative time (seconds)
     mouse_events_by_t = []  # list of (t_rel_seconds, dx, dy)
     keyboard_events_by_t = []  # list of (t_rel_seconds, vk_code, pressed)
     for ev in events:
         et = ev.get("event_type")
-        ts = ev.get("timestamp")
-        if not isinstance(ts, (int, float)):
+        t_rel = _event_time_relative_seconds(ev, session_start_unix)
+        if t_rel is None:
             continue
-        t_rel = ts - session_start_unix
         if t_rel < 0:
             continue  # skip pre-session events
-        if et == "MOUSE_MOVE":
-            # Try denormalized field first, fall back to event_args
-            dx = ev.get("mouse_dx")
-            dy = ev.get("mouse_dy")
-            if dx is None or dy is None:
-                ea = ev.get("event_args")
-                if isinstance(ea, list) and len(ea) >= 2:
-                    dx = ea[0]
-                    dy = ea[1]
-            if isinstance(dx, (int, float)) and isinstance(dy, (int, float)):
-                mouse_events_by_t.append((t_rel, float(dx), float(dy)))
+        if et in ("MOUSE_MOVE", "mouse_raw_delta"):
+            delta = _extract_mouse_delta(ev)
+            if delta is not None:
+                mouse_events_by_t.append((t_rel, delta[0], delta[1]))
         elif et == "KEYBOARD":
             vk = ev.get("vk_code")
             pressed = ev.get("pressed")
