@@ -112,6 +112,21 @@ def test_recorder_depth_mode_defaults_to_server_postprocess(monkeypatch) -> None
     assert m._client_depth_inference_enabled() is True
 
 
+def test_recorder_package_exposes_recording_mp4_alias(tmp_path: Path) -> None:
+    m = _import_recorder_module()
+    clip_dir = tmp_path / "clip"
+    clip_dir.mkdir()
+    video = clip_dir / "video.mp4"
+    video.write_bytes(b"fake-video")
+
+    alias = m._ensure_recording_mp4_alias(clip_dir)
+
+    assert alias == clip_dir / "recording.mp4"
+    assert video.is_file()
+    assert alias.exists()
+    assert alias.read_bytes() == b"fake-video"
+
+
 def test_oysterplay_auto_arms_recorder_even_when_log_ready_marker_is_missing(
     monkeypatch, tmp_path: Path
 ) -> None:

@@ -675,6 +675,35 @@ def _atomic_write_jsonl(path: Path, rows: Sequence[dict[str, Any]]) -> None:
     _atomic_write_text(path, body, encoding="utf-8")
 
 
+def _ensure_recording_mp4_alias(clip_dir: Path) -> Path:
+    """Expose lite ``video.mp4`` under the canonical ``recording.mp4`` name."""
+
+    source = Path(clip_dir) / "video.mp4"
+    alias = Path(clip_dir) / "recording.mp4"
+    if not source.is_file():
+        raise FileNotFoundError(f"video.mp4 missing in {clip_dir}")
+
+    if alias.exists():
+        try:
+            if alias.samefile(source):
+                return alias
+        except OSError:
+            pass
+        if alias.is_dir():
+            raise IsADirectoryError(f"recording.mp4 alias path is a directory: {alias}")
+        alias.unlink()
+    elif alias.is_symlink():
+        alias.unlink()
+
+    try:
+        os.link(source, alias)
+    except (OSError, NotImplementedError):
+        shutil.copy2(source, alias)
+    _fsync_file(alias)
+    _fsync_dir(alias.parent)
+    return alias
+
+
 def _write_session_complete_marker(session_dir: Path) -> None:
     marker = {
         "completed_at": datetime.now().isoformat(timespec="seconds"),
@@ -3124,6 +3153,7 @@ class RecorderApp(tk.Tk):
 
         if not (clip_dir / "video.mp4").is_file():
             raise RecorderError("video.mp4 missing after ffmpeg finalize; session not complete")
+        _ensure_recording_mp4_alias(clip_dir)
 
         _write_session_complete_marker(clip_dir)
         _trace("package: wrote .session_complete marker")

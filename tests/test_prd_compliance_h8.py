@@ -14,7 +14,7 @@ from pathlib import Path
 # Ensure bin/ is on the import path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "bin"))
 
-from prd_compliance_audit import _evaluate_h8
+from prd_compliance_audit import _evaluate_h8, _find_video, audit_group_a
 
 
 def _make_valid_exr(path: Path) -> None:
@@ -79,3 +79,21 @@ class TestH8PassStrictTier:
         assert result["id"] == "H8"
         assert result["status"] == "PASS"
         assert "PASS_DEGRADED" in result["evidence"]
+
+
+def test_find_video_accepts_lite_video_name(tmp_path: Path):
+    (tmp_path / "video.mp4").write_bytes(b"fake-video")
+
+    assert _find_video(tmp_path) == tmp_path / "video.mp4"
+
+
+def test_audit_group_a_accepts_lite_video_name(tmp_path: Path):
+    (tmp_path / "video.mp4").write_bytes(b"fake-video")
+    (tmp_path / "action_camera.json").write_text("[]")
+    (tmp_path / "gameinfo.xlsx").write_bytes(b"xlsx")
+    (tmp_path / "metadata.json").write_text("{}")
+
+    a1 = next(item for item in audit_group_a(tmp_path) if item["id"] == "A1")
+
+    assert a1["status"] == "PASS"
+    assert "video.mp4" in a1["evidence"]

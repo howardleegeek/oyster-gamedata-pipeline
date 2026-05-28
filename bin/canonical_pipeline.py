@@ -39,6 +39,7 @@ from typing import Optional
 _HERE = pathlib.Path(__file__).resolve().parent
 REPO_ROOT = _HERE.parent  # kept for any code that still references it
 BIN = _HERE  # ← key change: BIN is now the directory containing THIS file
+VIDEO_CANDIDATES = ("recording.mp4", "video.mp4", "screen.mp4")
 
 
 def step(msg: str) -> None:
@@ -48,6 +49,27 @@ def step(msg: str) -> None:
 def run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
     print(f"  $ {' '.join(map(str, cmd))}", flush=True)
     return subprocess.run(cmd, check=check, capture_output=False)
+
+
+def find_video(session_dir: pathlib.Path) -> Optional[pathlib.Path]:
+    """Return the first compatible video filename present in priority order."""
+
+    for name in VIDEO_CANDIDATES:
+        candidate = session_dir / name
+        if candidate.exists():
+            return candidate
+    return None
+
+
+_find_video = find_video
+
+
+def _require_video(session_dir: pathlib.Path) -> pathlib.Path:
+    video = find_video(session_dir)
+    if video is None:
+        joined = ", ".join(VIDEO_CANDIDATES)
+        raise FileNotFoundError(f"no compatible video found in {session_dir} ({joined})")
+    return video
 
 
 def ffprobe_frames(mp4: pathlib.Path) -> tuple[int, float]:
@@ -104,7 +126,7 @@ def step1_transform(sess: pathlib.Path) -> None:
 
 def step2_trim_mp4(sess: pathlib.Path, start_offset: int = 180, target_dur: int = 300) -> None:
     step(f"2/10 Re-encode mp4 (start={start_offset}s, dur={target_dur}s, 10Mbps)")
-    src = sess / "recording.mp4"
+    src = _require_video(sess)
 
     # Guard 2026-05-27: if the raw recording is shorter than the full trim
     # window, `ffmpeg -ss 180 -t 300` starts too late and can produce a
@@ -124,14 +146,14 @@ def step2_trim_mp4(sess: pathlib.Path, start_offset: int = 180, target_dur: int 
                 print(
                     "  SHORT INPUT SKIP: "
                     f"mp4 is {existing_dur:.3f}s < trim window {min_input_dur}s; "
-                    "leaving recording.mp4 unchanged"
+                    f"leaving {src.name} unchanged"
                 )
                 print(f"  mp4: {frames} frames, {existing_dur:.3f}s (unchanged)")
                 return
         except Exception as e:
             print(f"  ffprobe check failed ({e}); falling through to re-trim")
 
-    tmp = sess / "_recording_trim.mp4"
+    tmp = sess / f"_{src.stem}_trim.mp4"
     run(
         [
             "ffmpeg",
@@ -161,12 +183,13 @@ def step2_trim_mp4(sess: pathlib.Path, start_offset: int = 180, target_dur: int 
 
 def step3_extract_audio(sess: pathlib.Path) -> None:
     step("3/10 Extract audio.flac from mp4")
+    src = _require_video(sess)
     run(
         [
             "ffmpeg",
             "-y",
             "-i",
-            str(sess / "recording.mp4"),
+            str(src),
             "-vn",
             "-c:a",
             "flac",
@@ -316,12 +339,13 @@ def step8_depth(sess: pathlib.Path, skip: bool = False) -> None:
     depth_dir = sess / "depth"
     if not frames_dir.exists():
         frames_dir.mkdir(parents=True, exist_ok=True)
+        src = _require_video(sess)
         run(
             [
                 "ffmpeg",
                 "-y",
                 "-i",
-                str(sess / "recording.mp4"),
+                str(src),
                 "-vf",
                 "fps=6,scale=518:518",
                 "-frames:v",
