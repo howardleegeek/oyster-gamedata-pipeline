@@ -185,6 +185,51 @@ def test_atomic_session_writes_and_complete_marker(tmp_path: Path) -> None:
     assert marker["completed_at"]
 
 
+def test_input_capture_records_raw_mouse_delta_events(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WM_INPUT deltas are additive events in the same inputs.jsonl buffer."""
+
+    m = _import_recorder_module()
+    monkeypatch.setitem(sys.modules, "pynput", None)
+
+    class _FakeRawInputCapture:
+        def __init__(self, on_mouse_delta: Any) -> None:
+            self.on_mouse_delta = on_mouse_delta
+            self.tier = "none"
+            self.wm_input_total = 0
+            self.failures = 0
+
+        def start(self) -> bool:
+            self.on_mouse_delta(17, -4, 123)
+            self.wm_input_total = 1
+            self.tier = "rawinput"
+            return True
+
+        def stop(self) -> None:
+            return None
+
+    monkeypatch.setattr(m, "RawInputCapture", _FakeRawInputCapture)
+    monkeypatch.setattr(m, "_RAW_INPUT_CAPTURE_IMPORT_ERROR", None)
+
+    capture = m.InputCapture()
+
+    assert capture.start() is True
+    assert capture.stop() == [
+        {
+            "timestamp_ms": 123,
+            "event_type": "mouse_raw_delta",
+            "dx": 17,
+            "dy": -4,
+        }
+    ]
+    assert capture.raw_input_diagnostics() == {
+        "registration_tier": "rawinput",
+        "wm_input_total": 1,
+        "get_raw_input_data_failures": 0,
+    }
+
+
 def test_package_preserves_raw_game_state_jsonl_and_transforms_action_camera(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -290,6 +335,12 @@ def test_package_preserves_raw_game_state_jsonl_and_transforms_action_camera(
 
     session_dir = extract_dir / "clip-20260527-000000"
     assert (session_dir / "game_state.jsonl").read_text(encoding="utf-8") == raw_game_state
+    metadata = json.loads((session_dir / "metadata.json").read_text(encoding="utf-8"))
+    assert metadata["input_capture_diagnostics"] == {
+        "registration_tier": "none",
+        "wm_input_total": 0,
+        "get_raw_input_data_failures": 0,
+    }
 
     records = json.loads((session_dir / "action_camera.json").read_text(encoding="utf-8"))
     assert records

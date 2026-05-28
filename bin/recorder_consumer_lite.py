@@ -468,6 +468,13 @@ except Exception as _tk_exc:
 # the .exe doesn't fail if pynput's hooks misbehave on a tester's box.
 # PyInstaller still picks it up because we --hidden-import it in the
 # workflow.
+try:
+    from raw_input_capture import RawInputCapture
+except Exception as _raw_input_capture_exc:  # noqa: BLE001 - additive capture only
+    RawInputCapture = None  # type: ignore[assignment]
+    _RAW_INPUT_CAPTURE_IMPORT_ERROR = _raw_input_capture_exc
+else:
+    _RAW_INPUT_CAPTURE_IMPORT_ERROR = None
 
 # When PyInstaller-frozen, ffmpeg.exe lives in sys._MEIPASS.
 if getattr(sys, "frozen", False):
@@ -1555,6 +1562,7 @@ class InputCapture:
         self.events: list[dict[str, Any]] = []
         self._kbd_listener = None
         self._mouse_listener = None
+        self._raw_input_capture = None
         self._start_time = 0.0
         self._lock = threading.Lock()
 
@@ -1562,13 +1570,25 @@ class InputCapture:
         return int((time.time() - self._start_time) * 1000)
 
     def start(self) -> bool:
-        """Begin listening. Returns False if pynput unavailable."""
+        """Begin listening. Returns False if every input backend is unavailable."""
+        self._start_time = time.time()
+        pynput_ok = False
         try:
             from pynput import keyboard, mouse
-        except Exception:  # noqa: BLE001 — best-effort
-            return False
+        except Exception as exc:  # noqa: BLE001 — best-effort
+            _trace(f"input_capture: pynput unavailable: {exc}")
+        else:
+            try:
+                self._start_pynput_listeners(keyboard, mouse)
+                pynput_ok = True
+            except Exception as exc:  # noqa: BLE001
+                _trace(f"input_capture: pynput listener start failed: {exc}")
 
-        self._start_time = time.time()
+        raw_ok = self._start_raw_input_capture()
+        return pynput_ok or raw_ok
+
+    def _start_pynput_listeners(self, keyboard: Any, mouse: Any) -> None:
+        """Start the legacy absolute cursor/key listeners."""
 
         def on_press(key):  # noqa: ANN001
             self._record_key(key, "key_down")
@@ -1604,7 +1624,45 @@ class InputCapture:
         self._mouse_listener = mouse.Listener(on_move=on_move, on_click=on_click)
         self._kbd_listener.start()
         self._mouse_listener.start()
-        return True
+
+    def _start_raw_input_capture(self) -> bool:
+        """Start additive WM_INPUT relative mouse delta capture on Windows."""
+
+        if RawInputCapture is None:
+            if _RAW_INPUT_CAPTURE_IMPORT_ERROR is not None:
+                _trace(f"WARN: raw input capture unavailable: {_RAW_INPUT_CAPTURE_IMPORT_ERROR}")
+            return False
+
+        try:
+            raw_capture = RawInputCapture(self._record_raw_mouse_delta)
+            self._raw_input_capture = raw_capture
+            raw_ok = bool(raw_capture.start())
+        except Exception as exc:  # noqa: BLE001
+            self._raw_input_capture = None
+            _trace(f"WARN: raw input capture failed to start: {exc}")
+            return False
+
+        if raw_ok:
+            _trace("input_capture: raw input WM_INPUT registered")
+        else:
+            reason = getattr(raw_capture, "last_error", "") or "registration failed"
+            _trace(f"WARN: raw input capture disabled; continuing with pynput only ({reason})")
+        return raw_ok
+
+    def _record_raw_mouse_delta(self, dx: int, dy: int, timestamp_ms: int) -> None:
+        try:
+            ts = max(0, int(timestamp_ms))
+        except Exception:
+            ts = self._now_ms()
+        with self._lock:
+            self.events.append(
+                {
+                    "timestamp_ms": ts,
+                    "event_type": "mouse_raw_delta",
+                    "dx": int(dx),
+                    "dy": int(dy),
+                }
+            )
 
     def _record_key(self, key: Any, event_type: str) -> None:
         # PRD requires keyCode as an int. pynput exposes Key.<name> for
@@ -1702,6 +1760,11 @@ class InputCapture:
         }
 
     def stop(self) -> list[dict[str, Any]]:
+        if self._raw_input_capture is not None:
+            try:
+                self._raw_input_capture.stop()
+            except Exception:
+                pass
         for L in (self._kbd_listener, self._mouse_listener):
             try:
                 if L is not None:
@@ -1709,7 +1772,28 @@ class InputCapture:
             except Exception:
                 pass
         with self._lock:
-            return list(self.events)
+            indexed = list(enumerate(self.events))
+        return [
+            event
+            for _idx, event in sorted(
+                indexed,
+                key=lambda item: (int(item[1].get("timestamp_ms", 0)), item[0]),
+            )
+        ]
+
+    def raw_input_diagnostics(self) -> dict[str, Any]:
+        raw_capture = self._raw_input_capture
+        if raw_capture is None:
+            return {
+                "registration_tier": "none",
+                "wm_input_total": 0,
+                "get_raw_input_data_failures": 0,
+            }
+        return {
+            "registration_tier": getattr(raw_capture, "tier", "none"),
+            "wm_input_total": int(getattr(raw_capture, "wm_input_total", 0)),
+            "get_raw_input_data_failures": int(getattr(raw_capture, "failures", 0)),
+        }
 
 
 def _list_windows_processes() -> set[str]:
@@ -1779,6 +1863,11 @@ class RecorderApp(tk.Tk):
         self._stop_event = threading.Event()
         self._input_capture: Optional[InputCapture] = None
         self._captured_events: list[dict[str, Any]] = []
+        self._input_capture_diagnostics: dict[str, Any] = {
+            "registration_tier": "none",
+            "wm_input_total": 0,
+            "get_raw_input_data_failures": 0,
+        }
         self._window_no_activate_hwnd: Optional[int] = None
         self._window_original_ex_style: Optional[int] = None
         self._window_disabled_for_recording = False
@@ -3001,8 +3090,14 @@ class RecorderApp(tk.Tk):
         self._stop_ffmpeg()
         if self._input_capture is not None:
             self._captured_events = self._input_capture.stop()
+            self._input_capture_diagnostics = self._input_capture.raw_input_diagnostics()
         else:
             self._captured_events = []
+            self._input_capture_diagnostics = {
+                "registration_tier": "none",
+                "wm_input_total": 0,
+                "get_raw_input_data_failures": 0,
+            }
         try:
             output_tar = self._package_tarball(ts)
         except Exception as exc:  # noqa: BLE001
@@ -3496,13 +3591,25 @@ class RecorderApp(tk.Tk):
         # R01: if --allow-placeholder is active and JSONL was missing,
         # stamp metadata.json with data_authenticity='placeholder' so
         # buyers can identify non-real game-state tarballs.
+        metadata: dict[str, Any] = {
+            "input_capture_diagnostics": self.__dict__.get(
+                "_input_capture_diagnostics",
+                {
+                    "registration_tier": "none",
+                    "wm_input_total": 0,
+                    "get_raw_input_data_failures": 0,
+                },
+            )
+        }
         if getattr(self, "_allow_placeholder", False) and not _gs_samples:
-            meta = {
-                "data_authenticity": "placeholder",
-                "warning": "camera/player fields are constant [0.0, 64.0, 0.0]",
-            }
-            _atomic_write_json(clip_dir / "metadata.json", meta)
-            _trace("package: wrote metadata.json with data_authenticity=placeholder")
+            metadata.update(
+                {
+                    "data_authenticity": "placeholder",
+                    "warning": "camera/player fields are constant [0.0, 64.0, 0.0]",
+                }
+            )
+        _atomic_write_json(clip_dir / "metadata.json", metadata)
+        _trace("package: wrote metadata.json with input capture diagnostics")
 
         if not (clip_dir / "video.mp4").is_file():
             raise RecorderError("video.mp4 missing after ffmpeg finalize; session not complete")
