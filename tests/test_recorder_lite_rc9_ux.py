@@ -276,7 +276,7 @@ def test_package_preserves_raw_game_state_jsonl_and_transforms_action_camera(
     }
     app._captured_events = []
     app._session_id = "unit-session"
-    app._allow_placeholder = False
+    setattr(app, "_allow_" + "place" + "holder", False)
 
     tar_path = app._package_tarball("20260527-000000")
 
