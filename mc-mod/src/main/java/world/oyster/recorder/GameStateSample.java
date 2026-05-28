@@ -11,7 +11,7 @@ package world.oyster.recorder;
  *
  * <p>All angles in degrees; all distances in blocks (= metres in MC's
  * {@code metric_scale=1.0} convention); timestamps in ms-since-epoch.
- * {@code paused} marks samples captured while a menu/pause state was active.
+ * {@code paused} marks samples captured while the Minecraft client was paused.
  */
 public record GameStateSample(
     long tick,

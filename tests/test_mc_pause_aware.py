@@ -66,7 +66,7 @@ def test_prd_audit_q3_fails_when_paused_samples_exceed_5_percent(tmp_path: Path)
     assert "max 5%" in q3["evidence"]
 
 
-def test_mc_mod_source_marks_menu_or_pause_state_in_sample_contract() -> None:
+def test_mc_mod_source_marks_only_client_pause_state_in_sample_contract() -> None:
     capture = (
         REPO_ROOT / "mc-mod/src/main/java/world/oyster/recorder/GameStateCapture.java"
     ).read_text(encoding="utf-8")
@@ -77,8 +77,8 @@ def test_mc_mod_source_marks_menu_or_pause_state_in_sample_contract() -> None:
         REPO_ROOT / "mc-mod/src/main/java/world/oyster/recorder/server/ServerStateCapture.java"
     ).read_text(encoding="utf-8")
 
-    assert "client.currentScreen != null" in capture
-    assert "client.isPaused()" in capture
+    assert "currentScreen" not in capture
+    assert "boolean paused = client.isPaused();" in capture
     assert "boolean paused" in sample
     assert '"paused"' in sample
     assert "player.isSprinting(),\n            false," in server_capture
