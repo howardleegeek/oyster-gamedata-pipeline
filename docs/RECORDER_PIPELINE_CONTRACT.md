@@ -18,7 +18,7 @@ There are two version tracks and they must not be confused:
 | Component | Current release track | Current source track |
 |---|---|---|
 | `oyster-gamedata-pipeline` | Latest GitHub release remains `v0.16.0`; it carries the public Windows installer asset and checksum. | `main` continues from `v0.16.0` with architecture/CI contract fixes. Use `main` for development. |
-| `gamedata-recorder` | Latest recorder release remains `v2.6.0`; the current public installer asset is `OysterRecorder-Setup-v0.16.0.exe`, rebuilt from `cddcad6` through the R05E bundled-installer pipeline. | `vendor/recorder` is pinned to release-buildable commit `e171f20` (`release/v2.6.0-buildable`), based on the last successful Windows-build source plus no-popup runtime guards and detected-game HWND stabilization. Arbitrary recorder `main` changes are not consumer-release source until tray/auth/updater/notify/libobs changes compile and pass Windows installer smoke. |
+| `gamedata-recorder` | Latest recorder release remains `v2.6.0`; the current public installer asset is `OysterRecorder-Setup-v0.16.0.exe`, rebuilt from `cddcad6` through the R05E bundled-installer pipeline. | `vendor/recorder` is pinned to current source candidate commit `7de8a38`, carrying the post-`e171f20` recorder fixes promoted by `f4d38ed`. Arbitrary recorder `main` changes are not consumer-release source until tray/auth/updater/notify/libobs changes compile and pass Windows installer smoke. |
 
 Operationally: distribute from the latest verified release, rebuild from the
 release-buildable source pin, and keep newer recorder `main` work behind a

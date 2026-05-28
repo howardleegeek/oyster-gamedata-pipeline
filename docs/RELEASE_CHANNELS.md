@@ -9,7 +9,7 @@ candidate path. They are related, but they are not interchangeable.
 |---|---|---|---|
 | Consumer installer | `v0.16.0` | `OysterRecorder-Setup-v0.16.0.exe` + `SHA256SUMS.txt` | Latest public/internal distribution line. Appcast points here. |
 | Bundled recorder | `recorder-v0.28.0-rc19.0.3` | 1 GB bundled installer, `OysterRecorder.exe`, onedir zip, MC mod jars, `SHA-256-manifest.txt` | Strong historical recorder/reference line. Not an appcast target. |
-| Source candidate | `vendor/recorder` at `e171f20` | No direct user asset | Build input for the next release after Windows installer smoke. |
+| Source candidate | `vendor/recorder` at `7de8a38` | No direct user asset | Build input for the next release after Windows installer smoke. |
 
 The authoritative code contract is
 `src/oyster_agent_runner/release_channels.py`.

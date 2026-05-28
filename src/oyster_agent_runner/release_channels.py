@@ -60,10 +60,10 @@ class FallbackStep:
 
 
 CURRENT_CONSUMER_TAG = "v0.16.0"
-CURRENT_CONSUMER_INSTALLER = "OysterRecorder-Setup-v0.13.2.exe"
+CURRENT_CONSUMER_INSTALLER = "OysterRecorder-Setup-v0.16.0.exe"
 CURRENT_CONSUMER_SHA256 = "aaf65aec8e54ef27adcb5e50d6aeb1e45d5f6871d61be77fb283b80376d98a00"
 BUNDLED_REFERENCE_TAG = "recorder-v0.28.0-rc19.0.3"
-RECORDER_SOURCE_PIN = "e171f20cf27aeaea1ac2f1b63434d7e2a1e09f61"
+RECORDER_SOURCE_PIN = "7de8a38b881214f3fb617d0644e21a709eecf3df"
 
 
 CHANNELS: dict[ReleaseChannel, ReleaseChannelContract] = {
