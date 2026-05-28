@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import types
 from pathlib import Path
@@ -142,6 +143,45 @@ def test_audio_chain_falls_back_to_any_input_device(monkeypatch: pytest.MonkeyPa
         "-i",
         "audio=Microphone Array (USB Audio)",
     )
+
+
+def test_ffmpeg_probe_default_timeout_is_30_seconds(monkeypatch: pytest.MonkeyPatch) -> None:
+    m = _import_recorder_module()
+    seen: dict[str, Any] = {}
+
+    def _run(cmd: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        seen["cmd"] = cmd
+        seen["timeout"] = kwargs["timeout"]
+        return subprocess.CompletedProcess(cmd, 0, stdout="out", stderr="err")
+
+    monkeypatch.setattr(m.subprocess, "run", _run)
+
+    rc, output = m._run_ffmpeg_probe(["-hide_banner", "-devices"])
+
+    assert rc == 0
+    assert output == "outerr"
+    assert seen["timeout"] == 30.0
+
+
+def test_ffmpeg_probe_logs_slow_completion(monkeypatch: pytest.MonkeyPatch) -> None:
+    m = _import_recorder_module()
+    traces: list[str] = []
+    ticks = iter([100.0, 106.25])
+
+    def _run(cmd: list[str], **_kwargs: Any) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(m.subprocess, "run", _run)
+    monkeypatch.setattr(m.time, "monotonic", lambda: next(ticks))
+    monkeypatch.setattr(m, "_trace", traces.append)
+
+    rc, _output = m._run_ffmpeg_probe(["-hide_banner", "-list_devices", "true"])
+
+    assert rc == 0
+    assert traces == [
+        "WARNING: ffmpeg_probe slow completion "
+        "elapsed=6.2s timeout=30.0s args=-hide_banner -list_devices true"
+    ]
 
 
 def test_probe_audio_chain_cli_json(

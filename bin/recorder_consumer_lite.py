@@ -583,9 +583,10 @@ _APPLICATION_AUDIO_HINTS = (
 )
 
 
-def _run_ffmpeg_probe(args: Sequence[str], timeout: float = 8.0) -> tuple[int, str]:
+def _run_ffmpeg_probe(args: Sequence[str], timeout: float = 30.0) -> tuple[int, str]:
     """Run an ffmpeg probe and return (returncode, combined output)."""
 
+    start = time.monotonic()
     try:
         res = subprocess.run(
             [str(_FFMPEG), *args],
@@ -596,6 +597,12 @@ def _run_ffmpeg_probe(args: Sequence[str], timeout: float = 8.0) -> tuple[int, s
         )
     except Exception as e:  # noqa: BLE001 - diagnostics must not crash recorder startup
         return 127, f"{type(e).__name__}: {e}"
+    elapsed = time.monotonic() - start
+    if elapsed > 5.0:
+        _trace(
+            "WARNING: ffmpeg_probe slow completion "
+            f"elapsed={elapsed:.1f}s timeout={timeout:.1f}s args={' '.join(args)}"
+        )
     return res.returncode, (res.stdout or "") + (res.stderr or "")
 
 
