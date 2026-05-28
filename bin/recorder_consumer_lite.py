@@ -1093,6 +1093,89 @@ MIN_MC_WINDOW_WIDTH = 640
 MIN_MC_WINDOW_HEIGHT = 360
 
 
+def _candidate_mc_instance_dirs() -> list[Path]:
+    """Known Minecraft instance roots whose options.txt may affect recording."""
+
+    candidates: list[Path] = []
+    override = os.environ.get("OYSTER_MC_INSTANCE_DIR", "").strip()
+    if override:
+        candidates.append(Path(override).expanduser())
+
+    local_appdata = os.environ.get("LOCALAPPDATA", "").strip()
+    if local_appdata:
+        candidates.append(Path(local_appdata) / "OysterRecorder" / "mc-instance")
+    elif os.name == "nt":
+        candidates.append(Path.home() / "AppData" / "Local" / "OysterRecorder" / "mc-instance")
+
+    appdata = os.environ.get("APPDATA", "").strip()
+    if appdata:
+        candidates.append(Path(appdata) / ".minecraft")
+    elif os.name == "nt":
+        candidates.append(Path.home() / "AppData" / "Roaming" / ".minecraft")
+    elif sys.platform == "darwin":
+        candidates.append(Path.home() / "Library" / "Application Support" / "minecraft")
+    else:
+        candidates.append(Path.home() / ".minecraft")
+
+    out: list[Path] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = str(candidate.expanduser()).casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(candidate.expanduser())
+    return out
+
+
+def _ensure_mc_focus_loss_safe(mc_instance_dir: Path) -> None:
+    """Force Minecraft to keep ticking if the recorder/UI steals focus."""
+
+    options_path = Path(mc_instance_dir) / "options.txt"
+    if not options_path.exists():
+        _trace(f"options.txt not found at {options_path}, skipping")
+        return
+
+    try:
+        lines = options_path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except Exception as exc:  # noqa: BLE001
+        _trace(f"options.txt patch failed at {options_path}: {exc}")
+        return
+
+    required = {
+        "pauseOnLostFocus": "false",
+        "fullscreen": "false",
+    }
+    seen: set[str] = set()
+    patched: list[str] = []
+    for line in lines:
+        key, sep, _value = line.partition(":")
+        if sep and key in required:
+            patched.append(f"{key}:{required[key]}")
+            seen.add(key)
+        else:
+            patched.append(line)
+
+    for key, value in required.items():
+        if key not in seen:
+            patched.append(f"{key}:{value}")
+
+    try:
+        _atomic_write_text(options_path, "\n".join(patched) + "\n", encoding="utf-8")
+    except Exception as exc:  # noqa: BLE001
+        _trace(f"options.txt patch failed at {options_path}: {exc}")
+        return
+
+    _trace(f"options.txt patched: pauseOnLostFocus=false; fullscreen=false at {options_path}")
+
+
+def _ensure_known_mc_instances_focus_loss_safe() -> None:
+    """Patch all likely MC instance options files without failing recorder startup."""
+
+    for mc_dir in _candidate_mc_instance_dirs():
+        _ensure_mc_focus_loss_safe(mc_dir)
+
+
 def _normalise_process_name(name: str) -> str:
     return name.strip().casefold()
 
@@ -1586,6 +1669,7 @@ class RecorderApp(tk.Tk):
         # WITHOUT us recording first.
         self._record_armed = False
         self._mc_window_rect: Optional[dict[str, int]] = None
+        self._last_mc_focus_check_at: float = 0.0
 
         # rc9 (Howard 2026-05-09): depth-progress UX state.
         #
@@ -1608,6 +1692,7 @@ class RecorderApp(tk.Tk):
         self._depth_progress_started_at: float = 0.0
 
         self._build_ui()
+        _ensure_known_mc_instances_focus_loss_safe()
         # Start background watcher immediately — testers do not click anything.
         threading.Thread(target=self._watch_loop, daemon=True).start()
 
@@ -2452,6 +2537,40 @@ class RecorderApp(tk.Tk):
         except Exception:
             pass
 
+    def _watch_mc_focus_alive(self, *, force: bool = False) -> None:
+        """Best-effort keep the captured Minecraft HWND foregrounded while recording."""
+
+        now = time.time()
+        if not force and now - getattr(self, "_last_mc_focus_check_at", 0.0) < 5.0:
+            return
+        self._last_mc_focus_check_at = now
+
+        rect = self._mc_window_rect or {}
+        try:
+            hwnd = int(rect.get("hwnd") or 0)
+        except Exception:
+            hwnd = 0
+        if os.name != "nt" or hwnd <= 0:
+            return
+
+        try:
+            import ctypes
+
+            user32 = ctypes.windll.user32
+            foreground = int(user32.GetForegroundWindow())
+            if foreground == hwnd:
+                return
+
+            _trace(
+                "WARN: MC mod data frozen — possible focus loss; "
+                f"foreground={foreground} mc_hwnd={hwnd}; restoring"
+            )
+            user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+            user32.BringWindowToTop(hwnd)
+            user32.SetForegroundWindow(hwnd)
+        except Exception as exc:  # noqa: BLE001
+            _trace(f"minecraft focus watchdog failed: {exc}")
+
     def _run_one_session(self) -> None:
         """One arm→record→package→verdict cycle. Returns when finished."""
         # Phase 1: wait for tester to arm AND MC to start.
@@ -2474,6 +2593,7 @@ class RecorderApp(tk.Tk):
             armed = self._record_armed
             mc_alive = _minecraft_running()
             if armed and mc_alive:
+                _ensure_known_mc_instances_focus_loss_safe()
                 _trace("watch_loop: armed + MC alive → entering recording")
                 break
             now = time.time()
@@ -2571,6 +2691,7 @@ class RecorderApp(tk.Tk):
         # captured game window is minimized after ffmpeg starts, Windows
         # stops rendering it and ffmpeg records one stale frame forever.
         _restore_minecraft_window_for_capture(self._mc_window_rect)
+        self._watch_mc_focus_alive(force=True)
         try:
             self._start_ffmpeg(self._video_path)
         except Exception as exc:  # noqa: BLE001
@@ -2605,6 +2726,7 @@ class RecorderApp(tk.Tk):
         # process-level stop event. ffmpeg is terminated only through
         # _stop_ffmpeg(), which writes "q" for a clean container finalization.
         while True:
+            self._watch_mc_focus_alive()
             if self._stop_event.is_set():
                 _trace("watch_loop: stop_event set — finalizing whatever we have")
                 break
