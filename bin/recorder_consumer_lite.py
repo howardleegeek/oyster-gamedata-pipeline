@@ -1278,6 +1278,10 @@ def _candidate_mc_instance_dirs() -> list[Path]:
 def _ensure_mc_focus_loss_safe(mc_instance_dir: Path) -> None:
     """Force Minecraft to keep ticking if the recorder/UI steals focus."""
 
+    if os.name != "nt":
+        _trace("non-Windows, skipping options.txt patch")
+        return
+
     options_path = Path(mc_instance_dir) / "options.txt"
     if not options_path.exists():
         _trace(f"options.txt not found at {options_path}, skipping")

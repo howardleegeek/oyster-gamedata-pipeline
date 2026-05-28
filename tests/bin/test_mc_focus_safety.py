@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 import types
 from pathlib import Path
@@ -8,6 +9,14 @@ from typing import Any
 import pytest
 
 BIN_DIR = Path(__file__).resolve().parents[2] / "bin"
+
+
+class _OsProxy:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def __getattr__(self, attr: str) -> Any:
+        return getattr(os, attr)
 
 
 def _install_tk_stubs() -> None:
@@ -77,6 +86,7 @@ def test_ensure_mc_focus_loss_safe_patches_options_txt(
     m = _import_recorder_module()
     traces: list[str] = []
     monkeypatch.setattr(m, "_trace", traces.append)
+    monkeypatch.setattr(m, "os", _OsProxy("nt"))
 
     instance = tmp_path / "mc-instance"
     instance.mkdir()
@@ -101,6 +111,7 @@ def test_ensure_mc_focus_loss_safe_skips_missing_options_txt(
     m = _import_recorder_module()
     traces: list[str] = []
     monkeypatch.setattr(m, "_trace", traces.append)
+    monkeypatch.setattr(m, "os", _OsProxy("nt"))
 
     instance = tmp_path / "mc-instance"
     instance.mkdir()
@@ -109,6 +120,32 @@ def test_ensure_mc_focus_loss_safe_skips_missing_options_txt(
 
     assert not (instance / "options.txt").exists()
     assert traces == [f"options.txt not found at {instance / 'options.txt'}, skipping"]
+
+
+def test_ensure_mc_focus_loss_safe_noops_on_non_windows(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    m = _import_recorder_module()
+    traces: list[str] = []
+    monkeypatch.setattr(m, "_trace", traces.append)
+    monkeypatch.setattr(m, "os", _OsProxy("posix"))
+
+    def _fail_write(*_args: Any, **_kwargs: Any) -> None:
+        raise AssertionError("non-Windows path must not write options.txt")
+
+    monkeypatch.setattr(m, "_atomic_write_text", _fail_write)
+
+    instance = tmp_path / "mc-instance"
+    instance.mkdir()
+    options = instance / "options.txt"
+    original = "pauseOnLostFocus:true\nfullscreen:true\nrenderDistance:12\n"
+    options.write_text(original, encoding="utf-8")
+
+    m._ensure_mc_focus_loss_safe(instance)
+
+    assert options.read_text(encoding="utf-8") == original
+    assert traces == ["non-Windows, skipping options.txt patch"]
 
 
 def test_watch_mc_focus_alive_restores_non_foreground_mc_hwnd(
