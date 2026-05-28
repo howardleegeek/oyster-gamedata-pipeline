@@ -11,10 +11,20 @@ import ctypes
 import os
 import threading
 import time
-from ctypes import POINTER, Structure, byref, c_int, c_uint, sizeof, wintypes
+from ctypes import POINTER, Structure, byref, c_int, c_uint, c_void_p, sizeof, wintypes
 from typing import Any, Callable, Optional
 
 windll = getattr(ctypes, "windll", None)
+
+_WIN_HANDLE = getattr(wintypes, "HANDLE", c_void_p)
+_WIN_HBRUSH = getattr(wintypes, "HBRUSH", _WIN_HANDLE)
+_WIN_HCURSOR = getattr(wintypes, "HCURSOR", _WIN_HANDLE)
+_WIN_HICON = getattr(wintypes, "HICON", _WIN_HANDLE)
+_WIN_HINSTANCE = getattr(wintypes, "HINSTANCE", _WIN_HANDLE)
+_WIN_HMODULE = getattr(wintypes, "HMODULE", _WIN_HANDLE)
+_WIN_ATOM = getattr(wintypes, "ATOM", getattr(wintypes, "WORD", c_uint))
+_WIN_BOOL = getattr(wintypes, "BOOL", c_int)
+_WIN_LPVOID = getattr(wintypes, "LPVOID", c_void_p)
 
 RIDEV_REMOVE = 0x00000001
 RIDEV_INPUTSINK = 0x00000100
@@ -112,10 +122,10 @@ class WNDCLASS(Structure):
         ("lpfnWndProc", WNDPROC),
         ("cbClsExtra", c_int),
         ("cbWndExtra", c_int),
-        ("hInstance", wintypes.HINSTANCE),
-        ("hIcon", wintypes.HICON),
-        ("hCursor", wintypes.HCURSOR),
-        ("hbrBackground", wintypes.HBRUSH),
+        ("hInstance", _WIN_HINSTANCE),
+        ("hIcon", _WIN_HICON),
+        ("hCursor", _WIN_HCURSOR),
+        ("hbrBackground", _WIN_HBRUSH),
         ("lpszMenuName", wintypes.LPCWSTR),
         ("lpszClassName", wintypes.LPCWSTR),
     ]
@@ -378,16 +388,16 @@ class RawInputCapture:
                 pass
 
         _set(kernel32.GetModuleHandleW, "argtypes", [wintypes.LPCWSTR])
-        _set(kernel32.GetModuleHandleW, "restype", wintypes.HMODULE)
+        _set(kernel32.GetModuleHandleW, "restype", _WIN_HMODULE)
         _set(kernel32.GetCurrentThreadId, "restype", wintypes.DWORD)
         _set(user32.RegisterClassW, "argtypes", [POINTER(WNDCLASS)])
-        _set(user32.RegisterClassW, "restype", wintypes.ATOM)
+        _set(user32.RegisterClassW, "restype", _WIN_ATOM)
         _set(user32.CreateWindowExW, "restype", wintypes.HWND)
         _set(user32.RegisterRawInputDevices, "argtypes", [POINTER(RAWINPUTDEVICE), c_uint, c_uint])
-        _set(user32.RegisterRawInputDevices, "restype", wintypes.BOOL)
+        _set(user32.RegisterRawInputDevices, "restype", _WIN_BOOL)
         _set(
             user32.GetRawInputData,
             "argtypes",
-            [wintypes.HANDLE, wintypes.UINT, wintypes.LPVOID, POINTER(c_uint), c_uint],
+            [wintypes.HANDLE, wintypes.UINT, _WIN_LPVOID, POINTER(c_uint), c_uint],
         )
         _set(user32.GetRawInputData, "restype", wintypes.UINT)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ctypes
+import subprocess
 import sys
 from ctypes import POINTER, byref, c_uint, sizeof
 from pathlib import Path
@@ -12,6 +13,28 @@ if str(BIN_DIR) not in sys.path:
     sys.path.insert(0, str(BIN_DIR))
 
 import raw_input_capture as ric  # noqa: E402
+
+
+def test_import_survives_missing_optional_wintype_aliases() -> None:
+    code = f"""
+from ctypes import wintypes
+for name in ("HCURSOR", "HBRUSH", "HICON", "HINSTANCE", "HMODULE", "ATOM", "BOOL", "LPVOID"):
+    if hasattr(wintypes, name):
+        delattr(wintypes, name)
+import sys
+sys.path.insert(0, {str(BIN_DIR)!r})
+import raw_input_capture as ric
+capture = ric.RawInputCapture(lambda _dx, _dy, _ts: None, platform_name="posix")
+assert capture.start() is False
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
 
 
 class _FakeUser32:
