@@ -44,6 +44,7 @@ using PyInstaller --onefile --windowed with bundled ffmpeg.exe (added via
 from __future__ import annotations
 
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -498,6 +499,26 @@ _FFMPEG_CLEAN_QUIT_TIMEOUT_SEC = 60.0
 _FFMPEG_FORCE_STOP_TIMEOUT_SEC = 3.0
 _MP4_REMUX_REPAIR_TIMEOUT_SEC = 180.0
 _FFMPEG_DURATION_ARG = "-t"
+_CAPTURE_MODE_ENV = "OYSTER_CAPTURE_MODE"
+_VALID_CAPTURE_MODES = {"auto", "ddagrab", "gdigrab"}
+_CAPTURE_STARTUP_CHECK_SEC = 0.75
+_CAPTURE_ENTROPY_DELAY_SEC = 5.0
+_CAPTURE_ENTROPY_SAMPLE_SEC = 5.0
+_CAPTURE_ENTROPY_SAMPLE_FRAMES = 5
+_CAPTURE_ENTROPY_WIDTH = 160
+_CAPTURE_ENTROPY_HEIGHT = 90
+_CAPTURE_ENTROPY_THRESHOLD_BITS = 1.0
+
+
+def _normalize_capture_mode(value: Optional[str]) -> str:
+    raw = (value or "auto").strip().lower()
+    if raw in _VALID_CAPTURE_MODES:
+        return raw
+    _trace(f"WARNING: invalid {_CAPTURE_MODE_ENV}={value!r}; defaulting to auto")
+    return "auto"
+
+
+_CAPTURE_MODE = _normalize_capture_mode(os.environ.get(_CAPTURE_MODE_ENV, "auto"))
 
 
 def _mp4_has_moov_atom(mp4_path: Path) -> bool:
@@ -877,6 +898,158 @@ class AudioProbeReport:
             "selected": self.selected.to_dict() if self.selected else None,
             "probes": [p.to_dict() for p in self.probes],
         }
+
+
+@dataclass(frozen=True)
+class VideoCapturePlan:
+    """ffmpeg screen-capture input plan for the selected recorder mode."""
+
+    mode: str
+    input_args: tuple[str, ...]
+    pre_encode_filters: tuple[str, ...] = ()
+
+    def encode_filter(self) -> str:
+        return ",".join((*self.pre_encode_filters, "scale=1920:1080:flags=lanczos"))
+
+    def entropy_probe_filter(self) -> str:
+        return ",".join(
+            (
+                *self.pre_encode_filters,
+                "fps=1",
+                f"scale={_CAPTURE_ENTROPY_WIDTH}:{_CAPTURE_ENTROPY_HEIGHT}:flags=bilinear",
+                "format=gray",
+            )
+        )
+
+
+@dataclass(frozen=True)
+class CaptureEntropyResult:
+    """Low-cost diagnostic from sampling the live capture source."""
+
+    average_bits: float
+    frames_sampled: int
+    unique_frames: int
+
+
+def _build_video_capture_plan(mode: str, *, x: int, y: int, w: int, h: int) -> VideoCapturePlan:
+    if mode == "ddagrab":
+        # ddagrab captures the full DXGI output. Crop to the resolved
+        # Minecraft window rectangle after capture so GPU-rendered frames are visible.
+        return VideoCapturePlan(
+            mode="ddagrab",
+            input_args=(
+                "-f",
+                "ddagrab",
+                "-framerate",
+                "30",
+                "-draw_mouse",
+                "0",
+                "-i",
+                "output=0",
+            ),
+            pre_encode_filters=(f"crop={int(w)}:{int(h)}:{int(x)}:{int(y)}",),
+        )
+    if mode == "gdigrab":
+        return VideoCapturePlan(
+            mode="gdigrab",
+            input_args=(
+                "-f",
+                "gdigrab",
+                "-framerate",
+                "30",
+                "-draw_mouse",
+                "0",
+                "-offset_x",
+                str(int(x)),
+                "-offset_y",
+                str(int(y)),
+                "-video_size",
+                f"{int(w)}x{int(h)}",
+                "-i",
+                "desktop",
+            ),
+        )
+    raise ValueError(f"unsupported capture mode: {mode}")
+
+
+def _capture_mode_candidates(
+    requested_mode: str, *, x: int, y: int, w: int, h: int
+) -> list[VideoCapturePlan]:
+    requested_mode = _normalize_capture_mode(requested_mode)
+    modes = ("ddagrab", "gdigrab") if requested_mode == "auto" else (requested_mode,)
+    return [_build_video_capture_plan(mode, x=x, y=y, w=w, h=h) for mode in modes]
+
+
+def _byte_entropy_bits(data: bytes) -> float:
+    if not data:
+        return 0.0
+    counts = [0] * 256
+    for value in data:
+        counts[value] += 1
+    total = float(len(data))
+    entropy = 0.0
+    for count in counts:
+        if count:
+            probability = count / total
+            entropy -= probability * math.log2(probability)
+    return entropy
+
+
+def _measure_capture_entropy(plan: VideoCapturePlan) -> Optional[CaptureEntropyResult]:
+    """Sample the live capture source after startup and flag flat/static frames."""
+
+    frame_size = _CAPTURE_ENTROPY_WIDTH * _CAPTURE_ENTROPY_HEIGHT
+    cmd = [
+        str(_FFMPEG),
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        *plan.input_args,
+        _FFMPEG_DURATION_ARG,
+        f"{_CAPTURE_ENTROPY_SAMPLE_SEC:.1f}",
+        "-vf",
+        plan.entropy_probe_filter(),
+        "-frames:v",
+        str(_CAPTURE_ENTROPY_SAMPLE_FRAMES),
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "gray",
+        "pipe:1",
+    ]
+    flags = 0x08000000 if os.name == "nt" else 0
+    try:
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=_CAPTURE_ENTROPY_SAMPLE_SEC + 10.0,
+            creationflags=flags,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _trace(f"capture_entropy: probe failed to run mode={plan.mode}: {exc}")
+        return None
+    if result.returncode != 0:
+        stderr = result.stderr.decode("utf-8", errors="replace").strip()
+        _trace(f"capture_entropy: probe exited rc={result.returncode} mode={plan.mode}: {stderr}")
+        return None
+
+    frames = [
+        result.stdout[offset : offset + frame_size]
+        for offset in range(0, len(result.stdout), frame_size)
+        if len(result.stdout[offset : offset + frame_size]) == frame_size
+    ]
+    if not frames:
+        _trace(f"capture_entropy: no frames sampled mode={plan.mode}")
+        return None
+
+    average = sum(_byte_entropy_bits(frame) for frame in frames) / len(frames)
+    unique_frames = len({frame for frame in frames})
+    return CaptureEntropyResult(
+        average_bits=average,
+        frames_sampled=len(frames),
+        unique_frames=unique_frames,
+    )
 
 
 _DSHOW_LOOPBACK_HINTS = (
@@ -1499,12 +1672,12 @@ def _restore_minecraft_window_for_capture(rect: Optional[dict[str, Any]]) -> Non
         user32 = ctypes.windll.user32
         SW_RESTORE = 9
         # Never minimize the capture target. Windows stops rendering
-        # minimized game windows, and gdigrab then records the last visible
-        # frame forever, producing a frozen-looking video.
+        # minimized game windows, and screen capture can then record the
+        # last visible frame forever, producing a frozen-looking video.
         user32.ShowWindow(hwnd, SW_RESTORE)
         user32.BringWindowToTop(hwnd)
         user32.SetForegroundWindow(hwnd)
-        _trace("minecraft window restored/foregrounded for gdigrab capture")
+        _trace("minecraft window restored/foregrounded for screen capture")
     except Exception as exc:  # noqa: BLE001
         _trace(f"minecraft foreground restore failed: {exc}")
 
@@ -2716,8 +2889,8 @@ class RecorderApp(tk.Tk):
 
         Keep the recorder UI visible while waiting for Minecraft. Once
         recording starts, the watcher foregrounds the Minecraft HWND
-        without minimizing it, because gdigrab freezes on the last visible
-        frame if Windows stops rendering a minimized game window.
+        without minimizing it, because screen capture freezes on the last
+        visible frame if Windows stops rendering a minimized game window.
         """
         if not self._record_armed:
             # Arm
@@ -3059,7 +3232,7 @@ class RecorderApp(tk.Tk):
         import uuid as _uuid_mod
 
         self._session_id = str(_uuid_mod.uuid4())
-        # Bug fix: leave Minecraft visible/foreground for gdigrab. If the
+        # Bug fix: leave Minecraft visible/foreground for screen capture. If the
         # captured game window is minimized after ffmpeg starts, Windows
         # stops rendering it and ffmpeg records one stale frame forever.
         _restore_minecraft_window_for_capture(self._mc_window_rect)
@@ -3092,7 +3265,7 @@ class RecorderApp(tk.Tk):
         self.after(0, self._tick_recording_status)
 
         # Do not iconify/minimize anything after ffmpeg starts. The recorder
-        # UI stays available for Stop, and Minecraft stays visible so gdigrab
+        # UI stays available for Stop, and Minecraft stays visible so screen capture
         # keeps receiving fresh rendered frames.
         _trace("post-ffmpeg iconify skipped; Minecraft left visible for capture")
 
@@ -3631,7 +3804,11 @@ class RecorderApp(tk.Tk):
                     "wm_input_total": 0,
                     "get_raw_input_data_failures": 0,
                 },
-            )
+            ),
+            "video_capture": {
+                "requested_mode": _CAPTURE_MODE,
+                "selected_mode": self.__dict__.get("_video_capture_mode", "unknown"),
+            },
         }
         if getattr(self, "_allow_placeholder", False) and not _gs_samples:
             metadata.update(
@@ -3676,13 +3853,15 @@ class RecorderApp(tk.Tk):
         return out_tar
 
     def _start_ffmpeg(self, out_path: Path) -> None:
-        """Spawn ffmpeg with gdigrab to record the Minecraft window.
+        """Spawn ffmpeg to record the Minecraft window.
 
-        R01 v2 (iron-law-strict): ALWAYS uses cropped-desktop capture
-        with geometry from mc_window rect. Title encoding is irrelevant —
-        we use -offset_x/-offset_y/-video_size + -i desktop, which is
-        fully locale-blind. Hard-fails if mc_window is None (no window
-        detected). The old title-based branch has been removed.
+        R01 v3 (iron-law-strict): prefer DXGI Desktop Duplication
+        (ddagrab) full-output capture cropped to the Minecraft geometry.
+        The gdigrab geometry path remains only as an auto fallback for
+        older Windows hosts where ddagrab exits during startup. Title
+        encoding is irrelevant in both paths. Hard-fails if mc_window is
+        None (no window detected). The old title-based branch has been
+        removed.
 
         v0.29.0: captures audio via an explicit priority chain:
         Application Audio Capture(javaw.exe) -> Desktop Audio Output ->
@@ -3740,60 +3919,168 @@ class RecorderApp(tk.Tk):
                 "or input device to attach."
             )
 
-        # R01 v2: always cropped-desktop capture using detected geometry.
-        # locale-blind — title encoding never participates in the ffmpeg cmd.
-        desktop_input = ["-i", "desktop"]
-        video_input = [
-            "-f",
-            "gdigrab",
-            "-framerate",
-            "30",
-            "-draw_mouse",
-            "0",
-            "-offset_x",
-            str(x),
-            "-offset_y",
-            str(y),
-            "-video_size",
-            f"{w}x{h}",
-        ] + desktop_input
-        _trace(f"ffmpeg: window-area capture title='{mc_title}' " f"geometry={x},{y},{w},{h}")
-
-        cmd = [
-            str(_FFMPEG),
-            *video_input,
-            *audio_inputs,
-            "-vf",
-            "scale=1920:1080:flags=lanczos",
-            "-c:v",
-            "libx265",
-            "-preset",
-            "ultrafast",
-            # libx265 defaults to CRF 28 if no bitrate/CRF is specified. On
-            # static game scenes that collapsed clips to ~67 kbps and looked frozen.
-            "-b:v",
-            "10M",
-            "-maxrate",
-            "12M",
-            "-bufsize",
-            "20M",
-            "-pix_fmt",
-            "yuv420p",
-            *audio_codec,
-            "-r",
-            "30",
-            "-y",
-            str(out_path),
-        ]
         # On Windows, CREATE_NO_WINDOW (0x08000000) hides the ffmpeg
         # console window so the tester only sees our Tk window.
         flags = 0x08000000 if os.name == "nt" else 0
-        self._ffmpeg_proc = subprocess.Popen(
-            cmd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            creationflags=flags,
+        requested_capture_mode = _normalize_capture_mode(_CAPTURE_MODE)
+        plans = _capture_mode_candidates(
+            requested_capture_mode,
+            x=int(x),
+            y=int(y),
+            w=int(w),
+            h=int(h),
+        )
+        startup_errors: list[str] = []
+        for plan in plans:
+            _trace(
+                "ffmpeg: capture "
+                f"requested={requested_capture_mode} selected={plan.mode} "
+                f"title='{mc_title}' geometry={x},{y},{w},{h}"
+            )
+            if plan.mode == "gdigrab":
+                _trace(
+                    "WARNING: ffmpeg capture_mode=gdigrab uses GDI-layer capture; "
+                    "hardware-accelerated Minecraft may record a static frame. "
+                    f"Prefer {_CAPTURE_MODE_ENV}=ddagrab on Windows 8+."
+                )
+
+            cmd = [
+                str(_FFMPEG),
+                "-hide_banner",
+                *plan.input_args,
+                *audio_inputs,
+                "-vf",
+                plan.encode_filter(),
+                "-c:v",
+                "libx265",
+                "-preset",
+                "ultrafast",
+                # libx265 defaults to CRF 28 if no bitrate/CRF is specified. On
+                # static game scenes that collapsed clips to ~67 kbps and looked frozen.
+                "-b:v",
+                "10M",
+                "-maxrate",
+                "12M",
+                "-bufsize",
+                "20M",
+                "-pix_fmt",
+                "yuv420p",
+                *audio_codec,
+                "-r",
+                "30",
+                "-y",
+                str(out_path),
+            ]
+            try:
+                proc = subprocess.Popen(
+                    cmd,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    creationflags=flags,
+                )
+            except Exception as exc:  # noqa: BLE001
+                startup_errors.append(f"{plan.mode} spawn failed: {exc}")
+                _trace(f"ffmpeg: capture_mode={plan.mode} spawn failed: {exc}")
+                continue
+
+            if requested_capture_mode == "auto" and plan.mode == "ddagrab":
+                time.sleep(_CAPTURE_STARTUP_CHECK_SEC)
+                returncode = proc.poll()
+                if returncode is not None:
+                    startup_errors.append(f"ddagrab exited during startup rc={returncode}")
+                    _trace(
+                        "WARNING: ffmpeg ddagrab exited during startup "
+                        f"rc={returncode}; falling back to gdigrab. "
+                        "Fallback may record static frames for hardware-accelerated MC."
+                    )
+                    continue
+
+            self._ffmpeg_proc = proc
+            self._video_capture_mode = plan.mode
+            self._video_capture_plan = plan
+            self._start_capture_entropy_monitor(plan)
+            return
+
+        detail = "; ".join(startup_errors) or "no capture candidates were available"
+        raise RecorderError(f"ffmpeg capture startup failed: {detail}")
+
+    def _start_capture_entropy_monitor(self, plan: VideoCapturePlan) -> None:
+        """After startup, sample live capture frames and warn on static output."""
+
+        if os.name != "nt":
+            return
+
+        proc = self._ffmpeg_proc
+        if proc is None:
+            return
+
+        def _go() -> None:
+            time.sleep(_CAPTURE_ENTROPY_DELAY_SEC)
+            current_proc = self._ffmpeg_proc
+            if current_proc is None or current_proc is not proc or current_proc.poll() is not None:
+                return
+            result = _measure_capture_entropy(plan)
+            if result is None:
+                return
+            _trace(
+                "capture_entropy: "
+                f"mode={plan.mode} avg_bits={result.average_bits:.3f} "
+                f"frames={result.frames_sampled} unique={result.unique_frames}"
+            )
+            looks_static = result.average_bits < _CAPTURE_ENTROPY_THRESHOLD_BITS or (
+                result.frames_sampled >= 2 and result.unique_frames <= 1
+            )
+            if not looks_static:
+                return
+            _trace(
+                "WARNING: capture_entropy indicates possibly static video "
+                f"mode={plan.mode} avg_bits={result.average_bits:.3f} "
+                f"unique={result.unique_frames}/{result.frames_sampled}"
+            )
+            try:
+                self.after(0, lambda: self._offer_capture_mode_switch(plan.mode, result))
+            except RuntimeError:
+                pass
+
+        threading.Thread(target=_go, daemon=True, name="capture-entropy-monitor").start()
+
+    def _offer_capture_mode_switch(self, mode: str, result: CaptureEntropyResult) -> None:
+        alternate = "gdigrab" if mode == "ddagrab" else "ddagrab"
+        warning = (
+            "视频捕获看起来可能是静止画面。\n"
+            f"mode={mode}, entropy={result.average_bits:.2f}, "
+            f"unique={result.unique_frames}/{result.frames_sampled}\n"
+            f"是否停止当前录制并切换到 {alternate}？"
+        )
+        self._set(
+            "⚠️ 视频可能卡帧",
+            ORANGE,
+            f"检测到捕获画面可能是静止的。当前模式: {mode}；可切换到 {alternate} 后重录。",
+        )
+        ask_yes_no = getattr(messagebox, "askyesno", None)
+        if not callable(ask_yes_no):
+            _trace("capture_entropy: messagebox.askyesno unavailable; warning shown in UI only")
+            return
+        try:
+            switch = ask_yes_no("OysterRecorder 捕获模式", warning)
+        except Exception as exc:  # noqa: BLE001
+            _trace(f"capture_entropy: switch prompt failed: {exc}")
+            return
+        if not switch:
+            _trace("capture_entropy: user kept current capture mode")
+            return
+
+        global _CAPTURE_MODE
+        _CAPTURE_MODE = alternate
+        os.environ[_CAPTURE_MODE_ENV] = alternate
+        _trace(f"capture_entropy: user switched capture mode to {alternate}; stopping current clip")
+        self._record_armed = False
+        self._stop_ffmpeg()
+        self._set(
+            "⚠️ 已切换捕获模式",
+            ORANGE,
+            f"当前录制已停止。已切换到 {alternate}，请重新点击 ▶ 开始录制。",
         )
 
     def _stop_ffmpeg(self) -> None:
@@ -3966,7 +4253,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         default="javaw.exe",
         help="Process name to target for application audio probing (default: javaw.exe)",
     )
+    parser.add_argument(
+        "--capture-mode",
+        choices=sorted(_VALID_CAPTURE_MODES),
+        default=None,
+        help=(
+            "Video capture mode: auto tries ddagrab then gdigrab; "
+            f"default comes from {_CAPTURE_MODE_ENV} or auto"
+        ),
+    )
     args, _unknown = parser.parse_known_args(argv)
+
+    global _CAPTURE_MODE
+    _CAPTURE_MODE = _normalize_capture_mode(
+        args.capture_mode or os.environ.get(_CAPTURE_MODE_ENV, "auto")
+    )
 
     if args.probe_audio_chain or args.probe_audio_chain_json:
         report = probe_audio_source_chain(args.audio_process_name)

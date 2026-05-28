@@ -369,8 +369,11 @@ def test_recorder_allows_placeholder_with_explicit_flag():
 
 
 def test_recorder_window_capture_uses_geometry_not_title():
-    """R01 v2: ffmpeg invocation must use cropped-desktop with geometry
-    (offset_x/offset_y/video_size + -i desktop), NOT -i title=...
+    """R01 v3: ffmpeg invocation must use geometry, NOT -i title=...
+
+    ddagrab captures the full DXGI output and crops to the Minecraft
+    geometry. gdigrab remains as the legacy fallback with
+    offset_x/offset_y/video_size + -i desktop.
 
     Verified two ways:
     (a) Source-grep recorder_consumer_lite.py to confirm geometry-based
@@ -380,10 +383,12 @@ def test_recorder_window_capture_uses_geometry_not_title():
     src = _read_recorder_source()
 
     # (a) Source-level: recorder must use geometry-based capture.
+    assert '"ddagrab"' in src, "Recorder must prefer DXGI ddagrab capture"
+    assert "crop=" in src, "Recorder must crop ddagrab to the Minecraft geometry"
     assert '"-offset_x"' in src, "Recorder must use -offset_x in ffmpeg cmd"
     assert '"-offset_y"' in src, "Recorder must use -offset_y in ffmpeg cmd"
     assert '"-video_size"' in src, "Recorder must use -video_size in ffmpeg cmd"
-    assert '"-i", "desktop"' in src, "Recorder must use -i desktop"
+    assert '"-i"' in src and '"desktop"' in src, "Recorder fallback must use -i desktop"
 
     # (a) Source-level: title-based capture must be gone.
     assert "title_safe" not in src, "Iron-law: the title_safe branch must be removed entirely"

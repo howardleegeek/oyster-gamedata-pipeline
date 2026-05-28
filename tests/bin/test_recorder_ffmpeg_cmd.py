@@ -50,6 +50,23 @@ def _mp4_box(name: bytes, payload: bytes = b"") -> bytes:
     return (8 + len(payload)).to_bytes(4, "big") + name + payload
 
 
+class _LiveProc:
+    stdin = None
+
+    def poll(self) -> None:
+        return None
+
+
+class _ExitedProc:
+    stdin = None
+
+    def __init__(self, returncode: int = 1) -> None:
+        self.returncode = returncode
+
+    def poll(self) -> int:
+        return self.returncode
+
+
 def test_recorder_ffmpeg_cmd_pins_h265_bitrate(tmp_path: Path) -> None:
     m = _import_recorder_module()
     app = object.__new__(m.RecorderApp)
@@ -76,7 +93,7 @@ def test_recorder_ffmpeg_cmd_pins_h265_bitrate(tmp_path: Path) -> None:
     with (
         mock.patch.object(m, "_FFMPEG", tmp_path / "ffmpeg.exe"),
         mock.patch.object(m, "probe_audio_source_chain", return_value=audio_report),
-        mock.patch.object(m.subprocess, "Popen") as popen,
+        mock.patch.object(m.subprocess, "Popen", return_value=_LiveProc()) as popen,
     ):
         app._start_ffmpeg(tmp_path / "video.mp4")
 
@@ -85,6 +102,72 @@ def test_recorder_ffmpeg_cmd_pins_h265_bitrate(tmp_path: Path) -> None:
     assert cmd[cmd.index("-b:v") + 1] == "10M"
     assert cmd[cmd.index("-maxrate") + 1] == "12M"
     assert cmd[cmd.index("-bufsize") + 1] == "20M"
+
+
+def test_recorder_ffmpeg_cmd_prefers_ddagrab_in_auto_mode(tmp_path: Path) -> None:
+    m = _import_recorder_module()
+    app = object.__new__(m.RecorderApp)
+    app._mc_window_rect = {
+        "title": "Minecraft 1.21.4",
+        "x": 10,
+        "y": 20,
+        "width": 1280,
+        "height": 720,
+    }
+    audio_report = m.AudioProbeReport(process_name="javaw.exe", selected=None, probes=[])
+
+    with (
+        mock.patch.object(m, "_CAPTURE_MODE", "auto"),
+        mock.patch.object(m, "_CAPTURE_STARTUP_CHECK_SEC", 0.0),
+        mock.patch.object(m, "_FFMPEG", tmp_path / "ffmpeg.exe"),
+        mock.patch.object(m, "probe_audio_source_chain", return_value=audio_report),
+        mock.patch.object(m.subprocess, "Popen", return_value=_LiveProc()) as popen,
+    ):
+        app._start_ffmpeg(tmp_path / "video.mp4")
+
+    cmd = popen.call_args.args[0]
+    assert cmd[cmd.index("-f") + 1] == "ddagrab"
+    assert cmd[cmd.index("-i") + 1] == "output=0"
+    assert "-offset_x" not in cmd
+    assert cmd[cmd.index("-vf") + 1].startswith("crop=1280:720:10:20,scale=")
+    assert app._video_capture_mode == "ddagrab"
+
+
+def test_recorder_ffmpeg_cmd_falls_back_to_gdigrab_when_ddagrab_exits(
+    tmp_path: Path,
+) -> None:
+    m = _import_recorder_module()
+    app = object.__new__(m.RecorderApp)
+    app._mc_window_rect = {
+        "title": "Minecraft 1.21.4",
+        "x": 10,
+        "y": 20,
+        "width": 1280,
+        "height": 720,
+    }
+    audio_report = m.AudioProbeReport(process_name="javaw.exe", selected=None, probes=[])
+
+    with (
+        mock.patch.object(m, "_CAPTURE_MODE", "auto"),
+        mock.patch.object(m, "_CAPTURE_STARTUP_CHECK_SEC", 0.0),
+        mock.patch.object(m, "_FFMPEG", tmp_path / "ffmpeg.exe"),
+        mock.patch.object(m, "probe_audio_source_chain", return_value=audio_report),
+        mock.patch.object(
+            m.subprocess,
+            "Popen",
+            side_effect=[_ExitedProc(returncode=1), _LiveProc()],
+        ) as popen,
+    ):
+        app._start_ffmpeg(tmp_path / "video.mp4")
+
+    first_cmd = popen.call_args_list[0].args[0]
+    second_cmd = popen.call_args_list[1].args[0]
+    assert first_cmd[first_cmd.index("-f") + 1] == "ddagrab"
+    assert second_cmd[second_cmd.index("-f") + 1] == "gdigrab"
+    assert second_cmd[second_cmd.index("-offset_x") + 1] == "10"
+    assert second_cmd[second_cmd.index("-offset_y") + 1] == "20"
+    assert second_cmd[second_cmd.index("-video_size") + 1] == "1280x720"
+    assert app._video_capture_mode == "gdigrab"
 
 
 def test_stop_ffmpeg_waits_60s_for_clean_mp4_finalization(tmp_path: Path) -> None:
