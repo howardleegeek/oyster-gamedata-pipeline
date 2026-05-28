@@ -214,4 +214,7 @@ def test_all_video_layers_fail_packages_data_without_video(
     assert (session_dir / "inputs.jsonl").is_file()
     assert (session_dir / "audio.flac").is_file()
     assert metadata["video_capture"]["selected_layer"] == "none"
+    assert metadata["video_capture"]["validation_passed"] is False
+    assert metadata["video_capture"]["validation_reason"] == "video.mp4 does not exist"
     assert "video_missing_data_only_session" in metadata["video_capture"]["warnings"]
+    assert "video_validation_failed" in metadata["video_capture"]["warnings"]

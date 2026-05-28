@@ -218,7 +218,10 @@ def test_stop_ffmpeg_waits_60s_for_clean_mp4_finalization(tmp_path: Path) -> Non
     app._ffmpeg_proc = proc
     app._video_path = video_path
 
-    with mock.patch.object(m, "_fsync_file") as fsync_file:
+    with (
+        mock.patch.object(m, "_fsync_file") as fsync_file,
+        mock.patch.object(m, "_validate_recorded_video", return_value=(True, "unit")),
+    ):
         app._stop_ffmpeg()
 
     assert proc.stdin.writes == [b"q\n"]
@@ -277,6 +280,7 @@ def test_stop_ffmpeg_repairs_missing_moov_after_forced_stop(tmp_path: Path) -> N
     with (
         mock.patch.object(m, "_FFMPEG", tmp_path / "ffmpeg.exe"),
         mock.patch.object(m.subprocess, "run", side_effect=_fake_run),
+        mock.patch.object(m, "_validate_recorded_video", return_value=(True, "unit")),
     ):
         app._stop_ffmpeg()
 

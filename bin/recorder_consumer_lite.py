@@ -978,7 +978,6 @@ def _package_orphaned_active_session(
             _fsync_file(tmp_tar)
             os.replace(tmp_tar, out_tar)
             _fsync_dir(out_tar.parent)
-            _reset_active_session_dir(active_dir)
         except Exception:
             try:
                 tmp_tar.unlink()
@@ -4411,15 +4410,31 @@ class RecorderApp(tk.Tk):
 
         if output_tar.exists():
             size_mb = output_tar.stat().st_size / (1024 * 1024)
-            self._set(
-                "✓ 录制完成",
-                GREEN,
-                f"{output_tar.name} ({size_mb:.1f} MB) 已保存。" f"正在验证买家规格…",
+            video_validation_failed = bool(self.__dict__.get("_video_validation_failed", False))
+            video_validation_reason = str(
+                self.__dict__.get("_video_validation_reason", "not_checked")
             )
-            self._hint.config(
-                text=f"已保存: {output_tar}",
-                fg=GREEN,
-            )
+            if video_validation_failed:
+                self._set(
+                    "⚠️ 视频捕获异常",
+                    ORANGE,
+                    f"{video_validation_reason}。已保存 {output_tar.name} ({size_mb:.1f} MB)；"
+                    "下次会自动换捕获层重试。",
+                )
+                self._hint.config(
+                    text=f"已保存: {output_tar}\n视频验证失败: {video_validation_reason}",
+                    fg=ORANGE,
+                )
+            else:
+                self._set(
+                    "✓ 录制完成",
+                    GREEN,
+                    f"{output_tar.name} ({size_mb:.1f} MB) 已保存。正在验证买家规格…",
+                )
+                self._hint.config(
+                    text=f"已保存: {output_tar}",
+                    fg=GREEN,
+                )
             # v0.6.0: window was iconified when arm was pressed to free
             # MC focus. MC has now exited, so restore our window so the
             # tester sees the green "✓ 录制完成" verdict without needing
@@ -4430,13 +4445,16 @@ class RecorderApp(tk.Tk):
             # directly inside the recorder, no need to launch a separate
             # tool. We import lint_v3 lazily so its numpy/PIL deps don't
             # delay startup.
-            self._auto_lint(output_tar)
-            # v0.21.0: shift-left BFT N=4 self-verification — Howard
-            # 战略反馈"最重要确保数据是对的". Lint v3 is a shallow check
-            # (24 PRD criteria); BFT runs the full PINNs residual stack
-            # across 4 independent verifiers and surfaces specific
-            # disagreements so tester knows what to re-record.
-            self._auto_bft(output_tar)
+            if not video_validation_failed:
+                self._auto_lint(output_tar)
+                # v0.21.0: shift-left BFT N=4 self-verification — Howard
+                # 战略反馈"最重要确保数据是对的". Lint v3 is a shallow check
+                # (24 PRD criteria); BFT runs the full PINNs residual stack
+                # across 4 independent verifiers and surfaces specific
+                # disagreements so tester knows what to re-record.
+                self._auto_bft(output_tar)
+            else:
+                _trace("auto_lint/auto_bft skipped because video validation failed")
 
             # Engineer-side telemetry: push the full session log to a
             # remote pastebin so engineering can curl <url> and see what
@@ -4447,7 +4465,7 @@ class RecorderApp(tk.Tk):
                         0,
                         lambda: self._hint.config(
                             text=f"已保存: {output_tar}\n远程日志: {url}",
-                            fg=GREEN,
+                            fg=ORANGE if video_validation_failed else GREEN,
                         ),
                     )
 
@@ -4916,17 +4934,23 @@ class RecorderApp(tk.Tk):
 
         video_file = clip_dir / "video.mp4"
         has_video = video_file.is_file()
+        if self.__dict__.get("_video_validation_passed") is None:
+            self._record_video_validation_result(video_file)
+        video_validation_passed = bool(self.__dict__.get("_video_validation_passed", False))
+        video_validation_reason = str(self.__dict__.get("_video_validation_reason", "not_checked"))
         has_real_game_state = bool(_gs_samples)
         partial_reasons: list[str] = []
         if elapsed_sec < 300.0:
             partial_reasons.append("duration_below_5min")
         if not has_video:
             partial_reasons.append("video_missing")
+        if not video_validation_passed:
+            partial_reasons.append("video_validation_failed")
         if not has_real_game_state:
             partial_reasons.append("real_game_state_missing")
         if game_state_partial_reason:
             partial_reasons.append("mod_jsonl_missing")
-        session_complete = has_video and has_real_game_state
+        session_complete = has_video and video_validation_passed and has_real_game_state
 
         # R01: if --allow-placeholder is active and JSONL was missing,
         # stamp metadata.json with data_authenticity='placeholder' so
@@ -4951,6 +4975,8 @@ class RecorderApp(tk.Tk):
                 ),
                 "selected_mode": self.__dict__.get("_video_capture_mode", "unknown"),
                 "selected_layer": self.__dict__.get("_video_capture_mode", "unknown"),
+                "validation_passed": video_validation_passed,
+                "validation_reason": video_validation_reason,
                 "layer_attempt_log": self.__dict__.get("_video_capture_attempt_log", []),
                 "attempts_failed": [
                     attempt
@@ -4966,6 +4992,8 @@ class RecorderApp(tk.Tk):
             video_capture_warnings.append("video_missing_data_only_session")
             metadata["video_capture"]["selected_mode"] = "none"
             metadata["video_capture"]["selected_layer"] = "none"
+        if not video_validation_passed:
+            video_capture_warnings.append("video_validation_failed")
         if video_capture_warnings:
             metadata["video_capture"]["warning"] = "; ".join(video_capture_warnings)
             metadata["video_capture"]["warnings"] = video_capture_warnings
@@ -5021,6 +5049,8 @@ class RecorderApp(tk.Tk):
                 pass
             raise
 
+        _reset_active_session_dir(active_dir)
+
         # Cleanup tmp dir.
         try:
             shutil.rmtree(self._tmp_dir, ignore_errors=True)
@@ -5037,6 +5067,10 @@ class RecorderApp(tk.Tk):
         requested_capture_mode = _normalize_capture_mode(_CAPTURE_MODE)
         self._video_capture_requested_mode = requested_capture_mode
         self._video_capture_attempt_log = []
+        self._video_validation_checked = False
+        self._video_validation_passed = None
+        self._video_validation_failed = False
+        self._video_validation_reason = "not_checked"
 
         if self._mc_window_rect is None:
             message = "Minecraft window not detected; continuing session without video"
@@ -5093,11 +5127,20 @@ class RecorderApp(tk.Tk):
             _trace(f"WARNING: audio_probe failed unexpectedly: {exc}")
 
         flags = 0x08000000 if os.name == "nt" else 0
-        layers = (
-            list(_VIDEO_AUTO_LAYERS)
-            if requested_capture_mode == "auto"
-            else [requested_capture_mode]
-        )
+        if requested_capture_mode == "auto":
+            failed_layers = set(self.__dict__.get("_video_capture_failed_layers", set()))
+            layers = [layer for layer in _VIDEO_AUTO_LAYERS if layer not in failed_layers]
+            if failed_layers:
+                _trace(
+                    "video_capture: skipping previously failed layers for auto retry "
+                    f"{sorted(failed_layers)}"
+                )
+            if not layers:
+                _trace("video_capture: all layers were previously failed; retrying full chain")
+                self._video_capture_failed_layers = set()
+                layers = list(_VIDEO_AUTO_LAYERS)
+        else:
+            layers = [requested_capture_mode]
         errors: list[str] = []
         for layer in layers:
             if layer == "none":
@@ -5157,6 +5200,24 @@ class RecorderApp(tk.Tk):
 
         self._start_video_capture(out_path)
 
+    def _record_video_validation_result(self, video_path: Path) -> None:
+        valid, reason = _validate_recorded_video(video_path)
+        self._video_validation_checked = True
+        self._video_validation_passed = valid
+        self._video_validation_failed = not valid
+        self._video_validation_reason = reason
+        layer = str(self.__dict__.get("_video_capture_mode", "unknown"))
+        failed_layers = set(self.__dict__.get("_video_capture_failed_layers", set()))
+        if valid:
+            failed_layers.discard(layer)
+            _trace(f"video validation passed: {reason}")
+        else:
+            _trace(f"WARNING: video validation failed: {reason}")
+            if layer in _VIDEO_AUTO_LAYERS:
+                failed_layers.add(layer)
+                _trace("video_capture: marked layer failed for next auto retry " f"layer={layer}")
+        self._video_capture_failed_layers = failed_layers
+
     def _stop_ffmpeg(self) -> None:
         """Send 'q' to ffmpeg's stdin and wait for MP4 finalization."""
         handle = getattr(self, "_video_capture_handle", None)
@@ -5175,6 +5236,8 @@ class RecorderApp(tk.Tk):
                 _attempt_mp4_remux_repair(video_path)
             if isinstance(video_path, Path) and video_path.exists():
                 _fsync_file(video_path)
+            if isinstance(video_path, Path):
+                self._record_video_validation_result(video_path)
             return
 
         proc = self._ffmpeg_proc
@@ -5218,6 +5281,8 @@ class RecorderApp(tk.Tk):
             _attempt_mp4_remux_repair(video_path)
         if isinstance(video_path, Path) and video_path.exists():
             _fsync_file(video_path)
+        if isinstance(video_path, Path):
+            self._record_video_validation_result(video_path)
 
     def _on_close(self) -> None:
         _trace("on_close: user closed window")
