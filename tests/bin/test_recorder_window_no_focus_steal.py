@@ -153,6 +153,7 @@ def test_recording_path_wraps_ffmpeg_with_focus_mitigation() -> None:
     ) in src
     assert (
         "except Exception as exc:  # noqa: BLE001\n"
-        "            self._restore_window_activatable()\n"
-        '            self._set("⚠️ 录制启动失败"'
+        '            _trace(f"video capture failed at all 4 layers: {exc}")\n'
+        "            self._video_started = False"
     ) in src
+    assert ('self._set("⚠️ 仅数据采集（视频不可用）", ORANGE, str(exc)[:80])') in src

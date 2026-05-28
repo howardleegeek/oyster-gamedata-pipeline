@@ -53,6 +53,21 @@ def test_windows_build_stages_obs_runtime_before_inno_compile() -> None:
     assert "/DSourceDir=$srcDir" in workflow
 
 
+def test_recorder_pyinstaller_workflows_bundle_ffprobe_with_ffmpeg() -> None:
+    workflows = {
+        ".github/workflows/build-recorder-exe.yml": 2,
+        ".github/workflows/build-recorder-installer.yml": 1,
+    }
+
+    for relative, expected_pyinstaller_invocations in workflows.items():
+        workflow = (REPO_ROOT / relative).read_text()
+        assert "ffmpeg-master-latest-win64-gpl.zip" in workflow
+        assert "ffprobe.exe" in workflow
+        assert "$ffprobeBin" in workflow
+        assert workflow.count('--add-binary "ffmpeg.exe;."') == expected_pyinstaller_invocations
+        assert workflow.count('--add-binary "ffprobe.exe;."') == expected_pyinstaller_invocations
+
+
 def test_windows_installer_smoke_workflow_exercises_real_install_path() -> None:
     workflow = (REPO_ROOT / ".github/workflows/windows-installer-smoke.yml").read_text()
 
@@ -83,6 +98,7 @@ def test_windows_installer_smoke_workflow_exercises_real_install_path() -> None:
     assert "OBS runtime dependency missing" in workflow
     assert "OBS runtime directory missing" in workflow
     assert "Verify installed PE architecture" in workflow
+    assert "Bundled recorder ffprobe.exe missing" in workflow
     assert "Installed PE architecture mismatch" in workflow
     assert "allowedX86RuntimeHelpers" in workflow
     assert "Allowed OBS 32-bit runtime helper" in workflow

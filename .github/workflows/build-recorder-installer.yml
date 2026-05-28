@@ -391,6 +391,10 @@ jobs:
           Expand-Archive -Path ffmpeg.zip -DestinationPath ffmpeg-extracted -Force
           $ffmpegBin = Get-ChildItem -Recurse ffmpeg-extracted -Filter 'ffmpeg.exe' | Select-Object -First 1
           Copy-Item $ffmpegBin.FullName -Destination 'ffmpeg.exe' -Force
+          Get-Item ffmpeg.exe | Format-List Length, FullName
+          $ffprobeBin = Get-ChildItem -Recurse ffmpeg-extracted -Filter 'ffprobe.exe' | Select-Object -First 1
+          Copy-Item $ffprobeBin.FullName -Destination 'ffprobe.exe' -Force
+          Get-Item ffprobe.exe | Format-List Length, FullName
 
       - name: Download Fabric installer jar
         shell: pwsh
@@ -420,6 +424,7 @@ jobs:
             --distpath bundle `
             --workpath build/OysterRecorder-onedir `
             --add-binary "ffmpeg.exe;." `
+            --add-binary "ffprobe.exe;." `
             --add-data "bin/lint_v3_prd_grounded.py;." `
             --add-data "bin/generate_systeminfo_json.py;." `
             --add-data "bin/generate_gameinfo_xlsx.py;." `

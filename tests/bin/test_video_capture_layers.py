@@ -218,3 +218,6 @@ def test_all_video_layers_fail_packages_data_without_video(
     assert metadata["video_capture"]["validation_reason"] == "video.mp4 does not exist"
     assert "video_missing_data_only_session" in metadata["video_capture"]["warnings"]
     assert "video_validation_failed" in metadata["video_capture"]["warnings"]
+    assert metadata["audio_capture"]["silent_fallback_attempted"] is True
+    assert metadata["audio_capture"]["silent_fallback_mode"] == "session_elapsed_duration"
+    assert metadata["audio_capture"]["silent_fallback_generated"] is True

@@ -47,6 +47,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -515,6 +516,8 @@ _VIDEO_VALIDATION_WIDTH = 160
 _VIDEO_VALIDATION_HEIGHT = 90
 _VIDEO_VALIDATION_LOW_ENTROPY_BITS = 2.0
 _CAPTURE_STARTUP_CHECK_SEC = _VIDEO_LAYER_INIT_TIMEOUT_SEC
+_FFMPEG_DURATION_RE = re.compile(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)")
+_MP4_CONTAINER_BOXES = {b"moov", b"trak", b"mdia"}
 
 
 def _normalize_capture_mode(value: Optional[str]) -> str:
@@ -544,15 +547,28 @@ def _byte_entropy_bits(data: bytes) -> float:
     return entropy
 
 
-def _validate_recorded_video(
-    video_path: Path,
-    min_duration_sec: float = _VIDEO_VALIDATION_MIN_DURATION_SEC,
-) -> tuple[bool, str]:
-    """Sanity check the captured video. Returns (is_valid, reason)."""
+def _positive_duration_from_text(value: str) -> Optional[float]:
+    try:
+        duration = float(value.strip())
+    except (ValueError, AttributeError):
+        return None
+    if duration > 0:
+        return duration
+    return None
 
-    if not video_path.exists():
-        return False, "video.mp4 does not exist"
 
+def _parse_ffmpeg_duration_sec(output: str) -> Optional[float]:
+    match = _FFMPEG_DURATION_RE.search(output or "")
+    if not match:
+        return None
+    hours = int(match.group(1))
+    minutes = int(match.group(2))
+    seconds = float(match.group(3))
+    duration = hours * 3600 + minutes * 60 + seconds
+    return duration if duration > 0 else None
+
+
+def _probe_duration_with_ffprobe(path: Path) -> Optional[float]:
     try:
         proc = subprocess.run(
             [
@@ -563,7 +579,7 @@ def _validate_recorded_video(
                 "format=duration",
                 "-of",
                 "csv=p=0",
-                str(video_path),
+                str(path),
             ],
             capture_output=True,
             text=True,
@@ -571,11 +587,144 @@ def _validate_recorded_video(
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        return False, f"ffprobe failed: {exc}"
+        _trace(f"duration_probe: ffprobe unavailable for {path}: {exc}")
+        return None
+    if proc.returncode != 0:
+        stderr = (proc.stderr or "").strip()
+        _trace(
+            "duration_probe: ffprobe failed "
+            f"rc={proc.returncode} path={path} stderr={stderr[:300]}"
+        )
+        return None
+    duration = _positive_duration_from_text(proc.stdout)
+    if duration is None:
+        _trace(f"duration_probe: ffprobe returned invalid duration for {path}: {proc.stdout!r}")
+    return duration
+
+
+def _probe_duration_with_ffmpeg(path: Path) -> Optional[float]:
     try:
-        duration = float(proc.stdout.strip())
-    except (ValueError, AttributeError):
-        return False, "cannot parse duration"
+        proc = subprocess.run(
+            [str(_FFMPEG), "-hide_banner", "-i", str(path)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        _trace(f"duration_probe: ffmpeg stderr probe unavailable for {path}: {exc}")
+        return None
+    output = f"{proc.stderr or ''}\n{proc.stdout or ''}"
+    duration = _parse_ffmpeg_duration_sec(output)
+    if duration is None:
+        _trace(f"duration_probe: ffmpeg stderr had no Duration line for {path}")
+    return duration
+
+
+def _probe_duration_from_mp4_boxes(path: Path) -> Optional[float]:
+    """Read MP4 mvhd duration without external ffmpeg/ffprobe binaries."""
+
+    def _read_mvhd_duration(fh: Any, start: int) -> Optional[float]:
+        fh.seek(start)
+        version_flags = fh.read(4)
+        if len(version_flags) != 4:
+            return None
+        version = version_flags[0]
+        if version == 1:
+            payload = fh.read(28)
+            if len(payload) != 28:
+                return None
+            timescale = int.from_bytes(payload[16:20], "big")
+            duration_units = int.from_bytes(payload[20:28], "big")
+        else:
+            payload = fh.read(16)
+            if len(payload) != 16:
+                return None
+            timescale = int.from_bytes(payload[8:12], "big")
+            duration_units = int.from_bytes(payload[12:16], "big")
+        if timescale <= 0 or duration_units <= 0:
+            return None
+        return duration_units / timescale
+
+    try:
+        file_size = path.stat().st_size
+        with path.open("rb") as fh:
+
+            def _iter_boxes(start: int, end: int) -> Any:
+                offset = start
+                while offset + 8 <= end:
+                    fh.seek(offset)
+                    header = fh.read(8)
+                    if len(header) != 8:
+                        return
+                    box_size = int.from_bytes(header[:4], "big")
+                    box_type = header[4:8]
+                    header_size = 8
+                    if box_size == 1:
+                        ext_size = fh.read(8)
+                        if len(ext_size) != 8:
+                            return
+                        box_size = int.from_bytes(ext_size, "big")
+                        header_size = 16
+                    elif box_size == 0:
+                        box_size = end - offset
+                    if box_size < header_size:
+                        return
+                    data_start = offset + header_size
+                    data_end = min(offset + box_size, end)
+                    if data_end <= data_start:
+                        return
+                    yield box_type, data_start, data_end
+                    offset += box_size
+
+            def _find_mvhd(start: int, end: int, depth: int) -> Optional[float]:
+                if depth > 4:
+                    return None
+                for box_type, data_start, data_end in _iter_boxes(start, end):
+                    if box_type == b"mvhd":
+                        return _read_mvhd_duration(fh, data_start)
+                    if box_type in _MP4_CONTAINER_BOXES:
+                        duration = _find_mvhd(data_start, data_end, depth + 1)
+                        if duration is not None:
+                            return duration
+                return None
+
+            duration = _find_mvhd(0, file_size, 0)
+    except OSError as exc:
+        _trace(f"duration_probe: mp4 box parse failed for {path}: {exc}")
+        return None
+    if duration is None:
+        _trace(f"duration_probe: mp4 box parse found no mvhd duration for {path}")
+    return duration
+
+
+def _probe_duration_sec(path: Path) -> Optional[float]:
+    """Best-effort duration probe that does not require ffprobe to exist."""
+
+    path = Path(path)
+    if not path.exists():
+        return None
+    duration = _probe_duration_with_ffprobe(path)
+    if duration is not None:
+        return duration
+    duration = _probe_duration_with_ffmpeg(path)
+    if duration is not None:
+        return duration
+    return _probe_duration_from_mp4_boxes(path)
+
+
+def _validate_recorded_video(
+    video_path: Path,
+    min_duration_sec: float = _VIDEO_VALIDATION_MIN_DURATION_SEC,
+) -> tuple[bool, str]:
+    """Sanity check the captured video. Returns (is_valid, reason)."""
+
+    if not video_path.exists():
+        return False, "video.mp4 does not exist"
+
+    duration = _probe_duration_sec(video_path)
+    if duration is None:
+        return False, "duration probe unavailable"
     if duration < min_duration_sec:
         return False, f"duration {duration:.1f}s < {min_duration_sec}s"
 
@@ -1048,39 +1197,12 @@ def _generate_silent_audio_fallback(session_dir: Path, video_path: Path) -> None
                 "method": "ffmpeg lavfi anullsrc fallback (no device)",
             },
         )
-        _trace(f"silent_audio_fallback: failed ({error})")
-        raise RecorderError(f"silent audio fallback failed: {error}")
+        _trace(f"WARNING: silent_audio_fallback failed nonfatally ({error})")
 
-    try:
-        probe = subprocess.run(
-            [
-                str(_FFPROBE),
-                "-v",
-                "error",
-                "-show_entries",
-                "format=duration",
-                "-of",
-                "default=noprint_wrappers=1:nokey=1",
-                str(video_path),
-            ],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        _fail(f"ffprobe failed: {exc}")
-
-    if probe.returncode != 0:
-        stderr = (probe.stderr or "").strip()
-        _fail(stderr or f"ffprobe exited with code {probe.returncode}")
-
-    try:
-        duration = float(probe.stdout.strip())
-    except (ValueError, AttributeError):
-        _fail(f"ffprobe returned invalid duration: {probe.stdout!r}")
-    if duration <= 0:
-        _fail(f"ffprobe returned non-positive duration: {duration!r}")
+    duration = _probe_duration_sec(video_path)
+    if duration is None or duration <= 0:
+        _fail("duration probe unavailable")
+        return
 
     out_path = session_dir / "audio.flac"
     try:
@@ -1106,16 +1228,19 @@ def _generate_silent_audio_fallback(session_dir: Path, video_path: Path) -> None
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         _fail(f"ffmpeg failed: {exc}", duration_sec=duration)
+        return
 
     if result.returncode != 0:
         stderr = (result.stderr or "").strip()
         _fail(stderr or f"ffmpeg exited with code {result.returncode}", duration_sec=duration)
+        return
 
     size_bytes = out_path.stat().st_size if out_path.is_file() else 0
     if size_bytes <= 0:
         stderr = (result.stderr or "").strip()
         detail = stderr or "ffmpeg exited successfully but audio.flac is missing or empty"
         _fail(detail, duration_sec=duration)
+        return
 
     _atomic_write_json(
         session_dir / "audio_check.json",
@@ -1161,8 +1286,7 @@ def _generate_silent_audio_fallback_for_duration(
                 "method": "ffmpeg lavfi anullsrc fallback (duration)",
             },
         )
-        _trace(f"silent_audio_fallback_duration: failed ({error})")
-        raise RecorderError(f"silent audio fallback failed: {error}")
+        _trace(f"WARNING: silent_audio_fallback_duration failed nonfatally ({error})")
 
     out_path = session_dir / "audio.flac"
     try:
@@ -1188,16 +1312,19 @@ def _generate_silent_audio_fallback_for_duration(
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         _fail(f"ffmpeg failed: {exc}")
+        return
 
     if result.returncode != 0:
         stderr = (result.stderr or "").strip()
         _fail(stderr or f"ffmpeg exited with code {result.returncode}")
+        return
 
     size_bytes = out_path.stat().st_size if out_path.is_file() else 0
     if size_bytes <= 0:
         stderr = (result.stderr or "").strip()
         detail = stderr or "ffmpeg exited successfully but audio.flac is missing or empty"
         _fail(detail)
+        return
 
     _atomic_write_json(
         session_dir / "audio_check.json",
@@ -4322,9 +4449,8 @@ class RecorderApp(tk.Tk):
         _restore_minecraft_window_for_capture(self._mc_window_rect)
         self._watch_mc_focus_alive(force=True)
         self._make_window_non_focus_stealing()
-
         try:
-            self._start_video_capture(self._video_path)
+            self._start_ffmpeg(self._video_path)
             self._video_started = getattr(self, "_video_capture_mode", "none") != "none"
         except Exception as exc:  # noqa: BLE001
             _trace(f"video capture failed at all 4 layers: {exc}")
@@ -5010,20 +5136,65 @@ class RecorderApp(tk.Tk):
                     "warning": "camera/player fields are constant [0.0, 64.0, 0.0]",
                 }
             )
-        _atomic_write_json(clip_dir / "metadata.json", metadata)
-        _trace("package: wrote metadata.json with input capture diagnostics")
 
+        audio_capture: dict[str, Any] = {"silent_fallback_attempted": False}
         if video_file.is_file() and getattr(self, "_audio_probe_failed", False):
-            _generate_silent_audio_fallback(clip_dir, clip_dir / "video.mp4")
+            audio_capture.update(
+                {
+                    "silent_fallback_attempted": True,
+                    "silent_fallback_mode": "match_video_duration",
+                }
+            )
+            try:
+                _generate_silent_audio_fallback(clip_dir, clip_dir / "video.mp4")
+            except Exception as exc:  # noqa: BLE001 - packaging must continue
+                _trace(f"WARNING: silent audio fallback failed nonfatally: {exc}")
+                audio_capture.update(
+                    {
+                        "silent_fallback_failed": True,
+                        "silent_fallback_error": str(exc)[:300],
+                    }
+                )
         elif not video_file.is_file():
+            audio_capture.update(
+                {
+                    "silent_fallback_attempted": True,
+                    "silent_fallback_mode": "session_elapsed_duration",
+                }
+            )
             try:
                 _generate_silent_audio_fallback_for_duration(
                     clip_dir,
                     duration=elapsed_sec,
                     reason="video capture unavailable; synthetic silent audio preserves session timeline",
                 )
-            except RecorderError as exc:
+            except Exception as exc:  # noqa: BLE001 - packaging must continue
                 _trace(f"WARNING: data-only audio fallback failed nonfatally: {exc}")
+                audio_capture.update(
+                    {
+                        "silent_fallback_failed": True,
+                        "silent_fallback_error": str(exc)[:300],
+                    }
+                )
+        if audio_capture["silent_fallback_attempted"]:
+            audio_capture["silent_fallback_generated"] = (clip_dir / "audio.flac").is_file()
+            audio_check_path = clip_dir / "audio_check.json"
+            if audio_check_path.is_file():
+                try:
+                    audio_check = json.loads(audio_check_path.read_text(encoding="utf-8"))
+                    audio_capture["audio_check_source"] = audio_check.get("audio_source")
+                    if audio_check.get("error"):
+                        audio_capture["silent_fallback_failed"] = True
+                        audio_capture["silent_fallback_error"] = str(audio_check["error"])[:300]
+                except Exception as exc:  # noqa: BLE001 - metadata flag is best-effort
+                    audio_capture["audio_check_read_error"] = str(exc)[:300]
+            if audio_capture["silent_fallback_generated"]:
+                audio_capture["silent_fallback_failed"] = False
+            metadata["audio_capture"] = audio_capture
+
+        _atomic_write_json(clip_dir / "metadata.json", metadata)
+        _trace("package: wrote metadata.json with input/audio capture diagnostics")
+
         if video_file.is_file():
             _ensure_recording_mp4_alias(clip_dir)
 

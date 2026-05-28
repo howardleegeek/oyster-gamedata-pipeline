@@ -172,6 +172,13 @@ jobs:
                 Select-Object -First 200 FullName, Length, LastWriteTime
               throw "Bundled recorder ffmpeg.exe missing"
             }
+            $ffprobe = Get-ChildItem -Path $onedir -Recurse -Filter "ffprobe.exe" |
+              Select-Object -First 1
+            if (-not $ffprobe) {
+              Get-ChildItem -Recurse -Force $onedir -ErrorAction SilentlyContinue |
+                Select-Object -First 200 FullName, Length, LastWriteTime
+              throw "Bundled recorder ffprobe.exe missing"
+            }
             Write-Host "Verified bundled runtime dependencies"
             return
           }

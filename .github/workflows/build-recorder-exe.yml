@@ -47,6 +47,9 @@ jobs:
           $ffmpegBin = Get-ChildItem -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
           Copy-Item $ffmpegBin.FullName -Destination ffmpeg.exe
           Get-Item ffmpeg.exe | Format-List Length, FullName
+          $ffprobeBin = Get-ChildItem -Recurse -Filter "ffprobe.exe" | Select-Object -First 1
+          Copy-Item $ffprobeBin.FullName -Destination ffprobe.exe
+          Get-Item ffprobe.exe | Format-List Length, FullName
 
       - name: Download Fabric installer jar (D17)
         # Howard 2026-05-07 (D17): bundle the Fabric loader installer so the
@@ -114,6 +117,7 @@ jobs:
             --name OysterRecorder `
             --runtime-tmpdir "%LOCALAPPDATA%\OysterRecorder\runtime" `
             --add-binary "ffmpeg.exe;." `
+            --add-binary "ffprobe.exe;." `
             --add-data "bin/lint_v3_prd_grounded.py;." `
             --add-data "bin/generate_systeminfo_json.py;." `
             --add-data "bin/generate_gameinfo_xlsx.py;." `
@@ -161,6 +165,7 @@ jobs:
           pyinstaller --onedir --windowed `
             --name OysterRecorder-onedir `
             --add-binary "ffmpeg.exe;." `
+            --add-binary "ffprobe.exe;." `
             --add-data "bin/lint_v3_prd_grounded.py;." `
             --add-data "bin/generate_systeminfo_json.py;." `
             --add-data "bin/generate_gameinfo_xlsx.py;." `
