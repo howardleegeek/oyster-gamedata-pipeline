@@ -192,3 +192,63 @@ def test_package_writes_silent_flac_when_all_audio_probes_fail(
     assert check["continuous"] is True
     assert check["duration_sec"] > 0
     assert check["size_bytes"] == audio_path.stat().st_size
+
+
+def test_silent_audio_fallback_records_ffmpeg_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    m = _import_recorder_module()
+    monkeypatch.setattr(m, "_FFMPEG", Path("ffmpeg"))
+    monkeypatch.setattr(m, "_FFPROBE", Path("ffprobe"))
+
+    def _fake_run(args: list[str], **_kwargs: Any) -> subprocess.CompletedProcess[str]:
+        if args[0] == "ffprobe":
+            return subprocess.CompletedProcess(args, 0, stdout="0.4\n", stderr="")
+        if args[0] == "ffmpeg":
+            return subprocess.CompletedProcess(
+                args,
+                1,
+                stdout="",
+                stderr="Unknown input format: lavfi",
+            )
+        raise AssertionError(f"unexpected subprocess: {args}")
+
+    monkeypatch.setattr(m.subprocess, "run", _fake_run)
+
+    with pytest.raises(m.RecorderError):
+        m._generate_silent_audio_fallback(tmp_path, tmp_path / "video.mp4")
+
+    audio_path = tmp_path / "audio.flac"
+    check = json.loads((tmp_path / "audio_check.json").read_text(encoding="utf-8"))
+    assert not audio_path.exists()
+    assert check["audio_source"] == "failed"
+    assert check["size_bytes"] == 0
+    assert check["error"] == "Unknown input format: lavfi"
+
+
+def test_silent_audio_fallback_rejects_zero_byte_output(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    m = _import_recorder_module()
+    monkeypatch.setattr(m, "_FFMPEG", Path("ffmpeg"))
+    monkeypatch.setattr(m, "_FFPROBE", Path("ffprobe"))
+
+    def _fake_run(args: list[str], **_kwargs: Any) -> subprocess.CompletedProcess[str]:
+        if args[0] == "ffprobe":
+            return subprocess.CompletedProcess(args, 0, stdout="0.4\n", stderr="")
+        if args[0] == "ffmpeg":
+            (tmp_path / "audio.flac").write_bytes(b"")
+            return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+        raise AssertionError(f"unexpected subprocess: {args}")
+
+    monkeypatch.setattr(m.subprocess, "run", _fake_run)
+
+    with pytest.raises(m.RecorderError):
+        m._generate_silent_audio_fallback(tmp_path, tmp_path / "video.mp4")
+
+    check = json.loads((tmp_path / "audio_check.json").read_text(encoding="utf-8"))
+    assert check["audio_source"] == "failed"
+    assert check["size_bytes"] == 0
+    assert "missing or empty" in check["error"]

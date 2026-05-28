@@ -727,6 +727,22 @@ def _write_session_complete_marker(session_dir: Path) -> None:
 def _generate_silent_audio_fallback(session_dir: Path, video_path: Path) -> None:
     """All audio probes failed: write silent stereo FLAC matching video duration."""
 
+    def _fail(error: str, *, duration_sec: float = 0.0) -> None:
+        _atomic_write_json(
+            session_dir / "audio_check.json",
+            {
+                "audio_source": "failed",
+                "reason": "silent audio fallback generation failed",
+                "audio_file": "audio.flac",
+                "duration_sec": duration_sec,
+                "size_bytes": 0,
+                "error": error,
+                "method": "ffmpeg lavfi anullsrc fallback (no device)",
+            },
+        )
+        _trace(f"silent_audio_fallback: failed ({error})")
+        raise RecorderError(f"silent audio fallback failed: {error}")
+
     try:
         probe = subprocess.run(
             [
@@ -745,21 +761,22 @@ def _generate_silent_audio_fallback(session_dir: Path, video_path: Path) -> None
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        _trace(f"silent_audio_fallback: probe failed, skipping ({exc})")
-        return
+        _fail(f"ffprobe failed: {exc}")
+
+    if probe.returncode != 0:
+        stderr = (probe.stderr or "").strip()
+        _fail(stderr or f"ffprobe exited with code {probe.returncode}")
 
     try:
         duration = float(probe.stdout.strip())
     except (ValueError, AttributeError):
-        _trace("silent_audio_fallback: probe failed, skipping")
-        return
+        _fail(f"ffprobe returned invalid duration: {probe.stdout!r}")
     if duration <= 0:
-        _trace(f"silent_audio_fallback: non-positive duration {duration!r}, skipping")
-        return
+        _fail(f"ffprobe returned non-positive duration: {duration!r}")
 
     out_path = session_dir / "audio.flac"
     try:
-        subprocess.run(
+        result = subprocess.run(
             [
                 str(_FFMPEG),
                 "-hide_banner",
@@ -775,11 +792,22 @@ def _generate_silent_audio_fallback(session_dir: Path, video_path: Path) -> None
                 str(out_path),
             ],
             capture_output=True,
+            text=True,
             timeout=120,
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        _trace(f"silent_audio_fallback: ffmpeg failed ({exc})")
+        _fail(f"ffmpeg failed: {exc}", duration_sec=duration)
+
+    if result.returncode != 0:
+        stderr = (result.stderr or "").strip()
+        _fail(stderr or f"ffmpeg exited with code {result.returncode}", duration_sec=duration)
+
+    size_bytes = out_path.stat().st_size if out_path.is_file() else 0
+    if size_bytes <= 0:
+        stderr = (result.stderr or "").strip()
+        detail = stderr or "ffmpeg exited successfully but audio.flac is missing or empty"
+        _fail(detail, duration_sec=duration)
 
     _atomic_write_json(
         session_dir / "audio_check.json",
@@ -788,7 +816,7 @@ def _generate_silent_audio_fallback(session_dir: Path, video_path: Path) -> None
             "reason": "no audio device available on tester machine",
             "audio_file": "audio.flac",
             "duration_sec": duration,
-            "size_bytes": out_path.stat().st_size if out_path.exists() else 0,
+            "size_bytes": size_bytes,
             "rms_db": -120.0,
             "peak_db": -120.0,
             "snr_db": 0.0,
