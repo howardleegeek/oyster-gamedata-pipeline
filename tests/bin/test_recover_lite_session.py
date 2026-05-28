@@ -14,10 +14,9 @@ sys.path.insert(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
 )
 
-from bin.recover_lite_session import main  # noqa: E402
+import bin.recover_lite_session as recover_mod  # noqa: E402
 
-
-pytestmark = pytest.mark.skipif(
+requires_ffmpeg = pytest.mark.skipif(
     shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None,
     reason="recover_lite_session requires ffmpeg/ffprobe",
 )
@@ -79,6 +78,43 @@ def _write_action_camera(path: Path) -> None:
     path.write_text(json.dumps(frames), encoding="utf-8")
 
 
+def test_step6_run_audit_timeout_returns_shape_only_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sess = tmp_path / "clip-20260528-100703"
+    sess.mkdir()
+    for name in recover_mod.SHAPE_ONLY_ARTIFACTS:
+        path = sess / name
+        if name == "depth":
+            path.mkdir()
+        else:
+            path.write_bytes(b"x")
+
+    def fake_run(cmd: list[str], timeout: int = 120) -> subprocess.CompletedProcess[str]:
+        assert cmd[-1] == "--json"
+        assert timeout == recover_mod.AUDIT_TIMEOUT_SEC
+        raise subprocess.TimeoutExpired(cmd=cmd, timeout=timeout)
+
+    monkeypatch.setattr(recover_mod, "_run", fake_run)
+
+    result = recover_mod.step6_run_audit(sess)
+
+    assert result["audit_status"] == "timeout"
+    assert result["audit_mode"] == "shape-only"
+    assert result["present"] == 12
+    assert result["expected"] == 12
+    assert result["missing"] == []
+    assert (
+        recover_mod._format_audit_result(result)
+        == 'audit_status="timeout" shape-only=12/12 artifacts present'
+    )
+    fallback = json.loads((sess / "recovery_audit_fallback.json").read_text(encoding="utf-8"))
+    assert fallback["audit_status"] == "timeout"
+    assert fallback["present"] == 12
+    assert fallback["expected"] == 12
+
+
+@requires_ffmpeg
 def test_recover_lite_session_derives_prd_shape(tmp_path: Path) -> None:
     sess = tmp_path / "clip-20260528-100703"
     sess.mkdir()
@@ -121,7 +157,7 @@ def test_recover_lite_session_derives_prd_shape(tmp_path: Path) -> None:
     (sess / "intrinsics.yaml").write_text("fx: 64\nfy: 64\n", encoding="utf-8")
     (sess / "depth_manifest.json").write_text("{}", encoding="utf-8")
 
-    assert main(["recover_lite_session.py", str(sess)]) == 0
+    assert recover_mod.main(["recover_lite_session.py", str(sess)]) == 0
 
     for name in [
         "recording.mp4",

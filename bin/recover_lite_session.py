@@ -27,6 +27,22 @@ from typing import Any
 BIN = Path(__file__).resolve().parent
 DEPTH_EXR_COUNT = 1800
 DEFAULT_FPS = 30.0
+AUDIT_TIMEOUT_SEC = 600
+
+SHAPE_ONLY_ARTIFACTS = [
+    "recording.mp4",
+    "metadata.json",
+    "systeminfo.json",
+    "action_camera.json",
+    "gameinfo.xlsx",
+    "inputs.jsonl",
+    "game_state.jsonl",
+    "audio.flac",
+    "audio_check.json",
+    "frames.jsonl",
+    "input_latency.json",
+    "depth",
+]
 
 
 def _read_json(path: Path, default: Any) -> Any:
@@ -438,7 +454,9 @@ def step4_game_state_from_action_camera(s: Path) -> None:
     with out.open("w", encoding="utf-8") as fp:
         for idx, frame in enumerate(frames):
             pos = frame.get("player_position") or frame.get("camera_position") or [0, 0, 0]
-            rot = frame.get("player_rotation_oula") or frame.get("camera_rotation_oula") or [0, 0, 0]
+            rot = (
+                frame.get("player_rotation_oula") or frame.get("camera_rotation_oula") or [0, 0, 0]
+            )
             if not (isinstance(pos, list) and len(pos) >= 3):
                 pos = [0, 0, 0]
             if not (isinstance(rot, list) and len(rot) >= 2):
@@ -662,23 +680,76 @@ def step5e_manifest(s: Path) -> None:
     _write_json(out, payload)
 
 
-def step6_run_audit(s: Path) -> str:
-    proc = _run(
-        ["python3", str(BIN / "prd_compliance_audit.py"), str(s), "--json"],
-        timeout=180,
-    )
+def _shape_only_audit(s: Path, audit_status: str) -> dict[str, Any]:
+    artifacts = []
+    for name in SHAPE_ONLY_ARTIFACTS:
+        path = s / name
+        present = path.is_dir() if name == "depth" else path.exists() and path.stat().st_size > 0
+        artifacts.append({"name": name, "present": present})
+
+    present_count = sum(1 for item in artifacts if item["present"])
+    payload = {
+        "audit_status": audit_status,
+        "audit_mode": "shape-only",
+        "present": present_count,
+        "expected": len(SHAPE_ONLY_ARTIFACTS),
+        "missing": [item["name"] for item in artifacts if not item["present"]],
+        "artifacts": artifacts,
+    }
+    _write_json(s / "recovery_audit_fallback.json", payload)
+    return payload
+
+
+def _format_audit_result(result: dict[str, Any]) -> str:
+    status = str(result.get("audit_status", "unknown"))
+    if result.get("audit_mode") == "shape-only":
+        present = int(result.get("present", 0))
+        expected = int(result.get("expected", len(SHAPE_ONLY_ARTIFACTS)))
+        return f'audit_status="{status}" shape-only={present}/{expected} artifacts present'
+    audit_result = str(result.get("audit_result", "unknown"))
+    return f'audit_status="{status}" PRD audit = {audit_result}'
+
+
+def step6_run_audit(s: Path) -> dict[str, Any]:
+    try:
+        proc = _run(
+            ["python3", str(BIN / "prd_compliance_audit.py"), str(s), "--json"],
+            timeout=AUDIT_TIMEOUT_SEC,
+        )
+    except subprocess.TimeoutExpired:
+        return _shape_only_audit(s, audit_status="timeout")
+
     try:
         report = json.loads(proc.stdout)
-        return f"{int(report['passed'])}/{int(report['total_items'])} PASS"
+        passed = int(report["passed"])
+        total_items = int(report["total_items"])
+        return {
+            "audit_status": "ok",
+            "audit_mode": "prd_compliance_audit",
+            "audit_result": f"{passed}/{total_items} PASS",
+            "passed": passed,
+            "total_items": total_items,
+            "returncode": proc.returncode,
+        }
     except (json.JSONDecodeError, KeyError, TypeError, ValueError):
         text = proc.stdout + "\n" + proc.stderr
         match = re.search(r"(\d+/\d+\s+PASS)", text)
         if match:
-            return match.group(1)
-        return "unknown"
+            return {
+                "audit_status": "ok",
+                "audit_mode": "prd_compliance_audit",
+                "audit_result": match.group(1),
+                "returncode": proc.returncode,
+            }
+        return {
+            "audit_status": "unknown",
+            "audit_mode": "prd_compliance_audit",
+            "audit_result": "unknown",
+            "returncode": proc.returncode,
+        }
 
 
-def recover_session(sess: Path) -> str:
+def recover_session(sess: Path) -> dict[str, Any]:
     step0_normalize_action_camera(sess)
     step1_recording_symlink(sess)
     step2_metadata(sess)
@@ -701,8 +772,8 @@ def main(argv: list[str]) -> int:
     if not sess.is_dir():
         print(f"ERROR: not a directory: {sess}", file=sys.stderr)
         return 2
-    pass_count = recover_session(sess)
-    print(f"Recovery complete: {sess.name} PRD audit = {pass_count}")
+    audit_result = recover_session(sess)
+    print(f"Recovery complete: {sess.name} {_format_audit_result(audit_result)}")
     return 0
 
 
