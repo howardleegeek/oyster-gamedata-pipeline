@@ -1919,8 +1919,8 @@ class RecorderApp(tk.Tk):
 
     def _tick_recording_status(self) -> None:
         """v0.12.0: tick once per second while ffmpeg is alive, updating
-        the subtitle with elapsed time + current video file size +
-        progress toward 6-minute cap. Self-stops when ffmpeg dies.
+        the subtitle with elapsed time + current video file size.
+        Self-stops when ffmpeg dies.
         """
         if self._ffmpeg_proc is None or self._ffmpeg_proc.poll() is not None:
             return  # ffmpeg has exited; let watch_loop's finalizer take over
@@ -1940,16 +1940,10 @@ class RecorderApp(tk.Tk):
                 size_str = f"{mb:.1f} MB"
         except Exception:
             pass
-        # Progress bar visual (caps at 6 min = 360s)
-        cap = 360.0
-        pct = min(100, int((elapsed / cap) * 100))
-        bar_w = 18
-        filled = int(bar_w * pct / 100)
-        bar = "█" * filled + "░" * (bar_w - filled)
         # v0.22.0: real-time data quality (Howard '录的时候确保数据的精确度')
         # Lightweight check on the live event buffer — if anything looks off,
         # surface it NOW so the tester aborts and re-records instead of
-        # discovering a problem 6 minutes later in _auto_bft.
+        # discovering a problem later in _auto_bft.
         quality_line = ""
         try:
             if self._input_capture is not None:
@@ -1971,7 +1965,7 @@ class RecorderApp(tk.Tk):
             pass
         try:
             self._subtitle.config(
-                text=f"⏱  {mm}分{ss:02d}秒  /  6 分钟  ({pct}%)\n[{bar}]\n📦 视频文件 {size_str}{quality_line}",
+                text=f"⏱  {mm}分{ss:02d}秒\n📦 视频文件 {size_str}{quality_line}",
                 fg=RED,
             )
         except Exception:
@@ -2439,11 +2433,9 @@ class RecorderApp(tk.Tk):
         # keeps receiving fresh rendered frames.
         _trace("post-ffmpeg iconify skipped; Minecraft left visible for capture")
 
-        # Phase 3: wait for MC to exit OR for 6 minutes elapsed (PRD cap)
-        # OR for the user to disarm.
-        # PRD spec requires 5-6 min duration; auto-stop at 6 min so the
-        # downstream lint doesn't reject for over-length.
-        MAX_RECORD_SECONDS = 6 * 60
+        # Phase 3: wait for MC to exit, for the user to disarm, or for the
+        # process-level stop event. ffmpeg is terminated only through
+        # _stop_ffmpeg(), which writes "q" for a clean container finalization.
         while True:
             if self._stop_event.is_set():
                 _trace("watch_loop: stop_event set — finalizing whatever we have")
@@ -2454,15 +2446,11 @@ class RecorderApp(tk.Tk):
             if not _minecraft_running():
                 _trace("watch_loop: MC exited — finalizing")
                 break
-            elapsed = time.time() - self._record_started_at
-            if elapsed >= MAX_RECORD_SECONDS:
-                self._set("⏱ 已到 6 分钟，自动停止", ORANGE, "PRD 规格要求 5-6 分钟，正在收尾…")
-                break
             time.sleep(2.0)
 
         # v0.9.0 BUG FIX: previously, hitting `_stop_event` returned
         # before `_package_tarball`, throwing away the recording. Now ANY
-        # stop reason (MC exit / user disarm / 6-min cap / stop_event)
+        # stop reason (MC exit / user disarm / stop_event)
         # falls through to packaging so the tester always gets a tarball
         # representing what was actually recorded up to that point.
 
@@ -3084,8 +3072,6 @@ class RecorderApp(tk.Tk):
             *audio_codec,
             "-r",
             "30",
-            "-t",
-            "360",
             "-y",
             str(out_path),
         ]

@@ -81,3 +81,11 @@ def test_recorder_ffmpeg_cmd_pins_h265_bitrate(tmp_path: Path) -> None:
     assert cmd[cmd.index("-b:v") + 1] == "10M"
     assert cmd[cmd.index("-maxrate") + 1] == "12M"
     assert cmd[cmd.index("-bufsize") + 1] == "20M"
+    assert "-t" not in cmd
+
+
+def test_recorder_source_has_no_six_min_recording_cap() -> None:
+    src = (BIN_DIR / "recorder_consumer_lite.py").read_text(encoding="utf-8")
+
+    assert "MAX_RECORD_SECONDS" not in src
+    assert '"-t",' not in src
