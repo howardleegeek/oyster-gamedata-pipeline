@@ -2910,10 +2910,17 @@ class RecorderApp(tk.Tk):
             _trace(
                 f"package: real game-state JSONL found, {len(_gs_samples)} samples — overlay enabled"
             )
-            _atomic_write_jsonl(clip_dir / "game_state.jsonl", _gs_samples)
+            if not _gs_jsonl_path:
+                raise RecorderError(
+                    "Real game-state samples loaded but raw game_state.jsonl source is unknown; "
+                    "refusing to package unauditable data."
+                )
+            gs_source = Path(_gs_jsonl_path())
+            gs_target = clip_dir / "game_state.jsonl"
+            shutil.copy2(gs_source, gs_target)
             _trace(
-                "package: wrote game_state.jsonl "
-                f"from {_gs_jsonl_path() if _gs_jsonl_path else 'loaded samples'}"
+                "package: copied raw game_state.jsonl "
+                f"from {gs_source} ({gs_target.stat().st_size} bytes)"
             )
         else:
             ver = _recorder_version_tuple()

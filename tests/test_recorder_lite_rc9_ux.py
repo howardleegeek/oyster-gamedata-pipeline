@@ -29,7 +29,9 @@ its window-capture helper coverage.
 from __future__ import annotations
 
 import json
+import os
 import sys
+import tarfile
 import types
 from pathlib import Path
 from typing import Any
@@ -181,6 +183,118 @@ def test_atomic_session_writes_and_complete_marker(tmp_path: Path) -> None:
     marker = json.loads((tmp_path / ".session_complete").read_text(encoding="utf-8"))
     assert marker["recorder_version"] == m.RECORDER_VERSION
     assert marker["completed_at"]
+
+
+def test_package_preserves_raw_game_state_jsonl_and_transforms_action_camera(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """The lite package must copy the mod JSONL bytes before overlaying action_camera."""
+
+    m = _import_recorder_module()
+
+    if str(BIN_DIR) not in sys.path:
+        sys.path.insert(0, str(BIN_DIR))
+    import game_state_overlay  # type: ignore[import-not-found]  # noqa: PLC0415
+
+    def _sample(tick: int, timestamp_ms: int, x: float) -> dict[str, Any]:
+        return {
+            "tick": tick,
+            "timestamp_ms": timestamp_ms,
+            "x": x,
+            "y": 64.0,
+            "z": -8.0,
+            "yaw_deg": 90.0,
+            "pitch_deg": 10.0,
+            "look_x": 0.0,
+            "look_y": 0.0,
+            "look_z": 1.0,
+            "velocity_x": 0.1,
+            "velocity_y": 0.0,
+            "velocity_z": 0.2,
+            "on_ground": True,
+            "sneaking": False,
+            "sprinting": True,
+            "dimension": "minecraft:overworld",
+            "game_mode": "SURVIVAL",
+        }
+
+    source_dir = tmp_path / "mc-instance"
+    source_dir.mkdir()
+    source_jsonl = source_dir / "game_state.jsonl"
+    raw_game_state = (
+        "  "
+        + json.dumps(_sample(1, 1000, 12.5), ensure_ascii=False)
+        + "  \n\n"
+        + json.dumps(_sample(2, 1050, 12.75), ensure_ascii=False)
+        + "\n"
+    )
+    source_jsonl.write_text(raw_game_state, encoding="utf-8")
+    source_mtime = 1_700_000_123
+    os.utime(source_jsonl, (source_mtime, source_mtime))
+
+    fake_gsi = types.ModuleType("generate_systeminfo_json")
+    fake_gsi.build_systeminfo = lambda **kwargs: {  # type: ignore[attr-defined]
+        "gameProcessName": kwargs["game_process_name"],
+        "x": kwargs["x"],
+        "y": kwargs["y"],
+        "width": kwargs["width"],
+        "height": kwargs["height"],
+        "recordDpi": kwargs["record_dpi"],
+    }
+    fake_ggx = types.ModuleType("generate_gameinfo_xlsx")
+    fake_ggx.parse_game_version_from_window_title = lambda _title: "1.21.4"  # type: ignore[attr-defined]
+    fake_ggx.build_gameinfo_dict = lambda **kwargs: kwargs  # type: ignore[attr-defined]
+    fake_ggx.write_xlsx = (  # type: ignore[attr-defined]
+        lambda _game_info, path: Path(path).write_bytes(b"fake xlsx")
+    )
+    monkeypatch.setitem(sys.modules, "generate_systeminfo_json", fake_gsi)
+    monkeypatch.setitem(sys.modules, "generate_gameinfo_xlsx", fake_ggx)
+    monkeypatch.setattr(game_state_overlay, "jsonl_path", lambda: source_jsonl)
+
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    monkeypatch.setattr(m, "_output_dir", lambda: out_dir)
+    monkeypatch.setattr(m, "_client_depth_inference_enabled", lambda: False)
+
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+    video_path = work_dir / "capture.mp4"
+    video_path.write_bytes(b"fake mp4 bytes")
+
+    app = object.__new__(m.RecorderApp)
+    app._tmp_dir = work_dir
+    app._video_path = video_path
+    app._record_started_at = m.time.time() - 0.25
+    app._mc_window_rect = {
+        "title": "Minecraft 1.21.4 - Singleplayer",
+        "x": 10,
+        "y": 20,
+        "width": 1280,
+        "height": 720,
+        "recordDpi": 96,
+    }
+    app._captured_events = []
+    app._session_id = "unit-session"
+    app._allow_placeholder = False
+
+    tar_path = app._package_tarball("20260527-000000")
+
+    extract_dir = tmp_path / "extract"
+    with tarfile.open(tar_path, "r:gz") as tf:
+        names = set(tf.getnames())
+        assert "clip-20260527-000000/game_state.jsonl" in names
+        assert "clip-20260527-000000/action_camera.json" in names
+        assert int(tf.getmember("clip-20260527-000000/game_state.jsonl").mtime) == source_mtime
+        tf.extractall(extract_dir)
+
+    session_dir = extract_dir / "clip-20260527-000000"
+    assert (session_dir / "game_state.jsonl").read_text(encoding="utf-8") == raw_game_state
+
+    records = json.loads((session_dir / "action_camera.json").read_text(encoding="utf-8"))
+    assert records
+    assert records[0]["_real_game_state"] is True
+    assert records[0]["player_position"] == [12.5, 64.0, -8.0]
 
 
 # ---------------------------------------------------------------------------
