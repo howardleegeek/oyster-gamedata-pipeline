@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime as dt
 import json
 import os
 import shutil
@@ -112,6 +113,53 @@ def test_step6_run_audit_timeout_returns_shape_only_fallback(
     assert fallback["audit_status"] == "timeout"
     assert fallback["present"] == 12
     assert fallback["expected"] == 12
+
+
+def test_start_time_uses_min_authoritative_timestamp_when_inputs_conflict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    now = dt.datetime(2026, 5, 28, 20, 0, 0, tzinfo=dt.timezone.utc)
+    dir_time = dt.datetime(2026, 5, 29, 18, 35, 0, tzinfo=dt.timezone.utc)
+    systeminfo_start = dt.datetime(2026, 5, 27, 18, 35, 0, tzinfo=dt.timezone.utc)
+    mp4_ctime = dt.datetime(2026, 5, 28, 18, 40, 0, tzinfo=dt.timezone.utc)
+    sess = tmp_path / f"clip-{dir_time:%Y%m%d-%H%M%S}"
+    sess.mkdir()
+
+    monkeypatch.setattr(recover_mod, "_video_ctime_utc", lambda _session: mp4_ctime)
+
+    actual = recover_mod._start_time_from_session(
+        sess,
+        {"start_time": recover_mod._iso_utc(now - dt.timedelta(days=7))},
+        {"start_time": recover_mod._iso_utc(systeminfo_start)},
+        now=now,
+    )
+
+    assert actual == systeminfo_start
+    assert actual < dir_time
+    assert actual < mp4_ctime
+    assert actual <= now
+
+
+def test_start_time_caps_authoritative_timestamp_to_now(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    now = dt.datetime(2026, 5, 28, 20, 0, 0, tzinfo=dt.timezone.utc)
+    dir_time = now + dt.timedelta(hours=3)
+    systeminfo_start = now + dt.timedelta(minutes=5)
+    mp4_ctime = now + dt.timedelta(hours=1)
+    sess = tmp_path / f"clip-{dir_time:%Y%m%d-%H%M%S}"
+    sess.mkdir()
+
+    monkeypatch.setattr(recover_mod, "_video_ctime_utc", lambda _session: mp4_ctime)
+
+    actual = recover_mod._start_time_from_session(
+        sess,
+        {},
+        {"start_time": recover_mod._iso_utc(systeminfo_start)},
+        now=now,
+    )
+
+    assert actual == now
 
 
 @requires_ffmpeg

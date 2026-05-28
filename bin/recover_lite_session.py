@@ -118,16 +118,7 @@ def _parse_recorded_at(value: Any) -> dt.datetime | None:
     return None
 
 
-def _start_time_from_session(s: Path, sm: dict[str, Any], si: dict[str, Any]) -> dt.datetime:
-    for candidate in (
-        _parse_datetime(sm.get("start_time")),
-        _parse_datetime(sm.get("started_at")),
-        _parse_datetime(si.get("start_time")),
-        _parse_recorded_at(si.get("recordedAt")),
-    ):
-        if candidate is not None:
-            return candidate
-
+def _session_dir_time_utc(s: Path) -> dt.datetime | None:
     match = re.search(r"(\d{8})[-_](\d{6})", s.name)
     if match:
         try:
@@ -136,11 +127,61 @@ def _start_time_from_session(s: Path, sm: dict[str, Any], si: dict[str, Any]) ->
             )
         except ValueError:
             pass
+    return None
+
+
+def _video_ctime_utc(s: Path) -> dt.datetime | None:
+    video = s / "video.mp4"
+    if not video.exists():
+        return None
+    return dt.datetime.fromtimestamp(video.stat().st_ctime, dt.timezone.utc)
+
+
+def _cap_not_future(value: dt.datetime, now: dt.datetime) -> dt.datetime:
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=dt.timezone.utc)
+    now = now.astimezone(dt.timezone.utc)
+    return value if value <= now else now
+
+
+def _start_time_from_session(
+    s: Path,
+    sm: dict[str, Any],
+    si: dict[str, Any],
+    *,
+    now: dt.datetime | None = None,
+) -> dt.datetime:
+    now_utc = now or dt.datetime.now(dt.timezone.utc)
+    if now_utc.tzinfo is None:
+        now_utc = now_utc.replace(tzinfo=dt.timezone.utc)
+    now_utc = now_utc.astimezone(dt.timezone.utc)
+
+    authoritative = [
+        candidate
+        for candidate in (
+            _session_dir_time_utc(s),
+            _parse_datetime(si.get("start_time")),
+            _video_ctime_utc(s),
+        )
+        if candidate is not None
+    ]
+    if authoritative:
+        return _cap_not_future(min(authoritative), now_utc)
+
+    for candidate in (
+        _parse_datetime(sm.get("start_time")),
+        _parse_datetime(sm.get("started_at")),
+        _parse_recorded_at(si.get("recordedAt")),
+    ):
+        if candidate is not None:
+            return _cap_not_future(candidate, now_utc)
 
     video = s / "video.mp4"
     if video.exists():
-        return dt.datetime.fromtimestamp(video.stat().st_mtime, dt.timezone.utc)
-    return dt.datetime.now(dt.timezone.utc)
+        return _cap_not_future(
+            dt.datetime.fromtimestamp(video.stat().st_mtime, dt.timezone.utc), now_utc
+        )
+    return now_utc
 
 
 def _run(cmd: list[str], timeout: int = 120) -> subprocess.CompletedProcess[str]:
