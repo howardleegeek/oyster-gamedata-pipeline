@@ -216,8 +216,9 @@ def test_silent_audio_fallback_records_ffmpeg_failure(
 
     monkeypatch.setattr(m.subprocess, "run", _fake_run)
 
-    with pytest.raises(m.RecorderError):
-        m._generate_silent_audio_fallback(tmp_path, tmp_path / "video.mp4")
+    video_path = tmp_path / "video.mp4"
+    video_path.write_bytes(b"fake mp4")
+    m._generate_silent_audio_fallback(tmp_path, video_path)
 
     audio_path = tmp_path / "audio.flac"
     check = json.loads((tmp_path / "audio_check.json").read_text(encoding="utf-8"))
@@ -227,7 +228,7 @@ def test_silent_audio_fallback_records_ffmpeg_failure(
     assert check["error"] == "Unknown input format: lavfi"
 
 
-def test_silent_audio_fallback_rejects_zero_byte_output(
+def test_silent_audio_fallback_records_zero_byte_output(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -245,8 +246,9 @@ def test_silent_audio_fallback_rejects_zero_byte_output(
 
     monkeypatch.setattr(m.subprocess, "run", _fake_run)
 
-    with pytest.raises(m.RecorderError):
-        m._generate_silent_audio_fallback(tmp_path, tmp_path / "video.mp4")
+    video_path = tmp_path / "video.mp4"
+    video_path.write_bytes(b"fake mp4")
+    m._generate_silent_audio_fallback(tmp_path, video_path)
 
     check = json.loads((tmp_path / "audio_check.json").read_text(encoding="utf-8"))
     assert check["audio_source"] == "failed"
