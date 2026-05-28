@@ -52,10 +52,7 @@ def test_transform_resample_does_not_freeze_moving_game_state() -> None:
     resampled = resample_to_video_grid(ticks, target_count=10856)
     rows = [transform_tick_to_action_camera_row(tick, i) for i, tick in enumerate(resampled)]
 
-    unique_positions = {
-        tuple(round(float(v), 3) for v in row["player_position"])
-        for row in rows
-    }
+    unique_positions = {tuple(round(float(v), 3) for v in row["player_position"]) for row in rows}
     unique_yaws = {round(float(row["camera_rotation_oula"][1]), 3) for row in rows}
 
     assert len(resampled) == 10856

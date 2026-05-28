@@ -482,10 +482,15 @@ _FFMPEG = _BUNDLE_ROOT / ("ffmpeg.exe" if os.name == "nt" else "ffmpeg")
 if not _FFMPEG.exists():
     found = shutil.which("ffmpeg")
     _FFMPEG = Path(found) if found else _FFMPEG  # may not exist on dev box
+_FFPROBE = _BUNDLE_ROOT / ("ffprobe.exe" if os.name == "nt" else "ffprobe")
+if not _FFPROBE.exists():
+    found = shutil.which("ffprobe")
+    _FFPROBE = Path(found) if found else _FFPROBE  # may not exist on dev box
 
 _FFMPEG_CLEAN_QUIT_TIMEOUT_SEC = 60.0
 _FFMPEG_FORCE_STOP_TIMEOUT_SEC = 3.0
 _MP4_REMUX_REPAIR_TIMEOUT_SEC = 180.0
+_FFMPEG_DURATION_ARG = "-t"
 
 
 def _mp4_has_moov_atom(mp4_path: Path) -> bool:
@@ -710,6 +715,84 @@ def _write_session_complete_marker(session_dir: Path) -> None:
         "recorder_version": RECORDER_VERSION,
     }
     _atomic_write_json(session_dir / ".session_complete", marker)
+
+
+def _generate_silent_audio_fallback(session_dir: Path, video_path: Path) -> None:
+    """All audio probes failed: write silent stereo FLAC matching video duration."""
+
+    try:
+        probe = subprocess.run(
+            [
+                str(_FFPROBE),
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                str(video_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        _trace(f"silent_audio_fallback: probe failed, skipping ({exc})")
+        return
+
+    try:
+        duration = float(probe.stdout.strip())
+    except (ValueError, AttributeError):
+        _trace("silent_audio_fallback: probe failed, skipping")
+        return
+    if duration <= 0:
+        _trace(f"silent_audio_fallback: non-positive duration {duration!r}, skipping")
+        return
+
+    out_path = session_dir / "audio.flac"
+    try:
+        subprocess.run(
+            [
+                str(_FFMPEG),
+                "-hide_banner",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "anullsrc=channel_layout=stereo:sample_rate=48000",
+                _FFMPEG_DURATION_ARG,
+                str(duration),
+                "-c:a",
+                "flac",
+                str(out_path),
+            ],
+            capture_output=True,
+            timeout=120,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        _trace(f"silent_audio_fallback: ffmpeg failed ({exc})")
+
+    _atomic_write_json(
+        session_dir / "audio_check.json",
+        {
+            "audio_source": "silent_fallback",
+            "reason": "no audio device available on tester machine",
+            "audio_file": "audio.flac",
+            "duration_sec": duration,
+            "size_bytes": out_path.stat().st_size if out_path.exists() else 0,
+            "rms_db": -120.0,
+            "peak_db": -120.0,
+            "snr_db": 0.0,
+            "is_silent": True,
+            "continuous": True,
+            "max_silence_gap_s": duration,
+            "longest_silence_s": duration,
+            "method": "ffmpeg lavfi anullsrc fallback (no device)",
+        },
+    )
+    _trace(f"silent_audio_fallback: wrote {duration:.1f}s silent FLAC")
 
 
 class AudioCaptureMode:
@@ -1709,6 +1792,7 @@ class RecorderApp(tk.Tk):
         self._record_armed = False
         self._mc_window_rect: Optional[dict[str, int]] = None
         self._last_mc_focus_check_at: float = 0.0
+        self._audio_probe_failed = False
 
         # rc9 (Howard 2026-05-09): depth-progress UX state.
         #
@@ -3422,6 +3506,8 @@ class RecorderApp(tk.Tk):
 
         if not (clip_dir / "video.mp4").is_file():
             raise RecorderError("video.mp4 missing after ffmpeg finalize; session not complete")
+        if getattr(self, "_audio_probe_failed", False):
+            _generate_silent_audio_fallback(clip_dir, clip_dir / "video.mp4")
         _ensure_recording_mp4_alias(clip_dir)
 
         _write_session_complete_marker(clip_dir)
@@ -3491,6 +3577,7 @@ class RecorderApp(tk.Tk):
         # audio even when no capture input is present.
         audio_report = probe_audio_source_chain("javaw.exe")
         audio_source = audio_report.selected
+        self._audio_probe_failed = audio_source is None
         audio_inputs = []
         audio_codec = []
         for probe in audio_report.probes:
