@@ -2,8 +2,8 @@
 """Transform Fabric mod's `game_state.jsonl` into PRD-compliant
 `action_camera.json` with 20 literal-named fields.
 
-The Fabric mod records 18 fields per tick (tick, x/y/z, yaw/pitch, look_xyz,
-velocity_xyz, on_ground/sneaking/sprinting, dimension, game_mode). The PRD
+The Fabric mod records 19 fields per tick (tick, x/y/z, yaw/pitch, look_xyz,
+velocity_xyz, on_ground/sneaking/sprinting, paused, dimension, game_mode). The PRD
 buyer-pipeline requires 20 named fields per row of action_camera.json:
 
   frame, time, fps, route_type,
@@ -66,6 +66,17 @@ def _first_number(data: dict, keys: tuple[str, ...]) -> float | None:
         if isinstance(value, (int, float)):
             return float(value)
     return None
+
+
+def _truthy_bool(value: Any) -> bool:
+    """Coerce recorder JSON bool-ish values without treating arbitrary text as true."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y"}
+    return False
 
 
 def _unit_interval(value: float) -> float:
@@ -167,6 +178,7 @@ def transform_tick_to_action_camera_row(
     vx = float(tick_data.get("velocity_x", 0.0)) * MC_TICKS_PER_SECOND  # tick→sec
     vy = float(tick_data.get("velocity_y", 0.0)) * MC_TICKS_PER_SECOND
     vz = float(tick_data.get("velocity_z", 0.0)) * MC_TICKS_PER_SECOND
+    paused = _truthy_bool(tick_data.get("paused", tick_data.get("is_paused", False)))
 
     # Camera position = player position + eye offset (only Y)
     cam_x, cam_y, cam_z = x, y + eye_offset_y, z
@@ -221,6 +233,7 @@ def transform_tick_to_action_camera_row(
         "player_rotation_quaternion": player_quat,
         "player_speed": [vx, vy, vz],  # in MC, head and body move together
         "metric_scale": metric_scale,
+        "_paused": paused,
     }
 
 

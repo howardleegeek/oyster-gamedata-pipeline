@@ -75,6 +75,62 @@ def find_video(session_dir: Path) -> Path | None:
 _find_video = find_video
 
 
+def _truthy_bool(value: object) -> bool:
+    """Coerce persisted bool-ish telemetry without treating arbitrary text as true."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y"}
+    return False
+
+
+def _paused_sample_stats(session: Path) -> tuple[int, int, str]:
+    """Return ``(paused_count, total_count, source)`` for pause-aware MC samples."""
+
+    ac_path = session / "action_camera.json"
+    if ac_path.exists():
+        try:
+            data = json.loads(ac_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            data = None
+        if isinstance(data, list) and data:
+            has_pause_field = any(isinstance(row, dict) and "_paused" in row for row in data)
+            if has_pause_field:
+                paused = sum(
+                    1 for row in data if isinstance(row, dict) and _truthy_bool(row.get("_paused"))
+                )
+                return paused, len(data), "action_camera._paused"
+
+    gs_path = session / "game_state.jsonl"
+    total = 0
+    paused = 0
+    has_pause_field = False
+    if gs_path.exists():
+        try:
+            with gs_path.open(encoding="utf-8") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        row = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if not isinstance(row, dict):
+                        continue
+                    total += 1
+                    if "paused" in row:
+                        has_pause_field = True
+                        if _truthy_bool(row.get("paused")):
+                            paused += 1
+        except OSError:
+            return 0, 0, "unreadable"
+
+    return paused if has_pause_field else 0, total, "game_state.paused"
+
+
 def _evaluate_h8(session: Path) -> dict:
     """Evaluate H8: depth ground-truth provenance (grafted from D3v2 patch).
 
@@ -1063,11 +1119,15 @@ def audit_group_q_operator(session: Path) -> list[dict]:
         try:
             with gs_path.open(encoding="utf-8") as fh:
                 gs_lines = sum(1 for line in fh if line.strip())
+                paused_count, paused_total, paused_source = _paused_sample_stats(session)
+                paused_ratio = paused_count / paused_total if paused_total > 0 else 0.0
                 items.append(
                     _result(
                         "Q3",
-                        gs_lines > 0,
-                        f"game_state.jsonl entries: {gs_lines} (death OK — Howard policy 2026-05-16)",
+                        gs_lines > 0 and paused_ratio <= 0.05,
+                        f"game_state.jsonl entries: {gs_lines}; paused samples "
+                        f"{paused_count}/{paused_total} from {paused_source} "
+                        f"({paused_ratio:.1%}, max 5%; death OK — Howard policy 2026-05-16)",
                     )
                 )
         except OSError as e:

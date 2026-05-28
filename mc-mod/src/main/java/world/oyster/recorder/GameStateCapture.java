@@ -22,6 +22,8 @@ import net.minecraft.world.World;
  *   <li>{@code client.world == null} — no world loaded yet
  *   <li>Spectator / creative gamemode — recorder doesn't want this; we
  *       still write but tag it so downstream can filter
+ *   <li>Pause/menu screen — still write, but tag {@code paused=true} so
+ *       downstream can reject stale pose samples
  * </ul>
  */
 public final class GameStateCapture {
@@ -39,6 +41,7 @@ public final class GameStateCapture {
         if (player == null || world == null) {
             return;
         }
+        boolean paused = (client.currentScreen != null) || isMcPaused(client);
 
         // Position & rotation.
         Vec3d pos = player.getPos();
@@ -67,10 +70,15 @@ public final class GameStateCapture {
             player.isOnGround(),
             player.isSneaking(),
             player.isSprinting(),
+            paused,
             dimension,
             gameMode.name()
         );
 
         writer.append(sample);
+    }
+
+    static boolean isMcPaused(MinecraftClient client) {
+        return client.isPaused();
     }
 }
