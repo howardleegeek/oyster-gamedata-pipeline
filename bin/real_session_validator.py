@@ -53,6 +53,7 @@ REQUIRED_FILES = {"recording.mp4", "game_state.jsonl"}
 LEGACY_VIDEO = "recording.mp4"
 LEGACY_GAME_STATE = "game_state.jsonl"
 LEGACY_INPUTS = "inputs.jsonl"
+SESSION_COMPLETE_MARKER = ".session_complete"
 LEM_VIDEO = pathlib.Path("recordings/main_record.mp4")
 LEM_STATE_STREAM = pathlib.Path("streams/states.jsonl")
 LEM_ACTION_STREAM = pathlib.Path("streams/actions.jsonl")
@@ -71,7 +72,14 @@ def _has_lem_session_files(session_dir: pathlib.Path) -> bool:
     return is_complete_layout(session_dir, SessionLayout.LEM)
 
 
+def _has_session_complete_marker(session_dir: pathlib.Path) -> bool:
+    return (session_dir / SESSION_COMPLETE_MARKER).is_file()
+
+
 def _session_format(session_dir: pathlib.Path) -> str | None:
+    if not _has_session_complete_marker(session_dir):
+        return None
+
     contract_result = detect_session_layout(session_dir)
     if not contract_result.is_valid:
         return None
@@ -137,7 +145,7 @@ def session_validation_view(session_dir: pathlib.Path):
         if actions_path.is_file():
             _link_or_copy_file(actions_path, view_dir / LEGACY_INPUTS)
 
-        for optional_name in ("MANIFEST.json", "metadata.json"):
+        for optional_name in ("MANIFEST.json", "metadata.json", SESSION_COMPLETE_MARKER):
             optional_path = session_dir / optional_name
             if optional_path.is_file():
                 _link_or_copy_file(optional_path, view_dir / optional_name)

@@ -28,6 +28,7 @@ its window-capture helper coverage.
 
 from __future__ import annotations
 
+import json
 import sys
 import types
 from pathlib import Path
@@ -155,6 +156,31 @@ def test_detect_gpu_available_returns_bool(monkeypatch: pytest.MonkeyPatch) -> N
         "Windows-without-NVIDIA-or-DirectML must return False so the "
         "skip checkbox is pre-checked"
     )
+
+
+def test_atomic_session_writes_and_complete_marker(tmp_path: Path) -> None:
+    """Recorder JSON/JSONL helpers must publish complete files via final names only."""
+
+    m = _import_recorder_module()
+
+    inputs = tmp_path / "inputs.jsonl"
+    m._atomic_write_jsonl(
+        inputs,
+        [
+            {"event_type": "session_start", "timestamp_ms": 0},
+            {"event_type": "key_down", "timestamp_ms": 12, "keyCode": 87},
+        ],
+    )
+
+    rows = [json.loads(line) for line in inputs.read_text(encoding="utf-8").splitlines()]
+    assert rows[0]["event_type"] == "session_start"
+    assert rows[1]["keyCode"] == 87
+    assert not list(tmp_path.glob("*.tmp"))
+
+    m._write_session_complete_marker(tmp_path)
+    marker = json.loads((tmp_path / ".session_complete").read_text(encoding="utf-8"))
+    assert marker["recorder_version"] == m.RECORDER_VERSION
+    assert marker["completed_at"]
 
 
 # ---------------------------------------------------------------------------

@@ -34,6 +34,7 @@ def make_fake_session(root: pathlib.Path, name: str, files: list[str] | None = N
     required = files or ["recording.mp4", "game_state.jsonl"]
     for f in required:
         (session_dir / f).write_text("fake")
+    (session_dir / ".session_complete").write_text("{}")
     return session_dir
 
 
@@ -47,6 +48,7 @@ def make_fake_lem_session(root: pathlib.Path, name: str):
     (session_dir / "streams" / "states.jsonl").write_text('{"tick":1}\n')
     (session_dir / "streams" / "actions.jsonl").write_text('{"event_type":"ACTION"}\n')
     (session_dir / "metadata" / "session.json").write_text('{"session_id":"lem"}\n')
+    (session_dir / ".session_complete").write_text("{}")
     return session_dir
 
 
@@ -168,6 +170,24 @@ class TestDiscoverSessions(unittest.TestCase):
 
         shutil.rmtree(root)
 
+    def test_dirs_without_complete_marker_are_refused(self):
+        root = pathlib.Path("/tmp/rsv_test_no_complete_marker")
+        if root.exists():
+            import shutil
+
+            shutil.rmtree(root)
+        root.mkdir(parents=True)
+
+        session_dir = make_fake_session(root, "session_001")
+        (session_dir / ".session_complete").unlink()
+
+        result = rsv.discover_sessions(root)
+        self.assertEqual(result, [])
+
+        import shutil
+
+        shutil.rmtree(root)
+
     def test_discovers_lem_sessions(self):
         root = pathlib.Path("/tmp/rsv_test_lem_valid")
         if root.exists():
@@ -201,6 +221,7 @@ class TestDiscoverSessions(unittest.TestCase):
             self.assertTrue((view_dir / "recording.mp4").exists())
             self.assertTrue((view_dir / "game_state.jsonl").exists())
             self.assertTrue((view_dir / "inputs.jsonl").exists())
+            self.assertTrue((view_dir / ".session_complete").exists())
             self.assertEqual((view_dir / "game_state.jsonl").read_text(), '{"tick":1}\n')
             self.assertFalse((session_dir / "game_state.jsonl").exists())
 

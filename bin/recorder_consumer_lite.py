@@ -483,6 +483,103 @@ if not _FFMPEG.exists():
     found = shutil.which("ffmpeg")
     _FFMPEG = Path(found) if found else _FFMPEG  # may not exist on dev box
 
+_FFMPEG_CLEAN_QUIT_TIMEOUT_SEC = 60.0
+_FFMPEG_FORCE_STOP_TIMEOUT_SEC = 3.0
+_MP4_REMUX_REPAIR_TIMEOUT_SEC = 180.0
+
+
+def _mp4_has_moov_atom(mp4_path: Path) -> bool:
+    """Return True when an MP4 has a top-level moov atom."""
+
+    try:
+        file_size = mp4_path.stat().st_size
+        with mp4_path.open("rb") as fh:
+            offset = 0
+            while offset + 8 <= file_size:
+                fh.seek(offset)
+                header = fh.read(8)
+                if len(header) < 8:
+                    return False
+                box_size = int.from_bytes(header[:4], "big")
+                box_type = header[4:8]
+                header_size = 8
+                if box_type == b"moov":
+                    return True
+                if box_size == 1:
+                    ext_size = fh.read(8)
+                    if len(ext_size) < 8:
+                        return False
+                    box_size = int.from_bytes(ext_size, "big")
+                    header_size = 16
+                elif box_size == 0:
+                    return False
+                if box_size < header_size:
+                    return False
+                offset += box_size
+    except OSError as exc:
+        _trace(f"mp4: unable to inspect moov atom for {mp4_path}: {exc}")
+        return False
+    return False
+
+
+def _attempt_mp4_remux_repair(mp4_path: Path) -> bool:
+    """Best-effort remux repair for an MP4 killed before moov finalization."""
+
+    fixed_path = mp4_path.with_name(f"{mp4_path.stem}.fixed{mp4_path.suffix}")
+    try:
+        fixed_path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+    cmd = [
+        str(_FFMPEG),
+        "-y",
+        "-i",
+        str(mp4_path),
+        "-c",
+        "copy",
+        str(fixed_path),
+    ]
+    _trace(f"mp4: missing moov after forced ffmpeg stop; attempting remux repair: {cmd}")
+    try:
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            timeout=_MP4_REMUX_REPAIR_TIMEOUT_SEC,
+            check=False,
+        )
+    except Exception as exc:  # noqa: BLE001 - repair is best-effort
+        _trace(f"mp4: remux repair failed to run: {type(exc).__name__}: {exc}")
+        return False
+
+    if result.returncode != 0:
+        stderr = (result.stderr or b"").decode("utf-8", errors="replace")[-500:]
+        _trace(f"mp4: remux repair failed rc={result.returncode}: {stderr}")
+        try:
+            fixed_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return False
+
+    if not fixed_path.exists() or not _mp4_has_moov_atom(fixed_path):
+        _trace("mp4: remux repair did not produce a playable MP4 with moov atom")
+        try:
+            fixed_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return False
+
+    try:
+        fixed_path.replace(mp4_path)
+    except OSError as exc:
+        _trace(f"mp4: remux repair could not replace original: {exc}")
+        return False
+    _fsync_file(mp4_path)
+    _fsync_dir(mp4_path.parent)
+    _trace(f"mp4: remux repair succeeded and replaced {mp4_path}")
+    return True
+
 
 # Tester output directory: ~/Documents/OysterClips/
 #
@@ -513,6 +610,77 @@ def _output_dir() -> Path:
     docs = _real_documents_dir() / "OysterClips"
     docs.mkdir(parents=True, exist_ok=True)
     return docs
+
+
+def _fsync_dir(path: Path) -> None:
+    """Best-effort directory fsync after atomic rename."""
+
+    try:
+        fd = os.open(str(path), os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+
+
+def _fsync_file(path: Path) -> None:
+    """Best-effort fsync for files produced by external processes."""
+
+    try:
+        with path.open("rb") as fh:
+            os.fsync(fh.fileno())
+    except OSError:
+        pass
+
+
+def _atomic_write_text(path: Path, data: str, *, encoding: str = "utf-8") -> None:
+    """Write text through a same-directory temp file, then os.replace."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent))
+    tmp_path = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding=encoding) as fh:
+            fh.write(data)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp_path, path)
+        _fsync_dir(path.parent)
+    except Exception:
+        try:
+            tmp_path.unlink()
+        except OSError:
+            pass
+        raise
+
+
+def _atomic_write_json(path: Path, data: Any, *, indent: int | None = 2) -> None:
+    kwargs: dict[str, Any] = {"ensure_ascii": False}
+    if indent is None:
+        kwargs["separators"] = (",", ":")
+    else:
+        kwargs["indent"] = indent
+    _atomic_write_text(path, json.dumps(data, **kwargs), encoding="utf-8")
+
+
+def _atomic_write_jsonl(path: Path, rows: Sequence[dict[str, Any]]) -> None:
+    body = "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows)
+    _atomic_write_text(path, body, encoding="utf-8")
+
+
+def _write_session_complete_marker(session_dir: Path) -> None:
+    marker = {
+        "completed_at": datetime.now().isoformat(timespec="seconds"),
+        "recorder_version": RECORDER_VERSION,
+    }
+    _atomic_write_json(session_dir / ".session_complete", marker)
 
 
 class AudioCaptureMode:
@@ -2538,7 +2706,10 @@ class RecorderApp(tk.Tk):
 
         # 1. Move the real video into place.
         if self._video_path and self._video_path.exists():
-            shutil.move(str(self._video_path), str(clip_dir / "video.mp4"))
+            video_target = clip_dir / "video.mp4"
+            os.replace(self._video_path, video_target)
+            _fsync_file(video_target)
+            _fsync_dir(clip_dir)
 
         # 2. systeminfo.json — v0.10.0: now uses the proper engineering
         # helper bin/generate_systeminfo_json.build_systeminfo() rather
@@ -2571,7 +2742,7 @@ class RecorderApp(tk.Tk):
                 "recordedAt": ts,
                 "recorderVersion": "lite-v0.10.0-fallback",
             }
-        (clip_dir / "systeminfo.json").write_text(json.dumps(sys_info, indent=2), encoding="utf-8")
+        _atomic_write_json(clip_dir / "systeminfo.json", sys_info)
 
         # 3. action_camera.json — v0.19.0 BIG REWRITE: PRD-aligned schema
         # was event-based with mouseX/cameraX scalars; PRD wants 9000
@@ -2605,15 +2776,22 @@ class RecorderApp(tk.Tk):
         # --allow-placeholder was explicitly passed.
         try:
             from game_state_overlay import apply_to_record as _gs_apply
+            from game_state_overlay import jsonl_path as _gs_jsonl_path
             from game_state_overlay import load as _gs_load  # type: ignore  # noqa: PLC0415
             from game_state_overlay import lookup_at_ms as _gs_lookup
         except ImportError:
             _gs_load = _gs_lookup = _gs_apply = None  # type: ignore
+            _gs_jsonl_path = None  # type: ignore
 
         _gs_samples = _gs_load() if _gs_load else None
         if _gs_samples:
             _trace(
                 f"package: real game-state JSONL found, {len(_gs_samples)} samples — overlay enabled"
+            )
+            _atomic_write_jsonl(clip_dir / "game_state.jsonl", _gs_samples)
+            _trace(
+                "package: wrote game_state.jsonl "
+                f"from {_gs_jsonl_path() if _gs_jsonl_path else 'loaded samples'}"
             )
         else:
             ver = _recorder_version_tuple()
@@ -2709,11 +2887,12 @@ class RecorderApp(tk.Tk):
                     _gs_apply(rec, sample)
             action_records.append(rec)
 
-        (clip_dir / "action_camera.json").write_text(
+        _atomic_write_json(
+            clip_dir / "action_camera.json",
             # PRD format: top-level array of records, no wrapper dict.
             # sample_tarball_builder.py writes this format too.
-            json.dumps(action_records, separators=(",", ":"), ensure_ascii=False),
-            encoding="utf-8",
+            action_records,
+            indent=None,
         )
 
         # v0.20.2: write inputs.jsonl — raw pynput events (key_down, key_up,
@@ -2723,24 +2902,20 @@ class RecorderApp(tk.Tk):
         # See docs/SPEC_R13_MULTIMODAL.md § R13. Per IL10, this file is OK
         # to be missing on legacy/headless runs — R13 will ABSTAIN, not FAIL.
         try:
-            with (clip_dir / "inputs.jsonl").open("w", encoding="utf-8") as fh:
-                # First line: session_start sentinel (frame-time alignment).
-                fh.write(
-                    json.dumps(
-                        {
-                            "event_type": "session_start",
-                            "timestamp_ms": 0,
-                            "fps": FPS,
-                            "frame_count": target_frame_count,
-                            # R18: session_id ties this inputs.jsonl to the same
-                            # session_manifest.json that action_camera frames cite.
-                            "session_id": getattr(self, "_session_id", ""),
-                        }
-                    )
-                    + "\n"
-                )
-                for ev in self._captured_events:
-                    fh.write(json.dumps(ev, ensure_ascii=False) + "\n")
+            # First line: session_start sentinel (frame-time alignment).
+            input_rows = [
+                {
+                    "event_type": "session_start",
+                    "timestamp_ms": 0,
+                    "fps": FPS,
+                    "frame_count": target_frame_count,
+                    # R18: session_id ties this inputs.jsonl to the same
+                    # session_manifest.json that action_camera frames cite.
+                    "session_id": getattr(self, "_session_id", ""),
+                },
+                *self._captured_events,
+            ]
+            _atomic_write_jsonl(clip_dir / "inputs.jsonl", input_rows)
             _trace(f"package: wrote inputs.jsonl ({len(self._captured_events)} events)")
         except Exception as e:
             _trace(f"package: inputs.jsonl write failed: {e}")
@@ -2750,18 +2925,15 @@ class RecorderApp(tk.Tk):
         # bind every artifact (action_camera frames + inputs.jsonl session_start)
         # to a single recording. Closes red-team B-05 (Frankenstein splice).
         try:
-            (clip_dir / "session_manifest.json").write_text(
-                json.dumps(
-                    {
-                        "session_id": getattr(self, "_session_id", ""),
-                        "recorder_version": "lite-v0.21.0",
-                        "start_time": _dt.fromtimestamp(self._record_started_at).isoformat(),
-                        "frame_count": target_frame_count,
-                        "fps": FPS,
-                    },
-                    indent=2,
-                ),
-                encoding="utf-8",
+            _atomic_write_json(
+                clip_dir / "session_manifest.json",
+                {
+                    "session_id": getattr(self, "_session_id", ""),
+                    "recorder_version": "lite-v0.21.0",
+                    "start_time": _dt.fromtimestamp(self._record_started_at).isoformat(),
+                    "frame_count": target_frame_count,
+                    "fps": FPS,
+                },
             )
             _trace("package: wrote session_manifest.json")
         except Exception as e:  # noqa: BLE001
@@ -2864,10 +3036,7 @@ class RecorderApp(tk.Tk):
                     "linearization and OpenEXR generation run server-side."
                 ),
             }
-            (clip_dir / "depth_postprocess.json").write_text(
-                json.dumps(postprocess_manifest, indent=2),
-                encoding="utf-8",
-            )
+            _atomic_write_json(clip_dir / "depth_postprocess.json", postprocess_manifest)
             _trace("depth: local inference disabled; wrote depth_postprocess.json")
 
         # R22 (D-04 defense): hash every *.exr in depth/ and write
@@ -2886,10 +3055,7 @@ class RecorderApp(tk.Tk):
                     for chunk in iter(lambda fh=fh: fh.read(1 << 20), b""):
                         sha.update(chunk)
                 depth_manifest[exr_path.name] = sha.hexdigest()
-            (clip_dir / "depth_manifest.json").write_text(
-                json.dumps(depth_manifest, indent=2),
-                encoding="utf-8",
-            )
+            _atomic_write_json(clip_dir / "depth_manifest.json", depth_manifest)
             _trace(f"package: wrote depth_manifest.json ({len(depth_manifest)} entries)")
         except Exception as e:  # noqa: BLE001
             _trace(f"package: depth_manifest.json write failed: {e}")
@@ -2922,13 +3088,15 @@ class RecorderApp(tk.Tk):
         try:
             import yaml  # noqa: PLC0415
 
-            (clip_dir / "intrinsics.yaml").write_text(
+            _atomic_write_text(
+                clip_dir / "intrinsics.yaml",
                 yaml.safe_dump(intrinsics, sort_keys=False),
                 encoding="utf-8",
             )
         except Exception:
             # Fall back to a plain text file in YAML-ish format.
-            (clip_dir / "intrinsics.yaml").write_text(
+            _atomic_write_text(
+                clip_dir / "intrinsics.yaml",
                 "\n".join(f"{k}: {v}" for k, v in intrinsics.items()),
                 encoding="utf-8",
             )
@@ -2941,7 +3109,7 @@ class RecorderApp(tk.Tk):
         sys_info["actual_duration_sec"] = round(elapsed_sec, 1)
         sys_info["partial"] = elapsed_sec < 300.0  # <5 min
         # Re-write systeminfo.json with the new fields.
-        (clip_dir / "systeminfo.json").write_text(json.dumps(sys_info, indent=2), encoding="utf-8")
+        _atomic_write_json(clip_dir / "systeminfo.json", sys_info)
 
         # R01: if --allow-placeholder is active and JSONL was missing,
         # stamp metadata.json with data_authenticity='placeholder' so
@@ -2951,13 +3119,30 @@ class RecorderApp(tk.Tk):
                 "data_authenticity": "placeholder",
                 "warning": "camera/player fields are constant [0.0, 64.0, 0.0]",
             }
-            (clip_dir / "metadata.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+            _atomic_write_json(clip_dir / "metadata.json", meta)
             _trace("package: wrote metadata.json with data_authenticity=placeholder")
+
+        if not (clip_dir / "video.mp4").is_file():
+            raise RecorderError("video.mp4 missing after ffmpeg finalize; session not complete")
+
+        _write_session_complete_marker(clip_dir)
+        _trace("package: wrote .session_complete marker")
 
         # Write the tarball into the user's Documents/OysterClips/.
         out_tar = _output_dir() / f"clip-{ts}.tar.gz"
-        with tarfile.open(out_tar, "w:gz") as tf:
-            tf.add(clip_dir, arcname=f"clip-{ts}")
+        tmp_tar = out_tar.with_name(f".{out_tar.name}.tmp")
+        try:
+            with tarfile.open(tmp_tar, "w:gz") as tf:
+                tf.add(clip_dir, arcname=f"clip-{ts}")
+            _fsync_file(tmp_tar)
+            os.replace(tmp_tar, out_tar)
+            _fsync_dir(out_tar.parent)
+        except Exception:
+            try:
+                tmp_tar.unlink()
+            except OSError:
+                pass
+            raise
 
         # Cleanup tmp dir.
         try:
@@ -3087,10 +3272,11 @@ class RecorderApp(tk.Tk):
         )
 
     def _stop_ffmpeg(self) -> None:
-        """Send 'q' to ffmpeg's stdin (clean shutdown), then wait 5s."""
+        """Send 'q' to ffmpeg's stdin and wait for MP4 finalization."""
         proc = self._ffmpeg_proc
         if proc is None:
             return
+        forced_stop = False
         try:
             if proc.stdin:
                 proc.stdin.write(b"q\n")
@@ -3098,14 +3284,34 @@ class RecorderApp(tk.Tk):
         except Exception:
             pass
         try:
-            proc.wait(timeout=5.0)
+            proc.wait(timeout=_FFMPEG_CLEAN_QUIT_TIMEOUT_SEC)
         except subprocess.TimeoutExpired:
+            forced_stop = True
+            _trace(
+                "ffmpeg: clean quit timed out after "
+                f"{_FFMPEG_CLEAN_QUIT_TIMEOUT_SEC:.1f}s; terminating"
+            )
             proc.terminate()
             try:
-                proc.wait(timeout=3.0)
+                proc.wait(timeout=_FFMPEG_FORCE_STOP_TIMEOUT_SEC)
             except subprocess.TimeoutExpired:
+                _trace("ffmpeg: terminate timed out; killing process")
                 proc.kill()
+                try:
+                    proc.wait(timeout=_FFMPEG_FORCE_STOP_TIMEOUT_SEC)
+                except subprocess.TimeoutExpired:
+                    _trace("ffmpeg: kill did not complete before timeout")
         self._ffmpeg_proc = None
+        video_path = getattr(self, "_video_path", None)
+        if (
+            forced_stop
+            and isinstance(video_path, Path)
+            and video_path.exists()
+            and not _mp4_has_moov_atom(video_path)
+        ):
+            _attempt_mp4_remux_repair(video_path)
+        if isinstance(video_path, Path) and video_path.exists():
+            _fsync_file(video_path)
 
     def _on_close(self) -> None:
         _trace("on_close: user closed window")

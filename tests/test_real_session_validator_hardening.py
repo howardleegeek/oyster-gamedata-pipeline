@@ -40,6 +40,7 @@ def make_fake_session(
     required = files or ["recording.mp4", "game_state.jsonl"]
     for f in required:
         (session_dir / f).write_text("fake")
+    (session_dir / ".session_complete").write_text("{}")
     if with_manifest:
         (session_dir / "MANIFEST.json").write_text("{}")
     return session_dir

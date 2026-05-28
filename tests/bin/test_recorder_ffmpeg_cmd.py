@@ -46,6 +46,10 @@ def _import_recorder_module() -> Any:
     return m
 
 
+def _mp4_box(name: bytes, payload: bytes = b"") -> bytes:
+    return (8 + len(payload)).to_bytes(4, "big") + name + payload
+
+
 def test_recorder_ffmpeg_cmd_pins_h265_bitrate(tmp_path: Path) -> None:
     m = _import_recorder_module()
     app = object.__new__(m.RecorderApp)
@@ -81,7 +85,123 @@ def test_recorder_ffmpeg_cmd_pins_h265_bitrate(tmp_path: Path) -> None:
     assert cmd[cmd.index("-b:v") + 1] == "10M"
     assert cmd[cmd.index("-maxrate") + 1] == "12M"
     assert cmd[cmd.index("-bufsize") + 1] == "20M"
-    assert "-t" not in cmd
+
+
+def test_stop_ffmpeg_waits_60s_for_clean_mp4_finalization(tmp_path: Path) -> None:
+    m = _import_recorder_module()
+    app = object.__new__(m.RecorderApp)
+    video_path = tmp_path / "video.mp4"
+    video_path.write_bytes(_mp4_box(b"ftyp", b"isom0000") + _mp4_box(b"moov"))
+
+    class _Stdin:
+        def __init__(self) -> None:
+            self.writes: list[bytes] = []
+            self.flushed = False
+
+        def write(self, data: bytes) -> None:
+            self.writes.append(data)
+
+        def flush(self) -> None:
+            self.flushed = True
+
+    class _Proc:
+        def __init__(self) -> None:
+            self.stdin = _Stdin()
+            self.wait_timeouts: list[float] = []
+            self.terminated = False
+
+        def wait(self, timeout: float) -> int:
+            self.wait_timeouts.append(timeout)
+            return 0
+
+        def terminate(self) -> None:
+            self.terminated = True
+
+        def kill(self) -> None:
+            raise AssertionError("clean ffmpeg shutdown must not be killed")
+
+    proc = _Proc()
+    app._ffmpeg_proc = proc
+    app._video_path = video_path
+
+    with mock.patch.object(m, "_fsync_file") as fsync_file:
+        app._stop_ffmpeg()
+
+    assert proc.stdin.writes == [b"q\n"]
+    assert proc.stdin.flushed
+    assert proc.wait_timeouts == [60.0]
+    assert not proc.terminated
+    assert app._ffmpeg_proc is None
+    fsync_file.assert_called_once_with(video_path)
+
+
+def test_stop_ffmpeg_repairs_missing_moov_after_forced_stop(tmp_path: Path) -> None:
+    m = _import_recorder_module()
+    app = object.__new__(m.RecorderApp)
+    video_path = tmp_path / "video.mp4"
+    video_path.write_bytes(_mp4_box(b"ftyp", b"isom0000") + _mp4_box(b"mdat", b"payload"))
+
+    class _Stdin:
+        def write(self, _data: bytes) -> None:
+            pass
+
+        def flush(self) -> None:
+            pass
+
+    class _Proc:
+        def __init__(self) -> None:
+            self.stdin = _Stdin()
+            self.wait_timeouts: list[float] = []
+            self.terminated = False
+            self.killed = False
+
+        def wait(self, timeout: float) -> int:
+            self.wait_timeouts.append(timeout)
+            if len(self.wait_timeouts) == 1:
+                raise m.subprocess.TimeoutExpired("ffmpeg", timeout)
+            return 0
+
+        def terminate(self) -> None:
+            self.terminated = True
+
+        def kill(self) -> None:
+            self.killed = True
+
+    proc = _Proc()
+    app._ffmpeg_proc = proc
+    app._video_path = video_path
+    remux_calls: list[list[str]] = []
+
+    def _fake_run(cmd: list[str], **_kwargs: Any) -> Any:
+        remux_calls.append(cmd)
+        fixed_path = Path(cmd[-1])
+        fixed_path.write_bytes(
+            _mp4_box(b"ftyp", b"isom0000") + _mp4_box(b"moov") + _mp4_box(b"mdat", b"payload")
+        )
+        return type("Completed", (), {"returncode": 0, "stderr": b""})()
+
+    with (
+        mock.patch.object(m, "_FFMPEG", tmp_path / "ffmpeg.exe"),
+        mock.patch.object(m.subprocess, "run", side_effect=_fake_run),
+    ):
+        app._stop_ffmpeg()
+
+    assert proc.wait_timeouts == [60.0, 3.0]
+    assert proc.terminated
+    assert not proc.killed
+    assert remux_calls == [
+        [
+            str(tmp_path / "ffmpeg.exe"),
+            "-y",
+            "-i",
+            str(video_path),
+            "-c",
+            "copy",
+            str(tmp_path / "video.fixed.mp4"),
+        ]
+    ]
+    assert m._mp4_has_moov_atom(video_path)
+    assert not (tmp_path / "video.fixed.mp4").exists()
 
 
 def test_recorder_source_has_no_six_min_recording_cap() -> None:
