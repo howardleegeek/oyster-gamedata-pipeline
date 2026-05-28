@@ -3064,6 +3064,14 @@ class RecorderApp(tk.Tk):
             "libx265",
             "-preset",
             "ultrafast",
+            # libx265 defaults to CRF 28 if no bitrate/CRF is specified. On
+            # static game scenes that collapsed clips to ~67 kbps and looked frozen.
+            "-b:v",
+            "10M",
+            "-maxrate",
+            "12M",
+            "-bufsize",
+            "20M",
             "-pix_fmt",
             "yuv420p",
             *audio_codec,
