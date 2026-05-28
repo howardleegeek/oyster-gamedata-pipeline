@@ -55,10 +55,24 @@ GAMEINFO_FIELDS_14 = [
     "route_type",
     "notes",
 ]
+VIDEO_CANDIDATES = ("recording.mp4", "video.mp4", "screen.mp4")
 
 
 def _result(id_: str, ok: bool, evidence: str) -> dict:
     return {"id": id_, "status": "PASS" if ok else "FAIL", "evidence": evidence}
+
+
+def find_video(session_dir: Path) -> Path | None:
+    """Return the first compatible video filename present in priority order."""
+
+    for name in VIDEO_CANDIDATES:
+        candidate = session_dir / name
+        if candidate.exists():
+            return candidate
+    return None
+
+
+_find_video = find_video
 
 
 def _evaluate_h8(session: Path) -> dict:
@@ -176,8 +190,25 @@ def _evaluate_h8(session: Path) -> dict:
 def audit_group_a(session: Path) -> list[dict]:
     """A1-A5: files present."""
     items = []
+    mp4 = find_video(session)
+    if mp4 is None:
+        items.append(
+            _result(
+                "A1",
+                False,
+                f"compatible video missing or empty ({', '.join(VIDEO_CANDIDATES)})",
+            )
+        )
+    else:
+        ok = mp4.stat().st_size > 0
+        items.append(
+            _result(
+                "A1",
+                ok,
+                f"{mp4.name}: {'present, ' + str(mp4.stat().st_size) + ' bytes' if ok else 'missing or empty'}",
+            )
+        )
     for id_, fname in [
-        ("A1", "recording.mp4"),
         ("A2", "action_camera.json"),
         ("A3", "gameinfo.xlsx"),
         ("A5", "metadata.json"),
@@ -353,9 +384,12 @@ def audit_groups_c_d_e(session: Path) -> list[dict]:
 def audit_group_v_mp4(session: Path) -> list[dict]:
     """V1-V8: mp4 properties via ffprobe."""
     items = []
-    mp4 = session / "recording.mp4"
-    if not mp4.exists():
-        return [_result(f"V{i}", False, "recording.mp4 missing") for i in range(1, 9)]
+    mp4 = find_video(session)
+    if mp4 is None:
+        return [
+            _result(f"V{i}", False, f"compatible video missing ({', '.join(VIDEO_CANDIDATES)})")
+            for i in range(1, 9)
+        ]
     import subprocess  # noqa: PLC0415
 
     try:
@@ -789,9 +823,11 @@ def audit_group_v_real_footage(session: Path) -> list[dict]:
     not SKIP (the audit must refuse to certify without the evidence).
     """
     items = []
-    mp4 = session / "recording.mp4"
-    if not mp4.exists():
-        items.append(_result("B8", False, "recording.mp4 missing"))
+    mp4 = find_video(session)
+    if mp4 is None:
+        items.append(
+            _result("B8", False, f"compatible video missing ({', '.join(VIDEO_CANDIDATES)})")
+        )
         return items
     import subprocess  # noqa: PLC0415
 
@@ -1076,14 +1112,14 @@ def audit_group_session_sanity(session: Path) -> list[dict]:
     import subprocess  # noqa: PLC0415
     from datetime import datetime, timedelta, timezone  # noqa: PLC0415
 
-    mp4 = session / "recording.mp4"
+    mp4 = find_video(session)
     meta_path = session / "metadata.json"
     ac_path = session / "action_camera.json"
     frames_path = session / "frames.jsonl"
     depth_dir = session / "depth"
 
     mp4_dur = None
-    if mp4.exists():
+    if mp4 is not None:
         try:
             r = subprocess.run(
                 [
@@ -1378,8 +1414,9 @@ def main(argv: list[str]) -> int:
 
         import audit_quality_metrics  # noqa: PLC0415
 
+        video_path = find_video(session)
         adapter = SimpleNamespace(
-            video_path=str(session / "recording.mp4"),
+            video_path=str(video_path) if video_path is not None else "",
             audio_flac_path=str(session / "audio.flac"),
             frames_jsonl_path=str(session / "frames.jsonl"),
             inputs_jsonl_path=str(session / "inputs.jsonl"),

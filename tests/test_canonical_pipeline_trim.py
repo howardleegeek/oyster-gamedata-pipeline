@@ -8,10 +8,10 @@ import pytest
 from bin import canonical_pipeline
 
 
-def _make_session(tmp_path: pathlib.Path) -> pathlib.Path:
+def _make_session(tmp_path: pathlib.Path, video_name: str = "recording.mp4") -> pathlib.Path:
     sess = tmp_path / "session"
     sess.mkdir()
-    (sess / "recording.mp4").write_bytes(b"original mp4 bytes")
+    (sess / video_name).write_bytes(b"original mp4 bytes")
     (sess / "metadata.json").write_text(
         json.dumps(
             {
@@ -47,6 +47,41 @@ def test_step2_skips_trim_when_mp4_shorter_than_trim_window(
     assert metadata["recording_dur_sec"] == pytest.approx(479.25)
     assert metadata["recording_duration_sec"] == pytest.approx(479.25)
     assert metadata["preserved"] == {"nested": True}
+
+
+def test_find_video_accepts_lite_video_name(tmp_path: pathlib.Path) -> None:
+    sess = _make_session(tmp_path, video_name="video.mp4")
+
+    assert canonical_pipeline._find_video(sess) == sess / "video.mp4"
+
+
+def test_find_video_prefers_recording_name(tmp_path: pathlib.Path) -> None:
+    sess = _make_session(tmp_path, video_name="video.mp4")
+    (sess / "recording.mp4").write_bytes(b"canonical")
+    (sess / "screen.mp4").write_bytes(b"screen")
+
+    assert canonical_pipeline._find_video(sess) == sess / "recording.mp4"
+
+
+def test_step2_skips_trim_with_lite_video_name(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    sess = _make_session(tmp_path, video_name="video.mp4")
+
+    def _fake_ffprobe(mp4: pathlib.Path) -> tuple[int, float]:
+        assert mp4 == sess / "video.mp4"
+        return 14_377, 479.25
+
+    monkeypatch.setattr(canonical_pipeline, "ffprobe_frames", _fake_ffprobe)
+    monkeypatch.setattr(canonical_pipeline, "run", _forbid_ffmpeg)
+
+    canonical_pipeline.step2_trim_mp4(sess, start_offset=180, target_dur=300)
+
+    out = capsys.readouterr().out
+    assert "SHORT INPUT SKIP" in out
+    assert "leaving video.mp4 unchanged" in out
+    assert (sess / "video.mp4").read_bytes() == b"original mp4 bytes"
+    assert not (sess / "recording.mp4").exists()
 
 
 def test_step2_keeps_idempotent_target_duration_skip(
