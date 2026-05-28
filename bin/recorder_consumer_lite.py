@@ -1686,12 +1686,22 @@ class RecorderApp(tk.Tk):
         self.geometry("520x340")
         self.minsize(440, 300)
         self.configure(bg="white")
+        try:
+            self.attributes("-toolwindow", True)
+        except Exception as exc:  # noqa: BLE001 - Windows-only hint; harmless elsewhere
+            _trace(f"toolwindow attribute failed: {exc}")
 
         self._ffmpeg_proc: Optional[subprocess.Popen] = None
         self._output_path: Optional[Path] = None
         self._stop_event = threading.Event()
         self._input_capture: Optional[InputCapture] = None
         self._captured_events: list[dict[str, Any]] = []
+        self._window_no_activate_hwnd: Optional[int] = None
+        self._window_original_ex_style: Optional[int] = None
+        self._window_disabled_for_recording = False
+        self._disabled_stop_hotkey_thread: Optional[threading.Thread] = None
+        self._disabled_stop_hotkey_thread_id: Optional[int] = None
+        self._disabled_stop_hotkey_id = 0x534F
         # v0.4.0: tester explicitly opts in to recording. Default is
         # observe-only mode so our .exe can NEVER be blamed for MC
         # crashing — a tester whose MC crashes can verify it crashes
@@ -2600,6 +2610,134 @@ class RecorderApp(tk.Tk):
         except Exception as exc:  # noqa: BLE001
             _trace(f"minecraft focus watchdog failed: {exc}")
 
+    def _make_window_non_focus_stealing(self) -> None:
+        if os.name != "nt":
+            return
+        try:
+            import ctypes
+
+            WS_EX_NOACTIVATE = 0x08000000
+            GWL_EXSTYLE = -20
+            hwnd = self.winfo_id()
+            frame = self.wm_frame()
+            if frame:
+                hwnd = frame if isinstance(frame, int) else int(str(frame), 16)
+            user32 = ctypes.windll.user32
+            ex_style = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex_style | WS_EX_NOACTIVATE)
+            self._window_no_activate_hwnd = hwnd
+            self._window_original_ex_style = ex_style
+            self._window_disabled_for_recording = False
+            _trace("window made non-activatable (WS_EX_NOACTIVATE)")
+        except Exception as exc:  # noqa: BLE001 - fall back to disabled window
+            _trace(f"WS_EX_NOACTIVATE failed: {exc}")
+            self._disable_window_focus_fallback()
+
+    def _disable_window_focus_fallback(self) -> None:
+        try:
+            self.attributes("-disabled", True)
+            self._window_disabled_for_recording = True
+            self._start_disabled_stop_hotkey()
+            _trace("window disabled during recording; Ctrl+Shift+S stop hotkey armed")
+        except Exception as exc:  # noqa: BLE001
+            _trace(f"disabled-window fallback failed: {exc}")
+
+    def _start_disabled_stop_hotkey(self) -> None:
+        if os.name != "nt" or self._disabled_stop_hotkey_thread is not None:
+            return
+
+        def _hotkey_loop() -> None:
+            try:
+                import ctypes
+
+                MOD_CONTROL = 0x0002
+                MOD_SHIFT = 0x0004
+                VK_S = 0x53
+                WM_HOTKEY = 0x0312
+
+                class POINT(ctypes.Structure):
+                    _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+
+                class MSG(ctypes.Structure):
+                    _fields_ = [
+                        ("hwnd", ctypes.c_void_p),
+                        ("message", ctypes.c_uint),
+                        ("wParam", ctypes.c_size_t),
+                        ("lParam", ctypes.c_ssize_t),
+                        ("time", ctypes.c_ulong),
+                        ("pt", POINT),
+                    ]
+
+                user32 = ctypes.windll.user32
+                kernel32 = ctypes.windll.kernel32
+                self._disabled_stop_hotkey_thread_id = int(kernel32.GetCurrentThreadId())
+                hotkey_id = int(self._disabled_stop_hotkey_id)
+                if not user32.RegisterHotKey(None, hotkey_id, MOD_CONTROL | MOD_SHIFT, VK_S):
+                    _trace("disabled-window stop hotkey registration failed")
+                    return
+                try:
+                    msg = MSG()
+                    while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
+                        if int(msg.message) == WM_HOTKEY and int(msg.wParam) == hotkey_id:
+                            _trace("disabled-window stop hotkey received")
+                            self._record_armed = False
+                            self._stop_event.set()
+                            self._stop_ffmpeg()
+                            break
+                finally:
+                    user32.UnregisterHotKey(None, hotkey_id)
+            except Exception as exc:  # noqa: BLE001
+                _trace(f"disabled-window stop hotkey failed: {exc}")
+            finally:
+                self._disabled_stop_hotkey_thread_id = None
+
+        self._disabled_stop_hotkey_thread = threading.Thread(
+            target=_hotkey_loop,
+            daemon=True,
+            name="recorder-stop-hotkey",
+        )
+        self._disabled_stop_hotkey_thread.start()
+
+    def _stop_disabled_stop_hotkey(self) -> None:
+        thread = self._disabled_stop_hotkey_thread
+        thread_id = self._disabled_stop_hotkey_thread_id
+        if thread is None:
+            return
+        if os.name == "nt" and thread_id:
+            try:
+                import ctypes
+
+                WM_QUIT = 0x0012
+                ctypes.windll.user32.PostThreadMessageW(int(thread_id), WM_QUIT, 0, 0)
+            except Exception as exc:  # noqa: BLE001
+                _trace(f"disabled-window stop hotkey shutdown failed: {exc}")
+        if thread is not threading.current_thread():
+            thread.join(timeout=1.0)
+        if not thread.is_alive():
+            self._disabled_stop_hotkey_thread = None
+
+    def _restore_window_activatable(self) -> None:
+        if os.name != "nt":
+            return
+        try:
+            if self._window_disabled_for_recording:
+                self.attributes("-disabled", False)
+                self._window_disabled_for_recording = False
+            self._stop_disabled_stop_hotkey()
+
+            hwnd = self._window_no_activate_hwnd
+            ex_style = self._window_original_ex_style
+            if hwnd is not None and ex_style is not None:
+                import ctypes
+
+                GWL_EXSTYLE = -20
+                ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex_style)
+                _trace("window restored activatable")
+            self._window_no_activate_hwnd = None
+            self._window_original_ex_style = None
+        except Exception as exc:  # noqa: BLE001
+            _trace(f"restore window activatable failed: {exc}")
+
     def _run_one_session(self) -> None:
         """One arm→record→package→verdict cycle. Returns when finished."""
         # Phase 1: wait for tester to arm AND MC to start.
@@ -2721,9 +2859,11 @@ class RecorderApp(tk.Tk):
         # stops rendering it and ffmpeg records one stale frame forever.
         _restore_minecraft_window_for_capture(self._mc_window_rect)
         self._watch_mc_focus_alive(force=True)
+        self._make_window_non_focus_stealing()
         try:
             self._start_ffmpeg(self._video_path)
         except Exception as exc:  # noqa: BLE001
+            self._restore_window_activatable()
             self._set("⚠️ 录制启动失败", ORANGE, f"{type(exc).__name__}: {exc}")
             return
 
@@ -3434,6 +3574,7 @@ class RecorderApp(tk.Tk):
         """Send 'q' to ffmpeg's stdin and wait for MP4 finalization."""
         proc = self._ffmpeg_proc
         if proc is None:
+            self._restore_window_activatable()
             return
         forced_stop = False
         try:
@@ -3461,6 +3602,7 @@ class RecorderApp(tk.Tk):
                 except subprocess.TimeoutExpired:
                     _trace("ffmpeg: kill did not complete before timeout")
         self._ffmpeg_proc = None
+        self._restore_window_activatable()
         video_path = getattr(self, "_video_path", None)
         if (
             forced_stop
