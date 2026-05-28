@@ -193,6 +193,96 @@ def test_step6_run_audit_timeout_returns_shape_only_fallback(
     assert fallback["expected"] == 12
 
 
+def test_step2_metadata_backfills_existing_metadata_without_second_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sess = tmp_path / "clip-20260528-100703"
+    sess.mkdir()
+    _write_action_camera(sess / "action_camera.json")
+    (sess / "inputs.jsonl").write_text(
+        "\n".join(
+            [
+                json.dumps({"timestamp_ms": 0, "event_type": "keyboard", "key": "W"}),
+                json.dumps({"timestamp_ms": 100, "event_type": "keyboard", "key": "A"}),
+                json.dumps({"timestamp_ms": 200, "event_type": "mouse_move", "mouseX": 80}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (sess / "session_manifest.json").write_text(
+        json.dumps(
+            {
+                "session_id": "a8ffc5a6-17ef-4279-a38e-8bc16467d2d2",
+                "recorder_version": "lite-v0.21.0",
+                "recorder_commit": "abc123",
+                "start_time": "2026-05-28T10:07:03.420606",
+                "frame_count": 30,
+                "fps": 30.0,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (sess / "systeminfo.json").write_text(
+        json.dumps(
+            {
+                "gameProcessName": "javaw.exe",
+                "width": 160,
+                "height": 90,
+                "gpu": "NVIDIA GeForce RTX 4090",
+                "cpu": "AMD Ryzen 9",
+                "cpuCores": 16,
+                "ram_gb": 64,
+            }
+        ),
+        encoding="utf-8",
+    )
+    existing_metadata = {
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "recorder_version": "preserved-version",
+        "duration": 2.5,
+        "hardware_specs": {"cpu": {"cores": 24}},
+        "recorder_extra": {"encoder": "nvenc"},
+    }
+    (sess / "metadata.json").write_text(
+        json.dumps(existing_metadata, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        recover_mod,
+        "_video_info",
+        lambda _session: {
+            "duration": 1.0,
+            "fps": 30.0,
+            "width": 160,
+            "height": 90,
+            "frame_count": 30,
+        },
+    )
+
+    recover_mod.step2_metadata(sess)
+
+    metadata_path = sess / "metadata.json"
+    first_text = metadata_path.read_text(encoding="utf-8")
+    metadata = json.loads(first_text)
+    assert metadata["session_id"] == existing_metadata["session_id"]
+    assert metadata["recorder_version"] == "preserved-version"
+    assert metadata["duration"] == 2.5
+    assert metadata["duration_ns"] == 2_500_000_000
+    assert metadata["recorder_commit"] == "abc123"
+    assert metadata["hardware_specs"]["cpu"]["cores"] == 24
+    assert metadata["hardware_specs"]["gpus"][0]["vendor"] == "NVIDIA"
+    assert metadata["input_stats"]["total_keyboard_events"] == 2
+    assert metadata["input_stats"]["wasd_apm"] > 0
+    assert metadata["recorder_extra"]["encoder"] == "nvenc"
+    assert metadata["recorder_extra"]["window_capture"] is False
+
+    recover_mod.step2_metadata(sess)
+
+    assert metadata_path.read_text(encoding="utf-8") == first_text
+
+
 def test_start_time_uses_min_authoritative_timestamp_when_inputs_conflict(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

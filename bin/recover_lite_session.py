@@ -58,6 +58,19 @@ def _write_json(path: Path, payload: Any) -> None:
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
+def _merge_missing(existing: dict[str, Any], defaults: dict[str, Any]) -> bool:
+    """Merge default metadata fields without overwriting recorder-provided values."""
+    changed = False
+    for key, value in defaults.items():
+        if key not in existing:
+            existing[key] = value
+            changed = True
+            continue
+        if isinstance(existing[key], dict) and isinstance(value, dict):
+            changed = _merge_missing(existing[key], value) or changed
+    return changed
+
+
 def _load_action_camera(s: Path) -> list[dict[str, Any]]:
     data = _read_json(s / "action_camera.json", [])
     if isinstance(data, dict) and isinstance(data.get("frames"), list):
@@ -355,9 +368,164 @@ def step1_recording_symlink(s: Path) -> None:
             shutil.copy2(video, rec)
 
 
+def _gpu_vendor(name: Any) -> str:
+    text = str(name or "").lower()
+    if "nvidia" in text:
+        return "NVIDIA"
+    if "amd" in text or "radeon" in text:
+        return "AMD"
+    if "intel" in text:
+        return "Intel"
+    return "Unknown"
+
+
+def _as_int(value: Any, default: int) -> int:
+    parsed = _float_or_none(value)
+    if parsed is None:
+        return default
+    return int(parsed)
+
+
+def _as_float(value: Any, default: float) -> float:
+    parsed = _float_or_none(value)
+    if parsed is None:
+        return default
+    return float(parsed)
+
+
+def _hardware_specs_from_systeminfo(si: dict[str, Any], width: int, height: int) -> dict[str, Any]:
+    gpu_names = si.get("gpus") or si.get("gpu") or si.get("gpuName") or si.get("graphics")
+    if isinstance(gpu_names, str):
+        gpu_values = [gpu_names]
+    elif isinstance(gpu_names, list):
+        gpu_values = gpu_names
+    else:
+        gpu_values = []
+
+    gpus = []
+    for gpu in gpu_values:
+        if isinstance(gpu, dict):
+            name = str(gpu.get("name") or gpu.get("gpu") or "Unknown")
+            driver_version = gpu.get("driver_version") or gpu.get("driverVersion")
+        else:
+            name = str(gpu or "Unknown")
+            driver_version = si.get("gpuDriverVersion") or si.get("driver_version")
+        item = {"name": name, "vendor": _gpu_vendor(name)}
+        if driver_version:
+            item["driver_version"] = str(driver_version)
+        gpus.append(item)
+    if not gpus:
+        gpus.append({"name": "Unknown", "vendor": "Unknown"})
+
+    cpu_name = str(si.get("cpu") or si.get("cpuName") or si.get("processor") or "Unknown")
+    return {
+        "cpu": {
+            "name": cpu_name,
+            "cores": _as_int(si.get("cpuCores") or si.get("cores"), 0),
+            "frequency_mhz": _as_int(si.get("cpuFrequencyMhz") or si.get("frequency_mhz"), 0),
+            "vendor": str(si.get("cpuVendor") or "Unknown"),
+            "brand": str(si.get("cpuBrand") or cpu_name),
+        },
+        "gpus": gpus,
+        "system": {
+            "os_name": str(si.get("os") or si.get("osName") or "Windows"),
+            "os_version": str(si.get("osVersion") or si.get("windowsVersion") or "Unknown"),
+            "kernel_version": str(si.get("kernelVersion") or si.get("build") or "Unknown"),
+            "hostname": str(si.get("hostname") or si.get("computerName") or "Unknown"),
+            "total_memory_gb": _as_float(si.get("ram_gb") or si.get("totalMemoryGb"), 0.0),
+        },
+        "primary_monitor_resolution": [width, height],
+    }
+
+
+def _input_stats_from_inputs(s: Path, duration: float) -> dict[str, Any]:
+    inputs = s / "inputs.jsonl"
+    keyboard_events: list[dict[str, Any]] = []
+    mouse_dx_values: list[float] = []
+    mouse_dy_values: list[float] = []
+    mouse_x_values: list[float] = []
+    mouse_y_values: list[float] = []
+    gamepad_events = 0
+
+    if inputs.exists():
+        with inputs.open(encoding="utf-8") as fp:
+            for line in fp:
+                if not line.strip():
+                    continue
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(event, dict):
+                    continue
+                event_type = str(event.get("event_type") or event.get("type") or "").lower()
+                if "key" in event_type or "keyboard" in event_type or "keyCode" in event:
+                    keyboard_events.append(event)
+                if "mouse" in event_type:
+                    dx = _float_or_none(
+                        event.get("mouse_dx") or event.get("dx") or event.get("lLastX")
+                    )
+                    dy = _float_or_none(
+                        event.get("mouse_dy") or event.get("dy") or event.get("lLastY")
+                    )
+                    mx = _float_or_none(event.get("mouseX") or event.get("mouse_x"))
+                    my = _float_or_none(event.get("mouseY") or event.get("mouse_y"))
+                    if dx is not None:
+                        mouse_dx_values.append(dx)
+                    if dy is not None:
+                        mouse_dy_values.append(dy)
+                    if mx is not None:
+                        mouse_x_values.append(mx)
+                    if my is not None:
+                        mouse_y_values.append(my)
+                if "gamepad" in event_type:
+                    gamepad_events += 1
+
+    minutes = max(duration / 60.0, 1.0 / 60.0)
+    keys = [
+        event.get("key") or event.get("keyCode") or event.get("code") or event.get("button")
+        for event in keyboard_events
+    ]
+    key_texts = {str(key).upper() for key in keys if key is not None}
+    wasd_keys = {"W", "A", "S", "D", "87", "65", "83", "68"}
+    wasd_events = sum(1 for key in keys if str(key).upper() in wasd_keys)
+    mouse_magnitudes = [
+        math.hypot(dx, dy)
+        for dx, dy in zip(
+            mouse_dx_values,
+            mouse_dy_values + [0.0] * max(0, len(mouse_dx_values) - len(mouse_dy_values)),
+        )
+    ]
+
+    return {
+        "wasd_apm": round(wasd_events / minutes, 6),
+        "unique_keys": len(key_texts),
+        "button_diversity": (
+            round(len(key_texts) / len(keyboard_events), 6) if keyboard_events else 0.0
+        ),
+        "total_keyboard_events": len(keyboard_events),
+        "mouse_movement_std": 0.0,
+        "mouse_x_std": 0.0,
+        "mouse_y_std": 0.0,
+        "mouse_max_movement": max(mouse_magnitudes) if mouse_magnitudes else 0.0,
+        "mouse_max_x": max((abs(value) for value in mouse_x_values), default=0.0),
+        "mouse_max_y": max((abs(value) for value in mouse_y_values), default=0.0),
+        "gamepad_button_apm": 0.0,
+        "gamepad_unique_buttons": 0,
+        "gamepad_button_diversity": 0.0,
+        "gamepad_total_events": gamepad_events,
+        "gamepad_axis_activity": 0.0,
+        "gamepad_axis_movement": 0.0,
+        "gamepad_max_axis_movement": 0.0,
+    }
+
+
 def step2_metadata(s: Path) -> None:
-    if (s / "metadata.json").exists():
-        return
+    meta_path = s / "metadata.json"
+    existing = _read_json(meta_path, {}) if meta_path.exists() else {}
+    if not isinstance(existing, dict):
+        existing = {}
+
     sm = _read_json(s / "session_manifest.json", {})
     si = _read_json(s / "systeminfo.json", {})
     video = _video_info(s)
@@ -392,8 +560,13 @@ def step2_metadata(s: Path) -> None:
         "recorder_version": sm.get("recorder_version")
         or si.get("recorderVersion")
         or "lite-recovered",
+        "recorder_commit": sm.get("recorder_commit")
+        or sm.get("git_commit")
+        or si.get("recorderCommit")
+        or "lite-recovered",
         "session_id": session_id,
         "hardware_id": hardware_id,
+        "hardware_specs": _hardware_specs_from_systeminfo(si, width, height),
         "device_id": hashlib.md5(hardware_id.encode("utf-8")).hexdigest()[:12],
         "game_exe": si.get("gameProcessName", "javaw.exe"),
         "game_resolution": [width, height],
@@ -401,6 +574,7 @@ def step2_metadata(s: Path) -> None:
         "start_timestamp": _iso_utc(start),
         "end_timestamp": _iso_utc(end),
         "duration": duration,
+        "duration_ns": int(max(duration, 0.0) * 1_000_000_000),
         "recording_duration": duration,
         "recording_duration_sec": duration,
         "wall_clock_start": _iso_utc(start),
@@ -408,8 +582,11 @@ def step2_metadata(s: Path) -> None:
         "recording_started_utc": _iso_utc(start),
         "metadata_written_utc": _iso_utc(now),
         "average_fps": fps,
+        "fps_effective": fps,
         "frame_count": len(frames) or int(sm.get("frame_count") or video["frame_count"] or 0),
         "video_frame_count": video["frame_count"],
+        "input_stats": _input_stats_from_inputs(s, duration),
+        "gamepads": {},
         "recorder": "lite-recovered",
         "platform": "Windows",
         "recorder_extra": {
@@ -420,7 +597,12 @@ def step2_metadata(s: Path) -> None:
     }
     if session_id_raw and session_id_raw != session_id:
         metadata["original_session_id"] = session_id_raw
-    _write_json(s / "metadata.json", metadata)
+    existing_duration = _float_or_none(existing.get("duration"))
+    if existing_duration is not None and "duration_ns" not in existing:
+        metadata["duration_ns"] = int(max(existing_duration, 0.0) * 1_000_000_000)
+
+    if _merge_missing(existing, metadata) or not meta_path.exists():
+        _write_json(meta_path, existing)
 
 
 def step3_silent_audio(s: Path) -> None:
