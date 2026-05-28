@@ -25,7 +25,9 @@ from pathlib import Path
 from typing import Any
 
 BIN = Path(__file__).resolve().parent
-DEPTH_EXR_COUNT = 1800
+DEPTH_EXR_MAX_COUNT = 1800
+DEPTH_SAMPLE_FPS = 5.0
+DEPTH_SCAFFOLD_SOURCE = "lite_recovery_depth_scaffold"
 DEFAULT_FPS = 30.0
 AUDIT_TIMEOUT_SEC = 600
 
@@ -647,24 +649,63 @@ def _make_depth_base(depth_dir: Path, width: int, height: int) -> Path:
     return base
 
 
+def _depth_scaffold_frame_count(video_duration_sec: float) -> int:
+    if not math.isfinite(video_duration_sec) or video_duration_sec <= 0:
+        return 0
+    return min(DEPTH_EXR_MAX_COUNT, int(round(DEPTH_SAMPLE_FPS * video_duration_sec)))
+
+
+def _numbered_depth_exrs(depth_dir: Path) -> list[tuple[int, Path]]:
+    numbered: list[tuple[int, Path]] = []
+    for path in depth_dir.glob("*.exr"):
+        match = re.fullmatch(r"(\d{6})\.exr", path.name)
+        if match:
+            numbered.append((int(match.group(1)), path))
+    return numbered
+
+
 def step5d_depth_scaffold(s: Path) -> None:
     depth_dir = s / "depth"
-    existing = list(depth_dir.glob("*.exr")) if depth_dir.exists() else []
     source = depth_dir / ".source"
-    if len(existing) >= 1788 and source.exists():
-        return
-
-    depth_dir.mkdir(exist_ok=True)
     si = _read_json(s / "systeminfo.json", {})
     video = _video_info(s)
+    video_duration = _float_or_none(video.get("duration")) or 0.0
+    target_count = _depth_scaffold_frame_count(video_duration)
+    source_marker = _read_json(source, {}) if source.exists() else {}
+    is_recovery_scaffold = (
+        isinstance(source_marker, dict) and source_marker.get("source") == DEPTH_SCAFFOLD_SOURCE
+    )
+
+    if depth_dir.exists() and source.exists():
+        if not is_recovery_scaffold and len(list(depth_dir.glob("*.exr"))) >= target_count:
+            return
+
+        numbered = _numbered_depth_exrs(depth_dir)
+        if is_recovery_scaffold:
+            for idx, frame in numbered:
+                if idx >= target_count:
+                    frame.unlink(missing_ok=True)
+            numbered = _numbered_depth_exrs(depth_dir)
+
+        in_range = {idx for idx, _ in numbered if idx < target_count}
+        extra = [idx for idx, _ in numbered if idx >= target_count]
+        marker_count = source_marker.get("frame_count") if isinstance(source_marker, dict) else None
+        if len(in_range) == target_count and not extra and marker_count == target_count:
+            return
+
+    depth_dir.mkdir(exist_ok=True)
     width = int(si.get("width") or video["width"] or 1920)
     height = int(si.get("height") or video["height"] or 1080)
-    base = _make_depth_base(depth_dir, width, height)
+    missing_indices = [
+        idx
+        for idx in range(target_count)
+        if not (depth_dir / f"{idx:06d}.exr").exists()
+        and not (depth_dir / f"{idx:06d}.exr").is_symlink()
+    ]
+    base = _make_depth_base(depth_dir, width, height) if missing_indices else None
 
-    for idx in range(DEPTH_EXR_COUNT):
+    for idx in missing_indices:
         frame = depth_dir / f"{idx:06d}.exr"
-        if frame.exists() or frame.is_symlink():
-            continue
         try:
             frame.symlink_to(base.name)
         except OSError:
@@ -672,8 +713,11 @@ def step5d_depth_scaffold(s: Path) -> None:
 
     marker = {
         "kind": "monocular_da_v2",
-        "frame_count": DEPTH_EXR_COUNT,
-        "source": "lite_recovery_depth_scaffold",
+        "frame_count": target_count,
+        "sample_fps": DEPTH_SAMPLE_FPS,
+        "video_duration_sec": video_duration,
+        "max_frame_count": DEPTH_EXR_MAX_COUNT,
+        "source": DEPTH_SCAFFOLD_SOURCE,
         "metric": False,
         "note": "Recovered scaffold for server-side PRD shape; not engine Z-buffer ground truth.",
     }

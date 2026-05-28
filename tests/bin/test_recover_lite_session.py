@@ -79,6 +79,84 @@ def _write_action_camera(path: Path) -> None:
     path.write_text(json.dumps(frames), encoding="utf-8")
 
 
+def test_depth_scaffold_frame_count_uses_video_duration_and_cap() -> None:
+    assert recover_mod._depth_scaffold_frame_count(230.0) == 1150
+    assert recover_mod._depth_scaffold_frame_count(0.2) == 1
+    assert recover_mod._depth_scaffold_frame_count(361.0) == 1800
+
+
+def test_step5d_depth_scaffold_uses_video_duration_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sess = tmp_path / "clip"
+    sess.mkdir()
+
+    monkeypatch.setattr(
+        recover_mod,
+        "_video_info",
+        lambda _sess: {"duration": 230.0, "width": 160, "height": 90},
+    )
+
+    def fake_depth_base(depth_dir: Path, width: int, height: int) -> Path:
+        assert (width, height) == (160, 90)
+        base = depth_dir / ".recovered_depth_base"
+        base.write_bytes(b"fake-exr")
+        return base
+
+    monkeypatch.setattr(recover_mod, "_make_depth_base", fake_depth_base)
+
+    recover_mod.step5d_depth_scaffold(sess)
+
+    depth_dir = sess / "depth"
+    assert len(list(depth_dir.glob("*.exr"))) == 1150
+    assert (depth_dir / "000000.exr").exists()
+    assert (depth_dir / "001149.exr").exists()
+    assert not (depth_dir / "001150.exr").exists()
+
+    source = json.loads((depth_dir / ".source").read_text(encoding="utf-8"))
+    assert source["frame_count"] == 1150
+    assert source["sample_fps"] == 5.0
+    assert source["video_duration_sec"] == 230.0
+
+
+def test_step5d_depth_scaffold_prunes_legacy_recovery_phantoms(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sess = tmp_path / "clip"
+    depth_dir = sess / "depth"
+    depth_dir.mkdir(parents=True)
+    for idx in range(1800):
+        (depth_dir / f"{idx:06d}.exr").write_bytes(b"legacy")
+    (depth_dir / ".source").write_text(
+        json.dumps(
+            {
+                "frame_count": 1800,
+                "source": recover_mod.DEPTH_SCAFFOLD_SOURCE,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        recover_mod,
+        "_video_info",
+        lambda _sess: {"duration": 230.0, "width": 160, "height": 90},
+    )
+    monkeypatch.setattr(
+        recover_mod,
+        "_make_depth_base",
+        lambda depth_dir, width, height: depth_dir / ".recovered_depth_base",
+    )
+
+    recover_mod.step5d_depth_scaffold(sess)
+
+    assert len(list(depth_dir.glob("*.exr"))) == 1150
+    assert (depth_dir / "001149.exr").exists()
+    assert not (depth_dir / "001150.exr").exists()
+    source = json.loads((depth_dir / ".source").read_text(encoding="utf-8"))
+    assert source["frame_count"] == 1150
+
+
 def test_step6_run_audit_timeout_returns_shape_only_fallback(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -222,7 +300,7 @@ def test_recover_lite_session_derives_prd_shape(tmp_path: Path) -> None:
 
     assert (sess / "depth").is_dir()
     assert (sess / "depth" / ".source").exists()
-    assert len(list((sess / "depth").glob("*.exr"))) == 1800
+    assert len(list((sess / "depth").glob("*.exr"))) == 5
 
     metadata = json.loads((sess / "metadata.json").read_text(encoding="utf-8"))
     assert metadata["recorder"] == "lite-recovered"
