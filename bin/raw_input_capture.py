@@ -17,6 +17,8 @@ from typing import Any, Callable, Optional
 windll = getattr(ctypes, "windll", None)
 
 _WIN_HANDLE = getattr(wintypes, "HANDLE", c_void_p)
+_WIN_HWND = getattr(wintypes, "HWND", _WIN_HANDLE)
+_WIN_HMENU = getattr(wintypes, "HMENU", _WIN_HANDLE)
 _WIN_HBRUSH = getattr(wintypes, "HBRUSH", _WIN_HANDLE)
 _WIN_HCURSOR = getattr(wintypes, "HCURSOR", _WIN_HANDLE)
 _WIN_HICON = getattr(wintypes, "HICON", _WIN_HANDLE)
@@ -24,6 +26,7 @@ _WIN_HINSTANCE = getattr(wintypes, "HINSTANCE", _WIN_HANDLE)
 _WIN_HMODULE = getattr(wintypes, "HMODULE", _WIN_HANDLE)
 _WIN_ATOM = getattr(wintypes, "ATOM", getattr(wintypes, "WORD", c_uint))
 _WIN_BOOL = getattr(wintypes, "BOOL", c_int)
+_WIN_LRESULT = getattr(wintypes, "LRESULT", wintypes.LPARAM)
 _WIN_LPVOID = getattr(wintypes, "LPVOID", c_void_p)
 
 RIDEV_REMOVE = 0x00000001
@@ -40,8 +43,8 @@ MOUSE_MOVE_ABSOLUTE = 1
 _UINT_FAILURE = 0xFFFFFFFF
 _WINFUNCTYPE = getattr(ctypes, "WINFUNCTYPE", ctypes.CFUNCTYPE)
 WNDPROC = _WINFUNCTYPE(
-    wintypes.LPARAM,
-    wintypes.HWND,
+    _WIN_LRESULT,
+    _WIN_HWND,
     wintypes.UINT,
     wintypes.WPARAM,
     wintypes.LPARAM,
@@ -53,7 +56,7 @@ class RAWINPUTDEVICE(Structure):
         ("usUsagePage", wintypes.USHORT),
         ("usUsage", wintypes.USHORT),
         ("dwFlags", wintypes.DWORD),
-        ("hwndTarget", wintypes.HWND),
+        ("hwndTarget", _WIN_HWND),
     ]
 
 
@@ -98,7 +101,7 @@ class RAWINPUTHEADER(Structure):
     _fields_ = [
         ("dwType", wintypes.DWORD),
         ("dwSize", wintypes.DWORD),
-        ("hDevice", wintypes.HANDLE),
+        ("hDevice", _WIN_HANDLE),
         ("wParam", wintypes.WPARAM),
     ]
 
@@ -389,15 +392,66 @@ class RawInputCapture:
 
         _set(kernel32.GetModuleHandleW, "argtypes", [wintypes.LPCWSTR])
         _set(kernel32.GetModuleHandleW, "restype", _WIN_HMODULE)
+        _set(kernel32.GetCurrentThreadId, "argtypes", [])
         _set(kernel32.GetCurrentThreadId, "restype", wintypes.DWORD)
         _set(user32.RegisterClassW, "argtypes", [POINTER(WNDCLASS)])
         _set(user32.RegisterClassW, "restype", _WIN_ATOM)
-        _set(user32.CreateWindowExW, "restype", wintypes.HWND)
+        _set(
+            user32.CreateWindowExW,
+            "argtypes",
+            [
+                wintypes.DWORD,
+                wintypes.LPCWSTR,
+                wintypes.LPCWSTR,
+                wintypes.DWORD,
+                c_int,
+                c_int,
+                c_int,
+                c_int,
+                _WIN_HWND,
+                _WIN_HMENU,
+                _WIN_HINSTANCE,
+                _WIN_LPVOID,
+            ],
+        )
+        _set(user32.CreateWindowExW, "restype", _WIN_HWND)
         _set(user32.RegisterRawInputDevices, "argtypes", [POINTER(RAWINPUTDEVICE), c_uint, c_uint])
         _set(user32.RegisterRawInputDevices, "restype", _WIN_BOOL)
         _set(
             user32.GetRawInputData,
             "argtypes",
-            [wintypes.HANDLE, wintypes.UINT, _WIN_LPVOID, POINTER(c_uint), c_uint],
+            [_WIN_HANDLE, wintypes.UINT, _WIN_LPVOID, POINTER(c_uint), c_uint],
         )
         _set(user32.GetRawInputData, "restype", wintypes.UINT)
+        _set(
+            user32.DefWindowProcW,
+            "argtypes",
+            [_WIN_HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM],
+        )
+        _set(user32.DefWindowProcW, "restype", _WIN_LRESULT)
+        _set(user32.DestroyWindow, "argtypes", [_WIN_HWND])
+        _set(user32.DestroyWindow, "restype", _WIN_BOOL)
+        _set(
+            user32.UnregisterClassW,
+            "argtypes",
+            [wintypes.LPCWSTR, _WIN_HINSTANCE],
+        )
+        _set(user32.UnregisterClassW, "restype", _WIN_BOOL)
+        _set(
+            user32.PostThreadMessageW,
+            "argtypes",
+            [wintypes.DWORD, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM],
+        )
+        _set(user32.PostThreadMessageW, "restype", _WIN_BOOL)
+        _set(user32.PostQuitMessage, "argtypes", [c_int])
+        _set(user32.PostQuitMessage, "restype", None)
+        _set(
+            user32.PeekMessageW,
+            "argtypes",
+            [POINTER(wintypes.MSG), _WIN_HWND, wintypes.UINT, wintypes.UINT, wintypes.UINT],
+        )
+        _set(user32.PeekMessageW, "restype", _WIN_BOOL)
+        _set(user32.TranslateMessage, "argtypes", [POINTER(wintypes.MSG)])
+        _set(user32.TranslateMessage, "restype", _WIN_BOOL)
+        _set(user32.DispatchMessageW, "argtypes", [POINTER(wintypes.MSG)])
+        _set(user32.DispatchMessageW, "restype", _WIN_LRESULT)

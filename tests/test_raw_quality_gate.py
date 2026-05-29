@@ -109,6 +109,15 @@ def test_varying_video_with_moving_game_state_passes(tmp_path: Path) -> None:
     assert result["mouse_present"] is True
 
 
+def test_find_video_skips_stub_and_prefers_largest_valid_mp4(tmp_path: Path) -> None:
+    session_dir = _make_session(tmp_path, frozen=False)
+    real_video = session_dir / "recording.mp4"
+    (session_dir / "video.mp4").rename(real_video)
+    (session_dir / "video.mp4").write_bytes(b"stub mp4!")
+
+    assert raw_quality_gate._find_video(session_dir) == real_video
+
+
 def test_missing_game_state_fails_with_reason(tmp_path: Path) -> None:
     session_dir = _make_session(tmp_path, frozen=False, game_state=False)
 

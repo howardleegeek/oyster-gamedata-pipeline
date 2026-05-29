@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sys
 import tarfile
+import time
 import types
 from pathlib import Path
 from typing import Any
@@ -182,6 +183,160 @@ def test_windows_capture_uses_one_based_monitor_index(
 
     assert captured_indices == [expected_monitor_index]
     assert captured_indices[0] > 0
+
+
+def test_windows_capture_callback_drops_frames_instead_of_blocking_on_slow_pipe(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    m = _import_recorder_module()
+    callbacks: dict[str, Any] = {}
+    callback_durations: list[float] = []
+    stopped = m.threading.Event()
+
+    class _FakeImage:
+        shape = (2, 2, 4)
+        flags = {"C_CONTIGUOUS": True}
+
+        def __init__(self, value: int) -> None:
+            self.value = value
+
+        def tobytes(self) -> bytes:
+            return bytes([self.value]) * 16
+
+    class _FakeFrame:
+        def __init__(self, value: int) -> None:
+            self.frame_buffer = _FakeImage(value)
+
+    class _FakeCaptureControl:
+        def stop(self) -> None:
+            stopped.set()
+
+    class _FakeWindowsCapture:
+        def __init__(self, **_kwargs: Any) -> None:
+            pass
+
+        def event(self, fn: Any) -> Any:
+            callbacks[fn.__name__] = fn
+            return fn
+
+        def start(self) -> None:
+            control = _FakeCaptureControl()
+            for value in range(12):
+                started_at = time.perf_counter()
+                callbacks["on_frame_arrived"](_FakeFrame(value), control)
+                callback_durations.append(time.perf_counter() - started_at)
+            stopped.wait(timeout=2.0)
+            callbacks["on_closed"]()
+
+    class _SlowStdin:
+        def __init__(self) -> None:
+            self.closed = False
+            self.writes: list[bytes] = []
+
+        def write(self, data: bytes) -> int:
+            time.sleep(0.25)
+            self.writes.append(data)
+            return len(data)
+
+        def close(self) -> None:
+            self.closed = True
+
+    class _FakeProc:
+        def __init__(self) -> None:
+            self.stdin = _SlowStdin()
+            self.returncode: int | None = None
+
+        def poll(self) -> int | None:
+            return self.returncode
+
+        def wait(self, timeout: float | None = None) -> int:
+            self.returncode = 0
+            return 0
+
+        def terminate(self) -> None:
+            self.returncode = 0
+
+        def kill(self) -> None:
+            self.returncode = -9
+
+    fake_proc = _FakeProc()
+    fake_module = types.ModuleType("windows_capture")
+    fake_module.WindowsCapture = _FakeWindowsCapture  # type: ignore[attr-defined]
+
+    def _fake_spawn(handle: Any, _cmd: list[str], *, creationflags: int) -> _FakeProc:
+        handle.proc = fake_proc
+        return fake_proc
+
+    monkeypatch.setattr(m.os, "name", "nt")
+    monkeypatch.setitem(sys.modules, "windows_capture", fake_module)
+    monkeypatch.setattr(m, "_get_windows_monitor_bounds", lambda: [])
+    monkeypatch.setattr(
+        m,
+        "_build_rawvideo_encoder_cmd",
+        lambda *a, **kw: ["ffmpeg", "-f", "rawvideo", "-c:v", "libx264"],
+    )
+    monkeypatch.setattr(m, "_spawn_video_encoder", _fake_spawn)
+
+    handle = m._start_windows_capture_layer(
+        tmp_path / "video.mp4",
+        x=0,
+        y=0,
+        w=2,
+        h=2,
+        audio_inputs=[],
+        audio_codec=[],
+        creationflags=0,
+        init_timeout_sec=1.0,
+    )
+    assert handle is not None
+    try:
+        assert len(callback_durations) == 12
+        assert max(callback_durations) < 0.15
+        assert handle.frames_dropped > 0
+        assert handle.first_frame_event.is_set()
+    finally:
+        m._stop_video_capture_handle(handle, clean_timeout=1.0, force_timeout=0.1)
+
+
+def test_rawvideo_writer_marks_dead_ffmpeg_failed(tmp_path: Path) -> None:
+    m = _import_recorder_module()
+
+    class _FakeStdin:
+        def __init__(self) -> None:
+            self.closed = False
+
+        def write(self, data: bytes) -> int:
+            return len(data)
+
+        def close(self) -> None:
+            self.closed = True
+
+    class _ExitedProc:
+        def __init__(self) -> None:
+            self.stdin = _FakeStdin()
+
+        def poll(self) -> int:
+            return 7
+
+    handle = m.VideoCaptureHandle(
+        layer="windows-capture",
+        out_path=tmp_path / "video.mp4",
+        stdin_kind="rawvideo",
+    )
+    proc = _ExitedProc()
+
+    m._start_rawvideo_frame_writer(handle, proc)
+    assert m._enqueue_rawvideo_frame(handle, b"frame")
+
+    deadline = time.time() + 1.0
+    while time.time() < deadline and not handle.error_event.is_set():
+        time.sleep(0.01)
+
+    assert handle.error_event.is_set()
+    assert handle.stop_event.is_set()
+    assert "ffmpeg exited rc=7" in "; ".join(handle.error_messages)
+    m._join_rawvideo_frame_writer(handle)
 
 
 def test_video_capture_layer_selection_tries_auto_layers_in_order(

@@ -47,6 +47,7 @@ import hashlib
 import json
 import math
 import os
+import queue
 import re
 import shutil
 import base64
@@ -95,7 +96,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.19.4"
+RECORDER_VERSION = "lite-v0.19.5"
 RAW_ONLY_DEPTH_SKIP_REASON = "DA-V2 weights not bundled in raw-only build"
 
 # R01 iron-law: supported MC versions for real game-state Fabric mod.
@@ -535,6 +536,7 @@ _VIDEO_WIDTH_ENV = "OYSTER_VIDEO_WIDTH"
 _VIDEO_HEIGHT_ENV = "OYSTER_VIDEO_HEIGHT"
 _VIDEO_FPS_ENV = "OYSTER_VIDEO_FPS"
 _VIDEO_FRAME_UNDERRUN_RATIO = 0.50
+_RAWVIDEO_FRAME_QUEUE_SIZE = 3
 _CAPTURE_STARTUP_CHECK_SEC = _VIDEO_LAYER_INIT_TIMEOUT_SEC
 _FFMPEG_DURATION_RE = re.compile(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)")
 _MP4_CONTAINER_BOXES = {b"moov", b"trak", b"mdia"}
@@ -2693,9 +2695,13 @@ class VideoCaptureHandle:
     error_messages: list[str] = field(default_factory=list)
     capture_control: Any = None
     frames_written: int = 0
+    frames_dropped: int = 0
     next_frame_at: float = 0.0
     warning: Optional[str] = None
     extra: dict[str, Any] = field(default_factory=dict)
+    frame_queue: Optional[queue.Queue[bytes]] = None
+    writer_thread: Optional[threading.Thread] = None
+    writer_lock: threading.Lock = field(default_factory=threading.Lock)
 
     def is_alive(self) -> bool:
         proc = self.proc
@@ -3040,6 +3046,119 @@ def _spawn_video_encoder(
     return proc
 
 
+def _mark_rawvideo_writer_failed(handle: VideoCaptureHandle, message: str) -> None:
+    handle.error_messages.append(message)
+    handle.error_event.set()
+    handle.stop_event.set()
+
+
+def _start_rawvideo_frame_writer(
+    handle: VideoCaptureHandle,
+    proc: subprocess.Popen,
+) -> None:
+    """Own ffmpeg stdin on a dedicated thread so capture producers never block."""
+
+    with handle.writer_lock:
+        if handle.frame_queue is None:
+            handle.frame_queue = queue.Queue(maxsize=_RAWVIDEO_FRAME_QUEUE_SIZE)
+        if handle.writer_thread is not None and handle.writer_thread.is_alive():
+            return
+
+        frame_queue = handle.frame_queue
+
+        def _write_frames() -> None:
+            stdin = proc.stdin
+            try:
+                while True:
+                    try:
+                        frame = frame_queue.get(timeout=0.05)
+                    except queue.Empty:
+                        if handle.stop_event.is_set():
+                            break
+                        rc = proc.poll()
+                        if rc is not None:
+                            raise BrokenPipeError(f"ffmpeg exited rc={rc}")
+                        continue
+
+                    if stdin is None:
+                        raise BrokenPipeError("ffmpeg stdin is unavailable")
+                    rc = proc.poll()
+                    if rc is not None:
+                        raise BrokenPipeError(f"ffmpeg exited rc={rc}")
+                    stdin.write(frame)
+                    handle.frames_written += 1
+                    handle.first_frame_event.set()
+                    if handle.stop_event.is_set() and frame_queue.empty():
+                        break
+            except BrokenPipeError as exc:
+                if not handle.stop_event.is_set():
+                    _mark_rawvideo_writer_failed(
+                        handle,
+                        f"{handle.layer} rawvideo writer failed: {exc}",
+                    )
+                else:
+                    handle.stop_event.set()
+            except Exception as exc:  # noqa: BLE001
+                if not handle.stop_event.is_set():
+                    _mark_rawvideo_writer_failed(
+                        handle,
+                        f"{handle.layer} rawvideo writer failed: {exc}",
+                    )
+                else:
+                    handle.stop_event.set()
+            finally:
+                try:
+                    if stdin is not None:
+                        stdin.close()
+                except Exception:
+                    pass
+
+        handle.writer_thread = threading.Thread(
+            target=_write_frames,
+            daemon=True,
+            name=f"video-{handle.layer}-writer",
+        )
+        handle.writer_thread.start()
+
+
+def _enqueue_rawvideo_frame(handle: VideoCaptureHandle, frame: bytes) -> bool:
+    """Queue a raw frame without blocking; drop stale frames when ffmpeg lags."""
+
+    frame_queue = handle.frame_queue
+    if frame_queue is None or handle.stop_event.is_set() or handle.error_event.is_set():
+        return False
+    try:
+        frame_queue.put_nowait(frame)
+        return True
+    except queue.Full:
+        try:
+            frame_queue.get_nowait()
+            handle.frames_dropped += 1
+        except queue.Empty:
+            pass
+        try:
+            frame_queue.put_nowait(frame)
+            return True
+        except queue.Full:
+            handle.frames_dropped += 1
+            return False
+
+
+def _join_rawvideo_frame_writer(handle: VideoCaptureHandle, timeout: float = 2.0) -> None:
+    thread = handle.writer_thread
+    if thread is None or not thread.is_alive():
+        return
+    thread.join(timeout=timeout)
+    if not thread.is_alive():
+        return
+    proc = handle.proc
+    try:
+        if proc is not None and proc.stdin:
+            proc.stdin.close()
+    except Exception:
+        pass
+
+
 def _wait_for_video_layer_init(handle: VideoCaptureHandle, timeout_sec: float) -> None:
     deadline = time.time() + max(0.0, timeout_sec)
     while time.time() < deadline:
@@ -3092,11 +3211,7 @@ def _stop_video_capture_handle(
             except Exception:
                 pass
         elif handle.stdin_kind == "rawvideo":
-            try:
-                if proc.stdin:
-                    proc.stdin.close()
-            except Exception:
-                pass
+            _join_rawvideo_frame_writer(handle)
         try:
             proc.wait(timeout=clean_timeout)
         except subprocess.TimeoutExpired:
@@ -3116,6 +3231,7 @@ def _stop_video_capture_handle(
                 except subprocess.TimeoutExpired:
                     _trace(f"video_capture: kill did not complete layer={handle.layer}")
 
+    _join_rawvideo_frame_writer(handle, timeout=0.5)
     _flush_video_capture_stderr(handle)
     return forced_stop
 
@@ -3329,6 +3445,7 @@ def _start_windows_capture_layer(
     def _ensure_proc(frame_width: int, frame_height: int) -> Optional[subprocess.Popen]:
         proc = handle.proc
         if proc is not None:
+            _start_rawvideo_frame_writer(handle, proc)
             return proc
         cmd = _build_rawvideo_encoder_cmd(
             out_path,
@@ -3350,7 +3467,9 @@ def _start_windows_capture_layer(
             f"cmd={' '.join(cmd)}"
         )
         try:
-            return _spawn_video_encoder(handle, cmd, creationflags=creationflags)
+            proc = _spawn_video_encoder(handle, cmd, creationflags=creationflags)
+            _start_rawvideo_frame_writer(handle, proc)
+            return proc
         except Exception as exc:  # noqa: BLE001
             handle.error_messages.append(f"rawvideo ffmpeg spawn failed: {exc}")
             handle.error_event.set()
@@ -3380,8 +3499,7 @@ def _start_windows_capture_layer(
             frame_width = int(image.shape[1])
             proc = _ensure_proc(frame_width, frame_height)
             if proc is None or proc.stdin is None or proc.poll() is not None:
-                handle.error_messages.append("rawvideo ffmpeg unavailable")
-                handle.error_event.set()
+                _mark_rawvideo_writer_failed(handle, "rawvideo ffmpeg unavailable")
                 return
             if profile.fps < _VIDEO_DEFAULT_FPS:
                 now = time.perf_counter()
@@ -3392,11 +3510,12 @@ def _start_windows_capture_layer(
                 import numpy as _np  # noqa: PLC0415
 
                 image = _np.ascontiguousarray(image)
-            proc.stdin.write(image.tobytes())
-            handle.frames_written += 1
-            handle.first_frame_event.set()
-        except BrokenPipeError:
-            handle.stop_event.set()
+            _enqueue_rawvideo_frame(handle, image.tobytes())
+        except BrokenPipeError as exc:
+            _mark_rawvideo_writer_failed(
+                handle,
+                f"windows-capture rawvideo pipe failed: {exc}",
+            )
             handle.done_event.set()
         except Exception as exc:  # noqa: BLE001
             handle.error_messages.append(f"windows-capture frame failed: {exc}")
@@ -3413,12 +3532,9 @@ def _start_windows_capture_layer(
             handle.error_messages.append(f"WindowsCapture start failed: {exc}")
             handle.error_event.set()
         finally:
+            handle.stop_event.set()
+            _join_rawvideo_frame_writer(handle)
             handle.done_event.set()
-            try:
-                if handle.proc is not None and handle.proc.stdin:
-                    handle.proc.stdin.close()
-            except Exception:
-                pass
 
     thread = threading.Thread(
         target=_run_capture,
@@ -3489,33 +3605,34 @@ def _start_mss_layer(
                     f"cmd={' '.join(cmd)}"
                 )
                 proc = _spawn_video_encoder(handle, cmd, creationflags=creationflags)
+                _start_rawvideo_frame_writer(handle, proc)
                 next_frame_at = time.perf_counter()
                 frame_interval = 1.0 / profile.fps
-                while not handle.stop_event.is_set() and proc.poll() is None:
+                while (
+                    not handle.stop_event.is_set()
+                    and not handle.error_event.is_set()
+                    and proc.poll() is None
+                ):
                     img = sct.grab(region)
-                    if proc.stdin is None:
-                        raise RuntimeError("ffmpeg stdin closed")
-                    proc.stdin.write(img.bgra)
-                    handle.frames_written += 1
-                    handle.first_frame_event.set()
+                    _enqueue_rawvideo_frame(handle, bytes(img.bgra))
                     next_frame_at += frame_interval
                     sleep_for = next_frame_at - time.perf_counter()
                     if sleep_for > 0:
                         time.sleep(min(sleep_for, frame_interval))
                     else:
                         next_frame_at = time.perf_counter()
-        except BrokenPipeError:
-            handle.stop_event.set()
+                rc = proc.poll()
+                if rc is not None and not handle.stop_event.is_set():
+                    _mark_rawvideo_writer_failed(handle, f"mss ffmpeg exited rc={rc}")
+        except BrokenPipeError as exc:
+            _mark_rawvideo_writer_failed(handle, f"mss rawvideo pipe failed: {exc}")
         except Exception as exc:  # noqa: BLE001
             handle.error_messages.append(f"mss capture failed: {exc}")
             handle.error_event.set()
         finally:
+            handle.stop_event.set()
+            _join_rawvideo_frame_writer(handle)
             handle.done_event.set()
-            try:
-                if handle.proc is not None and handle.proc.stdin:
-                    handle.proc.stdin.close()
-            except Exception:
-                pass
 
     thread = threading.Thread(target=_run, daemon=True, name="video-mss")
     handle.thread = thread

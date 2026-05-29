@@ -33,6 +33,7 @@ PASS_SCORE = 100.0
 WARN_SCORE = 60.0
 FAIL_SCORE = 0.0
 FRAME_SCALE = "scale=320:180:force_original_aspect_ratio=decrease,pad=320:180:(ow-iw)/2:(oh-ih)/2"
+MIN_VIDEO_BYTES = 1024
 
 
 def _json_dumps(payload: dict[str, Any]) -> str:
@@ -48,25 +49,34 @@ def _find_first_existing(session_dir: Path, candidates: tuple[str, ...]) -> Path
 
 
 def _find_video(session_dir: Path) -> Path | None:
-    preferred = _find_first_existing(
-        session_dir,
-        (
-            "video.mp4",
-            "recording.mp4",
-            "main_record.mp4",
-            "recordings/main_record.mp4",
-            "recordings/video.mp4",
-        ),
+    preferred_candidates = (
+        "video.mp4",
+        "recording.mp4",
+        "main_record.mp4",
+        "recordings/main_record.mp4",
+        "recordings/video.mp4",
     )
-    if preferred is not None:
-        return preferred
+    candidate_priorities = {
+        session_dir / rel_path: priority for priority, rel_path in enumerate(preferred_candidates)
+    }
 
-    root_mp4s = sorted(session_dir.glob("*.mp4"))
-    if root_mp4s:
-        return root_mp4s[0]
+    candidates = set(candidate_priorities)
+    candidates.update(session_dir.glob("*.mp4"))
+    candidates.update(session_dir.glob("**/*.mp4"))
 
-    recursive_mp4s = sorted(session_dir.glob("**/*.mp4"))
-    return recursive_mp4s[0] if recursive_mp4s else None
+    valid_candidates = []
+    for path in candidates:
+        if not path.is_file():
+            continue
+        size = path.stat().st_size
+        if size < MIN_VIDEO_BYTES:
+            continue
+        priority = candidate_priorities.get(path, len(candidate_priorities))
+        valid_candidates.append((size, priority, path))
+    if not valid_candidates:
+        return None
+
+    return sorted(valid_candidates, key=lambda item: (-item[0], item[1], str(item[2])))[0][2]
 
 
 def _ffprobe_duration(video_path: Path) -> float | None:
