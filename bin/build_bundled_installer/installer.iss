@@ -13,7 +13,8 @@
 ;       +-- Vanilla MC asset objects (rc7)          (R05B, ~390 MB)
 ;       +-- Fabric loader 0.16.10 + 9 mod jars      (R05B/mc-mod, ~10 MB)
 ;       +-- OysterRecorder-onedir/ (PyInstaller)    (~120 MB + OBS portable)
-;       +-- OysterPlay.exe single-button launcher   (R05C, ~5 MB)
+;       +-- OysterPlay.bat static launcher          (Defender-safe entry)
+;       +-- OysterPlay.exe PyInstaller launcher     (fallback payload only)
 ;       +-- manifest.json (combined SHA-256 pin)
 ;
 ; Iron-law constraints from R05D (reflected in the [Setup] block below):
@@ -86,7 +87,7 @@
 
 #define AppName        "Oyster Recorder"
 #define AppPublisher   "Oyster Labs"
-#define AppExeName     "OysterPlay.exe"
+#define AppExeName     "OysterPlay.bat"
 #define AppShortcutLbl "Oyster Recording"
 #define AppId          "{{C7E4F0D2-9B5E-4F1A-8C3D-OY5T3RR3C0RD}}"
 
@@ -261,12 +262,14 @@ Source: "{#BundleRoot}\\mc-instance\\mods\\fabric-api.jar"; \
     Flags: ignoreversion
 
 ; --- (3) PROVEN Rust gamedata-recorder v2.6.0 runtime ---------------------
-; Preferred recorder engine for OysterPlay. Staged from the published
+; Preferred recorder engine for OysterPlay.bat. Staged from the published
 ; howardleegeek/gamedata-recorder v2.6.0 release asset
 ; gamedata-recorder-windows-x64.zip. Includes data/libobs and OBS plugins
 ; needed by game_capture hook, plus NVENC/x264 support.
+; Installed at {app} root so the static batch launcher can execute
+; %LOCALAPPDATA%\OysterRecorder\gamedata-recorder.exe directly.
 Source: "{#BundleRoot}\\gamedata-recorder\\*"; \
-    DestDir: "{app}\\gamedata-recorder"; \
+    DestDir: "{app}"; \
     Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; --- (3a) OysterRecorder PyInstaller --onedir fallback bundle -------------
@@ -286,11 +289,36 @@ Source: "{#BundleRoot}\\OysterRecorder-onedir\\_internal\\obs\\*"; \
     DestDir: "{app}\\OysterRecorder-onedir\\_internal\\obs"; \
     Flags: ignoreversion recursesubdirs createallsubdirs
 
-; --- (4) OysterPlay.exe single-button launcher (R05C) ---------------------
-; ~5 MB. Lives directly in {app} so the desktop shortcut points at it.
+; --- (4) OysterPlay.exe redundant PyInstaller launcher ---------------------
+; Kept as fallback payload only. Shortcuts and post-install launch do not
+; depend on this executable because PyInstaller onefile has proven brittle
+; under Defender/minipc installs.
 Source: "{#BundleRoot}\\OysterPlay.exe"; \
     DestDir: "{app}"; \
-    DestName: "{#AppExeName}"; \
+    DestName: "OysterPlay.exe"; \
+    Flags: ignoreversion
+
+; --- (4b) Static batch launchers ------------------------------------------
+; Main double-click entry: start Rust recorder first, wait briefly, then
+; start the bundled Fabric Minecraft instance.
+Source: "OysterPlay.bat"; \
+    DestDir: "{app}"; \
+    DestName: "OysterPlay.bat"; \
+    Flags: ignoreversion
+Source: "launch_mc.bat"; \
+    DestDir: "{app}"; \
+    DestName: "launch_mc.bat"; \
+    Flags: ignoreversion
+
+; --- (4c) Rust v2.6.0 config preseed --------------------------------------
+; Source checked against ~/Downloads/gamedata-recorder tag v2.6.0:
+; Preferences has #[serde(rename_all="camelCase")], but nested GameConfig
+; has only #[serde(default)], so games entries must use snake_case
+; "use_window_capture" and "capture_mode"; CaptureMode has
+; #[serde(rename_all="snake_case")], so GameHook serializes as "game_hook".
+Source: "gamedata_recorder_config.json"; \
+    DestDir: "{userappdata}\\GameData Recorder"; \
+    DestName: "config.json"; \
     Flags: ignoreversion
 
 ; --- (5) Combined manifest.json -------------------------------------------
@@ -394,7 +422,7 @@ Source: "..\\..\\installer\\fix-scripts\\请先双击我.cmd"; \
 [Icons]
 ; ---- Start-menu group (always created) ------------------------------------
 Name: "{group}\\{#AppShortcutLbl}"; \
-    Filename: "{app}\\{#AppExeName}"; \
+    Filename: "{app}\\OysterPlay.bat"; \
     WorkingDir: "{app}"; \
     Comment: "Launch {#AppName} (records gameplay automatically)"
 
@@ -408,7 +436,7 @@ Name: "{group}\\Uninstall {#AppName}"; \
 ; machines this points at the OneDrive\Desktop folder instead of
 ; %USERPROFILE%\Desktop, so the icon shows up where the user expects it.
 Name: "{userdesktop}\\{#AppShortcutLbl}"; \
-    Filename: "{app}\\{#AppExeName}"; \
+    Filename: "{app}\\OysterPlay.bat"; \
     WorkingDir: "{app}"; \
     Comment: "Launch {#AppName}"; \
     Tasks: desktopicon
@@ -424,7 +452,8 @@ Filename: "{tmp}\vc_redist.x64.exe"; \
 ; Minecraft from the same double-click that ran setup. nowait so the
 ; installer's "Finish" page appears immediately; postinstall+skipifsilent
 ; suppresses this option in any future /SILENT invocation.
-Filename: "{app}\\{#AppExeName}"; \
+Filename: "{cmd}"; \
+    Parameters: "/c start """" ""{app}\\OysterPlay.bat"""; \
     Description: "Launch {#AppName} now"; \
     Flags: nowait postinstall skipifsilent
 

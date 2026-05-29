@@ -340,6 +340,9 @@ Test-RequiredPath (Join-Path $BundleDir "jre\bin\javaw.exe")             "[Files
 Test-RequiredPath (Join-Path $BundleDir "mc-instance")                   "[Files] (2) MC instance"
 Test-RequiredPath (Join-Path $BundleDir "OysterRecorder-onedir")         "[Files] (3) recorder onedir"
 Test-RequiredPath (Join-Path $BundleDir "OysterPlay.exe")                "[Files] (4) launcher"
+Test-RequiredPath (Join-Path $ScriptDir "OysterPlay.bat")                "[Files] (4b) static OysterPlay launcher"
+Test-RequiredPath (Join-Path $ScriptDir "launch_mc.bat")                 "[Files] (4b) static Minecraft launcher"
+Test-RequiredPath (Join-Path $ScriptDir "gamedata_recorder_config.json") "[Files] (4c) Rust recorder config preseed"
 Test-RequiredPath (Join-Path $BundleDir "manifest.json")                 "[Files] (5) manifest"
 Test-RequiredPath $IssFile                                               "installer.iss"
 
