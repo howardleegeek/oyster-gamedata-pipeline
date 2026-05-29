@@ -95,7 +95,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.19.0"
+RECORDER_VERSION = "lite-v0.19.1"
 
 # R01 iron-law: supported MC versions for real game-state Fabric mod.
 # Kept in sync with .github/workflows/build-mc-mod.yml matrix.
@@ -545,6 +545,10 @@ _OBS_WEBSOCKET_PASSWORD = "oyster-local-recorder"
 _OBS_COLLECTION = "oyster"
 _OBS_PROFILE = "oyster"
 _OBS_SCENE = "MC"
+_OBS_GAME_INPUT = "oyster_game"
+_OBS_DISPLAY_INPUT = "oyster_display"
+_OBS_MINECRAFT_EXE = "javaw.exe"
+_OBS_MINECRAFT_WINDOW_CLASS = "GLFW30"
 _OBS_CONNECT_TIMEOUT_SEC = 25.0
 _OBS_STOP_RECORD_TIMEOUT_SEC = 120.0
 _OBS_FILE_STABLE_TIMEOUT_SEC = 120.0
@@ -2048,6 +2052,194 @@ def _obs_request_optional(
         return None
 
 
+def _obs_response_data(response: Optional[Mapping[str, Any]]) -> Mapping[str, Any]:
+    if not isinstance(response, Mapping):
+        return {}
+    data = response.get("responseData", {})
+    return data if isinstance(data, Mapping) else {}
+
+
+def _obs_scene_names(client: Any) -> set[str]:
+    data = _obs_response_data(client.request("GetSceneList"))
+    scenes = data.get("scenes", [])
+    names: set[str] = set()
+    if not isinstance(scenes, list):
+        return names
+    for scene in scenes:
+        if not isinstance(scene, Mapping):
+            continue
+        for key in ("sceneName", "name"):
+            value = scene.get(key)
+            if value:
+                names.add(str(value))
+                break
+    return names
+
+
+def _obs_input_names(client: Any) -> set[str]:
+    data = _obs_response_data(client.request("GetInputList"))
+    inputs = data.get("inputs", [])
+    names: set[str] = set()
+    if not isinstance(inputs, list):
+        return names
+    for input_info in inputs:
+        if not isinstance(input_info, Mapping):
+            continue
+        value = input_info.get("inputName") or input_info.get("name")
+        if value:
+            names.add(str(value))
+    return names
+
+
+def _obs_scene_items_by_source(client: Any) -> dict[str, Mapping[str, Any]]:
+    response = client.request("GetSceneItemList", {"sceneName": _OBS_SCENE})
+    data = _obs_response_data(response)
+    items = data.get("sceneItems", [])
+    by_source: dict[str, Mapping[str, Any]] = {}
+    if not isinstance(items, list):
+        return by_source
+    for item in items:
+        if not isinstance(item, Mapping):
+            continue
+        source_name = item.get("sourceName") or item.get("inputName")
+        if source_name:
+            by_source[str(source_name)] = item
+    return by_source
+
+
+def _obs_ensure_source_in_scene(client: Any, source_name: str) -> None:
+    if source_name in _obs_scene_items_by_source(client):
+        return
+    client.request(
+        "CreateSceneItem",
+        {
+            "sceneName": _OBS_SCENE,
+            "sourceName": source_name,
+            "sceneItemEnabled": True,
+        },
+    )
+
+
+def _obs_place_display_behind_game(client: Any) -> None:
+    items = _obs_scene_items_by_source(client)
+    game_item = items.get(_OBS_GAME_INPUT)
+    display_item = items.get(_OBS_DISPLAY_INPUT)
+    if not game_item or not display_item:
+        return
+    display_item_id = display_item.get("sceneItemId")
+    if display_item_id is None:
+        return
+    indices: list[int] = []
+    for item in items.values():
+        try:
+            indices.append(int(item.get("sceneItemIndex", 0)))
+        except Exception:
+            continue
+    target_index = max(indices) if indices else 1
+    _obs_request_optional(
+        client,
+        "SetSceneItemIndex",
+        {
+            "sceneName": _OBS_SCENE,
+            "sceneItemId": display_item_id,
+            "sceneItemIndex": target_index,
+        },
+    )
+
+
+def _obs_sanitize_window_part(value: str) -> str:
+    return value.replace("#", "#22").replace(":", "#3A")
+
+
+def _obs_mc_window_value(mc_window: Optional[Mapping[str, Any]], key: str) -> str:
+    if not isinstance(mc_window, Mapping):
+        return ""
+    value = mc_window.get(key)
+    return str(value).strip() if value is not None else ""
+
+
+def _obs_minecraft_window_setting(mc_window: Optional[Mapping[str, Any]]) -> str:
+    title = _obs_mc_window_value(mc_window, "title") or "Minecraft*"
+    class_name = (
+        _obs_mc_window_value(mc_window, "class")
+        or _obs_mc_window_value(mc_window, "className")
+        or _OBS_MINECRAFT_WINDOW_CLASS
+    )
+    executable = (
+        _obs_mc_window_value(mc_window, "processName")
+        or _obs_mc_window_value(mc_window, "process_name")
+        or _obs_mc_window_value(mc_window, "gameProcessName")
+        or _OBS_MINECRAFT_EXE
+    )
+    return ":".join(_obs_sanitize_window_part(part) for part in (title, class_name, executable))
+
+
+def _obs_game_capture_settings(mc_window: Optional[Mapping[str, Any]]) -> dict[str, Any]:
+    return {
+        "capture_mode": "window",
+        "window": _obs_minecraft_window_setting(mc_window),
+        "priority": 2,
+        "capture_cursor": True,
+        "capture_audio": True,
+        "anti_cheat_hook": True,
+    }
+
+
+def _obs_ensure_scene_and_sources(
+    client: Any,
+    mc_window: Optional[Mapping[str, Any]] = None,
+) -> None:
+    client.request(
+        "SetVideoSettings",
+        {
+            "baseWidth": 1920,
+            "baseHeight": 1080,
+            "outputWidth": 1920,
+            "outputHeight": 1080,
+            "fpsNumerator": 30,
+            "fpsDenominator": 1,
+        },
+    )
+
+    if _OBS_SCENE not in _obs_scene_names(client):
+        client.request("CreateScene", {"sceneName": _OBS_SCENE})
+        _trace(f"obs: created scene {_OBS_SCENE}")
+    client.request("SetCurrentProgramScene", {"sceneName": _OBS_SCENE})
+
+    input_names = _obs_input_names(client)
+    if _OBS_GAME_INPUT not in input_names:
+        settings = _obs_game_capture_settings(mc_window)
+        client.request(
+            "CreateInput",
+            {
+                "sceneName": _OBS_SCENE,
+                "inputName": _OBS_GAME_INPUT,
+                "inputKind": "game_capture",
+                "inputSettings": settings,
+                "sceneItemEnabled": True,
+            },
+        )
+        input_names.add(_OBS_GAME_INPUT)
+        _trace(f"obs: created game_capture input {_OBS_GAME_INPUT}")
+    if _OBS_DISPLAY_INPUT not in input_names:
+        client.request(
+            "CreateInput",
+            {
+                "sceneName": _OBS_SCENE,
+                "inputName": _OBS_DISPLAY_INPUT,
+                "inputKind": "monitor_capture",
+                "inputSettings": {"capture_cursor": True},
+                "sceneItemEnabled": True,
+            },
+        )
+        input_names.add(_OBS_DISPLAY_INPUT)
+        _trace(f"obs: created monitor_capture fallback input {_OBS_DISPLAY_INPUT}")
+
+    _obs_ensure_source_in_scene(client, _OBS_DISPLAY_INPUT)
+    _obs_ensure_source_in_scene(client, _OBS_GAME_INPUT)
+    _obs_place_display_behind_game(client)
+
+
 def _obs_set_record_directory(client: Any, output_dir: Path) -> None:
     output_value = str(output_dir)
     try:
@@ -2181,6 +2373,7 @@ def _start_obs_capture_layer(
     out_path: Path,
     *,
     output_profile: Optional[VideoOutputProfile] = None,
+    mc_window: Optional[Mapping[str, Any]] = None,
     init_timeout_sec: float = _OBS_CONNECT_TIMEOUT_SEC,
     obs_exe: Optional[Path] = None,
     ws_client_factory: Optional[Callable[[], Any]] = None,
@@ -2213,8 +2406,8 @@ def _start_obs_capture_layer(
             client_factory=client_factory,
             timeout_sec=init_timeout_sec,
         )
+        _obs_ensure_scene_and_sources(client, mc_window)
         _obs_configure_recording_profile(client, out_path.parent)
-        _obs_request_optional(client, "SetCurrentProgramScene", {"sceneName": _OBS_SCENE})
         chosen_encoder = _obs_selected_encoder_from_profile(client)
         client.request("StartRecord")
     except Exception:
@@ -3406,6 +3599,7 @@ def _start_layer(
     audio_codec: Sequence[str],
     creationflags: int,
     output_profile: Optional[VideoOutputProfile] = None,
+    mc_window: Optional[Mapping[str, Any]] = None,
     init_timeout_sec: float = _VIDEO_LAYER_INIT_TIMEOUT_SEC,
 ) -> Optional[VideoCaptureHandle]:
     layer = _normalize_capture_mode(layer)
@@ -3415,6 +3609,7 @@ def _start_layer(
         return _start_obs_capture_layer(
             out_path,
             output_profile=output_profile,
+            mc_window=mc_window,
             init_timeout_sec=max(init_timeout_sec, _OBS_CONNECT_TIMEOUT_SEC),
         )  # type: ignore[return-value]
     if layer == "windows-capture":
@@ -6641,6 +6836,7 @@ class RecorderApp(tk.Tk):
                     audio_codec=audio_codec,
                     creationflags=flags,
                     output_profile=profile,
+                    mc_window=rect,
                     init_timeout_sec=_VIDEO_LAYER_INIT_TIMEOUT_SEC,
                 )
                 if handle is None:
