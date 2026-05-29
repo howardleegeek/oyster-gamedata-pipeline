@@ -260,7 +260,16 @@ Source: "{#BundleRoot}\\mc-instance\\mods\\fabric-api.jar"; \
     DestDir: "{app}\\mc-instance\\mods"; \
     Flags: ignoreversion
 
-; --- (3) OysterRecorder PyInstaller --onedir bundle -----------------------
+; --- (3) PROVEN Rust gamedata-recorder v2.6.0 runtime ---------------------
+; Preferred recorder engine for OysterPlay. Staged from the published
+; howardleegeek/gamedata-recorder v2.6.0 release asset
+; gamedata-recorder-windows-x64.zip. Includes data/libobs and OBS plugins
+; needed by game_capture hook, plus NVENC/x264 support.
+Source: "{#BundleRoot}\\gamedata-recorder\\*"; \
+    DestDir: "{app}\\gamedata-recorder"; \
+    Flags: ignoreversion recursesubdirs createallsubdirs
+
+; --- (3a) OysterRecorder PyInstaller --onedir fallback bundle -------------
 ; ~120 MB. Source comes from the existing build-recorder-exe.yml workflow
 ; (which we now run locally inside build_all.ps1 step 5).
 ; The OBS portable subtree is declared explicitly in (3b) so installer
@@ -270,7 +279,7 @@ Source: "{#BundleRoot}\\OysterRecorder-onedir\\*"; \
     Excludes: "\\_internal\\obs\\*"; \
     Flags: ignoreversion recursesubdirs createallsubdirs
 
-; --- (3b) OBS Studio portable for recorder capture backend ----------------
+; --- (3b) OBS Studio portable for Python fallback capture backend ---------
 ; Produced by build-recorder-installer.yml before ISCC compile. The recorder
 ; builds OBS profiles/scenes at runtime; installer only ships official OBS.
 Source: "{#BundleRoot}\\OysterRecorder-onedir\\_internal\\obs\\*"; \

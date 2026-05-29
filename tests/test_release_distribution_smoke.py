@@ -68,6 +68,25 @@ def test_recorder_pyinstaller_workflows_bundle_ffprobe_with_ffmpeg() -> None:
         assert workflow.count('--add-binary "ffprobe.exe;."') == expected_pyinstaller_invocations
 
 
+def test_bundled_installer_stages_proven_rust_recorder_runtime() -> None:
+    workflow = (REPO_ROOT / ".github/workflows/build-recorder-installer.yml").read_text()
+    installer = (REPO_ROOT / "bin/build_bundled_installer/installer.iss").read_text()
+
+    assert "RECORDER_RUNTIME_REPO: howardleegeek/gamedata-recorder" in workflow
+    assert "RECORDER_RUNTIME_TAG: v2.6.0" in workflow
+    assert "RECORDER_RUNTIME_ASSET: gamedata-recorder-windows-x64.zip" in workflow
+    assert "Stage Rust gamedata-recorder v2.6.0 runtime" in workflow
+    assert "gh release download $env:RECORDER_RUNTIME_TAG" in workflow
+    assert "bundle/gamedata-recorder/gamedata-recorder.exe" in workflow
+    assert "bundle/gamedata-recorder/obs-plugins/64bit/win-capture.dll" in workflow
+    assert "Staged Rust recorder runtime missing required path" in workflow
+    assert "Preflight bundled Rust recorder path" in workflow
+
+    assert 'Source: "{#BundleRoot}\\\\gamedata-recorder\\\\*"' in installer
+    assert 'DestDir: "{app}\\\\gamedata-recorder"' in installer
+    assert "PROVEN Rust gamedata-recorder v2.6.0 runtime" in installer
+
+
 def test_windows_installer_smoke_workflow_exercises_real_install_path() -> None:
     workflow = (REPO_ROOT / ".github/workflows/windows-installer-smoke.yml").read_text()
 

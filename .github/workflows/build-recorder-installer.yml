@@ -97,6 +97,9 @@ jobs:
       PYTHONUTF8: '1'
       EV_CERT_PFX: ${{ secrets.EV_CERT_PFX || secrets.EV_CERT_PFX_BASE64 }}
       EV_CERT_PASSWORD: ${{ secrets.EV_CERT_PASSWORD }}
+      RECORDER_RUNTIME_REPO: howardleegeek/gamedata-recorder
+      RECORDER_RUNTIME_TAG: v2.6.0
+      RECORDER_RUNTIME_ASSET: gamedata-recorder-windows-x64.zip
 
     steps:
       # ---------------------------------------------------------------------
@@ -533,6 +536,60 @@ jobs:
           Write-Host "Bundled OBS Studio version: $obsVersion"
           Write-Host "Bundled obs64.exe path: $bundledObsExe"
 
+      - name: Stage Rust gamedata-recorder v2.6.0 runtime
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $downloadDir = "rust-recorder-download"
+          $extractDir = "rust-recorder-extracted"
+          $bundleDir = "bundle/gamedata-recorder"
+          Remove-Item -Recurse -Force $downloadDir, $extractDir, $bundleDir -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $downloadDir, $extractDir, $bundleDir | Out-Null
+
+          gh release download $env:RECORDER_RUNTIME_TAG `
+            -R $env:RECORDER_RUNTIME_REPO `
+            -p $env:RECORDER_RUNTIME_ASSET `
+            -D $downloadDir `
+            --clobber
+
+          $zipPath = Join-Path $downloadDir $env:RECORDER_RUNTIME_ASSET
+          if (-not (Test-Path $zipPath)) {
+            Write-Error "Rust recorder asset download missing: $zipPath"
+            exit 1
+          }
+          Expand-Archive -Path $zipPath -DestinationPath $extractDir -Force
+          $rustExe = Get-ChildItem -Path $extractDir -Recurse -Filter 'gamedata-recorder.exe' |
+            Select-Object -First 1
+          if (-not $rustExe) {
+            Write-Error "Rust recorder archive did not contain gamedata-recorder.exe"
+            exit 1
+          }
+          $runtimeRoot = $rustExe.Directory.FullName
+          Copy-Item -Path (Join-Path $runtimeRoot '*') -Destination $bundleDir -Recurse -Force
+
+          $required = @(
+            'gamedata-recorder.exe',
+            'obs.dll',
+            'libobs-d3d11.dll',
+            'libobs-opengl.dll',
+            'libobs-winrt.dll',
+            'obs-ffmpeg-mux.exe',
+            'data',
+            'obs-plugins',
+            'obs-plugins/64bit/win-capture.dll',
+            'obs-plugins/64bit/obs-x264.dll'
+          )
+          foreach ($relative in $required) {
+            $candidate = Join-Path $bundleDir $relative
+            if (-not (Test-Path $candidate)) {
+              Write-Error "Staged Rust recorder runtime missing required path: $relative"
+              exit 1
+            }
+          }
+          $size_mb = [math]::Round((Get-ChildItem -Recurse $bundleDir | Measure-Object -Property Length -Sum).Sum / 1MB, 1)
+          Write-Host "Staged Rust recorder runtime from $env:RECORDER_RUNTIME_REPO@$env:RECORDER_RUNTIME_TAG ($size_mb MB)"
+
       # ---------------------------------------------------------------------
       # 12. Stage the full bundle layout that installer.iss expects
       # ---------------------------------------------------------------------
@@ -540,6 +597,7 @@ jobs:
       # `[Files]` block (kept in sync deliberately):
       #   Source: "{#BundleRoot}\jre\*"                  -> bundle/jre/...
       #   Source: "{#BundleRoot}\mc-instance\*"          -> bundle/mc-instance/...
+      #   Source: "{#BundleRoot}\gamedata-recorder\*"    -> bundle/gamedata-recorder/
       #   Source: "{#BundleRoot}\OysterRecorder-onedir\*"-> bundle/OysterRecorder-onedir/
       #   Source: "{#BundleRoot}\OysterRecorder-onedir\_internal\obs\*"-> bundled OBS Studio portable
       #   Source: "{#BundleRoot}\OysterPlay.exe"         -> bundle/OysterPlay.exe
@@ -557,6 +615,9 @@ jobs:
             'bundle/mc-instance/versions/fabric-loader-0.16.10-1.21.4/fabric-loader-0.16.10-1.21.4.json',
             'bundle/mc-instance/mods',
             'bundle/OysterPlay.exe',
+            'bundle/gamedata-recorder/gamedata-recorder.exe',
+            'bundle/gamedata-recorder/obs-plugins/64bit/win-capture.dll',
+            'bundle/gamedata-recorder/obs-plugins/64bit/obs-x264.dll',
             'bundle/OysterRecorder-onedir/OysterRecorder-onedir.exe',
             'bundle/OysterRecorder-onedir/_internal/obs/bin/64bit/obs64.exe',
             'bundle/OysterRecorder-onedir/_internal/obs/portable_mode.txt',
@@ -629,14 +690,17 @@ jobs:
           $bundledObsExe = "bundle/OysterRecorder-onedir/_internal/obs/bin/64bit/obs64.exe"
           $portableMarker = "bundle/OysterRecorder-onedir/_internal/obs/portable_mode.txt"
           $specMarker = "bundle/OysterRecorder-onedir/_internal/obs/obs_portable.txt"
-          foreach ($p in @($bundledObsExe, $portableMarker, $specMarker)) {
+          $rustRecorderExe = "bundle/gamedata-recorder/gamedata-recorder.exe"
+          $rustWinCapture = "bundle/gamedata-recorder/obs-plugins/64bit/win-capture.dll"
+          foreach ($p in @($bundledObsExe, $portableMarker, $specMarker, $rustRecorderExe, $rustWinCapture)) {
             if (-not (Test-Path $p)) {
-              Write-Error "Installer compile preflight missing bundled OBS Studio artifact: $p"
+              Write-Error "Installer compile preflight missing bundled recorder artifact: $p"
               exit 1
             }
           }
           Write-Host "Preflight bundled OBS Studio version: $obsVersion"
           Write-Host "Preflight bundled obs64.exe path: $(Resolve-Path $bundledObsExe)"
+          Write-Host "Preflight bundled Rust recorder path: $(Resolve-Path $rustRecorderExe)"
           # /Qp = quiet w/ progress (no /SILENT), /D injects preprocessor symbol.
           iscc.exe /Qp "/DAppVersion=$env:APP_VERSION" $iss
           if ($LASTEXITCODE -ne 0) {
