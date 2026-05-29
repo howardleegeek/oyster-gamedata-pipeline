@@ -4,6 +4,7 @@
 Per PRD audit's evidence string 'rc19.0.3 DA-V2', this IS the expected
 depth-estimation method when GL framebuffer hook is not available.
 """
+
 import sys
 import time
 import pathlib
@@ -74,24 +75,24 @@ def main():
             elapsed = time.time() - t0
             rate = (i + 1) / elapsed if elapsed else 0
             eta = (len(frame_files) - i - 1) / rate if rate else 0
-            print(f"  [{i+1}/{len(frame_files)}] elapsed={elapsed:.1f}s rate={rate:.2f}/s eta={eta:.0f}s", flush=True)
+            print(
+                f"  [{i+1}/{len(frame_files)}] elapsed={elapsed:.1f}s rate={rate:.2f}/s eta={eta:.0f}s",
+                flush=True,
+            )
 
-    # 2026-05-16 Howard PM directive: depth files MUST be tagged with source.
-    # Buyer PDF asks for view-space LINEAR depth in METERS along camera optical Z
-    # axis (= real engine Z-buffer). DA-V2 produces MONOCULAR RELATIVE depth —
-    # visually similar but NOT metric, NOT view-space, NOT physically anchored.
-    # Honesty marker tells the audit (and the buyer) these EXRs are a fallback
-    # estimate, not engine depth. STRICT BUYER MAY REJECT on this basis.
+    # 2026-05-28 Howard PM directive: production depth is server-side
+    # post-processing. DA-V2 monocular depth is first-class production evidence,
+    # not a tester-machine engine hook fallback.
     marker = depth_dir / ".source"
     marker.write_text(
         "kind: monocular_da_v2\n"
         "model: depth-anything/Depth-Anything-V2-Small-hf\n"
         "units: relative (not metric meters)\n"
         "view_space_z: false (monocular estimate, not optical-axis Z-buffer)\n"
-        "use_when: real engine Z-buffer hook unavailable; STRICT BUYER MAY REJECT\n"
+        "pipeline: server_side_postprocess\n"
     )
     print(f"[da-v2] DONE: {len(frame_files)} EXR files in {time.time()-t0:.1f}s")
-    print(f"[da-v2] wrote depth/.source marker: kind=monocular_da_v2 (honest fallback tag)")
+    print("[da-v2] wrote depth/.source marker: kind=monocular_da_v2")
 
 
 if __name__ == "__main__":

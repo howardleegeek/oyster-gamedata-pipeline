@@ -28,6 +28,8 @@ import os
 import pathlib
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from typing import Optional
 
 # BUG-1 fix (v0.12.2): self-locating, supports both layouts
@@ -40,6 +42,12 @@ _HERE = pathlib.Path(__file__).resolve().parent
 REPO_ROOT = _HERE.parent  # kept for any code that still references it
 BIN = _HERE  # ← key change: BIN is now the directory containing THIS file
 VIDEO_CANDIDATES = ("recording.mp4", "video.mp4", "screen.mp4")
+DEFAULT_DEPTH_ENDPOINT = "https://oyster-depth.modal.run"
+PRODUCTION_DEPTH_SOURCE_KINDS = {
+    "monocular_da_v2",
+    "calibrated_monocular",
+    "engine_zbuffer",
+}
 
 
 def step(msg: str) -> None:
@@ -70,6 +78,106 @@ def _require_video(session_dir: pathlib.Path) -> pathlib.Path:
         joined = ", ".join(VIDEO_CANDIDATES)
         raise FileNotFoundError(f"no compatible video found in {session_dir} ({joined})")
     return video
+
+
+def _read_depth_source_kind(depth_dir: pathlib.Path) -> str:
+    """Read depth/.source from either line-oriented or legacy JSON markers."""
+
+    marker = depth_dir / ".source"
+    if not marker.exists():
+        return "missing"
+
+    try:
+        content = marker.read_text().strip()
+    except OSError:
+        return "missing"
+
+    if not content:
+        return "missing"
+
+    try:
+        parsed = json.loads(content)
+    except json.JSONDecodeError:
+        parsed = None
+    if isinstance(parsed, dict):
+        kind = parsed.get("kind")
+        return kind.strip() if isinstance(kind, str) and kind.strip() else "missing"
+
+    for line in content.splitlines():
+        if line.startswith("kind:"):
+            kind = line.split(":", 1)[1].strip()
+            return kind or "missing"
+    return "missing"
+
+
+def _write_depth_source_marker(
+    depth_dir: pathlib.Path,
+    *,
+    kind: str,
+    backend: str,
+) -> None:
+    """Write the production depth provenance marker expected by G2."""
+
+    depth_dir.mkdir(parents=True, exist_ok=True)
+    marker = depth_dir / ".source"
+    marker.write_text(
+        "\n".join(
+            [
+                f"kind: {kind}",
+                "model: depth-anything/Depth-Anything-V2-Small-hf",
+                f"backend: {backend}",
+                f"timestamp: {dt.datetime.now(dt.timezone.utc).isoformat()}",
+                "units: relative",
+                "view_space_z: false",
+            ]
+        )
+        + "\n"
+    )
+
+
+def _depth_frame_files(frames_dir: pathlib.Path) -> list[pathlib.Path]:
+    extensions = {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".webp"}
+    if not frames_dir.exists():
+        return []
+    return sorted(p for p in frames_dir.iterdir() if p.suffix.lower() in extensions)
+
+
+def _depth_exr_count(depth_dir: pathlib.Path) -> int:
+    return len(list(depth_dir.glob("*.exr"))) if depth_dir.exists() else 0
+
+
+def _minimum_depth_exrs(frames_dir: pathlib.Path) -> int:
+    frame_count = len(_depth_frame_files(frames_dir))
+    if frame_count <= 0:
+        return 1
+    return max(1, int(frame_count * 0.993 + 0.999))
+
+
+def _depth_ready(depth_dir: pathlib.Path, frames_dir: pathlib.Path) -> bool:
+    kind = _read_depth_source_kind(depth_dir)
+    if kind not in PRODUCTION_DEPTH_SOURCE_KINDS:
+        return False
+    return _depth_exr_count(depth_dir) >= _minimum_depth_exrs(frames_dir)
+
+
+def _remote_depth_config() -> tuple[str, str] | None:
+    endpoint = os.environ.get("OYSTER_DEPTH_ENDPOINT", "").strip()
+    token = os.environ.get("MODAL_TOKEN", "").strip()
+    if not endpoint and not token:
+        return None
+    return endpoint or DEFAULT_DEPTH_ENDPOINT, token
+
+
+def _depth_endpoint_reachable(endpoint: str, auth_token: str = "") -> bool:
+    headers = {"Authorization": f"Bearer {auth_token}"} if auth_token else {}
+    request = urllib.request.Request(endpoint.rstrip("/"), headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310
+            return response.status < 500
+    except urllib.error.HTTPError as exc:
+        return exc.code < 500
+    except (OSError, urllib.error.URLError, TimeoutError):
+        return False
 
 
 def ffprobe_frames(mp4: pathlib.Path) -> tuple[int, float]:
@@ -344,7 +452,7 @@ def step8_depth(sess: pathlib.Path, skip: bool = False) -> None:
     if skip:
         step("8/10 Depth: SKIPPED (--skip-depth)")
         return
-    step("8/10 DepthAnything V2 inference -> 1800 EXR files (~5-13 min)")
+    step("8/10 DepthAnything V2 post-processing -> EXR files")
     frames_dir = sess / "frames_for_depth"
     depth_dir = sess / "depth"
     if not frames_dir.exists():
@@ -363,17 +471,71 @@ def step8_depth(sess: pathlib.Path, skip: bool = False) -> None:
                 str(frames_dir / "%06d.png"),
             ]
         )
-    if not depth_dir.exists() or len(list(depth_dir.glob("*.exr"))) < 1788:
-        run(
-            [
+    if _depth_ready(depth_dir, frames_dir):
+        print(
+            f"  depth ready: {_depth_exr_count(depth_dir)} EXRs, "
+            f"source={_read_depth_source_kind(depth_dir)}"
+        )
+        return
+
+    depth_dir.mkdir(parents=True, exist_ok=True)
+    errors: list[str] = []
+
+    remote = _remote_depth_config()
+    if remote is not None:
+        endpoint, token = remote
+        if _depth_endpoint_reachable(endpoint, token):
+            print(f"  using remote DA-V2 endpoint: {endpoint}")
+            cmd = [
                 "python3",
-                str(BIN / "run_da_v2_depth.py"),
+                str(BIN / "run_da_v2_depth_remote.py"),
                 "--frames-dir",
                 str(frames_dir),
                 "--depth-dir",
                 str(depth_dir),
+                "--endpoint",
+                endpoint,
             ]
-        )
+            if token:
+                cmd.extend(["--auth-token", token])
+            proc = run(cmd, check=False)
+            if proc.returncode == 0 and _depth_exr_count(depth_dir) >= _minimum_depth_exrs(
+                frames_dir
+            ):
+                _write_depth_source_marker(depth_dir, kind="monocular_da_v2", backend="modal")
+                print(f"  remote depth complete: {_depth_exr_count(depth_dir)} EXRs")
+                return
+            errors.append(
+                "remote DA-V2 failed or produced too few EXRs "
+                f"(exit={proc.returncode}, exrs={_depth_exr_count(depth_dir)})"
+            )
+        else:
+            print(f"  remote DA-V2 endpoint unreachable; falling back to local ONNX: {endpoint}")
+
+    print("  using local DA-V2 ONNX runner (CPU-capable)")
+    proc = run(
+        [
+            "python3",
+            str(BIN / "run_da_v2_depth_onnx.py"),
+            "--input-dir",
+            str(frames_dir),
+            "--output",
+            str(depth_dir),
+            "--format",
+            "exr",
+        ],
+        check=False,
+    )
+    if proc.returncode == 0 and _depth_exr_count(depth_dir) >= _minimum_depth_exrs(frames_dir):
+        _write_depth_source_marker(depth_dir, kind="monocular_da_v2", backend="onnxruntime")
+        print(f"  local ONNX depth complete: {_depth_exr_count(depth_dir)} EXRs")
+        return
+
+    errors.append(
+        "local ONNX DA-V2 failed or produced too few EXRs "
+        f"(exit={proc.returncode}, exrs={_depth_exr_count(depth_dir)})"
+    )
+    raise RuntimeError("Depth post-processing failed: " + "; ".join(errors))
 
 
 def step9_patch_metadata(sess: pathlib.Path, duration: float = 300.0, frames: int = 9000) -> None:
@@ -486,7 +648,7 @@ def step12_upload_gate_strict(sess: pathlib.Path) -> tuple[bool, list[str]]:
 
     Returns (allowed_to_upload, reasons_blocked). Strict mode enforces ALL of:
       G1. Audit FAIL count == 0
-      G2. depth/.source kind == 'engine_zbuffer' (NOT monocular fallback)
+      G2. depth/.source kind is production-valid
       G3. input_latency.json present with samples
       G4. audio.flac exists AND > 50 KB (silence-compresses to ~30-50KB
           for 5min; below = empty)
@@ -514,17 +676,12 @@ def step12_upload_gate_strict(sess: pathlib.Path) -> tuple[bool, list[str]]:
         blocked.append(f"G1: audit unparseable ({e})")
 
     # G2: depth source kind
-    marker = sess / "depth" / ".source"
-    kind = "missing"
-    if marker.exists():
-        for ln in marker.read_text().splitlines():
-            if ln.startswith("kind:"):
-                kind = ln.split(":", 1)[1].strip()
-                break
-    if kind != "engine_zbuffer":
+    kind = _read_depth_source_kind(sess / "depth")
+    if kind not in PRODUCTION_DEPTH_SOURCE_KINDS:
+        accepted = ", ".join(sorted(PRODUCTION_DEPTH_SOURCE_KINDS))
         blocked.append(
-            f"G2: depth source = '{kind}' (production requires 'engine_zbuffer'; "
-            f"deploy patches/depth_zbuffer_capture.diff to mc-mod-fabric)"
+            f"G2: depth source = '{kind}' "
+            f"(production requires one of: {accepted}; run server-side DA-V2 post-processing)"
         )
 
     # G3: input_latency.json present
@@ -656,7 +813,7 @@ def main() -> int:
     ap.add_argument(
         "--strict",
         action="store_true",
-        help="Enforce v0.3.1 upload gate: 0 FAIL audit + engine_zbuffer depth + "
+        help="Enforce v0.3.1 upload gate: 0 FAIL audit + production-valid depth + "
         "input_latency + audio non-silent + 9000 frames + MANIFEST verified",
     )
     args = ap.parse_args()

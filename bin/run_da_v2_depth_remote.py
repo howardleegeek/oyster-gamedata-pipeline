@@ -7,25 +7,22 @@ Same CLI as local DA-V2:
         --endpoint https://oyster-depth.modal.run \
         --auth-token $MODAL_TOKEN
 
-If endpoint is unreachable, falls back to --skip-depth behavior.
+If endpoint is unreachable or inference fails, exits non-zero so callers can
+fall back to local ONNX without silently accepting missing depth.
 """
 
 import argparse
 import os
-import sys
 import subprocess
 import tarfile
 import io
 import time
 import glob
 import requests
-from pathlib import Path
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Compute DA-V2 depth via remote Modal endpoint"
-    )
+    parser = argparse.ArgumentParser(description="Compute DA-V2 depth via remote Modal endpoint")
     parser.add_argument(
         "--frames-dir",
         required=True,
@@ -79,12 +76,25 @@ def create_video_from_frames(frames_dir: str, fps: int) -> bytes:
     import tempfile
 
     frame_pattern = os.path.join(frames_dir, "frame_%06d.jpg")
-    # Check if frames exist with this pattern
-    if not glob.glob(frame_pattern):
-        # Try other patterns
-        frame_pattern = os.path.join(frames_dir, "*.jpg")
-        if not glob.glob(frame_pattern):
-            frame_pattern = os.path.join(frames_dir, "*.png")
+    use_glob = False
+    start_number = None
+    frame_files = glob.glob(os.path.join(frames_dir, "frame_[0-9][0-9][0-9][0-9][0-9][0-9].jpg"))
+    if frame_files:
+        first_stem = os.path.splitext(os.path.basename(sorted(frame_files)[0]))[0]
+        start_number = first_stem.rsplit("_", 1)[-1].lstrip("0") or "0"
+    else:
+        frame_pattern = os.path.join(frames_dir, "%06d.png")
+        frame_files = glob.glob(os.path.join(frames_dir, "[0-9][0-9][0-9][0-9][0-9][0-9].png"))
+        if frame_files:
+            first_stem = os.path.splitext(os.path.basename(sorted(frame_files)[0]))[0]
+            start_number = first_stem.lstrip("0") or "0"
+        else:
+            frame_pattern = os.path.join(frames_dir, "*.jpg")
+            use_glob = True
+            if not glob.glob(frame_pattern):
+                frame_pattern = os.path.join(frames_dir, "*.png")
+                if not glob.glob(frame_pattern):
+                    raise RuntimeError(f"no jpg/png frames found in {frames_dir}")
 
     with tempfile.TemporaryDirectory() as tmpdir:
         video_path = os.path.join(tmpdir, "input.mp4")
@@ -92,13 +102,26 @@ def create_video_from_frames(frames_dir: str, fps: int) -> bytes:
         cmd = [
             "ffmpeg",
             "-y",
-            "-framerate", str(fps),
-            "-i", frame_pattern,
-            "-c:v", "libx264",
-            "-pix_fmt", "yuv420p",
-            "-crf", "18",
-            video_path,
+            "-framerate",
+            str(fps),
         ]
+        if start_number is not None:
+            cmd.extend(["-start_number", start_number])
+        if use_glob:
+            cmd.extend(["-pattern_type", "glob"])
+        cmd.extend(
+            [
+                "-i",
+                frame_pattern,
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                "-crf",
+                "18",
+                video_path,
+            ]
+        )
 
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
@@ -184,7 +207,7 @@ def extract_depth_exrs(tar_bytes: bytes, depth_dir: str):
         for member in members:
             if member.name.startswith("depth/"):
                 # Strip the prefix
-                member.name = member.name[len("depth/"):]
+                member.name = member.name[len("depth/") :]
                 if member.name:  # Skip empty names
                     tar.extract(member, path=depth_dir)
 
@@ -194,20 +217,24 @@ def extract_depth_exrs(tar_bytes: bytes, depth_dir: str):
     return exr_files
 
 
-def write_source_marker(depth_dir: str):
+def write_source_marker(depth_dir: str, *, backend: str = "modal-a10g") -> None:
     """
     Write depth/.source marker file for H8 audit trail.
     """
     source_path = os.path.join(depth_dir, ".source")
     with open(source_path, "w") as f:
-        f.write("kind: server_da_v2\n")
+        f.write("kind: monocular_da_v2\n")
         f.write(f"timestamp: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n")
-        f.write("model: depth-anything-v2-small\n")
-        f.write("compute: modal-a10g\n")
+        f.write("model: depth-anything/Depth-Anything-V2-Small-hf\n")
+        f.write(f"compute: {backend}\n")
+        f.write("units: relative\n")
+        f.write("view_space_z: false\n")
+        f.write("legacy_kind: server_da_v2\n")
+        f.write("legacy_model: depth-anything-v2-small\n")
     print(f"Written source marker: {source_path}")
 
 
-def main():
+def main() -> int:
     args = parse_args()
 
     # Graceful fallback: skip depth if requested
@@ -215,7 +242,7 @@ def main():
         print("--skip-depth: skipping depth computation")
         os.makedirs(args.depth_dir, exist_ok=True)
         write_source_marker(args.depth_dir)
-        return
+        return 0
 
     # Check endpoint reachability
     print(f"Checking endpoint: {args.endpoint}")
@@ -223,11 +250,8 @@ def main():
         response = requests.get(args.endpoint.rstrip("/"), timeout=10)
         print(f"Endpoint reachable (status: {response.status_code})")
     except requests.exceptions.RequestException as e:
-        print(f"WARNING: Endpoint unreachable: {e}")
-        print("Falling back to --skip-depth behavior")
-        os.makedirs(args.depth_dir, exist_ok=True)
-        write_source_marker(args.depth_dir)
-        return
+        print(f"ERROR: Endpoint unreachable: {e}")
+        return 1
 
     # Create video from frames
     print(f"Creating video from frames in {args.frames_dir}...")
@@ -241,10 +265,7 @@ def main():
             print(f"Created video ({len(video_bytes)} bytes)")
     except Exception as e:
         print(f"ERROR: Failed to create video: {e}")
-        print("Falling back to --skip-depth")
-        os.makedirs(args.depth_dir, exist_ok=True)
-        write_source_marker(args.depth_dir)
-        return
+        return 1
 
     # Upload and compute depth
     print("Uploading to Modal endpoint...")
@@ -258,10 +279,7 @@ def main():
         )
     except Exception as e:
         print(f"ERROR: Depth computation failed: {e}")
-        print("Falling back to --skip-depth")
-        os.makedirs(args.depth_dir, exist_ok=True)
-        write_source_marker(args.depth_dir)
-        return
+        return 1
 
     # Extract results
     print("Extracting depth EXRs...")
@@ -271,7 +289,8 @@ def main():
     write_source_marker(args.depth_dir)
 
     print(f"Done! {len(exr_files)} depth EXRs in {args.depth_dir}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

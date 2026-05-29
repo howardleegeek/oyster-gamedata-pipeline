@@ -8,14 +8,15 @@ Usage:
     python3 bin/run_da_v2_depth_onnx.py --input path/to/image.png --output depth/
     python3 bin/run_da_v2_depth_onnx.py --input-dir frames/ --output depth/
 """
+
 import argparse
-import json
-import os
 import pathlib
+import struct
 import sys
 import time
 import warnings
 from datetime import datetime, timezone
+from typing import Any
 
 import numpy as np
 from PIL import Image
@@ -23,7 +24,16 @@ from PIL import Image
 warnings.filterwarnings("ignore")
 
 
-def get_providers():
+def has_external_weights(model_path: pathlib.Path | str | None) -> bool:
+    """Return true when an ONNX model has sibling external initializer weights."""
+
+    if model_path is None:
+        return False
+    onnx_path = pathlib.Path(model_path)
+    return onnx_path.with_suffix(onnx_path.suffix + ".data").exists()
+
+
+def get_providers(model_path: pathlib.Path | str | None = None) -> list[str]:
     """Select best available ONNX Runtime execution providers.
 
     Priority: DirectML (Windows GPU) > CUDA > CoreML (Mac) > CPU
@@ -31,15 +41,61 @@ def get_providers():
     import onnxruntime as ort
 
     available = ort.get_available_providers()
-    providers = []
+    skip_coreml = has_external_weights(model_path)
+    providers: list[str] = []
     if "DmlExecutionProvider" in available:
         providers.append("DmlExecutionProvider")
     if "CUDAExecutionProvider" in available:
         providers.append("CUDAExecutionProvider")
-    if "CoreMLExecutionProvider" in available:
+    if "CoreMLExecutionProvider" in available and not skip_coreml:
         providers.append("CoreMLExecutionProvider")
     providers.append("CPUExecutionProvider")
     return providers
+
+
+def create_inference_session(onnx_path: pathlib.Path, providers: list[str]) -> Any:
+    """Create an ONNX Runtime session, falling back to CPU if an EP fails."""
+
+    import onnxruntime as ort
+
+    try:
+        return ort.InferenceSession(str(onnx_path), providers=providers)
+    except Exception as exc:
+        if providers == ["CPUExecutionProvider"]:
+            raise
+        print(
+            "WARNING: ONNX Runtime failed to initialize with providers "
+            f"{providers}: {exc}. Retrying with ['CPUExecutionProvider'].",
+            file=sys.stderr,
+        )
+        return ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
+
+
+def test_get_providers_skips_coreml_for_external_weights(
+    tmp_path: pathlib.Path, monkeypatch: Any
+) -> None:
+    """CoreML is skipped for split ONNX weights while other accelerators remain."""
+
+    model_path = tmp_path / "model.onnx"
+    model_path.touch()
+    model_path.with_suffix(model_path.suffix + ".data").touch()
+    monkeypatch.setattr(
+        "onnxruntime.get_available_providers",
+        lambda: [
+            "DmlExecutionProvider",
+            "CUDAExecutionProvider",
+            "CoreMLExecutionProvider",
+            "CPUExecutionProvider",
+        ],
+    )
+
+    providers = get_providers(model_path)
+
+    assert providers == [
+        "DmlExecutionProvider",
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider",
+    ]
 
 
 def load_processor(model_id: str):
@@ -72,16 +128,81 @@ def normalize_depth(depth: np.ndarray) -> Image.Image:
     return Image.fromarray(normalized, mode="L")
 
 
-def write_source_marker(output_dir: pathlib.Path):
+def resize_depth_for_exr(depth: np.ndarray) -> np.ndarray:
+    """Resize DA-V2 output to the canonical 1920x1080 EXR shape."""
+
+    depth_img = Image.fromarray(depth.astype(np.float32), mode="F")
+    depth_1920 = depth_img.resize((1920, 1080), Image.BILINEAR)
+    return np.asarray(depth_1920, dtype=np.float32)
+
+
+def write_exr_z(path: pathlib.Path, depth: np.ndarray) -> None:
+    """Write a single-channel float32 OpenEXR file without extra dependencies."""
+
+    depth = np.asarray(depth, dtype="<f4")
+    if depth.ndim != 2:
+        raise ValueError(f"expected 2D depth array, got shape={depth.shape}")
+
+    height, width = depth.shape
+
+    def attr(name: str, type_name: str, value: bytes) -> bytes:
+        return (
+            name.encode("ascii")
+            + b"\x00"
+            + type_name.encode("ascii")
+            + b"\x00"
+            + struct.pack("<i", len(value))
+            + value
+        )
+
+    channels = b"Z\x00" + struct.pack("<iB3xii", 2, 0, 1, 1) + b"\x00"
+    header = b"".join(
+        [
+            attr("channels", "chlist", channels),
+            attr("compression", "compression", b"\x00"),
+            attr("dataWindow", "box2i", struct.pack("<iiii", 0, 0, width - 1, height - 1)),
+            attr("displayWindow", "box2i", struct.pack("<iiii", 0, 0, width - 1, height - 1)),
+            attr("lineOrder", "lineOrder", b"\x00"),
+            attr("pixelAspectRatio", "float", struct.pack("<f", 1.0)),
+            attr("screenWindowCenter", "v2f", struct.pack("<ff", 0.0, 0.0)),
+            attr("screenWindowWidth", "float", struct.pack("<f", 1.0)),
+        ]
+    )
+    header += b"\x00"
+
+    line_size = width * 4
+    chunk_size = 8 + line_size
+    first_chunk_offset = 4 + 4 + len(header) + height * 8
+
+    with path.open("wb") as f:
+        f.write(struct.pack("<I", 20000630))
+        f.write(struct.pack("<I", 2))
+        f.write(header)
+        for y in range(height):
+            f.write(struct.pack("<q", first_chunk_offset + y * chunk_size))
+        for y in range(height):
+            f.write(struct.pack("<iI", y, line_size))
+            f.write(depth[y].tobytes(order="C"))
+
+
+def write_source_marker(output_dir: pathlib.Path) -> None:
     """Write .source marker to disambiguate backend used."""
+
     source_path = output_dir / ".source"
-    source_data = {
-        "kind": "monocular_da_v2_onnx",
-        "backend": "onnxruntime",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
-    with open(source_path, "w") as f:
-        json.dump(source_data, f, indent=2)
+    source_path.write_text(
+        "\n".join(
+            [
+                "kind: monocular_da_v2",
+                "backend: onnxruntime",
+                f"timestamp: {datetime.now(timezone.utc).isoformat()}",
+                "model: depth-anything/Depth-Anything-V2-Small-hf",
+                "units: relative",
+                "view_space_z: false",
+                "legacy_kind: monocular_da_v2_onnx",
+            ]
+        )
+        + "\n"
+    )
 
 
 def main():
@@ -101,10 +222,24 @@ def main():
         help="Directory of input images to process",
     )
     parser.add_argument(
+        "--frames-dir",
+        dest="input_dir",
+        type=str,
+        default=None,
+        help="Alias for --input-dir",
+    )
+    parser.add_argument(
         "--output",
         type=str,
         default="depth",
         help="Output directory for depth maps (default: depth)",
+    )
+    parser.add_argument(
+        "--depth-dir",
+        dest="output",
+        type=str,
+        default=None,
+        help="Alias for --output",
     )
     parser.add_argument(
         "--onnx-path",
@@ -120,16 +255,16 @@ def main():
     )
     parser.add_argument(
         "--format",
-        choices=["png", "npy", "both"],
-        default="both",
-        help="Output format: png, npy, or both (default: both)",
+        choices=["exr", "png", "npy", "both"],
+        default="exr",
+        help="Output format: exr, png, npy, or both (default: exr)",
     )
     args = parser.parse_args()
 
     if not args.input and not args.input_dir:
         parser.error("Either --input or --input-dir is required")
 
-    output_dir = pathlib.Path(args.output)
+    output_dir = pathlib.Path(args.output or "depth")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Resolve ONNX model path
@@ -153,11 +288,9 @@ def main():
 
     # Load ONNX session with best available providers
     print(f"Loading ONNX model: {onnx_path}")
-    import onnxruntime as ort
-
-    providers = get_providers()
+    providers = get_providers(onnx_path)
     print(f"  Execution providers: {providers}")
-    sess = ort.InferenceSession(str(onnx_path), providers=providers)
+    sess = create_inference_session(onnx_path, providers)
 
     # Load image processor
     print(f"Loading image processor: {args.model_id}")
@@ -169,9 +302,7 @@ def main():
     else:
         input_dir = pathlib.Path(args.input_dir)
         extensions = {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".webp"}
-        input_files = sorted(
-            f for f in input_dir.iterdir() if f.suffix.lower() in extensions
-        )
+        input_files = sorted(f for f in input_dir.iterdir() if f.suffix.lower() in extensions)
 
     print(f"Processing {len(input_files)} image(s)...")
     t0 = time.time()
@@ -181,6 +312,9 @@ def main():
         depth = run_inference(sess, processor, img)
 
         base_name = img_path.stem
+        if args.format == "exr":
+            out_exr = output_dir / f"{i:06d}.exr"
+            write_exr_z(out_exr, resize_depth_for_exr(depth))
         if args.format in ("png", "both"):
             depth_img = normalize_depth(depth)
             out_png = output_dir / f"{base_name}_depth.png"
