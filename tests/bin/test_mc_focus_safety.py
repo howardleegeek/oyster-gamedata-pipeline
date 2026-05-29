@@ -93,8 +93,8 @@ def test_ensure_mc_focus_loss_safe_patches_options_txt(
     options = instance / "options.txt"
     options.write_text(initial, encoding="utf-8")
 
-    m._ensure_mc_focus_loss_safe(instance)
-    m._ensure_mc_focus_loss_safe(instance)
+    assert m._ensure_mc_focus_loss_safe(instance) is True
+    assert m._ensure_mc_focus_loss_safe(instance) is True
 
     parsed = _options_map(options)
     assert parsed["pauseOnLostFocus"] == "false"
@@ -116,7 +116,7 @@ def test_ensure_mc_focus_loss_safe_skips_missing_options_txt(
     instance = tmp_path / "mc-instance"
     instance.mkdir()
 
-    m._ensure_mc_focus_loss_safe(instance)
+    assert m._ensure_mc_focus_loss_safe(instance) is False
 
     assert not (instance / "options.txt").exists()
     assert traces == [f"options.txt not found at {instance / 'options.txt'}, skipping"]
@@ -142,13 +142,13 @@ def test_ensure_mc_focus_loss_safe_noops_on_non_windows(
     original = "pauseOnLostFocus:true\nfullscreen:true\nrenderDistance:12\n"
     options.write_text(original, encoding="utf-8")
 
-    m._ensure_mc_focus_loss_safe(instance)
+    assert m._ensure_mc_focus_loss_safe(instance) is False
 
     assert options.read_text(encoding="utf-8") == original
     assert traces == ["non-Windows, skipping options.txt patch"]
 
 
-def test_watch_mc_focus_alive_restores_non_foreground_mc_hwnd(
+def test_watch_mc_focus_alive_is_disabled_by_default(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     m = _import_recorder_module()
@@ -181,14 +181,25 @@ def test_watch_mc_focus_alive_restores_non_foreground_mc_hwnd(
     app = object.__new__(m.RecorderApp)
     app._mc_window_rect = {"hwnd": 111}
     app._last_mc_focus_check_at = 0.0
+    app._mc_focus_restore_loop_enabled = False
+    app._mc_focus_restore_ran = False
 
     app._watch_mc_focus_alive()
     now[0] = 102.0
     app._watch_mc_focus_alive()
 
-    assert calls == [
-        ("ShowWindow", 111),
-        ("BringWindowToTop", 111),
-        ("SetForegroundWindow", 111),
-    ]
-    assert any("MC mod data frozen" in line for line in traces)
+    assert calls == []
+    assert traces == []
+    assert app._mc_focus_restore_ran is False
+
+
+def test_focus_restore_warning_loop_removed_from_source() -> None:
+    src = (BIN_DIR / "recorder_consumer_lite.py").read_text(encoding="utf-8")
+
+    assert "WARN: MC mod data frozen" not in src
+    assert "possible focus loss" not in src
+    watch_start = src.index("def _watch_mc_focus_alive")
+    watch_end = src.index("def _make_window_non_focus_stealing", watch_start)
+    watch_body = src[watch_start:watch_end]
+    assert "SetForegroundWindow" not in watch_body
+    assert "BringWindowToTop" not in watch_body

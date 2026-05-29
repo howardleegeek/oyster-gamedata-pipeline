@@ -195,6 +195,10 @@ def test_data_session_packages_when_all_video_layers_fail(
     monkeypatch.setattr(game_state_overlay, "jsonl_path", lambda: game_state)
     app = _new_app(m, tmp_path, active_dir)
     app._mark_session_started("20260528-000000")
+    app._mc_pause_on_lost_focus_set = True
+    app._mc_focus_restore_loop_enabled = False
+    app._mc_focus_restore_ran = False
+    app._window_no_activate_applied = True
 
     audio_report = m.AudioProbeReport(process_name="javaw.exe", selected=None, probes=[])
     monkeypatch.setattr(m, "probe_audio_source_chain", lambda _process: audio_report)
@@ -217,7 +221,13 @@ def test_data_session_packages_when_all_video_layers_fail(
     assert (clip_dir / "game_state.jsonl").read_text(encoding="utf-8").strip()
     metadata = json.loads((clip_dir / "metadata.json").read_text(encoding="utf-8"))
     assert metadata["video_capture"]["selected_mode"] == "none"
-    assert len(metadata["video_capture"]["attempts_failed"]) == 3
+    assert len(metadata["video_capture"]["attempts_failed"]) == 4
+    assert metadata["focus_safety"] == {
+        "pause_on_lost_focus_disabled": True,
+        "focus_restore_loop_enabled": False,
+        "focus_restore_ran": False,
+        "status_window_no_activate": True,
+    }
     assert metadata["session_complete"] is False
 
 

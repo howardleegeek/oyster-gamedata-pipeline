@@ -80,6 +80,7 @@ def _make_app(m: Any, *, frame: Any = "0x1234") -> Any:
     app = object.__new__(m.RecorderApp)
     app._window_no_activate_hwnd = None
     app._window_original_ex_style = None
+    app._window_no_activate_applied = False
     app._window_disabled_for_recording = False
     app._disabled_stop_hotkey_thread = None
     app._disabled_stop_hotkey_thread_id = None
@@ -101,10 +102,13 @@ def test_ws_ex_noactivate_applied_during_recording_and_restored(
 
     app._make_window_non_focus_stealing()
 
+    assert m.WS_EX_NOACTIVATE == 0x08000000
+    assert m.GWL_EXSTYLE == -20
     assert user32.get_calls == [(0x1234, -20)]
     assert user32.set_calls == [(0x1234, -20, 0x08040000)]
     assert app._window_no_activate_hwnd == 0x1234
     assert app._window_original_ex_style == 0x00040000
+    assert app._window_no_activate_applied is True
     assert app._window_disabled_for_recording is False
 
     app._restore_window_activatable()
@@ -133,6 +137,7 @@ def test_ws_ex_noactivate_failure_disables_window_and_restore_reenables(
 
     assert attribute_calls == [("-disabled", True)]
     assert hotkey_started == [True]
+    assert app._window_no_activate_applied is False
     assert app._window_disabled_for_recording is True
 
     app._restore_window_activatable()
@@ -157,3 +162,12 @@ def test_recording_path_wraps_ffmpeg_with_focus_mitigation() -> None:
         "            self._video_started = False"
     ) in src
     assert ('self._set("⚠️ 仅数据采集（视频不可用）", ORANGE, str(exc)[:80])') in src
+
+
+def test_status_window_never_uses_topmost_or_lift_for_status() -> None:
+    src = (BIN_DIR / "recorder_consumer_lite.py").read_text(encoding="utf-8")
+
+    assert 'attributes("-topmost"' not in src
+    assert ".lift(" not in src
+    assert ".focus_force(" not in src
+    assert ".grab_set(" not in src

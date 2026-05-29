@@ -179,12 +179,38 @@ def test_build_launch_plan_emits_knotclient(fake_install: Path) -> None:
     """End-to-end: the constructed cmd has KnotClient + -DFabricMcEmu."""
     plan = m.build_launch_plan(install_root_path=fake_install)
     assert plan.main_class == m.EXPECTED_FABRIC_MAIN
+    assert plan.pause_on_lost_focus_disabled is True
     cmd = list(plan.cmd)
     # KnotClient appears as a positional arg
     assert m.EXPECTED_FABRIC_MAIN in cmd
     # FabricMcEmu is in JVM args (somewhere before the -cp / mainClass)
     fabric_emu = [a for a in cmd if a.startswith("-DFabricMcEmu=")]
     assert fabric_emu, f"missing -DFabricMcEmu in cmd: {cmd}"
+
+
+def test_build_launch_plan_forces_pause_on_lost_focus_false(fake_install: Path) -> None:
+    options = m.mc_instance_dir(fake_install) / "options.txt"
+    options.write_text(
+        "pauseOnLostFocus:true\nrenderDistance:12\n",
+        encoding="utf-8",
+    )
+
+    m.build_launch_plan(install_root_path=fake_install)
+    m.build_launch_plan(install_root_path=fake_install)
+
+    text = options.read_text(encoding="utf-8")
+    assert "pauseOnLostFocus:false\n" in text
+    assert "renderDistance:12\n" in text
+    assert text.count("pauseOnLostFocus:false") == 1
+
+
+def test_build_launch_plan_creates_missing_options_txt(fake_install: Path) -> None:
+    options = m.mc_instance_dir(fake_install) / "options.txt"
+    assert not options.exists()
+
+    m.build_launch_plan(install_root_path=fake_install)
+
+    assert options.read_text(encoding="utf-8") == "pauseOnLostFocus:false\n"
 
 
 # ---------------------------------------------------------------------------

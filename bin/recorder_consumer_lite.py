@@ -91,7 +91,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.18.9"
+RECORDER_VERSION = "lite-v0.18.10"
 
 # R01 iron-law: supported MC versions for real game-state Fabric mod.
 # Kept in sync with .github/workflows/build-mc-mod.yml matrix.
@@ -2723,6 +2723,9 @@ MC_LAUNCHER_PROCESS_NAMES = {"minecraftlauncher.exe"}
 MC_WINDOW_TITLE_EXCLUDE_MARKERS = ("launcher", "启动器")
 MIN_MC_WINDOW_WIDTH = 640
 MIN_MC_WINDOW_HEIGHT = 360
+WS_EX_NOACTIVATE = 0x08000000
+GWL_EXSTYLE = -20
+MC_FOCUS_RESTORE_LOOP_ENABLED = False
 
 
 def _candidate_mc_instance_dirs() -> list[Path]:
@@ -2760,23 +2763,23 @@ def _candidate_mc_instance_dirs() -> list[Path]:
     return out
 
 
-def _ensure_mc_focus_loss_safe(mc_instance_dir: Path) -> None:
+def _ensure_mc_focus_loss_safe(mc_instance_dir: Path) -> bool:
     """Force Minecraft to keep ticking if the recorder/UI steals focus."""
 
     if os.name != "nt":
         _trace("non-Windows, skipping options.txt patch")
-        return
+        return False
 
     options_path = Path(mc_instance_dir) / "options.txt"
     if not options_path.exists():
         _trace(f"options.txt not found at {options_path}, skipping")
-        return
+        return False
 
     try:
         lines = options_path.read_text(encoding="utf-8", errors="replace").splitlines()
     except Exception as exc:  # noqa: BLE001
         _trace(f"options.txt patch failed at {options_path}: {exc}")
-        return
+        return False
 
     required = {
         "pauseOnLostFocus": "false",
@@ -2800,16 +2803,19 @@ def _ensure_mc_focus_loss_safe(mc_instance_dir: Path) -> None:
         _atomic_write_text(options_path, "\n".join(patched) + "\n", encoding="utf-8")
     except Exception as exc:  # noqa: BLE001
         _trace(f"options.txt patch failed at {options_path}: {exc}")
-        return
+        return False
 
     _trace(f"options.txt patched: pauseOnLostFocus=false; fullscreen=false at {options_path}")
+    return True
 
 
-def _ensure_known_mc_instances_focus_loss_safe() -> None:
+def _ensure_known_mc_instances_focus_loss_safe() -> bool:
     """Patch all likely MC instance options files without failing recorder startup."""
 
+    patched_any = False
     for mc_dir in _candidate_mc_instance_dirs():
-        _ensure_mc_focus_loss_safe(mc_dir)
+        patched_any = _ensure_mc_focus_loss_safe(mc_dir) or patched_any
+    return patched_any
 
 
 def _normalise_process_name(name: str) -> str:
@@ -3401,10 +3407,14 @@ class RecorderApp(tk.Tk):
         }
         self._window_no_activate_hwnd: Optional[int] = None
         self._window_original_ex_style: Optional[int] = None
+        self._window_no_activate_applied = False
         self._window_disabled_for_recording = False
         self._disabled_stop_hotkey_thread: Optional[threading.Thread] = None
         self._disabled_stop_hotkey_thread_id: Optional[int] = None
         self._disabled_stop_hotkey_id = 0x534F
+        self._mc_pause_on_lost_focus_set = False
+        self._mc_focus_restore_loop_enabled = MC_FOCUS_RESTORE_LOOP_ENABLED
+        self._mc_focus_restore_ran = False
         # v0.4.0: tester explicitly opts in to recording. Default is
         # observe-only mode so our .exe can NEVER be blamed for MC
         # crashing — a tester whose MC crashes can verify it crashes
@@ -3436,7 +3446,7 @@ class RecorderApp(tk.Tk):
 
         self._build_ui()
         self._recover_orphaned_active_session_on_boot()
-        _ensure_known_mc_instances_focus_loss_safe()
+        self._mc_pause_on_lost_focus_set = _ensure_known_mc_instances_focus_loss_safe()
         # Start background watcher immediately — testers do not click anything.
         threading.Thread(target=self._watch_loop, daemon=True).start()
 
@@ -3980,8 +3990,7 @@ class RecorderApp(tk.Tk):
         """
         try:
             self.deiconify()
-            self.lift()
-            _trace("window restored from taskbar")
+            _trace("window deiconified without focus raise")
         except Exception as e:
             _trace(f"deiconify failed: {e}")
 
@@ -3995,18 +4004,11 @@ class RecorderApp(tk.Tk):
     # self.after(0, ...) so the depth runner can call back from any
     # worker thread safely.
     def _show_depth_progress_ui(self) -> None:
-        """Replace the normal recorder UI with a depth-inference progress
-        view. Force the window to re-appear from the taskbar so the tester
-        actually sees it.
-        """
-        # rc9 Bug 1: force restore from iconified — tester complained the
-        # recorder "stayed hidden" while depth ran for ~40 min.
+        """Replace the normal recorder UI with a depth-inference progress view."""
+
         try:
             self.deiconify()
-            self.lift()
-            self.attributes("-topmost", True)
-            self.after(500, lambda: self.attributes("-topmost", False))
-            _trace("depth_progress: restored window from taskbar")
+            _trace("depth_progress: deiconified without topmost/focus raise")
         except Exception as e:
             _trace(f"depth_progress: deiconify failed: {e}")
 
@@ -4305,38 +4307,16 @@ class RecorderApp(tk.Tk):
         _trace(f"active_session: marked session start {marker['session_id']} -> clip-{ts}")
 
     def _watch_mc_focus_alive(self, *, force: bool = False) -> None:
-        """Best-effort keep the captured Minecraft HWND foregrounded while recording."""
+        """Legacy MC foreground watchdog.
 
-        now = time.time()
-        if not force and now - getattr(self, "_last_mc_focus_check_at", 0.0) < 5.0:
-            return
-        self._last_mc_focus_check_at = now
+        Disabled: forcing foreground in a loop can steal focus back and
+        forth with the Tk status window. Minecraft is kept live by
+        pauseOnLostFocus=false instead.
+        """
 
-        rect = self._mc_window_rect or {}
-        try:
-            hwnd = int(rect.get("hwnd") or 0)
-        except Exception:
-            hwnd = 0
-        if os.name != "nt" or hwnd <= 0:
-            return
-
-        try:
-            import ctypes
-
-            user32 = ctypes.windll.user32
-            foreground = int(user32.GetForegroundWindow())
-            if foreground == hwnd:
-                return
-
-            _trace(
-                "WARN: MC mod data frozen — possible focus loss; "
-                f"foreground={foreground} mc_hwnd={hwnd}; restoring"
-            )
-            user32.ShowWindow(hwnd, 9)  # SW_RESTORE
-            user32.BringWindowToTop(hwnd)
-            user32.SetForegroundWindow(hwnd)
-        except Exception as exc:  # noqa: BLE001
-            _trace(f"minecraft focus watchdog failed: {exc}")
+        _ = force
+        self._mc_focus_restore_loop_enabled = False
+        self._mc_focus_restore_ran = False
 
     def _make_window_non_focus_stealing(self) -> None:
         if os.name != "nt":
@@ -4344,8 +4324,6 @@ class RecorderApp(tk.Tk):
         try:
             import ctypes
 
-            WS_EX_NOACTIVATE = 0x08000000
-            GWL_EXSTYLE = -20
             hwnd = self.winfo_id()
             frame = self.wm_frame()
             if frame:
@@ -4355,6 +4333,7 @@ class RecorderApp(tk.Tk):
             user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex_style | WS_EX_NOACTIVATE)
             self._window_no_activate_hwnd = hwnd
             self._window_original_ex_style = ex_style
+            self._window_no_activate_applied = True
             self._window_disabled_for_recording = False
             _trace("window made non-activatable (WS_EX_NOACTIVATE)")
         except Exception as exc:  # noqa: BLE001 - fall back to disabled window
@@ -4364,6 +4343,7 @@ class RecorderApp(tk.Tk):
     def _disable_window_focus_fallback(self) -> None:
         try:
             self.attributes("-disabled", True)
+            self._window_no_activate_applied = False
             self._window_disabled_for_recording = True
             self._start_disabled_stop_hotkey()
             _trace("window disabled during recording; Ctrl+Shift+S stop hotkey armed")
@@ -4458,7 +4438,6 @@ class RecorderApp(tk.Tk):
             if hwnd is not None and ex_style is not None:
                 import ctypes
 
-                GWL_EXSTYLE = -20
                 ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex_style)
                 _trace("window restored activatable")
             self._window_no_activate_hwnd = None
@@ -4488,7 +4467,9 @@ class RecorderApp(tk.Tk):
             armed = self._record_armed
             mc_alive = _minecraft_running()
             if armed and mc_alive:
-                _ensure_known_mc_instances_focus_loss_safe()
+                self._mc_pause_on_lost_focus_set = (
+                    _ensure_known_mc_instances_focus_loss_safe() or self._mc_pause_on_lost_focus_set
+                )
                 _trace("watch_loop: armed + MC alive → entering recording")
                 break
             now = time.time()
@@ -5271,6 +5252,21 @@ class RecorderApp(tk.Tk):
                     if attempt.get("status") in {"failed", "unavailable", "not_started"}
                 ],
             },
+            "focus_safety": {
+                "pause_on_lost_focus_disabled": bool(
+                    self.__dict__.get("_mc_pause_on_lost_focus_set", False)
+                ),
+                "focus_restore_loop_enabled": bool(
+                    self.__dict__.get(
+                        "_mc_focus_restore_loop_enabled",
+                        MC_FOCUS_RESTORE_LOOP_ENABLED,
+                    )
+                ),
+                "focus_restore_ran": bool(self.__dict__.get("_mc_focus_restore_ran", False)),
+                "status_window_no_activate": bool(
+                    self.__dict__.get("_window_no_activate_applied", False)
+                ),
+            },
         }
         video_capture_warnings: list[str] = []
         if self.__dict__.get("_video_capture_mode") == "gdigrab":
@@ -5286,11 +5282,11 @@ class RecorderApp(tk.Tk):
         if video_capture_warnings:
             metadata["video_capture"]["warning"] = "; ".join(video_capture_warnings)
             metadata["video_capture"]["warnings"] = video_capture_warnings
-        if game_state_partial_reason:
+        if game_state_partial_reason or not has_real_game_state:
             metadata["game_state_capture"] = {
                 "status": "missing",
                 "required": True,
-                "error": game_state_partial_reason,
+                "error": game_state_partial_reason or "real game-state JSONL missing",
             }
         if getattr(self, "_allow_placeholder", False) and not _gs_samples:
             metadata.update(
