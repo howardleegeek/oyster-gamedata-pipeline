@@ -91,7 +91,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.18.11"
+RECORDER_VERSION = "lite-v0.18.12"
 
 # R01 iron-law: supported MC versions for real game-state Fabric mod.
 # Kept in sync with .github/workflows/build-mc-mod.yml matrix.
@@ -1944,9 +1944,13 @@ def _quick_test_video_encoder(encoder_name: str, ffmpeg_bin: Path) -> bool:
         "-f",
         "lavfi",
         "-i",
-        "color=c=black:s=64x64:r=1",
+        # Must match real-use resolution: hardware encoders (nvenc/amf/qsv)
+        # reject tiny frames (e.g. 64x64) with -22 (Invalid argument) due to
+        # minimum-size requirements, which falsely rejected ALL hw encoders on
+        # bingd's rig and forced the slow software path. Test at 1920x1080.
+        "color=c=black:s=1920x1080:r=30",
         "-frames:v",
-        "1",
+        "3",
         "-an",
         "-c:v",
         encoder_name,
