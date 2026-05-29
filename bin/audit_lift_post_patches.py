@@ -26,16 +26,41 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import math
 import os
 import re
 import subprocess
 import sys
 from pathlib import Path
 
-
 # ---------------------------------------------------------------------------
 # Patch 1+2+3: metadata.json — device_id, UTC timestamps, recording_started_utc
 # ---------------------------------------------------------------------------
+
+
+def _local_naive_to_utc(value: dt.datetime) -> dt.datetime:
+    if value.tzinfo is not None:
+        return value.astimezone(dt.timezone.utc)
+    return value.astimezone().astimezone(dt.timezone.utc)
+
+
+def _clamp_future_utc(value: dt.datetime) -> dt.datetime:
+    now_utc = dt.datetime.now(dt.timezone.utc)
+    if value > now_utc:
+        return now_utc
+    return value
+
+
+def _parse_utc_datetime(value: object) -> dt.datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return _local_naive_to_utc(parsed)
+    return parsed.astimezone(dt.timezone.utc)
 
 
 def patch_metadata(session: Path, dry_run: bool = False) -> dict:
@@ -79,9 +104,11 @@ def patch_metadata(session: Path, dry_run: bool = False) -> dict:
         if m:
             date_part, time_part = m.group(1), m.group(2)
             try:
-                started_dt = dt.datetime.strptime(
-                    date_part + time_part, "%Y%m%d%H%M%S",
-                ).replace(tzinfo=dt.timezone.utc)
+                local_naive = dt.datetime.strptime(
+                    date_part + time_part,
+                    "%Y%m%d%H%M%S",
+                )
+                started_dt = _local_naive_to_utc(local_naive)
             except ValueError:
                 pass
 
@@ -89,12 +116,15 @@ def patch_metadata(session: Path, dry_run: bool = False) -> dict:
         mp4 = session / "recording.mp4"
         if mp4.exists():
             started_dt = dt.datetime.fromtimestamp(
-                mp4.stat().st_mtime, dt.timezone.utc,
+                mp4.stat().st_mtime,
+                dt.timezone.utc,
             )
 
     if started_dt is not None:
+        started_dt = _clamp_future_utc(started_dt)
         utc_iso = started_dt.isoformat()
-        if not meta.get("recording_started_utc"):
+        existing_started = _parse_utc_datetime(meta.get("recording_started_utc"))
+        if existing_started is None or existing_started > dt.datetime.now(dt.timezone.utc):
             meta["recording_started_utc"] = utc_iso
             changes["recording_started_utc"] = utc_iso
 
@@ -116,12 +146,37 @@ def patch_metadata(session: Path, dry_run: bool = False) -> dict:
 # ---------------------------------------------------------------------------
 
 
+_SILENCE_DB_FLOOR = -120.0
+_ASTATS_VALUE = r"([+-]?(?:\d+(?:\.\d*)?|\.\d+|inf|nan))"
 _ASTATS_KEY_RE = re.compile(
     r"\[Parsed_astats[^\]]*\][^\n]*?"
-    r"(RMS level dB|Peak level dB|Mean difference|RMS difference|Min level|Max level):\s*"
-    r"([\-\d\.]+|nan|inf)",
+    r"(RMS level dB|Peak level dB|Noise floor dB|Mean difference|RMS difference|Min level|Max level):\s*"
+    + _ASTATS_VALUE,
     re.IGNORECASE,
 )
+_ASTATS_METADATA_RE = re.compile(
+    r"lavfi\.astats\.(?:Overall|\d+)\.(RMS_level|Peak_level|Noise_floor)=" + _ASTATS_VALUE,
+    re.IGNORECASE,
+)
+
+
+def _audio_db_value(raw: str) -> float | None:
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(value):
+        return None
+    if math.isinf(value):
+        return _SILENCE_DB_FLOOR if value < 0 else None
+    return value
+
+
+def _normalize_astats_key(key: str) -> str:
+    normalized = key.replace(" ", "_").replace("_dB", "_db").lower()
+    if normalized in {"rms_level", "peak_level", "noise_floor"}:
+        normalized = f"{normalized}_db"
+    return normalized
 
 
 def patch_audio_check(session: Path, dry_run: bool = False) -> dict:
@@ -133,13 +188,23 @@ def patch_audio_check(session: Path, dry_run: bool = False) -> dict:
 
     # ffmpeg -i audio.flac -af astats -f null -
     cmd = [
-        "ffmpeg", "-hide_banner", "-i", str(audio_path),
-        "-af", "astats=metadata=1:reset=1,ametadata=print:file=-",
-        "-f", "null", "-",
+        "ffmpeg",
+        "-hide_banner",
+        "-i",
+        str(audio_path),
+        "-af",
+        "astats=metadata=1:reset=1,ametadata=print:file=-",
+        "-f",
+        "null",
+        "-",
     ]
     try:
         proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=120, check=False,
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
         return {"error": f"ffmpeg failed: {exc}"}
@@ -154,17 +219,26 @@ def patch_audio_check(session: Path, dry_run: bool = False) -> dict:
         m = _ASTATS_KEY_RE.search(line)
         if m:
             key, val = m.group(1), m.group(2)
-            try:
-                parsed[key.replace(" ", "_").lower()] = float(val)
-            except (ValueError, TypeError):
-                pass
+            db_value = _audio_db_value(val)
+            if db_value is not None:
+                parsed[_normalize_astats_key(key)] = db_value
+            continue
+        m = _ASTATS_METADATA_RE.search(line)
+        if m:
+            key, val = m.group(1), m.group(2)
+            db_value = _audio_db_value(val)
+            if db_value is not None:
+                parsed[_normalize_astats_key(key)] = db_value
 
     # Compute SNR (peak - rms = approximate dynamic range)
     rms_db = parsed.get("rms_level_db")
     peak_db = parsed.get("peak_level_db")
-    snr_db = None
-    if rms_db is not None and peak_db is not None:
-        snr_db = peak_db - rms_db
+    noise_floor_db = parsed.get("noise_floor_db")
+    snr_db = 0.0
+    if rms_db is not None and noise_floor_db is not None and noise_floor_db < rms_db:
+        snr_db = rms_db - noise_floor_db
+    elif rms_db is not None and peak_db is not None:
+        snr_db = max(0.0, peak_db - rms_db)
 
     # Audio size + duration for B7 continuity check
     size_bytes = audio_path.stat().st_size
@@ -172,9 +246,20 @@ def patch_audio_check(session: Path, dry_run: bool = False) -> dict:
     dur_sec = 0.0
     try:
         r = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-             "-of", "default=noprint_wrappers=1:nokey=1", str(audio_path)],
-            capture_output=True, text=True, timeout=30, check=False,
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                str(audio_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
         )
         dur_sec = float(r.stdout.strip()) if r.stdout.strip() else 0.0
     except (subprocess.TimeoutExpired, FileNotFoundError, ValueError):
@@ -184,9 +269,21 @@ def patch_audio_check(session: Path, dry_run: bool = False) -> dict:
     max_silence_gap_s = 0.0
     try:
         sd_proc = subprocess.run(
-            ["ffmpeg", "-hide_banner", "-i", str(audio_path),
-             "-af", "silencedetect=noise=-50dB:duration=0.5", "-f", "null", "-"],
-            capture_output=True, text=True, timeout=60, check=False,
+            [
+                "ffmpeg",
+                "-hide_banner",
+                "-i",
+                str(audio_path),
+                "-af",
+                "silencedetect=noise=-50dB:duration=0.5",
+                "-f",
+                "null",
+                "-",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
         )
         # Parse silence_duration values
         durs = []
@@ -205,6 +302,7 @@ def patch_audio_check(session: Path, dry_run: bool = False) -> dict:
         "duration_sec": dur_sec,
         "rms_db": rms_db,
         "peak_db": peak_db,
+        "noise_floor_db": noise_floor_db,
         "snr_db": snr_db,
         "is_silent": (rms_db is not None and rms_db < -60.0),
         "continuous": dur_sec > 1.0,

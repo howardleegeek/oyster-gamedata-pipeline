@@ -24,8 +24,10 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import math
 import os
 import pathlib
+import re
 import subprocess
 import sys
 import urllib.error
@@ -57,6 +59,130 @@ def step(msg: str) -> None:
 def run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
     print(f"  $ {' '.join(map(str, cmd))}", flush=True)
     return subprocess.run(cmd, check=check, capture_output=False)
+
+
+_AUDIO_SILENCE_DB_FLOOR = -120.0
+_ASTATS_VALUE = r"([+-]?(?:\d+(?:\.\d*)?|\.\d+|inf|nan))"
+_ASTATS_TEXT_RE = re.compile(
+    r"\[Parsed_astats[^\]]*\][^\n]*?"
+    r"(RMS level dB|Peak level dB|Noise floor dB):\s*" + _ASTATS_VALUE,
+    re.IGNORECASE,
+)
+_ASTATS_METADATA_RE = re.compile(
+    r"lavfi\.astats\.(?:Overall|\d+)\.(RMS_level|Peak_level|Noise_floor)=" + _ASTATS_VALUE,
+    re.IGNORECASE,
+)
+
+
+def _audio_db_value(raw: str) -> float | None:
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(value):
+        return None
+    if math.isinf(value):
+        return _AUDIO_SILENCE_DB_FLOOR if value < 0 else None
+    return value
+
+
+def _normalize_astats_key(key: str) -> str:
+    normalized = key.replace(" ", "_").replace("_dB", "_db").lower()
+    if normalized in {"rms_level", "peak_level", "noise_floor"}:
+        normalized = f"{normalized}_db"
+    return normalized
+
+
+def _ffprobe_duration_sec(path: pathlib.Path) -> float:
+    try:
+        proc = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                str(path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        return float(proc.stdout.strip()) if proc.stdout.strip() else 0.0
+    except (subprocess.TimeoutExpired, FileNotFoundError, ValueError):
+        return 0.0
+
+
+def _measure_audio_stats(audio_path: pathlib.Path) -> dict[str, float | None]:
+    cmd = [
+        "ffmpeg",
+        "-hide_banner",
+        "-i",
+        str(audio_path),
+        "-af",
+        "astats=metadata=1:reset=0,ametadata=print:file=-",
+        "-f",
+        "null",
+        "-",
+    ]
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return {"rms_db": None, "peak_db": None, "noise_floor_db": None, "snr_db": None}
+
+    parsed: dict[str, float] = {}
+    for line in (proc.stderr + "\n" + proc.stdout).splitlines():
+        match = _ASTATS_TEXT_RE.search(line) or _ASTATS_METADATA_RE.search(line)
+        if not match:
+            continue
+        value = _audio_db_value(match.group(2))
+        if value is not None:
+            parsed[_normalize_astats_key(match.group(1))] = value
+
+    rms_db = parsed.get("rms_level_db")
+    peak_db = parsed.get("peak_level_db")
+    noise_floor_db = parsed.get("noise_floor_db")
+    snr_db = None
+    if rms_db is not None and noise_floor_db is not None and noise_floor_db < rms_db:
+        snr_db = rms_db - noise_floor_db
+    elif rms_db is not None and peak_db is not None:
+        snr_db = max(0.0, peak_db - rms_db)
+    elif rms_db is not None:
+        snr_db = 0.0
+    return {
+        "rms_db": rms_db,
+        "peak_db": peak_db,
+        "noise_floor_db": noise_floor_db,
+        "snr_db": snr_db,
+    }
+
+
+def _write_audio_check(sess: pathlib.Path, audio_path: pathlib.Path) -> dict:
+    stats = _measure_audio_stats(audio_path)
+    rms_db = stats["rms_db"]
+    payload = {
+        "checked_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "audio_file": audio_path.name,
+        "size_bytes": audio_path.stat().st_size,
+        "duration_sec": _ffprobe_duration_sec(audio_path),
+        "rms_db": rms_db,
+        "peak_db": stats["peak_db"],
+        "noise_floor_db": stats["noise_floor_db"],
+        "snr_db": stats["snr_db"] if stats["snr_db"] is not None else 0.0,
+        "is_silent": bool(rms_db is not None and rms_db < -60.0),
+        "method": "ffmpeg astats",
+    }
+    (sess / "audio_check.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return payload
 
 
 def find_video(session_dir: pathlib.Path) -> Optional[pathlib.Path]:
@@ -292,6 +418,7 @@ def step2_trim_mp4(sess: pathlib.Path, start_offset: int = 180, target_dur: int 
 def step3_extract_audio(sess: pathlib.Path) -> None:
     step("3/10 Extract audio.flac from mp4")
     src = _require_video(sess)
+    audio_path = sess / "audio.flac"
     run(
         [
             "ffmpeg",
@@ -301,8 +428,13 @@ def step3_extract_audio(sess: pathlib.Path) -> None:
             "-vn",
             "-c:a",
             "flac",
-            str(sess / "audio.flac"),
+            str(audio_path),
         ]
+    )
+    audio_check = _write_audio_check(sess, audio_path)
+    print(
+        "  audio_check: " f"rms_db={audio_check['rms_db']} snr_db={audio_check['snr_db']}",
+        flush=True,
     )
 
 
