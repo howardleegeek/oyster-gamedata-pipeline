@@ -66,10 +66,81 @@ VALID_INPUT_SIGNAL_EVENT_TYPES = {
     "mouse_move",
     "mouse_raw_delta",
 }
+PASS_STATUSES_PREFIX = "PASS"
+CRITICAL_SCORE_CAP_PERCENT = 0.0
+CRITICAL_CHECK_IDS = frozenset(
+    {
+        # Video must exist and contain real, changing game footage.
+        "A1",
+        "B8",
+        # PRD canonical artifacts must be present.
+        "A2",
+        "A3",
+        "A4",
+        "A5",
+        # MANIFEST.json is the canonical-pipeline completion/audit handoff.
+        "F8-manifest",
+        # Refuse certification without game-state evidence.
+        "Q3",
+    }
+)
 
 
 def _result(id_: str, ok: bool, evidence: str) -> dict:
     return {"id": id_, "status": "PASS" if ok else "FAIL", "evidence": evidence}
+
+
+def _is_pass_status(status: object) -> bool:
+    return isinstance(status, str) and status.startswith(PASS_STATUSES_PREFIX)
+
+
+def _tag_critical_checks(items: list[dict]) -> None:
+    for item in items:
+        if item.get("id") in CRITICAL_CHECK_IDS:
+            item["critical"] = True
+
+
+def summarize_audit_items(items: list[dict]) -> dict:
+    """Compute the buyer-facing audit verdict and score.
+
+    A failed or skipped critical check dominates the numeric score. Minor-only
+    failures retain the proportional pass rate so ordinary regressions remain
+    visible without certifying a useless session as high quality.
+    """
+    _tag_critical_checks(items)
+    total = len(items)
+    passed = sum(1 for item in items if _is_pass_status(item.get("status")))
+    failed = total - passed
+    proportional_score = (100.0 * passed / total) if total else 0.0
+    critical_failed = [
+        item
+        for item in items
+        if item.get("critical") is True and not _is_pass_status(item.get("status"))
+    ]
+    score_percent = (
+        min(proportional_score, CRITICAL_SCORE_CAP_PERCENT)
+        if critical_failed
+        else proportional_score
+    )
+    verdict = "PASS" if failed == 0 else "FAIL"
+    return {
+        "total_items": total,
+        "passed": passed,
+        "failed": failed,
+        "verdict": verdict,
+        "score": round(score_percent, 2),
+        "score_percent": round(score_percent, 2),
+        "score_10": round(score_percent / 10.0, 2),
+        "proportional_score_percent": round(proportional_score, 2),
+        "critical_failed": [
+            {
+                "id": item.get("id"),
+                "status": item.get("status"),
+                "evidence": item.get("evidence"),
+            }
+            for item in critical_failed
+        ],
+    }
 
 
 def find_video(session_dir: Path) -> Path | None:
@@ -687,7 +758,6 @@ def audit_group_m_metadata(session: Path) -> list[dict]:
     else:
         try:
             man = json.loads(manpath.read_text())
-            file_count = man.get("file_count", 0)
             entries = man.get("files", {})
             # `files` can be either {path: {sha256, ...}} (dict) or
             # [{path: ..., sha256: ...}, ...] (list) depending on producer.
@@ -698,12 +768,22 @@ def audit_group_m_metadata(session: Path) -> list[dict]:
                 values = entries
             else:
                 values = []
-            has_sha = all(isinstance(v, dict) and "sha256" in v for v in values)
+            file_count = man.get("file_count", len(values))
+            has_sha = all(
+                (isinstance(v, dict) and "sha256" in v) or (isinstance(v, str) and len(v) == 64)
+                for v in values
+            )
+            complete = man.get("complete", True) is not False
+            pipeline_failures = man.get("pipeline_failures") or []
+            if not isinstance(pipeline_failures, list):
+                pipeline_failures = [pipeline_failures]
+            ok = file_count > 0 and has_sha and complete and not pipeline_failures
             items.append(
                 _result(
                     "F8-manifest",
-                    file_count > 0 and has_sha,
-                    f"MANIFEST.json: {file_count} files, sha256-each={has_sha}",
+                    ok,
+                    f"MANIFEST.json: {file_count} files, sha256-each={has_sha}, "
+                    f"complete={complete}, pipeline_failures={len(pipeline_failures)}",
                 )
             )
         except (json.JSONDecodeError, OSError) as e:
@@ -1519,26 +1599,38 @@ def main(argv: list[str]) -> int:
             )
         )
 
-    total = len(items)
-    passed = sum(1 for it in items if it["status"] == "PASS")
-    failed = total - passed
+    summary = summarize_audit_items(items)
+    total = summary["total_items"]
+    passed = summary["passed"]
+    failed = summary["failed"]
 
     if out_format == "--json":
         report = {
             "session_dir": str(session),
-            "total_items": total,
-            "passed": passed,
-            "failed": failed,
+            **summary,
             "items": items,
         }
         print(json.dumps(report, indent=2))
     else:
         print(f"# PRD Compliance Audit — {session.name}\n")
-        print(f"**{passed}/{total} PASS** ({100*passed/total:.0f}%)  · {failed} FAIL\n")
+        print(
+            f"**{passed}/{total} PASS** "
+            f"({summary['proportional_score_percent']:.0f}%)  · {failed} FAIL\n"
+        )
+        print(
+            f"**VERDICT: {summary['verdict']}**  · "
+            f"**SCORE: {summary['score_percent']:.0f}% "
+            f"({summary['score_10']:.1f}/10)**\n"
+        )
+        if summary["critical_failed"]:
+            crit = ", ".join(
+                f"{item['id']}={item['status']}" for item in summary["critical_failed"]
+            )
+            print(f"Critical failures: {crit}\n")
         print("| ID | Status | Evidence |")
         print("|---|---|---|")
         for it in items:
-            mark = "✅" if it["status"] == "PASS" else "❌"
+            mark = "✅" if _is_pass_status(it["status"]) else "❌"
             print(f"| {it['id']} | {mark} | {it['evidence']} |")
     return 0 if failed == 0 else 1
 

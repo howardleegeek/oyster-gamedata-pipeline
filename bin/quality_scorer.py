@@ -25,10 +25,13 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
+CRITICAL_FAILURE_SCORE_CAP = 20.0
+
 
 # ---------------------------------------------------------------------------
 # Config loading
 # ---------------------------------------------------------------------------
+
 
 def load_weights(config_path: Optional[str] = None) -> Dict[str, Any]:
     """Load tunable weights from YAML config."""
@@ -36,7 +39,9 @@ def load_weights(config_path: Optional[str] = None) -> Dict[str, Any]:
         # Default: look relative to this script
         config_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
-            "..", "config", "quality_weights.yaml",
+            "..",
+            "config",
+            "quality_weights.yaml",
         )
     config_path = os.path.normpath(config_path)
     if not os.path.exists(config_path):
@@ -68,6 +73,7 @@ def _default_config() -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Component scorers
 # ---------------------------------------------------------------------------
+
 
 def score_audit_norm(audit_score: float, max_points: float = 30.0) -> float:
     """
@@ -130,7 +136,7 @@ def score_camera_motion(
 
     # Normalize: assume max reasonable volume ~1e6, max variance ~pi^2
     norm_volume = min(avg_volume / 1e6, 1.0)
-    norm_variance = min(avg_variance / (math.pi ** 2), 1.0)
+    norm_variance = min(avg_variance / (math.pi**2), 1.0)
 
     # Combined score: geometric mean for balance
     combined = math.sqrt(norm_volume * norm_variance)
@@ -240,9 +246,38 @@ def score_antipattern_penalty(
     return round(-total_penalty, 4)
 
 
+def has_critical_failure(session_data: Dict[str, Any]) -> bool:
+    """Return True when upstream audit/quality gates report a critical failure."""
+    for key in ("critical_failure", "critical_failed"):
+        value = session_data.get(key)
+        if isinstance(value, bool) and value:
+            return True
+        if isinstance(value, list) and value:
+            return True
+
+    failures = session_data.get("critical_failures")
+    if isinstance(failures, list) and failures:
+        return True
+
+    audit = session_data.get("audit")
+    if isinstance(audit, dict):
+        nested = audit.get("critical_failed") or audit.get("critical_failures")
+        if isinstance(nested, list) and nested:
+            return True
+
+    verdict = str(session_data.get("audit_verdict") or session_data.get("verdict") or "").upper()
+    audit_score = session_data.get("audit_score")
+    try:
+        audit_score_value = float(audit_score)
+    except (TypeError, ValueError):
+        audit_score_value = None
+    return verdict == "FAIL" and audit_score_value == 0.0
+
+
 # ---------------------------------------------------------------------------
 # Composite scorer
 # ---------------------------------------------------------------------------
+
 
 def compute_quality_score(
     session_data: Dict[str, Any],
@@ -322,12 +357,25 @@ def compute_quality_score(
         max_penalty=antipattern_cfg.get("max_penalty", 10),
     )
 
+    critical_failure = has_critical_failure(session_data)
+
     # Composite score
-    composite = audit_norm + action_diversity + camera_motion + failure_recovery + label_density + multimodal_score + antipattern
+    composite = (
+        audit_norm
+        + action_diversity
+        + camera_motion
+        + failure_recovery
+        + label_density
+        + multimodal_score
+        + antipattern
+    )
     composite = round(max(0.0, min(100.0, composite)), 4)
+    if critical_failure:
+        composite = min(composite, CRITICAL_FAILURE_SCORE_CAP)
 
     return {
         "composite_score": composite,
+        "critical_failure": critical_failure,
         "components": {
             "audit_norm": audit_norm,
             "action_diversity": action_diversity,
@@ -383,6 +431,7 @@ def score_session_with_percentile(
 # ---------------------------------------------------------------------------
 # CLI entry point
 # ---------------------------------------------------------------------------
+
 
 def main():
     """

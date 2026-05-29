@@ -544,6 +544,20 @@ class TestCompositeBounds:
         result = compute_quality_score(session)
         assert result["composite_score"] >= 0
 
+    def test_critical_failure_caps_composite_score(self, perfect_session):
+        """Critical audit failures must dominate rich side metrics."""
+        result = compute_quality_score(
+            {
+                **perfect_session,
+                "audit_verdict": "FAIL",
+                "audit_score": 0.0,
+                "critical_failures": [{"id": "B8", "status": "FAIL"}],
+            }
+        )
+
+        assert result["critical_failure"] is True
+        assert result["composite_score"] <= 20.0
+
 
 # ---------------------------------------------------------------------------
 # Test 6: Components sum sanity

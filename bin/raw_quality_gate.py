@@ -29,6 +29,9 @@ DOMINANT_SHA_FROZEN_RATIO = 0.70
 MEAN_DIFF_FROZEN_THRESHOLD = 0.5 / 255.0
 MOVING_PATH_BLOCKS_THRESHOLD = 20.0
 GAME_STATE_LIVE_PATH_THRESHOLD = MOVING_PATH_BLOCKS_THRESHOLD
+PASS_SCORE = 100.0
+WARN_SCORE = 60.0
+FAIL_SCORE = 0.0
 FRAME_SCALE = "scale=320:180:force_original_aspect_ratio=decrease,pad=320:180:(ow-iw)/2:(oh-ih)/2"
 
 
@@ -477,6 +480,7 @@ def evaluate_session(
         fail = True
         reasons.append(str(video["reason"] or "video unreadable"))
     elif not video["live"]:
+        fail = True
         reasons.append("video appears frozen")
 
     if game_state["empty"]:
@@ -501,9 +505,18 @@ def evaluate_session(
     verdict = "FAIL" if fail else "PASS"
     if verdict == "PASS" and reasons:
         verdict = "WARN"
+    if verdict == "FAIL":
+        score = FAIL_SCORE
+    elif verdict == "WARN":
+        score = WARN_SCORE
+    else:
+        score = PASS_SCORE
 
     result = {
         "verdict": verdict,
+        "score": score,
+        "score_percent": score,
+        "score_10": round(score / 10.0, 2),
         "video_live": bool(video["live"]),
         "game_state_live": bool(game_state["live"]),
         "frozen_while_moving": frozen_while_moving,

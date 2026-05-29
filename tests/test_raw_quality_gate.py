@@ -85,6 +85,8 @@ def test_frozen_video_while_player_moved_is_hard_fail(tmp_path: Path) -> None:
 
     assert exit_code == 1
     assert result["verdict"] == "FAIL"
+    assert result["score"] == 0.0
+    assert result["score_10"] == 0.0
     assert result["video_live"] is False
     assert result["game_state_live"] is True
     assert result["frozen_while_moving"] is True
@@ -98,6 +100,8 @@ def test_varying_video_with_moving_game_state_passes(tmp_path: Path) -> None:
     result = raw_quality_gate.evaluate_session(session_dir, sample_count=8)
 
     assert result["verdict"] == "PASS"
+    assert result["score"] == 100.0
+    assert result["score_10"] == 10.0
     assert result["video_live"] is True
     assert result["game_state_live"] is True
     assert result["frozen_while_moving"] is False
