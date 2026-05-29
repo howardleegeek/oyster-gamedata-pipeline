@@ -173,14 +173,13 @@ jobs:
           python -m pip install --upgrade pip
           # PyInstaller drives both R05C (OysterPlay.exe compile) and the
           # OysterRecorder onedir step. Keep this list narrow — anything
-          # the recorder needs at runtime (depth-anything, pynput, etc.)
-          # will be pulled in by recorder_consumer_lite.py via PyInstaller's
-          # --collect-all directives, not pinned at the workflow level.
+          # the raw-only recorder needs at runtime will be pulled in by
+          # recorder_consumer_lite.py via PyInstaller's --collect-all
+          # directives, not pinned at the workflow level. DA-V2/depth deps
+          # stay server-side.
           pip install "pyinstaller>=6.0"
           pip install pynput pillow numpy pyyaml
           pip install -r bin/build_bundled_installer/requirements-recorder.txt
-          pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
-          pip install transformers "imageio[ffmpeg]" OpenEXR Imath huggingface_hub
           python -c "import PyInstaller, sys; print(f'PyInstaller {PyInstaller.__version__} on Python {sys.version.split()[0]}')"
 
       # ---------------------------------------------------------------------
@@ -378,11 +377,6 @@ jobs:
       # onedir form for the bundled installer (Inno Setup ships a folder,
       # not a wrapped single-file .exe), so we skip the --onefile build
       # entirely here.
-      - name: Pre-download DepthAnything V2 weights
-        shell: pwsh
-        run: |
-          python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='depth-anything/Depth-Anything-V2-Small-hf', local_dir='hf_cache/depth-anything-v2-small-hf')"
-
       - name: Download ffmpeg (Windows x64, GPL static)
         shell: pwsh
         run: |
@@ -433,7 +427,6 @@ jobs:
             --add-data "bin/game_state_overlay.py;." `
             --add-data "fabric-installer.jar;." `
             --add-data "oyster-recorder-mod.jar;." `
-            --add-data "hf_cache;hf_cache" `
             --paths bin `
             --collect-all tkinter `
             --collect-all pynput `
@@ -442,12 +435,6 @@ jobs:
             --collect-all yaml `
             --collect-all windows_capture `
             --collect-all mss `
-            --collect-all torch `
-            --collect-all transformers `
-            --collect-all OpenEXR `
-            --collect-all Imath `
-            --collect-all imageio `
-            --collect-all imageio_ffmpeg `
             --hidden-import pynput.keyboard._win32 `
             --hidden-import pynput.mouse._win32 `
             --hidden-import lint_v3_prd_grounded `
@@ -459,6 +446,14 @@ jobs:
             --hidden-import windows_capture `
             --hidden-import mss `
             --hidden-import PIL.Image `
+            --exclude-module torch `
+            --exclude-module torchvision `
+            --exclude-module transformers `
+            --exclude-module OpenEXR `
+            --exclude-module Imath `
+            --exclude-module imageio `
+            --exclude-module imageio_ffmpeg `
+            --exclude-module huggingface_hub `
             bin/recorder_consumer_lite.py
           if (-not (Test-Path 'bundle/OysterRecorder-onedir/OysterRecorder-onedir.exe')) {
             Write-Error "PyInstaller did not produce bundle/OysterRecorder-onedir/OysterRecorder-onedir.exe"
@@ -575,6 +570,7 @@ jobs:
           }
           $size_mb = [math]::Round((Get-ChildItem -Recurse bundle | Measure-Object -Property Length -Sum).Sum / 1MB, 1)
           Write-Host "Bundle staged. Total size: ${size_mb} MB"
+          Write-Host "Expected v0.19.4 raw-only reduction: removed DA-V2 hf_cache weights plus torch/transformers/OpenEXR/imageio depth-only payloads; OBS portable bundling remains intact."
 
       # ---------------------------------------------------------------------
       # 13. Compose bundle/manifest.json — SHA-256 of every top-level artifact

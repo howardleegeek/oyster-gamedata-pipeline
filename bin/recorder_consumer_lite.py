@@ -95,7 +95,8 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.19.3"
+RECORDER_VERSION = "lite-v0.19.4"
+RAW_ONLY_DEPTH_SKIP_REASON = "DA-V2 weights not bundled in raw-only build"
 
 # R01 iron-law: supported MC versions for real game-state Fabric mod.
 # Kept in sync with .github/workflows/build-mc-mod.yml matrix.
@@ -1091,6 +1092,29 @@ def _atomic_write_json(path: Path, data: Any, *, indent: int | None = 2) -> None
     else:
         kwargs["indent"] = indent
     _atomic_write_text(path, json.dumps(data, **kwargs), encoding="utf-8")
+
+
+def _write_depth_postprocess_manifest(
+    clip_dir: Path, *, client_skip_reason: Optional[str] = None
+) -> None:
+    postprocess_manifest: dict[str, Any] = {
+        "mode": _depth_mode(),
+        "status": "pending_server_postprocess",
+        "client_depth_inference": False,
+        "source_video": "video.mp4",
+        "server_outputs": [
+            "linear_depth",
+            "openexr_depth",
+            "depth_uint16",
+        ],
+        "note": (
+            "Production clients capture raw evidence only. Depth "
+            "linearization and OpenEXR generation run server-side."
+        ),
+    }
+    if client_skip_reason:
+        postprocess_manifest["client_depth_skip_reason"] = client_skip_reason
+    _atomic_write_json(clip_dir / "depth_postprocess.json", postprocess_manifest)
 
 
 def _atomic_write_jsonl(path: Path, rows: Sequence[dict[str, Any]]) -> None:
@@ -6408,32 +6432,22 @@ class RecorderApp(tk.Tk):
                     )
             except Exception as e:
                 self.after(0, self._hide_depth_progress_ui)
-                _trace(f"depth: local DepthAnything inference FAILED: {e!r}")
-                raise RuntimeError(
-                    f"Local depth inference failed: {e}. Production tester builds "
-                    f"should use OYSTER_DEPTH_MODE=server. See ~/OysterRecorder.log "
-                    f"for details."
+                if depth_dir.exists():
+                    shutil.rmtree(depth_dir, ignore_errors=True)
+                _write_depth_postprocess_manifest(
+                    clip_dir,
+                    client_skip_reason=RAW_ONLY_DEPTH_SKIP_REASON,
+                )
+                _trace(
+                    "depth: "
+                    f"{RAW_ONLY_DEPTH_SKIP_REASON}; skipping local client inference "
+                    f"({e!r})"
                 )
         else:
             if depth_dir.exists():
                 shutil.rmtree(depth_dir, ignore_errors=True)
                 _trace("depth: removed legacy depth dir; server mode packages raw artifacts only")
-            postprocess_manifest = {
-                "mode": _depth_mode(),
-                "status": "pending_server_postprocess",
-                "client_depth_inference": False,
-                "source_video": "video.mp4",
-                "server_outputs": [
-                    "linear_depth",
-                    "openexr_depth",
-                    "depth_uint16",
-                ],
-                "note": (
-                    "Production clients capture raw evidence only. Depth "
-                    "linearization and OpenEXR generation run server-side."
-                ),
-            }
-            _atomic_write_json(clip_dir / "depth_postprocess.json", postprocess_manifest)
+            _write_depth_postprocess_manifest(clip_dir)
             _trace("depth: local inference disabled; wrote depth_postprocess.json")
 
         # R22 (D-04 defense): hash every *.exr in depth/ and write
