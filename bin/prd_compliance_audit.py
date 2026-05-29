@@ -1427,7 +1427,23 @@ def audit_group_anti_replay(session: Path) -> list[dict]:
         return items
 
     # AR1: autocorrelation at lag 100 on mouse_x. Real input < 0.85; copy-pasted ≈ 1.0
-    mxs = [f.get("mouse_x") for f in d[:2000] if isinstance(f.get("mouse_x"), (int, float))]
+    def _mx_scalar(v):
+        # action_camera stores mouse_x as a single-element list (e.g. [0.5])
+        # as well as bare scalars; accept both, reject bool.
+        if isinstance(v, bool):
+            return None
+        if isinstance(v, (int, float)):
+            return float(v)
+        if (
+            isinstance(v, list)
+            and len(v) == 1
+            and isinstance(v[0], (int, float))
+            and not isinstance(v[0], bool)
+        ):
+            return float(v[0])
+        return None
+
+    mxs = [m for m in (_mx_scalar(f.get("mouse_x")) for f in d[:2000]) if m is not None]
     if len(mxs) >= 200:
         n = len(mxs)
         lag = 100
