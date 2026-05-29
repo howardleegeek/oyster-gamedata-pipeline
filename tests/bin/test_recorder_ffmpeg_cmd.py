@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Any
 from unittest import mock
 
+import pytest
+
 BIN_DIR = Path(__file__).resolve().parents[2] / "bin"
 
 
@@ -71,7 +73,138 @@ def _force_windows(m: Any) -> mock._patch:
     return mock.patch.object(m.os, "name", "nt")
 
 
-def test_recorder_ffmpeg_cmd_pins_h265_bitrate(tmp_path: Path) -> None:
+def _completed(stdout: str = "", stderr: bytes | str = b"", returncode: int = 0) -> Any:
+    return type(
+        "Completed",
+        (),
+        {"stdout": stdout, "stderr": stderr, "returncode": returncode},
+    )()
+
+
+@pytest.mark.parametrize(
+    ("encoders_output", "expected_encoder"),
+    [
+        (
+            " V....D hevc_nvenc          NVIDIA NVENC hevc encoder\n"
+            " V....D h264_nvenc          NVIDIA NVENC h264 encoder\n",
+            "hevc_nvenc",
+        ),
+        (
+            " V....D hevc_amf            AMD AMF HEVC encoder\n"
+            " V....D h264_amf            AMD AMF H.264 encoder\n",
+            "hevc_amf",
+        ),
+        (" V....D h264_qsv            Intel QSV H.264 encoder\n", "h264_qsv"),
+        (" V....D libx264             libx264 H.264 encoder\n", "libx264"),
+    ],
+)
+def test_video_encoder_selection_prefers_hw_then_libx264(
+    tmp_path: Path,
+    encoders_output: str,
+    expected_encoder: str,
+) -> None:
+    m = _import_recorder_module()
+    run_calls: list[list[str]] = []
+
+    def _fake_run(cmd: list[str], **_kwargs: Any) -> Any:
+        run_calls.append(cmd)
+        if "-encoders" in cmd:
+            return _completed(stdout=encoders_output)
+        return _completed()
+
+    with mock.patch.object(m.subprocess, "run", side_effect=_fake_run):
+        spec = m._select_video_encoder(tmp_path / "ffmpeg.exe", use_cache=False)
+
+    assert spec.name == expected_encoder
+    assert spec.name != "libx265"
+    assert run_calls[0] == [str(tmp_path / "ffmpeg.exe"), "-hide_banner", "-encoders"]
+
+
+def test_video_encoder_selection_skips_hw_encoder_that_fails_quick_test(
+    tmp_path: Path,
+) -> None:
+    m = _import_recorder_module()
+    encoders_output = (
+        " V....D hevc_nvenc          NVIDIA NVENC hevc encoder\n"
+        " V....D h264_nvenc          NVIDIA NVENC h264 encoder\n"
+    )
+
+    def _fake_run(cmd: list[str], **_kwargs: Any) -> Any:
+        if "-encoders" in cmd:
+            return _completed(stdout=encoders_output)
+        encoder = cmd[cmd.index("-c:v") + 1]
+        return _completed(returncode=1 if encoder == "hevc_nvenc" else 0)
+
+    with mock.patch.object(m.subprocess, "run", side_effect=_fake_run):
+        spec = m._select_video_encoder(tmp_path / "ffmpeg.exe", use_cache=False)
+
+    assert spec.name == "h264_nvenc"
+
+
+def test_video_output_profile_downshift_env_and_adaptive_path() -> None:
+    m = _import_recorder_module()
+
+    default = m._resolve_video_output_profile(env={})
+    forced = m._resolve_video_output_profile(env={"OYSTER_VIDEO_DOWNSHIFT": "1"})
+    fps_only = m._resolve_video_output_profile(env={"OYSTER_VIDEO_FPS": "20"})
+    adaptive = m._resolve_video_output_profile(auto_downshift=True, env={})
+
+    assert default.to_dict() == {
+        "width": 1920,
+        "height": 1080,
+        "fps": 30.0,
+        "downshifted": False,
+        "reason": "default",
+    }
+    assert forced.to_dict() == {
+        "width": 1280,
+        "height": 720,
+        "fps": 20.0,
+        "downshifted": True,
+        "reason": "env_downshift",
+    }
+    assert fps_only.width == 1920
+    assert fps_only.height == 1080
+    assert fps_only.fps == 20.0
+    assert fps_only.downshifted is True
+    assert adaptive.width == 1280
+    assert adaptive.height == 720
+    assert adaptive.fps == 20.0
+    assert adaptive.downshifted is True
+
+
+def test_downshift_profile_updates_rawvideo_encoder_cmd(tmp_path: Path) -> None:
+    m = _import_recorder_module()
+    profile = m._resolve_video_output_profile(env={"OYSTER_VIDEO_DOWNSHIFT": "1"})
+
+    with mock.patch.object(
+        m,
+        "_select_video_encoder",
+        return_value=m.VideoEncoderSpec(
+            "libx264",
+            "software",
+            "h264",
+            False,
+            "10M",
+            "12M",
+            "20M",
+        ),
+    ):
+        cmd = m._build_rawvideo_encoder_cmd(
+            tmp_path / "video.mp4",
+            width=1920,
+            height=1080,
+            audio_inputs=[],
+            audio_codec=[],
+            output_profile=profile,
+        )
+
+    assert cmd[cmd.index("-framerate") + 1] == "20"
+    assert cmd[cmd.index("-vf") + 1] == "scale=1280:720:flags=lanczos"
+    assert cmd[cmd.index("-r") + 1] == "20"
+
+
+def test_recorder_ffmpeg_cmd_uses_libx264_fallback_bitrate(tmp_path: Path) -> None:
     m = _import_recorder_module()
     app = object.__new__(m.RecorderApp)
     app._mc_window_rect = {
@@ -99,16 +232,20 @@ def test_recorder_ffmpeg_cmd_pins_h265_bitrate(tmp_path: Path) -> None:
         mock.patch.object(m, "_CAPTURE_MODE", "ddagrab"),
         mock.patch.object(m, "_VIDEO_LAYER_INIT_TIMEOUT_SEC", 0.0),
         mock.patch.object(m, "_FFMPEG", tmp_path / "ffmpeg.exe"),
+        mock.patch.object(m, "_select_video_encoder", return_value=m._SOFTWARE_VIDEO_ENCODER),
         mock.patch.object(m, "probe_audio_source_chain", return_value=audio_report),
         mock.patch.object(m.subprocess, "Popen", return_value=_LiveProc()) as popen,
     ):
         app._start_ffmpeg(tmp_path / "video.mp4")
 
     cmd = popen.call_args.args[0]
-    assert cmd[cmd.index("-c:v") + 1] == "libx265"
+    assert cmd[cmd.index("-c:v") + 1] == "libx264"
+    assert cmd[cmd.index("-preset") + 1] == "ultrafast"
     assert cmd[cmd.index("-b:v") + 1] == "10M"
     assert cmd[cmd.index("-maxrate") + 1] == "12M"
     assert cmd[cmd.index("-bufsize") + 1] == "20M"
+    assert "libx265" not in cmd
+    assert app._video_encoder == "libx264"
 
 
 def test_recorder_ffmpeg_cmd_supports_manual_ddagrab_mode(tmp_path: Path) -> None:
@@ -128,6 +265,7 @@ def test_recorder_ffmpeg_cmd_supports_manual_ddagrab_mode(tmp_path: Path) -> Non
         mock.patch.object(m, "_CAPTURE_MODE", "ddagrab"),
         mock.patch.object(m, "_VIDEO_LAYER_INIT_TIMEOUT_SEC", 0.0),
         mock.patch.object(m, "_FFMPEG", tmp_path / "ffmpeg.exe"),
+        mock.patch.object(m, "_select_video_encoder", return_value=m._SOFTWARE_VIDEO_ENCODER),
         mock.patch.object(m, "probe_audio_source_chain", return_value=audio_report),
         mock.patch.object(m.subprocess, "Popen", return_value=_LiveProc()) as popen,
     ):
@@ -138,7 +276,7 @@ def test_recorder_ffmpeg_cmd_supports_manual_ddagrab_mode(tmp_path: Path) -> Non
     assert cmd[cmd.index("-i") + 1] == "ddagrab=output_idx=0:framerate=30:draw_mouse=0"
     assert "-offset_x" not in cmd
     assert cmd[cmd.index("-vf") + 1].startswith("hwdownload,format=bgra,crop=1280:720:10:20,scale=")
-    assert cmd[cmd.index("-c:v") + 1] == "libx265"
+    assert cmd[cmd.index("-c:v") + 1] == "libx264"
     assert app._video_capture_mode == "ddagrab"
 
 
@@ -200,6 +338,7 @@ def test_recorder_ffmpeg_cmd_falls_back_to_gdigrab_when_ddagrab_exits(
         mock.patch.object(m, "_VIDEO_AUTO_LAYERS", ("ddagrab", "gdigrab")),
         mock.patch.object(m, "_VIDEO_LAYER_INIT_TIMEOUT_SEC", 0.0),
         mock.patch.object(m, "_FFMPEG", tmp_path / "ffmpeg.exe"),
+        mock.patch.object(m, "_select_video_encoder", return_value=m._SOFTWARE_VIDEO_ENCODER),
         mock.patch.object(m, "probe_audio_source_chain", return_value=audio_report),
         mock.patch.object(
             m.subprocess,
@@ -243,6 +382,7 @@ def test_ddagrab_failure_attempt_log_includes_rc_and_stderr(
         mock.patch.object(m, "_VIDEO_AUTO_LAYERS", ("ddagrab", "gdigrab")),
         mock.patch.object(m, "_VIDEO_LAYER_INIT_TIMEOUT_SEC", 0.0),
         mock.patch.object(m, "_FFMPEG", tmp_path / "ffmpeg.exe"),
+        mock.patch.object(m, "_select_video_encoder", return_value=m._SOFTWARE_VIDEO_ENCODER),
         mock.patch.object(m, "probe_audio_source_chain", return_value=audio_report),
         mock.patch.object(m, "_video_capture_stderr_text", return_value=stderr),
         mock.patch.object(

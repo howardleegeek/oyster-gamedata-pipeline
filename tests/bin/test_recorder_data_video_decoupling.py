@@ -307,6 +307,18 @@ def test_video_success_missing_mod_jsonl_marks_partial(
     app._video_path.write_bytes(b"fake mp4 bytes")
     app._video_capture_mode = "ddagrab"
     app._video_capture_attempt_log = [{"layer": "ddagrab", "status": "selected"}]
+    app._video_encoder = "h264_nvenc"
+    app._video_output_profile = m.VideoOutputProfile(
+        width=1280,
+        height=720,
+        fps=20.0,
+        downshifted=True,
+        reason="unit",
+    )
+    app._video_frames_written = 120
+    app._video_expected_frames = 180
+    app._video_frames_under_expected = True
+    app._video_load_reduction_recommended = True
 
     tar_path = app._package_tarball("20260528-000100")
     extract_dir = tmp_path / "extract"
@@ -320,6 +332,19 @@ def test_video_success_missing_mod_jsonl_marks_partial(
     )
     assert metadata["session_complete"] is False
     assert metadata["partial"] is True
+    assert metadata["video_encoder"] == "h264_nvenc"
+    assert metadata["video_capture"]["video_encoder"] == "h264_nvenc"
+    assert metadata["video_capture"]["output_profile"] == {
+        "width": 1280,
+        "height": 720,
+        "fps": 20.0,
+        "downshifted": True,
+        "reason": "unit",
+    }
+    assert metadata["video_capture"]["frames_written"] == 120
+    assert metadata["video_capture"]["expected_frames"] == 180
+    assert metadata["video_capture"]["frames_under_expected"] is True
+    assert metadata["video_capture"]["adaptive_load_reduction_recommended"] is True
     assert "real_game_state_missing" in metadata["partial_reasons"]
     assert metadata["game_state_capture"]["status"] == "missing"
 

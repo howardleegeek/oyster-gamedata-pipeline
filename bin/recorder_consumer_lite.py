@@ -60,7 +60,7 @@ import types
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Optional, Sequence
+from typing import Any, Callable, Mapping, Optional, Sequence
 
 # ---- Startup tracing (runs BEFORE any heavyweight import) -----------------
 # Howard tester 2026-05-05: "反馈过来一点就闪退" — v0.1.0 silently crashed
@@ -91,7 +91,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.18.10"
+RECORDER_VERSION = "lite-v0.18.11"
 
 # R01 iron-law: supported MC versions for real game-state Fabric mod.
 # Kept in sync with .github/workflows/build-mc-mod.yml matrix.
@@ -518,6 +518,18 @@ _VIDEO_VALIDATION_HEIGHT = 90
 _VIDEO_VALIDATION_LOW_ENTROPY_BITS = 2.0
 _VIDEO_FROZEN_DOMINANT_FRAME_RATIO = 0.70
 _VIDEO_FROZEN_MEAN_DIFF_THRESHOLD = 0.5 / 255.0
+_VIDEO_DEFAULT_WIDTH = 1920
+_VIDEO_DEFAULT_HEIGHT = 1080
+_VIDEO_DEFAULT_FPS = 30.0
+_VIDEO_DOWNSHIFT_WIDTH = 1280
+_VIDEO_DOWNSHIFT_HEIGHT = 720
+_VIDEO_DOWNSHIFT_FPS = 20.0
+_VIDEO_DOWNSHIFT_ENV = "OYSTER_VIDEO_DOWNSHIFT"
+_VIDEO_RESOLUTION_ENV = "OYSTER_VIDEO_RESOLUTION"
+_VIDEO_WIDTH_ENV = "OYSTER_VIDEO_WIDTH"
+_VIDEO_HEIGHT_ENV = "OYSTER_VIDEO_HEIGHT"
+_VIDEO_FPS_ENV = "OYSTER_VIDEO_FPS"
+_VIDEO_FRAME_UNDERRUN_RATIO = 0.50
 _CAPTURE_STARTUP_CHECK_SEC = _VIDEO_LAYER_INIT_TIMEOUT_SEC
 _FFMPEG_DURATION_RE = re.compile(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)")
 _MP4_CONTAINER_BOXES = {b"moov", b"trak", b"mdia"}
@@ -1489,17 +1501,154 @@ class AudioProbeReport:
 
 
 @dataclass(frozen=True)
+class VideoOutputProfile:
+    """Output geometry/framerate for the realtime MP4 encoder."""
+
+    width: int
+    height: int
+    fps: float
+    downshifted: bool = False
+    reason: str = "default"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "width": self.width,
+            "height": self.height,
+            "fps": self.fps,
+            "downshifted": self.downshifted,
+            "reason": self.reason,
+        }
+
+    def scale_filter(self) -> str:
+        return f"scale={self.width}:{self.height}:flags=lanczos"
+
+
+def _truthy_env(value: Optional[str]) -> bool:
+    return (value or "").strip().casefold() in {"1", "true", "yes", "on", "y"}
+
+
+def _parse_positive_int(value: Optional[str]) -> Optional[int]:
+    try:
+        parsed = int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _parse_positive_float(value: Optional[str]) -> Optional[float]:
+    try:
+        parsed = float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _parse_video_resolution(value: Optional[str]) -> Optional[tuple[int, int]]:
+    if not value:
+        return None
+    match = re.fullmatch(r"\s*(\d+)\s*[xX]\s*(\d+)\s*", str(value))
+    if not match:
+        return None
+    width = int(match.group(1))
+    height = int(match.group(2))
+    if width <= 0 or height <= 0:
+        return None
+    return width, height
+
+
+def _resolve_video_output_profile(
+    *,
+    auto_downshift: bool = False,
+    env: Optional[Mapping[str, str]] = None,
+) -> VideoOutputProfile:
+    """Return the requested realtime encode profile.
+
+    Default remains 1080p30. Operators can force lower load with
+    OYSTER_VIDEO_DOWNSHIFT=1, or set resolution/fps independently via
+    OYSTER_VIDEO_RESOLUTION=1280x720 and/or OYSTER_VIDEO_FPS=20.
+    """
+
+    values = os.environ if env is None else env
+    forced_downshift = _truthy_env(values.get(_VIDEO_DOWNSHIFT_ENV))
+    downshifted = bool(auto_downshift or forced_downshift)
+    reason = "default"
+    if forced_downshift:
+        reason = "env_downshift"
+    elif auto_downshift:
+        reason = "adaptive_software_encoder_underperformed"
+
+    width = _VIDEO_DOWNSHIFT_WIDTH if downshifted else _VIDEO_DEFAULT_WIDTH
+    height = _VIDEO_DOWNSHIFT_HEIGHT if downshifted else _VIDEO_DEFAULT_HEIGHT
+    fps = _VIDEO_DOWNSHIFT_FPS if downshifted else _VIDEO_DEFAULT_FPS
+
+    resolution = _parse_video_resolution(values.get(_VIDEO_RESOLUTION_ENV))
+    if resolution is not None:
+        width, height = resolution
+        downshifted = downshifted or width < _VIDEO_DEFAULT_WIDTH or height < _VIDEO_DEFAULT_HEIGHT
+        if reason == "default":
+            reason = "env_resolution"
+    else:
+        if values.get(_VIDEO_RESOLUTION_ENV):
+            _trace(
+                "WARNING: invalid "
+                f"{_VIDEO_RESOLUTION_ENV}={values.get(_VIDEO_RESOLUTION_ENV)!r}; ignored"
+            )
+        env_width = _parse_positive_int(values.get(_VIDEO_WIDTH_ENV))
+        env_height = _parse_positive_int(values.get(_VIDEO_HEIGHT_ENV))
+        if env_width is not None:
+            width = env_width
+            downshifted = downshifted or width < _VIDEO_DEFAULT_WIDTH
+            if reason == "default":
+                reason = "env_width"
+        elif values.get(_VIDEO_WIDTH_ENV):
+            _trace(f"WARNING: invalid {_VIDEO_WIDTH_ENV}={values.get(_VIDEO_WIDTH_ENV)!r}; ignored")
+        if env_height is not None:
+            height = env_height
+            downshifted = downshifted or height < _VIDEO_DEFAULT_HEIGHT
+            if reason == "default":
+                reason = "env_height"
+        elif values.get(_VIDEO_HEIGHT_ENV):
+            _trace(
+                f"WARNING: invalid {_VIDEO_HEIGHT_ENV}={values.get(_VIDEO_HEIGHT_ENV)!r}; ignored"
+            )
+
+    env_fps = _parse_positive_float(values.get(_VIDEO_FPS_ENV))
+    if env_fps is not None:
+        fps = env_fps
+        downshifted = downshifted or fps < _VIDEO_DEFAULT_FPS
+        if reason == "default":
+            reason = "env_fps"
+    elif values.get(_VIDEO_FPS_ENV):
+        _trace(f"WARNING: invalid {_VIDEO_FPS_ENV}={values.get(_VIDEO_FPS_ENV)!r}; ignored")
+
+    return VideoOutputProfile(
+        width=int(width),
+        height=int(height),
+        fps=float(fps),
+        downshifted=bool(downshifted),
+        reason=reason,
+    )
+
+
+@dataclass(frozen=True)
 class VideoCapturePlan:
     """ffmpeg screen-capture input plan for the selected recorder mode."""
 
     mode: str
     input_args: tuple[str, ...]
     pre_encode_filters: tuple[str, ...] = ()
+    output_profile: VideoOutputProfile = field(
+        default_factory=lambda: VideoOutputProfile(
+            _VIDEO_DEFAULT_WIDTH,
+            _VIDEO_DEFAULT_HEIGHT,
+            _VIDEO_DEFAULT_FPS,
+        )
+    )
     warning: Optional[str] = None
     extra: dict[str, Any] = field(default_factory=dict)
 
     def encode_filter(self) -> str:
-        return ",".join((*self.pre_encode_filters, "scale=1920:1080:flags=lanczos"))
+        return ",".join((*self.pre_encode_filters, self.output_profile.scale_filter()))
 
 
 class VideoCaptureLayerError(RuntimeError):
@@ -1519,7 +1668,16 @@ class VideoCaptureLayerError(RuntimeError):
         self.stderr_log = stderr_log
 
 
-def _build_video_capture_plan(mode: str, *, x: int, y: int, w: int, h: int) -> VideoCapturePlan:
+def _build_video_capture_plan(
+    mode: str,
+    *,
+    x: int,
+    y: int,
+    w: int,
+    h: int,
+    output_profile: Optional[VideoOutputProfile] = None,
+) -> VideoCapturePlan:
+    profile = output_profile or _resolve_video_output_profile()
     if mode == "ddagrab":
         monitors = _get_windows_monitor_bounds()
         monitor = _best_monitor_for_rect(monitors, x=x, y=y, w=w, h=h)
@@ -1549,13 +1707,14 @@ def _build_video_capture_plan(mode: str, *, x: int, y: int, w: int, h: int) -> V
                 "-f",
                 "lavfi",
                 "-i",
-                f"ddagrab=output_idx={output_idx}:framerate=30:draw_mouse=0",
+                f"ddagrab=output_idx={output_idx}:framerate={profile.fps:g}:draw_mouse=0",
             ),
             pre_encode_filters=(
                 "hwdownload",
                 "format=bgra",
                 crop,
             ),
+            output_profile=profile,
             extra=extra,
         )
     if mode == "gdigrab":
@@ -1565,7 +1724,7 @@ def _build_video_capture_plan(mode: str, *, x: int, y: int, w: int, h: int) -> V
                 "-f",
                 "gdigrab",
                 "-framerate",
-                "30",
+                f"{profile.fps:g}",
                 "-draw_mouse",
                 "0",
                 "-offset_x",
@@ -1577,6 +1736,7 @@ def _build_video_capture_plan(mode: str, *, x: int, y: int, w: int, h: int) -> V
                 "-i",
                 "desktop",
             ),
+            output_profile=profile,
             warning="known_static_frames_on_hardware_accel_mc",
         )
     raise ValueError(f"unsupported capture mode: {mode}")
@@ -1600,6 +1760,8 @@ class VideoCaptureHandle:
     out_path: Path
     stdin_kind: str
     proc: Optional[subprocess.Popen] = None
+    video_encoder: str = "unknown"
+    output_profile: Optional[VideoOutputProfile] = None
     thread: Optional[threading.Thread] = None
     stderr_thread: Optional[threading.Thread] = None
     stop_event: threading.Event = field(default_factory=threading.Event)
@@ -1611,6 +1773,7 @@ class VideoCaptureHandle:
     error_messages: list[str] = field(default_factory=list)
     capture_control: Any = None
     frames_written: int = 0
+    next_frame_at: float = 0.0
     warning: Optional[str] = None
     extra: dict[str, Any] = field(default_factory=dict)
 
@@ -1689,6 +1852,190 @@ def _stderr_has_ffmpeg_error(stderr: str) -> bool:
     return any(marker in lowered for marker in markers)
 
 
+@dataclass(frozen=True)
+class VideoEncoderSpec:
+    """Selected realtime ffmpeg encoder and rate-control settings."""
+
+    name: str
+    vendor: str
+    codec: str
+    hardware: bool
+    bitrate: str
+    maxrate: str
+    bufsize: str
+    extra_args: tuple[str, ...] = ()
+
+    def ffmpeg_args(self) -> list[str]:
+        args = ["-c:v", self.name, *self.extra_args]
+        if self.name == "libx264":
+            args.extend(["-preset", "ultrafast"])
+        args.extend(
+            [
+                "-b:v",
+                self.bitrate,
+                "-maxrate",
+                self.maxrate,
+                "-bufsize",
+                self.bufsize,
+            ]
+        )
+        if self.codec == "hevc":
+            args.extend(["-tag:v", "hvc1"])
+        return args
+
+
+_VIDEO_ENCODER_PREFERENCE: tuple[VideoEncoderSpec, ...] = (
+    VideoEncoderSpec("hevc_nvenc", "nvidia", "hevc", True, "8M", "10M", "16M"),
+    VideoEncoderSpec("h264_nvenc", "nvidia", "h264", True, "10M", "12M", "20M"),
+    VideoEncoderSpec("hevc_amf", "amd", "hevc", True, "8M", "10M", "16M"),
+    VideoEncoderSpec("h264_amf", "amd", "h264", True, "10M", "12M", "20M"),
+    VideoEncoderSpec("hevc_qsv", "intel", "hevc", True, "8M", "10M", "16M"),
+    VideoEncoderSpec("h264_qsv", "intel", "h264", True, "10M", "12M", "20M"),
+)
+_SOFTWARE_VIDEO_ENCODER = VideoEncoderSpec(
+    "libx264",
+    "software",
+    "h264",
+    False,
+    "10M",
+    "12M",
+    "20M",
+)
+_VIDEO_ENCODER_CACHE: dict[str, VideoEncoderSpec] = {}
+
+
+def _parse_ffmpeg_encoder_names(output: str) -> set[str]:
+    names: set[str] = set()
+    for line in (output or "").splitlines():
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+        flags, name = parts[0], parts[1]
+        if flags.startswith("V"):
+            names.add(name)
+    return names
+
+
+def _available_ffmpeg_encoder_names(ffmpeg_bin: Path) -> set[str]:
+    run_kwargs: dict[str, Any] = {}
+    if os.name == "nt":
+        run_kwargs["creationflags"] = 0x08000000
+    try:
+        result = subprocess.run(
+            [str(ffmpeg_bin), "-hide_banner", "-encoders"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+            **run_kwargs,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        _trace(f"video_encoder: ffmpeg encoder probe failed: {exc}")
+        return set()
+    return _parse_ffmpeg_encoder_names(f"{result.stdout or ''}\n{result.stderr or ''}")
+
+
+def _quick_test_video_encoder(encoder_name: str, ffmpeg_bin: Path) -> bool:
+    cmd = [
+        str(ffmpeg_bin),
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "color=c=black:s=64x64:r=1",
+        "-frames:v",
+        "1",
+        "-an",
+        "-c:v",
+        encoder_name,
+        "-pix_fmt",
+        "yuv420p",
+        "-f",
+        "null",
+        "-",
+    ]
+    run_kwargs: dict[str, Any] = {}
+    if os.name == "nt":
+        run_kwargs["creationflags"] = 0x08000000
+    try:
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            timeout=8,
+            check=False,
+            **run_kwargs,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        _trace(f"video_encoder: quick test failed to run encoder={encoder_name}: {exc}")
+        return False
+    if result.returncode == 0:
+        return True
+    raw_stderr = result.stderr or b""
+    if isinstance(raw_stderr, bytes):
+        stderr = raw_stderr.decode("utf-8", errors="replace")[-300:]
+    else:
+        stderr = str(raw_stderr)[-300:]
+    _trace(
+        "video_encoder: quick test rejected "
+        f"encoder={encoder_name} rc={result.returncode} stderr={stderr}"
+    )
+    return False
+
+
+def _select_video_encoder(
+    ffmpeg_bin: Optional[Path] = None,
+    *,
+    use_cache: bool = True,
+    encoder_test: Optional[Callable[[str], bool]] = None,
+) -> VideoEncoderSpec:
+    """Pick the lightest usable realtime encoder.
+
+    Hardware encoders are tried by vendor priority: NVIDIA, AMD, Intel.
+    The software fallback is always libx264 ultrafast; libx265 is never used
+    on this realtime capture path.
+    """
+
+    raw_ffmpeg_path = ffmpeg_bin or _FFMPEG
+    ffmpeg_path = raw_ffmpeg_path if isinstance(raw_ffmpeg_path, Path) else Path(raw_ffmpeg_path)
+    cache_key = str(ffmpeg_path)
+    if use_cache and cache_key in _VIDEO_ENCODER_CACHE:
+        return _VIDEO_ENCODER_CACHE[cache_key]
+
+    available = _available_ffmpeg_encoder_names(ffmpeg_path)
+    probe = encoder_test or (lambda name: _quick_test_video_encoder(name, ffmpeg_path))
+    for spec in _VIDEO_ENCODER_PREFERENCE:
+        if spec.name not in available:
+            continue
+        if not probe(spec.name):
+            continue
+        _trace(f"video_encoder: selected hardware encoder={spec.name}")
+        if use_cache:
+            _VIDEO_ENCODER_CACHE[cache_key] = spec
+        return spec
+
+    _trace("video_encoder: no usable hardware encoder found; falling back to libx264")
+    if use_cache:
+        _VIDEO_ENCODER_CACHE[cache_key] = _SOFTWARE_VIDEO_ENCODER
+    return _SOFTWARE_VIDEO_ENCODER
+
+
+def _encoder_name_from_cmd(cmd: Sequence[str]) -> str:
+    try:
+        return str(cmd[list(cmd).index("-c:v") + 1])
+    except (ValueError, IndexError):
+        return "unknown"
+
+
+def _frames_well_below_expected(frames_written: int, elapsed_sec: float, fps: float) -> bool:
+    if frames_written <= 0 or elapsed_sec < 5.0 or fps <= 0:
+        return False
+    expected = elapsed_sec * fps
+    return frames_written < expected * _VIDEO_FRAME_UNDERRUN_RATIO
+
+
 def _build_video_encoder_cmd(
     out_path: Path,
     *,
@@ -1696,7 +2043,11 @@ def _build_video_encoder_cmd(
     audio_inputs: Sequence[str],
     audio_codec: Sequence[str],
     vf: str,
+    output_profile: Optional[VideoOutputProfile] = None,
+    video_encoder: Optional[VideoEncoderSpec] = None,
 ) -> list[str]:
+    profile = output_profile or _resolve_video_output_profile()
+    encoder = video_encoder or _select_video_encoder()
     return [
         str(_FFMPEG),
         "-hide_banner",
@@ -1704,23 +2055,12 @@ def _build_video_encoder_cmd(
         *audio_inputs,
         "-vf",
         vf,
-        "-c:v",
-        "libx265",
-        "-preset",
-        "ultrafast",
-        # libx265 defaults to CRF 28 if no bitrate/CRF is specified. On
-        # static game scenes that collapsed clips to ~67 kbps and looked frozen.
-        "-b:v",
-        "10M",
-        "-maxrate",
-        "12M",
-        "-bufsize",
-        "20M",
+        *encoder.ffmpeg_args(),
         "-pix_fmt",
         "yuv420p",
         *audio_codec,
         "-r",
-        "30",
+        f"{profile.fps:g}",
         "-y",
         str(out_path),
     ]
@@ -1734,7 +2074,9 @@ def _build_rawvideo_encoder_cmd(
     audio_inputs: Sequence[str],
     audio_codec: Sequence[str],
     pre_encode_filters: Sequence[str] = (),
+    output_profile: Optional[VideoOutputProfile] = None,
 ) -> list[str]:
+    profile = output_profile or _resolve_video_output_profile()
     return _build_video_encoder_cmd(
         out_path,
         input_args=(
@@ -1745,13 +2087,14 @@ def _build_rawvideo_encoder_cmd(
             "-video_size",
             f"{int(width)}x{int(height)}",
             "-framerate",
-            "30",
+            f"{profile.fps:g}",
             "-i",
             "pipe:",
         ),
         audio_inputs=audio_inputs,
         audio_codec=audio_codec,
-        vf=",".join((*pre_encode_filters, "scale=1920:1080:flags=lanczos")),
+        vf=",".join((*pre_encode_filters, profile.scale_filter())),
+        output_profile=profile,
     )
 
 
@@ -2018,10 +2361,12 @@ def _start_windows_capture_layer(
     audio_inputs: Sequence[str],
     audio_codec: Sequence[str],
     creationflags: int,
+    output_profile: Optional[VideoOutputProfile] = None,
     init_timeout_sec: float = _VIDEO_LAYER_INIT_TIMEOUT_SEC,
 ) -> Optional[VideoCaptureHandle]:
     if os.name != "nt":
         return None
+    profile = output_profile or _resolve_video_output_profile()
     try:
         from windows_capture import WindowsCapture  # type: ignore[import-not-found]
     except Exception as exc:  # noqa: BLE001
@@ -2041,6 +2386,7 @@ def _start_windows_capture_layer(
         layer="windows-capture",
         out_path=out_path,
         stdin_kind="rawvideo",
+        output_profile=profile,
         stderr_path=_video_capture_stderr_path(out_path, "windows-capture"),
         extra={"monitor_index": monitor_index},
     )
@@ -2067,10 +2413,16 @@ def _start_windows_capture_layer(
             audio_inputs=audio_inputs,
             audio_codec=audio_codec,
             pre_encode_filters=pre_filters,
+            output_profile=profile,
         )
+        handle.video_encoder = _encoder_name_from_cmd(cmd)
+        handle.extra["video_encoder"] = handle.video_encoder
+        handle.extra["output_profile"] = profile.to_dict()
         _trace(
             "video_capture: windows-capture encoder "
             f"monitor_index={monitor_index} size={frame_width}x{frame_height} "
+            f"profile={profile.width}x{profile.height}@{profile.fps:g} "
+            f"encoder={handle.video_encoder} "
             f"cmd={' '.join(cmd)}"
         )
         try:
@@ -2107,6 +2459,11 @@ def _start_windows_capture_layer(
                 handle.error_messages.append("rawvideo ffmpeg unavailable")
                 handle.error_event.set()
                 return
+            if profile.fps < _VIDEO_DEFAULT_FPS:
+                now = time.perf_counter()
+                if now < handle.next_frame_at:
+                    return
+                handle.next_frame_at = now + (1.0 / profile.fps)
             if not getattr(image, "flags", None) or not image.flags["C_CONTIGUOUS"]:
                 import numpy as _np  # noqa: PLC0415
 
@@ -2164,10 +2521,12 @@ def _start_mss_layer(
     audio_inputs: Sequence[str],
     audio_codec: Sequence[str],
     creationflags: int,
+    output_profile: Optional[VideoOutputProfile] = None,
     init_timeout_sec: float = _VIDEO_LAYER_INIT_TIMEOUT_SEC,
 ) -> Optional[VideoCaptureHandle]:
     if os.name != "nt":
         return None
+    profile = output_profile or _resolve_video_output_profile()
     try:
         import mss  # type: ignore[import-not-found]
     except Exception as exc:  # noqa: BLE001
@@ -2178,6 +2537,7 @@ def _start_mss_layer(
         layer="mss",
         out_path=out_path,
         stdin_kind="rawvideo",
+        output_profile=profile,
         stderr_path=_video_capture_stderr_path(out_path, "mss"),
     )
 
@@ -2192,11 +2552,21 @@ def _start_mss_layer(
                     height=int(region["height"]),
                     audio_inputs=audio_inputs,
                     audio_codec=audio_codec,
+                    output_profile=profile,
                 )
-                _trace("video_capture: mss encoder " f"region={region} cmd={' '.join(cmd)}")
+                handle.video_encoder = _encoder_name_from_cmd(cmd)
+                handle.extra["video_encoder"] = handle.video_encoder
+                handle.extra["output_profile"] = profile.to_dict()
+                _trace(
+                    "video_capture: mss encoder "
+                    f"region={region} "
+                    f"profile={profile.width}x{profile.height}@{profile.fps:g} "
+                    f"encoder={handle.video_encoder} "
+                    f"cmd={' '.join(cmd)}"
+                )
                 proc = _spawn_video_encoder(handle, cmd, creationflags=creationflags)
                 next_frame_at = time.perf_counter()
-                frame_interval = 1.0 / 30.0
+                frame_interval = 1.0 / profile.fps
                 while not handle.stop_event.is_set() and proc.poll() is None:
                     img = sct.grab(region)
                     if proc.stdin is None:
@@ -2245,13 +2615,16 @@ def _start_ffmpeg_capture_layer(
     audio_inputs: Sequence[str],
     audio_codec: Sequence[str],
     creationflags: int,
+    output_profile: Optional[VideoOutputProfile] = None,
     init_timeout_sec: float = _VIDEO_LAYER_INIT_TIMEOUT_SEC,
 ) -> Optional[VideoCaptureHandle]:
-    plan = _build_video_capture_plan(layer, x=x, y=y, w=w, h=h)
+    profile = output_profile or _resolve_video_output_profile()
+    plan = _build_video_capture_plan(layer, x=x, y=y, w=w, h=h, output_profile=profile)
     handle = VideoCaptureHandle(
         layer=layer,
         out_path=out_path,
         stdin_kind="control",
+        output_profile=profile,
         stderr_path=_video_capture_stderr_path(out_path, layer),
         warning=plan.warning,
         extra=dict(plan.extra),
@@ -2262,10 +2635,16 @@ def _start_ffmpeg_capture_layer(
         audio_inputs=audio_inputs,
         audio_codec=audio_codec,
         vf=plan.encode_filter(),
+        output_profile=profile,
     )
+    handle.video_encoder = _encoder_name_from_cmd(cmd)
+    handle.extra["video_encoder"] = handle.video_encoder
+    handle.extra["output_profile"] = profile.to_dict()
     _trace(
         "video_capture: ffmpeg layer "
-        f"selected={layer} geometry={x},{y},{w},{h} cmd={' '.join(cmd)}"
+        f"selected={layer} geometry={x},{y},{w},{h} "
+        f"profile={profile.width}x{profile.height}@{profile.fps:g} "
+        f"encoder={handle.video_encoder} cmd={' '.join(cmd)}"
     )
     try:
         proc = _spawn_video_encoder(handle, cmd, creationflags=creationflags)
@@ -2319,6 +2698,7 @@ def _start_layer(
     audio_inputs: Sequence[str],
     audio_codec: Sequence[str],
     creationflags: int,
+    output_profile: Optional[VideoOutputProfile] = None,
     init_timeout_sec: float = _VIDEO_LAYER_INIT_TIMEOUT_SEC,
 ) -> Optional[VideoCaptureHandle]:
     layer = _normalize_capture_mode(layer)
@@ -2334,6 +2714,7 @@ def _start_layer(
             audio_inputs=audio_inputs,
             audio_codec=audio_codec,
             creationflags=creationflags,
+            output_profile=output_profile,
             init_timeout_sec=init_timeout_sec,
         )
     if layer == "mss":
@@ -2346,6 +2727,7 @@ def _start_layer(
             audio_inputs=audio_inputs,
             audio_codec=audio_codec,
             creationflags=creationflags,
+            output_profile=output_profile,
             init_timeout_sec=init_timeout_sec,
         )
     if layer in {"ddagrab", "gdigrab"}:
@@ -2359,6 +2741,7 @@ def _start_layer(
             audio_inputs=audio_inputs,
             audio_codec=audio_codec,
             creationflags=creationflags,
+            output_profile=output_profile,
             init_timeout_sec=init_timeout_sec,
         )
     raise ValueError(f"unsupported video capture layer: {layer}")
@@ -3393,6 +3776,12 @@ class RecorderApp(tk.Tk):
         self._video_validation_reason = "not_checked"
         self._video_frozen = False
         self._video_frozen_reason: Optional[str] = None
+        self._video_encoder = "unknown"
+        self._video_output_profile = _resolve_video_output_profile()
+        self._video_load_reduction_recommended = False
+        self._video_frames_written = 0
+        self._video_expected_frames = 0
+        self._video_frames_under_expected = False
         self._video_started = False
         self._recording_active = False
         self._active_session_dir = _active_session_dir()
@@ -5200,6 +5589,12 @@ class RecorderApp(tk.Tk):
         video_validation_reason = str(self.__dict__.get("_video_validation_reason", "not_checked"))
         video_frozen = bool(self.__dict__.get("_video_frozen", False))
         frozen_reason = self.__dict__.get("_video_frozen_reason")
+        video_encoder = str(self.__dict__.get("_video_encoder", "unknown"))
+        output_profile = self.__dict__.get("_video_output_profile")
+        if isinstance(output_profile, VideoOutputProfile):
+            output_profile_payload = output_profile.to_dict()
+        else:
+            output_profile_payload = _resolve_video_output_profile().to_dict()
         has_real_game_state = bool(_gs_samples)
         partial_reasons: list[str] = []
         if elapsed_sec < 300.0:
@@ -5226,6 +5621,7 @@ class RecorderApp(tk.Tk):
             "partial_reasons": partial_reasons,
             "video_frozen": video_frozen,
             "frozen_reason": frozen_reason,
+            "video_encoder": video_encoder,
             "input_capture_diagnostics": self.__dict__.get(
                 "_input_capture_diagnostics",
                 {
@@ -5245,6 +5641,16 @@ class RecorderApp(tk.Tk):
                 "validation_reason": video_validation_reason,
                 "video_frozen": video_frozen,
                 "frozen_reason": frozen_reason,
+                "video_encoder": video_encoder,
+                "output_profile": output_profile_payload,
+                "frames_written": int(self.__dict__.get("_video_frames_written", 0) or 0),
+                "expected_frames": int(self.__dict__.get("_video_expected_frames", 0) or 0),
+                "frames_under_expected": bool(
+                    self.__dict__.get("_video_frames_under_expected", False)
+                ),
+                "adaptive_load_reduction_recommended": bool(
+                    self.__dict__.get("_video_load_reduction_recommended", False)
+                ),
                 "layer_attempt_log": self.__dict__.get("_video_capture_attempt_log", []),
                 "attempts_failed": [
                     attempt
@@ -5403,6 +5809,19 @@ class RecorderApp(tk.Tk):
         self._video_validation_reason = "not_checked"
         self._video_frozen = False
         self._video_frozen_reason = None
+        profile = _resolve_video_output_profile(
+            auto_downshift=bool(self.__dict__.get("_video_load_reduction_recommended", False))
+        )
+        self._video_output_profile = profile
+        self._video_encoder = "unknown"
+        self._video_frames_written = 0
+        self._video_expected_frames = 0
+        self._video_frames_under_expected = False
+        if profile.downshifted:
+            _trace(
+                "video_capture: using load-reduced profile "
+                f"{profile.width}x{profile.height}@{profile.fps:g} reason={profile.reason}"
+            )
 
         if self._mc_window_rect is None:
             message = "Minecraft window not detected; continuing session without video"
@@ -5493,6 +5912,7 @@ class RecorderApp(tk.Tk):
                     audio_inputs=audio_inputs,
                     audio_codec=audio_codec,
                     creationflags=flags,
+                    output_profile=profile,
                     init_timeout_sec=_VIDEO_LAYER_INIT_TIMEOUT_SEC,
                 )
                 if handle is None:
@@ -5504,6 +5924,7 @@ class RecorderApp(tk.Tk):
                 self._video_capture_mode = layer
                 self._video_capture_handle = handle
                 self._ffmpeg_proc = handle.proc
+                self._video_encoder = handle.video_encoder
                 self._video_capture_attempt_log.append(
                     {
                         "layer": layer,
@@ -5543,12 +5964,14 @@ class RecorderApp(tk.Tk):
     def _record_video_validation_result(self, video_path: Path) -> None:
         valid, reason = _validate_recorded_video(video_path)
         video_frozen = _video_validation_reason_is_frozen(reason)
+        frames_under_expected = bool(self.__dict__.get("_video_frames_under_expected", False))
         self._video_validation_checked = True
         self._video_validation_passed = valid
         self._video_validation_failed = not valid
         self._video_validation_reason = reason
         self._video_frozen = video_frozen
         self._video_frozen_reason = reason if video_frozen else None
+        encoder = str(self.__dict__.get("_video_encoder", "unknown"))
         layer = str(self.__dict__.get("_video_capture_mode", "unknown"))
         failed_layers = set(self.__dict__.get("_video_capture_failed_layers", set()))
         if valid:
@@ -5570,6 +5993,13 @@ class RecorderApp(tk.Tk):
             if layer in _VIDEO_AUTO_LAYERS:
                 failed_layers.add(layer)
                 _trace("video_capture: marked layer failed for next auto retry " f"layer={layer}")
+        if encoder == _SOFTWARE_VIDEO_ENCODER.name and (not valid or frames_under_expected):
+            self._video_load_reduction_recommended = True
+            _trace(
+                "video_capture: software encoder underperformed; "
+                "next capture will use load-reduced profile "
+                f"reason={reason} frames_under_expected={frames_under_expected}"
+            )
         self._video_capture_failed_layers = failed_layers
 
     def _stop_ffmpeg(self) -> None:
@@ -5577,6 +6007,20 @@ class RecorderApp(tk.Tk):
         handle = getattr(self, "_video_capture_handle", None)
         if isinstance(handle, VideoCaptureHandle):
             forced_stop = _stop_video_capture_handle(handle)
+            elapsed_sec = max(
+                0.0,
+                time.time() - float(self.__dict__.get("_record_started_at", time.time())),
+            )
+            profile = handle.output_profile or self.__dict__.get("_video_output_profile")
+            fps = profile.fps if isinstance(profile, VideoOutputProfile) else _VIDEO_DEFAULT_FPS
+            expected_frames = int(elapsed_sec * fps) if elapsed_sec > 0 else 0
+            self._video_frames_written = int(handle.frames_written)
+            self._video_expected_frames = expected_frames
+            self._video_frames_under_expected = _frames_well_below_expected(
+                int(handle.frames_written),
+                elapsed_sec,
+                fps,
+            )
             self._video_capture_handle = None
             self._ffmpeg_proc = None
             self._restore_window_activatable()
