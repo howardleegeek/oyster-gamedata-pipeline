@@ -221,7 +221,7 @@ def test_data_session_packages_when_all_video_layers_fail(
     assert (clip_dir / "game_state.jsonl").read_text(encoding="utf-8").strip()
     metadata = json.loads((clip_dir / "metadata.json").read_text(encoding="utf-8"))
     assert metadata["video_capture"]["selected_mode"] == "none"
-    assert len(metadata["video_capture"]["attempts_failed"]) == 4
+    assert len(metadata["video_capture"]["attempts_failed"]) == 5
     assert metadata["focus_safety"] == {
         "pause_on_lost_focus_disabled": True,
         "focus_restore_loop_enabled": False,

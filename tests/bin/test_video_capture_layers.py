@@ -99,7 +99,7 @@ def test_video_capture_optional_imports_are_tolerated_on_macos(
 def test_video_capture_auto_chain_prioritizes_hw_accel_layers() -> None:
     m = _import_recorder_module()
 
-    assert m._VIDEO_AUTO_LAYERS == ("windows-capture", "ddagrab", "mss", "gdigrab")
+    assert m._VIDEO_AUTO_LAYERS == ("obs", "windows-capture", "ddagrab", "mss", "gdigrab")
 
 
 @pytest.mark.parametrize(
@@ -209,7 +209,7 @@ def test_video_capture_layer_selection_tries_auto_layers_in_order(
 
     app._start_ffmpeg(tmp_path / "video.mp4")
 
-    assert attempts == ["windows-capture", "ddagrab", "mss", "gdigrab"]
+    assert attempts == ["obs", "windows-capture", "ddagrab", "mss", "gdigrab"]
     assert app._video_capture_mode == "gdigrab"
     assert app._video_capture_attempt_log[-1]["status"] == "selected"
 

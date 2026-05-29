@@ -1684,6 +1684,693 @@ class VideoCaptureLayerError(RuntimeError):
         self.stderr_log = stderr_log
 
 
+class ObsWebSocketError(RuntimeError):
+    """OBS websocket control failure."""
+
+
+class ObsWebSocketRequestError(ObsWebSocketError):
+    """OBS websocket request returned a non-success status."""
+
+    def __init__(self, request_type: str, status: Mapping[str, Any]) -> None:
+        self.request_type = request_type
+        self.status = dict(status)
+        self.code = status.get("code")
+        self.comment = status.get("comment")
+        detail = f"OBS {request_type} failed"
+        if self.code is not None:
+            detail += f" code={self.code}"
+        if self.comment:
+            detail += f" comment={self.comment}"
+        super().__init__(detail)
+
+
+def _obs_auth_response(password: str, challenge: str, salt: str) -> str:
+    secret = hashlib.sha256((password + salt).encode("utf-8")).digest()
+    secret_b64 = base64.b64encode(secret).decode("ascii")
+    auth = hashlib.sha256((secret_b64 + challenge).encode("utf-8")).digest()
+    return base64.b64encode(auth).decode("ascii")
+
+
+class ObsWebSocketClient:
+    """Tiny stdlib obs-websocket v5 JSON client for localhost control."""
+
+    OP_HELLO = 0
+    OP_IDENTIFY = 1
+    OP_IDENTIFIED = 2
+    OP_EVENT = 5
+    OP_REQUEST = 6
+    OP_REQUEST_RESPONSE = 7
+
+    def __init__(
+        self,
+        *,
+        host: str = _OBS_WEBSOCKET_HOST,
+        port: int = _OBS_WEBSOCKET_PORT,
+        password: str = _OBS_WEBSOCKET_PASSWORD,
+        timeout: float = 5.0,
+    ) -> None:
+        self.host = host
+        self.port = int(port)
+        self.password = password
+        self.timeout = float(timeout)
+        self._sock: Optional[socket.socket] = None
+
+    def connect(self) -> None:
+        sock = socket.create_connection((self.host, self.port), timeout=self.timeout)
+        try:
+            key = base64.b64encode(os.urandom(16)).decode("ascii")
+            request = (
+                f"GET / HTTP/1.1\r\n"
+                f"Host: {self.host}:{self.port}\r\n"
+                "Upgrade: websocket\r\n"
+                "Connection: Upgrade\r\n"
+                f"Sec-WebSocket-Key: {key}\r\n"
+                "Sec-WebSocket-Version: 13\r\n"
+                "Sec-WebSocket-Protocol: obswebsocket.json\r\n"
+                "\r\n"
+            )
+            sock.sendall(request.encode("ascii"))
+            response = self._recv_http_response(sock)
+            status_line = response.split("\r\n", 1)[0]
+            if " 101 " not in status_line:
+                raise ObsWebSocketError(f"websocket upgrade failed: {status_line}")
+
+            self._sock = sock
+            hello = self._recv_json(timeout=self.timeout)
+            if hello.get("op") != self.OP_HELLO:
+                raise ObsWebSocketError(f"expected OBS Hello, got {hello}")
+
+            hello_data = hello.get("d", {}) if isinstance(hello.get("d"), dict) else {}
+            rpc_version = int(hello_data.get("rpcVersion") or 1)
+            identify_data: dict[str, Any] = {
+                "rpcVersion": min(rpc_version, 1),
+                "eventSubscriptions": 0,
+            }
+            auth_data = hello_data.get("authentication")
+            if isinstance(auth_data, dict):
+                challenge = str(auth_data.get("challenge", ""))
+                salt = str(auth_data.get("salt", ""))
+                identify_data["authentication"] = _obs_auth_response(
+                    self.password,
+                    challenge,
+                    salt,
+                )
+            self._send_json({"op": self.OP_IDENTIFY, "d": identify_data})
+
+            while True:
+                message = self._recv_json(timeout=self.timeout)
+                op = message.get("op")
+                if op == self.OP_IDENTIFIED:
+                    return
+                if op == self.OP_EVENT:
+                    continue
+                raise ObsWebSocketError(f"OBS identify failed: {message}")
+        except Exception:
+            try:
+                sock.close()
+            finally:
+                self._sock = None
+            raise
+
+    def request(
+        self,
+        request_type: str,
+        request_data: Optional[Mapping[str, Any]] = None,
+        *,
+        timeout: Optional[float] = None,
+    ) -> dict[str, Any]:
+        request_id = f"oyster-{uuid.uuid4()}"
+        payload: dict[str, Any] = {
+            "op": self.OP_REQUEST,
+            "d": {
+                "requestType": request_type,
+                "requestId": request_id,
+            },
+        }
+        if request_data is not None:
+            payload["d"]["requestData"] = dict(request_data)
+        self._send_json(payload)
+
+        deadline = time.monotonic() + float(timeout if timeout is not None else self.timeout)
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError(f"timeout waiting for OBS {request_type}")
+            message = self._recv_json(timeout=remaining)
+            if message.get("op") != self.OP_REQUEST_RESPONSE:
+                continue
+            data = message.get("d", {})
+            if not isinstance(data, dict) or data.get("requestId") != request_id:
+                continue
+            status = data.get("requestStatus", {})
+            if not isinstance(status, dict) or not status.get("result"):
+                raise ObsWebSocketRequestError(
+                    request_type, status if isinstance(status, dict) else {}
+                )
+            return data
+
+    def close(self) -> None:
+        sock = self._sock
+        self._sock = None
+        if sock is None:
+            return
+        try:
+            self._send_frame(b"", opcode=0x8, sock=sock)
+        except Exception:
+            pass
+        try:
+            sock.close()
+        except Exception:
+            pass
+
+    @staticmethod
+    def _recv_http_response(sock: socket.socket) -> str:
+        sock.settimeout(5.0)
+        chunks: list[bytes] = []
+        total = 0
+        while b"\r\n\r\n" not in b"".join(chunks):
+            chunk = sock.recv(4096)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+            if total > 65536:
+                raise ObsWebSocketError("websocket upgrade response too large")
+        return b"".join(chunks).decode("iso-8859-1", errors="replace")
+
+    def _recv_exact(self, count: int, *, timeout: float) -> bytes:
+        sock = self._sock
+        if sock is None:
+            raise ObsWebSocketError("OBS websocket is not connected")
+        sock.settimeout(max(0.1, timeout))
+        data = bytearray()
+        while len(data) < count:
+            chunk = sock.recv(count - len(data))
+            if not chunk:
+                raise ObsWebSocketError("OBS websocket closed")
+            data.extend(chunk)
+        return bytes(data)
+
+    def _recv_frame(self, *, timeout: float) -> tuple[int, bytes]:
+        header = self._recv_exact(2, timeout=timeout)
+        first, second = header[0], header[1]
+        opcode = first & 0x0F
+        length = second & 0x7F
+        masked = bool(second & 0x80)
+        if length == 126:
+            length = struct.unpack("!H", self._recv_exact(2, timeout=timeout))[0]
+        elif length == 127:
+            length = struct.unpack("!Q", self._recv_exact(8, timeout=timeout))[0]
+        mask = self._recv_exact(4, timeout=timeout) if masked else b""
+        payload = self._recv_exact(length, timeout=timeout) if length else b""
+        if masked:
+            payload = bytes(value ^ mask[index % 4] for index, value in enumerate(payload))
+        return opcode, payload
+
+    def _recv_text(self, *, timeout: float) -> str:
+        while True:
+            opcode, payload = self._recv_frame(timeout=timeout)
+            if opcode == 0x1:
+                return payload.decode("utf-8")
+            if opcode == 0x8:
+                raise ObsWebSocketError("OBS websocket closed")
+            if opcode == 0x9:
+                self._send_frame(payload, opcode=0xA)
+
+    def _recv_json(self, *, timeout: float) -> dict[str, Any]:
+        return json.loads(self._recv_text(timeout=timeout))
+
+    def _send_frame(
+        self,
+        payload: bytes,
+        *,
+        opcode: int = 0x1,
+        sock: Optional[socket.socket] = None,
+    ) -> None:
+        target = sock or self._sock
+        if target is None:
+            raise ObsWebSocketError("OBS websocket is not connected")
+        length = len(payload)
+        header = bytearray([0x80 | (opcode & 0x0F)])
+        if length < 126:
+            header.append(0x80 | length)
+        elif length <= 0xFFFF:
+            header.extend((0x80 | 126).to_bytes(1, "big"))
+            header.extend(struct.pack("!H", length))
+        else:
+            header.extend((0x80 | 127).to_bytes(1, "big"))
+            header.extend(struct.pack("!Q", length))
+        mask = os.urandom(4)
+        masked = bytes(value ^ mask[index % 4] for index, value in enumerate(payload))
+        target.sendall(bytes(header) + mask + masked)
+
+    def _send_json(self, payload: Mapping[str, Any]) -> None:
+        raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        self._send_frame(raw)
+
+
+@dataclass(frozen=True)
+class ObsLaunchSpec:
+    executable: Path
+    args: tuple[str, ...]
+    cwd: Path
+
+
+@dataclass
+class ObsCaptureHandle:
+    layer: str
+    out_path: Path
+    proc: Any
+    client: Any
+    output_dir: Path
+    started_at: float
+    video_encoder: str = _OBS_CHOSEN_ENCODER_DEFAULT
+    output_profile: Optional[VideoOutputProfile] = None
+    warning: Optional[str] = None
+    extra: dict[str, Any] = field(default_factory=dict)
+
+
+def _obs_backend_enabled() -> bool:
+    value = os.environ.get(_OBS_ENABLED_ENV, "1").strip().lower()
+    return value not in {"0", "false", "no", "off", "disabled"}
+
+
+def _find_bundled_obs_exe(bundle_root: Optional[Path] = None) -> Optional[Path]:
+    override = os.environ.get(_OBS_PATH_ENV, "").strip()
+    if override:
+        candidate = Path(override)
+        return candidate if candidate.exists() else None
+
+    roots: list[Path] = []
+    if bundle_root is not None:
+        roots.append(bundle_root)
+    roots.append(_BUNDLE_ROOT)
+    try:
+        exe_parent = Path(sys.executable).resolve().parent
+        roots.extend([exe_parent, exe_parent / "_internal"])
+    except Exception:
+        pass
+
+    seen: set[Path] = set()
+    for root in roots:
+        try:
+            resolved_root = root.resolve()
+        except Exception:
+            resolved_root = root
+        if resolved_root in seen:
+            continue
+        seen.add(resolved_root)
+        for rel in (
+            Path("obs-studio") / "bin" / "64bit" / "obs64.exe",
+            Path("OBS Studio") / "bin" / "64bit" / "obs64.exe",
+            Path("obs") / "bin" / "64bit" / "obs64.exe",
+            Path("bin") / "64bit" / "obs64.exe",
+            Path("obs64.exe"),
+        ):
+            candidate = root / rel
+            if candidate.exists():
+                return candidate
+    return None
+
+
+def _build_obs_launch_spec(
+    obs_exe: Path,
+    *,
+    collection: str = _OBS_COLLECTION,
+    profile: str = _OBS_PROFILE,
+    scene: str = _OBS_SCENE,
+) -> ObsLaunchSpec:
+    executable = Path(obs_exe)
+    return ObsLaunchSpec(
+        executable=executable,
+        cwd=executable.parent,
+        args=(
+            str(executable),
+            "--portable",
+            "--minimize-to-tray",
+            "--disable-shutdown-check",
+            "--collection",
+            collection,
+            "--profile",
+            profile,
+            "--scene",
+            scene,
+        ),
+    )
+
+
+def _obs_popen_kwargs() -> dict[str, Any]:
+    kwargs: dict[str, Any] = {
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+    }
+    if os.name == "nt":
+        kwargs["creationflags"] = 0x08000000
+        try:
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 7  # SW_SHOWMINNOACTIVE
+            kwargs["startupinfo"] = startupinfo
+        except Exception:
+            pass
+    return kwargs
+
+
+def _obs_request_optional(
+    client: Any,
+    request_type: str,
+    request_data: Optional[Mapping[str, Any]] = None,
+) -> Optional[dict[str, Any]]:
+    try:
+        return client.request(request_type, request_data)
+    except Exception as exc:  # noqa: BLE001 - optional OBS tuning varies by version
+        _trace(f"obs: optional request {request_type} failed: {exc}")
+        return None
+
+
+def _obs_set_record_directory(client: Any, output_dir: Path) -> None:
+    output_value = str(output_dir)
+    try:
+        client.request("SetRecordDirectory", {"recordDirectory": output_value})
+        return
+    except ObsWebSocketRequestError as exc:
+        if exc.code != 204:
+            _trace(f"obs: SetRecordDirectory failed, trying profile parameters: {exc}")
+    except Exception as exc:  # noqa: BLE001
+        _trace(f"obs: SetRecordDirectory unavailable, trying profile parameters: {exc}")
+
+    failures: list[str] = []
+    for category, parameter in (
+        ("SimpleOutput", "FilePath"),
+        ("AdvOut", "RecFilePath"),
+    ):
+        try:
+            client.request(
+                "SetProfileParameter",
+                {
+                    "parameterCategory": category,
+                    "parameterName": parameter,
+                    "parameterValue": output_value,
+                },
+            )
+            return
+        except Exception as exc:  # noqa: BLE001
+            failures.append(f"{category}.{parameter}: {exc}")
+    raise ObsWebSocketError("OBS recording directory could not be set: " + "; ".join(failures))
+
+
+def _obs_configure_recording_profile(client: Any, output_dir: Path) -> None:
+    _obs_set_record_directory(client, output_dir)
+    for category, parameter, value in (
+        ("SimpleOutput", "RecFormat2", "mp4"),
+        ("SimpleOutput", "RecFormat", "mp4"),
+        ("AdvOut", "RecFormat2", "mp4"),
+        ("AdvOut", "RecFormat", "mp4"),
+        ("Output", "FilenameFormatting", "oyster-%CCYY-%MM-%DD-%hh-%mm-%ss"),
+    ):
+        _obs_request_optional(
+            client,
+            "SetProfileParameter",
+            {
+                "parameterCategory": category,
+                "parameterName": parameter,
+                "parameterValue": value,
+            },
+        )
+
+
+def _obs_get_profile_parameter(client: Any, category: str, parameter: str) -> Optional[str]:
+    try:
+        response = client.request(
+            "GetProfileParameter",
+            {
+                "parameterCategory": category,
+                "parameterName": parameter,
+            },
+        )
+    except Exception:
+        return None
+    data = response.get("responseData", {}) if isinstance(response, dict) else {}
+    if not isinstance(data, dict):
+        return None
+    value = data.get("parameterValue")
+    if value is None or value == "":
+        return None
+    return str(value)
+
+
+def _obs_selected_encoder_from_profile(client: Any) -> str:
+    for category, parameter in (
+        ("SimpleOutput", "RecEncoder"),
+        ("SimpleOutput", "StreamEncoder"),
+        ("AdvOut", "RecEncoder"),
+        ("AdvOut", "Encoder"),
+    ):
+        value = _obs_get_profile_parameter(client, category, parameter)
+        if value:
+            return value
+    return _OBS_CHOSEN_ENCODER_DEFAULT
+
+
+def _terminate_obs_process(proc: Any) -> None:
+    try:
+        if proc is None or proc.poll() is not None:
+            return
+    except Exception:
+        return
+    try:
+        proc.terminate()
+        proc.wait(timeout=8.0)
+    except Exception:
+        try:
+            proc.kill()
+            proc.wait(timeout=3.0)
+        except Exception:
+            pass
+
+
+def _wait_for_obs_websocket(
+    proc: Any,
+    *,
+    client_factory: Callable[[], Any],
+    timeout_sec: float,
+) -> Any:
+    deadline = time.monotonic() + timeout_sec
+    last_error: Optional[BaseException] = None
+    while time.monotonic() < deadline:
+        try:
+            if proc.poll() is not None:
+                raise ObsWebSocketError(f"OBS exited during startup rc={proc.poll()}")
+        except AttributeError:
+            pass
+        client = client_factory()
+        try:
+            client.connect()
+            return client
+        except Exception as exc:  # noqa: BLE001 - retry until OBS websocket is up
+            last_error = exc
+            try:
+                client.close()
+            except Exception:
+                pass
+            time.sleep(0.25)
+    raise ObsWebSocketError(f"OBS websocket unreachable: {last_error}")
+
+
+def _start_obs_capture_layer(
+    out_path: Path,
+    *,
+    output_profile: Optional[VideoOutputProfile] = None,
+    init_timeout_sec: float = _OBS_CONNECT_TIMEOUT_SEC,
+    obs_exe: Optional[Path] = None,
+    ws_client_factory: Optional[Callable[[], Any]] = None,
+    popen_factory: Optional[Callable[..., Any]] = None,
+) -> ObsCaptureHandle:
+    if not _obs_backend_enabled():
+        raise VideoCaptureLayerError("OBS backend disabled by OYSTER_OBS_ENABLED")
+    executable = obs_exe or _find_bundled_obs_exe()
+    if executable is None:
+        raise VideoCaptureLayerError(
+            "bundled OBS Studio not found; expected obs-studio/bin/64bit/obs64.exe"
+        )
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    spec = _build_obs_launch_spec(executable)
+    _trace(f"obs: launching {' '.join(spec.args)} cwd={spec.cwd}")
+    popen = popen_factory or subprocess.Popen
+    proc = popen(list(spec.args), cwd=str(spec.cwd), **_obs_popen_kwargs())
+    client_factory = ws_client_factory or (
+        lambda: ObsWebSocketClient(
+            host=_OBS_WEBSOCKET_HOST,
+            port=_OBS_WEBSOCKET_PORT,
+            password=_OBS_WEBSOCKET_PASSWORD,
+            timeout=5.0,
+        )
+    )
+    try:
+        client = _wait_for_obs_websocket(
+            proc,
+            client_factory=client_factory,
+            timeout_sec=init_timeout_sec,
+        )
+        _obs_configure_recording_profile(client, out_path.parent)
+        _obs_request_optional(client, "SetCurrentProgramScene", {"sceneName": _OBS_SCENE})
+        chosen_encoder = _obs_selected_encoder_from_profile(client)
+        client.request("StartRecord")
+    except Exception:
+        try:
+            client.close()  # type: ignore[name-defined]
+        except Exception:
+            pass
+        _terminate_obs_process(proc)
+        raise
+
+    return ObsCaptureHandle(
+        layer="obs",
+        out_path=out_path,
+        proc=proc,
+        client=client,
+        output_dir=out_path.parent,
+        started_at=time.time(),
+        video_encoder=chosen_encoder,
+        output_profile=output_profile or _resolve_video_output_profile(),
+        extra={
+            "launch_args": list(spec.args[1:]),
+            "profile": _OBS_PROFILE,
+            "collection": _OBS_COLLECTION,
+            "scene": _OBS_SCENE,
+            "websocket_host": _OBS_WEBSOCKET_HOST,
+            "websocket_port": _OBS_WEBSOCKET_PORT,
+        },
+    )
+
+
+def _wait_for_file_stable(path: Path, *, timeout_sec: float, quiet_sec: float = 0.5) -> None:
+    deadline = time.monotonic() + timeout_sec
+    last_size: Optional[int] = None
+    stable_since: Optional[float] = None
+    while time.monotonic() < deadline:
+        try:
+            size = path.stat().st_size
+        except OSError:
+            time.sleep(0.1)
+            continue
+        now = time.monotonic()
+        if size > 0 and size == last_size:
+            if stable_since is None:
+                stable_since = now
+            if now - stable_since >= quiet_sec:
+                return
+        else:
+            stable_since = None
+            last_size = size
+        time.sleep(0.1)
+    raise TimeoutError(f"OBS output did not stabilize: {path}")
+
+
+def _latest_obs_recording_file(output_dir: Path, *, started_at: float) -> Optional[Path]:
+    candidates: list[Path] = []
+    for suffix in ("*.mp4", "*.mkv"):
+        candidates.extend(output_dir.glob(suffix))
+    fresh: list[Path] = []
+    for candidate in candidates:
+        try:
+            if candidate.stat().st_mtime >= started_at - 3.0:
+                fresh.append(candidate)
+        except OSError:
+            continue
+    if not fresh:
+        return None
+    return max(fresh, key=lambda path: path.stat().st_mtime)
+
+
+def _same_file_best_effort(left: Path, right: Path) -> bool:
+    try:
+        return left.samefile(right)
+    except OSError:
+        return left.resolve(strict=False) == right.resolve(strict=False)
+
+
+def _remux_obs_recording_to_mp4(source: Path, target: Path) -> None:
+    if not _FFMPEG.exists():
+        raise FileNotFoundError(f"ffmpeg missing; cannot remux OBS output {source}")
+    tmp_target = target.with_suffix(".obs-remux.tmp.mp4")
+    cmd = [
+        str(_FFMPEG),
+        "-hide_banner",
+        "-y",
+        "-i",
+        str(source),
+        "-c",
+        "copy",
+        "-movflags",
+        "+faststart",
+        str(tmp_target),
+    ]
+    run_kwargs: dict[str, Any] = {}
+    if os.name == "nt":
+        run_kwargs["creationflags"] = 0x08000000
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=_MP4_REMUX_REPAIR_TIMEOUT_SEC,
+        check=False,
+        **run_kwargs,
+    )
+    if result.returncode != 0 or not tmp_target.exists():
+        try:
+            tmp_target.unlink()
+        except OSError:
+            pass
+        raise RuntimeError((result.stderr or result.stdout or "OBS remux failed")[-500:])
+    os.replace(tmp_target, target)
+
+
+def _move_obs_output_to_video_path(source: Path, target: Path) -> None:
+    _wait_for_file_stable(source, timeout_sec=_OBS_FILE_STABLE_TIMEOUT_SEC)
+    if source.suffix.lower() == ".mkv":
+        _remux_obs_recording_to_mp4(source, target)
+        try:
+            source.unlink()
+        except OSError:
+            pass
+        return
+    if not _same_file_best_effort(source, target):
+        if target.exists():
+            target.unlink()
+        os.replace(source, target)
+
+
+def _stop_obs_capture_handle(handle: ObsCaptureHandle) -> None:
+    output_path: Optional[Path] = None
+    stop_error: Optional[BaseException] = None
+    try:
+        response = handle.client.request("StopRecord", timeout=_OBS_STOP_RECORD_TIMEOUT_SEC)
+        data = response.get("responseData", {}) if isinstance(response, dict) else {}
+        if isinstance(data, dict) and data.get("outputPath"):
+            output_path = Path(str(data["outputPath"]))
+    except Exception as exc:  # noqa: BLE001
+        stop_error = exc
+        _trace(f"obs: StopRecord failed: {exc}")
+
+    if output_path is None:
+        output_path = _latest_obs_recording_file(handle.output_dir, started_at=handle.started_at)
+    if output_path is None:
+        if stop_error is not None:
+            raise ObsWebSocketError(f"OBS recording did not finalize: {stop_error}") from stop_error
+        raise ObsWebSocketError("OBS recording did not produce an output file")
+
+    try:
+        _move_obs_output_to_video_path(output_path, handle.out_path)
+    finally:
+        try:
+            handle.client.close()
+        except Exception:
+            pass
+        _terminate_obs_process(handle.proc)
+
+
 def _build_video_capture_plan(
     mode: str,
     *,
@@ -2724,6 +3411,12 @@ def _start_layer(
     layer = _normalize_capture_mode(layer)
     if layer == "none":
         return None
+    if layer == "obs":
+        return _start_obs_capture_layer(
+            out_path,
+            output_profile=output_profile,
+            init_timeout_sec=max(init_timeout_sec, _OBS_CONNECT_TIMEOUT_SEC),
+        )  # type: ignore[return-value]
     if layer == "windows-capture":
         return _start_windows_capture_layer(
             out_path,
@@ -3786,6 +4479,7 @@ class RecorderApp(tk.Tk):
 
         self._ffmpeg_proc: Optional[subprocess.Popen] = None
         self._video_capture_handle: Optional[VideoCaptureHandle] = None
+        self._obs_capture_handle: Optional[ObsCaptureHandle] = None
         self._video_capture_mode = "unknown"
         self._video_capture_requested_mode = _CAPTURE_MODE
         self._video_capture_attempt_log: list[dict[str, Any]] = []
@@ -4664,9 +5358,13 @@ class RecorderApp(tk.Tk):
         the .exe. Only the close-the-window or app exit path tears the
         loop down for good (via self._stop_event when _on_close fires).
         """
-        if not _FFMPEG.exists():
-            self._set("⚠️ 缺少 ffmpeg", ORANGE, "ffmpeg.exe 没有打包进来，请联系工程师。")
-            return
+        if not _FFMPEG.exists() and _find_bundled_obs_exe() is None:
+            self._set(
+                "⚠️ 缺少视频后端",
+                ORANGE,
+                "OBS/ffmpeg 都没有打包进来；会尽量保留游戏状态与键鼠数据。",
+            )
+            _trace("WARNING: no OBS or ffmpeg video backend found; data-only fallback possible")
 
         while not self._stop_event.is_set():
             self._run_one_session()
@@ -5610,6 +6308,13 @@ class RecorderApp(tk.Tk):
         video_frozen = bool(self.__dict__.get("_video_frozen", False))
         frozen_reason = self.__dict__.get("_video_frozen_reason")
         video_encoder = str(self.__dict__.get("_video_encoder", "unknown"))
+        selected_video_mode = str(self.__dict__.get("_video_capture_mode", "unknown"))
+        if selected_video_mode == "obs":
+            video_backend = "obs"
+        elif selected_video_mode == "none":
+            video_backend = "none"
+        else:
+            video_backend = "ffmpeg"
         output_profile = self.__dict__.get("_video_output_profile")
         if isinstance(output_profile, VideoOutputProfile):
             output_profile_payload = output_profile.to_dict()
@@ -5651,17 +6356,19 @@ class RecorderApp(tk.Tk):
                 },
             ),
             "video_capture": {
+                "backend": video_backend,
                 "requested_mode": self.__dict__.get(
                     "_video_capture_requested_mode",
                     _CAPTURE_MODE,
                 ),
-                "selected_mode": self.__dict__.get("_video_capture_mode", "unknown"),
-                "selected_layer": self.__dict__.get("_video_capture_mode", "unknown"),
+                "selected_mode": selected_video_mode,
+                "selected_layer": selected_video_mode,
                 "validation_passed": video_validation_passed,
                 "validation_reason": video_validation_reason,
                 "video_frozen": video_frozen,
                 "frozen_reason": frozen_reason,
                 "video_encoder": video_encoder,
+                "chosen_encoder": video_encoder,
                 "output_profile": output_profile_payload,
                 "frames_written": int(self.__dict__.get("_video_frames_written", 0) or 0),
                 "expected_frames": int(self.__dict__.get("_video_expected_frames", 0) or 0),
@@ -5818,6 +6525,7 @@ class RecorderApp(tk.Tk):
         """Start video capture through the nonfatal auto fallback chain."""
 
         self._video_capture_handle = None
+        self._obs_capture_handle = None
         self._ffmpeg_proc = None
         self._video_capture_mode = "none"
         requested_capture_mode = _normalize_capture_mode(_CAPTURE_MODE)
@@ -5942,15 +6650,20 @@ class RecorderApp(tk.Tk):
                     _trace(f"video_capture: layer={layer} unavailable")
                     continue
                 self._video_capture_mode = layer
-                self._video_capture_handle = handle
+                if isinstance(handle, ObsCaptureHandle):
+                    self._obs_capture_handle = handle
+                    self._video_capture_handle = None
+                else:
+                    self._video_capture_handle = handle
+                    self._obs_capture_handle = None
                 self._ffmpeg_proc = handle.proc
                 self._video_encoder = handle.video_encoder
                 self._video_capture_attempt_log.append(
                     {
                         "layer": layer,
                         "status": "selected",
-                        "warning": handle.warning,
-                        "extra": handle.extra,
+                        "warning": getattr(handle, "warning", None),
+                        "extra": getattr(handle, "extra", {}),
                     }
                 )
                 _trace(f"video_capture: selected layer={layer}")
@@ -5974,6 +6687,7 @@ class RecorderApp(tk.Tk):
         _trace("WARNING: ALL video capture layers failed: " f"{errors}. Continuing with NO video.")
         self._video_capture_mode = "none"
         self._video_capture_handle = None
+        self._obs_capture_handle = None
         self._ffmpeg_proc = None
 
     def _start_ffmpeg(self, out_path: Path) -> None:
@@ -6024,6 +6738,43 @@ class RecorderApp(tk.Tk):
 
     def _stop_ffmpeg(self) -> None:
         """Send 'q' to ffmpeg's stdin and wait for MP4 finalization."""
+        obs_handle = getattr(self, "_obs_capture_handle", None)
+        if isinstance(obs_handle, ObsCaptureHandle):
+            elapsed_sec = max(
+                0.0,
+                time.time() - float(self.__dict__.get("_record_started_at", time.time())),
+            )
+            profile = obs_handle.output_profile or self.__dict__.get("_video_output_profile")
+            fps = profile.fps if isinstance(profile, VideoOutputProfile) else _VIDEO_DEFAULT_FPS
+            expected_frames = int(elapsed_sec * fps) if elapsed_sec > 0 else 0
+            try:
+                _stop_obs_capture_handle(obs_handle)
+            except Exception as exc:  # noqa: BLE001
+                _trace(f"WARNING: obs stop/finalize failed: {exc}")
+                self._video_capture_attempt_log.append(
+                    {
+                        "layer": "obs",
+                        "status": "failed",
+                        "phase": "stop_record",
+                        "error": str(exc),
+                    }
+                )
+            finally:
+                self._video_frames_written = expected_frames
+                self._video_expected_frames = expected_frames
+                self._video_frames_under_expected = False
+                self._obs_capture_handle = None
+                self._video_capture_handle = None
+                self._ffmpeg_proc = None
+                self._restore_window_activatable()
+
+            video_path = getattr(self, "_video_path", None)
+            if isinstance(video_path, Path) and video_path.exists():
+                _fsync_file(video_path)
+            if isinstance(video_path, Path):
+                self._record_video_validation_result(video_path)
+            return
+
         handle = getattr(self, "_video_capture_handle", None)
         if isinstance(handle, VideoCaptureHandle):
             forced_stop = _stop_video_capture_handle(handle)
