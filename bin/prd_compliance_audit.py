@@ -1034,7 +1034,16 @@ def audit_group_v_real_footage(session: Path) -> list[dict]:
             var = sum((y - mean) ** 2 for y in yavgs) / len(yavgs)
         else:
             var = 0
-        signal_2 = var > 100  # testsrc fixed bars → very low YAVG variance
+        # signal_2: reject a *literally frozen* stream (identical frames →
+        # YAVG variance collapses to ~0). The old `> 100` threshold was
+        # uncalibrated and falsely flagged ALL real footage as fake: average
+        # luma is near-constant in normal gameplay (Minecraft daytime) even
+        # under heavy motion. Empirical calibration (2026-05-29): solid-color
+        # frozen=0.0, static testsrc bars=1.0, confirmed-real 300s session=5.0.
+        # Bitrate (signal_1) and first-frame detail (signal_3) separate real
+        # from fake by 30-300x and are the reliable anti-"假 pass" signals; the
+        # YAVG floor only guards against a literally-frozen stream.
+        signal_2 = var > 1.5
         # Signal 3: first-frame size — testsrc encodes to tiny I-frame
         frame_out = subprocess.run(
             [
