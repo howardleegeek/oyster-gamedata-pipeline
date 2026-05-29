@@ -309,6 +309,10 @@ Source: "launch_mc.bat"; \
     DestDir: "{app}"; \
     DestName: "launch_mc.bat"; \
     Flags: ignoreversion
+Source: "mc_args_template.txt"; \
+    DestDir: "{app}"; \
+    DestName: "mc_args_template.txt"; \
+    Flags: ignoreversion
 
 ; --- (4c) Rust v2.6.0 config preseed --------------------------------------
 ; Source checked against ~/Downloads/gamedata-recorder tag v2.6.0:

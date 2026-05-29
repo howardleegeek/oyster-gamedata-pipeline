@@ -290,6 +290,35 @@ jobs:
             exit 1
           }
 
+      - name: Generate static Minecraft @argfile template
+        shell: pwsh
+        run: |
+          python bin/build_bundled_installer/gen_mc_args_template.py
+          $template = 'bin/build_bundled_installer/mc_args_template.txt'
+          if (-not (Test-Path $template)) {
+            Write-Error "Minecraft @argfile template was not generated: $template"
+            exit 1
+          }
+          $content = Get-Content -Raw -LiteralPath $template
+          if ($content -notmatch '\{ROOT\}') {
+            Write-Error "Minecraft @argfile template is missing the literal {ROOT} placeholder"
+            exit 1
+          }
+          if ($content -notmatch '"-DFabricMcEmu= net\.minecraft\.client\.main\.Main"') {
+            Write-Error "Minecraft @argfile template is missing the quoted FabricMcEmu JVM arg"
+            exit 1
+          }
+          if ($content -match '\\') {
+            Write-Error "Minecraft @argfile template contains backslashes; paths must use forward slashes"
+            exit 1
+          }
+          $lineCount = ($content -split "`n" | Where-Object { $_ -ne '' }).Count
+          if ($lineCount -ne 33) {
+            Write-Error "Minecraft @argfile template must be 33 non-empty lines, got $lineCount"
+            exit 1
+          }
+          Write-Host "Generated $template ($lineCount lines)"
+
       # ---------------------------------------------------------------------
       # 9. R05C — compile OysterPlay.py → OysterPlay.exe
       # ---------------------------------------------------------------------
@@ -692,7 +721,8 @@ jobs:
           $specMarker = "bundle/OysterRecorder-onedir/_internal/obs/obs_portable.txt"
           $rustRecorderExe = "bundle/gamedata-recorder/gamedata-recorder.exe"
           $rustWinCapture = "bundle/gamedata-recorder/obs-plugins/64bit/win-capture.dll"
-          foreach ($p in @($bundledObsExe, $portableMarker, $specMarker, $rustRecorderExe, $rustWinCapture)) {
+          $mcArgsTemplate = "bin/build_bundled_installer/mc_args_template.txt"
+          foreach ($p in @($bundledObsExe, $portableMarker, $specMarker, $rustRecorderExe, $rustWinCapture, $mcArgsTemplate)) {
             if (-not (Test-Path $p)) {
               Write-Error "Installer compile preflight missing bundled recorder artifact: $p"
               exit 1
