@@ -465,6 +465,79 @@ jobs:
             exit 1
           }
 
+      - name: Stage OBS Studio portable into OysterRecorder onedir
+        shell: pwsh
+        run: |
+          # v0.19: ship OBS Studio portable inside the PyInstaller onedir
+          # bundle. The recorder runtime owns profile/scene generation and
+          # launch args; CI only stages the official portable OBS tree.
+          $obsVersion = "30.2.3"
+          $obsZipName = "OBS-Studio-$obsVersion-Windows.zip"
+          $obsUrl = "https://github.com/obsproject/obs-studio/releases/download/$obsVersion/$obsZipName"
+          $obsSha256 = "c5bf721258f6d8b2342ed39f04e65cdd3a07a9d1300654471d4be91d87fee65b"
+          $obsExpectedBytes = 158525553
+          Write-Host "Downloading OBS Studio portable $obsVersion from $obsUrl"
+          Invoke-WebRequest -Uri $obsUrl -OutFile $obsZipName
+          $obsZip = Get-Item $obsZipName
+          if ($obsZip.Length -ne $obsExpectedBytes) {
+            Write-Error "OBS Studio zip size mismatch: expected $obsExpectedBytes bytes, got $($obsZip.Length)"
+            exit 1
+          }
+          $obsHash = (Get-FileHash $obsZipName -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($obsHash -ne $obsSha256) {
+            Write-Error "OBS Studio zip SHA256 mismatch: expected $obsSha256, got $obsHash"
+            exit 1
+          }
+          Write-Host "Verified OBS Studio portable ${obsVersion}: $($obsZip.Length) bytes, sha256:$obsHash"
+
+          $obsExtractDir = "obs-studio-extracted"
+          Remove-Item -Recurse -Force $obsExtractDir -ErrorAction SilentlyContinue
+          Expand-Archive -Path $obsZipName -DestinationPath $obsExtractDir -Force
+          $obsExe = Get-ChildItem -Path $obsExtractDir -Recurse -Filter "obs64.exe" |
+            Where-Object { $_.FullName -match '\\bin\\64bit\\obs64\.exe$' } |
+            Select-Object -First 1
+          if (-not $obsExe) {
+            Write-Error "OBS Studio portable extraction did not contain bin/64bit/obs64.exe"
+            exit 1
+          }
+          $obsRoot = $obsExe.Directory.Parent.Parent.FullName
+          $obsDest = "bundle/OysterRecorder-onedir/_internal/obs"
+          Remove-Item -Recurse -Force $obsDest -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $obsDest | Out-Null
+          Copy-Item -Path (Join-Path $obsRoot "*") -Destination $obsDest -Recurse -Force
+
+          # Official OBS portable mode uses portable_mode.txt. Keep the
+          # spec-named marker too; it is harmless and makes the bundle intent
+          # obvious to humans inspecting the tree.
+          New-Item -ItemType File -Force -Path (Join-Path $obsDest "portable_mode.txt") | Out-Null
+          New-Item -ItemType File -Force -Path (Join-Path $obsDest "obs_portable.txt") | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $obsDest "config") | Out-Null
+
+          $requiredObsPaths = @(
+            "bin/64bit/obs64.exe",
+            "bin/64bit/obs-amf-test.exe",
+            "bin/64bit/obs-nvenc-test.exe",
+            "bin/64bit/obs-qsv-test.exe",
+            "data",
+            "obs-plugins",
+            "obs-plugins/64bit/obs-ffmpeg.dll",
+            "obs-plugins/64bit/obs-qsv11.dll",
+            "obs-plugins/64bit/obs-websocket.dll",
+            "obs-plugins/64bit/win-capture.dll",
+            "portable_mode.txt",
+            "obs_portable.txt"
+          )
+          foreach ($relative in $requiredObsPaths) {
+            $candidate = Join-Path $obsDest $relative
+            if (-not (Test-Path $candidate)) {
+              Write-Error "Bundled OBS Studio is missing required path: $relative"
+              exit 1
+            }
+          }
+          $bundledObsExe = Resolve-Path (Join-Path $obsDest "bin/64bit/obs64.exe")
+          Write-Host "Bundled OBS Studio version: $obsVersion"
+          Write-Host "Bundled obs64.exe path: $bundledObsExe"
+
       # ---------------------------------------------------------------------
       # 12. Stage the full bundle layout that installer.iss expects
       # ---------------------------------------------------------------------
@@ -473,6 +546,7 @@ jobs:
       #   Source: "{#BundleRoot}\jre\*"                  -> bundle/jre/...
       #   Source: "{#BundleRoot}\mc-instance\*"          -> bundle/mc-instance/...
       #   Source: "{#BundleRoot}\OysterRecorder-onedir\*"-> bundle/OysterRecorder-onedir/
+      #   Source: "{#BundleRoot}\OysterRecorder-onedir\_internal\obs\*"-> bundled OBS Studio portable
       #   Source: "{#BundleRoot}\OysterPlay.exe"         -> bundle/OysterPlay.exe
       #   Source: "{#BundleRoot}\manifest.json"          -> bundle/manifest.json
       - name: Compose bundle/ layout
@@ -488,7 +562,10 @@ jobs:
             'bundle/mc-instance/versions/fabric-loader-0.16.10-1.21.4/fabric-loader-0.16.10-1.21.4.json',
             'bundle/mc-instance/mods',
             'bundle/OysterPlay.exe',
-            'bundle/OysterRecorder-onedir/OysterRecorder-onedir.exe'
+            'bundle/OysterRecorder-onedir/OysterRecorder-onedir.exe',
+            'bundle/OysterRecorder-onedir/_internal/obs/bin/64bit/obs64.exe',
+            'bundle/OysterRecorder-onedir/_internal/obs/portable_mode.txt',
+            'bundle/OysterRecorder-onedir/_internal/obs/obs_portable.txt'
           )
           foreach ($p in $required) {
             if (-not (Test-Path $p)) {
@@ -552,6 +629,18 @@ jobs:
             Write-Error "R05D artifact missing: $iss (check spec R05D_inno_setup_installer.md)"
             exit 1
           }
+          $obsVersion = "30.2.3"
+          $bundledObsExe = "bundle/OysterRecorder-onedir/_internal/obs/bin/64bit/obs64.exe"
+          $portableMarker = "bundle/OysterRecorder-onedir/_internal/obs/portable_mode.txt"
+          $specMarker = "bundle/OysterRecorder-onedir/_internal/obs/obs_portable.txt"
+          foreach ($p in @($bundledObsExe, $portableMarker, $specMarker)) {
+            if (-not (Test-Path $p)) {
+              Write-Error "Installer compile preflight missing bundled OBS Studio artifact: $p"
+              exit 1
+            }
+          }
+          Write-Host "Preflight bundled OBS Studio version: $obsVersion"
+          Write-Host "Preflight bundled obs64.exe path: $(Resolve-Path $bundledObsExe)"
           # /Qp = quiet w/ progress (no /SILENT), /D injects preprocessor symbol.
           iscc.exe /Qp "/DAppVersion=$env:APP_VERSION" $iss
           if ($LASTEXITCODE -ne 0) {
@@ -574,19 +663,24 @@ jobs:
           Copy-Item -Force $issOut $finalExe
           $size_mb = [math]::Round((Get-Item $finalExe).Length / 1MB, 1)
           Write-Host "Installer built: $finalExe (${size_mb} MB)"
+          if (-not (Test-Path $bundledObsExe)) {
+            Write-Error "Bundled OBS Studio artifact disappeared after installer compile: $bundledObsExe"
+            exit 1
+          }
+          Write-Host "Installer bundles OBS Studio $obsVersion"
+          Write-Host "Bundled obs64.exe path: $(Resolve-Path $bundledObsExe)"
           # Iron-law size sanity gate (mirrors build_all.ps1 stage 8).
           $bytes = (Get-Item $finalExe).Length
           if ($bytes -lt (400 * 1MB)) {
             Write-Error "Installer is too small (${size_mb} MiB < 400 MiB) — JRE / MC bundle may be missing"
             exit 1
           }
-          if ($bytes -gt (1000 * 1MB)) {
+          if ($bytes -gt (1200 * 1MB)) {
             # rc7 target is ~800 MB (rc6 was ~460 MB before bundling MC
-            # asset objects). 1000 MB ceiling absorbs the ~390 MB of
-            # objects + minor mod / weight bloat without falsely failing
-            # a healthy build. Mirrors build_all.ps1's gate — keep both
-            # in sync when re-tuning.
-            Write-Error "Installer is too large (${size_mb} MiB > 1000 MiB) — investigate Solid compression"
+            # asset objects). OBS portable adds ~150 MB compressed on top,
+            # so the ceiling allows that plus minor mod / weight bloat
+            # without falsely failing a healthy build.
+            Write-Error "Installer is too large (${size_mb} MiB > 1200 MiB) — investigate Solid compression"
             exit 1
           }
 

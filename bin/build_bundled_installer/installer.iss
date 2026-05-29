@@ -12,7 +12,7 @@
 ;       +-- Vanilla Minecraft 1.21.4 client + libs  (R05B, ~200 MB)
 ;       +-- Vanilla MC asset objects (rc7)          (R05B, ~390 MB)
 ;       +-- Fabric loader 0.16.10 + 9 mod jars      (R05B/mc-mod, ~10 MB)
-;       +-- OysterRecorder-onedir/ (PyInstaller)    (~120 MB)
+;       +-- OysterRecorder-onedir/ (PyInstaller)    (~120 MB + OBS portable)
 ;       +-- OysterPlay.exe single-button launcher   (R05C, ~5 MB)
 ;       +-- manifest.json (combined SHA-256 pin)
 ;
@@ -263,8 +263,18 @@ Source: "{#BundleRoot}\\mc-instance\\mods\\fabric-api.jar"; \
 ; --- (3) OysterRecorder PyInstaller --onedir bundle -----------------------
 ; ~120 MB. Source comes from the existing build-recorder-exe.yml workflow
 ; (which we now run locally inside build_all.ps1 step 5).
+; The OBS portable subtree is declared explicitly in (3b) so installer
+; audits can prove _internal\obs\bin\64bit\obs64.exe is in the payload.
 Source: "{#BundleRoot}\\OysterRecorder-onedir\\*"; \
     DestDir: "{app}\\OysterRecorder-onedir"; \
+    Excludes: "\\_internal\\obs\\*"; \
+    Flags: ignoreversion recursesubdirs createallsubdirs
+
+; --- (3b) OBS Studio portable for recorder capture backend ----------------
+; Produced by build-recorder-installer.yml before ISCC compile. The recorder
+; builds OBS profiles/scenes at runtime; installer only ships official OBS.
+Source: "{#BundleRoot}\\OysterRecorder-onedir\\_internal\\obs\\*"; \
+    DestDir: "{app}\\OysterRecorder-onedir\\_internal\\obs"; \
     Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; --- (4) OysterPlay.exe single-button launcher (R05C) ---------------------
