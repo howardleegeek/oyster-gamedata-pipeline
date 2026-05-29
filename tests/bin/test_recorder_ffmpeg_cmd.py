@@ -111,7 +111,7 @@ def test_recorder_ffmpeg_cmd_pins_h265_bitrate(tmp_path: Path) -> None:
     assert cmd[cmd.index("-bufsize") + 1] == "20M"
 
 
-def test_recorder_ffmpeg_cmd_prefers_ddagrab_in_auto_mode(tmp_path: Path) -> None:
+def test_recorder_ffmpeg_cmd_supports_manual_ddagrab_mode(tmp_path: Path) -> None:
     m = _import_recorder_module()
     app = object.__new__(m.RecorderApp)
     app._mc_window_rect = {
@@ -125,8 +125,7 @@ def test_recorder_ffmpeg_cmd_prefers_ddagrab_in_auto_mode(tmp_path: Path) -> Non
 
     with (
         _force_windows(m),
-        mock.patch.object(m, "_CAPTURE_MODE", "auto"),
-        mock.patch.object(m, "_VIDEO_AUTO_LAYERS", ("ddagrab", "gdigrab")),
+        mock.patch.object(m, "_CAPTURE_MODE", "ddagrab"),
         mock.patch.object(m, "_VIDEO_LAYER_INIT_TIMEOUT_SEC", 0.0),
         mock.patch.object(m, "_FFMPEG", tmp_path / "ffmpeg.exe"),
         mock.patch.object(m, "probe_audio_source_chain", return_value=audio_report),

@@ -371,8 +371,10 @@ def test_recorder_allows_placeholder_with_explicit_flag():
 def test_recorder_window_capture_uses_geometry_not_title():
     """R01 v3: ffmpeg invocation must use geometry, NOT -i title=...
 
-    ddagrab captures the full DXGI output and crops to the Minecraft
-    geometry. gdigrab remains as the legacy fallback with
+    windows-capture/mss are the automatic hardware-friendly capture path.
+    ddagrab remains as an explicit diagnostic path that captures the full DXGI
+    output and crops to the Minecraft geometry. gdigrab remains as the last
+    automatic fallback with
     offset_x/offset_y/video_size + -i desktop.
 
     Verified two ways:
@@ -383,7 +385,10 @@ def test_recorder_window_capture_uses_geometry_not_title():
     src = _read_recorder_source()
 
     # (a) Source-level: recorder must use geometry-based capture.
-    assert '"ddagrab"' in src, "Recorder must prefer DXGI ddagrab capture"
+    assert (
+        '_VIDEO_AUTO_LAYERS = ("windows-capture", "mss", "gdigrab")' in src
+    ), "Recorder auto mode must try WGC, then mss, then gdigrab"
+    assert '"ddagrab"' in src, "Recorder must keep explicit DXGI ddagrab diagnostics"
     assert "crop=" in src, "Recorder must crop ddagrab to the Minecraft geometry"
     assert '"-offset_x"' in src, "Recorder must use -offset_x in ffmpeg cmd"
     assert '"-offset_y"' in src, "Recorder must use -offset_y in ffmpeg cmd"

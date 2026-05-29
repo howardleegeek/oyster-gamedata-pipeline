@@ -157,7 +157,7 @@ def test_validate_recorded_video_uses_ffmpeg_duration_when_ffprobe_missing(
             raise FileNotFoundError("missing ffprobe")
         if "-vframes" in cmd:
             frame_calls.append(len(frame_calls))
-            frame = bytes(range(256)) * 60 + bytes([len(frame_calls)])
+            frame = bytes([len(frame_calls) * 40]) * (160 * 90)
             return types.SimpleNamespace(returncode=0, stdout=frame, stderr="")
         return types.SimpleNamespace(
             returncode=1,

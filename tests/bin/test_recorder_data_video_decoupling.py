@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
 import sys
 import tarfile
 import types
@@ -46,6 +48,43 @@ def _import_recorder_module() -> Any:
     import recorder_consumer_lite as m  # type: ignore[import-not-found]
 
     return m
+
+
+def _require_ffmpeg_tools(monkeypatch: pytest.MonkeyPatch, m: Any) -> Path:
+    ffmpeg = shutil.which("ffmpeg")
+    ffprobe = shutil.which("ffprobe")
+    if ffmpeg is None or ffprobe is None:
+        pytest.skip("ffmpeg/ffprobe not installed")
+    monkeypatch.setattr(m, "_FFMPEG", Path(ffmpeg))
+    monkeypatch.setattr(m, "_FFPROBE", Path(ffprobe))
+    return Path(ffmpeg)
+
+
+def _make_fixture_video(path: Path, lavfi: str, *, ffmpeg: Path) -> None:
+    result = subprocess.run(
+        [
+            str(ffmpeg),
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            lavfi,
+            "-c:v",
+            "mpeg4",
+            "-pix_fmt",
+            "yuv420p",
+            str(path),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    if result.returncode != 0:
+        pytest.fail(result.stderr or f"ffmpeg exited with code {result.returncode}")
 
 
 def _install_packaging_fakes(monkeypatch: pytest.MonkeyPatch, m: Any, out_dir: Path) -> None:
@@ -159,11 +198,6 @@ def test_data_session_packages_when_all_video_layers_fail(
 
     audio_report = m.AudioProbeReport(process_name="javaw.exe", selected=None, probes=[])
     monkeypatch.setattr(m, "probe_audio_source_chain", lambda _process: audio_report)
-    monkeypatch.setattr(
-        m,
-        "_VIDEO_AUTO_LAYERS",
-        ("windows-capture", "mss", "ddagrab", "gdigrab"),
-    )
 
     def _fail_layer(layer: str, *_args: Any, **_kwargs: Any) -> None:
         raise RuntimeError(f"{layer} unavailable")
@@ -183,8 +217,63 @@ def test_data_session_packages_when_all_video_layers_fail(
     assert (clip_dir / "game_state.jsonl").read_text(encoding="utf-8").strip()
     metadata = json.loads((clip_dir / "metadata.json").read_text(encoding="utf-8"))
     assert metadata["video_capture"]["selected_mode"] == "none"
-    assert len(metadata["video_capture"]["attempts_failed"]) == 4
+    assert len(metadata["video_capture"]["attempts_failed"]) == 3
     assert metadata["session_complete"] is False
+
+
+@pytest.mark.parametrize(
+    ("lavfi", "expected_frozen"),
+    [
+        ("color=c=blue:s=320x180:r=10:d=6", True),
+        ("testsrc2=duration=6:size=320x180:rate=10", False),
+    ],
+)
+def test_video_frozen_status_is_written_to_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    lavfi: str,
+    expected_frozen: bool,
+) -> None:
+    m = _import_recorder_module()
+    ffmpeg = _require_ffmpeg_tools(monkeypatch, m)
+    out_dir = tmp_path / ("out_frozen" if expected_frozen else "out_live")
+    out_dir.mkdir()
+    _install_packaging_fakes(monkeypatch, m, out_dir)
+
+    active_dir = out_dir / "active_session"
+    active_dir.mkdir()
+    game_state = active_dir / "game_state.jsonl"
+    game_state.write_text(_game_state_line() + "\n", encoding="utf-8")
+
+    if str(BIN_DIR) not in sys.path:
+        sys.path.insert(0, str(BIN_DIR))
+    import game_state_overlay  # type: ignore[import-not-found]  # noqa: PLC0415
+
+    monkeypatch.setattr(game_state_overlay, "jsonl_path", lambda: game_state)
+
+    app = _new_app(m, tmp_path, active_dir)
+    app._record_started_at = m.time.time() - 6.0
+    app._video_capture_mode = "mss"
+    app._video_capture_attempt_log = [{"layer": "mss", "status": "selected"}]
+    _make_fixture_video(app._video_path, lavfi, ffmpeg=ffmpeg)
+
+    tar_path = app._package_tarball("20260528-000050")
+    extract_dir = tmp_path / ("extract_frozen" if expected_frozen else "extract_live")
+    with tarfile.open(tar_path, "r:gz") as tf:
+        tf.extractall(extract_dir)
+
+    metadata = json.loads(
+        (extract_dir / "clip-20260528-000050" / "metadata.json").read_text(encoding="utf-8")
+    )
+    assert metadata["video_frozen"] is expected_frozen
+    assert metadata["video_capture"]["video_frozen"] is expected_frozen
+    if expected_frozen:
+        assert metadata["frozen_reason"]
+        assert "video_frozen" in metadata["partial_reasons"]
+        assert metadata["video_capture"]["validation_passed"] is False
+    else:
+        assert metadata["frozen_reason"] is None
+        assert metadata["video_capture"]["validation_passed"] is True
 
 
 def test_video_success_missing_mod_jsonl_marks_partial(

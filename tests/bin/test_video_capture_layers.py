@@ -96,6 +96,88 @@ def test_video_capture_optional_imports_are_tolerated_on_macos(
     )
 
 
+@pytest.mark.parametrize(
+    ("monitors", "x", "expected_monitor_index"),
+    [
+        (
+            [{"index": 1, "left": 0, "top": 0, "width": 1920, "height": 1080, "primary": True}],
+            10,
+            1,
+        ),
+        (
+            [
+                {"index": 1, "left": 0, "top": 0, "width": 1920, "height": 1080, "primary": True},
+                {
+                    "index": 2,
+                    "left": 1920,
+                    "top": 0,
+                    "width": 1920,
+                    "height": 1080,
+                    "primary": False,
+                },
+            ],
+            2000,
+            2,
+        ),
+        ([], 10, 1),
+    ],
+)
+def test_windows_capture_uses_one_based_monitor_index(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monitors: list[dict[str, Any]],
+    x: int,
+    expected_monitor_index: int,
+) -> None:
+    m = _import_recorder_module()
+    captured_indices: list[int] = []
+
+    class _FakeWindowsCapture:
+        def __init__(self, *, monitor_index: int, **_kwargs: Any) -> None:
+            captured_indices.append(monitor_index)
+
+        def event(self, fn: Any) -> Any:
+            return fn
+
+        def start(self) -> None:
+            raise RuntimeError("unit stop")
+
+    fake_module = types.ModuleType("windows_capture")
+    fake_module.WindowsCapture = _FakeWindowsCapture  # type: ignore[attr-defined]
+
+    monitor_bounds = [
+        m.MonitorBounds(
+            index=int(monitor["index"]),
+            left=int(monitor["left"]),
+            top=int(monitor["top"]),
+            width=int(monitor["width"]),
+            height=int(monitor["height"]),
+            is_primary=bool(monitor["primary"]),
+        )
+        for monitor in monitors
+    ]
+
+    monkeypatch.setattr(m.os, "name", "nt")
+    monkeypatch.setitem(sys.modules, "windows_capture", fake_module)
+    monkeypatch.setattr(m, "_get_windows_monitor_bounds", lambda: monitor_bounds)
+
+    with pytest.raises(RuntimeError, match="WindowsCapture start failed"):
+        m._start_windows_capture_layer(
+            tmp_path / "video.mp4",
+            x=x,
+            y=20,
+            w=640,
+            h=360,
+            audio_inputs=[],
+            audio_codec=[],
+            creationflags=0,
+            init_timeout_sec=0.2,
+        )
+
+    assert captured_indices == [expected_monitor_index]
+    assert captured_indices[0] > 0
+
+
 def test_video_capture_layer_selection_tries_auto_layers_in_order(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -106,24 +188,23 @@ def test_video_capture_layer_selection_tries_auto_layers_in_order(
 
     def _fake_start_layer(layer: str, out_path: Path, **_kwargs: Any) -> Any:
         attempts.append(layer)
-        if layer != "ddagrab":
+        if layer != "gdigrab":
             raise RuntimeError(f"{layer} failed")
         return m.VideoCaptureHandle(
-            layer="ddagrab",
+            layer="gdigrab",
             out_path=out_path,
             stdin_kind="control",
             proc=types.SimpleNamespace(poll=lambda: None),
         )
 
     monkeypatch.setattr(m, "_CAPTURE_MODE", "auto")
-    monkeypatch.setattr(m, "_VIDEO_AUTO_LAYERS", ("windows-capture", "mss", "ddagrab", "gdigrab"))
     monkeypatch.setattr(m, "probe_audio_source_chain", lambda _process_name: _audio_report(m))
     monkeypatch.setattr(m, "_start_layer", _fake_start_layer)
 
     app._start_ffmpeg(tmp_path / "video.mp4")
 
-    assert attempts == ["windows-capture", "mss", "ddagrab"]
-    assert app._video_capture_mode == "ddagrab"
+    assert attempts == ["windows-capture", "mss", "gdigrab"]
+    assert app._video_capture_mode == "gdigrab"
     assert app._video_capture_attempt_log[-1]["status"] == "selected"
 
 

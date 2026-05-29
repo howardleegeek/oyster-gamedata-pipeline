@@ -91,7 +91,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.28.0-rc9"
+RECORDER_VERSION = "lite-v0.18.8"
 
 # R01 iron-law: supported MC versions for real game-state Fabric mod.
 # Kept in sync with .github/workflows/build-mc-mod.yml matrix.
@@ -502,19 +502,22 @@ _FFMPEG_FORCE_STOP_TIMEOUT_SEC = 3.0
 _MP4_REMUX_REPAIR_TIMEOUT_SEC = 180.0
 _FFMPEG_DURATION_ARG = "-t"
 _CAPTURE_MODE_ENV = "OYSTER_CAPTURE_MODE"
-_VIDEO_AUTO_LAYERS = ("windows-capture", "mss", "ddagrab", "gdigrab")
+_VIDEO_AUTO_LAYERS = ("windows-capture", "mss", "gdigrab")
+_VIDEO_EXPLICIT_LAYERS = ("windows-capture", "mss", "ddagrab", "gdigrab")
 _CAPTURE_MODE_ALIASES = {
     "wgc": "windows-capture",
     "windows_capture": "windows-capture",
     "windowscapture": "windows-capture",
 }
-_VALID_CAPTURE_MODES = {"auto", "none", *_VIDEO_AUTO_LAYERS, *_CAPTURE_MODE_ALIASES}
+_VALID_CAPTURE_MODES = {"auto", "none", *_VIDEO_EXPLICIT_LAYERS, *_CAPTURE_MODE_ALIASES}
 _VIDEO_LAYER_INIT_TIMEOUT_SEC = 3.0
 _VIDEO_VALIDATION_MIN_DURATION_SEC = 5.0
 _VIDEO_VALIDATION_SAMPLE_FRACTIONS = (0.1, 0.3, 0.5, 0.7, 0.9)
 _VIDEO_VALIDATION_WIDTH = 160
 _VIDEO_VALIDATION_HEIGHT = 90
 _VIDEO_VALIDATION_LOW_ENTROPY_BITS = 2.0
+_VIDEO_FROZEN_DOMINANT_FRAME_RATIO = 0.70
+_VIDEO_FROZEN_MEAN_DIFF_THRESHOLD = 0.5 / 255.0
 _CAPTURE_STARTUP_CHECK_SEC = _VIDEO_LAYER_INIT_TIMEOUT_SEC
 _FFMPEG_DURATION_RE = re.compile(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)")
 _MP4_CONTAINER_BOXES = {b"moov", b"trak", b"mdia"}
@@ -713,25 +716,22 @@ def _probe_duration_sec(path: Path) -> Optional[float]:
     return _probe_duration_from_mp4_boxes(path)
 
 
-def _validate_recorded_video(
-    video_path: Path,
-    min_duration_sec: float = _VIDEO_VALIDATION_MIN_DURATION_SEC,
-) -> tuple[bool, str]:
-    """Sanity check the captured video. Returns (is_valid, reason)."""
+@dataclass(frozen=True)
+class VideoFreezeAnalysis:
+    frozen: bool
+    reason: Optional[str]
+    sampled_frames: int
+    requested_samples: int
+    unique_frame_count: int
+    dominant_frame_ratio: float
+    mean_pairwise_diff: float
 
-    if not video_path.exists():
-        return False, "video.mp4 does not exist"
 
-    duration = _probe_duration_sec(video_path)
-    if duration is None:
-        return False, "duration probe unavailable"
-    if duration < min_duration_sec:
-        return False, f"duration {duration:.1f}s < {min_duration_sec}s"
-
-    frame_hashes: set[str] = set()
-    frame_entropies: list[float] = []
+def _sample_recorded_video_frames(video_path: Path, duration_sec: float) -> list[bytes]:
+    frames: list[bytes] = []
+    expected_len = _VIDEO_VALIDATION_WIDTH * _VIDEO_VALIDATION_HEIGHT
     for fraction in _VIDEO_VALIDATION_SAMPLE_FRACTIONS:
-        timestamp = duration * fraction
+        timestamp = max(0.0, duration_sec * fraction)
         try:
             proc = subprocess.run(
                 [
@@ -764,21 +764,113 @@ def _validate_recorded_video(
             continue
         if proc.returncode != 0 or not proc.stdout:
             continue
-        frame_hashes.add(hashlib.sha256(proc.stdout).hexdigest())
-        frame_entropies.append(_byte_entropy_bits(proc.stdout))
+        if len(proc.stdout) != expected_len:
+            continue
+        frames.append(proc.stdout)
+    return frames
 
-    sample_count = len(_VIDEO_VALIDATION_SAMPLE_FRACTIONS)
-    if len(frame_hashes) <= 1:
-        return (
-            False,
-            f"all {sample_count} sampled frames identical (SHA256 match) - capture was static",
+
+def _mean_pairwise_frame_diff(frames: Sequence[bytes]) -> float:
+    if len(frames) < 2:
+        return 0.0
+    pair_diffs: list[float] = []
+    for idx, left in enumerate(frames[:-1]):
+        for right in frames[idx + 1 :]:
+            frame_len = min(len(left), len(right))
+            if frame_len <= 0:
+                continue
+            diff_sum = sum(abs(left[pos] - right[pos]) for pos in range(frame_len))
+            pair_diffs.append(diff_sum / (frame_len * 255.0))
+    return sum(pair_diffs) / len(pair_diffs) if pair_diffs else 0.0
+
+
+def _analyze_recorded_video_freeze(video_path: Path, duration_sec: float) -> VideoFreezeAnalysis:
+    frames = _sample_recorded_video_frames(video_path, duration_sec)
+    requested_samples = len(_VIDEO_VALIDATION_SAMPLE_FRACTIONS)
+    if len(frames) < 2:
+        return VideoFreezeAnalysis(
+            frozen=False,
+            reason=None,
+            sampled_frames=len(frames),
+            requested_samples=requested_samples,
+            unique_frame_count=len({hashlib.sha256(frame).hexdigest() for frame in frames}),
+            dominant_frame_ratio=1.0 if frames else 0.0,
+            mean_pairwise_diff=0.0,
         )
-    if frame_entropies and max(frame_entropies) < _VIDEO_VALIDATION_LOW_ENTROPY_BITS:
-        return (
-            False,
-            f"all frames very low entropy ({max(frame_entropies):.2f} bits) - likely black/uniform",
+
+    hashes = [hashlib.sha256(frame).hexdigest() for frame in frames]
+    counts: dict[str, int] = {}
+    for frame_hash in hashes:
+        counts[frame_hash] = counts.get(frame_hash, 0) + 1
+    dominant_count = max(counts.values())
+    dominant_ratio = dominant_count / len(hashes)
+    mean_diff = _mean_pairwise_frame_diff(frames)
+
+    reason: Optional[str] = None
+    if dominant_ratio > _VIDEO_FROZEN_DOMINANT_FRAME_RATIO:
+        reason = (
+            "video frozen: "
+            f"{dominant_count}/{len(hashes)} sampled frames byte-identical "
+            f"(dominant_frame_ratio={dominant_ratio:.3f})"
         )
-    return True, f"{len(frame_hashes)} unique frames across {sample_count} samples"
+    elif mean_diff <= _VIDEO_FROZEN_MEAN_DIFF_THRESHOLD:
+        reason = (
+            "video frozen: "
+            f"mean pairwise frame diff {mean_diff:.6f} <= "
+            f"{_VIDEO_FROZEN_MEAN_DIFF_THRESHOLD:.6f}"
+        )
+
+    return VideoFreezeAnalysis(
+        frozen=reason is not None,
+        reason=reason,
+        sampled_frames=len(frames),
+        requested_samples=requested_samples,
+        unique_frame_count=len(counts),
+        dominant_frame_ratio=dominant_ratio,
+        mean_pairwise_diff=mean_diff,
+    )
+
+
+def _video_validation_reason_is_frozen(reason: str) -> bool:
+    lowered = reason.casefold()
+    return "video frozen:" in lowered
+
+
+def _validate_recorded_video(
+    video_path: Path,
+    min_duration_sec: float = _VIDEO_VALIDATION_MIN_DURATION_SEC,
+) -> tuple[bool, str]:
+    """Sanity check the captured video. Returns (is_valid, reason)."""
+
+    if not video_path.exists():
+        return False, "video.mp4 does not exist"
+
+    duration = _probe_duration_sec(video_path)
+    if duration is None:
+        return False, "duration probe unavailable"
+
+    freeze = _analyze_recorded_video_freeze(video_path, duration)
+    failures: list[str] = []
+    if duration < min_duration_sec:
+        failures.append(f"duration {duration:.1f}s < {min_duration_sec}s")
+    if freeze.sampled_frames < 2:
+        failures.append(
+            "ffmpeg could not sample enough frames "
+            f"({freeze.sampled_frames}/{freeze.requested_samples})"
+        )
+    if freeze.frozen and freeze.reason:
+        failures.append(freeze.reason)
+    if failures:
+        return False, "; ".join(failures)
+    return (
+        True,
+        (
+            f"{freeze.unique_frame_count} unique frames across "
+            f"{freeze.sampled_frames}/{freeze.requested_samples} samples; "
+            f"dominant_frame_ratio={freeze.dominant_frame_ratio:.3f}; "
+            f"mean_pairwise_diff={freeze.mean_pairwise_diff:.6f}"
+        ),
+    )
 
 
 def _mp4_has_moov_atom(mp4_path: Path) -> bool:
@@ -1899,11 +1991,9 @@ def _start_windows_capture_layer(
 
     monitors = _get_windows_monitor_bounds()
     monitor = _best_monitor_for_rect(monitors, x=x, y=y, w=w, h=h)
-    # windows-capture's Python examples historically used 1-indexed monitor
-    # IDs, while bingd's failing build request specified 0. Use zero-based
-    # from our Win32 enumeration so primary monitor becomes 0; MSS/ddagrab
-    # remain behind it if this package rejects the index.
-    monitor_index = max(0, (monitor.index - 1) if monitor else 0)
+    # windows-capture validates monitor_index as one-based. Passing 0 caused
+    # the WGC layer to fail before capture started on tester machines.
+    monitor_index = max(1, monitor.index if monitor else 1)
     pre_filters: tuple[str, ...] = ()
     if monitor is not None:
         pre_filters = (_crop_filter_for_monitor((x, y, w, h), monitor),)
@@ -3234,6 +3324,8 @@ class RecorderApp(tk.Tk):
         self._video_validation_passed: Optional[bool] = None
         self._video_validation_failed = False
         self._video_validation_reason = "not_checked"
+        self._video_frozen = False
+        self._video_frozen_reason: Optional[str] = None
         self._video_started = False
         self._recording_active = False
         self._active_session_dir = _active_session_dir()
@@ -5064,12 +5156,16 @@ class RecorderApp(tk.Tk):
             self._record_video_validation_result(video_file)
         video_validation_passed = bool(self.__dict__.get("_video_validation_passed", False))
         video_validation_reason = str(self.__dict__.get("_video_validation_reason", "not_checked"))
+        video_frozen = bool(self.__dict__.get("_video_frozen", False))
+        frozen_reason = self.__dict__.get("_video_frozen_reason")
         has_real_game_state = bool(_gs_samples)
         partial_reasons: list[str] = []
         if elapsed_sec < 300.0:
             partial_reasons.append("duration_below_5min")
         if not has_video:
             partial_reasons.append("video_missing")
+        if video_frozen:
+            partial_reasons.append("video_frozen")
         if not video_validation_passed:
             partial_reasons.append("video_validation_failed")
         if not has_real_game_state:
@@ -5086,6 +5182,8 @@ class RecorderApp(tk.Tk):
             "session_complete": session_complete,
             "partial": bool(partial_reasons),
             "partial_reasons": partial_reasons,
+            "video_frozen": video_frozen,
+            "frozen_reason": frozen_reason,
             "input_capture_diagnostics": self.__dict__.get(
                 "_input_capture_diagnostics",
                 {
@@ -5103,6 +5201,8 @@ class RecorderApp(tk.Tk):
                 "selected_layer": self.__dict__.get("_video_capture_mode", "unknown"),
                 "validation_passed": video_validation_passed,
                 "validation_reason": video_validation_reason,
+                "video_frozen": video_frozen,
+                "frozen_reason": frozen_reason,
                 "layer_attempt_log": self.__dict__.get("_video_capture_attempt_log", []),
                 "attempts_failed": [
                     attempt
@@ -5118,6 +5218,8 @@ class RecorderApp(tk.Tk):
             video_capture_warnings.append("video_missing_data_only_session")
             metadata["video_capture"]["selected_mode"] = "none"
             metadata["video_capture"]["selected_layer"] = "none"
+        if video_frozen:
+            video_capture_warnings.append("video_frozen")
         if not video_validation_passed:
             video_capture_warnings.append("video_validation_failed")
         if video_capture_warnings:
@@ -5230,7 +5332,7 @@ class RecorderApp(tk.Tk):
         return out_tar
 
     def _start_video_capture(self, out_path: Path) -> None:
-        """Start video capture through the nonfatal four-layer fallback chain."""
+        """Start video capture through the nonfatal auto fallback chain."""
 
         self._video_capture_handle = None
         self._ffmpeg_proc = None
@@ -5242,6 +5344,8 @@ class RecorderApp(tk.Tk):
         self._video_validation_passed = None
         self._video_validation_failed = False
         self._video_validation_reason = "not_checked"
+        self._video_frozen = False
+        self._video_frozen_reason = None
 
         if self._mc_window_rect is None:
             message = "Minecraft window not detected; continuing session without video"
@@ -5373,10 +5477,13 @@ class RecorderApp(tk.Tk):
 
     def _record_video_validation_result(self, video_path: Path) -> None:
         valid, reason = _validate_recorded_video(video_path)
+        video_frozen = _video_validation_reason_is_frozen(reason)
         self._video_validation_checked = True
         self._video_validation_passed = valid
         self._video_validation_failed = not valid
         self._video_validation_reason = reason
+        self._video_frozen = video_frozen
+        self._video_frozen_reason = reason if video_frozen else None
         layer = str(self.__dict__.get("_video_capture_mode", "unknown"))
         failed_layers = set(self.__dict__.get("_video_capture_failed_layers", set()))
         if valid:
@@ -5384,6 +5491,17 @@ class RecorderApp(tk.Tk):
             _trace(f"video validation passed: {reason}")
         else:
             _trace(f"WARNING: video validation failed: {reason}")
+            if video_frozen:
+                _trace(f"WARNING: video_capture frozen-frame self-detect: {reason}")
+                self._video_capture_attempt_log.append(
+                    {
+                        "layer": layer,
+                        "status": "failed",
+                        "error": reason,
+                        "video_frozen": True,
+                        "phase": "post_capture_validation",
+                    }
+                )
             if layer in _VIDEO_AUTO_LAYERS:
                 failed_layers.add(layer)
                 _trace("video_capture: marked layer failed for next auto retry " f"layer={layer}")
@@ -5586,7 +5704,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         choices=sorted(_VALID_CAPTURE_MODES),
         default=None,
         help=(
-            "Video capture mode: auto tries windows-capture, mss, ddagrab, then gdigrab; "
+            "Video capture mode: auto tries windows-capture, mss, then gdigrab; "
             f"default comes from {_CAPTURE_MODE_ENV} or auto"
         ),
     )
