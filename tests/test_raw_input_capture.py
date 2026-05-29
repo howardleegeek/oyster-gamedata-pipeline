@@ -78,6 +78,45 @@ class _FakeUser32:
         return sizeof(ric.RAWINPUT)
 
 
+class _FakeWinFunc:
+    def __init__(self, name: str, result: int | None = 1) -> None:
+        self.name = name
+        self.result = result
+        self.calls: list[tuple[Any, ...]] = []
+
+    def __call__(self, *args: Any) -> int | None:
+        self.calls.append(args)
+        if (
+            self.name == "CreateWindowExW"
+            and getattr(self, "argtypes", None) is None
+            and int(args[10]) > 0xFFFFFFFF
+        ):
+            raise OverflowError("int too long to convert")
+        return self.result
+
+
+class _FakeWinUser32:
+    def __init__(self) -> None:
+        self.RegisterClassW = _FakeWinFunc("RegisterClassW", 1)
+        self.CreateWindowExW = _FakeWinFunc("CreateWindowExW", 0xABCDEF)
+        self.RegisterRawInputDevices = _FakeWinFunc("RegisterRawInputDevices", 1)
+        self.GetRawInputData = _FakeWinFunc("GetRawInputData", 0)
+        self.DefWindowProcW = _FakeWinFunc("DefWindowProcW", 0)
+        self.DestroyWindow = _FakeWinFunc("DestroyWindow", 1)
+        self.UnregisterClassW = _FakeWinFunc("UnregisterClassW", 1)
+        self.PostThreadMessageW = _FakeWinFunc("PostThreadMessageW", 1)
+        self.PostQuitMessage = _FakeWinFunc("PostQuitMessage", None)
+        self.PeekMessageW = _FakeWinFunc("PeekMessageW", 0)
+        self.TranslateMessage = _FakeWinFunc("TranslateMessage", 1)
+        self.DispatchMessageW = _FakeWinFunc("DispatchMessageW", 0)
+
+
+class _FakeWinKernel32:
+    def __init__(self, hinstance: int) -> None:
+        self.GetModuleHandleW = _FakeWinFunc("GetModuleHandleW", hinstance)
+        self.GetCurrentThreadId = _FakeWinFunc("GetCurrentThreadId", 1234)
+
+
 def test_non_windows_start_is_noop() -> None:
     calls: list[tuple[int, int, int]] = []
     capture = ric.RawInputCapture(
@@ -109,6 +148,68 @@ def test_register_and_unregister_raw_input_devices() -> None:
     assert unregister.usUsage == 0x02
     assert unregister.dwFlags == ric.RIDEV_REMOVE
     assert unregister.hwndTarget is None
+
+
+def test_win32_prototypes_are_64_bit_handle_safe() -> None:
+    user32 = _FakeWinUser32()
+    kernel32 = _FakeWinKernel32(hinstance=0x1234567887654321)
+
+    ric.RawInputCapture._configure_prototypes(user32, kernel32)
+
+    assert user32.CreateWindowExW.argtypes == [
+        ric.wintypes.DWORD,
+        ric.wintypes.LPCWSTR,
+        ric.wintypes.LPCWSTR,
+        ric.wintypes.DWORD,
+        ric.c_int,
+        ric.c_int,
+        ric.c_int,
+        ric.c_int,
+        ric._WIN_HWND,
+        ric._WIN_HMENU,
+        ric._WIN_HINSTANCE,
+        ric._WIN_LPVOID,
+    ]
+    assert user32.CreateWindowExW.restype is ric._WIN_HWND
+    assert user32.RegisterRawInputDevices.argtypes == [
+        POINTER(ric.RAWINPUTDEVICE),
+        c_uint,
+        c_uint,
+    ]
+    assert user32.GetRawInputData.argtypes == [
+        ric._WIN_HANDLE,
+        ric.wintypes.UINT,
+        ric._WIN_LPVOID,
+        POINTER(c_uint),
+        c_uint,
+    ]
+    assert user32.DefWindowProcW.argtypes == [
+        ric._WIN_HWND,
+        ric.wintypes.UINT,
+        ric.wintypes.WPARAM,
+        ric.wintypes.LPARAM,
+    ]
+    assert user32.DestroyWindow.argtypes == [ric._WIN_HWND]
+
+
+def test_registration_path_accepts_64_bit_hinstance() -> None:
+    user32 = _FakeWinUser32()
+    kernel32 = _FakeWinKernel32(hinstance=0x1234567887654321)
+    capture = ric.RawInputCapture(
+        lambda _dx, _dy, _ts: None,
+        user32=user32,
+        kernel32=kernel32,
+        platform_name="nt",
+    )
+
+    try:
+        assert capture.start(timeout=1.0) is True
+    finally:
+        capture.stop()
+
+    assert capture.last_error == ""
+    assert user32.CreateWindowExW.calls[0][10] == 0x1234567887654321
+    assert user32.RegisterRawInputDevices.calls
 
 
 def test_wm_input_relative_mouse_delta_invokes_callback() -> None:

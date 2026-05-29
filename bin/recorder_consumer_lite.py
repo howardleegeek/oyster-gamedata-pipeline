@@ -96,7 +96,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.19.5"
+RECORDER_VERSION = "lite-v0.19.6"
 RAW_ONLY_DEPTH_SKIP_REASON = "DA-V2 weights not bundled in raw-only build"
 
 # R01 iron-law: supported MC versions for real game-state Fabric mod.
@@ -2152,8 +2152,9 @@ def _obs_place_display_behind_game(client: Any) -> None:
     display_item = items.get(_OBS_DISPLAY_INPUT)
     if not game_item or not display_item:
         return
+    game_item_id = game_item.get("sceneItemId")
     display_item_id = display_item.get("sceneItemId")
-    if display_item_id is None:
+    if game_item_id is None or display_item_id is None:
         return
     indices: list[int] = []
     for item in items.values():
@@ -2161,20 +2162,29 @@ def _obs_place_display_behind_game(client: Any) -> None:
             indices.append(int(item.get("sceneItemIndex", 0)))
         except Exception:
             continue
-    target_index = max(indices) if indices else 1
+    top_index = max(max(indices) if indices else 0, len(items) - 1, 1)
     _obs_request_optional(
         client,
         "SetSceneItemIndex",
         {
             "sceneName": _OBS_SCENE,
             "sceneItemId": display_item_id,
-            "sceneItemIndex": target_index,
+            "sceneItemIndex": 0,
+        },
+    )
+    _obs_request_optional(
+        client,
+        "SetSceneItemIndex",
+        {
+            "sceneName": _OBS_SCENE,
+            "sceneItemId": game_item_id,
+            "sceneItemIndex": top_index,
         },
     )
 
 
 def _obs_sanitize_window_part(value: str) -> str:
-    return value.replace("#", "#22").replace(":", "#3A")
+    return value.replace("#", "#23").replace(":", "#3A")
 
 
 def _obs_mc_window_value(mc_window: Optional[Mapping[str, Any]], key: str) -> str:
@@ -2211,6 +2221,39 @@ def _obs_game_capture_settings(mc_window: Optional[Mapping[str, Any]]) -> dict[s
     }
 
 
+def _obs_window_rect_tuple(
+    mc_window: Optional[Mapping[str, Any]],
+) -> Optional[tuple[int, int, int, int]]:
+    if not isinstance(mc_window, Mapping):
+        return None
+    try:
+        x = int(mc_window.get("x", 0))
+        y = int(mc_window.get("y", 0))
+        w = int(mc_window.get("width", mc_window.get("w", 0)))
+        h = int(mc_window.get("height", mc_window.get("h", 0)))
+    except (TypeError, ValueError):
+        return None
+    if w <= 0 or h <= 0:
+        return None
+    return x, y, w, h
+
+
+def _obs_display_capture_settings(mc_window: Optional[Mapping[str, Any]]) -> dict[str, Any]:
+    settings: dict[str, Any] = {"capture_cursor": True}
+    rect = _obs_window_rect_tuple(mc_window)
+    if rect is None:
+        return settings
+    x, y, w, h = rect
+    monitor = _best_monitor_for_rect(_get_windows_monitor_bounds(), x=x, y=y, w=w, h=h)
+    if monitor is None:
+        return settings
+    monitor_index = max(0, monitor.index - 1)
+    settings["monitor"] = monitor_index
+    if monitor.device_name:
+        settings["monitor_id"] = monitor.device_name
+    return settings
+
+
 def _obs_ensure_scene_and_sources(
     client: Any,
     mc_window: Optional[Mapping[str, Any]] = None,
@@ -2233,20 +2276,31 @@ def _obs_ensure_scene_and_sources(
     client.request("SetCurrentProgramScene", {"sceneName": _OBS_SCENE})
 
     input_names = _obs_input_names(client)
+    game_settings = _obs_game_capture_settings(mc_window)
     if _OBS_GAME_INPUT not in input_names:
-        settings = _obs_game_capture_settings(mc_window)
         client.request(
             "CreateInput",
             {
                 "sceneName": _OBS_SCENE,
                 "inputName": _OBS_GAME_INPUT,
                 "inputKind": "game_capture",
-                "inputSettings": settings,
+                "inputSettings": game_settings,
                 "sceneItemEnabled": True,
             },
         )
         input_names.add(_OBS_GAME_INPUT)
         _trace(f"obs: created game_capture input {_OBS_GAME_INPUT}")
+    else:
+        client.request(
+            "SetInputSettings",
+            {
+                "inputName": _OBS_GAME_INPUT,
+                "inputSettings": game_settings,
+                "overlay": True,
+            },
+        )
+        _trace(f"obs: updated game_capture input {_OBS_GAME_INPUT}")
+    display_settings = _obs_display_capture_settings(mc_window)
     if _OBS_DISPLAY_INPUT not in input_names:
         client.request(
             "CreateInput",
@@ -2254,12 +2308,22 @@ def _obs_ensure_scene_and_sources(
                 "sceneName": _OBS_SCENE,
                 "inputName": _OBS_DISPLAY_INPUT,
                 "inputKind": "monitor_capture",
-                "inputSettings": {"capture_cursor": True},
+                "inputSettings": display_settings,
                 "sceneItemEnabled": True,
             },
         )
         input_names.add(_OBS_DISPLAY_INPUT)
         _trace(f"obs: created monitor_capture fallback input {_OBS_DISPLAY_INPUT}")
+    else:
+        client.request(
+            "SetInputSettings",
+            {
+                "inputName": _OBS_DISPLAY_INPUT,
+                "inputSettings": display_settings,
+                "overlay": True,
+            },
+        )
+        _trace(f"obs: updated monitor_capture fallback input {_OBS_DISPLAY_INPUT}")
 
     _obs_ensure_source_in_scene(client, _OBS_DISPLAY_INPUT)
     _obs_ensure_source_in_scene(client, _OBS_GAME_INPUT)
@@ -2272,12 +2336,14 @@ def _obs_set_record_directory(client: Any, output_dir: Path) -> None:
         client.request("SetRecordDirectory", {"recordDirectory": output_value})
         return
     except ObsWebSocketRequestError as exc:
-        if exc.code != 204:
-            _trace(f"obs: SetRecordDirectory failed, trying profile parameters: {exc}")
-    except Exception as exc:  # noqa: BLE001
+        if str(exc.code) != "204":
+            raise ObsWebSocketError(f"OBS SetRecordDirectory failed: {exc}") from exc
         _trace(f"obs: SetRecordDirectory unavailable, trying profile parameters: {exc}")
+    except Exception as exc:  # noqa: BLE001
+        raise ObsWebSocketError(f"OBS SetRecordDirectory failed: {exc}") from exc
 
     failures: list[str] = []
+    applied = 0
     for category, parameter in (
         ("SimpleOutput", "FilePath"),
         ("AdvOut", "RecFilePath"),
@@ -2291,9 +2357,11 @@ def _obs_set_record_directory(client: Any, output_dir: Path) -> None:
                     "parameterValue": output_value,
                 },
             )
-            return
+            applied += 1
         except Exception as exc:  # noqa: BLE001
             failures.append(f"{category}.{parameter}: {exc}")
+    if applied:
+        return
     raise ObsWebSocketError("OBS recording directory could not be set: " + "; ".join(failures))
 
 
@@ -2426,6 +2494,7 @@ def _start_obs_capture_layer(
             timeout=5.0,
         )
     )
+    client: Any | None = None
     try:
         client = _wait_for_obs_websocket(
             proc,
@@ -2437,10 +2506,11 @@ def _start_obs_capture_layer(
         chosen_encoder = _obs_selected_encoder_from_profile(client)
         client.request("StartRecord")
     except Exception:
-        try:
-            client.close()  # type: ignore[name-defined]
-        except Exception:
-            pass
+        if client is not None:
+            try:
+                client.close()
+            except Exception:
+                pass
         _terminate_obs_process(proc)
         raise
 
@@ -2500,7 +2570,17 @@ def _latest_obs_recording_file(output_dir: Path, *, started_at: float) -> Option
             continue
     if not fresh:
         return None
-    return max(fresh, key=lambda path: path.stat().st_mtime)
+    candidate = max(fresh, key=lambda path: path.stat().st_mtime)
+    deadline = time.monotonic() + 5.0
+    while time.monotonic() < deadline:
+        try:
+            if candidate.stat().st_size > 0:
+                return candidate
+        except OSError:
+            return None
+        time.sleep(0.1)
+    _trace(f"obs: latest recording stayed empty: {candidate}")
+    return None
 
 
 def _same_file_best_effort(left: Path, right: Path) -> bool:
@@ -2672,6 +2752,7 @@ class MonitorBounds:
     width: int
     height: int
     is_primary: bool = False
+    device_name: Optional[str] = None
 
 
 @dataclass
@@ -3257,6 +3338,7 @@ def _get_windows_monitor_bounds() -> list[MonitorBounds]:
             ("rcMonitor", wt.RECT),
             ("rcWork", wt.RECT),
             ("dwFlags", wt.DWORD),
+            ("szDevice", ctypes.c_wchar * 32),
         ]
 
     hmonitor_t = getattr(wt, "HMONITOR", wt.HANDLE)
@@ -3283,6 +3365,7 @@ def _get_windows_monitor_bounds() -> list[MonitorBounds]:
                 width=int(rect.right - rect.left),
                 height=int(rect.bottom - rect.top),
                 is_primary=bool(info.dwFlags & 1),
+                device_name=str(info.szDevice).rstrip("\x00") or None,
             )
         )
         return True

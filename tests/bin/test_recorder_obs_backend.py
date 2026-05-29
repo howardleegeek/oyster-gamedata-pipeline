@@ -89,6 +89,7 @@ class _FakeObsClient:
         self.requests: list[tuple[str, dict[str, Any] | None]] = []
         self.scenes = set(scenes or [])
         self.inputs = dict(inputs or {})
+        self.input_settings: dict[str, dict[str, Any]] = {}
         self.scene_items: list[dict[str, Any]] = [dict(item) for item in scene_items or []]
         self._next_scene_item_id = 1 + max(
             [int(item.get("sceneItemId", 0)) for item in self.scene_items] or [0]
@@ -127,8 +128,16 @@ class _FakeObsClient:
             assert request_data is not None
             input_name = str(request_data["inputName"])
             self.inputs[input_name] = str(request_data["inputKind"])
+            self.input_settings[input_name] = dict(request_data.get("inputSettings") or {})
             scene_item_id = self._add_scene_item(input_name)
             return {"responseData": {"sceneItemId": scene_item_id}}
+        if request_type == "SetInputSettings":
+            assert request_data is not None
+            input_name = str(request_data["inputName"])
+            current = dict(self.input_settings.get(input_name, {}))
+            current.update(dict(request_data.get("inputSettings") or {}))
+            self.input_settings[input_name] = current
+            return {}
         if request_type == "GetSceneItemList":
             return {"responseData": {"sceneItems": [dict(item) for item in self.scene_items]}}
         if request_type == "CreateSceneItem":
@@ -216,10 +225,10 @@ def _request_payloads(client: _FakeObsClient, request_type: str) -> list[dict[st
     ]
 
 
-def test_recorder_version_is_v0195() -> None:
+def test_recorder_version_is_v0196() -> None:
     m = _import_recorder_module()
 
-    assert m.RECORDER_VERSION == "lite-v0.19.5"
+    assert m.RECORDER_VERSION == "lite-v0.19.6"
 
 
 def test_obs_launch_arg_builder_uses_portable_minimized_profile(tmp_path: Path) -> None:
@@ -346,7 +355,7 @@ def test_obs_start_creates_capture_graph_before_record(tmp_path: Path) -> None:
     }
 
 
-def test_obs_start_skips_existing_capture_graph(tmp_path: Path) -> None:
+def test_obs_start_updates_existing_game_capture_settings(tmp_path: Path) -> None:
     m = _import_recorder_module()
     obs_exe = tmp_path / "obs-studio" / "bin" / "64bit" / "obs64.exe"
     obs_exe.parent.mkdir(parents=True)
@@ -371,7 +380,7 @@ def test_obs_start_skips_existing_capture_graph(tmp_path: Path) -> None:
     m._start_obs_capture_layer(
         out_path,
         output_profile=m.VideoOutputProfile(width=1920, height=1080, fps=30.0),
-        mc_window={"title": "Minecraft 1.21.4 - Singleplayer"},
+        mc_window={"title": "Minecraft #Modded"},
         obs_exe=obs_exe,
         ws_client_factory=lambda: client,
         popen_factory=lambda args, *, cwd, **_kwargs: proc,
@@ -384,6 +393,157 @@ def test_obs_start_skips_existing_capture_graph(tmp_path: Path) -> None:
     assert "CreateScene" not in request_types
     assert "CreateInput" not in request_types
     assert "CreateSceneItem" not in request_types
+    game_updates = [
+        payload
+        for payload in _request_payloads(client, "SetInputSettings")
+        if payload["inputName"] == "oyster_game"
+    ]
+    assert game_updates
+    assert game_updates[-1]["inputSettings"]["window"] == "Minecraft #23Modded:GLFW30:javaw.exe"
+
+
+def test_obs_start_orders_display_capture_behind_game_capture(tmp_path: Path) -> None:
+    m = _import_recorder_module()
+    obs_exe = tmp_path / "obs-studio" / "bin" / "64bit" / "obs64.exe"
+    obs_exe.parent.mkdir(parents=True)
+    obs_exe.write_text("fake", encoding="utf-8")
+    obs_output = tmp_path / "obs-out" / "obs-file.mp4"
+    obs_output.parent.mkdir()
+    client = _FakeObsClient(
+        obs_output,
+        scenes=["MC"],
+        inputs={
+            "oyster_game": "game_capture",
+            "oyster_display": "monitor_capture",
+        },
+        scene_items=[
+            {"sourceName": "oyster_game", "sceneItemId": 10, "sceneItemIndex": 0},
+            {"sourceName": "oyster_display", "sceneItemId": 11, "sceneItemIndex": 1},
+        ],
+    )
+
+    m._start_obs_capture_layer(
+        tmp_path / "session" / "video.mp4",
+        output_profile=m.VideoOutputProfile(width=1920, height=1080, fps=30.0),
+        obs_exe=obs_exe,
+        ws_client_factory=lambda: client,
+        popen_factory=lambda args, *, cwd, **_kwargs: _FakeProc(),
+    )
+
+    index_by_source = {
+        str(item["sourceName"]): int(item["sceneItemIndex"]) for item in client.scene_items
+    }
+    assert index_by_source["oyster_display"] == 0
+    assert index_by_source["oyster_game"] > index_by_source["oyster_display"]
+    scene_index_updates = _request_payloads(client, "SetSceneItemIndex")
+    assert {
+        "sceneName": "MC",
+        "sceneItemId": 11,
+        "sceneItemIndex": 0,
+    } in scene_index_updates
+    assert {
+        "sceneName": "MC",
+        "sceneItemId": 10,
+        "sceneItemIndex": 1,
+    } in scene_index_updates
+
+
+def test_obs_display_capture_uses_monitor_under_minecraft_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    m = _import_recorder_module()
+    monitors = [
+        m.MonitorBounds(
+            index=1,
+            left=0,
+            top=0,
+            width=1920,
+            height=1080,
+            is_primary=True,
+            device_name=r"\\.\DISPLAY1",
+        ),
+        m.MonitorBounds(
+            index=2,
+            left=1920,
+            top=0,
+            width=1920,
+            height=1080,
+            is_primary=False,
+            device_name=r"\\.\DISPLAY2",
+        ),
+    ]
+    monkeypatch.setattr(m, "_get_windows_monitor_bounds", lambda: monitors)
+
+    settings = m._obs_display_capture_settings({"x": 2000, "y": 20, "width": 640, "height": 360})
+
+    assert settings["monitor"] == 1
+    assert settings["monitor_id"] == r"\\.\DISPLAY2"
+
+
+def test_obs_record_directory_non_204_failure_propagates(tmp_path: Path) -> None:
+    m = _import_recorder_module()
+    obs_exe = tmp_path / "obs-studio" / "bin" / "64bit" / "obs64.exe"
+    obs_exe.parent.mkdir(parents=True)
+    obs_exe.write_text("fake", encoding="utf-8")
+    obs_output = tmp_path / "obs-out" / "obs-file.mp4"
+    obs_output.parent.mkdir()
+
+    class _RecordDirFailClient(_FakeObsClient):
+        def request(
+            self,
+            request_type: str,
+            request_data: dict[str, Any] | None = None,
+            **kwargs: Any,
+        ) -> dict[str, Any]:
+            if request_type == "SetRecordDirectory":
+                self.requests.append((request_type, request_data))
+                raise m.ObsWebSocketRequestError(
+                    "SetRecordDirectory",
+                    {"result": False, "code": 500, "comment": "denied"},
+                )
+            return super().request(request_type, request_data, **kwargs)
+
+    client = _RecordDirFailClient(obs_output)
+    proc = _FakeProc()
+
+    with pytest.raises(m.ObsWebSocketError, match="SetRecordDirectory failed"):
+        m._start_obs_capture_layer(
+            tmp_path / "session" / "video.mp4",
+            output_profile=m.VideoOutputProfile(width=1920, height=1080, fps=30.0),
+            obs_exe=obs_exe,
+            ws_client_factory=lambda: client,
+            popen_factory=lambda args, *, cwd, **_kwargs: proc,
+        )
+
+    assert ("StartRecord", None) not in client.requests
+    assert client.closed
+    assert proc.terminated
+
+
+def test_obs_start_websocket_wait_failure_terminates_without_nameerror(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    m = _import_recorder_module()
+    obs_exe = tmp_path / "obs-studio" / "bin" / "64bit" / "obs64.exe"
+    obs_exe.parent.mkdir(parents=True)
+    obs_exe.write_text("fake", encoding="utf-8")
+    proc = _FakeProc()
+
+    def _raise_before_client(*_args: Any, **_kwargs: Any) -> None:
+        raise m.ObsWebSocketError("OBS websocket unreachable: unit")
+
+    monkeypatch.setattr(m, "_wait_for_obs_websocket", _raise_before_client)
+    with pytest.raises(m.ObsWebSocketError, match="websocket unreachable"):
+        m._start_obs_capture_layer(
+            tmp_path / "session" / "video.mp4",
+            output_profile=m.VideoOutputProfile(width=1920, height=1080, fps=30.0),
+            obs_exe=obs_exe,
+            ws_client_factory=lambda: _FakeObsClient(tmp_path / "obs.mp4"),
+            popen_factory=lambda args, *, cwd, **_kwargs: proc,
+        )
+
+    assert proc.terminated
 
 
 def test_obs_missing_falls_back_to_existing_ffmpeg_layer(
