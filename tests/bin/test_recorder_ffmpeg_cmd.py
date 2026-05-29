@@ -134,11 +134,50 @@ def test_recorder_ffmpeg_cmd_supports_manual_ddagrab_mode(tmp_path: Path) -> Non
         app._start_ffmpeg(tmp_path / "video.mp4")
 
     cmd = popen.call_args.args[0]
-    assert cmd[cmd.index("-f") + 1] == "ddagrab"
-    assert cmd[cmd.index("-i") + 1] == "output=0"
+    assert cmd[cmd.index("-f") + 1] == "lavfi"
+    assert cmd[cmd.index("-i") + 1] == "ddagrab=output_idx=0:framerate=30:draw_mouse=0"
     assert "-offset_x" not in cmd
-    assert cmd[cmd.index("-vf") + 1].startswith("crop=1280:720:10:20,scale=")
+    assert cmd[cmd.index("-vf") + 1].startswith("hwdownload,format=bgra,crop=1280:720:10:20,scale=")
+    assert cmd[cmd.index("-c:v") + 1] == "libx265"
     assert app._video_capture_mode == "ddagrab"
+
+
+def test_ddagrab_plan_captures_window_monitor_then_crops_to_mc_geometry() -> None:
+    m = _import_recorder_module()
+    monitors = [
+        m.MonitorBounds(
+            index=1,
+            left=0,
+            top=0,
+            width=1920,
+            height=1080,
+            is_primary=True,
+        ),
+        m.MonitorBounds(
+            index=2,
+            left=1920,
+            top=0,
+            width=1920,
+            height=1080,
+            is_primary=False,
+        ),
+    ]
+
+    with mock.patch.object(m, "_get_windows_monitor_bounds", return_value=monitors):
+        plan = m._build_video_capture_plan("ddagrab", x=2000, y=30, w=1280, h=720)
+
+    assert plan.input_args == (
+        "-f",
+        "lavfi",
+        "-i",
+        "ddagrab=output_idx=1:framerate=30:draw_mouse=0",
+    )
+    assert plan.pre_encode_filters == (
+        "hwdownload",
+        "format=bgra",
+        "crop=1280:720:80:30",
+    )
+    assert plan.extra["output_idx"] == 1
 
 
 def test_recorder_ffmpeg_cmd_falls_back_to_gdigrab_when_ddagrab_exits(
@@ -172,12 +211,54 @@ def test_recorder_ffmpeg_cmd_falls_back_to_gdigrab_when_ddagrab_exits(
 
     first_cmd = popen.call_args_list[0].args[0]
     second_cmd = popen.call_args_list[1].args[0]
-    assert first_cmd[first_cmd.index("-f") + 1] == "ddagrab"
+    assert first_cmd[first_cmd.index("-f") + 1] == "lavfi"
+    assert first_cmd[first_cmd.index("-i") + 1] == (
+        "ddagrab=output_idx=0:framerate=30:draw_mouse=0"
+    )
     assert second_cmd[second_cmd.index("-f") + 1] == "gdigrab"
     assert second_cmd[second_cmd.index("-offset_x") + 1] == "10"
     assert second_cmd[second_cmd.index("-offset_y") + 1] == "20"
     assert second_cmd[second_cmd.index("-video_size") + 1] == "1280x720"
     assert app._video_capture_mode == "gdigrab"
+
+
+def test_ddagrab_failure_attempt_log_includes_rc_and_stderr(
+    tmp_path: Path,
+) -> None:
+    m = _import_recorder_module()
+    app = object.__new__(m.RecorderApp)
+    app._mc_window_rect = {
+        "title": "Minecraft 1.21.4",
+        "x": 10,
+        "y": 20,
+        "width": 1280,
+        "height": 720,
+    }
+    audio_report = m.AudioProbeReport(process_name="javaw.exe", selected=None, probes=[])
+    stderr = "Error initializing ddagrab: Invalid argument"
+
+    with (
+        _force_windows(m),
+        mock.patch.object(m, "_CAPTURE_MODE", "auto"),
+        mock.patch.object(m, "_VIDEO_AUTO_LAYERS", ("ddagrab", "gdigrab")),
+        mock.patch.object(m, "_VIDEO_LAYER_INIT_TIMEOUT_SEC", 0.0),
+        mock.patch.object(m, "_FFMPEG", tmp_path / "ffmpeg.exe"),
+        mock.patch.object(m, "probe_audio_source_chain", return_value=audio_report),
+        mock.patch.object(m, "_video_capture_stderr_text", return_value=stderr),
+        mock.patch.object(
+            m.subprocess,
+            "Popen",
+            side_effect=[_ExitedProc(returncode=-22), _LiveProc()],
+        ),
+    ):
+        app._start_ffmpeg(tmp_path / "video.mp4")
+
+    failed = app._video_capture_attempt_log[0]
+    assert failed["layer"] == "ddagrab"
+    assert failed["status"] == "failed"
+    assert failed["rc"] == -22
+    assert failed["stderr"] == stderr
+    assert failed["stderr_log"].endswith("video.ddagrab.stderr.log")
 
 
 def test_stop_ffmpeg_waits_60s_for_clean_mp4_finalization(tmp_path: Path) -> None:

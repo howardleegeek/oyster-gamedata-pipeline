@@ -91,7 +91,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.18.8"
+RECORDER_VERSION = "lite-v0.18.9"
 
 # R01 iron-law: supported MC versions for real game-state Fabric mod.
 # Kept in sync with .github/workflows/build-mc-mod.yml matrix.
@@ -502,8 +502,8 @@ _FFMPEG_FORCE_STOP_TIMEOUT_SEC = 3.0
 _MP4_REMUX_REPAIR_TIMEOUT_SEC = 180.0
 _FFMPEG_DURATION_ARG = "-t"
 _CAPTURE_MODE_ENV = "OYSTER_CAPTURE_MODE"
-_VIDEO_AUTO_LAYERS = ("windows-capture", "mss", "gdigrab")
-_VIDEO_EXPLICIT_LAYERS = ("windows-capture", "mss", "ddagrab", "gdigrab")
+_VIDEO_AUTO_LAYERS = ("windows-capture", "ddagrab", "mss", "gdigrab")
+_VIDEO_EXPLICIT_LAYERS = ("windows-capture", "ddagrab", "mss", "gdigrab")
 _CAPTURE_MODE_ALIASES = {
     "wgc": "windows-capture",
     "windows_capture": "windows-capture",
@@ -1496,28 +1496,67 @@ class VideoCapturePlan:
     input_args: tuple[str, ...]
     pre_encode_filters: tuple[str, ...] = ()
     warning: Optional[str] = None
+    extra: dict[str, Any] = field(default_factory=dict)
 
     def encode_filter(self) -> str:
         return ",".join((*self.pre_encode_filters, "scale=1920:1080:flags=lanczos"))
 
 
+class VideoCaptureLayerError(RuntimeError):
+    """Capture-layer startup failure with ffmpeg diagnostics attached."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        returncode: Optional[int] = None,
+        stderr: str = "",
+        stderr_log: Optional[Path] = None,
+    ) -> None:
+        super().__init__(message)
+        self.returncode = returncode
+        self.stderr = stderr
+        self.stderr_log = stderr_log
+
+
 def _build_video_capture_plan(mode: str, *, x: int, y: int, w: int, h: int) -> VideoCapturePlan:
     if mode == "ddagrab":
-        # ddagrab captures the full DXGI output. Crop to the resolved
-        # Minecraft window rectangle after capture so GPU-rendered frames are visible.
+        monitors = _get_windows_monitor_bounds()
+        monitor = _best_monitor_for_rect(monitors, x=x, y=y, w=w, h=h)
+        output_idx = max(0, (monitor.index - 1) if monitor else 0)
+        crop = (
+            _crop_filter_for_monitor((x, y, w, h), monitor)
+            if monitor
+            else f"crop={int(w)}:{int(h)}:{int(x)}:{int(y)}"
+        )
+        extra: dict[str, Any] = {"output_idx": output_idx}
+        if monitor is not None:
+            extra["monitor"] = {
+                "index": monitor.index,
+                "left": monitor.left,
+                "top": monitor.top,
+                "width": monitor.width,
+                "height": monitor.height,
+                "is_primary": monitor.is_primary,
+            }
+
+        # ddagrab is an FFmpeg source filter, not a demuxer. Capture the full
+        # DXGI output containing the Minecraft window, download hardware frames
+        # to system memory, then crop to the window geometry.
         return VideoCapturePlan(
             mode="ddagrab",
             input_args=(
                 "-f",
-                "ddagrab",
-                "-framerate",
-                "30",
-                "-draw_mouse",
-                "0",
+                "lavfi",
                 "-i",
-                "output=0",
+                f"ddagrab=output_idx={output_idx}:framerate=30:draw_mouse=0",
             ),
-            pre_encode_filters=(f"crop={int(w)}:{int(h)}:{int(x)}:{int(y)}",),
+            pre_encode_filters=(
+                "hwdownload",
+                "format=bgra",
+                crop,
+            ),
+            extra=extra,
         )
     if mode == "gdigrab":
         return VideoCapturePlan(
@@ -2051,7 +2090,16 @@ def _start_windows_capture_layer(
                 pass
             return
         try:
-            image = frame.to_numpy()
+            # windows-capture Frame exposes pixels via .frame_buffer (BGRA ndarray);
+            # older/newer bindings may use .to_numpy(). Be robust to both.
+            if hasattr(frame, "frame_buffer"):
+                image = frame.frame_buffer
+            elif hasattr(frame, "to_numpy"):
+                image = frame.to_numpy()
+            else:
+                raise AttributeError(
+                    "windows-capture Frame has no frame_buffer/to_numpy pixel accessor"
+                )
             frame_height = int(image.shape[0])
             frame_width = int(image.shape[1])
             proc = _ensure_proc(frame_width, frame_height)
@@ -2206,6 +2254,7 @@ def _start_ffmpeg_capture_layer(
         stdin_kind="control",
         stderr_path=_video_capture_stderr_path(out_path, layer),
         warning=plan.warning,
+        extra=dict(plan.extra),
     )
     cmd = _build_video_encoder_cmd(
         out_path,
@@ -2233,12 +2282,24 @@ def _start_ffmpeg_capture_layer(
         returncode = proc.poll()
         if returncode is not None:
             _flush_video_capture_stderr(handle)
-            raise RuntimeError(
-                f"ddagrab exited during init rc={returncode}; stderr_log={handle.stderr_path}"
+            stderr = _video_capture_stderr_text(handle)
+            raise VideoCaptureLayerError(
+                f"ddagrab exited during init rc={returncode}; stderr_log={handle.stderr_path}",
+                returncode=returncode,
+                stderr=stderr,
+                stderr_log=handle.stderr_path,
             )
         if _stderr_has_ffmpeg_error(stderr):
             _stop_video_capture_handle(handle, clean_timeout=0.5, force_timeout=0.5)
-            raise RuntimeError(f"ddagrab stderr reported error; stderr_log={handle.stderr_path}")
+            returncode = proc.poll()
+            stderr = _video_capture_stderr_text(handle)
+            raise VideoCaptureLayerError(
+                f"ddagrab stderr reported error rc={returncode}; "
+                f"stderr_log={handle.stderr_path}",
+                returncode=returncode,
+                stderr=stderr,
+                stderr_log=handle.stderr_path,
+            )
     elif layer == "gdigrab":
         _trace(
             "WARNING: video_capture selected gdigrab; hardware-accelerated "
@@ -5460,9 +5521,17 @@ class RecorderApp(tk.Tk):
             except Exception as exc:  # noqa: BLE001
                 error = f"{layer}: {exc}"
                 errors.append(error)
-                self._video_capture_attempt_log.append(
-                    {"layer": layer, "status": "failed", "error": str(exc)}
-                )
+                attempt: dict[str, Any] = {
+                    "layer": layer,
+                    "status": "failed",
+                    "error": str(exc),
+                }
+                if isinstance(exc, VideoCaptureLayerError):
+                    attempt["rc"] = exc.returncode
+                    attempt["stderr"] = exc.stderr
+                    if exc.stderr_log is not None:
+                        attempt["stderr_log"] = str(exc.stderr_log)
+                self._video_capture_attempt_log.append(attempt)
                 _trace(f"video_capture: layer={layer} failed: {exc}")
 
         _trace("WARNING: ALL video capture layers failed: " f"{errors}. Continuing with NO video.")
