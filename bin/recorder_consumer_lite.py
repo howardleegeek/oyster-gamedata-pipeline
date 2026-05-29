@@ -49,7 +49,10 @@ import math
 import os
 import re
 import shutil
+import base64
+import socket
 import subprocess
+import struct
 import sys
 import tarfile
 import tempfile
@@ -57,6 +60,7 @@ import threading
 import time
 import traceback
 import types
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -91,7 +95,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.18.12"
+RECORDER_VERSION = "lite-v0.19.0"
 
 # R01 iron-law: supported MC versions for real game-state Fabric mod.
 # Kept in sync with .github/workflows/build-mc-mod.yml matrix.
@@ -502,8 +506,8 @@ _FFMPEG_FORCE_STOP_TIMEOUT_SEC = 3.0
 _MP4_REMUX_REPAIR_TIMEOUT_SEC = 180.0
 _FFMPEG_DURATION_ARG = "-t"
 _CAPTURE_MODE_ENV = "OYSTER_CAPTURE_MODE"
-_VIDEO_AUTO_LAYERS = ("windows-capture", "ddagrab", "mss", "gdigrab")
-_VIDEO_EXPLICIT_LAYERS = ("windows-capture", "ddagrab", "mss", "gdigrab")
+_VIDEO_AUTO_LAYERS = ("obs", "windows-capture", "ddagrab", "mss", "gdigrab")
+_VIDEO_EXPLICIT_LAYERS = ("obs", "windows-capture", "ddagrab", "mss", "gdigrab")
 _CAPTURE_MODE_ALIASES = {
     "wgc": "windows-capture",
     "windows_capture": "windows-capture",
@@ -533,6 +537,18 @@ _VIDEO_FRAME_UNDERRUN_RATIO = 0.50
 _CAPTURE_STARTUP_CHECK_SEC = _VIDEO_LAYER_INIT_TIMEOUT_SEC
 _FFMPEG_DURATION_RE = re.compile(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)")
 _MP4_CONTAINER_BOXES = {b"moov", b"trak", b"mdia"}
+_OBS_PATH_ENV = "OYSTER_OBS_PATH"
+_OBS_ENABLED_ENV = "OYSTER_OBS_ENABLED"
+_OBS_WEBSOCKET_HOST = "127.0.0.1"
+_OBS_WEBSOCKET_PORT = 4455
+_OBS_WEBSOCKET_PASSWORD = "oyster-local-recorder"
+_OBS_COLLECTION = "oyster"
+_OBS_PROFILE = "oyster"
+_OBS_SCENE = "MC"
+_OBS_CONNECT_TIMEOUT_SEC = 25.0
+_OBS_STOP_RECORD_TIMEOUT_SEC = 120.0
+_OBS_FILE_STABLE_TIMEOUT_SEC = 120.0
+_OBS_CHOSEN_ENCODER_DEFAULT = "obs_auto_hardware"
 
 
 def _normalize_capture_mode(value: Optional[str]) -> str:
