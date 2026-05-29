@@ -95,7 +95,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.19.1"
+RECORDER_VERSION = "lite-v0.19.2"
 
 # R01 iron-law: supported MC versions for real game-state Fabric mod.
 # Kept in sync with .github/workflows/build-mc-mod.yml matrix.
@@ -4005,6 +4005,18 @@ def _detect_gpu_available() -> bool:
     return False
 
 
+def _client_depth_default_skip() -> bool:
+    """Return whether legacy client depth should default to skip.
+
+    Production/default recorder runs are raw collection only, so they must not
+    probe GPUs just to decide a hidden depth setting.
+    """
+
+    if not _client_depth_inference_enabled():
+        return False
+    return not _detect_gpu_available()
+
+
 # Process names treated as "Minecraft" — both Java and Bedrock variants.
 # Critical: do NOT include MinecraftLauncher.exe here. The launcher is a
 # pre-game surface; recording it creates empty/false sessions and misses
@@ -4729,16 +4741,15 @@ class RecorderApp(tk.Tk):
         # "跳过深度图" / when GPU isn't detected and the tester left the
         # default-skip checkbox armed.
         #
-        # _depth_default_skip is a boolean computed once at startup —
-        # True means the GPU probe came back negative so the skip
-        # checkbox is pre-checked. The tester can still untick it on the
-        # progress UI to override.
+        # _depth_default_skip is only computed from GPU probing when an
+        # engineer explicitly enables legacy client depth. Production
+        # server-depth mode leaves it False without touching GPU APIs.
         #
         # _depth_progress_widgets holds the live tk widgets for the
         # progress UI so we can tear it down once inference returns to
         # ready state.
         self._skip_depth_flag = threading.Event()
-        self._depth_default_skip: bool = not _detect_gpu_available()
+        self._depth_default_skip: bool = _client_depth_default_skip()
         self._depth_progress_widgets: list[Any] = []
         self._depth_progress_started_at: float = 0.0
 
@@ -6354,7 +6365,7 @@ class RecorderApp(tk.Tk):
         # locally. The recorder captures raw evidence and writes a manifest
         # telling the backend to produce linear depth / EXR during
         # post-processing. Legacy local inference is kept only for explicit
-        # engineering runs via OYSTER_DEPTH_MODE=local or
+        # engineering runs via OYSTER_DEPTH_MODE=client/local or
         # OYSTER_ALLOW_CLIENT_DEPTH=1.
         video_path = clip_dir / "video.mp4"
         depth_dir = clip_dir / "depth"
@@ -6404,6 +6415,9 @@ class RecorderApp(tk.Tk):
                     f"for details."
                 )
         else:
+            if depth_dir.exists():
+                shutil.rmtree(depth_dir, ignore_errors=True)
+                _trace("depth: removed legacy depth dir; server mode packages raw artifacts only")
             postprocess_manifest = {
                 "mode": _depth_mode(),
                 "status": "pending_server_postprocess",

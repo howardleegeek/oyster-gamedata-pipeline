@@ -87,7 +87,13 @@ def _make_fixture_video(path: Path, lavfi: str, *, ffmpeg: Path) -> None:
         pytest.fail(result.stderr or f"ffmpeg exited with code {result.returncode}")
 
 
-def _install_packaging_fakes(monkeypatch: pytest.MonkeyPatch, m: Any, out_dir: Path) -> None:
+def _install_packaging_fakes(
+    monkeypatch: pytest.MonkeyPatch,
+    m: Any,
+    out_dir: Path,
+    *,
+    disable_client_depth: bool = True,
+) -> None:
     fake_gsi = types.ModuleType("generate_systeminfo_json")
     fake_gsi.build_systeminfo = lambda **kwargs: {  # type: ignore[attr-defined]
         "gameProcessName": kwargs["game_process_name"],
@@ -106,7 +112,8 @@ def _install_packaging_fakes(monkeypatch: pytest.MonkeyPatch, m: Any, out_dir: P
     monkeypatch.setitem(sys.modules, "generate_systeminfo_json", fake_gsi)
     monkeypatch.setitem(sys.modules, "generate_gameinfo_xlsx", fake_ggx)
     monkeypatch.setattr(m, "_output_dir", lambda: out_dir)
-    monkeypatch.setattr(m, "_client_depth_inference_enabled", lambda: False)
+    if disable_client_depth:
+        monkeypatch.setattr(m, "_client_depth_inference_enabled", lambda: False)
     monkeypatch.setattr(
         m,
         "_generate_silent_audio_fallback_for_duration",
@@ -172,6 +179,142 @@ def _new_app(m: Any, tmp_path: Path, active_dir: Path) -> Any:
     app._video_capture_requested_mode = "auto"
     setattr(app, "_allow_" + "place" + "holder", False)
     return app
+
+
+def _mark_video_valid(app: Any, m: Any) -> None:
+    app._video_capture_mode = "obs"
+    app._video_capture_attempt_log = [{"layer": "obs", "status": "selected"}]
+    app._video_encoder = "obs_auto_hardware"
+    app._video_output_profile = m.VideoOutputProfile(width=1920, height=1080, fps=30.0)
+    app._video_validation_passed = True
+    app._video_validation_reason = "unit"
+    app._video_frozen = False
+    app._video_frozen_reason = None
+    app._video_frames_written = 30
+    app._video_expected_frames = 30
+    app._video_frames_under_expected = False
+    app._video_load_reduction_recommended = False
+
+
+def test_default_finalize_packages_raw_artifacts_without_client_depth(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("OYSTER_DEPTH_MODE", raising=False)
+    monkeypatch.delenv("OYSTER_ALLOW_CLIENT_DEPTH", raising=False)
+    m = _import_recorder_module()
+    monkeypatch.setattr(m, "_detect_gpu_available", lambda: True)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    _install_packaging_fakes(monkeypatch, m, out_dir, disable_client_depth=False)
+
+    active_dir = out_dir / "active_session"
+    active_dir.mkdir()
+    game_state = active_dir / "game_state.jsonl"
+    game_state.write_text(_game_state_line() + "\n", encoding="utf-8")
+    frames_dir = active_dir / "frames"
+    frames_dir.mkdir()
+    (frames_dir / "frame_000001.png").write_bytes(b"raw-frame")
+    legacy_depth_dir = active_dir / "depth"
+    legacy_depth_dir.mkdir()
+    (legacy_depth_dir / "000000.exr").write_bytes(b"legacy-client-depth")
+
+    if str(BIN_DIR) not in sys.path:
+        sys.path.insert(0, str(BIN_DIR))
+    import game_state_overlay  # type: ignore[import-not-found]  # noqa: PLC0415
+
+    monkeypatch.setattr(game_state_overlay, "jsonl_path", lambda: game_state)
+
+    depth_module = types.ModuleType("depth_anything_v2_inference")
+
+    def _unexpected_infer(*_args: Any, **_kwargs: Any) -> dict[str, str]:
+        raise AssertionError("default server mode must not run client depth inference")
+
+    depth_module.infer_depth_for_video = _unexpected_infer  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "depth_anything_v2_inference", depth_module)
+
+    app = _new_app(m, tmp_path, active_dir)
+    app._video_path.write_bytes(b"fake mp4 bytes")
+    _mark_video_valid(app, m)
+
+    def _unexpected_depth_ui() -> None:
+        raise AssertionError("default server mode must not show depth UI")
+
+    app._show_depth_progress_ui = _unexpected_depth_ui
+    app._hide_depth_progress_ui = _unexpected_depth_ui
+
+    tar_path = app._package_tarball("20260529-010000")
+    with tarfile.open(tar_path, "r:gz") as tf:
+        names = set(tf.getnames())
+
+    prefix = "clip-20260529-010000"
+    assert f"{prefix}/video.mp4" in names
+    assert f"{prefix}/game_state.jsonl" in names
+    assert f"{prefix}/inputs.jsonl" in names
+    assert f"{prefix}/metadata.json" in names
+    assert f"{prefix}/frames/frame_000001.png" in names
+    assert f"{prefix}/systeminfo.json" in names
+    assert f"{prefix}/gameinfo.xlsx" in names
+    assert f"{prefix}/depth_postprocess.json" in names
+    assert not any(name.startswith(f"{prefix}/depth/") for name in names)
+
+
+def test_client_depth_mode_invokes_legacy_local_depth(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("OYSTER_DEPTH_MODE", "client")
+    monkeypatch.delenv("OYSTER_ALLOW_CLIENT_DEPTH", raising=False)
+    m = _import_recorder_module()
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    _install_packaging_fakes(monkeypatch, m, out_dir, disable_client_depth=False)
+
+    active_dir = out_dir / "active_session"
+    active_dir.mkdir()
+    game_state = active_dir / "game_state.jsonl"
+    game_state.write_text(_game_state_line() + "\n", encoding="utf-8")
+
+    if str(BIN_DIR) not in sys.path:
+        sys.path.insert(0, str(BIN_DIR))
+    import game_state_overlay  # type: ignore[import-not-found]  # noqa: PLC0415
+
+    monkeypatch.setattr(game_state_overlay, "jsonl_path", lambda: game_state)
+
+    infer_calls: list[tuple[Path, Path]] = []
+    depth_module = types.ModuleType("depth_anything_v2_inference")
+
+    def _fake_infer(video_path: Path, depth_dir: Path, **_kwargs: Any) -> dict[str, str]:
+        infer_calls.append((video_path, depth_dir))
+        depth_dir.mkdir(parents=True, exist_ok=True)
+        (depth_dir / "000000.exr").write_bytes(b"depth")
+        return {"000000.exr": "unit"}
+
+    depth_module.infer_depth_for_video = _fake_infer  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "depth_anything_v2_inference", depth_module)
+
+    app = _new_app(m, tmp_path, active_dir)
+    app._video_path.write_bytes(b"fake mp4 bytes")
+    _mark_video_valid(app, m)
+    app._skip_depth_flag = m.threading.Event()
+    ui_calls: list[str] = []
+    app.after = lambda _delay, callback: callback()
+    app._show_depth_progress_ui = lambda: ui_calls.append("show")
+    app._hide_depth_progress_ui = lambda: ui_calls.append("hide")
+    app._on_depth_progress = lambda _done, _total: None
+
+    tar_path = app._package_tarball("20260529-010500")
+    with tarfile.open(tar_path, "r:gz") as tf:
+        names = set(tf.getnames())
+
+    assert infer_calls == [
+        (
+            tmp_path / "work" / "clip-20260529-010500" / "video.mp4",
+            tmp_path / "work" / "clip-20260529-010500" / "depth",
+        )
+    ]
+    assert ui_calls == ["show", "hide"]
+    assert "clip-20260529-010500/depth/000000.exr" in names
 
 
 def test_data_session_packages_when_all_video_layers_fail(

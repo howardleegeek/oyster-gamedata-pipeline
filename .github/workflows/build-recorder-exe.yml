@@ -218,7 +218,7 @@ jobs:
             Write-Error "OBS Studio zip SHA256 mismatch: expected $obsSha256, got $obsHash"
             exit 1
           }
-          Write-Host "Verified OBS Studio portable $obsVersion: $($obsZip.Length) bytes, sha256:$obsHash"
+          Write-Host "Verified OBS Studio portable ${obsVersion}: $($obsZip.Length) bytes, sha256:$obsHash"
 
           $obsExtractDir = "obs-studio-extracted"
           Remove-Item -Recurse -Force $obsExtractDir -ErrorAction SilentlyContinue

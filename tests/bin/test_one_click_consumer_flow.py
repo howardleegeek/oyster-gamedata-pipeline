@@ -104,6 +104,15 @@ def test_recorder_depth_mode_defaults_to_server_postprocess(monkeypatch) -> None
     assert m._depth_mode() == "server"
     assert m._client_depth_inference_enabled() is False
 
+    def _gpu_probe_must_not_run() -> bool:
+        raise AssertionError("default server mode must not probe GPU")
+
+    monkeypatch.setattr(m, "_detect_gpu_available", _gpu_probe_must_not_run)
+    assert m._client_depth_default_skip() is False
+
+    monkeypatch.setenv("OYSTER_DEPTH_MODE", "client")
+    assert m._client_depth_inference_enabled() is True
+
     monkeypatch.setenv("OYSTER_DEPTH_MODE", "local")
     assert m._client_depth_inference_enabled() is True
 
