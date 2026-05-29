@@ -62,6 +62,11 @@ RUST_RECORDER_EXE_NAME = "gamedata-recorder.exe"
 RUST_RECORDER_VERSION = "2.6.0"
 RUST_CONFIG_APP_DIR = "GameData Recorder"
 RUST_GAME_CAPTURE_STEMS = ("javaw", "minecraft")
+RUST_ENV_KEYS_TO_SCRUB = (
+    "GAMEDATA_CI_MODE",
+    "GAMEDATA_OUTPUT_DIR",
+    "GAMEDATA_SKIP_API_KEY",
+)
 # Bug 5 (R05E): when PyInstaller --onedir is invoked with
 # `--name OysterRecorder-onedir`, the produced binary is named
 # `OysterRecorder-onedir.exe` and lives in a sibling subdir of the same
@@ -172,15 +177,6 @@ def _infer_install_root_from_recorder_exe(recorder_exe: Path) -> Path:
     return parent
 
 
-def oyster_clips_sessions_dir() -> Path:
-    """Return the consumer-visible session root used by the one-click bundle."""
-    override = os.environ.get("OYSTER_CLIPS_DIR")
-    if override:
-        return Path(override) / "sessions"
-    user_root = Path(os.environ.get("USERPROFILE", str(Path.home())))
-    return user_root / "Documents" / "OysterClips" / "sessions"
-
-
 def rust_recorder_config_path() -> Path:
     """Return v2.6.0's standard `%APPDATA%\\GameData Recorder\\config.json`."""
     appdata = os.environ.get("APPDATA")
@@ -192,9 +188,20 @@ def rust_recorder_config_path() -> Path:
     return base / RUST_CONFIG_APP_DIR / "config.json"
 
 
+def rust_recorder_recordings_dir() -> Path:
+    """Return v2.6.0's normal-mode recording root under `%LOCALAPPDATA%`."""
+    local_appdata = os.environ.get("LOCALAPPDATA")
+    if local_appdata:
+        base = Path(local_appdata)
+    else:
+        user_root = Path(os.environ.get("USERPROFILE", str(Path.home())))
+        base = user_root / "AppData" / "Local"
+    return base / RUST_CONFIG_APP_DIR / "recordings"
+
+
 def _read_json_object(path: Path) -> dict[str, object]:
     try:
-        parsed = json.loads(path.read_text(encoding="utf-8"))
+        parsed = json.loads(path.read_text(encoding="utf-8-sig"))
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return {}
     if isinstance(parsed, dict):
@@ -211,15 +218,25 @@ def _dict_child(parent: dict[str, object], key: str) -> dict[str, object]:
     return child
 
 
+def _write_json_object_utf8_no_bom(path: Path, data: dict[str, object]) -> None:
+    """Persist JSON as UTF-8 without BOM; serde_json rejects BOM at byte 0."""
+    payload = (json.dumps(data, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    if payload.startswith(b"\xef\xbb\xbf"):
+        raise ValueError("refusing to write BOM-prefixed Rust recorder config")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(payload)
+
+
 def ensure_rust_recorder_headless_config() -> Path:
     """Seed Rust v2.6.0 config for no-click Minecraft game-hook capture.
 
-    CI env handles consent/output at runtime. The config seed is still needed
-    because the v2.6.0 tag does not read `OYSTER_CAPTURE_MODE`, so forcing
-    `javaw`/`minecraft` to `game_hook` must go through persisted per-game
-    settings.
+    This is the shippable path: no CI-mode bypass. Consent is granted through
+    the persisted `credentials.consentGivenAtVersion`, and `javaw`/`minecraft`
+    are built into the v2.6.0 whitelist, so the config only needs to pin their
+    per-game capture strategy.
     """
     config_path = rust_recorder_config_path()
+    recordings_dir = rust_recorder_recordings_dir()
     config = _read_json_object(config_path)
     credentials = _dict_child(config, "credentials")
     credentials["hasConsented"] = True
@@ -228,6 +245,7 @@ def ensure_rust_recorder_headless_config() -> Path:
     preferences = _dict_child(config, "preferences")
     preferences["autoUploadOnCompletion"] = False
     preferences["recordMicrophone"] = False
+    preferences["recordingLocation"] = str(recordings_dir)
 
     games = _dict_child(preferences, "games")
     for stem in RUST_GAME_CAPTURE_STEMS:
@@ -235,22 +253,21 @@ def ensure_rust_recorder_headless_config() -> Path:
         game_config["use_window_capture"] = False
         game_config["capture_mode"] = "game_hook"
 
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text(json.dumps(config, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    recordings_dir.mkdir(parents=True, exist_ok=True)
+    _write_json_object_utf8_no_bom(config_path, config)
     return config_path
 
 
-def rust_recorder_env(output_dir: Path) -> dict[str, str]:
-    """Build the proven v2.6.0 no-click runtime environment."""
+def rust_recorder_env() -> dict[str, str]:
+    """Build the shippable v2.6.0 runtime environment.
+
+    Scrub CI/test-only GAMEDATA_* variables inherited from the parent shell so
+    one-click cannot accidentally enter the recorder's "must NOT ship" path.
+    """
     env = os.environ.copy()
-    env.update(
-        {
-            "GAMEDATA_CI_MODE": "1",
-            "GAMEDATA_SKIP_API_KEY": "1",
-            "OYSTER_CAPTURE_MODE": "game",
-            "GAMEDATA_OUTPUT_DIR": str(output_dir),
-        }
-    )
+    for key in RUST_ENV_KEYS_TO_SCRUB:
+        env.pop(key, None)
+    env["OYSTER_CAPTURE_MODE"] = "game"
     return env
 
 
@@ -279,16 +296,15 @@ def spawn_recorder(recorder_exe: Path) -> subprocess.Popen | None:
     startupinfo = None
     if is_rust_recorder_exe(recorder_exe):
         install_root = _infer_install_root_from_recorder_exe(recorder_exe)
-        output_dir = oyster_clips_sessions_dir()
-        output_dir.mkdir(parents=True, exist_ok=True)
         config_path = ensure_rust_recorder_headless_config()
-        env = rust_recorder_env(output_dir)
+        recordings_dir = rust_recorder_recordings_dir()
+        env = rust_recorder_env()
         startupinfo = _hidden_startupinfo()
         logger.info(
-            "spawning Rust recorder: %s (install_root=%s, output_dir=%s, config=%s)",
+            "spawning Rust recorder: %s (install_root=%s, recordings_dir=%s, config=%s)",
             recorder_exe,
             install_root,
-            output_dir,
+            recordings_dir,
             config_path,
         )
     else:

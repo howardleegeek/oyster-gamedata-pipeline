@@ -6,75 +6,111 @@ installer shell without touching Rust capture code.
 
 ## Decision
 
-Use the Rust recorder in CI/headless env mode for no-click consent and output
-directory redirection, and have `OysterPlay.exe` pre-seed the Rust config for
-Minecraft game-hook capture before launching it.
+Do not ship `GAMEDATA_CI_MODE=1`.
 
-Runtime settings:
+`v2.6.0` logs the CI banner as:
 
-- `GAMEDATA_CI_MODE=1`
-- `GAMEDATA_SKIP_API_KEY=1`
-- `GAMEDATA_OUTPUT_DIR=%USERPROFILE%\Documents\OysterClips\sessions`
-- `OYSTER_CAPTURE_MODE=game` as a harmless forward-compatible env hint
-- `%APPDATA%\GameData Recorder\config.json` merged with:
-  `preferences.games.javaw.capture_mode=game_hook` and
-  `preferences.games.minecraft.capture_mode=game_hook`
+`CI MODE ACTIVE — consent auto-granted, whitelist bypassed, this build must NOT ship to end users`
 
-This path gives no consent click, no API-key/login requirement, and real
-disk-backed recordings under the OysterClips sessions directory.
+The shippable one-click path now starts the Rust recorder in normal mode and
+pre-seeds `%APPDATA%\GameData Recorder\config.json` as UTF-8 without BOM:
+
+```json
+{
+  "credentials": {
+    "hasConsented": true,
+    "consentGivenAtVersion": "2.6.0"
+  },
+  "preferences": {
+    "autoUploadOnCompletion": false,
+    "recordMicrophone": false,
+    "recordingLocation": "%LOCALAPPDATA%\\GameData Recorder\\recordings",
+    "games": {
+      "javaw": {
+        "use_window_capture": false,
+        "capture_mode": "game_hook"
+      },
+      "minecraft": {
+        "use_window_capture": false,
+        "capture_mode": "game_hook"
+      }
+    }
+  }
+}
+```
+
+`preferences` is camelCase because `Preferences` uses
+`#[serde(rename_all = "camelCase")]`; `GameConfig` is not camel-cased, so the
+real per-game keys are `use_window_capture` and `capture_mode`.
 
 ## Evidence
 
-CI mode is not an in-memory recorder. In `v2.6.0:src/main.rs:144-164`, the
-"in-memory only" note refers to the config mutation not being persisted:
-the code creates `GAMEDATA_OUTPUT_DIR`, locks `app_state.config`, and assigns
-`config.preferences.recording_location = ci_dir`, then deliberately skips
-`config.save()`.
+Consent can be pre-granted without CI mode. `v2.6.0:src/config.rs:523-541`
+defines `credentials.hasConsented` and `credentials.consentGivenAtVersion`.
+`v2.6.0:src/config.rs:681-692` grants consent only when the stored semver
+matches the running package version, and `v2.6.0:src/config.rs:722-728` builds
+the runtime `ConsentGuard` from that config when CI mode is not active.
 
-Consent is session-only auto-granted in CI mode. `v2.6.0:src/config.rs:718-725`
-returns `ConsentGuard::granted()` when `ci_mode()` is active, and
-`v2.6.0:src/config.rs:738-743` documents that CI mode auto-grants consent,
-bypasses the game whitelist/game-shape gate, and redirects recordings when
-`GAMEDATA_OUTPUT_DIR` is set.
+CI mode is not acceptable for a shipped build. `v2.6.0:src/main.rs:95-106`
+emits the "must NOT ship" warning. `v2.6.0:src/config.rs:738-743` documents
+that CI mode auto-grants consent, treats any foreground non-null HWND as
+recordable, bypasses `GAME_WHITELIST` and game-shape checks, and only then
+honors `GAMEDATA_OUTPUT_DIR`.
 
-The output path is used by the real disk recorder. `v2.6.0:src/tokio_thread.rs:82-95`
-builds each session directory from
-`app_state.config.preferences.recording_location`. `v2.6.0:src/record/recorder.rs:166-169`
-calls `LocalRecording::create_at(&recording_location)`, and
-`v2.6.0:src/record/recording.rs:146-153` writes `recording.mp4` and
-`inputs.jsonl` under that session path. `v2.6.0:src/record/local_recording.rs:621-623`
-writes `metadata.json` to the same recording directory.
+There is no config key that adds to the whitelist. Minecraft is already in the
+compiled whitelist: `v2.6.0:crates/constants/src/lib.rs:167-170` contains
+`javaw` and `minecraft`. Normal mode still checks that whitelist in
+`v2.6.0:src/record/recorder.rs:490-499` and process scanning uses the same list
+in `v2.6.0:src/record/recorder.rs:526-536`. The one-click config therefore
+sets capture behavior for the already-whitelisted stems; it does not bypass or
+extend the whitelist.
 
-`GAMEDATA_SKIP_API_KEY` only affects upload gating, which is what we want for
-offline/no-login use. `v2.6.0:src/tokio_thread.rs:1765-1777` checks the env var
-and avoids blocking auto-upload logic on a missing API key.
+Important limitation: `v2.6.0` also cannot narrow the compiled whitelist to
+Minecraft-only through config. Normal mode can still auto-record any executable
+already present in `GAME_WHITELIST` if it passes the normal game-window and
+game-shape checks. This is much narrower than CI mode's "any foreground HWND"
+bypass, but strict "only MC and nothing else" requires a recorder source patch
+that adds a configurable allowlist or a launch-scoped target process filter.
 
-The tag source does not implement `OYSTER_CAPTURE_MODE`. A tag audit with
-`git grep -n "OYSTER_CAPTURE_MODE" v2.6.0 -- src crates constants` returned no
-matches. Capture mode is instead controlled through `GameConfig`: the enum is
-serialized as snake_case in `v2.6.0:src/config.rs:182-218`, and
-`v2.6.0:src/config.rs:280-313` resolves `CaptureMode::GameHook` to the OBS
-game-capture hook. Minecraft's process stems are already whitelisted as
-`javaw` and `minecraft` in `v2.6.0:crates/constants/src/lib.rs:167-170`, while
-`KNOWN_HOOK_REQUIRED_GAMES` is intentionally empty at
-`v2.6.0:crates/constants/src/lib.rs:284-288`, so config seeding is required to
-force Minecraft to game hook in the released artifact.
+`GAMEDATA_OUTPUT_DIR` is CI-only. `v2.6.0:src/config.rs:768-787` returns the env
+override only when `ci_mode()` is true, and `v2.6.0:src/main.rs:144-164` applies
+that override in memory. In normal mode the default is
+`%LOCALAPPDATA%\GameData Recorder\recordings` from
+`v2.6.0:src/config.rs:334-339`; `v2.6.0:src/config.rs:366-421` rejects
+recording locations outside LocalAppData, and `v2.6.0:src/config.rs:1094-1111`
+resets invalid stored paths on load.
 
-Normal-mode-only config redirection is not the right output-dir strategy for
-OysterClips. `v2.6.0:src/config.rs:366-421` only accepts normal
-`recording_location` values inside LocalAppData, and
-`v2.6.0:src/config.rs:1094-1111` resets unsafe/outside paths on load. The CI
-output override intentionally skips that validation for harness-controlled
-paths in `v2.6.0:src/config.rs:768-776`, which is why `GAMEDATA_OUTPUT_DIR` is
-the correct way to land sessions under Documents/OysterClips.
+Finished Rust recorder sessions land under:
 
-## Rejected Path
+`%LOCALAPPDATA%\GameData Recorder\recordings\session_YYYYMMDD_HHMMSS_<8hex>\`
 
-Pure normal mode with only a shipped config file was rejected. It can pregrant
-consent by setting `credentials.consentGivenAtVersion="2.6.0"` and can force
-`game_hook`, but it cannot safely set `Documents\OysterClips\sessions` as
-`recordingLocation` because the v2.6.0 loader resets paths outside LocalAppData.
+The recorder builds session folders from `preferences.recording_location` in
+`v2.6.0:src/tokio_thread.rs:82-95`, writes `recording.mp4` and `inputs.jsonl`
+in `v2.6.0:src/record/recording.rs:146-153`, and writes `metadata.json` in
+`v2.6.0:src/record/local_recording.rs:621-623`.
 
-Pure CI env mode without config seeding was also rejected. It gives no-click
-consent and disk output, but `OYSTER_CAPTURE_MODE` is absent in the v2.6.0 tag,
-so Minecraft would remain on Auto/WGC instead of the proven game-hook path.
+`GAMEDATA_SKIP_API_KEY` is not CI-only, but the shipped one-click launcher does
+not need it. `v2.6.0:src/tokio_thread.rs:1765-1777` uses it only to allow
+auto-upload when no API key exists, and `v2.6.0:src/ui/views/mod.rs:355-379`
+shows the login routing is disabled while local recording is the focus. We set
+`preferences.autoUploadOnCompletion=false`, so offline recording is not blocked
+by login or an API key.
+
+## Rejected Paths
+
+Shipping CI mode is rejected because it bypasses consent and whitelist/game
+shape checks and the binary itself declares that path non-shippable.
+
+Putting recordings under `Documents\OysterClips\sessions` through
+`recordingLocation` is rejected for `v2.6.0` because the normal-mode loader
+resets paths outside LocalAppData. Moving normal-mode output to Documents would
+require a small source patch and rebuild of the recorder.
+
+Using `GAMEDATA_SKIP_API_KEY` as a no-login switch is rejected for default
+one-click launch because local recording already works without login, and
+auto-upload is explicitly disabled.
+
+Strict Minecraft-only auto-recording is not achievable by config alone in
+`v2.6.0`. The honest alternatives are either: accept normal-mode compiled
+whitelist behavior for the one-click release, or patch/rebuild the recorder with
+a minimal `allowed_process_stems`/target-PID gate and keep CI mode disabled.

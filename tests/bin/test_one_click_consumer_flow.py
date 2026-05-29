@@ -193,15 +193,17 @@ def test_oysterplay_prefers_bundled_rust_recorder(tmp_path: Path) -> None:
     assert m.find_recorder_exe(tmp_path) == rust
 
 
-def test_oysterplay_spawns_rust_recorder_with_no_click_env_and_config(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_oysterplay_spawns_rust_recorder_with_shippable_config(monkeypatch, tmp_path: Path) -> None:
     m = _import_oyster_play()
     rust = tmp_path / "install" / "gamedata-recorder" / "gamedata-recorder.exe"
     rust.parent.mkdir(parents=True)
     rust.write_text("rust", encoding="utf-8")
-    output_dir = tmp_path / "User" / "Documents" / "OysterClips" / "sessions"
+    recordings_dir = tmp_path / "User" / "AppData" / "Local" / "GameData Recorder" / "recordings"
     config_path = tmp_path / "User" / "AppData" / "Roaming" / "GameData Recorder" / "config.json"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_bytes(
+        b"\xef\xbb\xbf" + json.dumps({"preferences": {"honk": True}}).encode("utf-8")
+    )
     popen_calls: list[dict[str, Any]] = []
 
     class _FakePopen:
@@ -210,9 +212,12 @@ def test_oysterplay_spawns_rust_recorder_with_no_click_env_and_config(
 
     monkeypatch.setattr(m.os, "name", "nt", raising=False)
     monkeypatch.setattr(m, "is_recorder_running", lambda: False)
-    monkeypatch.setattr(m, "oyster_clips_sessions_dir", lambda: output_dir)
     monkeypatch.setattr(m, "rust_recorder_config_path", lambda: config_path)
+    monkeypatch.setattr(m, "rust_recorder_recordings_dir", lambda: recordings_dir)
     monkeypatch.setattr(m.subprocess, "Popen", _FakePopen)
+    monkeypatch.setenv("GAMEDATA_CI_MODE", "1")
+    monkeypatch.setenv("GAMEDATA_SKIP_API_KEY", "1")
+    monkeypatch.setenv("GAMEDATA_OUTPUT_DIR", str(tmp_path / "ci-output"))
 
     proc = m.spawn_recorder(rust)
 
@@ -220,16 +225,20 @@ def test_oysterplay_spawns_rust_recorder_with_no_click_env_and_config(
     assert popen_calls[0]["args"] == [str(rust)]
     assert popen_calls[0]["cwd"] == str(rust.parent)
     env = popen_calls[0]["env"]
-    assert env["GAMEDATA_CI_MODE"] == "1"
-    assert env["GAMEDATA_SKIP_API_KEY"] == "1"
+    assert "GAMEDATA_CI_MODE" not in env
+    assert "GAMEDATA_SKIP_API_KEY" not in env
+    assert "GAMEDATA_OUTPUT_DIR" not in env
     assert env["OYSTER_CAPTURE_MODE"] == "game"
-    assert env["GAMEDATA_OUTPUT_DIR"] == str(output_dir)
 
-    config = json.loads(config_path.read_text(encoding="utf-8"))
+    raw_config = config_path.read_bytes()
+    assert not raw_config.startswith(b"\xef\xbb\xbf")
+    config = json.loads(raw_config.decode("utf-8"))
     assert config["credentials"]["hasConsented"] is True
     assert config["credentials"]["consentGivenAtVersion"] == "2.6.0"
     assert config["preferences"]["autoUploadOnCompletion"] is False
     assert config["preferences"]["recordMicrophone"] is False
+    assert config["preferences"]["recordingLocation"] == str(recordings_dir)
+    assert config["preferences"]["honk"] is True
     assert config["preferences"]["games"]["javaw"] == {
         "capture_mode": "game_hook",
         "use_window_capture": False,
