@@ -59,5 +59,14 @@ public class OysterRecorderMod implements ClientModInitializer {
         });
 
         LOGGER.info("Oyster Recorder mod ready — tick listener registered");
+
+        // Z-buffer depth capture (raw GL depth → zbuffer/tick_<N>.bin). Independent
+        // of game-state capture and fail-soft: a depth-hook failure must never stop
+        // game_state streaming or crash the user's game.
+        try {
+            ZBufferCapture.register();
+        } catch (Throwable t) {
+            LOGGER.warn("Z-buffer depth capture init failed (non-fatal): {}", t.toString());
+        }
     }
 }
