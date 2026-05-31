@@ -98,7 +98,7 @@ jobs:
       EV_CERT_PFX: ${{ secrets.EV_CERT_PFX || secrets.EV_CERT_PFX_BASE64 }}
       EV_CERT_PASSWORD: ${{ secrets.EV_CERT_PASSWORD }}
       RECORDER_RUNTIME_REPO: howardleegeek/gamedata-recorder
-      RECORDER_RUNTIME_TAG: v2.6.0
+      RECORDER_RUNTIME_TAG: v2.6.11
       RECORDER_RUNTIME_ASSET: gamedata-recorder-windows-x64.zip
 
     steps:
