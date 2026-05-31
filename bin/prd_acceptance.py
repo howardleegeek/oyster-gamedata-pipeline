@@ -127,8 +127,12 @@ def get_test_arguments(test_name: str, session_dir: Path) -> List[str]:
     # the code's math, not this session's data). The previous map fed them a
     # positional session file, which their argparse rejected (exit 2) → bogus FAIL.
     # Invoke each with its real self-test args (mostly none) instead.
+    # Tests that take a session file via the -i FLAG (session validators).
+    i_flag_tests = {
+        "prd_test_action_per_second": ["action_camera.json"],  # CLI: `... [-i INPUT]`
+    }
+
     no_session_tests = {
-        "prd_test_action_per_second": [],            # CLI: `... [-a ACTIONS ...]`
         "prd_test_depth_invalid_marker": [],         # CLI: `... [--sentinel ...] [-v]`
         "prd_test_left_hand_coordinates": [],        # CLI: `... [--verbose]`
         "prd_test_stationary_threshold": [],         # CLI: `... [--fps FPS]`
@@ -176,7 +180,17 @@ def get_test_arguments(test_name: str, session_dir: Path) -> List[str]:
         else:
             # Fall back to first option even if it doesn't exist
             args.extend(["--input", str(session_dir / input_flag_tests[test_name][0])])
-    
+
+    elif test_name in i_flag_tests:
+        # These tests take a session file via the -i flag.
+        for filename in i_flag_tests[test_name]:
+            file_path = session_dir / filename
+            if file_path.exists():
+                args.extend(["-i", str(file_path)])
+                break
+        else:
+            args.extend(["-i", str(session_dir / i_flag_tests[test_name][0])])
+
     elif test_name in data_dir_tests:
         # These tests take --data-dir argument
         args.extend(["--data-dir", str(session_dir)])
