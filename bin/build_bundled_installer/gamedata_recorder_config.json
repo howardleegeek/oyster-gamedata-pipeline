@@ -6,12 +6,12 @@
   "preferences": {
     "games": {
       "javaw": {
-        "use_window_capture": false,
-        "capture_mode": "game_hook"
+        "use_window_capture": true,
+        "capture_mode": "monitor"
       },
       "minecraft": {
-        "use_window_capture": false,
-        "capture_mode": "game_hook"
+        "use_window_capture": true,
+        "capture_mode": "monitor"
       }
     }
   }
