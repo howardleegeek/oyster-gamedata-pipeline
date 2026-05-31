@@ -565,7 +565,7 @@ jobs:
           Write-Host "Bundled OBS Studio version: $obsVersion"
           Write-Host "Bundled obs64.exe path: $bundledObsExe"
 
-      - name: Stage Rust gamedata-recorder v2.6.0 runtime
+      - name: Stage Rust gamedata-recorder runtime
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
