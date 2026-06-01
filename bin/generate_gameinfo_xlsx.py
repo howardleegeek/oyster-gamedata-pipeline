@@ -34,6 +34,12 @@ FIELD_NAMES = [
     "notes",
 ]
 
+# Fields that should be converted to int in fallback path
+INT_FIELDS = {"total_frames", "route_type"}
+
+# Fields that should be converted to float in fallback path
+FLOAT_FIELDS = {"video_duration_sec"}
+
 
 def build_gameinfo_dict(
     game_name: str = "Minecraft",
@@ -180,46 +186,44 @@ def _write_xlsx_fallback(data: Dict[str, Any], out_path: str) -> None:
     <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
 </Relationships>'''
     
-    # Write the XLSX file
+    # Write the XLSX file (which is a ZIP archive)
     with zipfile.ZipFile(out_path, 'w', zipfile.ZIP_DEFLATED) as zf:
         zf.writestr('[Content_Types].xml', content_types)
         zf.writestr('_rels/.rels', rels)
         zf.writestr('xl/workbook.xml', workbook_xml)
-        zf.writestr('xl/_rels/workbook.xml.rels', workbook_rels)
         zf.writestr('xl/worksheets/sheet1.xml', sheet_xml)
+        zf.writestr('xl/_rels/workbook.xml.rels', workbook_rels)
 
 
 def write_xlsx(data: Dict[str, Any], out_path: str) -> None:
     """
-    Write data to an XLSX file.
+    Write an XLSX file with gameinfo data.
     
-    Uses openpyxl if available, otherwise falls back to stdlib zipfile.
+    Uses openpyxl if available, otherwise falls back to manual XML generation.
     
     Args:
         data: Dictionary with field names as keys
-        out_path: Path to output XLSX file
+        out_path: Output file path
     """
     try:
         from openpyxl import Workbook
-        from openpyxl.utils import get_column_letter
         
         wb = Workbook()
         ws = wb.active
         ws.title = "gameinfo"
         
-        # Write header row (field names)
+        # Write header row
         for col_idx, field in enumerate(FIELD_NAMES, start=1):
             ws.cell(row=1, column=col_idx, value=field)
         
         # Write data row
         for col_idx, field in enumerate(FIELD_NAMES, start=1):
-            value = data.get(field, "")
-            ws.cell(row=2, column=col_idx, value=value)
+            ws.cell(row=1, column=col_idx, value=field)
+            ws.cell(row=2, column=col_idx, value=data.get(field, ""))
         
         wb.save(out_path)
         
     except ImportError:
-        # Fallback: use stdlib zipfile to create XLSX
         _write_xlsx_fallback(data, out_path)
 
 
@@ -301,6 +305,17 @@ def read_xlsx(path: str) -> Dict[str, Any]:
         
         result = {}
         for key, value in zip(keys, values):
+            # Convert numeric fields to proper types
+            if key in INT_FIELDS:
+                try:
+                    value = int(value)
+                except (ValueError, TypeError):
+                    pass
+            elif key in FLOAT_FIELDS:
+                try:
+                    value = float(value)
+                except (ValueError, TypeError):
+                    pass
             result[key] = value
         
         return result
@@ -350,8 +365,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     
     # Validate route_type
     if not validate_route_type(args.route_type):
-        print(f"Error: route_type must be 1, 2, or 3, got {args.route_type}", 
-              file=sys.stderr)
+        print(f"Error: route_type must be 1, 2, or 3, got {args.route_type}", file=sys.stderr)
         return 1
     
     # Build the data dictionary
@@ -372,13 +386,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         notes=args.notes,
     )
     
-    # Write the XLSX file
+    # Write the file
     try:
         write_xlsx(data, args.output)
-        print(f"Successfully wrote {args.output}")
+        print(f"Generated {args.output}")
         return 0
     except Exception as e:
-        print(f"Error writing XLSX file: {e}", file=sys.stderr)
+        print(f"Error writing file: {e}", file=sys.stderr)
         return 1
 
 
