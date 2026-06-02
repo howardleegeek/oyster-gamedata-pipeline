@@ -106,8 +106,14 @@ def _make_session(
     width: int = 320,
     height: int = 240,
     extra_inputs: list[dict] | None = None,
+    metadata_extra: dict | None = None,
 ) -> Path:
-    """Materialize a synthetic session dir (no real video; metadata supplies fps)."""
+    """Materialize a synthetic session dir (no real video; metadata supplies fps).
+
+    ``metadata_extra`` merges additional keys into metadata.json (e.g. an
+    operator-set ``route_type``); it defaults to nothing so existing callers
+    are unaffected.
+    """
     session = tmp_path / "session"
     session.mkdir(exist_ok=True)
 
@@ -128,6 +134,8 @@ def _make_session(
     }
     if start_timestamp is not None:
         metadata["start_timestamp"] = start_timestamp
+    if metadata_extra:
+        metadata.update(metadata_extra)
     (session / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
     return session
 
@@ -810,3 +818,208 @@ def test_main_writes_input_frame_map_sidecar(tmp_path):
     assert len(ac) == 16
     assert ORIGINAL_FIELDS <= set(ac[0].keys())
     assert NEW_FIELDS <= set(ac[0].keys())
+
+
+# =============================================================================
+# route_type semantics (ISC-AL-9): operator route category {1,2,3}, constant
+# per clip — NOT per-frame locomotion. The genuine per-frame movement signal is
+# preserved (un-renamed logic) under the additive `locomotion_state` field.
+# =============================================================================
+#
+# PRD §4.1: `route_type` is the OPERATOR-selected route category ∈ {1,2,3}
+# (1=normal, 2=special, 3=loop). It is CONSTANT for the whole recording/clip,
+# defaults to 1, and is set via the OYSTER_ROUTE_TYPE env / metadata. lint_v3
+# criterion #11 reads the first non-null `route_type` from action_camera.json
+# and requires it ∈ {1,2,3}. The previous build emitted a PER-FRAME locomotion
+# code (0..6), which both contradicts the PRD semantic and fails #11.
+
+# A real-moving session: rows that exercise several distinct locomotion codes
+# (stationary / walking / running / sprinting / jumping / falling / sneaking)
+# so we can prove the movement signal survives under `locomotion_state`.
+LOCOMOTION_MOVING_ROWS = [
+    # stationary (no velocity, on ground)
+    _gs_row(0, 100500, velocity_x=0.0, velocity_z=0.0, on_ground=True),
+    # walking (~1 m/s horizontal: 0.05 blocks/tick * 20)
+    _gs_row(1, 100550, velocity_x=0.05, velocity_z=0.0, on_ground=True),
+    # running (~3.6 m/s: 0.18 blocks/tick * 20)
+    _gs_row(2, 100600, velocity_x=0.18, velocity_z=0.0, on_ground=True),
+    # sprinting (flag set)
+    _gs_row(3, 100650, velocity_x=0.2, velocity_z=0.0, on_ground=True, sprinting=True),
+    # jumping (airborne, rising)
+    _gs_row(4, 100700, velocity_y=0.3, on_ground=False),
+    # falling (airborne, descending fast)
+    _gs_row(5, 100750, velocity_y=-0.5, on_ground=False),
+    # sneaking (flag set)
+    _gs_row(6, 100800, velocity_x=0.03, on_ground=True, sneaking=True),
+    # back to stationary so the tail is covered
+    _gs_row(7, 100850, velocity_x=0.0, velocity_z=0.0, on_ground=True),
+]
+
+
+def _moving_session(tmp_path: Path, *, metadata_extra: dict | None = None) -> Path:
+    """A small covered session whose game_state spans several locomotion modes."""
+    anchor = 100.0
+    fps = 10.0
+    # ticks cover epoch [100.5 .. 100.85] → video-seconds [0.5 .. 0.85]; with
+    # frame_count 12 (frames 0..11) frames 5..8 are covered, the rest flagged.
+    return _make_session(
+        tmp_path,
+        gs_rows=LOCOMOTION_MOVING_ROWS,
+        fps=fps,
+        frame_count=12,
+        start_timestamp=anchor,
+        video_start_ts=anchor,
+        metadata_extra=metadata_extra,
+    )
+
+
+# --- (a) no route_type in metadata → every record route_type == 1 (default) --
+
+
+def test_route_type_defaults_to_one_when_absent(tmp_path):
+    """No operator route category anywhere → PRD default 1 on every record."""
+    session = _moving_session(tmp_path)
+    records = bac.build_records(session, vfov_deg=70.0)
+    assert records, "expected records"
+    assert {r["route_type"] for r in records} == {1}
+    # stays an int, satisfying lint_v3 #11.
+    assert all(isinstance(r["route_type"], int) for r in records)
+
+
+# --- (b) metadata route_type=2 → all records == 2 ----------------------------
+
+
+def test_route_type_from_metadata_top_level(tmp_path):
+    session = _moving_session(tmp_path, metadata_extra={"route_type": 2})
+    records = bac.build_records(session, vfov_deg=70.0)
+    assert {r["route_type"] for r in records} == {2}
+
+
+def test_route_type_from_metadata_oyster_env_key(tmp_path):
+    """The OYSTER_ROUTE_TYPE metadata key (env passthrough) is honoured."""
+    session = _moving_session(tmp_path, metadata_extra={"OYSTER_ROUTE_TYPE": 3})
+    records = bac.build_records(session, vfov_deg=70.0)
+    assert {r["route_type"] for r in records} == {3}
+
+
+def test_route_type_from_recorder_extra(tmp_path):
+    """A route_type nested under recorder_extra is honoured."""
+    session = _moving_session(tmp_path, metadata_extra={"recorder_extra": {"route_type": 2}})
+    records = bac.build_records(session, vfov_deg=70.0)
+    assert {r["route_type"] for r in records} == {2}
+
+
+def test_route_type_metadata_string_coerced(tmp_path):
+    """A numeric-string operator value (e.g. from env) is coerced to int."""
+    session = _moving_session(tmp_path, metadata_extra={"route_type": "2"})
+    records = bac.build_records(session, vfov_deg=70.0)
+    assert {r["route_type"] for r in records} == {2}
+    assert all(isinstance(r["route_type"], int) for r in records)
+
+
+# --- (c) metadata route_type=99 (invalid) → falls back to 1 + warning --------
+
+
+def test_route_type_invalid_metadata_falls_back_to_one(tmp_path, capsys):
+    """An out-of-range operator value falls back to 1 and logs a warning."""
+    session = _moving_session(tmp_path, metadata_extra={"route_type": 99})
+    records = bac.build_records(session, vfov_deg=70.0)
+    assert {r["route_type"] for r in records} == {1}
+    captured = capsys.readouterr()
+    # warning surfaced (not silently swallowed) — honest, not fudged.
+    assert "route_type" in (captured.err + captured.out).lower()
+    assert "99" in (captured.err + captured.out)
+
+
+def test_route_type_non_numeric_metadata_falls_back_to_one(tmp_path):
+    """A non-numeric operator value falls back to 1 (never crashes / never 0)."""
+    session = _moving_session(tmp_path, metadata_extra={"route_type": "loopish"})
+    records = bac.build_records(session, vfov_deg=70.0)
+    assert {r["route_type"] for r in records} == {1}
+
+
+# --- (d) --route-type 3 overrides everything → all == 3 ----------------------
+
+
+def test_cli_route_type_overrides_metadata(tmp_path):
+    """An explicit --route-type wins over a metadata route_type."""
+    session = _moving_session(tmp_path, metadata_extra={"route_type": 2})
+    records = bac.build_records(session, vfov_deg=70.0, route_type_override=3)
+    assert {r["route_type"] for r in records} == {3}
+
+
+def test_cli_route_type_invalid_raises(tmp_path):
+    """An out-of-range --route-type is rejected (operator typo, not silently 1)."""
+    session = _moving_session(tmp_path)
+    with pytest.raises(ValueError):
+        bac.build_records(session, vfov_deg=70.0, route_type_override=7)
+
+
+def test_main_route_type_arg_applies_and_is_constant(tmp_path):
+    """main(--route-type 3) writes a constant route_type 3 on every record."""
+    session = _moving_session(tmp_path)
+    rc = bac.main([str(session), "--route-type", "3"])
+    assert rc == 0
+    ac = json.loads((session / "action_camera.json").read_text(encoding="utf-8"))
+    assert {r["route_type"] for r in ac} == {3}
+
+
+# --- (e) locomotion_state present per record + spans multiple 0..6 values -----
+
+
+def test_locomotion_state_present_and_spans_multiple_values(tmp_path):
+    """The genuine per-frame movement signal is preserved as locomotion_state."""
+    session = _moving_session(tmp_path)
+    records = bac.build_records(session, vfov_deg=70.0)
+    # every record carries the additive field, an int in 0..6.
+    for r in records:
+        assert "locomotion_state" in r
+        assert isinstance(r["locomotion_state"], int)
+        assert 0 <= r["locomotion_state"] <= 6
+    # the moving session exhibits several distinct locomotion modes.
+    distinct = {r["locomotion_state"] for r in records}
+    assert len(distinct) >= 3, f"expected varied locomotion, got {distinct}"
+
+
+def test_locomotion_state_matches_classify_route_type(tmp_path):
+    """locomotion_state == classify_route_type(nearest tick) — same honest logic."""
+    session = _moving_session(tmp_path)
+    records = bac.build_records(session, vfov_deg=70.0)
+    gs = bac._read_jsonl(session / "game_state.jsonl")
+    gs_times, gs_rows = bac.build_gs_index(gs)
+    metadata = json.loads((session / "metadata.json").read_text(encoding="utf-8"))
+    inputs = bac._read_jsonl(session / "inputs.jsonl")
+    anchor, _ = bac.resolve_frame_anchor(inputs, metadata, gs_times[0])
+    _, _, fps, _ = bac.resolve_video_params(session, metadata)
+    for r in records:
+        frame_epoch = anchor + r["frame"] / fps
+        nearest = bac.interpolate_pose(gs_times, gs_rows, frame_epoch)["nearest"]
+        assert r["locomotion_state"] == bac.classify_route_type(nearest)
+
+
+def test_route_type_codes_mapping_intact():
+    """The ROUTE_TYPE_CODES mapping/logic is preserved verbatim under the rename."""
+    assert bac.ROUTE_TYPE_CODES == {
+        "stationary": 0,
+        "walking": 1,
+        "running": 2,
+        "sprinting": 3,
+        "jumping": 4,
+        "falling": 5,
+        "sneaking": 6,
+    }
+
+
+# --- (f) all original fields + record count + ordering unchanged -------------
+
+
+def test_route_type_fix_preserves_all_fields_and_count(tmp_path):
+    """route_type fix keeps every original/alignment field, count, and order."""
+    session = _moving_session(tmp_path)
+    records = bac.build_records(session, vfov_deg=70.0)
+    assert len(records) == 12
+    assert [r["frame"] for r in records] == list(range(12))
+    for r in records:
+        assert ORIGINAL_FIELDS <= set(r.keys())
+        assert NEW_FIELDS <= set(r.keys())
+        assert "locomotion_state" in r  # the one new additive field

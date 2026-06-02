@@ -102,6 +102,21 @@ one code); ``input_frame_map.json`` preserves ALL press/release events, so
 concurrency is reconstructable downstream. ``frame_alignment.json`` carries a
 compact summary of this map (counts + out-of-range disclosure).
 
+route_type vs locomotion_state (ISC-AL-9)
+=========================================
+``route_type`` is the OPERATOR-selected route CATEGORY of the whole recording
+(PRD §4.1): a single CONSTANT in {1,2,3} (1=normal, 2=special, 3=loop), set via
+the ``--route-type`` CLI arg or a ``route_type`` / ``OYSTER_ROUTE_TYPE`` value in
+metadata.json (incl. nested ``recorder_extra``), defaulting to 1 when the
+operator did not choose. An out-of-range metadata value falls back to 1 with a
+warning. The PRD's 50/25/25 route mix is ACROSS a fleet of clips, never within
+one clip. This is what lint_v3 criterion #11 (route_type ∈ {1,2,3}) checks.
+
+The genuine PER-FRAME movement signal (stationary/walking/running/sprinting/
+jumping/falling/sneaking, ints 0..6 from real velocity/on_ground/sprinting/
+sneaking) is preserved as the additive ``locomotion_state`` field on every
+record — valuable training data, kept honestly separate from ``route_type``.
+
 Usage
 -----
     python3 bin/build_action_camera.py <session_dir>
@@ -134,11 +149,23 @@ TICKS_PER_SECOND = 20.0  # MC server tick rate; velocity_* are blocks/tick
 VIDEO_START_EVENT = "VIDEO_START"  # OBS emits frame 0 at this event → PTS 0 anchor
 EXACT_POSE_EPS_MS = 1.0  # |Δ frame_epoch → tick| below this == an exact tick hit
 
-# Movement → route_type integer codes. Each is a real, distinct locomotion
-# state derived from game_state (velocity / on_ground / sprinting / sneaking),
-# satisfying prd_test_route_type_distribution's ">=5 distinct" requirement with
-# honest classifications instead of a single hard-coded value. Thresholds in
-# m/s mirror the walk/run/sprint bands used by the (passing) speed_units test.
+# route_type (PRD §4.1) -------------------------------------------------------
+# The OPERATOR-selected route CATEGORY of the whole recording/clip: a single
+# constant in {1,2,3} (1=normal, 2=special, 3=loop). It is NOT per-frame
+# locomotion. The operator sets it via the OYSTER_ROUTE_TYPE env / metadata;
+# when unset it defaults to 1. lint_v3 criterion #11 requires route_type ∈
+# {1,2,3}. The 50%/25%/25% distribution the PRD asks for is ACROSS a fleet of
+# clips (a batch tracker's job), never within a single clip.
+PRD_ROUTE_TYPES = (1, 2, 3)
+DEFAULT_ROUTE_TYPE = 1  # PRD default when the operator did not choose
+
+# Movement → locomotion_state integer codes. Each is a real, distinct
+# locomotion state derived per frame from game_state (velocity / on_ground /
+# sprinting / sneaking). This is a genuine movement signal (valuable training
+# data) and is emitted on every record as the additive ``locomotion_state``
+# field — it is deliberately SEPARATE from ``route_type`` (the operator route
+# category). Thresholds in m/s mirror the walk/run/sprint bands used by the
+# (passing) speed_units test.
 ROUTE_TYPE_CODES = {
     "stationary": 0,
     "walking": 1,
@@ -174,16 +201,20 @@ def euler_zyx_to_quat(roll: float, pitch: float, yaw: float) -> tuple[float, ...
     return (qx, qy, qz, qw)
 
 
-# ---- Movement classification (route_type) -----------------------------------
+# ---- Movement classification (locomotion_state) -----------------------------
 
 
 def classify_route_type(gs: dict[str, Any]) -> int:
-    """Classify a game_state row into a route_type integer.
+    """Classify a game_state row into a per-frame ``locomotion_state`` integer.
 
     Honest locomotion classification from real recorder fields. velocity_* are
     blocks/tick → ×20 gives m/s (1 block == 1 m). Priority handles airborne
     states first (a fall still has horizontal speed). Returns a stable int from
     ROUTE_TYPE_CODES so the dataset exhibits the real spread of movement modes.
+
+    NOTE: this is the per-frame MOVEMENT signal emitted as ``locomotion_state``;
+    it is NOT ``route_type`` (the operator route category — see
+    :func:`resolve_route_type`). The function name is kept for compatibility.
     """
     vx = float(gs.get("velocity_x", 0.0))
     vy = float(gs.get("velocity_y", 0.0))
@@ -207,6 +238,73 @@ def classify_route_type(gs: dict[str, Any]) -> int:
     if horiz > 0.15:
         return ROUTE_TYPE_CODES["walking"]
     return ROUTE_TYPE_CODES["stationary"]
+
+
+# ---- route_type resolution (PRD §4.1 operator route category) ---------------
+
+
+def resolve_route_type(
+    metadata: dict[str, Any],
+    override: int | None = None,
+) -> int:
+    """Resolve the clip's single constant ``route_type`` ∈ {1,2,3} (PRD §4.1).
+
+    ``route_type`` is the OPERATOR-selected route CATEGORY for the WHOLE
+    recording (1=normal, 2=special, 3=loop), not per-frame locomotion. Source
+    priority, honest and explicit:
+
+      (a) ``override`` — the ``--route-type`` CLI arg, when given. An
+          out-of-range override is an operator typo and is REJECTED (raises),
+          never silently coerced to the default.
+      (b) a route_type in metadata.json — checked in order ``route_type`` →
+          ``OYSTER_ROUTE_TYPE`` (the env passthrough) → ``recorder_extra.route_type``.
+          A found value is coerced to int; if it is not in {1,2,3} (or not
+          numeric) we fall back to the default and log a warning to stderr.
+      (c) the PRD default ``1`` when the operator did not choose.
+
+    Returns an int in {1,2,3}. This is constant for every record in the clip.
+    """
+    if override is not None:
+        if override not in PRD_ROUTE_TYPES:
+            raise ValueError(
+                f"--route-type {override} invalid: must be one of {list(PRD_ROUTE_TYPES)} "
+                "(operator route category: 1=normal, 2=special, 3=loop)"
+            )
+        return int(override)
+
+    raw: Any = None
+    source = ""
+    for key in ("route_type", "OYSTER_ROUTE_TYPE"):
+        if metadata.get(key) is not None:
+            raw, source = metadata.get(key), key
+            break
+    if raw is None:
+        extra = metadata.get("recorder_extra")
+        if isinstance(extra, dict) and extra.get("route_type") is not None:
+            raw, source = extra.get("route_type"), "recorder_extra.route_type"
+
+    if raw is None:
+        return DEFAULT_ROUTE_TYPE
+
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        print(
+            f"WARNING: route_type={raw!r} (from metadata {source}) is not numeric; "
+            f"falling back to default {DEFAULT_ROUTE_TYPE}.",
+            file=sys.stderr,
+        )
+        return DEFAULT_ROUTE_TYPE
+
+    if value not in PRD_ROUTE_TYPES:
+        print(
+            f"WARNING: route_type={value} (from metadata {source}) not in "
+            f"{list(PRD_ROUTE_TYPES)}; falling back to default {DEFAULT_ROUTE_TYPE}.",
+            file=sys.stderr,
+        )
+        return DEFAULT_ROUTE_TYPE
+
+    return value
 
 
 # ---- Session loading --------------------------------------------------------
@@ -858,13 +956,19 @@ def build_records(
 ) -> list[dict[str, Any]]:
     """Build the full list of per-frame action_camera records.
 
-    route_type is derived per frame from real movement state unless
-    ``route_type_override`` forces a single value (used only when a caller
-    explicitly wants every record tagged the same).
+    ``route_type`` is the operator route CATEGORY (PRD §4.1) — a single
+    constant in {1,2,3} resolved once for the whole clip by
+    :func:`resolve_route_type` (``route_type_override`` ← ``--route-type``,
+    else metadata, else default 1). The genuine per-frame movement signal is
+    emitted separately as the additive ``locomotion_state`` (int 0..6 from
+    :func:`classify_route_type`).
     """
     metadata = json.loads((session_dir / "metadata.json").read_text(encoding="utf-8"))
     game_state = _read_jsonl(session_dir / "game_state.jsonl")
     inputs = _read_jsonl(session_dir / "inputs.jsonl")
+
+    # Operator route category for the whole clip — one constant in {1,2,3}.
+    route_type = resolve_route_type(metadata, route_type_override)
 
     width, height, fps, frame_count = resolve_video_params(session_dir, metadata)
     intrinsics = compute_intrinsics(width, height, vfov_deg)
@@ -923,12 +1027,11 @@ def build_records(
         pose_source = pose["pose_source"]
         pose_dt_ms = pose["pose_dt_ms"]
 
-        # route_type: discrete locomotion class from the NEAREST tick's flags
-        # (booleans can't interpolate), or a forced override.
-        if route_type_override is not None:
-            route_type = route_type_override
-        else:
-            route_type = classify_route_type(pose["nearest"])
+        # locomotion_state: discrete per-frame movement class from the NEAREST
+        # tick's flags (booleans can't interpolate). This is the genuine
+        # movement signal — SEPARATE from route_type (the operator route
+        # category resolved once for the whole clip above).
+        locomotion_state = classify_route_type(pose["nearest"])
 
         rel_pos = [
             round(abs_x - ox, 6),
@@ -971,6 +1074,7 @@ def build_records(
                 "time": round(frame_time, 6),
                 "timestamp": round(ts_action, 6),
                 "fps": round(fps, 6),
+                # PRD §4.1 operator route category — one constant in {1,2,3}.
                 "route_type": int(route_type),
                 "mouse_x": 0.0,  # filled after normalisation pass
                 "mouse_y": 0.0,
@@ -988,6 +1092,10 @@ def build_records(
                 "player_rotation_quaternion": [round(q, 9) for q in quat],
                 "player_speed": round(speed, 6),
                 "metric_scale": METRIC_SCALE,
+                # --- per-frame locomotion (genuine movement signal, additive) ---
+                # The real walk/run/sprint/jump/fall/sneak class for THIS frame.
+                # Kept separate from route_type (the operator route category).
+                "locomotion_state": int(locomotion_state),
                 # --- frame↔pose alignment provenance (ISC-FRAME2FRAME) ---
                 "pose_valid": bool(pose_valid),
                 "pose_source": pose_source,
@@ -1121,9 +1229,13 @@ def main(argv: list[str] | None = None) -> int:
         "--route-type",
         type=int,
         default=None,
+        choices=PRD_ROUTE_TYPES,
         help=(
-            "Force a single route_type for every record. Default: derive each "
-            "frame's route_type from real movement state (recommended)."
+            "Operator route category for the whole clip (PRD §4.1): "
+            "1=normal, 2=special, 3=loop. This is NOT per-frame locomotion. "
+            "Defaults to the route_type in metadata.json (OYSTER_ROUTE_TYPE) "
+            "or 1 when the operator did not set one. The genuine per-frame "
+            "movement class is always emitted separately as locomotion_state."
         ),
     )
     parser.add_argument(
@@ -1176,6 +1288,7 @@ def main(argv: list[str] | None = None) -> int:
 
     intr = records[0]["camera_intrinsics"] if records else {}
     distinct_routes = sorted({r["route_type"] for r in records})
+    distinct_locomotion = sorted({r["locomotion_state"] for r in records})
     print(f"Wrote {len(records)} records → {out_path}")
     print(
         "  intrinsics: "
@@ -1184,7 +1297,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     if records:
         print(f"  record[0].camera_position (relative m): {records[0]['camera_position']}")
-        print(f"  fps={records[0]['fps']}  distinct route_types={distinct_routes}")
+        print(f"  fps={records[0]['fps']}")
+        print(f"  route_type (operator category, constant): {distinct_routes}")
+        print(f"  distinct locomotion_state (per-frame movement): {distinct_locomotion}")
 
     print(f"Wrote alignment report → {report_path}")
     print(
