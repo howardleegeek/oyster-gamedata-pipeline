@@ -52,6 +52,40 @@ actions share that timestamp (Δt = 0, dropped by the test), so the surviving
 deltas are the genuine inter-action intervals — i.e. the player's true
 action cadence. Every timestamp is a real recorded event time.
 
+Frame↔pose alignment honesty (ISC-FRAME2FRAME)
+==============================================
+A finished session's video frames and recorded poses do NOT cover the same
+wall-clock window: OBS starts emitting frames at the ``VIDEO_START`` event
+(epoch), but game_state ticks only begin a few seconds later and stop a few
+frames before the video ends. The old lookup did
+``frame_epoch = start_timestamp + frame/fps`` then took the *nearest* tick,
+which CLAMPED any frame outside the recorded-pose window to the first/last
+tick — silently fabricating a frozen pose for frames where no pose existed.
+
+This generator fixes that with three honest rules:
+
+1. **Anchor** — frame 0's epoch is the ``VIDEO_START`` inputs.jsonl event
+   (PTS=0 ↔ VIDEO_START), falling back to ``metadata.start_timestamp`` and
+   then the first game_state epoch. ``frame_epoch = anchor + frame/fps``.
+
+2. **Interpolate inside the real window** — for a frame whose epoch lies in
+   ``[first_tick, last_tick]`` the pose is LINEARLY interpolated between the
+   two bracketing ticks (≤50 ms apart): position/velocity/speed linear,
+   pitch/yaw shortest-arc angular, quaternion rebuilt from the interpolated
+   euler (so euler↔quat stay consistent), and discrete route flags
+   (on_ground/sneaking/sprinting) taken from the NEAREST tick.
+
+3. **Flag uncovered frames** — frames before the first tick or after the last
+   are marked ``pose_valid=false`` / ``pose_source="extrapolated_no_pose"``;
+   their pose is clamped to the nearest boundary tick (kept numeric, never
+   nulled) but NEVER presented as a real recorded pose.
+
+Three additive per-record fields carry the provenance: ``pose_valid`` (bool),
+``pose_source`` ("exact"|"interpolated"|"extrapolated_no_pose"), and
+``pose_dt_ms`` (ms from the frame epoch to the nearest real tick). A sidecar
+``frame_alignment.json`` summarises coverage and recommends a clip trim so a
+downstream packager can cut video+audio+depth+pose to one co-extensive clip.
+
 Euler→quaternion math is reused verbatim from ``verify_action_camera.py``
 (``euler_zyx_to_quat``) so the two tools agree by construction.
 
@@ -81,6 +115,10 @@ DEFAULT_FPS = 30.0  # PRD §3.2 nominal; overridden by real video metadata
 METRIC_SCALE = 1.0  # MC: 1 block == 1 metre
 DISCRETE_ACTION_EVENTS = ("KEYBOARD", "MOUSE_BUTTON", "SCROLL")
 TICKS_PER_SECOND = 20.0  # MC server tick rate; velocity_* are blocks/tick
+
+# Frame↔pose alignment (ISC-FRAME2FRAME) -------------------------------------
+VIDEO_START_EVENT = "VIDEO_START"  # OBS emits frame 0 at this event → PTS 0 anchor
+EXACT_POSE_EPS_MS = 1.0  # |Δ frame_epoch → tick| below this == an exact tick hit
 
 # Movement → route_type integer codes. Each is a real, distinct locomotion
 # state derived from game_state (velocity / on_ground / sprinting / sneaking),
@@ -356,6 +394,181 @@ def nearest_gs(gs_times: list[float], gs_rows: list[dict], t_epoch: float) -> di
     return gs_rows[idx - 1] if (t_epoch - before) <= (after - t_epoch) else gs_rows[idx]
 
 
+# ---- Frame-0 epoch anchor (ISC-FRAME2FRAME) ---------------------------------
+
+
+def resolve_frame_anchor(
+    inputs: list[dict[str, Any]],
+    metadata: dict[str, Any],
+    gs_first_epoch: float,
+) -> tuple[float, str]:
+    """Resolve the epoch of video frame 0 and how it was derived.
+
+    OBS emits the first frame at the ``VIDEO_START`` event (PTS 0 ↔ that
+    event's wall-clock epoch), so it is the most accurate frame-0 anchor.
+    Falls back to ``metadata.start_timestamp`` (recording-process start, a few
+    ms before OBS's first frame) and finally the first game_state epoch.
+
+    Returns ``(anchor_epoch_seconds, anchor_source)`` where ``anchor_source``
+    is one of ``"video_start_event"`` / ``"metadata_start_timestamp"`` /
+    ``"first_game_state"`` — mirrored verbatim into the alignment report.
+    """
+    for ev in inputs:
+        if ev.get("event_type") != VIDEO_START_EVENT:
+            continue
+        try:
+            return float(ev["timestamp"]), "video_start_event"
+        except (KeyError, TypeError, ValueError):
+            continue
+
+    start_ts = metadata.get("start_timestamp")
+    if isinstance(start_ts, (int, float)):
+        return float(start_ts), "metadata_start_timestamp"
+
+    return float(gs_first_epoch), "first_game_state"
+
+
+# ---- Pose interpolation (ISC-FRAME2FRAME) -----------------------------------
+
+
+def lerp_angle_deg(a: float, b: float, t: float) -> float:
+    """Shortest-arc linear interpolation between two angles (degrees).
+
+    Walks the SMALLEST signed angular difference so 350°→10° passes through
+    0° (not naively backwards through 180°). roll stays 0 in this pipeline so
+    only pitch/yaw use this; result is ``a`` plus a fraction of the wrapped
+    delta and may fall slightly outside [0,360) (callers may ``% 360``).
+    """
+    delta = (b - a + 180.0) % 360.0 - 180.0
+    return a + delta * t
+
+
+def _bracketing_indices(gs_times: list[float], t_epoch: float) -> tuple[int, int]:
+    """Indices (lo, hi) of the two ticks bracketing ``t_epoch``.
+
+    Clamps to the array ends so callers always get a valid pair; when
+    ``t_epoch`` is outside the window lo == hi == the boundary index.
+    """
+    n = len(gs_times)
+    idx = bisect.bisect_left(gs_times, t_epoch)
+    if idx <= 0:
+        return 0, 0
+    if idx >= n:
+        return n - 1, n - 1
+    if gs_times[idx] == t_epoch:
+        return idx, idx
+    return idx - 1, idx
+
+
+def interpolate_pose(gs_times: list[float], gs_rows: list[dict], t_epoch: float) -> dict[str, Any]:
+    """Honestly resolve a frame's pose from the recorded game_state ticks.
+
+    Within the real window ``[first_tick, last_tick]`` the pose is linearly
+    interpolated between the two bracketing ticks (≤50 ms apart): position,
+    velocity and derived speed linear; pitch/yaw shortest-arc; quaternion
+    rebuilt from the interpolated euler. Discrete route flags come from the
+    NEAREST tick (booleans can't interpolate). Outside the window the pose is
+    clamped to the nearest boundary tick and flagged ``pose_valid=false`` —
+    NEVER presented as a real recorded pose.
+
+    Returns a dict with interpolated scalars (x/y/z, pitch_deg/yaw_deg,
+    velocity_x/y/z, speed), ``quat`` (x,y,z,w), the ``nearest`` raw tick (for
+    discrete fields + route_type), and the provenance triple ``pose_valid`` /
+    ``pose_source`` / ``pose_dt_ms``.
+    """
+    if not gs_rows:
+        quat = euler_zyx_to_quat(0.0, 0.0, 0.0)
+        return {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0,
+            "pitch_deg": 0.0,
+            "yaw_deg": 0.0,
+            "velocity_x": 0.0,
+            "velocity_y": 0.0,
+            "velocity_z": 0.0,
+            "speed": 0.0,
+            "quat": list(quat),
+            "nearest": {},
+            "pose_valid": False,
+            "pose_source": "extrapolated_no_pose",
+            "pose_dt_ms": 0.0,
+        }
+
+    first_epoch, last_epoch = gs_times[0], gs_times[-1]
+    lo, hi = _bracketing_indices(gs_times, t_epoch)
+    a, b = gs_rows[lo], gs_rows[hi]
+    ta, tb = gs_times[lo], gs_times[hi]
+
+    pose_valid = first_epoch <= t_epoch <= last_epoch
+
+    # ms to the NEAREST real tick (distance to whichever bracket is closer).
+    dt_to_lo = abs(t_epoch - ta)
+    dt_to_hi = abs(tb - t_epoch)
+    pose_dt_ms = min(dt_to_lo, dt_to_hi) * 1000.0
+    nearest = a if dt_to_lo <= dt_to_hi else b
+
+    if not pose_valid:
+        # Clamp to nearest boundary tick (numeric, NOT null) but flag honestly.
+        boundary = gs_rows[0] if t_epoch < first_epoch else gs_rows[-1]
+        bt = first_epoch if t_epoch < first_epoch else last_epoch
+        pitch = float(boundary.get("pitch_deg", 0.0))
+        yaw = float(boundary.get("yaw_deg", 0.0))
+        vx = float(boundary.get("velocity_x", 0.0))
+        vy = float(boundary.get("velocity_y", 0.0))
+        vz = float(boundary.get("velocity_z", 0.0))
+        return {
+            "x": float(boundary.get("x", 0.0)),
+            "y": float(boundary.get("y", 0.0)),
+            "z": float(boundary.get("z", 0.0)),
+            "pitch_deg": pitch,
+            "yaw_deg": yaw,
+            "velocity_x": vx,
+            "velocity_y": vy,
+            "velocity_z": vz,
+            "speed": _vec_speed(vx, vy, vz),
+            "quat": list(euler_zyx_to_quat(0.0, pitch, yaw)),
+            "nearest": boundary,
+            "pose_valid": False,
+            "pose_source": "extrapolated_no_pose",
+            "pose_dt_ms": abs(t_epoch - bt) * 1000.0,
+        }
+
+    span = tb - ta
+    frac = (t_epoch - ta) / span if span > 0 else 0.0
+
+    def _lin(key: str) -> float:
+        return float(a.get(key, 0.0)) + (float(b.get(key, 0.0)) - float(a.get(key, 0.0))) * frac
+
+    x = _lin("x")
+    y = _lin("y")
+    z = _lin("z")
+    vx = _lin("velocity_x")
+    vy = _lin("velocity_y")
+    vz = _lin("velocity_z")
+    pitch = lerp_angle_deg(float(a.get("pitch_deg", 0.0)), float(b.get("pitch_deg", 0.0)), frac)
+    yaw = lerp_angle_deg(float(a.get("yaw_deg", 0.0)), float(b.get("yaw_deg", 0.0)), frac)
+    quat = euler_zyx_to_quat(0.0, pitch, yaw)
+
+    source = "exact" if pose_dt_ms < EXACT_POSE_EPS_MS else "interpolated"
+    return {
+        "x": x,
+        "y": y,
+        "z": z,
+        "pitch_deg": pitch,
+        "yaw_deg": yaw,
+        "velocity_x": vx,
+        "velocity_y": vy,
+        "velocity_z": vz,
+        "speed": _vec_speed(vx, vy, vz),
+        "quat": list(quat),
+        "nearest": nearest,
+        "pose_valid": True,
+        "pose_source": source,
+        "pose_dt_ms": pose_dt_ms,
+    }
+
+
 # ---- Input (mouse / action) processing --------------------------------------
 
 
@@ -493,18 +706,18 @@ def build_records(
 
     gs_times, gs_rows = build_gs_index(game_state)
 
-    # Recording clock anchor: prefer metadata.start_timestamp (epoch seconds);
-    # otherwise fall back to the first game_state epoch.
-    start_epoch = metadata.get("start_timestamp")
-    if not isinstance(start_epoch, (int, float)):
-        start_epoch = gs_times[0]
-    start_epoch = float(start_epoch)
+    # Frame-0 epoch anchor (ISC-FRAME2FRAME): the VIDEO_START event marks when
+    # OBS emitted frame 0 (PTS 0), the most accurate anchor; fall back to
+    # metadata.start_timestamp then the first game_state epoch.
+    start_epoch, anchor_source = resolve_frame_anchor(inputs, metadata, gs_times[0])
 
     # Frame-0 absolute position → relative-to-clip-start origin (must-fix #1).
-    origin = nearest_gs(gs_times, gs_rows, start_epoch)
-    ox = float(origin.get("x", 0.0))
-    oy = float(origin.get("y", 0.0))
-    oz = float(origin.get("z", 0.0))
+    # Use the interpolated pose at the anchor so the origin reflects the true
+    # frame-0 position even when frame 0 precedes the first recorded tick.
+    origin_pose = interpolate_pose(gs_times, gs_rows, start_epoch)
+    ox = float(origin_pose["x"])
+    oy = float(origin_pose["y"])
+    oz = float(origin_pose["z"])
 
     mouse_moves = extract_mouse_moves(inputs)
     move_ts = [m[0] for m in mouse_moves]
@@ -525,25 +738,29 @@ def build_records(
         frame_time = frame / fps  # seconds since clip start (schema `time`)
         frame_epoch = start_epoch + frame_time
 
-        # --- pose from nearest game_state ---
-        gs = nearest_gs(gs_times, gs_rows, frame_epoch)
-        abs_x = float(gs.get("x", ox))
-        abs_y = float(gs.get("y", oy))
-        abs_z = float(gs.get("z", oz))
-        pitch = float(gs.get("pitch_deg", 0.0))
-        yaw = float(gs.get("yaw_deg", 0.0))
+        # --- pose by honest interpolation within the recorded window ---
+        # Inside [first_tick, last_tick]: linear position/velocity, shortest-arc
+        # pitch/yaw, quaternion rebuilt from the interpolated euler. Outside:
+        # clamped to the nearest boundary tick and flagged pose_valid=false.
+        pose = interpolate_pose(gs_times, gs_rows, frame_epoch)
+        abs_x = pose["x"]
+        abs_y = pose["y"]
+        abs_z = pose["z"]
+        pitch = pose["pitch_deg"]
+        yaw = pose["yaw_deg"]
         roll = 0.0
-        quat = euler_zyx_to_quat(roll, pitch, yaw)
-        vx = float(gs.get("velocity_x", 0.0))
-        vy = float(gs.get("velocity_y", 0.0))
-        vz = float(gs.get("velocity_z", 0.0))
-        speed = _vec_speed(vx, vy, vz)
+        quat = pose["quat"]
+        speed = pose["speed"]
+        pose_valid = pose["pose_valid"]
+        pose_source = pose["pose_source"]
+        pose_dt_ms = pose["pose_dt_ms"]
 
-        # route_type: honest per-frame locomotion class (or forced override).
+        # route_type: discrete locomotion class from the NEAREST tick's flags
+        # (booleans can't interpolate), or a forced override.
         if route_type_override is not None:
             route_type = route_type_override
         else:
-            route_type = classify_route_type(gs)
+            route_type = classify_route_type(pose["nearest"])
 
         rel_pos = [
             round(abs_x - ox, 6),
@@ -603,6 +820,10 @@ def build_records(
                 "player_rotation_quaternion": [round(q, 9) for q in quat],
                 "player_speed": round(speed, 6),
                 "metric_scale": METRIC_SCALE,
+                # --- frame↔pose alignment provenance (ISC-FRAME2FRAME) ---
+                "pose_valid": bool(pose_valid),
+                "pose_source": pose_source,
+                "pose_dt_ms": round(pose_dt_ms, 4),
             }
         )
 
@@ -631,6 +852,80 @@ def _normalise_mouse_positions(
     for i, rec in enumerate(records):
         rec["mouse_x"] = round(nx[i], 6) if i < len(nx) else 0.0
         rec["mouse_y"] = round(ny[i], 6) if i < len(ny) else 0.0
+
+
+# ---- Alignment report (ISC-FRAME2FRAME) -------------------------------------
+
+
+def _tick_rate_hz(gs_times: list[float]) -> float:
+    """Median tick rate (Hz) from consecutive game_state timestamps."""
+    if len(gs_times) < 2:
+        return 0.0
+    deltas = sorted(b - a for a, b in zip(gs_times, gs_times[1:]) if (b - a) > 0)
+    if not deltas:
+        return 0.0
+    mid = deltas[len(deltas) // 2]
+    return round(1.0 / mid, 6) if mid > 0 else 0.0
+
+
+def build_alignment_report(session_dir: Path, records: list[dict[str, Any]]) -> dict[str, Any]:
+    """Summarise frame↔pose coverage for a downstream clip packager.
+
+    Re-resolves the anchor and tick rate from the session's real artifacts and
+    derives coverage counts directly from the built records' ``pose_valid``
+    flags, so the report can never disagree with the emitted per-frame data.
+    The ``recommended_clip_trim`` is the covered frame range — a hint to cut
+    video+audio+depth+pose to one co-extensive clip.
+    """
+    metadata = json.loads((session_dir / "metadata.json").read_text(encoding="utf-8"))
+    game_state = _read_jsonl(session_dir / "game_state.jsonl")
+    inputs = _read_jsonl(session_dir / "inputs.jsonl")
+    gs_times, _ = build_gs_index(game_state)
+    gs_first = gs_times[0] if gs_times else 0.0
+    anchor_epoch, anchor_source = resolve_frame_anchor(inputs, metadata, gs_first)
+
+    total = len(records)
+    fps = float(records[0]["fps"]) if records else float(DEFAULT_FPS)
+
+    valid_idx = [r["frame"] for r in records if r.get("pose_valid")]
+    valid_count = len(valid_idx)
+    if valid_idx:
+        first_cov, last_cov = valid_idx[0], valid_idx[-1]
+        covered_range: list[int] | None = [first_cov, last_cov]
+        leading = first_cov
+        trailing = (total - 1) - last_cov
+        max_dt = max(
+            (r["pose_dt_ms"] for r in records if r.get("pose_valid")),
+            default=0.0,
+        )
+    else:
+        first_cov = last_cov = None
+        covered_range = None
+        leading = total
+        trailing = 0
+        max_dt = 0.0
+
+    pct_valid = round((valid_count / total) * 100.0, 4) if total else 0.0
+
+    trim = (
+        {"start_frame": first_cov, "end_frame": last_cov}
+        if covered_range
+        else {"start_frame": None, "end_frame": None}
+    )
+
+    return {
+        "anchor_source": anchor_source,
+        "anchor_epoch": round(anchor_epoch, 6),
+        "fps": round(fps, 6),
+        "total_frames": total,
+        "covered_frame_range": covered_range,
+        "leading_uncovered_count": leading,
+        "trailing_uncovered_count": trailing,
+        "pct_frames_pose_valid": pct_valid,
+        "max_pose_dt_ms_within_window": round(max_dt, 4),
+        "pose_tick_rate_hz": _tick_rate_hz(gs_times),
+        "recommended_clip_trim": trim,
+    }
 
 
 # ---- CLI --------------------------------------------------------------------
@@ -685,6 +980,12 @@ def main(argv: list[str] | None = None) -> int:
     out_path = args.output or (session_dir / "action_camera.json")
     out_path.write_text(json.dumps(records, indent=2), encoding="utf-8")
 
+    # Frame↔pose alignment sidecar + summary (ISC-FRAME2FRAME). Always written
+    # next to the session so a downstream clip packager can trim to coverage.
+    report = build_alignment_report(session_dir, records)
+    report_path = session_dir / "frame_alignment.json"
+    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+
     intr = records[0]["camera_intrinsics"] if records else {}
     distinct_routes = sorted({r["route_type"] for r in records})
     print(f"Wrote {len(records)} records → {out_path}")
@@ -696,6 +997,22 @@ def main(argv: list[str] | None = None) -> int:
     if records:
         print(f"  record[0].camera_position (relative m): {records[0]['camera_position']}")
         print(f"  fps={records[0]['fps']}  distinct route_types={distinct_routes}")
+
+    print(f"Wrote alignment report → {report_path}")
+    print(
+        f"  anchor: {report['anchor_source']} @ {report['anchor_epoch']}  "
+        f"fps={report['fps']}  tick_rate={report['pose_tick_rate_hz']}Hz"
+    )
+    print(
+        f"  covered frames {report['covered_frame_range']} of {report['total_frames']}  "
+        f"(leading uncovered={report['leading_uncovered_count']}, "
+        f"trailing uncovered={report['trailing_uncovered_count']})"
+    )
+    print(
+        f"  pose_valid={report['pct_frames_pose_valid']}%  "
+        f"max Δt within window={report['max_pose_dt_ms_within_window']}ms"
+    )
+    print(f"  recommended_clip_trim: {report['recommended_clip_trim']}")
     return 0
 
 
