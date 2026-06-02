@@ -89,12 +89,26 @@ downstream packager can cut video+audio+depth+pose to one co-extensive clip.
 Euler→quaternion math is reused verbatim from ``verify_action_camera.py``
 (``euler_zyx_to_quat``) so the two tools agree by construction.
 
+Explicit input→frame index map (ISC-IF)
+=======================================
+Beyond the per-frame held-key model in action_camera.json, this generator also
+emits a sidecar ``input_frame_map.json`` mapping every DISCRETE input event
+(KEYBOARD / MOUSE_BUTTON / SCROLL) to the video frame it occurred on, via the
+SAME frame-0 anchor (``frame_of_epoch``). It answers "key W was pressed at frame
+N". Continuous MOUSE_MOVE events are excluded (already aggregated into
+mouse_dx/dy) as are lifecycle events. action_camera.json's single ``keyCode``
+field keeps only the most-recent held key (so a concurrent chord collapses to
+one code); ``input_frame_map.json`` preserves ALL press/release events, so
+concurrency is reconstructable downstream. ``frame_alignment.json`` carries a
+compact summary of this map (counts + out-of-range disclosure).
+
 Usage
 -----
     python3 bin/build_action_camera.py <session_dir>
     python3 bin/build_action_camera.py <session_dir> --fov 70 --route-type 1
 
-Writes ``<session_dir>/action_camera.json`` and prints a short summary.
+Writes ``<session_dir>/action_camera.json``, ``<session_dir>/frame_alignment.json``
+and ``<session_dir>/input_frame_map.json`` and prints a short summary.
 """
 
 from __future__ import annotations
@@ -428,6 +442,42 @@ def resolve_frame_anchor(
     return float(gs_first_epoch), "first_game_state"
 
 
+# ---- Canonical epoch → frame index mapping (ISC-IF-1) -----------------------
+
+
+def frame_of_epoch(t_epoch: float, anchor: float, fps: float, frame_count: int) -> int:
+    """Map a wall-clock epoch (seconds) to its CFR video-frame index.
+
+    The recording is constant-frame-rate: frame ``i`` is shown at
+    ``anchor + i/fps``. So the frame containing an event at ``t_epoch`` is the
+    nearest integer of ``(t_epoch - anchor) * fps``, clamped to the real clip
+    range ``[0, frame_count - 1]``. ``anchor`` is the frame-0 epoch resolved by
+    :func:`resolve_frame_anchor` (the ``VIDEO_START`` event); every stream shares
+    this one epoch clock, so the same anchor maps inputs, poses and video frames
+    onto a single timeline.
+
+    Clamping is honest, not silent: callers that need to know an event fell
+    OUTSIDE the encoded video (e.g. an ``END`` event a few frames after
+    ``VIDEO_END``) compare the raw rounded index against the clip range — see
+    :func:`summarize_input_frame_map`'s ``events_out_of_video_range``.
+
+    >>> frame_of_epoch(100.0, 100.0, 24.0, 7825)   # the anchor is frame 0
+    0
+    >>> frame_of_epoch(101.0, 100.0, 24.0, 7825)   # 1.0 s later at 24 fps
+    24
+    >>> frame_of_epoch(50.0, 100.0, 24.0, 7825)    # before the anchor → clamp low
+    0
+    >>> frame_of_epoch(1e9, 100.0, 24.0, 7825)     # past clip end → clamp high
+    7824
+    """
+    raw = round((t_epoch - anchor) * fps)
+    if raw < 0:
+        return 0
+    if raw > frame_count - 1:
+        return frame_count - 1
+    return int(raw)
+
+
 # ---- Pose interpolation (ISC-FRAME2FRAME) -----------------------------------
 
 
@@ -675,6 +725,124 @@ def build_keycode_timeline(inputs: list[dict[str, Any]]) -> list[tuple[float, in
     return timeline
 
 
+# ---- Explicit input-event → frame index map (ISC-IF-2) ----------------------
+
+
+def build_input_frame_map(
+    inputs: list[dict[str, Any]],
+    anchor: float,
+    fps: float,
+    frame_count: int,
+) -> list[dict[str, Any]]:
+    """Map every DISCRETE input event to the video frame it occurred on.
+
+    Discrete events are real key presses/releases (``KEYBOARD``), mouse-button
+    presses/releases (``MOUSE_BUTTON``) and wheel ticks (``SCROLL``). Continuous
+    ``MOUSE_MOVE`` events are NOT emitted per-event — they are already aggregated
+    into action_camera's per-frame ``mouse_dx``/``mouse_dy`` — and lifecycle
+    events (START/HOOK_START/VIDEO_START/VIDEO_END/END) are excluded entirely.
+
+    Each record answers "when in the video did this input happen?":
+      * ``event_type``  — the discrete event class.
+      * ``epoch``       — the event's wall-clock epoch (s, 6 dp).
+      * ``frame``       — ``frame_of_epoch(epoch, ...)``; the CFR frame index,
+                          clamped to ``[0, frame_count-1]`` (out-of-range events
+                          are disclosed via :func:`summarize_input_frame_map`).
+      * ``frame_time_s``— that frame's display time ``frame / fps`` (s, 6 dp).
+      * ``dt_to_frame_center_ms`` — signed offset (ms, 4 dp) from the event to
+                          the centre of its assigned frame; quantifies the
+                          sub-frame timing error introduced by CFR bucketing.
+      * ``keyCode``     — KEYBOARD only, via the shared :func:`_key_to_code`.
+      * ``button``      — MOUSE_BUTTON only (the button id from event_args[0]).
+      * ``scroll``      — SCROLL only (the raw event_args scroll delta(s)).
+
+    Records are sorted ascending by epoch. Keys that don't apply to an event
+    type are omitted (a KEYBOARD record has no ``button``/``scroll``).
+
+    KNOWN LIMITATION (honest disclosure): action_camera.json carries a single
+    ``keyCode`` per frame that keeps only the MOST-RECENT held key, so concurrent
+    chords (e.g. W+A+Shift) collapse to one code there. This map preserves EVERY
+    discrete event — both press and release — so downstream consumers can
+    reconstruct concurrency and key-hold intervals that the per-frame held-key
+    model alone cannot express.
+    """
+    records: list[dict[str, Any]] = []
+    for ev in inputs:
+        et = ev.get("event_type")
+        if et not in DISCRETE_ACTION_EVENTS:
+            continue
+        try:
+            t = float(ev["timestamp"])
+        except (KeyError, TypeError, ValueError):
+            continue
+
+        frame = frame_of_epoch(t, anchor, fps, frame_count)
+        rec: dict[str, Any] = {
+            "event_type": et,
+            "epoch": round(t, 6),
+            "frame": frame,
+            "frame_time_s": round(frame / fps, 6),
+            # Signed ms from the event to the centre of its assigned frame.
+            "dt_to_frame_center_ms": round(((t - anchor) - (frame + 0.5) / fps) * 1000.0, 4),
+        }
+
+        args = ev.get("event_args")
+        if et == "KEYBOARD":
+            rec["keyCode"] = _key_to_code(ev)
+        elif et == "MOUSE_BUTTON":
+            if isinstance(args, list) and args:
+                rec["button"] = args[0]
+        elif et == "SCROLL":
+            if args is not None:
+                rec["scroll"] = args
+
+        records.append(rec)
+
+    records.sort(key=lambda r: r["epoch"])
+    return records
+
+
+def summarize_input_frame_map(
+    frame_map: list[dict[str, Any]],
+    anchor: float,
+    fps: float,
+    frame_count: int,
+    inputs: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Compact, honest summary of the input→frame map for the alignment report.
+
+    Counts the discrete events overall and per class, plus how many landed
+    OUTSIDE the encoded video range ``[0, frame_count-1]`` BEFORE clamping (the
+    raw rounded index differs from the clamped ``frame``). Those events are
+    still emitted (clamped), but disclosed here so a buyer sees, e.g., that an
+    ``END`` event fired a few frames after the video ended.
+    """
+    keyboard = sum(1 for r in frame_map if r["event_type"] == "KEYBOARD")
+    mouse_button = sum(1 for r in frame_map if r["event_type"] == "MOUSE_BUTTON")
+    scroll = sum(1 for r in frame_map if r["event_type"] == "SCROLL")
+
+    out_of_range = 0
+    for ev in inputs:
+        if ev.get("event_type") not in DISCRETE_ACTION_EVENTS:
+            continue
+        try:
+            t = float(ev["timestamp"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        raw = round((t - anchor) * fps)
+        if raw < 0 or raw > frame_count - 1:
+            out_of_range += 1
+
+    return {
+        "path": "input_frame_map.json",
+        "discrete_event_count": len(frame_map),
+        "keyboard_count": keyboard,
+        "mouse_button_count": mouse_button,
+        "scroll_count": scroll,
+        "events_out_of_video_range": out_of_range,
+    }
+
+
 # ---- Record assembly --------------------------------------------------------
 
 
@@ -913,6 +1081,12 @@ def build_alignment_report(session_dir: Path, records: list[dict[str, Any]]) -> 
         else {"start_frame": None, "end_frame": None}
     )
 
+    # Explicit input-event → frame index map summary (ISC-IF-2). The full map is
+    # written to its own sidecar by main(); here we embed only a compact,
+    # honest count block so the alignment report self-describes both alignments.
+    frame_map = build_input_frame_map(inputs, anchor_epoch, fps, total)
+    input_frame_map_summary = summarize_input_frame_map(frame_map, anchor_epoch, fps, total, inputs)
+
     return {
         "anchor_source": anchor_source,
         "anchor_epoch": round(anchor_epoch, 6),
@@ -925,6 +1099,7 @@ def build_alignment_report(session_dir: Path, records: list[dict[str, Any]]) -> 
         "max_pose_dt_ms_within_window": round(max_dt, 4),
         "pose_tick_rate_hz": _tick_rate_hz(gs_times),
         "recommended_clip_trim": trim,
+        "input_frame_map": input_frame_map_summary,
     }
 
 
@@ -983,6 +1158,19 @@ def main(argv: list[str] | None = None) -> int:
     # Frame↔pose alignment sidecar + summary (ISC-FRAME2FRAME). Always written
     # next to the session so a downstream clip packager can trim to coverage.
     report = build_alignment_report(session_dir, records)
+
+    # Explicit input-event → frame index map sidecar (ISC-IF-2). Re-derive the
+    # anchor/fps/frame_count from the same real artifacts the report used, then
+    # write the FULL per-event map next to the session. The report embeds only a
+    # compact summary of this file (report["input_frame_map"]).
+    inputs = _read_jsonl(session_dir / "inputs.jsonl")
+    anchor_epoch = float(report["anchor_epoch"])
+    fps = float(report["fps"])
+    frame_count = int(report["total_frames"])
+    frame_map = build_input_frame_map(inputs, anchor_epoch, fps, frame_count)
+    frame_map_path = session_dir / "input_frame_map.json"
+    frame_map_path.write_text(json.dumps(frame_map, indent=2), encoding="utf-8")
+
     report_path = session_dir / "frame_alignment.json"
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
@@ -1013,6 +1201,14 @@ def main(argv: list[str] | None = None) -> int:
         f"max Δt within window={report['max_pose_dt_ms_within_window']}ms"
     )
     print(f"  recommended_clip_trim: {report['recommended_clip_trim']}")
+
+    ifm = report["input_frame_map"]
+    print(f"Wrote input frame map → {frame_map_path}")
+    print(
+        f"  discrete events={ifm['discrete_event_count']} "
+        f"(keyboard={ifm['keyboard_count']}, mouse_button={ifm['mouse_button_count']}, "
+        f"scroll={ifm['scroll_count']}); out of video range={ifm['events_out_of_video_range']}"
+    )
     return 0
 
 
