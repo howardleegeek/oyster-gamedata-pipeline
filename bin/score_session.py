@@ -123,6 +123,13 @@ from typing import Any, Optional
 VIDEO_CANDIDATES = ("video.mp4", "recording.mp4", "game.mp4")
 DEFAULT_REPO_ROOT = Path(__file__).resolve().parent.parent  # oyster-agent-runner/
 
+# Fail-closed video-integrity gate. A real recorded mp4 (even a few seconds of
+# game capture) is tens of KB at the very least — anything below this is an
+# empty/stub file that cannot carry a decodable stream. Used as a cheap first
+# screen BEFORE the (more authoritative) real decode; the decode is the actual
+# arbiter, this only short-cuts the obvious garbage and keeps the reason precise.
+MIN_PLAUSIBLE_VIDEO_BYTES = 1024
+
 # fps mismatch beyond this (|recorder - real|) is flagged as an anomaly — this is
 # the 30->24 class of bug we want visible, not silent.
 FPS_ANOMALY_THRESHOLD = 1.0
@@ -150,6 +157,7 @@ DEFAULT_PRD_TIMEOUT = 120
 SYSTEMINFO_REQUIRED_KEYS = ("gpu", "cpu", "ram_gb", "os", "build")
 
 # Stage names (stable identifiers for the report / logs).
+STAGE_INTEGRITY = "video_integrity"
 STAGE_FPS = "fps_rederive"
 STAGE_RESOLUTION = "resolution_rederive"
 STAGE_SYSTEMINFO = "systeminfo_synth"
@@ -166,11 +174,13 @@ logger = logging.getLogger("score_session")
 # Result containers
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class StageResult:
     """Structured outcome of a single orchestrated stage."""
+
     name: str
-    status: str = "pending"        # ok | skipped | failed | error
+    status: str = "pending"  # ok | skipped | failed | error
     exit_code: Optional[int] = None
     duration_seconds: float = 0.0
     started_at: Optional[str] = None
@@ -198,6 +208,7 @@ class StageResult:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -268,7 +279,9 @@ def _ffmpeg_probe_video_line(video: Path) -> dict[str, Any]:
         return out
     proc = subprocess.run(
         ["ffmpeg", "-hide_banner", "-i", str(video)],
-        capture_output=True, text=True, timeout=120,
+        capture_output=True,
+        text=True,
+        timeout=120,
     )
     # `ffmpeg -i` with no output file exits non-zero ("At least one output
     # file must be specified") but still prints full stream info to stderr.
@@ -303,11 +316,20 @@ def _ffprobe_resolution_csv(video: Path) -> tuple[Optional[int], Optional[int]]:
         return None, None
     proc = subprocess.run(
         [
-            "ffprobe", "-v", "error", "-select_streams", "v:0",
-            "-show_entries", "stream=width,height",
-            "-of", "csv=p=0:s=x", str(video),
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=width,height",
+            "-of",
+            "csv=p=0:s=x",
+            str(video),
         ],
-        capture_output=True, text=True, timeout=120,
+        capture_output=True,
+        text=True,
+        timeout=120,
     )
     token = (proc.stdout or "").strip().splitlines()[0:1]
     if not token:
@@ -336,10 +358,20 @@ def _ffmpeg_decode_count(video: Path) -> dict[str, Any]:
         return out
     proc = subprocess.run(
         [
-            "ffmpeg", "-nostats", "-hide_banner",
-            "-i", str(video), "-map", "0:v:0", "-f", "null", "-",
+            "ffmpeg",
+            "-nostats",
+            "-hide_banner",
+            "-i",
+            str(video),
+            "-map",
+            "0:v:0",
+            "-f",
+            "null",
+            "-",
         ],
-        capture_output=True, text=True, timeout=1800,
+        capture_output=True,
+        text=True,
+        timeout=1800,
     )
     stderr = proc.stderr or ""
     # The summary line is at/near the end. Scan from the bottom for the last
@@ -386,13 +418,22 @@ def ffprobe_truth(video: Path, *, count_frames: bool = True) -> dict[str, Any]:
     # 1) Cheap stream probe (resolution, rates, container nb_frames, duration).
     probe = subprocess.run(
         [
-            "ffprobe", "-v", "error", "-select_streams", "v:0",
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
             "-show_entries",
             "stream=width,height,avg_frame_rate,r_frame_rate,nb_frames,duration",
-            "-show_entries", "format=duration",
-            "-of", "json", str(video),
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "json",
+            str(video),
         ],
-        capture_output=True, text=True, timeout=120,
+        capture_output=True,
+        text=True,
+        timeout=120,
     )
     if probe.returncode != 0:
         raise RuntimeError(
@@ -459,11 +500,21 @@ def ffprobe_truth(video: Path, *, count_frames: bool = True) -> dict[str, Any]:
     if count_frames:
         cf = subprocess.run(
             [
-                "ffprobe", "-v", "error", "-select_streams", "v:0",
-                "-count_frames", "-show_entries", "stream=nb_read_frames",
-                "-of", "default=nokey=1:noprint_wrappers=1", str(video),
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-count_frames",
+                "-show_entries",
+                "stream=nb_read_frames",
+                "-of",
+                "default=nokey=1:noprint_wrappers=1",
+                str(video),
             ],
-            capture_output=True, text=True, timeout=600,
+            capture_output=True,
+            text=True,
+            timeout=600,
         )
         out = (cf.stdout or "").strip()
         if cf.returncode == 0 and out.isdigit():
@@ -536,12 +587,139 @@ def ffprobe_truth(video: Path, *, count_frames: bool = True) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# INTEGRITY GATE — authoritative fail-closed video-decodability check
+# ---------------------------------------------------------------------------
+
+
+def assert_video_decodable(session_dir: Path) -> StageResult:
+    """Authoritatively decide whether the session's video is genuinely decodable.
+
+    This is the fail-CLOSED gate that runs BEFORE any scoring stage. It refuses
+    to let a non-decodable session reach the downstream stages that could
+    fabricate a high partial score (and that a payout-gating ingest worker might
+    then accept). It is tied to a REAL decode — the same ``ffprobe_truth`` STAGE
+    0 already uses — and only passes when BOTH ``fps > 0`` AND ``frame_count > 0``
+    come back from that decode.
+
+    Fail-closed (``status="fail"``) when ANY of:
+      * the video file is missing,
+      * the video file is empty or an implausibly tiny stub
+        (< ``MIN_PLAUSIBLE_VIDEO_BYTES`` — too small to carry a real stream),
+      * ``ffprobe_truth`` raises (corrupt / garbage bytes — no decodable stream),
+      * the decode yields a non-positive fps or frame_count.
+
+    Returns ``status="ok"`` (with the decoded fps/frame_count in ``detail``) only
+    when the video genuinely decodes to positive fps AND frame_count. This is an
+    honesty gate ("真货"): it refuses to score garbage, and it does NOT alter how
+    a genuinely decodable session scores — a real video sails straight through.
+    """
+    res = StageResult(name=STAGE_INTEGRITY, started_at=_now_iso())
+    t0 = time.time()
+    fail_reason: Optional[str] = None
+    try:
+        # --- Cheap structural screen: present, non-empty, not a tiny stub. ----
+        video = find_video(session_dir)
+        if video is None:
+            # No candidate at all, or every candidate is zero-byte (find_video
+            # already filters st_size == 0). Distinguish empty-vs-absent for the
+            # auditor, but either way it is non-decodable.
+            present = [n for n in VIDEO_CANDIDATES if (session_dir / n).exists()]
+            empty = [
+                n
+                for n in present
+                if (session_dir / n).is_file() and (session_dir / n).stat().st_size == 0
+            ]
+            if empty:
+                fail_reason = (
+                    f"video non-decodable — fail-closed (video file is empty: "
+                    f"{', '.join(empty)})"
+                )
+            else:
+                fail_reason = (
+                    "video non-decodable — fail-closed (no video file found; "
+                    f"looked for {', '.join(VIDEO_CANDIDATES)})"
+                )
+            res.detail = {
+                "video": None,
+                "candidates_present": present,
+                "empty_candidates": empty,
+            }
+        else:
+            size = video.stat().st_size
+            if size < MIN_PLAUSIBLE_VIDEO_BYTES:
+                fail_reason = (
+                    f"video non-decodable — fail-closed (implausibly tiny stub: "
+                    f"{size} bytes < {MIN_PLAUSIBLE_VIDEO_BYTES} minimum)"
+                )
+                res.detail = {"video": video.name, "size_bytes": size}
+            else:
+                # --- Authoritative arbiter: a genuine decode. ----------------
+                fps: Optional[float] = None
+                frame_count: Optional[int] = None
+                decode_error: Optional[str] = None
+                try:
+                    truth = ffprobe_truth(video, count_frames=True)
+                    fps = truth.get("fps")
+                    frame_count = truth.get("frame_count")
+                except Exception as e:  # noqa: BLE001 — a raise here IS the signal
+                    decode_error = f"{type(e).__name__}: {e}"
+
+                fps_ok = isinstance(fps, (int, float)) and fps > 0
+                fc_ok = isinstance(frame_count, int) and frame_count > 0
+
+                if decode_error is not None:
+                    fail_reason = (
+                        "video non-decodable — fail-closed (no real fps/frame_count "
+                        f"from decode; decode failed: {decode_error})"
+                    )
+                elif not (fps_ok and fc_ok):
+                    fail_reason = (
+                        "video non-decodable — fail-closed (no real fps/frame_count "
+                        f"from decode; got fps={fps!r}, frame_count={frame_count!r})"
+                    )
+                res.detail = {
+                    "video": video.name,
+                    "size_bytes": size,
+                    "fps": fps,
+                    "frame_count": frame_count,
+                    "decode_error": decode_error,
+                }
+
+        if fail_reason is None:
+            res.status = "ok"
+            res.exit_code = 0
+            res.detail["decodable"] = True
+        else:
+            res.status = "fail"
+            res.exit_code = 1
+            res.error = fail_reason
+            res.detail["decodable"] = False
+            res.detail["reason"] = fail_reason
+            logger.error("[%s] %s", STAGE_INTEGRITY, fail_reason)
+        return res
+    except Exception as e:  # noqa: BLE001 — the gate itself must never crash open
+        # An unexpected error in the gate is treated as fail-CLOSED, never open:
+        # if we cannot prove the video decodes, we refuse to score it.
+        res.status = "fail"
+        res.exit_code = 1
+        res.error = (
+            "video non-decodable — fail-closed (integrity gate error, refusing to "
+            f"score: {type(e).__name__}: {e})"
+        )
+        res.detail["decodable"] = False
+        res.detail["reason"] = res.error
+        return res
+    finally:
+        res.ended_at = _now_iso()
+        res.duration_seconds = time.time() - t0
+
+
+# ---------------------------------------------------------------------------
 # STAGE 0 — fps re-derive (the single highest-value primitive)
 # ---------------------------------------------------------------------------
 
-def rederive_fps_overwrite_metadata(
-    session_dir: Path, *, count_frames: bool = True
-) -> StageResult:
+
+def rederive_fps_overwrite_metadata(session_dir: Path, *, count_frames: bool = True) -> StageResult:
     """ffprobe the video → overwrite metadata.json fps fields with the truth.
 
     Idempotent. A prior correction is detected via the `_fps_correction`
@@ -561,8 +739,7 @@ def rederive_fps_overwrite_metadata(
         if video is None:
             res.status = "failed"
             res.error = (
-                f"no video found in {session_dir} "
-                f"(looked for {', '.join(VIDEO_CANDIDATES)})"
+                f"no video found in {session_dir} " f"(looked for {', '.join(VIDEO_CANDIDATES)})"
             )
             return res
 
@@ -609,9 +786,7 @@ def rederive_fps_overwrite_metadata(
                 return None
 
         recorder_fps_f = _f(recorder_fps)
-        fps_delta = (
-            abs(recorder_fps_f - real_fps) if recorder_fps_f is not None else None
-        )
+        fps_delta = abs(recorder_fps_f - real_fps) if recorder_fps_f is not None else None
         anomaly = fps_delta is not None and fps_delta > FPS_ANOMALY_THRESHOLD
 
         fields_already_truthful = (
@@ -662,16 +837,16 @@ def rederive_fps_overwrite_metadata(
             "fields_already_truthful_on_entry": fields_already_truthful,
             "video": video.name,
             "resolution": (
-                [truth.get("width"), truth.get("height")]
-                if truth.get("width")
-                else None
+                [truth.get("width"), truth.get("height")] if truth.get("width") else None
             ),
         }
         if anomaly:
             logger.warning(
                 "fps anomaly: recorder claimed %s, video is actually %.4f fps "
                 "(%d frames) — metadata corrected",
-                recorder_fps, real_fps, real_fc,
+                recorder_fps,
+                real_fps,
+                real_fc,
             )
         return res
     except Exception as e:  # noqa: BLE001 — stage must capture, not crash the run
@@ -686,6 +861,7 @@ def rederive_fps_overwrite_metadata(
 # ---------------------------------------------------------------------------
 # STAGE 0b — resolution re-derive (the data-honesty twin of fps-rederive)
 # ---------------------------------------------------------------------------
+
 
 def _as_int_pair(value: Any) -> Optional[list[int]]:
     """Coerce a resolution-ish value into a [width, height] int pair or None.
@@ -730,8 +906,7 @@ def rederive_resolution_overwrite_metadata(
         if video is None:
             res.status = "failed"
             res.error = (
-                f"no video found in {session_dir} "
-                f"(looked for {', '.join(VIDEO_CANDIDATES)})"
+                f"no video found in {session_dir} " f"(looked for {', '.join(VIDEO_CANDIDATES)})"
             )
             return res
 
@@ -752,8 +927,7 @@ def rederive_resolution_overwrite_metadata(
         truth = ffprobe_truth(video, count_frames=count_frames)
         real_w = truth.get("width")
         real_h = truth.get("height")
-        if not (isinstance(real_w, int) and isinstance(real_h, int)
-                and real_w > 0 and real_h > 0):
+        if not (isinstance(real_w, int) and isinstance(real_h, int) and real_w > 0 and real_h > 0):
             res.status = "failed"
             res.error = (
                 "ffprobe returned no usable video resolution "
@@ -809,8 +983,7 @@ def rederive_resolution_overwrite_metadata(
         # claim; on re-runs we keep the already-captured claim untouched.
         meta["_resolution_correction"] = {
             "corrected_by": (
-                "score_session.py resolution-rederive (ffprobe video-stream "
-                "ground-truth)"
+                "score_session.py resolution-rederive (ffprobe video-stream " "ground-truth)"
             ),
             "real_width": real_w,
             "real_height": real_h,
@@ -848,7 +1021,9 @@ def rederive_resolution_overwrite_metadata(
             logger.warning(
                 "resolution anomaly: recorder claimed %s, video is actually "
                 "%dx%d — metadata corrected (never upscaled)",
-                recorder_res, real_w, real_h,
+                recorder_res,
+                real_w,
+                real_h,
             )
         return res
     except Exception as e:  # noqa: BLE001 — stage must capture, not crash the run
@@ -863,6 +1038,7 @@ def rederive_resolution_overwrite_metadata(
 # ---------------------------------------------------------------------------
 # STAGE 0c — systeminfo synth (the metadata-honesty step for hardware provenance)
 # ---------------------------------------------------------------------------
+
 
 def _systeminfo_is_complete(data: Any) -> bool:
     """True iff *data* is a mapping containing every SYSTEMINFO_REQUIRED_KEY.
@@ -938,9 +1114,7 @@ def _derive_systeminfo_from_metadata(
 
     # build ← top-level recorder_version (the recorder build that produced this)
     rec_ver = meta.get("recorder_version")
-    build_val: Optional[str] = (
-        rec_ver if isinstance(rec_ver, str) and rec_ver.strip() else None
-    )
+    build_val: Optional[str] = rec_ver if isinstance(rec_ver, str) and rec_ver.strip() else None
 
     derived: dict[str, Any] = {
         "gpu": gpu,
@@ -1056,21 +1230,25 @@ def ensure_systeminfo(session_dir: Path) -> StageResult:
             # No real datum backed these → written as null, NOT fabricated.
             "null_unrecorded_fields": missing_sources,
             "fabricated_fields": [],  # invariant: we never invent hardware
-            "preserved_existing_keys": sorted(
-                k for k in base if k not in SYSTEMINFO_REQUIRED_KEYS
-            ),
+            "preserved_existing_keys": sorted(k for k in base if k not in SYSTEMINFO_REQUIRED_KEYS),
         }
         if missing_sources:
             logger.warning(
                 "[%s] %d required field(s) had no real source in metadata "
                 "(written as null, NOT fabricated): %s",
-                STAGE_SYSTEMINFO, len(missing_sources), ", ".join(missing_sources),
+                STAGE_SYSTEMINFO,
+                len(missing_sources),
+                ", ".join(missing_sources),
             )
         logger.info(
             "[%s] synthesised systeminfo.json from hardware_specs "
             "(gpu=%r cpu=%r ram_gb=%r os=%r build=%r)",
-            STAGE_SYSTEMINFO, derived["gpu"], derived["cpu"], derived["ram_gb"],
-            derived["os"], derived["build"],
+            STAGE_SYSTEMINFO,
+            derived["gpu"],
+            derived["cpu"],
+            derived["ram_gb"],
+            derived["os"],
+            derived["build"],
         )
         return res
     except Exception as e:  # noqa: BLE001 — stage must capture, not crash the run
@@ -1085,6 +1263,7 @@ def ensure_systeminfo(session_dir: Path) -> StageResult:
 # ---------------------------------------------------------------------------
 # Generic subprocess stage runner
 # ---------------------------------------------------------------------------
+
 
 def run_subprocess_stage(
     name: str,
@@ -1121,12 +1300,8 @@ def run_subprocess_stage(
             cwd=str(cwd) if cwd else None,
         )
         res.exit_code = proc.returncode
-        res.detail["stdout_tail"] = "\n".join(
-            (proc.stdout or "").strip().splitlines()[-25:]
-        )
-        res.detail["stderr_tail"] = "\n".join(
-            (proc.stderr or "").strip().splitlines()[-25:]
-        )
+        res.detail["stdout_tail"] = "\n".join((proc.stdout or "").strip().splitlines()[-25:])
+        res.detail["stderr_tail"] = "\n".join((proc.stderr or "").strip().splitlines()[-25:])
         if proc.returncode in ok_exit_codes:
             res.status = "ok"
         else:
@@ -1146,7 +1321,10 @@ def run_subprocess_stage(
         res.duration_seconds = time.time() - t0
         logger.info(
             "[%s] END    status=%s exit=%s duration=%.2fs",
-            name, res.status, res.exit_code, res.duration_seconds,
+            name,
+            res.status,
+            res.exit_code,
+            res.duration_seconds,
         )
     return res
 
@@ -1155,9 +1333,7 @@ def run_subprocess_stage(
 # STAGE 3 — parse the PRD acceptance report (the ONLY source of a score)
 # ---------------------------------------------------------------------------
 
-_SCORE_RE = re.compile(
-    r"Overall Score:\*\*\s*([\d.]+)%\s*\((\d+)/(\d+)\s*tests passed\)"
-)
+_SCORE_RE = re.compile(r"Overall Score:\*\*\s*([\d.]+)%\s*\((\d+)/(\d+)\s*tests passed\)")
 _ROW_RE = re.compile(r"^\|\s*`([^`]+)`\s*\|\s*([^|]+?)\s*\|.*\|\s*(-?\d+)\s*\|\s*$")
 
 
@@ -1335,9 +1511,7 @@ def build_clip_summary(
         # Real resolution comes from the resolution-rederive stage (truth), with
         # a metadata fallback (which resolution-rederive itself just wrote).
         res_detail = resolution_stage.detail if resolution_stage else {}
-        real_resolution = res_detail.get(
-            "real_resolution", meta.get("capture_resolution")
-        )
+        real_resolution = res_detail.get("real_resolution", meta.get("capture_resolution"))
 
         summary = {
             "schema": "oyster.clip_summary/v1",
@@ -1350,15 +1524,11 @@ def build_clip_summary(
             "fps_real": real_fps,
             "frame_count_real": real_fc,
             "fps_recorder_reported": fps_stage.detail.get("recorder_reported_fps"),
-            "frame_count_recorder_reported": fps_stage.detail.get(
-                "recorder_reported_frame_count"
-            ),
+            "frame_count_recorder_reported": fps_stage.detail.get("recorder_reported_frame_count"),
             "fps_corrected": bool(fps_stage.detail.get("anomaly")),
             # --- truth resolution (ffprobe-derived, never upscaled) ---
             "resolution_real": real_resolution,
-            "resolution_recorder_reported": res_detail.get(
-                "recorder_reported_resolution"
-            ),
+            "resolution_recorder_reported": res_detail.get("recorder_reported_resolution"),
             "resolution_corrected": bool(res_detail.get("anomaly")),
             "duration_s": meta.get("duration"),
             # --- PRD scoring (sole source: this run's prd_acceptance) ---
@@ -1413,6 +1583,70 @@ def build_clip_summary(
 # Orchestrator
 # ---------------------------------------------------------------------------
 
+
+def _failclosed_report(
+    session_dir: Path,
+    *,
+    stages: list[StageResult],
+    integrity: StageResult,
+    run_started: str,
+    wall0: float,
+    skip_depth: bool,
+) -> dict[str, Any]:
+    """Build the report for a fail-closed (non-decodable video) short-circuit.
+
+    Same schema/shape as the normal ``score_session`` report so every downstream
+    consumer (the CLI summary, the report JSON, the payout-gating ingest worker)
+    handles it uniformly — but it unambiguously reads as NOT-PASSED with a 0
+    score and no PRD pass. The downstream scoring stages were deliberately NOT
+    run; ``stages`` here is just the integrity gate that refused the session.
+    """
+    # Best-effort session_id from metadata (the video is bad, but metadata may
+    # still be readable). Falls back to the directory name.
+    session_id = session_dir.name
+    meta_path = session_dir / "metadata.json"
+    if meta_path.is_file():
+        try:
+            session_id = json.loads(meta_path.read_text()).get("session_id", session_dir.name)
+        except (json.JSONDecodeError, OSError):
+            session_id = session_dir.name
+
+    report = {
+        "schema": "oyster.score_session_report/v1",
+        "session_dir": str(session_dir),
+        "session_id": session_id,
+        "run_started_at": run_started,
+        "run_ended_at": _now_iso(),
+        "wall_seconds": round(time.time() - wall0, 3),
+        "skip_depth": skip_depth,
+        # --- unambiguous fail-closed verdict ---
+        "passed": False,
+        "verdict": "NOT-PASSED",
+        "prd_passed": False,
+        "prd_score_percent": 0.0,
+        "prd_passed_count": 0,
+        "prd_runnable_count": 0,
+        # --- integrity provenance (why we refused) ---
+        "fail_closed": True,
+        "fail_closed_reason": integrity.error,
+        # --- resolution unknown: the video did not decode ---
+        "resolution_real": None,
+        "resolution_recorder_reported": None,
+        "resolution_corrected": False,
+        "stage_failures": [s.name for s in stages if not s.ok],
+        "fleet_level_tests_mispassing_on_single_session": [],
+        "stages": [s.to_dict() for s in stages],
+        "clip_summary_path": None,
+        "report_md_path": None,
+    }
+    logger.error(
+        "FAIL-CLOSED: %s — refusing to score (%s)",
+        session_dir,
+        integrity.error,
+    )
+    return report
+
+
 def score_session(
     session_dir: Path,
     *,
@@ -1425,6 +1659,14 @@ def score_session(
 
     The report's `passed` is True only when every stage is ok/skipped AND
     prd_acceptance returned a genuine PASS.
+
+    FAIL-CLOSED: before any scoring stage runs, the session's video must prove
+    genuinely decodable (real positive fps AND frame_count from a real decode).
+    A non-decodable video (corrupt/garbage, empty, missing, or a tiny stub)
+    short-circuits to ``passed=False`` / ``verdict="NOT-PASSED"`` /
+    ``prd_passed=False`` / ``prd_score_percent=0.0`` with an integrity stage
+    recording the reason — the downstream stages that could fabricate a high
+    partial score are NOT run, so garbage can never reach a payout gate.
     """
     bin_dir = Path(__file__).resolve().parent
     build_ac = bin_dir / "build_action_camera.py"
@@ -1435,13 +1677,41 @@ def score_session(
     run_started = _now_iso()
     wall0 = time.time()
 
+    # ----- INTEGRITY GATE: fail-closed on a non-decodable video -----------
+    # Authoritative, tied to a REAL decode. If we cannot obtain positive fps AND
+    # frame_count from a genuine decode of the video, we refuse to score it: the
+    # run short-circuits NOT-PASSED with a 0 score, and NONE of the downstream
+    # stages (which could fabricate a high partial score) execute. This closes
+    # the fail-OPEN hole where garbage scored ~87.5%.
+    s_integrity = assert_video_decodable(session_dir)
+    stages.append(s_integrity)
+    logger.info(
+        "[%s] END    status=%s decodable=%s duration=%.2fs",
+        STAGE_INTEGRITY,
+        s_integrity.status,
+        s_integrity.detail.get("decodable"),
+        s_integrity.duration_seconds,
+    )
+    if not s_integrity.ok:
+        return _failclosed_report(
+            session_dir,
+            stages=stages,
+            integrity=s_integrity,
+            run_started=run_started,
+            wall0=wall0,
+            skip_depth=skip_depth,
+        )
+
     # ----- STAGE 0: fps re-derive -----------------------------------------
     s_fps = rederive_fps_overwrite_metadata(session_dir, count_frames=count_frames)
     stages.append(s_fps)
     logger.info(
         "[%s] END    status=%s real_fps=%s frame_count=%s anomaly=%s duration=%.2fs",
-        STAGE_FPS, s_fps.status, s_fps.detail.get("real_fps"),
-        s_fps.detail.get("real_frame_count"), s_fps.detail.get("anomaly"),
+        STAGE_FPS,
+        s_fps.status,
+        s_fps.detail.get("real_fps"),
+        s_fps.detail.get("real_frame_count"),
+        s_fps.detail.get("anomaly"),
         s_fps.duration_seconds,
     )
 
@@ -1453,9 +1723,12 @@ def score_session(
     logger.info(
         "[%s] END    status=%s real_resolution=%s recorder_reported=%s "
         "anomaly=%s duration=%.2fs",
-        STAGE_RESOLUTION, s_res.status, s_res.detail.get("real_resolution"),
+        STAGE_RESOLUTION,
+        s_res.status,
+        s_res.detail.get("real_resolution"),
         s_res.detail.get("recorder_reported_resolution"),
-        s_res.detail.get("anomaly"), s_res.duration_seconds,
+        s_res.detail.get("anomaly"),
+        s_res.duration_seconds,
     )
 
     # ----- STAGE 0c: systeminfo synth (metadata-honesty step) -------------
@@ -1467,8 +1740,11 @@ def score_session(
     stages.append(s_sys)
     logger.info(
         "[%s] END    status=%s action=%s null_unrecorded=%s duration=%.2fs",
-        STAGE_SYSTEMINFO, s_sys.status, s_sys.detail.get("action"),
-        s_sys.detail.get("null_unrecorded_fields"), s_sys.duration_seconds,
+        STAGE_SYSTEMINFO,
+        s_sys.status,
+        s_sys.detail.get("action"),
+        s_sys.detail.get("null_unrecorded_fields"),
+        s_sys.duration_seconds,
     )
 
     # ----- STAGE 1: build_action_camera (MUST precede finalize) -----------
@@ -1481,8 +1757,11 @@ def score_session(
 
     # ----- STAGE 2: finalize_session --------------------------------------
     finalize_cmd = [
-        sys.executable, str(finalize), str(session_dir),
-        "--repo-root", str(repo_root),
+        sys.executable,
+        str(finalize),
+        str(session_dir),
+        "--repo-root",
+        str(repo_root),
     ]
     if skip_depth:
         finalize_cmd.append("--no-depth")  # documented --skip-depth passthrough
@@ -1514,8 +1793,13 @@ def score_session(
     s_prd = run_subprocess_stage(
         STAGE_PRD,
         [
-            sys.executable, str(prd), str(session_dir),
-            "-o", str(report_md), "-t", str(prd_timeout),
+            sys.executable,
+            str(prd),
+            str(session_dir),
+            "-o",
+            str(report_md),
+            "-t",
+            str(prd_timeout),
         ],
         timeout=prd_timeout * 20 + 120,  # generous wall for the whole suite
         ok_exit_codes=(0, 1),  # exit 1 = some test failed; still a valid scored run
@@ -1561,9 +1845,7 @@ def score_session(
         "prd_passed_count": prd_parsed.get("passed_count"),
         "prd_runnable_count": prd_parsed.get("runnable_count"),
         "resolution_real": s_res.detail.get("real_resolution"),
-        "resolution_recorder_reported": s_res.detail.get(
-            "recorder_reported_resolution"
-        ),
+        "resolution_recorder_reported": s_res.detail.get("recorder_reported_resolution"),
         "resolution_corrected": bool(s_res.detail.get("anomaly")),
         "stage_failures": stage_failures,
         "fleet_level_tests_mispassing_on_single_session": [
@@ -1594,34 +1876,43 @@ def score_session(
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description="Phase 0 local-truth-loop scoring orchestrator for a "
-                    "GameData recorded session.",
+        "GameData recorded session.",
     )
     parser.add_argument("session_dir", type=Path, help="Path to the session directory")
     parser.add_argument(
-        "--skip-depth", action="store_true",
+        "--skip-depth",
+        action="store_true",
         help="Skip DA-V2 depth EXR generation (fast run). Passed through to "
-             "finalize_session as --no-depth; depth PRD tests will SKIP.",
+        "finalize_session as --no-depth; depth PRD tests will SKIP.",
     )
     parser.add_argument(
-        "--report-json", type=Path, default=None,
+        "--report-json",
+        type=Path,
+        default=None,
         help="Write the full orchestration report JSON to this path "
-             "(default: <session_dir>/score_session_report.json).",
+        "(default: <session_dir>/score_session_report.json).",
     )
     parser.add_argument(
-        "--repo-root", type=Path, default=DEFAULT_REPO_ROOT,
+        "--repo-root",
+        type=Path,
+        default=DEFAULT_REPO_ROOT,
         help=f"Repo root passed to finalize_session (default: {DEFAULT_REPO_ROOT}).",
     )
     parser.add_argument(
-        "--prd-timeout", type=int, default=DEFAULT_PRD_TIMEOUT,
+        "--prd-timeout",
+        type=int,
+        default=DEFAULT_PRD_TIMEOUT,
         help=f"Per-test timeout for prd_acceptance (default: {DEFAULT_PRD_TIMEOUT}s).",
     )
     parser.add_argument(
-        "--no-count-frames", action="store_true",
+        "--no-count-frames",
+        action="store_true",
         help="Skip the exact decode frame-count (use container nb_frames). "
-             "Faster but slightly less authoritative.",
+        "Faster but slightly less authoritative.",
     )
     parser.add_argument("--verbose", "-v", action="store_true")
     args = parser.parse_args(argv)
@@ -1644,7 +1935,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     if find_video(session_dir) is None:
         logger.error(
             "no video in %s (looked for %s) — cannot derive truth fps",
-            session_dir, ", ".join(VIDEO_CANDIDATES),
+            session_dir,
+            ", ".join(VIDEO_CANDIDATES),
         )
         return 2
     bin_dir = Path(__file__).resolve().parent
@@ -1672,28 +1964,36 @@ def main(argv: Optional[list[str]] = None) -> int:
     print(f"score_session: {report['verdict']}  ({session_dir})")
     print(f"  session_id        : {report['session_id']}")
     fps_detail = report["stages"][0]["detail"] if report["stages"] else {}
-    print(f"  fps               : recorder={fps_detail.get('recorder_reported_fps')} "
-          f"-> real={fps_detail.get('real_fps')} "
-          f"(frame_count {fps_detail.get('recorder_reported_frame_count')} "
-          f"-> {fps_detail.get('real_frame_count')}), "
-          f"anomaly={fps_detail.get('anomaly')}")
+    print(
+        f"  fps               : recorder={fps_detail.get('recorder_reported_fps')} "
+        f"-> real={fps_detail.get('real_fps')} "
+        f"(frame_count {fps_detail.get('recorder_reported_frame_count')} "
+        f"-> {fps_detail.get('real_frame_count')}), "
+        f"anomaly={fps_detail.get('anomaly')}"
+    )
     res_detail = next(
         (s["detail"] for s in report["stages"] if s["name"] == STAGE_RESOLUTION),
         {},
     )
-    print(f"  resolution        : "
-          f"recorder={res_detail.get('recorder_reported_resolution')} "
-          f"-> real={res_detail.get('real_resolution')}, "
-          f"anomaly={res_detail.get('anomaly')} (never upscaled)")
-    print(f"  PRD               : {report['prd_score_percent']}% "
-          f"({report['prd_passed_count']}/{report['prd_runnable_count']}) "
-          f"passed={report['prd_passed']}")
+    print(
+        f"  resolution        : "
+        f"recorder={res_detail.get('recorder_reported_resolution')} "
+        f"-> real={res_detail.get('real_resolution')}, "
+        f"anomaly={res_detail.get('anomaly')} (never upscaled)"
+    )
+    print(
+        f"  PRD               : {report['prd_score_percent']}% "
+        f"({report['prd_passed_count']}/{report['prd_runnable_count']}) "
+        f"passed={report['prd_passed']}"
+    )
     if report["stage_failures"]:
         print(f"  stage failures    : {', '.join(report['stage_failures'])}")
     if report["fleet_level_tests_mispassing_on_single_session"]:
-        print("  fleet mis-pass    : "
-              + ", ".join(report["fleet_level_tests_mispassing_on_single_session"])
-              + "  (NOT a real single-session pass)")
+        print(
+            "  fleet mis-pass    : "
+            + ", ".join(report["fleet_level_tests_mispassing_on_single_session"])
+            + "  (NOT a real single-session pass)"
+        )
     print(f"  clip_summary      : {report['clip_summary_path']}")
     print(f"  report json       : {report_json}")
     print("=" * 70)
