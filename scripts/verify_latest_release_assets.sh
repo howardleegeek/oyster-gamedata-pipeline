@@ -36,7 +36,43 @@ gh_release() {
 requested_tag="${1:-}"
 tag="$requested_tag"
 if [ -z "$tag" ]; then
-  tag=$(gh_release list --limit 1 --json tagName --jq '.[0].tagName')
+  # Channel-aware: resolve the newest CONSUMER-channel release, ignoring
+  # bundled/runtime tags (e.g. recorder-v2.6.x) even when GitHub marks them
+  # "Latest". All channel logic lives in the unit-tested latest_consumer_release.
+  tag=$(
+    GH_REPO="${GITHUB_REPOSITORY:-}" python3 - <<'PY'
+import json
+import os
+import subprocess
+import sys
+
+sys.path.insert(0, "src")
+from oyster_agent_runner.release_channels import (
+    ReleaseInfo,
+    latest_consumer_release,
+)
+
+repo = os.environ.get("GH_REPO") or subprocess.check_output(
+    ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
+    text=True,
+).strip()
+raw = subprocess.check_output(
+    ["gh", "api", f"repos/{repo}/releases?per_page=100"], text=True
+)
+releases = [
+    ReleaseInfo(
+        tag=item["tag_name"],
+        published_at=item.get("published_at") or "",
+        asset_names=tuple(asset["name"] for asset in item.get("assets", [])),
+    )
+    for item in json.loads(raw)
+]
+resolved = latest_consumer_release(releases)
+if resolved is None:
+    sys.exit("no consumer-channel release found")
+print(resolved.tag)
+PY
+  )
 fi
 
 if [ -z "$tag" ]; then
@@ -99,14 +135,14 @@ sha_row=$(
   gh_release view "$tag" \
     --json assets \
     --jq '.assets[]
-      | select(.name == "SHA256SUMS.txt")
+      | select(.name == "SHA-256-manifest.txt")
       | [.name, .url, (.size | tostring)]
       | @tsv' \
     | head -n 1
 )
 
 if [ -z "$sha_row" ]; then
-  die "SHA256SUMS.txt asset is missing on ${tag}"
+  die "SHA-256-manifest.txt asset is missing on ${tag}"
 fi
 
 IFS=$'\t' read -r sha_name sha_url sha_size <<< "$sha_row"

@@ -16,7 +16,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Pattern
+from typing import Iterable, Optional, Pattern
 
 
 class ReleaseChannel(str, Enum):
@@ -49,6 +49,15 @@ class ReleaseChannelContract:
 
 
 @dataclass(frozen=True)
+class ReleaseInfo:
+    """Minimal view of a published GitHub release used for channel resolution."""
+
+    tag: str
+    published_at: str
+    asset_names: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class FallbackStep:
     """One ordered recovery path when a release surface fails validation."""
 
@@ -59,9 +68,9 @@ class FallbackStep:
     gate: str
 
 
-CURRENT_CONSUMER_TAG = "v0.16.0"
-CURRENT_CONSUMER_INSTALLER = "OysterRecorder-Setup-v0.16.0.exe"
-CURRENT_CONSUMER_SHA256 = "aaf65aec8e54ef27adcb5e50d6aeb1e45d5f6871d61be77fb283b80376d98a00"
+CURRENT_CONSUMER_TAG = "recorder-v2.6.15"
+CURRENT_CONSUMER_INSTALLER = "OysterRecorder-Setup-recorder-v2.6.15.exe"
+CURRENT_CONSUMER_SHA256 = "7afe5c5c72bbe9e217a63ddf0bfed5d77127495f47077eae17af5c2ede558a44"
 BUNDLED_REFERENCE_TAG = "recorder-v0.28.0-rc19.0.3"
 RECORDER_SOURCE_PIN = "7de8a38b881214f3fb617d0644e21a709eecf3df"
 
@@ -71,7 +80,7 @@ CHANNELS: dict[ReleaseChannel, ReleaseChannelContract] = {
         channel=ReleaseChannel.CONSUMER_INSTALLER,
         description="Public auto-update and friend-download Windows installer channel.",
         asset_patterns=(r"^OysterRecorder-[Ss]etup-.*\.exe$",),
-        required_companion_assets=("SHA256SUMS.txt",),
+        required_companion_assets=("SHA-256-manifest.txt",),
         known_good_anchor=CURRENT_CONSUMER_TAG,
         appcast_allowed=True,
         promotion_gates=(
@@ -182,6 +191,41 @@ def appcast_channel() -> ReleaseChannelContract:
     """Return the only channel allowed to feed the public updater appcast."""
 
     return CHANNELS[ReleaseChannel.CONSUMER_INSTALLER]
+
+
+def release_satisfies_consumer_contract(asset_names: Iterable[str]) -> bool:
+    """True when a release's assets fulfil the full CONSUMER_INSTALLER contract.
+
+    Requires both a consumer installer asset AND every required companion asset.
+    The companion check is what distinguishes a real consumer release from a
+    bundled release whose installer filename collides with the consumer pattern
+    (bundle ships SHA-256-manifest.txt, consumer ships SHA256SUMS.txt).
+    """
+
+    names = tuple(asset_names)
+    contract = CHANNELS[ReleaseChannel.CONSUMER_INSTALLER]
+    has_installer = any(contract.matches_asset(name) for name in names)
+    has_companions = all(companion in names for companion in contract.required_companion_assets)
+    return has_installer and has_companions
+
+
+def latest_consumer_release(
+    releases: Iterable[ReleaseInfo],
+) -> Optional[ReleaseInfo]:
+    """Return the newest release that satisfies the CONSUMER_INSTALLER contract.
+
+    Resolution is channel-aware: it ignores bundled/runtime releases even when
+    they are newer or carry a consumer-pattern installer filename. Newest wins
+    by published_at (ISO-8601 sorts lexicographically). Returns None when no
+    release qualifies.
+    """
+
+    qualifying = [
+        release for release in releases if release_satisfies_consumer_contract(release.asset_names)
+    ]
+    if not qualifying:
+        return None
+    return max(qualifying, key=lambda release: release.published_at)
 
 
 def fallback_order() -> tuple[FallbackStep, ...]:

@@ -10,10 +10,14 @@ def test_release_smoke_script_checks_installer_asset() -> None:
 
     assert "OysterRecorder-[Ss]etup-" in script
     assert "GameDataRecorder-Setup-recorder" not in script
-    assert "SHA256SUMS.txt" in script
+    assert "SHA-256-manifest.txt" in script
     assert "CURRENT_CONSUMER_TAG" in script
     assert "does not match latest release" in script
     assert "Verified source release anchor" in script
+    # Channel-aware resolution: the no-tag path must delegate to the tested
+    # latest_consumer_release resolver, not naively take GitHub's newest release
+    # (which can be a bundled/runtime tag like recorder-v2.6.x).
+    assert "latest_consumer_release" in script
     assert "curl -fsSIL -L" in script
     assert "## Windows installer" in script
     assert "SmartScreen" in script
@@ -83,7 +87,7 @@ def test_bundled_installer_stages_proven_rust_recorder_runtime() -> None:
     assert "Preflight bundled Rust recorder path" in workflow
 
     assert 'Source: "{#BundleRoot}\\\\gamedata-recorder\\\\*"' in installer
-    assert 'DestDir: "{app}\\\\gamedata-recorder"' in installer
+    assert 'DestDir: "{app}"' in installer
     assert "PROVEN Rust gamedata-recorder v2.6.0 runtime" in installer
 
 

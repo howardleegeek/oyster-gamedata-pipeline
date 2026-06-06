@@ -7,19 +7,34 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Response
 
+from oyster_agent_runner.release_channels import (
+    CURRENT_CONSUMER_INSTALLER,
+    CURRENT_CONSUMER_SHA256,
+    CURRENT_CONSUMER_TAG,
+)
+
 router = APIRouter()
 
-DEFAULT_RECORDER_VERSION = "0.16.0"
-DEFAULT_RECORDER_SHA256 = "aaf65aec8e54ef27adcb5e50d6aeb1e45d5f6871d61be77fb283b80376d98a00"
-DEFAULT_INSTALLER_NAME = "OysterRecorder-Setup-v0.13.2.exe"
+
+def _version_from_tag(tag: str) -> str:
+    """Derive the bare semver from a consumer tag (recorder-v2.6.15 -> 2.6.15)."""
+
+    return tag.removeprefix("recorder-").removeprefix("v")
+
+
+# Single source of truth: the appcast defaults mirror the consumer contract in
+# release_channels.py so the two can never drift (the historical drift to
+# v0.16.0/v0.13.2 was the Backend Remote Smoke root cause).
+DEFAULT_RECORDER_TAG = CURRENT_CONSUMER_TAG
+DEFAULT_RECORDER_VERSION = _version_from_tag(CURRENT_CONSUMER_TAG)
+DEFAULT_RECORDER_SHA256 = CURRENT_CONSUMER_SHA256
+DEFAULT_INSTALLER_NAME = CURRENT_CONSUMER_INSTALLER
 RELEASE_BASE_URL = "https://github.com/howardleegeek/oyster-gamedata-pipeline/releases/download"
 
 
 def latest_release() -> dict[str, str]:
-    version = os.getenv("OYSTER_RECORDER_RELEASE_VERSION", DEFAULT_RECORDER_VERSION).removeprefix(
-        "v"
-    )
-    tag = os.getenv("OYSTER_RECORDER_RELEASE_TAG", f"v{version}")
+    tag = os.getenv("OYSTER_RECORDER_RELEASE_TAG", DEFAULT_RECORDER_TAG)
+    version = os.getenv("OYSTER_RECORDER_RELEASE_VERSION", _version_from_tag(tag)).removeprefix("v")
     url = os.getenv(
         "OYSTER_RECORDER_DOWNLOAD_URL",
         f"{RELEASE_BASE_URL}/{tag}/{DEFAULT_INSTALLER_NAME}",
