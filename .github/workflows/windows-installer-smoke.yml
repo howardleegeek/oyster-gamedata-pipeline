@@ -34,7 +34,7 @@ jobs:
             throw "Latest release $($release.tagName) has no OysterRecorder setup exe"
           }
           gh release download $release.tagName --pattern $installerAsset.name --dir dist
-          gh release download $release.tagName --pattern SHA256SUMS.txt --dir dist
+          gh release download $release.tagName --pattern SHA-256-manifest.txt --dir dist
           "INSTALLER_NAME=$($installerAsset.name)" | Out-File -FilePath $env:GITHUB_ENV -Append
           "RELEASE_TAG=$($release.tagName)" | Out-File -FilePath $env:GITHUB_ENV -Append
 
@@ -45,13 +45,13 @@ jobs:
           if (-not (Test-Path $installer)) {
             throw "Installer not downloaded: $installer"
           }
-          if (-not (Test-Path "dist\SHA256SUMS.txt")) {
-            throw "SHA256SUMS.txt not downloaded"
+          if (-not (Test-Path "dist\SHA-256-manifest.txt")) {
+            throw "SHA-256-manifest.txt not downloaded"
           }
-          $line = Select-String -Path "dist\SHA256SUMS.txt" -Pattern ([regex]::Escape($env:INSTALLER_NAME)) |
+          $line = Select-String -Path "dist\SHA-256-manifest.txt" -Pattern ([regex]::Escape($env:INSTALLER_NAME)) |
             Select-Object -First 1
           if (-not $line) {
-            throw "SHA256SUMS.txt does not mention $env:INSTALLER_NAME"
+            throw "SHA-256-manifest.txt does not mention $env:INSTALLER_NAME"
           }
           $expected = ($line.Line -split '\s+')[0].ToLowerInvariant()
           $actual = (Get-FileHash -Algorithm SHA256 -Path $installer).Hash.ToLowerInvariant()

@@ -96,7 +96,7 @@ def test_windows_installer_smoke_workflow_exercises_real_install_path() -> None:
 
     assert "runs-on: windows-latest" in workflow
     assert "gh release download" in workflow
-    assert "SHA256SUMS.txt" in workflow
+    assert "SHA-256-manifest.txt" in workflow
     assert "Get-FileHash" in workflow
     assert "Report Authenticode signature" in workflow
     assert "Get-AuthenticodeSignature -FilePath $installer" in workflow
