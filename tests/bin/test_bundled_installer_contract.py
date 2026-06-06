@@ -10,9 +10,12 @@ WORKFLOW = REPO_ROOT / ".github" / "workflows" / "build-recorder-installer.yml"
 def test_bundled_installer_shortcuts_point_to_oysterplay_only() -> None:
     text = ISS.read_text(encoding="utf-8")
 
-    assert '#define AppExeName     "OysterPlay.exe"' in text
-    assert 'Filename: "{app}\\\\{#AppExeName}"' in text
-    assert "launch_mc.bat" not in text
+    # R05E switched the primary launcher to the Defender-safe OysterPlay.bat;
+    # OysterPlay.exe is now only a fallback payload, not the shortcut target.
+    # launch_mc.bat is still staged as an accepted helper (kept intentionally);
+    # only the legacy python fabric launcher must be gone.
+    assert '#define AppExeName     "OysterPlay.bat"' in text
+    assert 'Filename: "{app}\\\\OysterPlay.bat"' in text
     assert "launch_mc_fabric.py" not in text
 
 
@@ -20,7 +23,8 @@ def test_bundled_installer_launches_oysterplay_after_install_by_default() -> Non
     text = ISS.read_text(encoding="utf-8")
     run_section = text.split("[Run]", 1)[1].split("[UninstallDelete]", 1)[0]
 
-    assert 'Filename: "{app}\\\\{#AppExeName}"' in run_section
+    # Post-install launch goes through `cmd /c start ... OysterPlay.bat`.
+    assert "OysterPlay.bat" in run_section
     assert 'Description: "Launch {#AppName} now"' in run_section
     assert "nowait postinstall skipifsilent" in run_section
     assert "unchecked" not in run_section
