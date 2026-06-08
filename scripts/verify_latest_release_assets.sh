@@ -46,11 +46,19 @@ import os
 import subprocess
 import sys
 
-sys.path.insert(0, "src")
-from oyster_agent_runner.release_channels import (
-    ReleaseInfo,
-    latest_consumer_release,
+import importlib.util
+
+# Load release_channels.py standalone (by file path) so we do NOT trigger
+# oyster_agent_runner/__init__.py, which pulls in pydantic. The smoke job runs
+# in a minimal env (gh + curl only); release_channels.py is stdlib-only.
+_spec = importlib.util.spec_from_file_location(
+    "release_channels", "src/oyster_agent_runner/release_channels.py"
 )
+_rc = importlib.util.module_from_spec(_spec)
+sys.modules["release_channels"] = _rc  # dataclass __module__ resolution needs this
+_spec.loader.exec_module(_rc)
+ReleaseInfo = _rc.ReleaseInfo
+latest_consumer_release = _rc.latest_consumer_release
 
 repo = os.environ.get("GH_REPO") or subprocess.check_output(
     ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
