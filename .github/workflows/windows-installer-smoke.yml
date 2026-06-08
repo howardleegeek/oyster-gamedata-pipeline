@@ -108,14 +108,26 @@ jobs:
           $bundledLauncher = Join-Path $installDir "OysterPlay.exe"
           $bundledRecorder = Join-Path $installDir "OysterRecorder-onedir\OysterRecorder-onedir.exe"
 
-          if (Test-Path $legacyExe) {
+          # Detect bundled FIRST: the R05E bundled installer ships the
+          # OysterPlay launcher and/or the OysterRecorder-onedir runtime, and
+          # since the installer stages the Rust runtime at {app} it ALSO drops
+          # gamedata-recorder.exe at the install root. So a root gamedata-
+          # recorder.exe is no longer a reliable "legacy" signal — the presence
+          # of a bundled marker is. Only classify legacy when no bundled marker
+          # exists.
+          if ((Test-Path $bundledLauncher) -or (Test-Path $bundledRecorder)) {
+            $layout = "bundled"
+            if (Test-Path $bundledRecorder) {
+              $recorderExe = $bundledRecorder
+              $recorderWorkDir = Split-Path -Parent $bundledRecorder
+            } else {
+              $recorderExe = $legacyExe
+              $recorderWorkDir = $installDir
+            }
+          } elseif (Test-Path $legacyExe) {
             $layout = "legacy"
             $recorderExe = $legacyExe
             $recorderWorkDir = $installDir
-          } elseif ((Test-Path $bundledLauncher) -and (Test-Path $bundledRecorder)) {
-            $layout = "bundled"
-            $recorderExe = $bundledRecorder
-            $recorderWorkDir = Split-Path -Parent $bundledRecorder
           } else {
             Get-ChildItem -Recurse -Force $installDir -ErrorAction SilentlyContinue
             throw "Installed recorder entrypoint missing: $legacyExe or $bundledRecorder"
