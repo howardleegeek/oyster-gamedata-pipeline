@@ -13,6 +13,7 @@ import argparse
 import ast
 import json
 import os
+import re
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -160,10 +161,16 @@ def evaluate_gate(config: GateConfig) -> GateReport:
     report = GateReport(mode=config.mode)
     production = config.mode == "production"
 
-    if config.expected_release_tag.startswith("v"):
+    # Consumer anchors come in two historical schemes: legacy "v0.16.0" and
+    # the R05E single-file line "recorder-v2.6.15". Accept both.
+    if re.fullmatch(r"(recorder-)?v\d[\w.\-]*", config.expected_release_tag):
         report.add("release-anchor", "pass", config.expected_release_tag)
     else:
-        report.add("release-anchor", "fail", "expected release tag must start with v")
+        report.add(
+            "release-anchor",
+            "fail",
+            "expected release tag must look like v* or recorder-v*",
+        )
 
     if config.backend_url.startswith(("http://", "https://")):
         report.add("backend-url-configured", "pass", config.backend_url)

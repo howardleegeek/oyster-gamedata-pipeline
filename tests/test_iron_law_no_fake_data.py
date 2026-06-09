@@ -386,7 +386,7 @@ def test_recorder_window_capture_uses_geometry_not_title():
 
     # (a) Source-level: recorder must use geometry-based capture.
     assert (
-        '_VIDEO_AUTO_LAYERS = ("windows-capture", "ddagrab", "mss", "gdigrab")' in src
+        '_VIDEO_AUTO_LAYERS = ("obs", "windows-capture", "ddagrab", "mss", "gdigrab")' in src
     ), "Recorder auto mode must try WGC, then ddagrab, then mss, then gdigrab"
     assert '"ddagrab"' in src, "Recorder must keep explicit DXGI ddagrab diagnostics"
     assert "crop=" in src, "Recorder must crop ddagrab to the Minecraft geometry"
