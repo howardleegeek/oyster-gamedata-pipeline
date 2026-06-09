@@ -261,7 +261,19 @@ jobs:
               $resolvedInstallDir,
               $file.FullName
             ).Replace("/", "\")
-            if ($machine -eq 0x014C -and $allowedX86RuntimeHelpers -contains $relativePath) {
+            # Bundled (onedir) layouts nest the OBS runtime under
+            # OysterRecorder-onedir\_internal\obs\..., so match the known
+            # 32-bit helpers by path suffix instead of an exact install-root
+            # relative path. Still restricted to the four known helpers in
+            # their proper obs-plugins subpath.
+            $isAllowedHelper = $false
+            foreach ($helper in $allowedX86RuntimeHelpers) {
+              if ($relativePath -eq $helper -or $relativePath.EndsWith("\" + $helper)) {
+                $isAllowedHelper = $true
+                break
+              }
+            }
+            if ($machine -eq 0x014C -and $isAllowedHelper) {
               Write-Host "Allowed OBS 32-bit runtime helper: $relativePath"
               continue
             }
