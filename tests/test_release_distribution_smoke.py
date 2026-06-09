@@ -1,5 +1,6 @@
 """Tests for the latest-release distribution smoke workflow."""
 
+import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -77,9 +78,12 @@ def test_bundled_installer_stages_proven_rust_recorder_runtime() -> None:
     installer = (REPO_ROOT / "bin/build_bundled_installer/installer.iss").read_text()
 
     assert "RECORDER_RUNTIME_REPO: howardleegeek/gamedata-recorder" in workflow
-    assert "RECORDER_RUNTIME_TAG: v2.6.0" in workflow
+    # Version-agnostic: the runtime tag bumps on every recorder release
+    # (v2.6.0 -> v2.6.15 -> ...). Assert the structure, not the pinned value,
+    # so release bumps don't break this contract test.
+    assert re.search(r"RECORDER_RUNTIME_TAG: v[\d.]+", workflow)
     assert "RECORDER_RUNTIME_ASSET: gamedata-recorder-windows-x64.zip" in workflow
-    assert "Stage Rust gamedata-recorder v2.6.0 runtime" in workflow
+    assert "Stage Rust gamedata-recorder" in workflow
     assert "gh release download $env:RECORDER_RUNTIME_TAG" in workflow
     assert "bundle/gamedata-recorder/gamedata-recorder.exe" in workflow
     assert "bundle/gamedata-recorder/obs-plugins/64bit/win-capture.dll" in workflow
@@ -88,7 +92,7 @@ def test_bundled_installer_stages_proven_rust_recorder_runtime() -> None:
 
     assert 'Source: "{#BundleRoot}\\\\gamedata-recorder\\\\*"' in installer
     assert 'DestDir: "{app}"' in installer
-    assert "PROVEN Rust gamedata-recorder v2.6.0 runtime" in installer
+    assert "PROVEN Rust gamedata-recorder" in installer
 
 
 def test_windows_installer_smoke_workflow_exercises_real_install_path() -> None:
