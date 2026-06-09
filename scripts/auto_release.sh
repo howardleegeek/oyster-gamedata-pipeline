@@ -294,16 +294,23 @@ from pathlib import Path
 
 previous_tag = sys.argv[1]
 target_tag = sys.argv[2]
-previous_version = previous_tag.removeprefix("v")
-target_version = target_tag.removeprefix("v")
+
+def _version_from_tag(tag: str) -> str:
+    """Bare semver from either consumer scheme: v0.16.0 or recorder-v2.6.15."""
+    return tag.removeprefix("recorder-").removeprefix("v")
+
+
+previous_version = _version_from_tag(previous_tag)
+target_version = _version_from_tag(target_tag)
 
 regex_replacements = {
     Path("src/oyster_agent_runner/release_channels.py"): (
-        (r'CURRENT_CONSUMER_TAG = "v[0-9]+\.[0-9]+\.[0-9]+"', f'CURRENT_CONSUMER_TAG = "{target_tag}"'),
+        # Match BOTH consumer schemes so the sync never silently no-ops:
+        # legacy v0.16.0 and the R05E single-file line recorder-v2.6.15.
+        (r'CURRENT_CONSUMER_TAG = "(recorder-)?v[0-9][\w.\-]*"', f'CURRENT_CONSUMER_TAG = "{target_tag}"'),
     ),
-    Path("backend_stub/appcast_server.py"): (
-        (r'DEFAULT_RECORDER_VERSION = "[0-9]+\.[0-9]+\.[0-9]+"', f'DEFAULT_RECORDER_VERSION = "{target_version}"'),
-    ),
+    # backend_stub/appcast_server.py needs no rewrite anymore: its
+    # DEFAULT_RECORDER_* values are derived from release_channels at import.
 }
 
 literal_replacement_files = (

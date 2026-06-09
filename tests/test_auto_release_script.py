@@ -339,7 +339,15 @@ class TestReleaseRaceHardening:
         assert "sync_release_anchor_files" in script
         assert 'sync_release_anchor_files "$CURRENT_VERSION" "$NEW_VERSION"' in script
         assert 'CURRENT_CONSUMER_TAG = "{target_tag}"' in script
-        assert 'DEFAULT_RECORDER_VERSION = "{target_version}"' in script
+        # Anchor sync must understand BOTH consumer tag schemes: the legacy
+        # v0.16.0 line and the R05E recorder-v2.6.15 line. Without the
+        # recorder- prefix handling, version derivation breaks and the
+        # CURRENT_CONSUMER_TAG regex silently no-ops on the current anchor.
+        assert 'removeprefix("recorder-")' in script
+        assert r'CURRENT_CONSUMER_TAG = "(recorder-)?v' in script
+        # appcast DEFAULT_RECORDER_VERSION is now derived from
+        # release_channels at import time — no literal left to rewrite.
+        assert 'DEFAULT_RECORDER_VERSION = "{target_version}"' not in script
         assert "tests/test_release_channels.py" in script
         assert script.index(
             'sync_release_anchor_files "$CURRENT_VERSION" "$NEW_VERSION"'
