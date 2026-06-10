@@ -1,0 +1,111 @@
+name: Deploy Backend (Fly.io)
+
+on:
+  workflow_dispatch:
+    inputs:
+      backend_url:
+        description: Public backend URL to verify after deploy.
+        required: false
+        default: https://oyster-backend-stub.fly.dev
+      fly_app:
+        description: Fly.io app name.
+        required: false
+        default: oyster-backend-stub
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-backend-fly
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      BACKEND_URL: ${{ inputs.backend_url }}
+      FLY_APP: ${{ inputs.fly_app }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preflight deploy inputs
+        run: |
+          if [ -z "${FLY_API_TOKEN}" ]; then
+            echo "::error::Missing repo secret FLY_API_TOKEN. Create it from Fly.io, then rerun this workflow."
+            exit 1
+          fi
+          if [ -z "${BACKEND_URL}" ]; then
+            echo "::error::backend_url input is required."
+            exit 1
+          fi
+          if [ -z "${FLY_APP}" ]; then
+            echo "::error::fly_app input is required."
+            exit 1
+          fi
+
+      - name: Resolve latest recorder release metadata
+        run: |
+          set -euo pipefail
+          tag="$(gh release view --json tagName --jq '.tagName')"
+          asset_url="$(
+            gh release view "$tag" --json assets \
+              --jq '.assets[] | select(.name | test("^OysterRecorder-[Ss]etup-.*\\.exe$")) | .url' \
+              | head -n 1
+          )"
+          asset_sha="$(
+            gh release view "$tag" --json assets \
+              --jq '.assets[] | select(.name | test("^OysterRecorder-[Ss]etup-.*\\.exe$")) | .digest' \
+              | head -n 1 \
+              | sed 's/^sha256://'
+          )"
+          if [ -z "$asset_url" ] || [ -z "$asset_sha" ]; then
+            echo "::error::Latest release ${tag} is missing installer URL or digest."
+            exit 1
+          fi
+          echo "RECORDER_RELEASE_TAG=${tag}" >> "$GITHUB_ENV"
+          echo "RECORDER_RELEASE_VERSION=${tag#v}" >> "$GITHUB_ENV"
+          echo "RECORDER_DOWNLOAD_URL=${asset_url}" >> "$GITHUB_ENV"
+          echo "RECORDER_SHA256=${asset_sha}" >> "$GITHUB_ENV"
+
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Configure recorder release metadata
+        run: |
+          flyctl secrets set \
+            OYSTER_RECORDER_RELEASE_VERSION="$RECORDER_RELEASE_VERSION" \
+            OYSTER_RECORDER_RELEASE_TAG="$RECORDER_RELEASE_TAG" \
+            OYSTER_RECORDER_DOWNLOAD_URL="$RECORDER_DOWNLOAD_URL" \
+            OYSTER_RECORDER_SHA256="$RECORDER_SHA256" \
+            --app "$FLY_APP"
+
+      - name: Deploy backend_stub to Fly.io
+        run: flyctl deploy backend_stub --config backend_stub/fly.toml --remote-only --app "$FLY_APP"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install smoke dependencies
+        run: python -m pip install --upgrade httpx
+
+      - name: Smoke-test deployed backend
+        run: python scripts/verify_deployed_backend.py --url "$BACKEND_URL" --verbose --expected-recorder-tag "$RECORDER_RELEASE_TAG"
+
+      - name: Run deployed recorder backend E2E
+        run: python bin/remote_recorder_backend_e2e.py --backend-url "$BACKEND_URL"
+
+      - name: Write deployment summary
+        if: always()
+        run: |
+          {
+            echo "## Backend Fly Deploy"
+            echo ""
+            echo "- App: \`${FLY_APP}\`"
+            echo "- URL: ${BACKEND_URL}"
+            echo "- Smoke workflow: \`scripts/verify_deployed_backend.py\`"
+            echo "- Recorder E2E: \`bin/remote_recorder_backend_e2e.py\`"
+          } >> "$GITHUB_STEP_SUMMARY"

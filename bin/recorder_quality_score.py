@@ -61,8 +61,7 @@ OTHER_ANOMALY_PENALTY: float = 1.0
 MIN_SCORE: float = 0.0
 
 
-def _load_action_camera(clip_dir: Path) -> Tuple[List[Dict[str, Any]],
-                                                  List[Dict[str, Any]]]:
+def _load_action_camera(clip_dir: Path) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """Load ``action_camera.json`` from ``clip_dir`` and split it into
     action records and camera records.
 
@@ -121,7 +120,46 @@ def build_clip_data(clip_dir: Path) -> Dict[str, Any]:
     return data
 
 
-def compute_score(analysis: Dict[str, Any]) -> Tuple[float, bool]:
+def _load_json_object(path: Path) -> Dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _critical_failures(clip_dir: Path, clip_data: Dict[str, Any]) -> List[str]:
+    failures: List[str] = []
+    if not any(clip_data.get(key) for key in ("actions", "camera", "trajectory")):
+        failures.append("missing_scorable_input")
+
+    raw_quality = _load_json_object(clip_dir / "raw_quality.json")
+    if raw_quality:
+        if raw_quality.get("verdict") == "FAIL":
+            failures.append("raw_quality_fail")
+        if raw_quality.get("video_live") is False:
+            failures.append("video_not_live")
+        if raw_quality.get("game_state_live") is False:
+            failures.append("game_state_not_live")
+        if raw_quality.get("frozen_while_moving") is True:
+            failures.append("frozen_while_moving")
+
+    metadata = _load_json_object(clip_dir / "metadata.json")
+    if metadata.get("video_frozen") is True:
+        failures.append("metadata_video_frozen")
+    video_capture = metadata.get("video_capture")
+    if isinstance(video_capture, dict):
+        if video_capture.get("video_frozen") is True:
+            failures.append("metadata_video_capture_frozen")
+        if video_capture.get("validation_passed") is False:
+            failures.append("metadata_video_capture_validation_failed")
+
+    return sorted(set(failures))
+
+
+def compute_score(
+    analysis: Dict[str, Any], critical_failures: Optional[List[str]] = None
+) -> Tuple[float, bool]:
     """Convert an ``analyze_clip`` result into ``(score, farming_flag)``.
 
     Args:
@@ -131,14 +169,21 @@ def compute_score(analysis: Dict[str, Any]) -> Tuple[float, bool]:
         ``(score, farming_detected)`` where score ∈ [0, 10].
     """
     anomalies = list(analysis.get("anomalies", []))
+    critical_failures = critical_failures or []
     score = PERFECT_SCORE
     low_entropy = any(a.startswith("low_action_entropy") for a in anomalies)
     low_variance = any(a.startswith("low_camera_variance") for a in anomalies)
+    critical = bool(critical_failures) or any(a.startswith("critical_failure") for a in anomalies)
     other_count = sum(
-        1 for a in anomalies
+        1
+        for a in anomalies
         if not a.startswith("low_action_entropy")
         and not a.startswith("low_camera_variance")
+        and not a.startswith("critical_failure")
     )
+    if critical:
+        farming = low_entropy and low_variance
+        return MIN_SCORE, farming
     if low_entropy:
         score -= LOW_ENTROPY_PENALTY
     if low_variance:
@@ -156,18 +201,15 @@ def _import_detector() -> Any:
     while the test harness adds the repo root and treats ``bin`` as a
     package.  Both styles must work without sys.path mutation.
     """
-    for name in ("anomaly_detector_clip_quality",
-                 "bin.anomaly_detector_clip_quality"):
+    for name in ("anomaly_detector_clip_quality", "bin.anomaly_detector_clip_quality"):
         try:
             return importlib.import_module(name)
         except ImportError:
             continue
-    raise ImportError(
-        "anomaly_detector_clip_quality not importable from any path")
+    raise ImportError("anomaly_detector_clip_quality not importable from any path")
 
 
-def score_clip(clip_dir: Path,
-               config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def score_clip(clip_dir: Path, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Compute the qa_score.json payload for ``clip_dir``.
 
     Args:
@@ -180,15 +222,20 @@ def score_clip(clip_dir: Path,
     detector = _import_detector()
     clip_data = build_clip_data(clip_dir)
     analysis = detector.analyze_clip(clip_data, config or {})
-    score, farming = compute_score(analysis)
+    critical_failures = _critical_failures(clip_dir, clip_data)
+    if critical_failures:
+        anomalies = list(analysis.get("anomalies", []))
+        anomalies.extend(f"critical_failure:{failure}" for failure in critical_failures)
+        analysis["anomalies"] = anomalies
+    score, farming = compute_score(analysis, critical_failures=critical_failures)
     payload: Dict[str, Any] = {
         "clip_id": clip_data.get("clip_id", clip_dir.name),
         "score": round(score, 2),
         "farming_detected": farming,
+        "critical_failures": critical_failures,
         "anomalies": list(analysis.get("anomalies", [])),
         "metrics": analysis.get("metrics", {}),
-        "scored_at": dt.datetime.now(dt.timezone.utc).strftime(
-            "%Y-%m-%dT%H:%M:%S+00:00"),
+        "scored_at": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00"),
     }
     return payload
 
@@ -203,20 +250,22 @@ def write_score(clip_dir: Path, payload: Dict[str, Any]) -> Path:
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--clip-dir", type=Path, required=True,
-                        help="Recorder clip directory to score")
-    parser.add_argument("--json-only", action="store_true",
-                        help="Only print the qa_score.json content")
-    parser.add_argument("--config-json", type=Path, default=None,
-                        help="Optional JSON file with detector overrides")
+    parser.add_argument(
+        "--clip-dir", type=Path, required=True, help="Recorder clip directory to score"
+    )
+    parser.add_argument(
+        "--json-only", action="store_true", help="Only print the qa_score.json content"
+    )
+    parser.add_argument(
+        "--config-json", type=Path, default=None, help="Optional JSON file with detector overrides"
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     """CLI entry point."""
     args = parse_args(argv)
-    logging.basicConfig(level=logging.INFO,
-                        format="%(levelname)s: %(message)s")
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     clip_dir: Path = args.clip_dir.resolve()
     if not clip_dir.exists() or not clip_dir.is_dir():
         logger.error("Clip dir not found: %s", clip_dir)
@@ -236,8 +285,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.json_only:
         sys.stdout.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
     else:
-        logger.info("Wrote %s — score=%s farming=%s", out,
-                    payload["score"], payload["farming_detected"])
+        logger.info(
+            "Wrote %s — score=%s farming=%s",
+            out,
+            payload["score"],
+            payload["farming_detected"],
+        )
+    if payload["critical_failures"]:
+        return 1
     return 2 if payload["farming_detected"] else 0
 
 

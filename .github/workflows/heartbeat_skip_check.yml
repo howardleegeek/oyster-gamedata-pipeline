@@ -22,10 +22,15 @@ jobs:
     steps:
       - name: Detect skip marker in commit message
         id: detect
+        # Pass commit message via env (NOT ${{ }} interpolation in run:).
+        # Otherwise backticks / $(...) / quotes inside the body get evaluated
+        # as bash by the runner — shell-injection risk + CI breakage on any
+        # normal commit whose body quotes code.
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
         run: |
           set -euo pipefail
 
-          COMMIT_MSG="${{ github.event.head_commit.message }}"
           SKIP="false"
           REASON=""
 

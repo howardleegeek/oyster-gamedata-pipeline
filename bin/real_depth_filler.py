@@ -8,7 +8,6 @@ Process RGB frames with DepthAnything V2 Small and output OpenEXR float32 depth 
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 import time
 from pathlib import Path
@@ -28,7 +27,7 @@ def lazy_load_depth_pipeline(
     try:
         import torch  # noqa: F401
         from transformers import pipeline
-    except ImportError as e:
+    except Exception as e:
         raise RuntimeError(
             "Missing dependencies. Install with: pip install torch transformers"
         ) from e
@@ -54,7 +53,7 @@ def select_device() -> str:
             return "cuda"
         if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
             return "mps"
-    except ImportError:
+    except Exception:
         pass
     return "cpu"
 
@@ -67,7 +66,7 @@ def _get_torch_dtype(device: str) -> Any:
         if device in ("cuda", "mps"):
             return torch.float16
         return torch.float32
-    except ImportError:
+    except Exception:
         return None
 
 
@@ -238,17 +237,14 @@ def infer_batch(
                 frames_done = batch_end
                 if frames_done > 0:
                     eta = elapsed / frames_done * (total_frames - frames_done)
-                    print(
-                        f"Progress: {frames_done}/{total_frames} frames, "
-                        f"ETA: {eta:.1f}s"
-                    )
+                    print(f"Progress: {frames_done}/{total_frames} frames, " f"ETA: {eta:.1f}s")
 
             i = batch_end
 
         except RuntimeError as e:
             if "out of memory" in str(e).lower() and current_batch_size > 1:
                 # OOM: reduce batch size and retry
-                print(f"OOM detected, reducing batch size to 1")
+                print("OOM detected, reducing batch size to 1")
                 current_batch_size = 1
                 # Clear cache if CUDA
                 try:
@@ -274,9 +270,7 @@ def infer_batch(
 
 def main(argv: list[str] | None = None) -> int:
     """CLI: --rgb-dir / --out-dir / --near / --far / --batch-size / --device"""
-    parser = argparse.ArgumentParser(
-        description="DepthAnything V2 depth estimation → OpenEXR"
-    )
+    parser = argparse.ArgumentParser(description="DepthAnything V2 depth estimation → OpenEXR")
     parser.add_argument(
         "--rgb-dir",
         required=True,

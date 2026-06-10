@@ -24,19 +24,10 @@ jobs:
       - name: Install build dependencies
         run: |
           python -m pip install --upgrade pip
-          # Howard 2026-05-07: bundle DepthAnything V2 inference into .exe
-          # so testers' recordings include REAL depth (no placeholder).
-          # CPU-only torch keeps the .exe smaller (~1 GB vs ~3 GB CUDA).
+          # v0.19.4: recorder clients are raw-only; server postprocess owns
+          # DA-V2/depth generation. Do not install torch/depth-only deps here.
           pip install pyinstaller pynput pillow numpy pyyaml
-          pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
-          pip install transformers imageio[ffmpeg] OpenEXR Imath huggingface_hub
-
-      - name: Pre-download DepthAnything V2 weights
-        # Bundle the model offline so testers don't need internet on first
-        # run. ViT-S is ~100 MB on disk after download.
-        run: |
-          python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='depth-anything/Depth-Anything-V2-Small-hf', local_dir='hf_cache/depth-anything-v2-small-hf')"
-          dir hf_cache
+          pip install -r bin/build_bundled_installer/requirements-recorder.txt
 
       - name: Download ffmpeg release build (Windows x64, GPL static)
         run: |
@@ -46,6 +37,9 @@ jobs:
           $ffmpegBin = Get-ChildItem -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
           Copy-Item $ffmpegBin.FullName -Destination ffmpeg.exe
           Get-Item ffmpeg.exe | Format-List Length, FullName
+          $ffprobeBin = Get-ChildItem -Recurse -Filter "ffprobe.exe" | Select-Object -First 1
+          Copy-Item $ffprobeBin.FullName -Destination ffprobe.exe
+          Get-Item ffprobe.exe | Format-List Length, FullName
 
       - name: Download Fabric installer jar (D17)
         # Howard 2026-05-07 (D17): bundle the Fabric loader installer so the
@@ -113,6 +107,7 @@ jobs:
             --name OysterRecorder `
             --runtime-tmpdir "%LOCALAPPDATA%\OysterRecorder\runtime" `
             --add-binary "ffmpeg.exe;." `
+            --add-binary "ffprobe.exe;." `
             --add-data "bin/lint_v3_prd_grounded.py;." `
             --add-data "bin/generate_systeminfo_json.py;." `
             --add-data "bin/generate_gameinfo_xlsx.py;." `
@@ -121,19 +116,14 @@ jobs:
             --add-data "bin/game_state_overlay.py;." `
             --add-data "fabric-installer.jar;." `
             --add-data "oyster-recorder-mod.jar;." `
-            --add-data "hf_cache;hf_cache" `
             --paths bin `
             --collect-all tkinter `
             --collect-all pynput `
             --collect-all numpy `
             --collect-all PIL `
             --collect-all yaml `
-            --collect-all torch `
-            --collect-all transformers `
-            --collect-all OpenEXR `
-            --collect-all Imath `
-            --collect-all imageio `
-            --collect-all imageio_ffmpeg `
+            --collect-all windows_capture `
+            --collect-all mss `
             --hidden-import pynput.keyboard._win32 `
             --hidden-import pynput.mouse._win32 `
             --hidden-import lint_v3_prd_grounded `
@@ -142,7 +132,17 @@ jobs:
             --hidden-import depth_anything_v2_inference `
             --hidden-import install_fabric_loader `
             --hidden-import game_state_overlay `
+            --hidden-import windows_capture `
+            --hidden-import mss `
             --hidden-import PIL.Image `
+            --exclude-module torch `
+            --exclude-module torchvision `
+            --exclude-module transformers `
+            --exclude-module OpenEXR `
+            --exclude-module Imath `
+            --exclude-module imageio `
+            --exclude-module imageio_ffmpeg `
+            --exclude-module huggingface_hub `
             bin/recorder_consumer_lite.py
 
       - name: Build --onedir fallback (zip distribution)
@@ -156,6 +156,7 @@ jobs:
           pyinstaller --onedir --windowed `
             --name OysterRecorder-onedir `
             --add-binary "ffmpeg.exe;." `
+            --add-binary "ffprobe.exe;." `
             --add-data "bin/lint_v3_prd_grounded.py;." `
             --add-data "bin/generate_systeminfo_json.py;." `
             --add-data "bin/generate_gameinfo_xlsx.py;." `
@@ -164,19 +165,12 @@ jobs:
             --add-data "bin/game_state_overlay.py;." `
             --add-data "fabric-installer.jar;." `
             --add-data "oyster-recorder-mod.jar;." `
-            --add-data "hf_cache;hf_cache" `
             --paths bin `
             --collect-all tkinter `
             --collect-all pynput `
             --collect-all numpy `
             --collect-all PIL `
             --collect-all yaml `
-            --collect-all torch `
-            --collect-all transformers `
-            --collect-all OpenEXR `
-            --collect-all Imath `
-            --collect-all imageio `
-            --collect-all imageio_ffmpeg `
             --hidden-import pynput.keyboard._win32 `
             --hidden-import pynput.mouse._win32 `
             --hidden-import lint_v3_prd_grounded `
@@ -186,7 +180,86 @@ jobs:
             --hidden-import install_fabric_loader `
             --hidden-import game_state_overlay `
             --hidden-import PIL.Image `
+            --exclude-module torch `
+            --exclude-module torchvision `
+            --exclude-module transformers `
+            --exclude-module OpenEXR `
+            --exclude-module Imath `
+            --exclude-module imageio `
+            --exclude-module imageio_ffmpeg `
+            --exclude-module huggingface_hub `
             bin/recorder_consumer_lite.py
+
+          # v0.19: ship OBS Studio portable inside the PyInstaller onedir
+          # bundle. The recorder runtime owns profile/scene generation and
+          # launch args; CI only stages the official portable OBS tree.
+          $obsVersion = "30.2.3"
+          $obsZipName = "OBS-Studio-$obsVersion-Windows.zip"
+          $obsUrl = "https://github.com/obsproject/obs-studio/releases/download/$obsVersion/$obsZipName"
+          $obsSha256 = "c5bf721258f6d8b2342ed39f04e65cdd3a07a9d1300654471d4be91d87fee65b"
+          $obsExpectedBytes = 158525553
+          Write-Host "Downloading OBS Studio portable $obsVersion from $obsUrl"
+          Invoke-WebRequest -Uri $obsUrl -OutFile $obsZipName
+          $obsZip = Get-Item $obsZipName
+          if ($obsZip.Length -ne $obsExpectedBytes) {
+            Write-Error "OBS Studio zip size mismatch: expected $obsExpectedBytes bytes, got $($obsZip.Length)"
+            exit 1
+          }
+          $obsHash = (Get-FileHash $obsZipName -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($obsHash -ne $obsSha256) {
+            Write-Error "OBS Studio zip SHA256 mismatch: expected $obsSha256, got $obsHash"
+            exit 1
+          }
+          Write-Host "Verified OBS Studio portable ${obsVersion}: $($obsZip.Length) bytes, sha256:$obsHash"
+
+          $obsExtractDir = "obs-studio-extracted"
+          Remove-Item -Recurse -Force $obsExtractDir -ErrorAction SilentlyContinue
+          Expand-Archive -Path $obsZipName -DestinationPath $obsExtractDir -Force
+          $obsExe = Get-ChildItem -Path $obsExtractDir -Recurse -Filter "obs64.exe" |
+            Where-Object { $_.FullName -match '\\bin\\64bit\\obs64\.exe$' } |
+            Select-Object -First 1
+          if (-not $obsExe) {
+            Write-Error "OBS Studio portable extraction did not contain bin/64bit/obs64.exe"
+            exit 1
+          }
+          $obsRoot = $obsExe.Directory.Parent.Parent.FullName
+          $obsDest = "dist/OysterRecorder-onedir/_internal/obs"
+          Remove-Item -Recurse -Force $obsDest -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $obsDest | Out-Null
+          Copy-Item -Path (Join-Path $obsRoot "*") -Destination $obsDest -Recurse -Force
+
+          # Official OBS portable mode uses portable_mode.txt. Keep the
+          # spec-named marker too; it is harmless and makes the bundle intent
+          # obvious to humans inspecting the tree.
+          New-Item -ItemType File -Force -Path (Join-Path $obsDest "portable_mode.txt") | Out-Null
+          New-Item -ItemType File -Force -Path (Join-Path $obsDest "obs_portable.txt") | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $obsDest "config") | Out-Null
+
+          $requiredObsPaths = @(
+            "bin/64bit/obs64.exe",
+            "bin/64bit/obs-amf-test.exe",
+            "bin/64bit/obs-nvenc-test.exe",
+            "bin/64bit/obs-qsv-test.exe",
+            "data",
+            "obs-plugins",
+            "obs-plugins/64bit/obs-ffmpeg.dll",
+            "obs-plugins/64bit/obs-qsv11.dll",
+            "obs-plugins/64bit/obs-websocket.dll",
+            "obs-plugins/64bit/win-capture.dll",
+            "portable_mode.txt",
+            "obs_portable.txt"
+          )
+          foreach ($relative in $requiredObsPaths) {
+            $candidate = Join-Path $obsDest $relative
+            if (-not (Test-Path $candidate)) {
+              Write-Error "Bundled OBS Studio is missing required path: $relative"
+              exit 1
+            }
+          }
+          $bundledObsExe = Resolve-Path (Join-Path $obsDest "bin/64bit/obs64.exe")
+          Write-Host "Bundled OBS Studio version: $obsVersion"
+          Write-Host "Bundled obs64.exe path: $bundledObsExe"
+
           # Zip the onedir output for distribution.
           Compress-Archive -Path dist/OysterRecorder-onedir/* `
             -DestinationPath dist/OysterRecorder-onedir.zip `
@@ -203,10 +276,37 @@ jobs:
             Write-Error "Recorder --onedir zip fallback missing"
             exit 1
           }
+          $obsVersion = "30.2.3"
+          $bundledObsExe = "dist/OysterRecorder-onedir/_internal/obs/bin/64bit/obs64.exe"
+          $portableMarker = "dist/OysterRecorder-onedir/_internal/obs/portable_mode.txt"
+          $specMarker = "dist/OysterRecorder-onedir/_internal/obs/obs_portable.txt"
+          foreach ($p in @($bundledObsExe, $portableMarker, $specMarker)) {
+            if (-not (Test-Path $p)) {
+              Write-Error "Bundled OBS Studio artifact missing: $p"
+              exit 1
+            }
+          }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path "dist/OysterRecorder-onedir.zip"))
+          try {
+            $entries = $zip.Entries.FullName
+            foreach ($entry in @("_internal/obs/bin/64bit/obs64.exe", "_internal/obs/portable_mode.txt", "_internal/obs/obs_portable.txt")) {
+              if ($entries -notcontains $entry) {
+                Write-Error "Recorder --onedir zip missing bundled OBS entry: $entry"
+                exit 1
+              }
+            }
+          }
+          finally {
+            $zip.Dispose()
+          }
           $size_mb_exe = (Get-Item dist/OysterRecorder.exe).Length / 1MB
           $size_mb_zip = (Get-Item dist/OysterRecorder-onedir.zip).Length / 1MB
           Write-Host "Recorder --onefile .exe: $size_mb_exe MB"
           Write-Host "Recorder --onedir .zip:  $size_mb_zip MB"
+          Write-Host "Expected v0.19.4 raw-only reduction: removed DA-V2 hf_cache weights plus torch/transformers/OpenEXR/imageio depth-only payloads; OBS portable bundling remains intact."
+          Write-Host "Bundled OBS Studio version: $obsVersion"
+          Write-Host "Bundled obs64.exe path: $(Resolve-Path $bundledObsExe)"
 
       - name: Upload as workflow artifact (always)
         uses: actions/upload-artifact@v4

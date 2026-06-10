@@ -1,0 +1,152 @@
+---
+name: Auto Release Tagger
+
+# yamllint disable-line rule:truthy
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-release-main
+  cancel-in-progress: false
+
+jobs:
+  auto-release:
+    runs-on: ubuntu-latest
+    # 2026-05-27 DISABLED — too aggressive (12 releases in 9h overnight).
+    # Re-enable via repo var AUTO_RELEASE_ENABLED=true, or use manual workflow_dispatch + git tag.
+    if: vars.AUTO_RELEASE_ENABLED == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Check release conditions
+        id: check
+        run: |
+          set -euo pipefail
+
+          # Get the latest tag
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No previous tag found; will create initial release."
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "reason=no_previous_tag" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Count commits since last tag
+          COMMIT_COUNT=$(git rev-list "${LATEST_TAG}..HEAD" --count)
+          echo "Commits since last tag (${LATEST_TAG}): ${COMMIT_COUNT}"
+
+          # Calculate hours since last tag
+          TAG_TIMESTAMP=$(git log -1 --format=%ct "${LATEST_TAG}")
+          NOW_TIMESTAMP=$(date +%s)
+          HOURS_SINCE_TAG=$(( (NOW_TIMESTAMP - TAG_TIMESTAMP) / 3600 ))
+          echo "Hours since last tag: ${HOURS_SINCE_TAG}"
+
+          SHOULD_RELEASE=false
+          REASON=""
+
+          if [ "$COMMIT_COUNT" -ge 3 ]; then
+            SHOULD_RELEASE=true
+            REASON="commit_threshold_met"
+          elif [ "$HOURS_SINCE_TAG" -ge 6 ]; then
+            SHOULD_RELEASE=true
+            REASON="time_threshold_met"
+          fi
+
+          echo "should_release=${SHOULD_RELEASE}" >> "$GITHUB_OUTPUT"
+          echo "reason=${REASON}" >> "$GITHUB_OUTPUT"
+          echo "latest_tag=${LATEST_TAG}" >> "$GITHUB_OUTPUT"
+          echo "commit_count=${COMMIT_COUNT}" >> "$GITHUB_OUTPUT"
+          echo "hours_since_tag=${HOURS_SINCE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Dry-run summary
+        if: steps.check.outputs.should_release != 'true'
+        run: |
+          echo "Release conditions not met."
+          echo "Reason: ${{ steps.check.outputs.reason }}"
+          echo "Commits: ${{ steps.check.outputs.commit_count }}"
+          echo "Hours: ${{ steps.check.outputs.hours_since_tag }}"
+
+      - name: Run auto-release script
+        if: steps.check.outputs.should_release == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LATEST_TAG: ${{ steps.check.outputs.latest_tag }}
+        run: |
+          chmod +x scripts/auto_release.sh
+          bash scripts/auto_release.sh
+
+      - name: Install backend smoke dependencies
+        if: steps.check.outputs.should_release == 'true' && vars.BACKEND_SMOKE_URL != ''
+        run: python3 -m pip install --upgrade httpx
+
+      - name: Resolve released recorder tag
+        id: released
+        if: steps.check.outputs.should_release == 'true' && vars.BACKEND_SMOKE_URL != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "tag=$(gh release view --json tagName --jq .tagName)" >> "$GITHUB_OUTPUT"
+
+      - name: Configure GCP backend SSH
+        id: gcp-ssh
+        if: steps.check.outputs.should_release == 'true' && vars.BACKEND_SMOKE_URL != ''
+        env:
+          GCP_BACKEND_ADDRESS: ${{ vars.GCP_BACKEND_ADDRESS || '136.109.41.170' }}
+          GCP_BACKEND_SSH_KEY: ${{ secrets.GCP_BACKEND_SSH_KEY }}
+          GCP_BACKEND_USER: ${{ vars.GCP_BACKEND_USER || 'howardli' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GCP_BACKEND_SSH_KEY}" ]; then
+            echo "::warning::GCP_BACKEND_SSH_KEY is not configured; skipping appcast sync and relying on verifier"
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${GCP_BACKEND_SSH_KEY}" > ~/.ssh/gcp_backend
+          chmod 600 ~/.ssh/gcp_backend
+          cat > ~/.ssh/config <<EOF
+          Host gamedata-backend
+            HostName ${GCP_BACKEND_ADDRESS}
+            User ${GCP_BACKEND_USER}
+            IdentityFile ~/.ssh/gcp_backend
+            StrictHostKeyChecking no
+          EOF
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+
+      - name: Sync GCP backend appcast to release
+        if: steps.check.outputs.should_release == 'true' && vars.BACKEND_SMOKE_URL != '' && steps.gcp-ssh.outputs.configured == 'true'
+        env:
+          BACKEND_URL: ${{ vars.BACKEND_SMOKE_URL }}
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RECORDER_RELEASE_TAG: ${{ steps.released.outputs.tag }}
+          RUN_E2E: "true"
+        run: bash scripts/sync_gcp_backend_release.sh
+
+      - name: Verify backend appcast matches release
+        if: steps.check.outputs.should_release == 'true' && vars.BACKEND_SMOKE_URL != ''
+        env:
+          BACKEND_URL: ${{ vars.BACKEND_SMOKE_URL }}
+          RECORDER_RELEASE_TAG: ${{ steps.released.outputs.tag }}
+        run: |
+          python3 scripts/verify_deployed_backend.py \
+            --url "$BACKEND_URL" \
+            --verbose \
+            --expected-recorder-tag "$RECORDER_RELEASE_TAG"

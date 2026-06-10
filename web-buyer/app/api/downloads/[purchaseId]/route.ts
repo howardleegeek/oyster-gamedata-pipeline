@@ -27,6 +27,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSupabaseServerClient, getSupabaseServiceClient } from '../../../../lib/supabase-server';
 import { isSupabaseConfigured, env } from '../../../../lib/env';
+import { safeEqual } from '../../../../lib/safe-equal';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -98,8 +99,11 @@ export async function GET(
   }
   const { data: { user } } = await supabase.auth.getUser();
 
+  // SECURITY (fix #02): constant-time compare against service-role key.
+  // Plain `===` short-circuits at the first byte mismatch and lets an
+  // attacker recover the key one byte at a time via HTTP RTT timing.
   const adminHeader = req.headers.get('x-supabase-service-role') ?? '';
-  const isAdmin = !!adminHeader && adminHeader === env.supabaseServiceRoleKey;
+  const isAdmin = safeEqual(adminHeader, env.supabaseServiceRoleKey);
 
   if (!isAdmin && !user) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
