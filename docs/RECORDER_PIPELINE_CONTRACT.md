@@ -17,8 +17,8 @@ There are two version tracks and they must not be confused:
 
 | Component | Current release track | Current source track |
 |---|---|---|
-| `oyster-gamedata-pipeline` | Latest GitHub release remains `v0.16.0`; it carries the public Windows installer asset and checksum. | `main` continues from `v0.16.0` with architecture/CI contract fixes. Use `main` for development. |
-| `gamedata-recorder` | Latest recorder release remains `v2.6.0`; the current public installer asset is `OysterRecorder-Setup-v0.16.0.exe`, rebuilt from `cddcad6` through the R05E bundled-installer pipeline. | `vendor/recorder` is pinned to current source candidate commit `7de8a38`, carrying the post-`e171f20` recorder fixes promoted by `f4d38ed`. Arbitrary recorder `main` changes are not consumer-release source until tray/auth/updater/notify/libobs changes compile and pass Windows installer smoke. |
+| `oyster-gamedata-pipeline` | Latest GitHub release remains `recorder-v2.6.15`; it carries the public Windows installer asset and checksum manifest. | `main` continues from `recorder-v2.6.15` with architecture/CI contract fixes. Use `main` for development. |
+| `gamedata-recorder` | Latest recorder release remains `v2.6.15`; the current public installer asset is `OysterRecorder-Setup-recorder-v2.6.15.exe`, rebuilt from `cddcad6` through the R05E bundled-installer pipeline. | `vendor/recorder` is pinned to current source candidate commit `7de8a38`, carrying the post-`e171f20` recorder fixes promoted by `f4d38ed`. Arbitrary recorder `main` changes are not consumer-release source until tray/auth/updater/notify/libobs changes compile and pass Windows installer smoke. |
 
 Operationally: distribute from the latest verified release, rebuild from the
 release-buildable source pin, and keep newer recorder `main` work behind a
@@ -101,7 +101,7 @@ It can move to `production` only after a clean Windows run proves:
 ## Current Architecture Read
 
 The release/distribution chain is real: latest verified public release is
-`v0.16.0`, the installer asset and SHA file exist, backend health/appcast are
+`recorder-v2.6.15`, the installer asset and SHA-256 manifest exist, backend health/appcast are
 live, and smoke workflows are green. The Windows installer is built from the
 release-buildable source pin plus the verified x64 recorder runtime, with PE
 architecture guards to prevent ARM64 DLLs from entering the setup payload. The

@@ -32,10 +32,18 @@ def test_recorder_submodule_is_pinned_to_release_buildable_commit() -> None:
 
 
 def test_version_alignment_doc_distinguishes_release_from_source() -> None:
+    from oyster_agent_runner.release_channels import (
+        CURRENT_CONSUMER_INSTALLER,
+        CURRENT_CONSUMER_TAG,
+    )
+
     doc = (REPO_ROOT / "docs" / "RECORDER_PIPELINE_CONTRACT.md").read_text(encoding="utf-8")
 
-    assert "Latest GitHub release remains `v0.16.0`" in doc
-    assert "Latest recorder release remains `v2.6.0`" in doc
+    # Single source of truth: the doc must name the SAME consumer anchor as
+    # release_channels.py so documentation drift fails loudly at test time.
+    assert f"Latest GitHub release remains `{CURRENT_CONSUMER_TAG}`" in doc
+    assert CURRENT_CONSUMER_INSTALLER in doc
+    assert "Latest recorder release remains" in doc
     assert "`vendor/recorder` is pinned to current source candidate commit `7de8a38`" in doc
     assert "verified x64 recorder runtime" in doc
     assert "docs/RELEASE_CHANNELS.md" in doc
