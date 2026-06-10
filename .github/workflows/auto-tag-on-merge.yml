@@ -1,0 +1,89 @@
+---
+name: Auto Tag Bot
+
+# yamllint disable-line rule:truthy
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+env:
+  # Configurable commit-count threshold (default: 3)
+  COMMIT_THRESHOLD: "${{ vars.COMMIT_THRESHOLD || '3' }}"
+
+jobs:
+  auto-tag:
+    runs-on: ubuntu-latest
+    # auto-release.yml is the canonical automatic publisher because release
+    # tags must carry a CHANGELOG entry. Keep this workflow available as a
+    # manual/opt-in fallback without racing auto-release on every main push.
+    if: vars.AUTO_TAG_BOT_ENABLED == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Evaluate tag conditions
+        id: eval
+        run: |
+          set -euo pipefail
+
+          THRESHOLD="${COMMIT_THRESHOLD:-3}"
+
+          # Get the latest tag
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No previous tag found; will create initial release."
+            echo "should_tag=true" >> "$GITHUB_OUTPUT"
+            echo "reason=no_previous_tag" >> "$GITHUB_OUTPUT"
+            echo "latest_tag=" >> "$GITHUB_OUTPUT"
+            echo "commit_count=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Count commits since last tag
+          COMMIT_COUNT=$(git rev-list "${LATEST_TAG}..HEAD" --count)
+          echo "Commits since last tag (${LATEST_TAG}): ${COMMIT_COUNT}"
+          echo "Threshold: ${THRESHOLD}"
+
+          SHOULD_TAG=false
+          REASON=""
+
+          if [ "$COMMIT_COUNT" -ge "$THRESHOLD" ]; then
+            SHOULD_TAG=true
+            REASON="commit_threshold_met"
+          fi
+
+          echo "should_tag=${SHOULD_TAG}" >> "$GITHUB_OUTPUT"
+          echo "reason=${REASON}" >> "$GITHUB_OUTPUT"
+          echo "latest_tag=${LATEST_TAG}" >> "$GITHUB_OUTPUT"
+          echo "commit_count=${COMMIT_COUNT}" >> "$GITHUB_OUTPUT"
+
+      - name: Dry-run summary (no tag)
+        if: steps.eval.outputs.should_tag != 'true'
+        run: |
+          echo "Auto-tag conditions not met."
+          echo "Reason: ${{ steps.eval.outputs.reason }}"
+          echo "Commits since last tag: ${{ steps.eval.outputs.commit_count }}"
+          echo "Threshold: ${{ env.COMMIT_THRESHOLD }}"
+
+      - name: Run auto-tag bot
+        if: steps.eval.outputs.should_tag == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LATEST_TAG: ${{ steps.eval.outputs.latest_tag }}
+          COMMIT_THRESHOLD: ${{ env.COMMIT_THRESHOLD }}
+        run: |
+          chmod +x scripts/auto_tag_bot.sh
+          bash scripts/auto_tag_bot.sh

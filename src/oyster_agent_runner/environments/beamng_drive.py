@@ -13,7 +13,9 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
+
+from oyster_agent_runner.environments.base import Action, Environment, Observation
 
 # Lazy imports
 try:
@@ -35,6 +37,57 @@ except ImportError:
     BeamNGpy = Vehicle = Scenario = Road = Camera = None
     HAS_BEAMNG = False
 
+BEAMNGPY_MISSING_ERROR = (
+    "BeamNGpy SDK is required for BeamNG.drive real mode. "
+    "Install it with `python -m pip install beamngpy` and enable BeamNG research mode, "
+    "or use `mode='mock'` / `--mock` for pure-Python dry-run smoke tests."
+)
+
+BeamNGMode = Literal["beamngpy", "mock"]
+
+
+def _require_beamngpy() -> None:
+    """Raise a clear operator-facing error when the optional SDK is absent."""
+
+    if not HAS_BEAMNG:
+        raise RuntimeError(BEAMNGPY_MISSING_ERROR)
+
+
+def _shape(value: Any) -> list[int] | None:
+    shape = getattr(value, "shape", None)
+    if shape is None:
+        return None
+    return [int(dim) for dim in shape]
+
+
+def _json_safe(value: Any) -> Any:
+    """Best-effort conversion for BeamNGpy/numpy objects into JSON-safe data."""
+
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(item) for item in value]
+
+    item = getattr(value, "item", None)
+    if callable(item):
+        try:
+            return _json_safe(item())
+        except Exception:  # noqa: BLE001
+            pass
+
+    tolist = getattr(value, "tolist", None)
+    if callable(tolist):
+        try:
+            return _json_safe(tolist())
+        except Exception:  # noqa: BLE001
+            pass
+
+    return str(value)
+
 
 @dataclass
 class SensorData:
@@ -45,19 +98,27 @@ class SensorData:
     camera_depth: Optional[Any]  # Depth image
     camera_rgb: Optional[Any]  # RGB image
     vehicle_sensors: Dict[str, Any]
+    source: str = "beamngpy"
+
+    def to_observation(self) -> Observation:
+        """Convert to the plug-and-play BeamNG observation contract."""
+
+        return {
+            "timestamp": float(self.timestamp),
+            "ego_pose": _json_safe(self.ego_pose),
+            "camera": {
+                "rgb_shape": _shape(self.camera_rgb),
+                "depth_shape": _shape(self.camera_depth),
+                "rgb_available": self.camera_rgb is not None,
+                "depth_available": self.camera_depth is not None,
+            },
+            "vehicle_sensors": _json_safe(self.vehicle_sensors),
+            "source": self.source,
+        }
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to serializable dict."""
-        result = {
-            "timestamp": self.timestamp,
-            "ego_pose": self.ego_pose,
-            "vehicle_sensors": self.vehicle_sensors,
-        }
-        if self.camera_depth is not None and np is not None:
-            result["camera_depth_shape"] = self.camera_depth.shape
-        if self.camera_rgb is not None and np is not None:
-            result["camera_rgb_shape"] = self.camera_rgb.shape
-        return result
+        return self.to_observation()
 
 
 class BeamNGDriveExtractor:
@@ -75,7 +136,7 @@ class BeamNGDriveExtractor:
         frequency_hz: float = 60.0,
     ):
         if not HAS_BEAMNG:
-            raise ImportError("BeamNGpy not installed. pip install beamngpy")
+            raise RuntimeError(BEAMNGPY_MISSING_ERROR)
 
         self.beamng_home = Path(beamng_home)
         self.host = host
@@ -177,6 +238,7 @@ class BeamNGDriveExtractor:
             camera_depth=camera_depth,
             camera_rgb=camera_rgb,
             vehicle_sensors=sensors_data,
+            source="beamngpy",
         )
 
     def run(self, duration_seconds: float = 10.0) -> List[SensorData]:
@@ -240,15 +302,213 @@ class BeamNGDriveExtractor:
         self.cleanup()
 
 
+class BeamNGDriveEnvironment(Environment):
+    """BeamNG.drive plug-and-play runner adapter.
+
+    ``mode="beamngpy"`` keeps the existing real BeamNGpy path. ``mode="mock"``
+    is a pure-Python dry-run that emits the same observation fields without the
+    game, SDK, Windows host, or rendering stack. That lets CI and cluster
+    workers smoke-test BeamNG wiring before a real Windows rig is available.
+    """
+
+    def __init__(
+        self,
+        *,
+        mode: BeamNGMode = "beamngpy",
+        beamng_home: Union[str, Path, None] = None,
+        host: str = "localhost",
+        port: int = 64256,
+        vehicle_model: str = "etk800",
+        scenario_name: str = "west_coast_usa",
+        capture_rgb: bool = True,
+        capture_depth: bool = True,
+        frequency_hz: float = 60.0,
+        done_after_steps: int = 600,
+        extractor: BeamNGDriveExtractor | None = None,
+    ) -> None:
+        if mode not in ("beamngpy", "mock"):
+            raise ValueError(f"unknown BeamNG mode: {mode!r}")
+
+        self.mode = mode
+        self.beamng_home = Path(beamng_home) if beamng_home is not None else None
+        self.host = host
+        self.port = port
+        self.vehicle_model = vehicle_model
+        self.scenario_name = scenario_name
+        self.capture_rgb = capture_rgb
+        self.capture_depth = capture_depth
+        self.frequency_hz = frequency_hz
+        self.done_after_steps = done_after_steps
+        self._injected_extractor = extractor
+        self._extractor: BeamNGDriveExtractor | None = None
+        self._last_frame: bytes | None = None
+        self._mock_step_count = 0
+        self._mock_seed = 0
+        self._mock_speed_mps = 0.0
+        self._mock_x = 0.0
+        self._mock_y = 0.0
+        self._mock_yaw = 0.0
+        self._mock_throttle = 0.0
+        self._mock_brake = 0.0
+        self._mock_steering = 0.0
+        self._is_shutdown = False
+
+    def reset(self, seed: int | None = None) -> Observation:
+        if self._is_shutdown:
+            raise RuntimeError("BeamNGDriveEnvironment is shut down; create a new instance.")
+
+        self.shutdown()
+        self._is_shutdown = False
+        if self.mode == "mock":
+            self._mock_step_count = 0
+            self._mock_seed = seed if seed is not None else 0
+            self._mock_speed_mps = 0.0
+            self._mock_x = 0.0
+            self._mock_y = 0.0
+            self._mock_yaw = 0.0
+            self._mock_throttle = 0.0
+            self._mock_brake = 0.0
+            self._mock_steering = 0.0
+            self._last_frame = None
+            return self._mock_observation()
+
+        _require_beamngpy()
+        if self.beamng_home is None:
+            raise RuntimeError("beamng_home is required for BeamNGpy mode; use mode='mock' for CI.")
+
+        extractor = self._injected_extractor or BeamNGDriveExtractor(
+            beamng_home=self.beamng_home,
+            host=self.host,
+            port=self.port,
+            vehicle_model=self.vehicle_model,
+            scenario_name=self.scenario_name,
+            capture_rgb=self.capture_rgb,
+            capture_depth=self.capture_depth,
+            frequency_hz=self.frequency_hz,
+        )
+        extractor.connect()
+        extractor.setup_scenario()
+        extractor.setup_camera()
+        self._extractor = extractor
+        return extractor.collect_sample().to_observation()
+
+    def step(self, action: Action) -> tuple[Observation, float, bool, dict[str, Any]]:
+        if self._is_shutdown:
+            raise RuntimeError("BeamNGDriveEnvironment is shut down; create a new instance.")
+
+        if self.mode == "mock":
+            self._advance_mock(action)
+            done = self._mock_step_count >= self.done_after_steps
+            observation = self._mock_observation()
+            reward = float(self._mock_speed_mps)
+            info: dict[str, Any] = {
+                "mode": "mock",
+                "step_count": self._mock_step_count,
+                "action": _json_safe(dict(action)),
+            }
+            return observation, reward, done, info
+
+        if self._extractor is None:
+            raise RuntimeError("BeamNGDriveEnvironment.step called before reset()")
+
+        self._apply_real_action(action)
+        observation = self._extractor.collect_sample().to_observation()
+        info = {"mode": "beamngpy", "action_applied": bool(action)}
+        return observation, 0.0, False, info
+
+    def render_frame(self) -> bytes | None:
+        return self._last_frame
+
+    def last_frame(self) -> bytes | None:
+        return self._last_frame
+
+    def shutdown(self) -> None:
+        if self._extractor is not None:
+            try:
+                self._extractor.cleanup()
+            finally:
+                self._extractor = None
+        self._is_shutdown = True
+
+    def _advance_mock(self, action: Action) -> None:
+        throttle = float(action.get("throttle", action.get("accelerate", 0.0)) or 0.0)
+        brake = float(action.get("brake", 0.0) or 0.0)
+        steering = float(action.get("steering", action.get("steer", 0.0)) or 0.0)
+        self._mock_throttle = throttle
+        self._mock_brake = brake
+        self._mock_steering = steering
+        dt = 1.0 / self.frequency_hz
+
+        acceleration = max(-8.0, min(6.0, throttle * 6.0 - brake * 8.0))
+        self._mock_speed_mps = max(0.0, self._mock_speed_mps + acceleration * dt)
+        self._mock_yaw += steering * dt
+        self._mock_x += self._mock_speed_mps * dt
+        self._mock_y += steering * self._mock_speed_mps * dt * 0.1
+        self._mock_step_count += 1
+
+    def _mock_observation(self) -> Observation:
+        timestamp = self._mock_step_count / self.frequency_hz
+        return {
+            "timestamp": float(timestamp),
+            "ego_pose": {
+                "x": float(self._mock_x),
+                "y": float(self._mock_y),
+                "z": 0.0,
+                "roll": 0.0,
+                "pitch": 0.0,
+                "yaw": float(self._mock_yaw),
+            },
+            "camera": {
+                "rgb_shape": [480, 640, 3] if self.capture_rgb else None,
+                "depth_shape": [480, 640] if self.capture_depth else None,
+                "rgb_available": bool(self.capture_rgb),
+                "depth_available": bool(self.capture_depth),
+            },
+            "vehicle_sensors": {
+                "speed_mps": float(self._mock_speed_mps),
+                "throttle": float(self._mock_throttle),
+                "brake": float(self._mock_brake),
+                "steering": float(self._mock_steering),
+                "rpm": float(900 + self._mock_speed_mps * 120),
+                "gear": 1 if self._mock_speed_mps > 0 else 0,
+                "seed": self._mock_seed,
+                "step": self._mock_step_count,
+            },
+            "source": "mock",
+        }
+
+    def _apply_real_action(self, action: Action) -> None:
+        vehicle = self._extractor.vehicle if self._extractor is not None else None
+        if vehicle is None or not action:
+            return
+        control = getattr(vehicle, "control", None)
+        if not callable(control):
+            return
+        try:
+            control(
+                throttle=float(action.get("throttle", action.get("accelerate", 0.0)) or 0.0),
+                brake=float(action.get("brake", 0.0) or 0.0),
+                steering=float(action.get("steering", action.get("steer", 0.0)) or 0.0),
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(f"BeamNGpy vehicle control failed: {exc}") from exc
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     """CLI entry point."""
     parser = argparse.ArgumentParser(description="BeamNG.drive 60Hz sensor data extractor")
 
     parser.add_argument(
         "--beamng-home",
-        required=True,
+        required=False,
         type=Path,
         help="Path to BeamNG.drive installation",
+    )
+
+    parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Run pure-Python dry-run mode without BeamNG.drive or BeamNGpy",
     )
 
     parser.add_argument(
@@ -323,6 +583,29 @@ def main(argv: Optional[List[str]] = None) -> int:
     logging.basicConfig(level=level, format="%(levelname)s: %(message)s")
 
     try:
+        if args.mock:
+            env = BeamNGDriveEnvironment(
+                mode="mock",
+                capture_rgb=not args.no_rgb,
+                capture_depth=not args.no_depth,
+                frequency_hz=args.frequency,
+                done_after_steps=max(1, int(args.duration * args.frequency)),
+            )
+            observations = [env.reset(seed=0)]
+            for _ in range(max(1, int(args.duration * args.frequency))):
+                observation, _, done, _ = env.step({"throttle": 0.25, "steering": 0.0})
+                observations.append(observation)
+                if done:
+                    break
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            with open(args.output, "w") as f:
+                json.dump(observations, f, indent=2)
+            logging.info(f"Saved mock BeamNG observations to {args.output}")
+            return 0
+
+        if args.beamng_home is None:
+            parser.error("--beamng-home is required unless --mock is set")
+
         extractor = BeamNGDriveExtractor(
             beamng_home=args.beamng_home,
             host=args.host,
@@ -347,7 +630,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
         return 0
 
-    except ImportError as e:
+    except RuntimeError as e:
         logging.error(f"Missing dependency: {e}")
         logging.error("Install: pip install beamngpy numpy pillow")
         return 1
