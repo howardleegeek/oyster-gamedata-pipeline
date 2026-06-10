@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="Oyster Recorder" Manufacturer="Oyster Labs"
+           Version="{{VERSION}}" UpgradeCode="{{UPGRADE_CODE}}"
+           Scope="perUser">
+    <Feature Id="MainFeature" Title="Oyster Recorder" Level="1">
+      {{COMPONENTS}}
+    </Feature>
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="INSTALLDIR" Name="OysterRecorder" />
+    </StandardDirectory>
+    <!-- Auto-start on boot via registry -->
+    <Component Id="AutoStartReg" Directory="INSTALLDIR">
+      <RegistryKey Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Run">
+        <RegistryValue Name="OysterRecorder" Type="string"
+                       Value="[INSTALLDIR]OysterRecorder.exe --tray" />
+      </RegistryKey>
+    </Component>
+  </Package>
+</Wix>

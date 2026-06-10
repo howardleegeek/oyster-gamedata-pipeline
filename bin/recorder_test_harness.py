@@ -424,9 +424,10 @@ def package_tarball(
     gameinfo_path = clip_dir / "gameinfo.xlsx"
     try:
         import generate_gameinfo_xlsx as ggx  # noqa: PLC0415
+        mc_version = ggx.parse_game_version_from_window_title(str(rect.get("title", "")))
         game_info = ggx.build_gameinfo_dict(
             game_name="Minecraft",
-            game_version="1.20.4",
+            game_version=mc_version,
             platform="Java Edition",
             scene_name="overworld",
             weather="clear",

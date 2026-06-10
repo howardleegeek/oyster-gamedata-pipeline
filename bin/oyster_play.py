@@ -18,9 +18,11 @@ Cross-platform: this module imports cleanly on macOS for testing. The
 Windows-only paths (registry Desktop, MessageBox, UIA, Popen of
 ``OysterRecorder.exe``) are gated by ``os.name == 'nt'`` checks.
 """
+
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import subprocess
@@ -55,6 +57,16 @@ logger = logging.getLogger("oyster_play")
 
 
 RECORDER_EXE_NAME = "OysterRecorder.exe"
+RUST_RECORDER_DIR = "gamedata-recorder"
+RUST_RECORDER_EXE_NAME = "gamedata-recorder.exe"
+RUST_RECORDER_VERSION = "2.6.0"
+RUST_CONFIG_APP_DIR = "GameData Recorder"
+RUST_GAME_CAPTURE_STEMS = ("javaw", "minecraft")
+RUST_ENV_KEYS_TO_SCRUB = (
+    "GAMEDATA_CI_MODE",
+    "GAMEDATA_OUTPUT_DIR",
+    "GAMEDATA_SKIP_API_KEY",
+)
 # Bug 5 (R05E): when PyInstaller --onedir is invoked with
 # `--name OysterRecorder-onedir`, the produced binary is named
 # `OysterRecorder-onedir.exe` and lives in a sibling subdir of the same
@@ -78,12 +90,14 @@ def find_recorder_exe(install_root_path: Path) -> Path | None:
 
     Looks in standard install layouts, in priority order:
 
-        1. <INSTALL_ROOT>/OysterRecorder-onedir/OysterRecorder-onedir.exe
+        1. <INSTALL_ROOT>/gamedata-recorder/gamedata-recorder.exe
+           — proven Rust v2.6.0 capture engine, preferred when bundled.
+        2. <INSTALL_ROOT>/OysterRecorder-onedir/OysterRecorder-onedir.exe
            — the layout R05E actually ships (PyInstaller --onedir with
            `--name OysterRecorder-onedir` produces this naming + path).
-        2. <INSTALL_ROOT>/recorder/OysterRecorder.exe
-        3. <INSTALL_ROOT>/OysterRecorder.exe
-        4. sibling of the running executable (when run from a
+        3. <INSTALL_ROOT>/recorder/OysterRecorder.exe
+        4. <INSTALL_ROOT>/OysterRecorder.exe
+        5. sibling of the running executable (when run from a
            PyInstaller bundle — OysterPlay.exe is dropped at {app})
 
     Bug 5 (R05E): the .exe is shipped under
@@ -94,6 +108,8 @@ def find_recorder_exe(install_root_path: Path) -> Path | None:
         OysterRecorder.exe not found near <INSTALL_ROOT>
     """
     candidates: list[Path] = [
+        # Proven Rust recorder (v2.6.0 release asset) — preferred.
+        install_root_path / RUST_RECORDER_DIR / RUST_RECORDER_EXE_NAME,
         # Onedir layout (current R05E ship layout) — check first.
         install_root_path / RECORDER_ONEDIR_DIR / RECORDER_ONEDIR_EXE,
         # Legacy / hand-installed layouts kept as fallbacks.
@@ -104,6 +120,7 @@ def find_recorder_exe(install_root_path: Path) -> Path | None:
     # When bundled, sys.executable is OysterPlay.exe — recorder may be
     # in the same dir under either layout.
     exe = Path(sys.executable).resolve()
+    candidates.append(exe.parent / RUST_RECORDER_DIR / RUST_RECORDER_EXE_NAME)
     candidates.append(exe.parent / RECORDER_ONEDIR_DIR / RECORDER_ONEDIR_EXE)
     candidates.append(exe.parent / RECORDER_EXE_NAME)
     candidates.append(exe.parent / "recorder" / RECORDER_EXE_NAME)
@@ -115,7 +132,7 @@ def find_recorder_exe(install_root_path: Path) -> Path | None:
 
 
 def is_recorder_running() -> bool:
-    """Return True if a recorder process is alive (either exe naming).
+    """Return True if a recorder process is alive (Rust or Python naming).
 
     Bug 5 (R05E): the actual shipped binary is
     ``OysterRecorder-onedir.exe``, but legacy installs may still have
@@ -127,16 +144,19 @@ def is_recorder_running() -> bool:
     if os.name != "nt":
         return False
 
-    for image_name in (RECORDER_ONEDIR_EXE, RECORDER_EXE_NAME):
+    for image_name in (RUST_RECORDER_EXE_NAME, RECORDER_ONEDIR_EXE, RECORDER_EXE_NAME):
         try:
             out = subprocess.check_output(
-                ["tasklist", "/FI", f"IMAGENAME eq {image_name}",
-                 "/FO", "CSV", "/NH"],
-                encoding="utf-8", errors="replace", timeout=10,
+                ["tasklist", "/FI", f"IMAGENAME eq {image_name}", "/FO", "CSV", "/NH"],
+                encoding="utf-8",
+                errors="replace",
+                timeout=10,
             )
         except (subprocess.SubprocessError, OSError) as e:
             logger.warning(
-                "tasklist failed for %s: %s — continuing", image_name, e,
+                "tasklist failed for %s: %s — continuing",
+                image_name,
+                e,
             )
             continue
         if image_name.lower() in out.lower():
@@ -144,8 +164,126 @@ def is_recorder_running() -> bool:
     return False
 
 
+def is_rust_recorder_exe(recorder_exe: Path) -> bool:
+    """Return True for the bundled Rust v2.6.0 recorder executable."""
+    return recorder_exe.name.lower() == RUST_RECORDER_EXE_NAME
+
+
+def _infer_install_root_from_recorder_exe(recorder_exe: Path) -> Path:
+    """Infer {app} from either Rust, Python onedir, or legacy recorder paths."""
+    parent = recorder_exe.parent
+    if parent.name in {RUST_RECORDER_DIR, RECORDER_ONEDIR_DIR, "recorder"}:
+        return parent.parent
+    return parent
+
+
+def rust_recorder_config_path() -> Path:
+    """Return v2.6.0's standard `%APPDATA%\\GameData Recorder\\config.json`."""
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        base = Path(appdata)
+    else:
+        user_root = Path(os.environ.get("USERPROFILE", str(Path.home())))
+        base = user_root / "AppData" / "Roaming"
+    return base / RUST_CONFIG_APP_DIR / "config.json"
+
+
+def rust_recorder_recordings_dir() -> Path:
+    """Return v2.6.0's normal-mode recording root under `%LOCALAPPDATA%`."""
+    local_appdata = os.environ.get("LOCALAPPDATA")
+    if local_appdata:
+        base = Path(local_appdata)
+    else:
+        user_root = Path(os.environ.get("USERPROFILE", str(Path.home())))
+        base = user_root / "AppData" / "Local"
+    return base / RUST_CONFIG_APP_DIR / "recordings"
+
+
+def _read_json_object(path: Path) -> dict[str, object]:
+    try:
+        parsed = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return {}
+    if isinstance(parsed, dict):
+        return parsed
+    return {}
+
+
+def _dict_child(parent: dict[str, object], key: str) -> dict[str, object]:
+    value = parent.get(key)
+    if isinstance(value, dict):
+        return value
+    child: dict[str, object] = {}
+    parent[key] = child
+    return child
+
+
+def _write_json_object_utf8_no_bom(path: Path, data: dict[str, object]) -> None:
+    """Persist JSON as UTF-8 without BOM; serde_json rejects BOM at byte 0."""
+    payload = (json.dumps(data, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    if payload.startswith(b"\xef\xbb\xbf"):
+        raise ValueError("refusing to write BOM-prefixed Rust recorder config")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(payload)
+
+
+def ensure_rust_recorder_headless_config() -> Path:
+    """Seed Rust v2.6.0 config for no-click Minecraft game-hook capture.
+
+    This is the shippable path: no CI-mode bypass. Consent is granted through
+    the persisted `credentials.consentGivenAtVersion`, and `javaw`/`minecraft`
+    are built into the v2.6.0 whitelist, so the config only needs to pin their
+    per-game capture strategy.
+    """
+    config_path = rust_recorder_config_path()
+    recordings_dir = rust_recorder_recordings_dir()
+    config = _read_json_object(config_path)
+    credentials = _dict_child(config, "credentials")
+    credentials["hasConsented"] = True
+    credentials["consentGivenAtVersion"] = RUST_RECORDER_VERSION
+
+    preferences = _dict_child(config, "preferences")
+    preferences["autoUploadOnCompletion"] = False
+    preferences["recordMicrophone"] = False
+    preferences["recordingLocation"] = str(recordings_dir)
+
+    games = _dict_child(preferences, "games")
+    for stem in RUST_GAME_CAPTURE_STEMS:
+        game_config = _dict_child(games, stem)
+        game_config["use_window_capture"] = False
+        game_config["capture_mode"] = "game_hook"
+
+    recordings_dir.mkdir(parents=True, exist_ok=True)
+    _write_json_object_utf8_no_bom(config_path, config)
+    return config_path
+
+
+def rust_recorder_env() -> dict[str, str]:
+    """Build the shippable v2.6.0 runtime environment.
+
+    Scrub CI/test-only GAMEDATA_* variables inherited from the parent shell so
+    one-click cannot accidentally enter the recorder's "must NOT ship" path.
+    """
+    env = os.environ.copy()
+    for key in RUST_ENV_KEYS_TO_SCRUB:
+        env.pop(key, None)
+    env["OYSTER_CAPTURE_MODE"] = "game"
+    return env
+
+
+def _hidden_startupinfo() -> subprocess.STARTUPINFO | None:
+    """Hide the Rust UI window on Windows when the platform exposes STARTUPINFO."""
+    startupinfo_cls = getattr(subprocess, "STARTUPINFO", None)
+    if startupinfo_cls is None:
+        return None
+    startupinfo = startupinfo_cls()
+    startupinfo.dwFlags |= getattr(subprocess, "STARTF_USESHOWWINDOW", 0x00000001)
+    startupinfo.wShowWindow = 0  # SW_HIDE
+    return startupinfo
+
+
 def spawn_recorder(recorder_exe: Path) -> subprocess.Popen | None:
-    """Start ``OysterRecorder.exe`` if not already running. Returns the
+    """Start the bundled recorder if not already running. Returns the
     Popen handle (or None when no spawn was needed / non-Windows)."""
     if os.name != "nt":
         logger.info("non-Windows — skipping recorder spawn (test mode)")
@@ -153,11 +291,31 @@ def spawn_recorder(recorder_exe: Path) -> subprocess.Popen | None:
     if is_recorder_running():
         logger.info("recorder already running — skipping spawn")
         return None
-    logger.info("spawning recorder: %s", recorder_exe)
+
+    env: dict[str, str] | None = None
+    startupinfo = None
+    if is_rust_recorder_exe(recorder_exe):
+        install_root = _infer_install_root_from_recorder_exe(recorder_exe)
+        config_path = ensure_rust_recorder_headless_config()
+        recordings_dir = rust_recorder_recordings_dir()
+        env = rust_recorder_env()
+        startupinfo = _hidden_startupinfo()
+        logger.info(
+            "spawning Rust recorder: %s (install_root=%s, recordings_dir=%s, config=%s)",
+            recorder_exe,
+            install_root,
+            recordings_dir,
+            config_path,
+        )
+    else:
+        logger.info("spawning Python recorder fallback: %s", recorder_exe)
+
     # CREATE_NEW_PROCESS_GROUP so the recorder lives independently.
     return subprocess.Popen(
         [str(recorder_exe)],
         cwd=str(recorder_exe.parent),
+        env=env,
+        startupinfo=startupinfo,
         creationflags=0x00000200,  # CREATE_NEW_PROCESS_GROUP
     )
 
@@ -170,6 +328,7 @@ def spawn_recorder(recorder_exe: Path) -> subprocess.Popen | None:
 @dataclass(frozen=True)
 class RecorderWindow:
     """Captured info about a recorder Tk window we can drive via UIA."""
+
     hwnd: int
     title: str
     class_name: str
@@ -307,13 +466,11 @@ def click_recorder_button(
         cond = uia.CreatePropertyCondition(UIA.UIA_NamePropertyId, button_label)
         elt = root.FindFirst(UIA.TreeScope_Descendants, cond)
         if elt is None:
-            logger.warning("UIA: button '%s' not found in hwnd %s",
-                           button_label, win.hwnd)
+            logger.warning("UIA: button '%s' not found in hwnd %s", button_label, win.hwnd)
             return False
         invoke = elt.GetCurrentPattern(UIA.UIA_InvokePatternId)
         if invoke is None:
-            logger.warning("UIA: button '%s' has no InvokePattern",
-                           button_label)
+            logger.warning("UIA: button '%s' has no InvokePattern", button_label)
             return False
         invoke.QueryInterface(UIA.IUIAutomationInvokePattern).Invoke()
         return True
@@ -366,9 +523,7 @@ def write_desktop_shortcut(
         import pythoncom  # type: ignore[import-not-found]
         from win32com.client import Dispatch  # type: ignore[import-not-found]
     except ImportError:
-        logger.warning(
-            "pywin32 not available — falling back to PowerShell shortcut creation"
-        )
+        logger.warning("pywin32 not available — falling back to PowerShell shortcut creation")
         ps = (
             f"$s = (New-Object -ComObject WScript.Shell).CreateShortcut('{lnk_path}'); "
             f"$s.TargetPath='{target_exe}'; "
@@ -378,7 +533,9 @@ def write_desktop_shortcut(
         try:
             subprocess.run(
                 ["powershell", "-NoProfile", "-Command", ps],
-                check=True, capture_output=True, timeout=15,
+                check=True,
+                capture_output=True,
+                timeout=15,
             )
             return lnk_path
         except (subprocess.SubprocessError, OSError) as e:
@@ -406,6 +563,7 @@ def write_desktop_shortcut(
 @dataclass
 class PlaySession:
     """Tracks the running session state. Fields populated step-by-step."""
+
     install_root: Path
     plan: launcher.LaunchPlan | None = None
     recorder_proc: subprocess.Popen | None = None
@@ -430,13 +588,35 @@ def run_session(
     # Step 1: install integrity check
     status = launcher.verify_install(install_root_path, profile_name)
     if not status.ok:
+        # Defender / antivirus is the #1 cause of these missing files
+        # (Java + Minecraft .jar are high-FP triggers on fresh Windows).
+        # Tell the user that in plain language and point them to the
+        # bundled fix script before suggesting reinstall.
+        fix_script_path = install_root_path / "fix-scripts" / "INSTALL-FIRST.cmd"
+
+        # Bilingual message — Chinese first because most testers are CN.
         sess.failure_reason = (
-            "Install incomplete. Please reinstall.\nMissing:\n  " +
-            "\n  ".join(status.missing)
+            "安装不完整。最常见原因: Windows Defender 误删了 Java + Minecraft 文件。\n\n"
+            "Install incomplete. Most common cause: Windows Defender quarantined the\n"
+            "bundled Java runtime + Minecraft files (high false-positive rate on\n"
+            "unsigned Java + Minecraft jar combos).\n\n"
+            "缺失文件 / Missing files:\n  " + "\n  ".join(status.missing) + "\n\n"
+            "─────────────────────────────────────────────────────────────────\n"
+            "解决方案 / Fix (3 步):\n"
+            "  1) 右键此文件, 选 '以管理员身份运行':\n"
+            f"     {fix_script_path}\n"
+            "  2) 在控制面板卸载 Oyster Recorder.\n"
+            "  3) 重新双击 OysterRecorder-Setup-*.exe 安装.\n\n"
+            "English (3 steps):\n"
+            "  1) Right-click + 'Run as administrator':\n"
+            f"     {fix_script_path}\n"
+            "  2) Uninstall Oyster Recorder via Control Panel.\n"
+            "  3) Re-run OysterRecorder-Setup-*.exe.\n"
         )
         if not dry_run:
             launcher._show_messagebox(  # noqa: SLF001 — internal helper
-                "Oyster Recorder — install corrupted", sess.failure_reason,
+                "Oyster Recorder — install corrupted (Defender?)",
+                sess.failure_reason,
             )
         return sess
 
@@ -452,7 +632,8 @@ def run_session(
         sess.failure_reason = f"Could not build launch command: {e}"
         if not dry_run:
             launcher._show_messagebox(  # noqa: SLF001
-                "Oyster Recorder — launch failed", sess.failure_reason,
+                "Oyster Recorder — launch failed",
+                sess.failure_reason,
             )
         return sess
     sess.plan = plan
@@ -464,38 +645,47 @@ def run_session(
     recorder = find_recorder_exe(install_root_path)
     if recorder is None:
         sess.failure_reason = (
-            f"OysterRecorder.exe not found near {install_root_path}. "
-            "Please reinstall."
+            "gamedata-recorder.exe / OysterRecorder fallback not found near "
+            f"{install_root_path}. Please reinstall."
         )
         launcher._show_messagebox(  # noqa: SLF001
-            "Oyster Recorder — recorder missing", sess.failure_reason,
+            "Oyster Recorder — recorder missing",
+            sess.failure_reason,
         )
         return sess
+    rust_recorder = is_rust_recorder_exe(recorder)
     sess.recorder_proc = spawn_recorder(recorder)
 
     # Step 4: spawn javaw
     sess.javaw_proc = launcher.launch_javaw(plan, detach=False)
     logger.info("javaw started (pid=%d)", sess.javaw_proc.pid)
 
-    # Step 5: wait for MC ready signal in latest.log
+    # Step 5: wait for MC ready signal in latest.log. This signal is helpful
+    # but not authoritative; recorder_consumer_lite now gates on the real
+    # gameplay window, so we still auto-arm when the marker is absent.
     log_path = launcher.latest_log_path(install_root_path)
     ready = launcher.wait_for_mc_ready(log_path, timeout_sec=ready_timeout_sec)
     if not ready:
         logger.warning(
-            "MC ready marker not seen in %.0fs — continuing anyway",
+            "MC ready marker not seen in %.0fs — auto-arming anyway; "
+            "recorder waits for the real game window",
             ready_timeout_sec,
         )
 
     # Step 6: locate recorder window + click ▶ 开始录制
-    sess.recorder_window = wait_for_recorder_window(timeout_sec=20.0)
-    if sess.recorder_window is not None and ready:
-        sess.armed = click_recorder_button(sess.recorder_window)
-        if sess.armed:
-            logger.info("recorder armed via UIA")
-        else:
-            logger.warning("could not arm recorder — user must click manually")
+    if rust_recorder:
+        sess.armed = True
+        logger.info("Rust recorder runs auto-record/headless; skipping Tk UIA arm")
     else:
-        logger.warning("recorder window not found; skipping auto-arm")
+        sess.recorder_window = wait_for_recorder_window(timeout_sec=20.0)
+        if sess.recorder_window is not None:
+            sess.armed = click_recorder_button(sess.recorder_window)
+            if sess.armed:
+                logger.info("recorder armed via UIA")
+            else:
+                logger.warning("could not arm recorder — user must click manually")
+        else:
+            logger.warning("recorder window not found; skipping auto-arm")
 
     # Step 7: wait for javaw exit, then disarm
     rc = sess.javaw_proc.wait()
@@ -505,9 +695,10 @@ def run_session(
         sess.failure_reason = f"Minecraft exited with code {rc}"
         launcher.surface_failure_messagebox(plan, rc)
     else:
-        if sess.armed and sess.recorder_window is not None:
+        if not rust_recorder and sess.armed and sess.recorder_window is not None:
             click_recorder_button(
-                sess.recorder_window, button_label=RECORDER_DISARM_LABEL,
+                sess.recorder_window,
+                button_label=RECORDER_DISARM_LABEL,
             )
 
     return sess
@@ -522,18 +713,23 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Oyster single-button consumer launcher",
     )
-    parser.add_argument("--install-root", type=Path, default=None,
-                        help="Override install root (default per-user)")
+    parser.add_argument(
+        "--install-root", type=Path, default=None, help="Override install root (default per-user)"
+    )
     parser.add_argument("--username", default="Player")
     parser.add_argument("--xmx", default="4G")
     parser.add_argument("--profile-name", default=launcher.FABRIC_PROFILE_NAME)
-    parser.add_argument("--ready-timeout", type=float,
-                        default=DEFAULT_READY_TIMEOUT_SEC)
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Build the plan + print the constructed javaw "
-                             "cmd line; never spawn anything.")
-    parser.add_argument("--write-desktop-shortcut", action="store_true",
-                        help="(Windows only) write the desktop .lnk and exit.")
+    parser.add_argument("--ready-timeout", type=float, default=DEFAULT_READY_TIMEOUT_SEC)
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Build the plan + print the constructed javaw " "cmd line; never spawn anything.",
+    )
+    parser.add_argument(
+        "--write-desktop-shortcut",
+        action="store_true",
+        help="(Windows only) write the desktop .lnk and exit.",
+    )
     parser.add_argument("--verbose", action="store_true")
 
     args = parser.parse_args(argv)

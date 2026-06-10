@@ -35,7 +35,9 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Protocol, Tuple
+
+from oyster_agent_runner.environments.base import Action, Environment, Observation
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +59,10 @@ ACTION_KEYS: Tuple[str, ...] = (
     "cancel",
     "run",
 )
+NOOP_ACTION = "noop"
+VALID_ACTIONS: Tuple[str, ...] = (*ACTION_KEYS, NOOP_ACTION)
 FACING_DIRS: Tuple[str, ...] = ("up", "down", "left", "right")
+DEFAULT_SOURCE = "smapi_relay"
 
 # ---------------------------------------------------------------------------
 # Data classes
@@ -191,6 +196,11 @@ class SMAPIRelayClient:
 # ---------------------------------------------------------------------------
 
 
+class _RelayClient(Protocol):
+    def get_state(self) -> PlayerState: ...
+    def press_key(self, key: str) -> Dict[str, Any]: ...
+
+
 class StardewValleyEnv:
     """High-level environment that polls the SMAPI relay at a fixed rate.
 
@@ -274,6 +284,118 @@ class StardewValleyEnv:
     @property
     def config(self) -> EnvConfig:
         return self._config
+
+
+class StardewValleyEnvironment(Environment):
+    """Environment-protocol wrapper backed by the SMAPI HTTP relay.
+
+    This is the plug-and-play adapter used by the generic runner. The older
+    ``StardewValleyEnv`` poller remains available for CLI capture loops, while
+    this wrapper exposes the standard ``reset``/``step``/``shutdown`` contract.
+    """
+
+    def __init__(
+        self,
+        host: str = DEFAULT_HOST,
+        port: int = DEFAULT_PORT,
+        *,
+        fps: int = DEFAULT_FPS,
+        timeout: float = DEFAULT_TIMEOUT,
+        client: _RelayClient | None = None,
+        source: str = DEFAULT_SOURCE,
+    ) -> None:
+        self._config = EnvConfig(host=host, port=port, fps=fps, timeout=timeout)
+        self._client: _RelayClient = (
+            client if client is not None else SMAPIRelayClient(self._config)
+        )
+        self._source = source
+        self._running = False
+        self._frame_count = 0
+        self._last_state: PlayerState | None = None
+        self._last_frame: bytes | None = None
+
+    def reset(self, seed: int | None = None) -> Observation:
+        """Read ``/state`` and return the initial protocol observation."""
+        del seed  # Stardew world determinism is controlled by the save file.
+        self._frame_count = 0
+        self._running = True
+        self._last_state = self._client.get_state()
+        return self._observation_from_state(self._last_state)
+
+    def step(self, action: Action) -> tuple[Observation, float, bool, dict[str, Any]]:
+        """Apply one allowed key action, then read ``/state`` again."""
+        if not self._running:
+            raise RuntimeError("StardewValleyEnvironment.step called before reset()")
+
+        key = _validate_action(action)
+        relay_response: Dict[str, Any] = {"ok": True, "skipped": True}
+        if key != NOOP_ACTION:
+            relay_response = self._client.press_key(key)
+
+        self._last_state = self._client.get_state()
+        self._frame_count += 1
+        observation = self._observation_from_state(self._last_state)
+        info: dict[str, Any] = {
+            "action": key,
+            "frame_count": self._frame_count,
+            "relay_response": relay_response,
+            "source": self._source,
+        }
+        return observation, 0.0, False, info
+
+    def render_frame(self) -> bytes | None:
+        return None
+
+    def last_frame(self) -> bytes | None:
+        return self._last_frame
+
+    def shutdown(self) -> None:
+        self._running = False
+        for method_name in ("shutdown", "close"):
+            method = getattr(self._client, method_name, None)
+            if callable(method):
+                method()
+                break
+
+    @property
+    def frame_count(self) -> int:
+        return self._frame_count
+
+    @property
+    def is_running(self) -> bool:
+        return self._running
+
+    @property
+    def config(self) -> EnvConfig:
+        return self._config
+
+    def _observation_from_state(self, state: PlayerState) -> Observation:
+        return {
+            "timestamp": float(state.timestamp),
+            "map_name": state.map_name,
+            "player_position": {
+                "x": state.x,
+                "y": state.y,
+            },
+            "facing": state.facing,
+            "keys": {key: bool(state.keys.get(key, False)) for key in ACTION_KEYS},
+            "source": self._source,
+        }
+
+
+def _validate_action(action: Action) -> str:
+    if not isinstance(action, dict):
+        raise ValueError("Stardew action must be a dict")
+
+    raw_key = action.get("key", action.get("action", action.get("op", NOOP_ACTION)))
+    if not isinstance(raw_key, str):
+        raise ValueError("Stardew action key must be a string")
+
+    key = raw_key.strip().lower()
+    if key not in VALID_ACTIONS:
+        allowed = ", ".join(VALID_ACTIONS)
+        raise ValueError(f"Unsupported Stardew action {raw_key!r}. Allowed: {allowed}")
+    return key
 
 
 # ---------------------------------------------------------------------------

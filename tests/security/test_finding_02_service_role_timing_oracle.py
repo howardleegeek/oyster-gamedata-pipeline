@@ -33,12 +33,12 @@ as the safe reference and `==` as the unsafe one. The unsafe variant
 exhibits a measurable correlation with prefix-match length; the safe
 variant does not.
 """
+
 from __future__ import annotations
 
 import hmac
 import time
 import unittest
-
 
 SECRET = "sk_live_" + "a" * 56  # 64 chars, prod-realistic length
 
@@ -72,10 +72,10 @@ class ServiceRoleTimingOracleTest(unittest.TestCase):
         growth of average ns-per-call for prefixes of increasing length.
         """
         prefixes = [
-            "x" + SECRET[1:],          # 0-byte match
-            SECRET[:8] + "x" * 56,     # 8-byte match
-            SECRET[:32] + "x" * 32,    # 32-byte match
-            SECRET[:60] + "xxxx",      # 60-byte match
+            "x" + SECRET[1:],  # 0-byte match
+            SECRET[:8] + "x" * 56,  # 8-byte match
+            SECRET[:32] + "x" * 32,  # 32-byte match
+            SECRET[:60] + "xxxx",  # 60-byte match
         ]
         timings = [_measure(unsafe_eq, p, SECRET) for p in prefixes]
 
