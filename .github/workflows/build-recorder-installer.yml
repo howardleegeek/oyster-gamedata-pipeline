@@ -301,7 +301,7 @@ jobs:
           }
           $content = Get-Content -Raw -LiteralPath $template
           if ($content -notmatch '\{ROOT\}') {
-            Write-Error "Minecraft @argfile template is missing the literal {ROOT} placeholder"
+            Write-Error "Minecraft @argfile template is missing the literal {ROOT} token"
             exit 1
           }
           if ($content -notmatch '"-DFabricMcEmu= net\.minecraft\.client\.main\.Main"') {
