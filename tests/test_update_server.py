@@ -16,9 +16,7 @@ injection point on :func:`resolve_update`.
 
 from __future__ import annotations
 
-import io
 import json
-import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -32,7 +30,6 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from bin import update_server_proxy as usp  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

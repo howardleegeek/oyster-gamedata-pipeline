@@ -10,7 +10,6 @@ import io
 import json
 import sys
 import tarfile
-import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -21,7 +20,6 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from bin import version_compat_checker as vcc  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Sample matrix

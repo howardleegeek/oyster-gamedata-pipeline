@@ -19,7 +19,6 @@ if str(_REPO_ROOT) not in sys.path:
 
 from bin import error_report_service as ers  # noqa: E402
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -38,7 +37,7 @@ def _minimal(**over: Any) -> dict[str, Any]:
         "os": "windows-11-build-22631",
         "stack_trace": (
             "Traceback (most recent call last):\n"
-            "  File \"recorder.py\", line 42, in main\n"
+            '  File "recorder.py", line 42, in main\n'
             "    raise RuntimeError('boom')\n"
             "RuntimeError: boom\n"
         ),
@@ -159,7 +158,7 @@ class TestScrubPii:
     def test_multiple_pii_in_one_blob(self):
         s = (
             "Traceback:\n"
-            "  File \"C:\\Users\\Howard\\AppData\\Local\\OysterRecorder\\bin\\foo.py\", line 42\n"
+            '  File "C:\\Users\\Howard\\AppData\\Local\\OysterRecorder\\bin\\foo.py", line 42\n'
             "  contact: howard.li@berkeley.edu  ip: 10.0.0.5\n"
         )
         out = ers.scrub_pii(s)
@@ -277,8 +276,7 @@ class TestStoreRecord:
         report = ers.validate_report(
             _minimal(
                 stack_trace=(
-                    "File C:\\Users\\Howard\\foo.py, line 1\n"
-                    "  contact howard.li@berkeley.edu\n"
+                    "File C:\\Users\\Howard\\foo.py, line 1\n" "  contact howard.li@berkeley.edu\n"
                 )
             )
         )
@@ -293,12 +291,8 @@ class TestStoreRecord:
     def test_dedup_collapses_pii_variants(self, store):
         # Two crashes with DIFFERENT usernames but identical structure
         # should dedup to one row after PII scrub.
-        a = ers.validate_report(
-            _minimal(stack_trace="C:\\Users\\Alice\\foo.py crashed\n")
-        )
-        b = ers.validate_report(
-            _minimal(stack_trace="C:\\Users\\Bob\\foo.py crashed\n")
-        )
+        a = ers.validate_report(_minimal(stack_trace="C:\\Users\\Alice\\foo.py crashed\n"))
+        b = ers.validate_report(_minimal(stack_trace="C:\\Users\\Bob\\foo.py crashed\n"))
         store.record(a)
         result = store.record(b)
         assert result["duplicate"] is True
