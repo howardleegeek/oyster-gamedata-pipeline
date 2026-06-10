@@ -9,12 +9,12 @@ References:
   - SECURITY_AUDIT_2026_05_13.md, findings #01, #02, #03
   - PR: 🚨 fix(sec): Top-3 critical + high security findings
 """
+
 from __future__ import annotations
 
 import re
 import unittest
 from pathlib import Path
-
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 

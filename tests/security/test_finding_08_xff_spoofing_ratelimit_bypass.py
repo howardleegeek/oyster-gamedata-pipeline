@@ -44,6 +44,7 @@ The Vercel documentation explicitly warns about this:
 Repro
 =====
 """
+
 from __future__ import annotations
 
 import unittest
@@ -76,9 +77,7 @@ class XffSpoofingTest(unittest.TestCase):
         """Attacker iterates IPs to defeat the 12/min/IP limit."""
         buckets: set[str] = set()
         for i in range(1000):
-            ip = client_ip_from_headers(
-                {"x-forwarded-for": f"10.0.0.{i % 256}, 198.51.100.42"}
-            )
+            ip = client_ip_from_headers({"x-forwarded-for": f"10.0.0.{i % 256}, 198.51.100.42"})
             buckets.add(ip)
         self.assertEqual(
             len(buckets),
@@ -122,9 +121,7 @@ class XffSpoofingTest(unittest.TestCase):
         self.assertEqual(seen, "198.51.100.42")
 
         # Even fall-back-to-XFF picks the rightmost (real) IP.
-        seen2 = fixed_client_ip_from_headers(
-            {"x-forwarded-for": "1.1.1.1, 198.51.100.42"}
-        )
+        seen2 = fixed_client_ip_from_headers({"x-forwarded-for": "1.1.1.1, 198.51.100.42"})
         self.assertEqual(seen2, "198.51.100.42")
 
 

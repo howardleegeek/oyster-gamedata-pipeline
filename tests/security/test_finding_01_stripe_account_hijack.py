@@ -23,6 +23,7 @@ Repro (logic, no live HTTP)
 Simulate the route's update-path with `account` from the query string and
 demonstrate the DB write would replace the destination.
 """
+
 from __future__ import annotations
 
 import unittest
@@ -162,9 +163,7 @@ class StripeAccountHijackTest(unittest.TestCase):
                 "details_submitted": True,
             },
         )
-        self.assertEqual(
-            testers.rows["victim-uuid"]["stripe_account_id"], "acct_victim_legit"
-        )
+        self.assertEqual(testers.rows["victim-uuid"]["stripe_account_id"], "acct_victim_legit")
 
 
 if __name__ == "__main__":
