@@ -1,0 +1,2 @@
+game_name,game_version,platform,scene_name,weather,time_of_day,character_name,character_class,operator_id,recording_date,total_frames,video_duration_sec,route_type,notes
+synthetic_game,1.0,linux,test_scene,clear,day,hero,warrior,OP-000,2024-01-01,20,1.0,linear,synthetic fixture
