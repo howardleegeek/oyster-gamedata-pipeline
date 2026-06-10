@@ -4,7 +4,7 @@
 Runtime launch_mc.bat deliberately does no JSON parsing. This script runs
 after fetch_minecraft.py and fetch_fabric.py have staged bundle/mc-instance.
 It reads the Fabric/Minecraft profile JSON once, resolves the classpath, and
-writes mc_args_template.txt with literal {ROOT} placeholders.
+writes mc_args_template.txt with literal {ROOT} tokens.
 """
 
 from __future__ import annotations
@@ -93,7 +93,7 @@ def _resolve_classpath(
     leaf: dict[str, Any],
     parent: dict[str, Any],
     mc_version: str,
-    root_placeholder: str,
+    root_token: str,
 ) -> str:
     libraries_root = instance_dir / "libraries"
     seen: set[str] = set()
@@ -119,13 +119,13 @@ def _resolve_classpath(
         if not jar.is_file():
             missing.append(str(rel).replace("\\", "/"))
             continue
-        entries.append(f"{root_placeholder}/mc-instance/libraries/{rel.as_posix()}")
+        entries.append(f"{root_token}/mc-instance/libraries/{rel.as_posix()}")
 
     client_jar = instance_dir / "versions" / mc_version / f"{mc_version}.jar"
     if not client_jar.is_file():
         missing.append(f"versions/{mc_version}/{mc_version}.jar")
     else:
-        entries.append(f"{root_placeholder}/mc-instance/versions/{mc_version}/{mc_version}.jar")
+        entries.append(f"{root_token}/mc-instance/versions/{mc_version}/{mc_version}.jar")
 
     if missing:
         raise FileNotFoundError(
@@ -145,7 +145,7 @@ def generate_template(
     instance_dir: Path,
     output: Path,
     manifest_path: Path,
-    root_placeholder: str,
+    root_token: str,
     username: str,
 ) -> list[str]:
     manifest = _load_json(manifest_path)
@@ -171,11 +171,11 @@ def generate_template(
         leaf=leaf,
         parent=parent,
         mc_version=mc_version,
-        root_placeholder=root_placeholder,
+        root_token=root_token,
     )
 
-    natives = f"{root_placeholder}/mc-instance/versions/{mc_version}/natives"
-    instance = f"{root_placeholder}/mc-instance"
+    natives = f"{root_token}/mc-instance/versions/{mc_version}/natives"
+    instance = f"{root_token}/mc-instance"
     lines = [
         "-Xmx4G",
         "-Xms4G",
@@ -216,8 +216,8 @@ def generate_template(
         raise RuntimeError(f"template line count changed: expected 33, got {len(lines)}")
     if any("\\" in line for line in lines):
         raise RuntimeError("template contains a backslash; paths must use forward slashes")
-    if root_placeholder not in "\n".join(lines):
-        raise RuntimeError(f"template missing {root_placeholder} placeholder")
+    if root_token not in "\n".join(lines):
+        raise RuntimeError(f"template missing {root_token} token")
 
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
@@ -229,7 +229,7 @@ def main() -> int:
     parser.add_argument("--instance-dir", type=Path, default=DEFAULT_INSTANCE_DIR)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--manifest", type=Path, default=PIN_MANIFEST)
-    parser.add_argument("--root-placeholder", default="{ROOT}")
+    parser.add_argument("--root-token", default="{ROOT}")
     parser.add_argument("--username", default="Player")
     args = parser.parse_args()
 
@@ -238,7 +238,7 @@ def main() -> int:
             instance_dir=args.instance_dir,
             output=args.output,
             manifest_path=args.manifest,
-            root_placeholder=args.root_placeholder,
+            root_token=args.root_token,
             username=args.username,
         )
     except Exception as exc:  # noqa: BLE001
