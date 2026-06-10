@@ -1,0 +1,13 @@
+# Keep the Cloud Build upload lean: only the backend image inputs matter.
+.git/
+tests/
+docs/
+patches/
+bin/
+web-buyer/
+web-tester/
+vendor/
+installer/
+scripts/
+specs/
+*.md

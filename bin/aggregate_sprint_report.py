@@ -4,10 +4,8 @@
 import argparse
 import glob
 import json
-import math
 import os
 import statistics
-import sys
 
 
 def aggregate(log_dir: str, output_md: str) -> dict:

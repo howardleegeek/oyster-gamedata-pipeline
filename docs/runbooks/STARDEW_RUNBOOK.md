@@ -132,6 +132,94 @@ Expected output should include `CaptureMod` with status `OK`.
 
 ---
 
+## Plug-and-Play Relay Contract
+
+The CI adapter uses `StardewValleyEnvironment` in
+`src/oyster_agent_runner/environments/stardew_valley.py`. It preserves the
+existing `SMAPIRelayClient` and wraps it with the shared Environment protocol.
+
+### Required Relay Endpoints
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/state` | Return the current player/map/key state |
+| `POST` | `/press` | Apply one input action: `{"key": "right"}` |
+
+`GET /state` must return JSON fields compatible with:
+
+```json
+{
+  "timestamp": 1779469000.0,
+  "map": "Farm",
+  "x": 12.5,
+  "y": 44.0,
+  "facing": "down",
+  "keys": {
+    "up": false,
+    "down": false,
+    "left": false,
+    "right": false,
+    "use_tool": false,
+    "do_action": false,
+    "cancel": false,
+    "run": false
+  }
+}
+```
+
+The adapter emits runner observations with exactly these stable fields:
+
+```json
+{
+  "timestamp": 1779469000.0,
+  "map_name": "Farm",
+  "player_position": {"x": 12.5, "y": 44.0},
+  "facing": "down",
+  "keys": {
+    "up": false,
+    "down": false,
+    "left": false,
+    "right": false,
+    "use_tool": false,
+    "do_action": false,
+    "cancel": false,
+    "run": false
+  },
+  "source": "smapi_relay"
+}
+```
+
+### Actions
+
+Only these actions are accepted by `step(action)`:
+
+- `up`
+- `down`
+- `left`
+- `right`
+- `use_tool`
+- `do_action`
+- `cancel`
+- `run`
+- `noop`
+
+Accepted action shapes are `{"key": "right"}`, `{"action": "right"}`, or
+`{"op": "right"}`. `noop` refreshes `/state` without sending `/press`.
+Every non-`noop` action posts to `/press` first, then reads `/state` so the
+observation is post-action state.
+
+### CI Smoke
+
+Run the plug-and-play contract tests before shipping a Stardew adapter change:
+
+```bash
+python3 -m pytest tests/test_stardew_valley_env.py tests/test_game_plugins.py -q
+ruff check src/oyster_agent_runner/environments/stardew_valley.py tests/test_stardew_valley_env.py
+black --check src/oyster_agent_runner/environments/stardew_valley.py tests/test_stardew_valley_env.py
+```
+
+---
+
 ## 30-Minute Smoke Test
 
 ### Step 1: Start Game with Logging

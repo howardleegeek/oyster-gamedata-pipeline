@@ -1,0 +1,255 @@
+{
+  "updated_at": "2026-05-20T02:15:29.083521+00:00",
+  "per_spec": [
+    {
+      "spec": "batch10",
+      "model": "glm-5",
+      "turns": 24,
+      "retries": 0,
+      "wall_s": 0,
+      "estimated_tokens": 19200,
+      "estimated_usd": 0.0576
+    },
+    {
+      "spec": "ci21",
+      "model": "glm-5",
+      "turns": 32,
+      "retries": 0,
+      "wall_s": 0,
+      "estimated_tokens": 25600,
+      "estimated_usd": 0.0768
+    },
+    {
+      "spec": "daemon20",
+      "model": "deepseek-v3.2",
+      "turns": 26,
+      "retries": 0,
+      "wall_s": 0,
+      "estimated_tokens": 20800,
+      "estimated_usd": 0.0624
+    },
+    {
+      "spec": "dashboard19",
+      "model": "glm-5",
+      "turns": 37,
+      "retries": 0,
+      "wall_s": 0,
+      "estimated_tokens": 29600,
+      "estimated_usd": 0.0888
+    },
+    {
+      "spec": "deploy07",
+      "model": "deepseek-v3.2",
+      "turns": 33,
+      "retries": 1,
+      "wall_s": 0,
+      "estimated_tokens": 26400,
+      "estimated_usd": 0.0792
+    },
+    {
+      "spec": "disc40",
+      "model": "qwen3.6-plus",
+      "turns": 37,
+      "retries": 0,
+      "wall_s": 0,
+      "estimated_tokens": 29600,
+      "estimated_usd": 0.0888
+    },
+    {
+      "spec": "e2e-orchestrator",
+      "model": "MiniMax-M2.5",
+      "turns": 24,
+      "retries": 0,
+      "wall_s": 0,
+      "estimated_tokens": 19200,
+      "estimated_usd": 0.0576
+    },
+    {
+      "spec": "i18n28",
+      "model": "deepseek-v3.2",
+      "turns": 40,
+      "retries": 1,
+      "wall_s": 0,
+      "estimated_tokens": 32000,
+      "estimated_usd": 0.096
+    },
+    {
+      "spec": "installer16",
+      "model": "MiniMax-M2.5",
+      "turns": 18,
+      "retries": 0,
+      "wall_s": 0,
+      "estimated_tokens": 14400,
+      "estimated_usd": 0.0432
+    },
+    {
+      "spec": "integration13",
+      "model": "qwen3.6-plus",
+      "turns": 0,
+      "retries": 0,
+      "wall_s": 0,
+      "estimated_tokens": 0,
+      "estimated_usd": 0.0
+    },
+    {
+      "spec": "mic15",
+      "model": "qwen3.6-plus",
+      "turns": 26,
+      "retries": 0,
+      "wall_s": 0,
+      "estimated_tokens": 20800,
+      "estimated_usd": 0.0624
+    },
+    {
+      "spec": "mkt32",
+      "model": "glm-5",
+      "turns": 30,
+      "retries": 3,
+      "wall_s": 0,
+      "estimated_tokens": 24000,
+      "estimated_usd": 0.072
+    },
+    {
+      "spec": "mod26",
+      "model": "MiniMax-M2.5",
+      "turns": 40,
+      "retries": 0,
+      "wall_s": 0,
+      "estimated_tokens": 32000,
+      "estimated_usd": 0.096
+    },
+    {
+      "spec": "modal17",
+      "model": "qwen3.6-plus",
+      "turns": 23,
+      "retries": 0,
+      "wall_s": 0,
+      "estimated_tokens": 18400,
+      "estimated_usd": 0.0552
+    },
+    {
+      "spec": "mon30",
+      "model": "qwen3.6-plus",
+      "turns": 32,
+      "retries": 3,
+      "wall_s": 0,
+      "estimated_tokens": 25600,
+      "estimated_usd": 0.0768
+    },
+    {
+      "spec": "oauth24",
+      "model": "glm-5",
+      "turns": 28,
+      "retries": 1,
+      "wall_s": 0,
+      "estimated_tokens": 22400,
+      "estimated_usd": 0.0672
+    },
+    {
+      "spec": "onnx22",
+      "model": "qwen3.6-plus",
+      "turns": 25,
+      "retries": 0,
+      "wall_s": 0,
+      "estimated_tokens": 20000,
+      "estimated_usd": 0.06
+    },
+    {
+      "spec": "pay23",
+      "model": "MiniMax-M2.5",
+      "turns": 37,
+      "retries": 3,
+      "wall_s": 0,
+      "estimated_tokens": 29600,
+      "estimated_usd": 0.0888
+    },
+    {
+      "spec": "pr14",
+      "model": "glm-5",
+      "turns": 40,
+      "retries": 1,
+      "wall_s": 0,
+      "estimated_tokens": 32000,
+      "estimated_usd": 0.096
+    },
+    {
+      "spec": "preflight08",
+      "model": "MiniMax-M2.5",
+      "turns": 22,
+      "retries": 1,
+      "wall_s": 0,
+      "estimated_tokens": 17600,
+      "estimated_usd": 0.0528
+    },
+    {
+      "spec": "priv29",
+      "model": "MiniMax-M2.5",
+      "turns": 40,
+      "retries": 2,
+      "wall_s": 0,
+      "estimated_tokens": 32000,
+      "estimated_usd": 0.096
+    },
+    {
+      "spec": "provenance01",
+      "model": "MiniMax-M2.5",
+      "turns": 40,
+      "retries": 0,
+      "wall_s": 0,
+      "estimated_tokens": 32000,
+      "estimated_usd": 0.096
+    },
+    {
+      "spec": "qual33",
+      "model": "qwen3.6-plus",
+      "turns": 40,
+      "retries": 2,
+      "wall_s": 0,
+      "estimated_tokens": 32000,
+      "estimated_usd": 0.096
+    },
+    {
+      "spec": "rl34",
+      "model": "deepseek-v3.2",
+      "turns": 25,
+      "retries": 4,
+      "wall_s": 0,
+      "estimated_tokens": 20000,
+      "estimated_usd": 0.06
+    },
+    {
+      "spec": "s3upload18",
+      "model": "MiniMax-M2.5",
+      "turns": 22,
+      "retries": 0,
+      "wall_s": 0,
+      "estimated_tokens": 17600,
+      "estimated_usd": 0.0528
+    },
+    {
+      "spec": "watchdog09",
+      "model": "qwen3.6-plus",
+      "turns": 0,
+      "retries": 0,
+      "wall_s": 0,
+      "estimated_tokens": 0,
+      "estimated_usd": 0.0
+    },
+    {
+      "spec": "zbuffer11",
+      "model": "deepseek-v3.2",
+      "turns": 40,
+      "retries": 1,
+      "wall_s": 0,
+      "estimated_tokens": 32000,
+      "estimated_usd": 0.096
+    }
+  ],
+  "totals": {
+    "specs": 27,
+    "turns": 781,
+    "retries": 23,
+    "wall_s": 0,
+    "estimated_usd": 1.8744
+  }
+}
