@@ -228,7 +228,7 @@ def _request_payloads(client: _FakeObsClient, request_type: str) -> list[dict[st
 def test_recorder_version_is_v0196() -> None:
     m = _import_recorder_module()
 
-    assert m.RECORDER_VERSION == "lite-v0.19.6"
+    assert m.RECORDER_VERSION == "lite-v0.26.0"
 
 
 def test_obs_launch_arg_builder_uses_portable_minimized_profile(tmp_path: Path) -> None:
