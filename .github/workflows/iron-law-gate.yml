@@ -1,0 +1,48 @@
+---
+name: Iron Law Gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  iron-law-gate:
+    name: Iron Law Gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install -e ".[test,exr,xlsx]" black ruff
+
+      - name: Black format check
+        run: |
+          black --check src/ tests/
+
+      - name: Ruff lint
+        run: |
+          ruff check src/ tests/
+
+      - name: Run pytest (fast-fail)
+        run: |
+          pytest tests/ -v -x
+
+      - name: Iron law check
+        run: |
+          bash scripts/iron_law_check.sh

@@ -7,13 +7,19 @@ Generates an Excel file with game information metadata for video recordings.
 """
 
 import argparse
+import json
+import logging
+import os
+import re
 import sys
 import zipfile
-import re
-import os
 from datetime import date, datetime
 from io import BytesIO
-from typing import Dict, Any, Optional, List
+from pathlib import Path
+from typing import Any, Dict, Iterator, List, Optional
+
+
+logger = logging.getLogger(__name__)
 
 
 # Field names in order (PRD §3.3)
@@ -34,10 +40,188 @@ FIELD_NAMES = [
     "notes",
 ]
 
+MC_VERSION_IN_TITLE_RE = re.compile(
+    r"\bMinecraft\s+(?P<version>\d+\.\d+(?:\.\d+)?(?:[-+._A-Za-z0-9]*)?)\b",
+    re.IGNORECASE,
+)
+MC_VERSION_TOKEN_RE = re.compile(
+    r"(?<![\d.])(?P<version>\d+\.\d+(?:\.\d+)?(?:[-+._A-Za-z0-9]*)?)(?![\d.])"
+)
+
+
+def _clean_version(value: Any) -> Optional[str]:
+    """Return a plausible Minecraft version string from ``value``."""
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    if not value:
+        return None
+    title_match = MC_VERSION_IN_TITLE_RE.search(value)
+    if title_match:
+        return title_match.group("version")
+    token_match = MC_VERSION_TOKEN_RE.fullmatch(value)
+    if token_match:
+        return token_match.group("version")
+    return value
+
+
+def parse_game_version_from_window_title(title: str) -> Optional[str]:
+    """Extract a Minecraft version from a window title like ``Minecraft 1.21.4``."""
+    match = MC_VERSION_IN_TITLE_RE.search(title)
+    return match.group("version") if match else None
+
+
+def _load_json_object(path: Path) -> Optional[Any]:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def detect_game_version_from_metadata(session_dir: os.PathLike[str] | str) -> Optional[str]:
+    """Read ``metadata.json`` in priority order: ``mc_version``, then ``game_version``."""
+    metadata = _load_json_object(Path(session_dir) / "metadata.json")
+    if not isinstance(metadata, dict):
+        return None
+    for key in ("mc_version", "game_version"):
+        version = _clean_version(metadata.get(key))
+        if version:
+            return version
+    return None
+
+
+def _iter_json_strings(value: Any) -> Iterator[str]:
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for child in value.values():
+            yield from _iter_json_strings(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _iter_json_strings(child)
+
+
+def detect_game_version_from_fps_log(session_dir: os.PathLike[str] | str) -> Optional[str]:
+    """Parse Minecraft version from any window-title string in ``fps_log.json``."""
+    fps_log = _load_json_object(Path(session_dir) / "fps_log.json")
+    if fps_log is None:
+        return None
+    for value in _iter_json_strings(fps_log):
+        version = parse_game_version_from_window_title(value)
+        if version:
+            return version
+    return None
+
+
+def _version_from_manifest_json(path: Path) -> Optional[str]:
+    data = _load_json_object(path)
+    if not isinstance(data, dict):
+        return None
+
+    # Fabric profile JSONs carry the real MC version in inheritsFrom.
+    for key in ("inheritsFrom", "minecraft_version", "version_id"):
+        version = _clean_version(data.get(key))
+        if version:
+            return version
+
+    pin = data.get("pin")
+    if isinstance(pin, dict):
+        for key in ("minecraft_version", "version_id"):
+            version = _clean_version(pin.get(key))
+            if version:
+                return version
+
+    version = _clean_version(data.get("id"))
+    if version and not version.startswith("fabric-loader-"):
+        return version
+    return None
+
+
+def _version_from_path_name(name: str) -> Optional[str]:
+    matches = [m.group("version") for m in MC_VERSION_TOKEN_RE.finditer(name)]
+    if not matches:
+        return None
+    # Fabric profile names contain both loader and MC versions; the MC version is last.
+    return matches[-1]
+
+
+def _candidate_install_roots(install_root: Optional[os.PathLike[str] | str]) -> List[Path]:
+    candidates: List[Path] = []
+    if install_root:
+        candidates.append(Path(install_root))
+    for env_name in ("OYSTER_INSTALL_ROOT", "GAMEDATA_INSTALL_ROOT"):
+        value = os.environ.get(env_name)
+        if value:
+            candidates.append(Path(value))
+    localappdata = os.environ.get("LOCALAPPDATA")
+    if localappdata:
+        candidates.extend(
+            [
+                Path(localappdata) / "OysterRecorder",
+                Path(localappdata) / "GameDataRecorder",
+            ]
+        )
+
+    unique: List[Path] = []
+    for candidate in candidates:
+        if candidate not in unique:
+            unique.append(candidate)
+    return unique
+
+
+def detect_game_version_from_launcher_manifest(
+    install_root: Optional[os.PathLike[str] | str] = None,
+) -> Optional[str]:
+    """Detect the bundled Minecraft version from ``mc-instance/versions`` manifests."""
+    for root in _candidate_install_roots(install_root):
+        instance = root / "mc-instance"
+        for manifest_name in ("manifest-fabric.json", "manifest-mc.json"):
+            version = _version_from_manifest_json(instance / manifest_name)
+            if version:
+                return version
+
+        versions_dir = instance / "versions"
+        if not versions_dir.is_dir():
+            continue
+
+        versions: List[str] = []
+        for child in sorted(versions_dir.iterdir()):
+            if not child.is_dir():
+                continue
+            manifest = child / f"{child.name}.json"
+            version = _version_from_manifest_json(manifest) or _version_from_path_name(child.name)
+            if version and version not in versions:
+                versions.append(version)
+        if len(versions) == 1:
+            return versions[0]
+        if len(versions) > 1:
+            logger.warning(
+                "Multiple Minecraft versions found under %s: %s; leaving game_version unset",
+                versions_dir,
+                ", ".join(versions),
+            )
+            return None
+    return None
+
+
+def detect_game_version(
+    session_dir: Optional[os.PathLike[str] | str] = None,
+    install_root: Optional[os.PathLike[str] | str] = None,
+) -> Optional[str]:
+    """Resolve game version from session metadata, fps log, then bundled install manifest."""
+    if session_dir is not None:
+        version = detect_game_version_from_metadata(session_dir)
+        if version:
+            return version
+        version = detect_game_version_from_fps_log(session_dir)
+        if version:
+            return version
+    return detect_game_version_from_launcher_manifest(install_root)
+
 
 def build_gameinfo_dict(
     game_name: str = "Minecraft",
-    game_version: str = "1.20.4",
+    game_version: Optional[str] = None,
     platform: str = "Java Edition",
     scene_name: str = "flat-overworld",
     weather: str = "clear",
@@ -110,7 +294,7 @@ def _write_xlsx_fallback(data: Dict[str, Any], out_path: str) -> None:
     This is a minimal XLSX writer that creates a valid .xlsx file.
     """
     # Ensure field order matches FIELD_NAMES
-    values = [str(data.get(field, "")) for field in FIELD_NAMES]
+    values = ["" if data.get(field) is None else str(data.get(field, "")) for field in FIELD_NAMES]
     
     # Build worksheet XML
     cells_xml = ""
@@ -251,15 +435,8 @@ def read_xlsx(path: str) -> Dict[str, Any]:
             keys.append(str(cell_value))
             col += 1
         
-        # Read data row
-        values = []
-        col = 1
-        while True:
-            cell_value = ws.cell(row=2, column=col).value
-            if cell_value is None:
-                break
-            values.append(cell_value)
-            col += 1
+        # Read data row. Preserve blank cells in the middle of the schema.
+        values = [ws.cell(row=2, column=col).value for col in range(1, len(keys) + 1)]
         
         # Combine keys and values
         result = {}
@@ -332,7 +509,24 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     
     parser.add_argument("--game-name", default="Minecraft")
-    parser.add_argument("--game-version", default="1.20.4")
+    parser.add_argument(
+        "--game-version",
+        default=None,
+        help=(
+            "Explicit game version override. If omitted, detect from session "
+            "metadata.json, fps_log.json, then bundled mc-instance manifests."
+        ),
+    )
+    parser.add_argument(
+        "--session-dir",
+        default=None,
+        help="Session directory containing metadata.json/fps_log.json (defaults to output parent).",
+    )
+    parser.add_argument(
+        "--install-root",
+        default=None,
+        help="Recorder install root containing mc-instance/versions for version fallback.",
+    )
     parser.add_argument("--platform", default="Java Edition")
     parser.add_argument("--scene-name", default="flat-overworld")
     parser.add_argument("--weather", default="clear")
@@ -354,10 +548,24 @@ def main(argv: Optional[List[str]] = None) -> int:
               file=sys.stderr)
         return 1
     
+    output_path = Path(args.output)
+    session_dir = Path(args.session_dir) if args.session_dir else output_path.parent
+    game_version = args.game_version.strip() if isinstance(args.game_version, str) else args.game_version
+    if not game_version:
+        game_version = detect_game_version(
+            session_dir=session_dir,
+            install_root=args.install_root,
+        )
+        if game_version is None:
+            logger.warning(
+                "Could not detect Minecraft version for %s; game_version will be blank",
+                session_dir,
+            )
+
     # Build the data dictionary
     data = build_gameinfo_dict(
         game_name=args.game_name,
-        game_version=args.game_version,
+        game_version=game_version,
         platform=args.platform,
         scene_name=args.scene_name,
         weather=args.weather,

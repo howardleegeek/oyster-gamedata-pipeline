@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "oyster-recorder-mod",
+  "version": "0.4.0",
+  "name": "Oyster Recorder Mod",
+  "description": "Records camera/player/world state and Z-buffer depth for ground-truth EXR generation",
+  "authors": [
+    "Oyster AI"
+  ],
+  "contact": {
+    "homepage": "https://github.com/oyster-ai/recorder-mod",
+    "sources": "https://github.com/oyster-ai/recorder-mod"
+  },
+  "license": "MIT",
+  "icon": "assets/oyster-recorder-mod/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "ai.oyster.recorder.mod.OysterRecorderMod::init",
+      "ai.oyster.recorder.mod.ZBufferCapture::init"
+    ],
+    "main": [
+      "ai.oyster.recorder.mod.OysterRecorderMod::init"
+    ]
+  },
+  "mixins": [],
+  "depends": {
+    "fabricloader": ">=0.15.0",
+    "minecraft": "~1.21.1",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
