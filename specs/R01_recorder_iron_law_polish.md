@@ -11,6 +11,7 @@ modifies:
   - .github/workflows/build-mc-mod.yml     # expand matrix to 10+ versions
   - tests/test_iron_law_no_fake_data.py    # add hard-gate test
 executor: codex-aliyun
+iron_law_waived: "Meta-spec defining the iron law itself — must reference the banned terms to specify what gets hard-failed at the recorder package layer."
 ---
 
 ## 目标 (Howard 2026-05-08, sharpened from v1)

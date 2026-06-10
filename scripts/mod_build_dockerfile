@@ -1,0 +1,23 @@
+# =============================================================================
+# mod_build_dockerfile
+#
+# Container for building the Fabric mod with depth Z-buffer capture.
+# =============================================================================
+FROM eclipse-temurin:21-jdk
+
+# Install build tools
+RUN apt-get update && apt-get install -y \
+    git \
+    gradle \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /work
+
+# Copy patch file (will be mounted or copied at build time)
+COPY patches/depth_zbuffer_capture.diff /work/patches/
+
+# Default entrypoint - will be overridden by volume mount
+# The mc-mod-fabric directory should be mounted as a volume at /work/mc-mod-fabric
+ENTRYPOINT ["/bin/bash", "./mod_build_orchestrator.sh"]

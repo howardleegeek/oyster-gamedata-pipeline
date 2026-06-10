@@ -18,6 +18,8 @@ What happens:
 2. Minipc downloads `OysterRecorder-Setup-recorder-v0.28.0-rc<N>.exe` directly
 3. Minipc verifies SHA-256 against the manifest (hard-fail if mismatch)
 4. Installer wizard appears in your Session 1 — **click Next → Install → Finish**
+   The Finish page launches `OysterPlay.exe` by default, which opens the
+   bundled Minecraft instance directly.
 5. Mac polls minipc until install completes
 
 **Green signal**: orchestrator prints `[OK] install complete` + post-install paths exist.
@@ -31,20 +33,21 @@ jre\bin\javaw.exe                                    # bundled Java 21
 mc-instance\versions\1.21.4\1.21.4.jar               # vanilla MC
 mc-instance\versions\fabric-loader-0.16.10-1.21.4\   # Fabric profile
 mc-instance\mods\oyster-recorder-mod-*-mc1.21.4.jar  # the recording mod
-OysterRecorder-onedir.exe                             # legacy recorder
+OysterRecorder-onedir\OysterRecorder-onedir.exe       # recorder
 OysterPlay.exe                                        # NEW one-button launcher
 ```
 
 **Red signal**: any path missing → tell me exactly which, I'll patch + rc<N+1>.
 
 ## Stage 3 — First Launch (~2 min)
-**Double-click `Oyster Recording` on your desktop.**
+If the Finish-page launch was not cancelled, this starts automatically.
+Otherwise, double-click `Oyster Recording` on your desktop.
 
 What happens (visible to you):
 1. (~5 sec) brief "loading" — pythonw spawns OysterPlay
-2. (~10 sec) MC window opens with Fabric mod-loading screen
+2. (~10 sec) OysterPlay starts the recorder and opens bundled Minecraft
 3. (~30 sec) MC main menu fully renders
-4. Recorder window appears briefly then iconifies to system tray
+4. Recorder arms automatically, waits for the real game window, then iconifies
 
 What happens (invisible — I verify via log):
 - `OysterRecorder.log` writes new boot block at home dir
@@ -57,7 +60,8 @@ What happens (invisible — I verify via log):
 3. **ESC → Save and Quit to Title → Quit Game**
 
 What recorder does (auto):
-- Detects MC window via `Minecraft 1.21.4` regex (recorder bug from today is fixed)
+- Ignores Minecraft Launcher/pre-game windows
+- Waits for a real, game-sized `Minecraft 1.21.4` window to stay stable
 - Captures via window-area ffmpeg (locale-blind)
 - Mod streams game-state JSON lines to `game_state.jsonl`
 - On MC quit → packages session as `clip-YYYYMMDD-HHMMSS.tar.gz` in `Documents\OysterClips\`

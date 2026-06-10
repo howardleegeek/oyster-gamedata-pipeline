@@ -120,6 +120,7 @@ public final class ServerStateCapture {
             player.isOnGround(),
             player.isSneaking(),
             player.isSprinting(),
+            false,
             dimension,
             gm.name()
         );

@@ -1,0 +1,193 @@
+diff --git a/src/main/java/com/example/depthmod/DepthCaptureMod.java b/src/main/java/com/example/depthmod/DepthCaptureMod.java
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/src/main/java/com/example/depthmod/DepthCaptureMod.java
+@@ -0,0 +1,145 @@
++package com.example.depthmod;
++
++import net.fabricmc.api.ClientModInitializer;
++import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
++import net.minecraft.client.MinecraftClient;
++import net.minecraft.client.gl.Framebuffer;
++import net.minecraft.client.util.math.MatrixStack;
++import net.minecraft.util.math.Matrix4f;
++import org.lwjgl.opengl.GL11;
++import org.lwjgl.opengl.GL30;
++
++import java.io.File;
++import java.io.FileOutputStream;
++import java.io.IOException;
++import java.nio.ByteBuffer;
++import java.nio.ByteOrder;
++import java.nio.FloatBuffer;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.nio.file.Paths;
++import java.nio.file.StandardOpenOption;
++import java.text.SimpleDateFormat;
++import java.util.Date;
++import java.util.concurrent.ExecutorService;
++import java.util.concurrent.Executors;
++import java.util.concurrent.LinkedBlockingQueue;
++
++public class DepthCaptureMod implements ClientModInitializer {
++    private static final int WIDTH = 1920;
++    private static final int HEIGHT = 1080;
++    private static final float NEAR_PLANE = 0.05f; // 5cm near plane
++    private static final float FAR_PLANE = 1000.0f; // 1km far plane
++    
++    private int frameCounter = 0;
++    private long lastCaptureTime = 0;
++    private static final long CAPTURE_INTERVAL_MS = 166; // ~6 FPS (1000/6 ≈ 166ms)
++    
++    private final ExecutorService captureExecutor = Executors.newSingleThreadExecutor();
++    private final LinkedBlockingQueue<CaptureTask> captureQueue = new LinkedBlockingQueue<>();
++    
++    private File sessionDir = null;
++    private File depthRawDir = null;
++    
++    private static class CaptureTask {
++        final float[] depthBuffer;
++        final int frameIndex;
++        final float[] projectionMatrix;
++        
++        CaptureTask(float[] depthBuffer, int frameIndex, float[] projectionMatrix) {
++            this.depthBuffer = depthBuffer;
++            this.frameIndex = frameIndex;
++            this.projectionMatrix = projectionMatrix;
++        }
++    }
++    
++    @Override
++    public void onInitializeClient() {
++        System.out.println("[DepthCaptureMod] Initializing Z-buffer capture mod");
++        
++        // Start background processor
++        captureExecutor.submit(this::processCaptureQueue);
++        
++        // Register render hook
++        WorldRenderEvents.LAST.register(context -> {
++            if (!isCaptureEnabled()) {
++                return;
++            }
++            
++            long currentTime = System.currentTimeMillis();
++            if (currentTime - lastCaptureTime < CAPTURE_INTERVAL_MS) {
++                return;
++            }
++            
++            lastCaptureTime = currentTime;
++            
++            // Get projection matrix
++            MatrixStack matrixStack = context.matrixStack();
++            Matrix4f projectionMatrix = matrixStack.peek().getPositionMatrix();
++            float[] projArray = new float[16];
++            projectionMatrix.writeColumnMajor(projArray);
++            
++            // Capture depth buffer
++            captureDepthBuffer(frameCounter, projArray);
++            frameCounter++;
++        });
++    }
++    
++    private boolean isCaptureEnabled() {
++        // Check if we're in an active session
++        File activeSession = new File("active_session");
++        if (!activeSession.exists() || !activeSession.isDirectory()) {
++            return false;
++        }
++        
++        // Initialize session directory on first capture
++        if (sessionDir == null) {
++            sessionDir = activeSession;
++            depthRawDir = new File(sessionDir, "depth_raw");
++            depthRawDir.mkdirs();
++            
++            // Clear previous depth_raw contents
++            if (depthRawDir.exists()) {
++                File[] files = depthRawDir.listFiles();
++                if (files != null) {
++                    for (File f : files) {
++                        f.delete();
++                    }
++                }
++            }
++        }
++        
++        return true;
++    }
++    
++    private void captureDepthBuffer(int frameIndex, float[] projectionMatrix) {
++        FloatBuffer depthBuffer = FloatBuffer.allocate(WIDTH * HEIGHT);
++        
++        // Bind and read depth buffer
++        GL11.glReadBuffer(GL11.GL_BACK);
++        GL11.glReadPixels(0, 0, WIDTH, HEIGHT, GL11.GL_DEPTH_COMPONENT, GL11.GL_FLOAT, depthBuffer);
++        
++        // Convert to array and linearize
++        float[] depthArray = new float[WIDTH * HEIGHT];
++        depthBuffer.rewind();
++        depthBuffer.get(depthArray);
++        
++        // Linearize depth buffer values to view-space meters
++        for (int i = 0; i < depthArray.length; i++) {
++            float z = depthArray[i];
++            // Convert from normalized device coordinates to view-space meters
++            // z_view_meters = (near * far) / (far - z_depth_buffer * (far - near))
++            depthArray[i] = (NEAR_PLANE * FAR_PLANE) / (FAR_PLANE - z * (FAR_PLANE - NEAR_PLANE));
++        }
++        
++        // Queue for background processing
++        captureQueue.offer(new CaptureTask(depthArray, frameIndex, projectionMatrix));
++    }
++    
++    private void processCaptureQueue() {
++        while (true) {
++            try {
++                CaptureTask task = captureQueue.take();
++                saveDepthFrame(task);
++                saveCameraMatrix(task);
++            } catch (InterruptedException e) {
++                Thread.currentThread().interrupt();
++                break;
++            }
++        }
++    }
++    
++    private void saveDepthFrame(CaptureTask task) {
++        File depthFile = new File(depthRawDir, String.format("%06d.f32", task.frameIndex));
++        
++        try (FileOutputStream fos = new FileOutputStream(depthFile)) {
++            ByteBuffer byteBuffer = ByteBuffer.allocate(task.depthBuffer.length * 4);
++            byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
++            
++            for (float value : task.depthBuffer) {
++                byteBuffer.putFloat(value);
++            }
++            
++            fos.write(byteBuffer.array());
++        } catch (IOException e) {
++            System.err.println("[DepthCaptureMod] Failed to save depth frame: " + e.getMessage());
++        }
++    }
++    
++    private void saveCameraMatrix(CaptureTask task) {
++        File matrixFile = new File(sessionDir, "camera_matrices.jsonl");
++        
++        try {
++            StringBuilder sb = new StringBuilder();
++            sb.append("{\"frame\":").append(task.frameIndex).append(",\"projection\":[");
++            for (int i = 0; i < task.projectionMatrix.length; i++) {
++                if (i > 0) sb.append(",");
++                sb.append(String.format("%.6f", task.projectionMatrix[i]));
++            }
++            sb.append("],\"near\":").append(NEAR_PLANE).append(",\"far\":").append(FAR_PLANE).append("}\n");
++            
++            Files.write(matrixFile.toPath(), sb.toString().getBytes(),
++                       StandardOpenOption.CREATE, StandardOpenOption.APPEND);
++        } catch (IOException e) {
++            System.err.println("[DepthCaptureMod] Failed to save camera matrix: " + e.getMessage());
++        }
++    }
++}
