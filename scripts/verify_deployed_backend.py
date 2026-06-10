@@ -100,6 +100,15 @@ def check_healthz(
         print("  → GET /healthz")
     try:
         resp = client.get("/healthz")
+        if resp.status_code == 404:
+            # Cloud Run's Google frontend intercepts /healthz on *.run.app
+            # and answers its own 404 before the container sees the request.
+            # Fall back to the unreserved alias serving the same rich body.
+            # Other failure codes (e.g. 500) are real backend answers and
+            # must surface immediately.
+            if verbose:
+                print("  → GET /api/v1/healthz (fallback)")
+            resp = client.get("/api/v1/healthz")
         if resp.status_code != 200:
             return CheckResult("GET /healthz", False, f"status={resp.status_code}")
         body = resp.json()
@@ -353,8 +362,11 @@ def _xml_attr(element: ET.Element, local_name: str) -> str:
 
 
 def _normalise_release_tag(tag: str) -> str:
+    """Both consumer schemes pass through: v0.16.0 and recorder-v2.6.15."""
     tag = tag.strip()
-    return tag if tag.startswith("v") else f"v{tag}"
+    if tag.startswith(("v", "recorder-v")):
+        return tag
+    return f"v{tag}"
 
 
 def _mask_secret(text: str, secret: str) -> str:

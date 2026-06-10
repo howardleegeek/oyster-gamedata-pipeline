@@ -335,6 +335,7 @@ def create_app(accelerate: float = 1.0, interval: float = 300.0) -> FastAPI:
     # Health check
     # ------------------------------------------------------------------
     @app.get("/healthz")
+    @app.get("/api/v1/healthz")
     async def healthz():
         return {
             "status": "ok",
