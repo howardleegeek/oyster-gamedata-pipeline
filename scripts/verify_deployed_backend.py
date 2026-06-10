@@ -2,8 +2,8 @@
 """verify_deployed_backend.py – Smoke-test a deployed backend_stub instance.
 
 Usage:
-    python scripts/verify_deployed_backend.py --url https://136-109-41-170.sslip.io
-    python scripts/verify_deployed_backend.py --url https://136-109-41-170.sslip.io --verbose
+    python scripts/verify_deployed_backend.py --url https://oyster-backend-6qup7rrx2q-uc.a.run.app
+    python scripts/verify_deployed_backend.py --url https://oyster-backend-6qup7rrx2q-uc.a.run.app --verbose
 
 Calls four required endpoints and optionally one admin endpoint:
   1. GET  /healthz                        → 200 + {"status": "ok"}
@@ -464,7 +464,7 @@ def main() -> None:
     parser.add_argument(
         "--url",
         required=True,
-        help="Base URL of the deployed backend (e.g. https://136-109-41-170.sslip.io)",
+        help="Base URL of the deployed backend (e.g. https://oyster-backend-6qup7rrx2q-uc.a.run.app)",
     )
     parser.add_argument(
         "--verbose",
