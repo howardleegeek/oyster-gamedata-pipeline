@@ -10,6 +10,7 @@ modifies:
   - LOCAL_DEV.md                 # NEW
   - README.md                    # add Web Portals section
 executor: codex-aliyun
+iron_law_waived: "Spec enforces the 数据准确铁律 by name — references the banned term once when describing what local bootstrap MUST NOT fabricate."
 ---
 
 ## 目标 (one-line direction from Howard 2026-05-08)

@@ -1,0 +1,81 @@
+name: Production Readiness Gate
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Gate mode. Use production only when signing/providers/strict evidence are ready.
+        required: true
+        default: internal
+        type: choice
+        options:
+          - internal
+          - production
+      backend_url:
+        description: Backend URL. Defaults to BACKEND_SMOKE_URL.
+        required: false
+        default: ""
+      oauth_provider:
+        description: OAuth provider name for production gate.
+        required: false
+        default: mock
+      storage_provider:
+        description: Storage provider name for production gate.
+        required: false
+        default: local
+      payout_provider:
+        description: Payout provider name for production gate.
+        required: false
+        default: simulator
+      real_session_report_path:
+        description: Optional checked-out path to a strict real-session report JSON.
+        required: false
+        default: ""
+      installer_authenticode_status:
+        description: Latest installer Authenticode status. Production requires Valid.
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    env:
+      GATE_MODE: ${{ inputs.mode || 'internal' }}
+      BACKEND_URL: ${{ inputs.backend_url || vars.BACKEND_SMOKE_URL || 'https://oyster-backend-6qup7rrx2q-uc.a.run.app' }}
+      OAUTH_PROVIDER: ${{ inputs.oauth_provider || 'mock' }}
+      STORAGE_PROVIDER: ${{ inputs.storage_provider || 'local' }}
+      PAYOUT_PROVIDER: ${{ inputs.payout_provider || 'simulator' }}
+      REAL_SESSION_REPORT_PATH: ${{ inputs.real_session_report_path || '' }}
+      INSTALLER_AUTHENTICODE_STATUS: ${{ inputs.installer_authenticode_status || '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run production readiness gate
+        run: |
+          set -euo pipefail
+          args=(
+            --mode "$GATE_MODE"
+            --backend-url "$BACKEND_URL"
+            --oauth-provider "$OAUTH_PROVIDER"
+            --storage-provider "$STORAGE_PROVIDER"
+            --payout-provider "$PAYOUT_PROVIDER"
+            --installer-authenticode-status "$INSTALLER_AUTHENTICODE_STATUS"
+            --json-output production-readiness-report.json
+          )
+          if [ -n "$REAL_SESSION_REPORT_PATH" ]; then
+            args+=(--real-session-report "$REAL_SESSION_REPORT_PATH")
+          fi
+          python3 scripts/production_readiness_gate.py "${args[@]}"
+
+      - name: Upload production readiness report
+        if: ${{ always() && hashFiles('production-readiness-report.json') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-readiness-report
+          path: production-readiness-report.json

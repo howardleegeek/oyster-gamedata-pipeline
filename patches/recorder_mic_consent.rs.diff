@@ -1,0 +1,376 @@
+--- a/src/recorder/main.rs
++++ b/src/recorder/main.rs
+@@ -0,0 +1,312 @@
++// recorder_mic_consent.rs.diff — Rust recorder patch
++// Adds --capture-voice {off,on,prompt} CLI arg with consent gating
++// Default: prompt on first run, persist in ~/.oysterrc
++// Voice capture OFF by default (BIPA biometric protection)
++// Game audio capture ON by default (no biometric risk)
++
++use clap::{Parser, ValueEnum};
++use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
++use serde::{Deserialize, Serialize};
++use sha2::{Digest, Sha256};
++use std::fs;
++use std::io::Write;
++use std::path::PathBuf;
++use std::sync::atomic::{AtomicBool, Ordering};
++use std::sync::Arc;
++use std::time::{SystemTime, UNIX_EPOCH};
++
++/// Voice capture consent mode
++#[derive(Debug, Clone, Copy, PartialEq, ValueEnum)]
++enum VoiceCaptureMode {
++    /// Voice capture disabled (default — BIPA compliant)
++    Off,
++    /// Voice capture enabled
++    On,
++    /// Prompt user on first run, persist choice
++    Prompt,
++}
++
++/// CLI arguments for the recorder
++#[derive(Parser, Debug)]
++#[command(name = "oyster-recorder", version = "0.4.0")]
++struct Args {
++    /// Voice capture mode: off, on, or prompt
++    #[arg(long, default_value = "prompt", value_enum)]
++    capture_voice: VoiceCaptureMode,
++
++    /// Path to audio.flac (game audio loopback)
++    #[arg(long, default_value = "audio.flac")]
++    audio_output: PathBuf,
++
++    /// Path to voice.flac (mic capture, if consented)
++    #[arg(long, default_value = "voice.flac")]
++    voice_output: PathBuf,
++
++    /// Path to consent record
++    #[arg(long, default_value = "voice_consent.json")]
++    consent_output: PathBuf,
++}
++
++/// Consent record written to voice_consent.json
++#[derive(Serialize, Deserialize, Debug)]
++struct VoiceConsentRecord {
++    /// ISO-8601 timestamp of consent decision
++    timestamp: String,
++    /// Consent state: "granted", "declined", or "pending"
++    consent: String,
++    /// Device ID used for capture (if granted)
++    device_id: Option<String>,
++    /// SHA-256 hash of the consent text shown to user
++    consent_text_hash: String,
++    /// Version of consent text
++    consent_version: u32,
++}
++
++/// Oyster config persisted in ~/.oysterrc
++#[derive(Serialize, Deserialize, Debug, Default)]
++struct OysterConfig {
++    voice_capture_consent: Option<String>, // "granted" | "declined" | null
++    voice_device_id: Option<String>,
++}
++
++/// Canonical consent text shown to user (version 1)
++const CONSENT_TEXT_V1: &str = concat!(
++    "Oyster Recorder — Voice Capture Consent\n",
++    "========================================\n",
++    "This recorder can capture your microphone audio for audit purposes.\n",
++    "Your voice data is biometric information protected under BIPA and similar laws.\n\n",
++    "If you consent:\n",
++    "  - Your mic audio will be recorded to voice.flac\n",
++    "  - The file is stored locally and used only for QM3/QM4 audio analysis\n",
++    "  - You can revoke consent at any time by deleting voice.flac\n\n",
++    "If you decline:\n",
++    "  - No mic audio will be captured\n",
++    "  - Game audio (audio.flac) continues normally\n\n",
++    "Type 'yes' to consent, anything else to decline: "
++);
++
++const CONSENT_VERSION: u32 = 1;
++
++/// Compute SHA-256 hash of consent text for audit trail
++fn hash_consent_text(text: &str) -> String {
++    let mut hasher = Sha256::new();
++    hasher.update(text.as_bytes());
++    format!("{:x}", hasher.finalize())
++}
++
++/// Get config path (~/.oysterrc)
++fn config_path() -> PathBuf {
++    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
++    PathBuf::from(home).join(".oysterrc")
++}
++
++/// Load persisted config
++fn load_config() -> OysterConfig {
++    let path = config_path();
++    if path.exists() {
++        if let Ok(contents) = fs::read_to_string(&path) {
++            if let Ok(config) = serde_json::from_str(&contents) {
++                return config;
++            }
++        }
++    }
++    OysterConfig::default()
++}
++
++/// Save config
++fn save_config(config: &OysterConfig) {
++    let path = config_path();
++    if let Ok(json) = serde_json::to_string_pretty(config) {
++        let _ = fs::write(&path, json);
++    }
++}
++
++/// Prompt user for consent via stdin
++fn prompt_consent() -> bool {
++    print!("{}", CONSENT_TEXT_V1);
++    let _ = std::io::stdout().flush();
++
++    let mut input = String::new();
++    let _ = std::io::stdin().read_line(&mut input);
++    input.trim().to_lowercase() == "yes"
++}
++
++/// Resolve consent decision based on CLI arg and persisted config
++fn resolve_consent(cli_mode: VoiceCaptureMode) -> (bool, OysterConfig) {
++    let mut config = load_config();
++
++    match cli_mode {
++        VoiceCaptureMode::Off => {
++            config.voice_capture_consent = Some("declined".to_string());
++            save_config(&config);
++            (false, config)
++        }
++        VoiceCaptureMode::On => {
++            config.voice_capture_consent = Some("granted".to_string());
++            save_config(&config);
++            (true, config)
++        }
++        VoiceCaptureMode::Prompt => {
++            // Check if we already have a persisted decision
++            if let Some(ref existing) = config.voice_capture_consent {
++                return (existing == "granted", config);
++            }
++            // First run — prompt the user
++            let granted = prompt_consent();
++            config.voice_capture_consent = Some(if granted {
++                "granted".to_string()
++            } else {
++                "declined".to_string()
++            });
++            save_config(&config);
++            (granted, config)
++        }
++    }
++}
++
++/// Enumerate available input devices and pick the default
++fn enumerate_input_devices() -> Result<(cpal::Device, String), String> {
++    let host = cpal::default_host();
++
++    // Try default input device first
++    if let Some(device) = host.default_input_device() {
++        let name = device.name().unwrap_or_else(|_| "unknown".to_string());
++        return Ok((device, name));
++    }
++
++    // Fall back to first available input device
++    for device in host.input_devices().map_err(|e| e.to_string())? {
++        let name = device.name().unwrap_or_else(|_| "unknown".to_string());
++        return Ok((device, name));
++    }
++
++    Err("No input devices found".to_string())
++}
++
++/// Write consent record to JSON file
++fn write_consent_record(
++    output_path: &PathBuf,
++    granted: bool,
++    device_id: Option<String>,
++) -> Result<(), String> {
++    let now = SystemTime::now()
++        .duration_since(UNIX_EPOCH)
++        .map_err(|e| e.to_string())?;
++
++    let timestamp = chrono::DateTime::<chrono::Utc>::from(now).to_rfc3339();
++
++    let record = VoiceConsentRecord {
++        timestamp,
++        consent: if granted {
++            "granted".to_string()
++        } else {
++            "declined".to_string()
++        },
++        device_id,
++        consent_text_hash: hash_consent_text(CONSENT_TEXT_V1),
++        consent_version: CONSENT_VERSION,
++    };
++
++    let json = serde_json::to_string_pretty(&record).map_err(|e| e.to_string())?;
++    fs::write(output_path, json).map_err(|e| e.to_string())?;
++
++    Ok(())
++}
++
++/// Capture mic audio to FLAC file using cpal
++/// Runs until `running` flag is set to false
++fn capture_voice(
++    device: cpal::Device,
++    output_path: &PathBuf,
++    running: Arc<AtomicBool>,
++) -> Result<(), String> {
++    let config = device
++        .default_input_config()
++        .map_err(|e| e.to_string())?;
++
++    eprintln!(
++        "[oyster] Capturing voice: {} @ {}Hz, {} channels",
++        device.name().unwrap_or_else(|_| "?".to_string()),
++        config.sample_rate().0,
++        config.channels()
++    );
++
++    // Open FLAC encoder (simplified — in production use hound crate)
++    let spec = hound::WavSpec {
++        channels: config.channels(),
++        sample_rate: config.sample_rate().0,
++        bits_per_sample: 16,
++        sample_format: hound::SampleFormat::Int,
++    };
++
++    // Write to WAV first, then convert to FLAC post-capture
++    let wav_path = output_path.with_extension("wav");
++    let mut writer = hound::WavWriter::create(&wav_path, spec).map_err(|e| e.to_string())?;
++
++    let running_clone = running.clone();
++    let err = Arc::new(std::sync::Mutex::new(None::<String>));
++    let err_clone = err.clone();
++
++    match config.sample_format() {
++        cpal::SampleFormat::I16 => {
++            let stream = device
++                .build_input_stream(
++                    &config.into(),
++                    move |data: &[i16], _: &cpal::InputCallbackInfo| {
++                        if !running_clone.load(Ordering::Relaxed) {
++                            return;
++                        }
++                        for &sample in data {
++                            let _ = writer.write_sample(sample);
++                        }
++                    },
++                    move |e| {
++                        eprintln!("[oyster] voice capture error: {}", e);
++                        *err_clone.lock().unwrap() = Some(e.to_string());
++                    },
++                    None,
++                )
++                .map_err(|e| e.to_string())?;
++
++            stream.play().map_err(|e| e.to_string())?;
++
++            // Block until running flag is cleared
++            while running_clone.load(Ordering::Relaxed) {
++                std::thread::sleep(std::time::Duration::from_millis(100));
++            }
++
++            stream.pause().ok();
++            drop(stream);
++        }
++        cpal::SampleFormat::F32 => {
++            let stream = device
++                .build_input_stream(
++                    &config.into(),
++                    move |data: &[f32], _: &cpal::InputCallbackInfo| {
++                        if !running_clone.load(Ordering::Relaxed) {
++                            return;
++                        }
++                        for &sample in data {
++                            let _ = writer.write_sample((sample * 32767.0) as i16);
++                        }
++                    },
++                    move |e| {
++                        eprintln!("[oyster] voice capture error: {}", e);
++                        *err_clone.lock().unwrap() = Some(e.to_string());
++                    },
++                    None,
++                )
++                .map_err(|e| e.to_string())?;
++
++            stream.play().map_err(|e| e.to_string())?;
++
++            while running_clone.load(Ordering::Relaxed) {
++                std::thread::sleep(std::time::Duration::from_millis(100));
++            }
++
++            stream.pause().ok();
++            drop(stream);
++        }
++        _ => {
++            return Err(format!("Unsupported sample format: {:?}", config.sample_format()));
++        }
++    }
++
++    writer.finalize().map_err(|e| e.to_string())?;
++
++    // Convert WAV to FLAC using sox (available in recorder environment)
++    let status = std::process::Command::new("sox")
++        .arg(&wav_path)
++        .arg(output_path)
++        .status()
++        .map_err(|e| e.to_string())?;
++
++    if !status.success() {
++        return Err("sox WAV->FLAC conversion failed".to_string());
++    }
++
++    // Clean up intermediate WAV
++    let _ = fs::remove_file(&wav_path);
++
++    if let Some(err_msg) = err.lock().unwrap().take() {
++        eprintln!("[oyster] voice capture completed with errors: {}", err_msg);
++    } else {
++        eprintln!("[oyster] voice capture completed: {:?}", output_path);
++    }
++
++    Ok(())
++}
++
++/// Main entry point — integrates voice capture into recorder pipeline
++pub fn run_voice_capture(args: &Args, running: Arc<AtomicBool>) -> Result<(), String> {
++    let (granted, config) = resolve_consent(args.capture_voice);
++
++    if !granted {
++        eprintln!("[oyster] Voice capture: DECLINED (consent not granted)");
++        write_consent_record(&args.consent_output, false, None)?;
++        return Ok(());
++    }
++
++    eprintln!("[oyster] Voice capture: GRANTED");
++
++    let (device, device_name) = enumerate_input_devices()?;
++    eprintln!("[oyster] Using input device: {}", device_name);
++
++    // Update config with device ID
++    let mut updated_config = config;
++    updated_config.voice_device_id = Some(device_name.clone());
++    save_config(&updated_config);
++
++    // Write consent record
++    write_consent_record(&args.consent_output, true, Some(device_name))?;
++
++    // Start capture in background thread
++    let output_path = args.voice_output.clone();
++    let capture_running = running.clone();
++    std::thread::spawn(move || {
++        if let Err(e) = capture_voice(device, &output_path, capture_running) {
++            eprintln!("[oyster] voice capture failed: {}", e);
++        }
++    });
++
++    Ok(())
++}

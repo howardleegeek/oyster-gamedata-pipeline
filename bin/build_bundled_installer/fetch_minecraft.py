@@ -811,18 +811,30 @@ def _fetch_asset_objects(asset_index_id: str) -> tuple[int, int, int, int]:
         _err("asset index has no objects[] map — corrupt?")
         sys.exit(7)
 
-    # De-dup by hash: many logical names share the same hash (e.g. legacy
-    # virtual icons). We still verify per logical name so any mismatch
-    # blames the right entry, but we only need to fetch each unique hash
-    # once. The thread pool deduplicates implicitly because subsequent
-    # workers see the file already on disk + SHA-correct == cache hit.
+    # De-dup by hash before scheduling work. Many logical names share the same
+    # hash; if we submit duplicate hashes concurrently, two workers can write
+    # the same ``<hash>.part`` path and race each other. That showed up in CI
+    # as all 4038 futures succeeding while a required sampled object vanished
+    # by post-fetch verification.
     objects_root = MC_INSTANCE_DIR / "assets" / "objects"
     objects_root.mkdir(parents=True, exist_ok=True)
 
     total = len(objects)
+    unique_objects: dict[str, tuple[str, int]] = {}
+    for logical_name, entry in objects.items():
+        sha1 = entry.get("hash")
+        size = entry.get("size")
+        if not isinstance(sha1, str) or not isinstance(size, int):
+            _err(
+                f"asset index entry malformed for {logical_name!r}: "
+                f"hash={sha1!r} size={size!r}"
+            )
+            sys.exit(7)
+        unique_objects.setdefault(sha1, (logical_name, size))
+
     _log(
-        f"  asset objects: {total} entries to verify (parallel workers="
-        f"{ASSET_FETCH_WORKERS})"
+        f"  asset objects: {total} entries, {len(unique_objects)} unique "
+        f"hashes to verify (parallel workers={ASSET_FETCH_WORKERS})"
     )
 
     bytes_dl_total = 0
@@ -835,15 +847,7 @@ def _fetch_asset_objects(asset_index_id: str) -> tuple[int, int, int, int]:
     # progress + abort fast on the first hard-fail.
     with ThreadPoolExecutor(max_workers=ASSET_FETCH_WORKERS) as pool:
         futures = []
-        for logical_name, entry in objects.items():
-            sha1 = entry.get("hash")
-            size = entry.get("size")
-            if not isinstance(sha1, str) or not isinstance(size, int):
-                _err(
-                    f"asset index entry malformed for {logical_name!r}: "
-                    f"hash={sha1!r} size={size!r}"
-                )
-                sys.exit(7)
+        for sha1, (logical_name, size) in unique_objects.items():
             futures.append(
                 pool.submit(
                     _fetch_one_asset_object,

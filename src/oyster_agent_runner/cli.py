@@ -1,9 +1,9 @@
 """Typer-based CLI — `oyster-agent run --env ... --task "..."`.
 
-The real environment integrations (MineRL, Factorio RCON, gym) are not
-yet wired up; invoking them today raises `NotImplementedError`. The
-`mock` environment is always available and drives the runner through
-the MockLLMProvider — useful for smoke-testing the install.
+The `mock` environment is always available and drives the runner through
+the MockLLMProvider. Minecraft is live through Mineflayer; Factorio is
+smoke-ready through the RCON/mod relay; optional environments such as gym
+depend on local packages and game installs.
 """
 
 from __future__ import annotations
@@ -64,7 +64,7 @@ ENV_REGISTRY: list[dict[str, str]] = [
     {
         "key": "factorio",
         "description": "Factorio RCON; accepts rcon://[pw@]host[:port] URI",
-        "status": "stub (RCON parsing live)",
+        "status": "smoke-ready (RCON/mod relay)",
     },
     {
         "key": "gym:<env_id>",
@@ -121,7 +121,7 @@ def _make_environment(env_key: str) -> Environment:
     Keys:
       mock               deterministic fake (always available)
       minecraft          Mineflayer subprocess (Phase 1 LIVE — see run-mc command)
-      factorio           STUB — raises NotImplementedError on reset
+      factorio           smoke-ready RCON/mod relay; needs a live Factorio server
       gym:<env_id>       real wrapper if gymnasium is installed, stub otherwise
     """
     if env_key == "mock":

@@ -1,0 +1,18 @@
+{
+  "credentials": {
+    "hasConsented": true,
+    "consentGivenAtVersion": "2.6.0"
+  },
+  "preferences": {
+    "games": {
+      "javaw": {
+        "use_window_capture": true,
+        "capture_mode": "monitor"
+      },
+      "minecraft": {
+        "use_window_capture": true,
+        "capture_mode": "monitor"
+      }
+    }
+  }
+}
