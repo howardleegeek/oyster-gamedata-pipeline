@@ -6,7 +6,6 @@ import sys
 import types
 from unittest.mock import MagicMock
 
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 
