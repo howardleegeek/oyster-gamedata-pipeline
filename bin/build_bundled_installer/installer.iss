@@ -12,8 +12,9 @@
 ;       +-- Vanilla Minecraft 1.21.4 client + libs  (R05B, ~200 MB)
 ;       +-- Vanilla MC asset objects (rc7)          (R05B, ~390 MB)
 ;       +-- Fabric loader 0.16.10 + 9 mod jars      (R05B/mc-mod, ~10 MB)
-;       +-- OysterRecorder-onedir/ (PyInstaller)    (~120 MB)
-;       +-- OysterPlay.exe single-button launcher   (R05C, ~5 MB)
+;       +-- OysterRecorder-onedir/ (PyInstaller)    (~120 MB + OBS portable)
+;       +-- OysterPlay.bat static launcher          (Defender-safe entry)
+;       +-- OysterPlay.exe PyInstaller launcher     (fallback payload only)
 ;       +-- manifest.json (combined SHA-256 pin)
 ;
 ; Iron-law constraints from R05D (reflected in the [Setup] block below):
@@ -86,7 +87,7 @@
 
 #define AppName        "Oyster Recorder"
 #define AppPublisher   "Oyster Labs"
-#define AppExeName     "OysterPlay.exe"
+#define AppExeName     "OysterPlay.bat"
 #define AppShortcutLbl "Oyster Recording"
 #define AppId          "{{C7E4F0D2-9B5E-4F1A-8C3D-OY5T3RR3C0RD}}"
 
@@ -125,6 +126,12 @@ DefaultDirName={localappdata}\OysterRecorder
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=auto
 DisableDirPage=no
+
+; BUG-14 fix (v0.12.2): require ~2 GB free for the bundle extraction.
+; Inno will refuse to install if {app} disk has less than this — with a
+; clear "disk full" dialog instead of a confusing mid-extraction failure.
+; 2048 MB = 800 MB final + ~600 MB temp during extraction + 600 MB safety.
+ExtraDiskSpaceRequired=2147483648
 
 ; Per-user uninstaller — registered under HKCU so it shows in
 ; "Apps & features" / "Add/Remove Programs" without admin.
@@ -254,18 +261,68 @@ Source: "{#BundleRoot}\\mc-instance\\mods\\fabric-api.jar"; \
     DestDir: "{app}\\mc-instance\\mods"; \
     Flags: ignoreversion
 
-; --- (3) OysterRecorder PyInstaller --onedir bundle -----------------------
-; ~120 MB. Source comes from the existing build-recorder-exe.yml workflow
-; (which we now run locally inside build_all.ps1 step 5).
-Source: "{#BundleRoot}\\OysterRecorder-onedir\\*"; \
-    DestDir: "{app}\\OysterRecorder-onedir"; \
+; --- (3) PROVEN Rust gamedata-recorder v2.6.0 runtime ---------------------
+; Preferred recorder engine for OysterPlay.bat. Staged from the published
+; howardleegeek/gamedata-recorder v2.6.0 release asset
+; gamedata-recorder-windows-x64.zip. Includes data/libobs and OBS plugins
+; needed by game_capture hook, plus NVENC/x264 support.
+; Installed at {app} root so the static batch launcher can execute
+; %LOCALAPPDATA%\OysterRecorder\gamedata-recorder.exe directly.
+Source: "{#BundleRoot}\\gamedata-recorder\\*"; \
+    DestDir: "{app}"; \
     Flags: ignoreversion recursesubdirs createallsubdirs
 
-; --- (4) OysterPlay.exe single-button launcher (R05C) ---------------------
-; ~5 MB. Lives directly in {app} so the desktop shortcut points at it.
+; --- (3a) OysterRecorder PyInstaller --onedir fallback bundle -------------
+; ~120 MB. Source comes from the existing build-recorder-exe.yml workflow
+; (which we now run locally inside build_all.ps1 step 5).
+; The OBS portable subtree is declared explicitly in (3b) so installer
+; audits can prove _internal\obs\bin\64bit\obs64.exe is in the payload.
+Source: "{#BundleRoot}\\OysterRecorder-onedir\\*"; \
+    DestDir: "{app}\\OysterRecorder-onedir"; \
+    Excludes: "\\_internal\\obs\\*"; \
+    Flags: ignoreversion recursesubdirs createallsubdirs
+
+; --- (3b) OBS Studio portable for Python fallback capture backend ---------
+; Produced by build-recorder-installer.yml before ISCC compile. The recorder
+; builds OBS profiles/scenes at runtime; installer only ships official OBS.
+Source: "{#BundleRoot}\\OysterRecorder-onedir\\_internal\\obs\\*"; \
+    DestDir: "{app}\\OysterRecorder-onedir\\_internal\\obs"; \
+    Flags: ignoreversion recursesubdirs createallsubdirs
+
+; --- (4) OysterPlay.exe redundant PyInstaller launcher ---------------------
+; Kept as fallback payload only. Shortcuts and post-install launch do not
+; depend on this executable because PyInstaller onefile has proven brittle
+; under Defender/minipc installs.
 Source: "{#BundleRoot}\\OysterPlay.exe"; \
     DestDir: "{app}"; \
-    DestName: "{#AppExeName}"; \
+    DestName: "OysterPlay.exe"; \
+    Flags: ignoreversion
+
+; --- (4b) Static batch launchers ------------------------------------------
+; Main double-click entry: start Rust recorder first, wait briefly, then
+; start the bundled Fabric Minecraft instance.
+Source: "OysterPlay.bat"; \
+    DestDir: "{app}"; \
+    DestName: "OysterPlay.bat"; \
+    Flags: ignoreversion
+Source: "launch_mc.bat"; \
+    DestDir: "{app}"; \
+    DestName: "launch_mc.bat"; \
+    Flags: ignoreversion
+Source: "mc_args_template.txt"; \
+    DestDir: "{app}"; \
+    DestName: "mc_args_template.txt"; \
+    Flags: ignoreversion
+
+; --- (4c) Rust v2.6.0 config preseed --------------------------------------
+; Source checked against ~/Downloads/gamedata-recorder tag v2.6.0:
+; Preferences has #[serde(rename_all="camelCase")], but nested GameConfig
+; has only #[serde(default)], so games entries must use snake_case
+; "use_window_capture" and "capture_mode"; CaptureMode has
+; #[serde(rename_all="snake_case")], so GameHook serializes as "game_hook".
+Source: "gamedata_recorder_config.json"; \
+    DestDir: "{userappdata}\\GameData Recorder"; \
+    DestName: "config.json"; \
     Flags: ignoreversion
 
 ; --- (5) Combined manifest.json -------------------------------------------
@@ -275,10 +332,101 @@ Source: "{#BundleRoot}\\manifest.json"; \
     DestName: "manifest.json"; \
     Flags: ignoreversion
 
+; --- (6) VC++ Redist 2015-2022 x64 (S131) ---------------------------------
+; ~25 MB. Downloaded by the CI workflow's "Download VC++ Redistributable"
+; step into the same dir as this .iss. Goes to {tmp} so it's removed after
+; the [Run] entry silently installs it on first-run testers' machines.
+; skipifsourcedoesntexist is BELT-AND-SUSPENDERS: if CI failed to download
+; it, the build still succeeds and the recorder simply assumes the user
+; already has VC++ Redist installed (most modern Windows 10/11 do).
+Source: "vc_redist.x64.exe"; \
+    DestDir: "{tmp}"; \
+    Flags: deleteafterinstall noencryption skipifsourcedoesntexist
+
+; --- (7) Python self-audit tools for testers (v0.12.2) -------------------
+; ~150 KB total. Lets the internal tester run prd_compliance_audit + the
+; tester_preflight wrapper without git-cloning the repo. Tester needs
+; Python 3.11+ pre-installed (documented in TESTER_HANDOFF_v0.11.20.md).
+; Lives at {app}\tools\ so the install layout stays clean.
+;
+; All 9 .py scripts are pure stdlib — no pip-install needed. Specifically:
+;   - tester_preflight.py     — entry point (BUG-1 fix: co-located lookup)
+;   - prd_compliance_audit.py — 105-check PRD compliance auditor
+;   - audit_quality_metrics.py — QM1-QM10 quality metrics (statistics)
+;   - canonical_pipeline.py   — orchestrator (calls the 5 below in order)
+;   - transform_game_state_to_action_camera.py
+;   - generate_gameinfo_xlsx.py  (writes .xlsx via stdlib zipfile)
+;   - generate_systeminfo_json.py
+;   - input_latency_telemetry.py
+;   - prd_compliance_audit_H8_patch.py
+Source: "..\\tester_preflight.py"; \
+    DestDir: "{app}\\tools"; \
+    Flags: ignoreversion
+Source: "..\\prd_compliance_audit.py"; \
+    DestDir: "{app}\\tools"; \
+    Flags: ignoreversion
+Source: "..\\audit_quality_metrics.py"; \
+    DestDir: "{app}\\tools"; \
+    Flags: ignoreversion
+Source: "..\\canonical_pipeline.py"; \
+    DestDir: "{app}\\tools"; \
+    Flags: ignoreversion
+Source: "..\\transform_game_state_to_action_camera.py"; \
+    DestDir: "{app}\\tools"; \
+    Flags: ignoreversion
+Source: "..\\generate_gameinfo_xlsx.py"; \
+    DestDir: "{app}\\tools"; \
+    Flags: ignoreversion
+Source: "..\\generate_systeminfo_json.py"; \
+    DestDir: "{app}\\tools"; \
+    Flags: ignoreversion
+Source: "..\\input_latency_telemetry.py"; \
+    DestDir: "{app}\\tools"; \
+    Flags: ignoreversion
+Source: "..\\prd_compliance_audit_H8_patch.py"; \
+    DestDir: "{app}\\tools"; \
+    Flags: ignoreversion skipifsourcedoesntexist
+
+; --- (7c) Recording watchdog (v0.14, R-1) -------------------------------
+; ~6 KB. Sidecar process OysterPlay spawns alongside the recorder. Polls
+; recording.mp4 + game_state.jsonl + inputs.jsonl every 5s; writes
+; .stall_warning marker if any file stops growing > 15s. Catches silent
+; failures (recorder hung, MC mod died) in real-time instead of post-mortem.
+Source: "..\recording_watchdog.py"; \
+    DestDir: "{app}\tools"; \
+    Flags: ignoreversion
+
+; --- (7b) One-click session uploader (v0.12.4) ---------------------------
+; ~7 KB. Lets tester upload their session to our S3 bucket via the
+; production backend (http://136.109.41.170:8081) with ONE command:
+;   python {app}\tools\upload_session.py --token <token>
+; Replaces the tar+网盘+微信 chain. Pure stdlib (urllib + zipfile).
+; Requires Bearer token (issued via Discord OAuth or admin helper).
+Source: "..\\upload_session.py"; \
+    DestDir: "{app}\\tools"; \
+    Flags: ignoreversion
+
+; --- (8) Defender pre-install fix scripts (v0.12.3) ---------------------
+; ~5 KB total. Two .cmd files (English + Chinese) that the tester can run
+; as Administrator to add %LOCALAPPDATA%\OysterRecorder\ to Windows
+; Defender exclusions BEFORE installing. This prevents Defender from
+; quarantining bundled javaw.exe + Minecraft .jar files (the "install
+; corrupted" bug seen by tester bingd on v0.12.0/v0.12.1/v0.12.2).
+;
+; oyster_play.py's "Install incomplete" dialog points users to:
+;   {app}\fix-scripts\INSTALL-FIRST.cmd
+; with instructions to right-click → "Run as administrator", then reinstall.
+Source: "..\\..\\installer\\fix-scripts\\INSTALL-FIRST.cmd"; \
+    DestDir: "{app}\\fix-scripts"; \
+    Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\\..\\installer\\fix-scripts\\请先双击我.cmd"; \
+    DestDir: "{app}\\fix-scripts"; \
+    Flags: ignoreversion skipifsourcedoesntexist
+
 [Icons]
 ; ---- Start-menu group (always created) ------------------------------------
 Name: "{group}\\{#AppShortcutLbl}"; \
-    Filename: "{app}\\{#AppExeName}"; \
+    Filename: "{app}\\OysterPlay.bat"; \
     WorkingDir: "{app}"; \
     Comment: "Launch {#AppName} (records gameplay automatically)"
 
@@ -292,20 +440,26 @@ Name: "{group}\\Uninstall {#AppName}"; \
 ; machines this points at the OneDrive\Desktop folder instead of
 ; %USERPROFILE%\Desktop, so the icon shows up where the user expects it.
 Name: "{userdesktop}\\{#AppShortcutLbl}"; \
-    Filename: "{app}\\{#AppExeName}"; \
+    Filename: "{app}\\OysterPlay.bat"; \
     WorkingDir: "{app}"; \
     Comment: "Launch {#AppName}"; \
     Tasks: desktopicon
 
 [Run]
-; Optional: launch immediately after install so a brand-new user sees the
-; recorder come up on the same double-click that ran setup. nowait so
-; the installer's "Finish" page appears immediately; postinstall+skipifsilent
-; honors the spec's "no silent default" by suppressing this option in any
-; future /SILENT invocation.
-Filename: "{app}\\{#AppExeName}"; \
+; S131: Silent install of bundled VC++ Redist when missing
+Filename: "{tmp}\vc_redist.x64.exe"; \
+  Parameters: "/install /quiet /norestart"; \
+  StatusMsg: "Installing Visual C++ 2015-2022 Redistributable (x64)..."; \
+  Check: VCRedistNotInstalled; \
+  Flags: waituntilterminated
+; Launch immediately after install so a brand-new user sees OysterPlay open
+; Minecraft from the same double-click that ran setup. nowait so the
+; installer's "Finish" page appears immediately; postinstall+skipifsilent
+; suppresses this option in any future /SILENT invocation.
+Filename: "{cmd}"; \
+    Parameters: "/c start """" ""{app}\\OysterPlay.bat"""; \
     Description: "Launch {#AppName} now"; \
-    Flags: nowait postinstall skipifsilent unchecked
+    Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
 ; The orchestrator pre-creates {app}\logs and other writable dirs in [Dirs].
@@ -337,6 +491,11 @@ Type: filesandordirs; Name: "{app}\\runtime"
 ; ---------------------------------------------------------------------------
 
 [Code]
+function VCRedistNotInstalled(): Boolean;
+begin
+  Result := not RegKeyExists(HKLM, 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64');
+end;
+
 { -------------------------------------------------------------------------
   Pascal scripting kept to the absolute minimum. Anything we can do via
   declarative sections above, we do there — Pascal code in installers is

@@ -22,10 +22,7 @@ import argparse
 import csv
 import json
 import math
-import os
 import sys
-import tempfile
-from collections import Counter
 from pathlib import Path
 from typing import Any, Iterable, List, Optional
 

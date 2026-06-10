@@ -11,6 +11,7 @@ package world.oyster.recorder;
  *
  * <p>All angles in degrees; all distances in blocks (= metres in MC's
  * {@code metric_scale=1.0} convention); timestamps in ms-since-epoch.
+ * {@code paused} marks samples captured while the Minecraft client was paused.
  */
 public record GameStateSample(
     long tick,
@@ -22,6 +23,7 @@ public record GameStateSample(
     boolean onGround,
     boolean sneaking,
     boolean sprinting,
+    boolean paused,
     String dimension,
     String gameMode
 ) {
@@ -49,6 +51,7 @@ public record GameStateSample(
         appendKv(sb, "on_ground", onGround);        sb.append(',');
         appendKv(sb, "sneaking", sneaking);         sb.append(',');
         appendKv(sb, "sprinting", sprinting);       sb.append(',');
+        appendKv(sb, "paused", paused);             sb.append(',');
         appendKvStr(sb, "dimension", dimension);    sb.append(',');
         appendKvStr(sb, "game_mode", gameMode);
         sb.append('}');

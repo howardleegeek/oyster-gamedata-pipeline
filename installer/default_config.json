@@ -1,0 +1,8 @@
+{
+  "backend_url": "https://oyster-backend-6qup7rrx2q-uc.a.run.app",
+  "discord_webhook": "",
+  "update_server": "https://updates.oyster.example",
+  "auto_update_check_hours": 24,
+  "income_notification_time": "20:00",
+  "telemetry_enabled": false
+}

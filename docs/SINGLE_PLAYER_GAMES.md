@@ -28,21 +28,22 @@ Worst-case fallback for **any** game: RGB video + Raw Input + DepthAnything V2 i
 - **Coverage**: 20/20 action_camera fields + DepthAnything V2 depth
 - **Vendor effort**: ~10 min install (per `docs/SOP_LAO_LIU.md`)
 
-### 2. BeamNG.drive 🟡 SCAFFOLDED
-- **Status**: `environments/factorio.py` parallel; `BEAMNG_RUNBOOK.md` ready
+### 2. BeamNG.drive 🟡 SMOKE-READY
+- **Status**: `environments/beamng_drive.py` has a plug-and-play BeamNGpy wrapper plus pure-Python mock dry-run for CI/cluster smoke
 - **Extraction**: `pip install beamngpy>=1.27` (already in `pyproject.toml [beamng]`)
 - **What it gives**: native depth sensor + camera intrinsics + vehicle pose/velocity at 60 Hz
 - **Why P0**: only paid game in P0 list ($24.99 Steam) but **driving data is in Wayve / Tesla / Cosmos training corpora** — premium buyer demand
-- **Integration estimate**: 2 days
+- **Integration estimate**: 1-2 days remaining for clean Windows + BeamNG.drive + BeamNGpy real-session smoke
 
-### 3. Factorio 🟡 SCAFFOLDED
-- **Status**: `environments/factorio.py` 148 LOC stub with RCON URI parser
-- **Extraction**: official mod API + RCON; we ship a tiny observer mod
-- **What it gives**: 2D-orthographic camera + player position + tile state
+### 3. Factorio 🟡 SMOKE-READY
+- **Status**: `environments/factorio.py` now has the plug-and-play RCON/mod relay contract, action validation, and fake-client CI coverage
+- **Extraction**: official mod API + RCON; we ship a tiny observer/action mod exposing `observe` and `act`
+- **What it gives**: 2D-orthographic camera + tick, player position, surface, inventory, nearby entities, and flat tile/world state
 - **Why P0**: $30 Steam, very large modding community, Factorio devs blessed automation
-- **Integration estimate**: 3 days (mod-side Lua + Python RCON glue)
+- **Integration estimate**: 2 days remaining for mod-side Lua packaging + real-session smoke
 
 ### 4. Stardew Valley 🆕 NEW
+- **Status**: `environments/stardew_valley.py` has a plug-and-play SMAPI relay wrapper with fake-relay CI coverage
 - **Extraction**: SMAPI (Stardew Modding API) — official-blessed framework
 - **Pin**: `SMAPI 4.x` from smapi.io
 - **What it gives**: player position (x, y, mapName), facing direction, action key state, NPC positions
@@ -132,10 +133,10 @@ For these, we either skip OR ship a degraded "RGB + RawInput + DepthAnything inf
 | Game | Required SW | Pin | Status |
 |---|---|---|---|
 | Minecraft Java | Mineflayer | `^4.20.0` | ✅ in `mineflayer/package.json` |
-| BeamNG | beamngpy | `>=1.27` | ✅ in `pyproject.toml [beamng]` |
-| Factorio | RCON + observer mod | RCON 25575, mod TBD | 🟡 stub in `environments/factorio.py` |
+| BeamNG | beamngpy | `>=1.27` | 🟡 mock/CI contract in `environments/beamng_drive.py`; real BeamNGpy smoke pending |
+| Factorio | RCON + observer/action mod | RCON 25575, `oyster_recorder.observe`/`act` relay | 🟡 Python contract in `environments/factorio.py`; Lua mod packaging pending |
 | CS2 (post-game) | demoparser2 | included | ✅ in `pyproject.toml [cs2]` |
-| Stardew Valley | SMAPI | `4.x` from smapi.io | ⚪ not yet integrated |
+| Stardew Valley | SMAPI | `4.x` from smapi.io | 🟡 Python contract in `environments/stardew_valley.py`; SMAPI relay packaging pending |
 | Cyberpunk 2077 | CET | `1.32+` Lua | ⚪ not yet integrated |
 | Cities Skylines | Mod API | Workshop | ⚪ not yet integrated |
 | Skyrim SE | SKSE64 | latest | ⚪ not yet integrated |
@@ -178,6 +179,64 @@ For these, we either skip OR ship a degraded "RGB + RawInput + DepthAnything inf
 ```
 
 **Game-specific code is the small box at top.** Everything below is reused. Adding a new game = writing one extractor module (~200-400 LOC) + a runbook. That's the unit of work.
+
+## Plug-and-play game plugin contract
+
+Each supported game now has a small declarative profile in
+`src/oyster_agent_runner/game_plugins.py`. The profile is the handoff unit
+for cluster workers: it declares process detection, allowed modes,
+official/blessed data sources, required output streams, runbook, adapter module,
+and setup time. A game should not be dispatched to implementation until its
+profile validates.
+
+Local checks:
+
+```bash
+PYTHONPATH=src python3 -m oyster_agent_runner.game_plugins list
+PYTHONPATH=src python3 -m oyster_agent_runner.game_plugins validate
+PYTHONPATH=src python3 -m oyster_agent_runner.game_plugins show minecraft
+```
+
+Minimum plug-and-play requirements:
+
+| Requirement | Why |
+|---|---|
+| `video` source | OBS/window capture stays game-agnostic. |
+| `input` source | RawInput keeps user action capture common across games. |
+| `state` source | Game-specific pose/camera/world state must come from an official or community-blessed channel. |
+| `manifest.json` output | Every session must be self-describing for validator/backend ingestion. |
+| `runbook` | Operators and cluster workers need deterministic setup and smoke steps. |
+| anti-cheat policy | Online/kernel anti-cheat games must not be mixed into the single-player adapter path. |
+
+Current built-in P0 profile set:
+
+| Profile | Tier | Data source contract |
+|---|---|---|
+| `minecraft` | production | OBS + RawInput + Mineflayer; reference implementation. |
+| `beamng` | smoke_ready | OBS + RawInput + BeamNGpy + native camera depth; mock dry-run contract in CI. |
+| `factorio` | smoke_ready | OBS + RawInput + RCON/Lua mod; fake RCON CI contract; flat 2D depth. |
+| `stardew_valley` | smoke_ready | OBS + RawInput + SMAPI HTTP relay; fake relay CI contract; flat 2D depth. |
+| `cyberpunk_2077` | scaffold | OBS + RawInput + CET Lua websocket; single-player only. |
+| `cities_skylines` | scaffold | OBS + RawInput + Mod API/named pipe; city-state telemetry. |
+
+Factorio adapter contract:
+
+| Surface | Contract |
+|---|---|
+| Observation | `tick`, `player_position`, `surface`, `inventory`, `entities_near`, `source` |
+| Actions | `move`, `craft`, `place`, `mine`, `noop` |
+| CI path | Inject fake RCON client; no Factorio process is started in tests. |
+| Live path | Source-RCON socket to `host:rcon_port`; failures name the host/port and expected observer mod. |
+
+This turns horizontal expansion into a repeatable loop:
+
+1. Add/update the game profile.
+2. Implement the thin adapter listed by `adapter_module`.
+3. Emit `recording.mp4`, `game_state.jsonl`, `inputs.jsonl`, and
+   `manifest.json` or a LEM session view that maps to those files.
+4. Run game-specific smoke plus the shared validator/backend smoke.
+5. Promote the profile from `scaffold` to `smoke_ready` after CI/fake or mock
+   contract tests pass, then to `production` only after clean real sessions pass.
 
 ---
 

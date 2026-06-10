@@ -41,6 +41,7 @@ EXPECTED_FIELDS = {
     "on_ground",
     "sneaking",
     "sprinting",
+    "paused",
     "dimension",
     "game_mode",
 }
@@ -110,6 +111,7 @@ def test_lookup_at_ms_returns_expected_fields():
     sample["on_ground"] = True
     sample["sneaking"] = False
     sample["sprinting"] = False
+    sample["paused"] = False
     sample["timestamp_ms"] = 1000
 
     samples = [sample]
