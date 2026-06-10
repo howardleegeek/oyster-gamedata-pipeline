@@ -42,7 +42,7 @@ jobs:
           rm -rf .venv
           python -m venv .venv
           source .venv/bin/activate
-          pip install -e ".[test]"
+          pip install -e ".[test,exr]"
           pip install ruff black pytest pytest-cov
 
       - name: Lint with ruff

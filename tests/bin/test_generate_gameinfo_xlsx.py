@@ -3,6 +3,7 @@
 Tests for bin/generate_gameinfo_xlsx.py
 """
 
+import json
 import os
 import sys
 import tempfile
@@ -17,6 +18,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from bin.generate_gameinfo_xlsx import (
     FIELD_NAMES,
     build_gameinfo_dict,
+    detect_game_version,
+    detect_game_version_from_launcher_manifest,
     main,
     read_xlsx,
     validate_route_type,
@@ -58,7 +61,7 @@ class TestBuildGameinfoDict:
         result = build_gameinfo_dict()
 
         assert result["game_name"] == "Minecraft"
-        assert result["game_version"] == "1.20.4"
+        assert result["game_version"] is None
         assert result["platform"] == "Java Edition"
         assert result["scene_name"] == "flat-overworld"
         assert result["weather"] == "clear"
@@ -295,6 +298,73 @@ class TestRouteTypeValidation:
             )
 
             assert result == 1, "main() should return 1 for invalid route_type"
+
+
+class TestGameVersionDetection:
+    """Tests for Minecraft version detection used by gameinfo generation."""
+
+    def test_detects_mc_version_from_session_metadata(self, tmp_path):
+        (tmp_path / "metadata.json").write_text(
+            json.dumps({"mc_version": "1.21.4", "game_version": "1.20.4"}),
+            encoding="utf-8",
+        )
+
+        assert detect_game_version(tmp_path) == "1.21.4"
+
+    def test_detects_mc_version_from_minipc1_0527_fps_log_fixture(self, tmp_path):
+        (tmp_path / "fps_log.json").write_text(
+            json.dumps(
+                [
+                    {
+                        "second": 0,
+                        "fps": 30,
+                        "window_title": "Minecraft 1.21.4 - Singleplayer",
+                    }
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        assert detect_game_version(tmp_path) == "1.21.4"
+
+    def test_detects_mc_version_from_bundled_launcher_manifest(self, tmp_path):
+        version_dir = tmp_path / "mc-instance" / "versions" / "fabric-loader-0.16.10-1.21.4"
+        version_dir.mkdir(parents=True)
+        (version_dir / "fabric-loader-0.16.10-1.21.4.json").write_text(
+            json.dumps(
+                {
+                    "id": "fabric-loader-0.16.10-1.21.4",
+                    "inheritsFrom": "1.21.4",
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        assert detect_game_version_from_launcher_manifest(tmp_path) == "1.21.4"
+
+    def test_main_auto_detects_game_version_from_output_parent(self, tmp_path):
+        output_path = tmp_path / "gameinfo.xlsx"
+        (tmp_path / "metadata.json").write_text(
+            json.dumps({"game_version": "1.21.4"}),
+            encoding="utf-8",
+        )
+
+        result = main(["--output", str(output_path)])
+
+        assert result == 0
+        data = read_xlsx(str(output_path))
+        assert data["game_version"] == "1.21.4"
+
+    def test_main_leaves_game_version_blank_when_undetected(self, tmp_path, caplog):
+        caplog.set_level("WARNING")
+        output_path = tmp_path / "gameinfo.xlsx"
+
+        result = main(["--output", str(output_path)])
+
+        assert result == 0
+        data = read_xlsx(str(output_path))
+        assert data["game_version"] is None
+        assert "Could not detect Minecraft version" in caplog.text
 
 
 if __name__ == "__main__":

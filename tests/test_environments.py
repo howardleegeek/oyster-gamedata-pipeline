@@ -121,9 +121,9 @@ def test_factorio_env_discrete_params_still_work() -> None:
     assert env.connection == RconConnection(host="h", port=9999, password="p")
 
 
-def test_factorio_env_step_still_raises_not_implemented() -> None:
+def test_factorio_env_step_requires_reset_first() -> None:
     env = FactorioEnvironment(rcon_uri="rcon://localhost")
-    with pytest.raises(NotImplementedError, match="scaffold stub"):
+    with pytest.raises(RuntimeError, match="step called before reset"):
         env.step({"op": "noop"})
 
 

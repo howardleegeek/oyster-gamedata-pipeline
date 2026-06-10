@@ -1,355 +1,244 @@
-# G213 Privacy Policy
+# Oyster — Privacy Policy (Draft)
 
-**Effective Date:** January 1, 2025  
-**Last Updated:** January 1, 2025  
-**Version:** 1.0
+> **DRAFT — NOT LEGAL ADVICE.** This document is a preliminary draft for internal
+> review during the 内测 (closed beta) phase. It has not been reviewed by legal
+> counsel and should not be relied upon as a binding legal instrument.
+
+**Effective Date:** May 20, 2026  
+**Last Updated:** May 20, 2026  
+**Version:** 0.1.0-draft
 
 ---
 
 ## 1. Introduction
 
-This Privacy Policy ("Policy") describes how G213 ("we," "us," or "our") collects, uses, discloses, and safeguards personal information in connection with our platform services. We are committed to protecting your privacy and ensuring compliance with applicable data protection laws, including the General Data Protection Regulation ("GDPR") and the California Consumer Privacy Act ("CCPA").
+Your use of the Service is also governed by our [Terms of Service](TERMS_OF_SERVICE.md).
 
-By accessing or using our services, you acknowledge that you have read, understood, and agree to the practices described in this Policy.
+This Privacy Policy ("Policy") describes how Oyster ("we," "us," or "our")
+collects, uses, discloses, and safeguards your personal information in
+connection with our game data recorder and AI training data marketplace
+platform ("Service").
 
----
+We are committed to protecting your privacy and complying with applicable data
+protection laws, including the **General Data Protection Regulation (GDPR)**
+and the **California Consumer Privacy Act (CCPA)**.
 
-## 2. Scope
-
-This Policy applies to:
-
-- **Vendors**: Individuals or entities who register on our platform to sell content, including clips, videos, and other media.
-- **Buyers**: Individuals or entities who purchase or license content from our platform.
-- **End Users**: Individuals who view or interact with content distributed through our platform.
-
----
-
-## 3. Personal Information We Collect
-
-### 3.1 Vendor Personal Information
-
-We collect the following personal information from vendors:
-
-| Category | Examples | Purpose |
-|----------|----------|---------|
-| Contact Information | Full name, email address, phone number | Account creation, communication, support |
-| Payout Information | Bank account details, PayPal email, routing number, tax identification number (TIN) | Processing payments, tax reporting |
-| Identity Verification | Government-issued ID, business registration documents | Compliance with anti-money laundering (AML) and know-your-customer (KYC) requirements |
-| Profile Information | Username, bio, profile picture, social media links | Public vendor profile on our platform |
-
-### 3.2 Buyer Personal Information
-
-We collect the following personal information from buyers:
-
-| Category | Examples | Purpose |
-|----------|----------|---------|
-| Contact Information | Email address, shipping address | Order fulfillment, communication |
-| Payment Information | Credit card details, billing address (processed via secure payment processor) | Transaction processing |
-| Account Information | Username, purchase history, preferences | Account management, personalized experience |
-
-### 3.3 Automatically Collected Information
-
-We automatically collect certain information when you use our platform:
-
-- IP address
-- Browser type and version
-- Operating system
-- Device identifiers
-- Access times
-- Pages viewed
-- Referring/exit URLs
+By using the Service, you acknowledge that you have read and understood this
+Policy.
 
 ---
 
-## 4. How We Use Personal Information
+## 2. Information We Collect
 
-We use personal information for the following purposes:
+### 2.1 Game Screen Recording
 
-1. **Service Delivery**: To provide, maintain, and improve our platform services.
-2. **Payment Processing**: To process transactions and distribute earnings to vendors.
-3. **Communication**: To send transactional emails, marketing communications (with consent), and support responses.
-4. **Compliance**: To comply with legal obligations, including tax reporting and fraud prevention.
-5. **Security**: To detect, prevent, and address fraudulent activities, security breaches, and illegal conduct.
-6. **Analytics**: To analyze usage patterns and improve user experience.
+When you run the Oyster recorder, we capture:
+
+- **Screen video** — Real-time video frames of your gameplay sessions.
+- **Input events** — Keyboard, mouse, and controller inputs with timestamps.
+- **Game-state data** — In-game state information extracted from supported
+  titles (e.g., player position, health, inventory).
+
+### 2.2 OAuth Identity Information
+
+When you sign in, we collect identity information from your chosen **OAuth**
+provider (e.g., Google, Discord, GitHub), which may include:
+
+- OAuth provider user ID
+- Display name / username
+- Email address
+- Profile picture URL
+- OAuth access token (stored securely, used only for authentication)
+
+We do not store your OAuth provider password.
+
+### 2.3 Account & Technical Data
+
+- Account creation date and last login timestamp
+- IP address (for security and abuse prevention)
+- Device information (OS version, hardware identifiers)
+- Application version and configuration settings
+- Crash reports and diagnostic logs
+
+### 2.4 Payment-Related Data (Future Phase)
+
+In future phases when real payouts are enabled, we may collect:
+
+- Payout method details (e.g., PayPal email, bank account information)
+- Tax identification information (as required by law)
+
+During the current 内测 phase, no real payout data is collected.
+
+---
+
+## 3. How We Use Your Information
+
+We use the collected information for the following purposes:
+
+| Purpose | Data Used |
+|---------|-----------|
+| **AI/ML model training** | Screen recordings, input events, game-state data |
+| **Payout calculation** | Session metrics, data quality scores (future phase) |
+| **Service operation** | Account data, technical data, OAuth identity |
+| **Security & fraud prevention** | IP address, device info, login patterns |
+| **Communication** | Email address (for service updates, policy changes) |
+| **Service improvement** | Crash reports, diagnostic logs, usage analytics |
+
+---
+
+## 4. Data Sharing & Disclosure
+
+### 4.1 Third-Party AI Buyers
+
+User-contributed gameplay data may be packaged and licensed to third-party
+AI/ML buyers through the Oyster marketplace. Before sharing:
+
+- Data is **anonymized** to remove or obfuscate personally identifiable
+  information.
+- Direct identifiers (OAuth identity, email, IP address) are **never** shared
+  with buyers.
+- Buyers receive only the gameplay data (screen recordings, input events,
+  game-state data) in anonymized form.
+
+### 4.2 Service Providers
+
+We may share information with trusted third-party service providers who assist
+us in operating the Service (e.g., cloud hosting, analytics, payment
+processing). These providers are contractually obligated to use your
+information only for the purposes we specify.
+
+### 4.3 Legal Requirements
+
+We may disclose your information if required by law, regulation, legal process,
+or governmental request.
+
+### 4.4 Business Transfers
+
+In the event of a merger, acquisition, or sale of assets, your information may
+be transferred as part of that transaction. We will notify you of any such
+change.
 
 ---
 
 ## 5. Data Retention
 
-### 5.1 Clip Data Retention
-
-**Clip content and associated metadata shall be retained for a period of ninety (90) days following the date of upload or the date of last access, whichever is later.** After this period, clip data will be automatically deleted from our active systems, subject to the following exceptions:
-
-- **Legal Hold**: Data may be retained longer if required by law, regulation, or legal proceeding.
-- **Pending Disputes**: Data relevant to unresolved disputes may be retained until resolution.
-- **Archival Backup**: Residual copies may remain in encrypted backup systems for up to an additional 30 days.
-
-### 5.2 Account Data Retention
-
-Vendor and buyer account data will be retained for as long as the account remains active. Upon account deletion, personal information will be anonymized or deleted within 30 days, except as required by law.
+- **Gameplay recordings** are retained for as long as your account is active
+  and for a reasonable period thereafter to fulfill marketplace obligations.
+- **OAuth identity data** is retained while your account is active.
+- **Anonymized/aggregated data** may be retained indefinitely, as it no longer
+  constitutes personal information.
+- You may request deletion of your data at any time (see Section 6).
 
 ---
 
-## 6. Data Sharing and Disclosure
+## 6. Your Rights
 
-### 6.1 Third-Party Service Providers
+Depending on your jurisdiction, you may have the following rights:
 
-We may share personal information with third-party service providers who perform services on our behalf, including:
+### 6.1 Right to Access
 
-- Payment processors (e.g., Stripe, PayPal)
-- Cloud storage providers
-- Email delivery services
-- Analytics providers
-- Customer support platforms
+You may request a copy of the personal information we hold about you.
 
-These providers are contractually obligated to protect personal information and use it only for the services they provide.
+### 6.2 Right to Rectification
 
-### 6.2 Legal Requirements
+You may request correction of inaccurate or incomplete personal information.
 
-We may disclose personal information when required to do so by law or in response to valid requests by public authorities (e.g., court orders, subpoenas).
+### 6.3 Right to Delete
 
-### 6.3 Business Transfers
+You may request that we **delete** your account and associated personal
+information. To do so, contact us at `placeholder@oyster.example` or use the
+account deletion feature within the Service. Note that anonymized or aggregated
+data derived from your contributions may be retained.
 
-In the event of a merger, acquisition, or sale of all or a portion of our assets, personal information may be transferred as part of that transaction. We will notify you of any such change in ownership or control.
+### 6.4 Right to Data Portability (Export)
 
----
+You may request an **export** of your personal data in a machine-readable
+format. Contact us at `placeholder@oyster.example` to initiate an export
+request.
 
-## 7. Your Rights Under GDPR
+### 6.5 Right to Object / Restrict Processing
 
-If you are located in the European Economic Area (EEA) or the United Kingdom (UK), you have the following rights under the GDPR:
+You may object to or request restriction of certain processing activities,
+subject to applicable law.
 
-### 7.1 Right to Access
+### 6.6 Right to Withdraw Consent
 
-You have the right to request a copy of the personal information we hold about you.
-
-### 7.2 Right to Rectification
-
-You have the right to request correction of inaccurate or incomplete personal information.
-
-### 7.3 Right to Erasure ("Right to be Forgotten")
-
-You have the right to request deletion of your personal information, subject to legal retention requirements.
-
-### 7.4 Right to Restriction of Processing
-
-You have the right to request restriction of processing in certain circumstances.
-
-### 7.5 Right to Data Portability
-
-You have the right to receive your personal information in a structured, commonly used, and machine-readable format.
-
-### 7.6 Right to Object
-
-You have the right to object to processing based on legitimate interests or direct marketing.
-
-### 7.7 Rights Related to Automated Decision-Making
-
-You have the right not to be subject to decisions based solely on automated processing that significantly affect you.
+Where processing is based on consent, you may withdraw consent at any time.
+Withdrawal does not affect the lawfulness of processing based on consent before
+its withdrawal.
 
 ---
 
-## 8. GDPR Data Subject Access Request (DSAR) Procedure
+## 7. GDPR Acknowledgment
 
-To exercise your GDPR rights, please submit a Data Subject Access Request (DSAR) using one of the following methods:
+If you are located in the European Economic Area (EEA), United Kingdom, or
+Switzerland, the following applies:
 
-### 8.1 Submitting a DSAR
-
-**Online:** Visit our Data Request Portal at `https://g213.example.com/data-request`
-
-**Email:** Send your request to `privacy@g213.example.com` with the subject line "GDPR DSAR"
-
-**Mail:** Send a written request to:
-
-```
-G213 Privacy Team
-123 Privacy Lane
-San Francisco, CA 94102
-United States
-```
-
-### 8.2 Required Information
-
-Your DSAR must include:
-
-1. Full name
-2. Email address associated with your account
-3. Specific description of the right you wish to exercise
-4. Proof of identity (e.g., copy of government-issued ID)
-
-### 8.3 Response Timeline
-
-We will respond to your DSAR within **one (1) month** of receipt. If we cannot fulfill your request, we will provide a written explanation. The response period may be extended by up to two (2) additional months for complex requests, in which case we will notify you within the first month.
-
-### 8.4 No Fee Requirement
-
-We will not charge a fee for processing your DSAR, unless the request is manifestly unfounded or excessive.
+- Oyster acts as a **data controller** for the personal information described
+  in this Policy.
+- Our lawful bases for processing include: (a) your consent, (b) performance
+  of a contract, (c) legitimate interests, and (d) compliance with legal
+  obligations.
+- You have the right to lodge a complaint with a supervisory authority in your
+  jurisdiction.
 
 ---
 
-## 9. Your Rights Under CCPA (California Residents)
+## 8. CCPA Acknowledgment
 
-If you are a California resident, you have the following rights under the CCPA:
+If you are a California resident, the following applies:
 
-### 9.1 Right to Know
-
-You have the right to request disclosure of the categories and specific pieces of personal information we have collected about you.
-
-### 9.2 Right to Delete
-
-You have the right to request deletion of your personal information, subject to certain exceptions.
-
-### 9.3 Right to Opt-Out
-
-You have the right to **opt-out of the sale of your personal information**. We do not sell personal information to third parties for monetary consideration.
-
-### 9.4 Right to Non-Discrimination
-
-We will not discriminate against you for exercising any of your CCPA rights.
-
-### 9.5 Right to Designate an Authorized Agent
-
-You may designate an authorized agent to exercise your rights on your behalf.
+- We collect the categories of personal information described in Section 2.
+- We do not **sell** your personal information as defined by the CCPA.
+- You have the right to know, delete, and opt out of the sale of your personal
+  information.
+- We will not discriminate against you for exercising your CCPA rights.
 
 ---
 
-## 10. CCPA Opt-Out Procedure
+## 9. Children's Privacy
 
-To exercise your right to opt-out of the sale of your personal information:
-
-**Online:** Visit our "Do Not Sell My Personal Information" page at `https://g213.example.com/do-not-sell`
-
-**Email:** Send your request to `privacy@g213.example.com` with the subject line "CCPA Opt-Out"
-
-**Phone:** Call our privacy hotline at `+1 (555) 123-4567`
-
-Upon receiving your opt-out request, we will cease selling your personal information within fifteen (15) business days.
+The Service is not intended for individuals under the age of 18. We do not
+knowingly collect personal information from children under 13. If we become
+aware that we have collected personal information from a child under 13, we
+will take steps to delete such information.
 
 ---
 
-## 11. Data Deletion Endpoint
+## 10. Security
 
-We provide a programmatic API endpoint for users to request deletion of their data.
-
-### 11.1 API Specification
-
-**Endpoint:** `DELETE /api/v1/user/data`
-
-**Authentication:** Bearer token (OAuth 2.0)
-
-**Request Headers:**
-
-```
-Authorization: Bearer <your_access_token>
-Content-Type: application/json
-```
-
-**Request Body:**
-
-```json
-{
-  "reason": "user_request",
-  "confirmation": true
-}
-```
-
-**Response (Success):**
-
-```json
-{
-  "status": "success",
-  "request_id": "del_req_1234567890",
-  "message": "Your data deletion request has been queued for processing.",
-  "estimated_completion": "2025-02-01T00:00:00Z"
-}
-```
-
-**Response (Error):**
-
-```json
-{
-  "status": "error",
-  "code": "INVALID_TOKEN",
-  "message": "The provided access token is invalid or expired."
-}
-```
-
-### 11.2 Deletion Timeline
-
-Data deletion requests will be completed within **thirty (30) days** of confirmation. You will receive email confirmation once deletion is complete.
-
-### 11.3 Exceptions
-
-We may retain certain data as required by law or for legitimate business purposes, including:
-
-- Tax records required by tax authorities
-- Transaction records required by financial regulations
-- Data necessary to prevent fraud or ensure platform security
+We implement reasonable technical and organizational measures to protect your
+personal information against unauthorized access, alteration, disclosure, or
+destruction. However, no method of transmission over the Internet or electronic
+storage is 100% secure, and we cannot guarantee absolute security.
 
 ---
 
-## 12. Security Measures
+## 11. International Data Transfers
 
-We implement appropriate technical and organizational measures to protect personal information, including:
-
-- **Encryption**: Data in transit (TLS 1.3) and at rest (AES-256)
-- **Access Controls**: Role-based access control (RBAC) and principle of least privilege
-- **Monitoring**: Continuous security monitoring and incident response procedures
-- **Training**: Regular security awareness training for employees
-- **Testing**: Periodic vulnerability assessments and penetration testing
+Your information may be transferred to and processed in countries other than
+your country of residence, including the United States. These countries may
+have data protection laws that differ from those in your jurisdiction. By using
+the Service, you consent to such transfers.
 
 ---
 
-## 13. International Data Transfers
+## 12. Changes to This Policy
 
-Personal information may be transferred to and processed in countries outside your country of residence. When we transfer personal information internationally, we ensure appropriate safeguards are in place, such as:
-
-- Standard Contractual Clauses (SCCs) approved by the European Commission
-- Adequacy decisions by the European Commission
-- Binding Corporate Rules (BCRs) for intra-group transfers
+We may update this Policy from time to time. Material changes will be
+communicated via email or in-app notification. Your continued use of the
+Service after changes are posted constitutes acceptance of the updated Policy.
 
 ---
 
-## 14. Children's Privacy
+## 13. Contact
 
-Our services are not intended for individuals under the age of 16. We do not knowingly collect personal information from children under 16. If we become aware that we have collected such information, we will take steps to delete it promptly.
+For questions, concerns, or requests regarding this Policy or your personal
+information, please contact:
 
----
-
-## 15. Changes to This Policy
-
-We may update this Policy from time to time. We will notify you of any material changes by posting the new Policy on this page and updating the "Last Updated" date. We encourage you to review this Policy periodically.
+**Email:** placeholder@oyster.example
 
 ---
 
-## 16. Contact Information
-
-If you have any questions, concerns, or requests regarding this Policy or our data practices, please contact us:
-
-**Email:** `privacy@g213.example.com`  
-**Phone:** `+1 (555) 123-4567`  
-**Mail:**
-
-```
-G213 Privacy Team
-123 Privacy Lane
-San Francisco, CA 94102
-United States
-```
-
-**Data Protection Officer (DPO):** `dpo@g213.example.com`
-
----
-
-## 17. Appendix A: Data Processing Agreement (DPA)
-
-A separate Data Processing Agreement is available for enterprise customers and vendors who require additional contractual guarantees. Contact `enterprise@g213.example.com` for more information.
-
----
-
-## 18. Appendix B: Cookie Policy
-
-We use cookies and similar tracking technologies to enhance your experience. For detailed information about the cookies we use, please refer to our Cookie Policy available at `https://g213.example.com/cookie-policy`.
-
----
-
-*This Policy is provided for informational purposes and does not constitute a legal contract. For legal advice regarding your specific situation, please consult with a qualified attorney.*
+*This is a draft document for internal review only. It does not constitute legal
+advice and should not be relied upon as a binding legal instrument.*

@@ -1,135 +1,493 @@
-# Changelog
+# CHANGELOG
 
-## [Unreleased]
+## [0.16.0] - 2026-05-27
 
-### Minecraft Phase 1 — CoT + metadata + inputs trajectory pipeline
-- `mineflayer/bot.js` — Node.js subprocess implementing the
-  Mineflayer half of the JSON-line stdio protocol (`hello`, `spawn`,
-  `action`, `observation`, `error`, `goodbye` messages); supports four
-  Phase 1 actions: `move_to`, `dig`, `look`, `chat`. Defensive against
-  malformed parent input, mineflayer crashes, and unknown ops.
-- `mineflayer/protocol.md` — versioned wire-protocol contract.
-- `MinecraftEnvironment` upgraded from stub to a Mineflayer-backed
-  `Environment` implementation. Spawns the bot as a subprocess, performs
-  hello+spawn handshake, dispatches actions, surfaces fatal errors as
-  `RuntimeError` so the runner's fail-safe handles them. MineRL path
-  remains stubbed for Phase 3+.
-- `ClaudeThinkingProvider` — Anthropic Messages API wrapper with
-  `thinking={"type":"enabled","budget_tokens":16000}` enabled by default.
-  Captures all `thinking`-type content blocks into `last_thinking` for
-  the runner to emit as a separate `LLM_THINKING` event. Forces
-  `temperature=1.0` per Anthropic API requirement.
-- Runner change: when `provider.wants_thinking_capture` is True, emit a
-  new `LLM_THINKING` event (with the full chain-of-thought text) before
-  the `LLM_REASONING` event each step. Backwards-compatible — providers
-  without the flag see no behavior change.
-- `MinecraftStreamWriter` — Phase 1 multi-stream demuxer that writes
-  `cot.jsonl` (thinking + reasoning + actions), `metadata.jsonl`
-  (observations + ticks), `inputs.jsonl` (action stream), and
-  `manifest.json` (session metadata + alignment proof) sharing a single
-  wall-clock anchor.
-- `oyster-agent run-mc` CLI command — drives a single Phase 1
-  trajectory end-to-end: load task JSON → spawn bot → run agent loop →
-  demux trajectory.jsonl into the four Phase 1 files.
-- `tasks/MC-tutorial-001.json` — first task definition (punch a tree,
-  collect 1 log) following the spec § 4 schema.
-- `docs/PHASE1_RUNBOOK.md` — operator-facing runbook covering Paper
-  server install, npm install, the run command, expected output sizes,
-  cost estimates, troubleshooting.
-- 37 new tests (all mock-based, no Minecraft server required for CI):
-  Mineflayer protocol parser, env lifecycle with fake subprocess,
-  `ClaudeThinkingProvider` with mocked SDK responses, runner thinking-
-  event emission semantics, multi-stream writer, run-mc CLI integration.
+### Added
 
-Phase 1 deliberately omits the video stream (`video.mp4` +
-`frames.jsonl`) — that lands in Phase 2 with the OBS spectator pipeline.
+- linearize engine zbuffer depth (ed650c0)
 
-### CLI — introspection & validation
-- `oyster-agent list-envs` — print registered environments (table or
-  `--json`) with status and description columns
-- `oyster-agent list-providers` — same for LLM providers, including the
-  new `claude-vision` / `openai-vision` keys
-- `oyster-agent validate-task <path>` — validate a JSON `AgentTask`
-  file against the Pydantic schema; renders the task on success or a
-  structured Pydantic error report on failure (exit 1)
-- README: documents the three new commands
-- 12 new tests (happy + error paths + JSON flag for each)
+### Fixed
 
-### RAG memory
-- `TrajectoryMemory` — in-memory store of `(text, embedding, metadata)`
-  records with top-k cosine-similarity retrieval
-- Pluggable `Embedder` callable (`str → Sequence[float]`) — zero runtime
-  deps on numpy / FAISS / sentence-transformers
-- `hashing_embedder(dim)` deterministic fallback (hashing-trick bag of
-  words, unit-normalized) for CI/tests without a real model
-- JSONL save/load (`save_jsonl`, `load_jsonl` with append mode)
-- Tie-breaking: identical similarity preserves insertion order
-- 17 new tests covering similarity math, embedder, retrieval ordering,
-  persistence round-trips, and ranking stability
+- skip trim for short recordings (4ae9f76)
+- normalize raw mouse pixels (72f12a4)
 
-### Tool-use protocol
-- `Tool` frozen dataclass + `ToolProvider` Protocol + `SimpleToolProvider`
-  reference implementation in `tools.py`
-- Runner accepts an optional `tools=...` kwarg; agent actions shaped
-  `{"op": "call_tool", "tool": "<name>", "args": {...}}` are dispatched
-  to the provider rather than the env
-- Tool results are fed back to the agent on the next turn as a user
-  message (`[tool:<name>] result: ...`) and logged as `TOOL_CALL` +
-  `TOOL_RESULT` events in the trajectory JSONL
-- `tool_catalog_prompt()` renders the tool list into the system prompt
-  so the agent knows what's available
-- New public `TrajectoryLogger.write_event(event)` for subsystems that
-  need to emit their own event types (tools, memory, custom telemetry)
-- 10 new tests
+### Other
 
-### Vision-capable LLM providers
-- `ClaudeVisionProvider` — Anthropic SDK wrapper that injects PNG frames
-  as `image`-type content blocks on every user turn
-- `OpenAIVisionProvider` — OpenAI SDK wrapper that injects frames as
-  `image_url` blocks using a `data:image/png;base64,...` URI
-- Both providers declare `wants_vision = True` and expose a
-  single-use `set_next_frame(bytes)` setter; the runner feature-detects
-  both the provider and the env and threads the current frame through
-  on each step (zero change for text-only providers)
-- CLI gains `claude-vision` / `openai-vision` provider keys
-- 10 new tests for vision providers (includes runner-level wiring)
+- ci(installer): add minimal recorder installer (6fbe421)
 
-### Environment primitives + runner fail-safe
-- `VisionCapableEnvironment` protocol + `has_vision(env)` helper; envs
-  may expose `last_frame()` returning the most recent PNG bytes
-- `MockEnvironment` now caches and returns its last rendered frame, and
-  clears it on `reset()`
-- `GymEnvironment` conditional implementation — delegates to real
-  `gymnasium` when the package is importable, stubs cleanly otherwise
-  (exposed via `is_stub` property); PNG encoding via Pillow if present
-- `FactorioEnvironment` accepts an `rcon_uri` (`rcon://[pw@]host[:port]`);
-  shipped as a standalone `RconConnection` dataclass + documented Lua
-  mod + action-dispatch contract
-- `MinecraftEnvironment` documents MineRL (pixel / research) vs
-  Mineflayer (symbolic / headless) tradeoff and stores a `path` attr so
-  downstream wrappers branch cleanly
-- `RunnerConfig.max_consecutive_errors` fail-safe: soft-skip individual
-  step failures, abort the run only after N consecutive errors
-  (default 5, `None` disables); prevents runaway token burn on persistent
-  env/provider outages
-- 22 new tests (env adapters + fail-safe semantics)
 
-### Initial scaffold (Layer 4 agent runner)
-- Pydantic v2 schema with `extra="forbid"` — `AgentTask`, `TrajectoryEntry`,
-  `TaskResult`, `TrajectoryEvent`
-- `AgentRunner` orchestrator with state machine: INIT → RESET → (OBSERVE →
-  REASON → ACT → LOG)* → TERMINATED
-- `Environment` protocol + `MockEnvironment` (hand-rolled tiny-PNG emitter,
-  no Pillow dep in core)
-- `LLMProvider` protocol + Claude (`anthropic`) + OpenAI + Mock providers
-  with retry/backoff on 429/5xx
-- `TrajectoryLogger` emits JSONL in `{timestamp, event_type, event_args}`
-  envelope — byte-identical to `gamedata-recorder/inputs.jsonl` so
-  `oyster-enrichment` ingests agent trajectories without schema changes
-- Typer CLI: `oyster-agent run | schema`
-- Stub environments: `minecraft.py` (MineRL / Mineflayer TODO),
-  `factorio.py` (RCON TODO), `gym_env.py` (gymnasium.make TODO)
-- Red-line games list in README: ONLY Minecraft / Factorio / Skyrim SE /
-  SP GTA V / Civ VI / gym / MineRL / Procgen. Activision / Riot / Epic
-  explicitly forbidden with $14.5M precedent cited.
-- 16 tests passing (schema + runner-mocked + trajectory-logger-compat)
+## [0.15.0] - 2026-05-27
+
+### Added
+
+- backend/codex_api.py — Codex CLI HTTP wrapper (parallel dispatch) (c0aab26)
+
+### Other
+
+- chore(submodule): bump vendor/recorder e171f20 → 7de8a38 (+26 commits) (f4d38ed)
+- docs: investigate OBS audio silence (87b54ca)
+
+
+## [0.14.0] - 2026-05-27
+
+### Added
+
+- bin/audit_lift_post_patches.py — fix 5 audit fails post-process (3b24358)
+
+### Other
+
+- ci(installer): accept bundled installer layout in smoke (fa0efe3)
+- ci(installer): remove placeholder smoke arg (5d53203)
+
+
+## [0.13.1] - 2026-05-27
+
+### Fixed
+
+- align appcast with v0.13.0 asset (26a8a7c)
+
+### Other
+
+- chore(ci): format vcredist installer test (64a3f9f)
+- docs(spec): SPEC_engine_zbuffer_hook.md — Tier 3 metric depth (A2 P0) (7f034fe)
+
+
+## [0.13.0] - 2026-05-27
+
+### Added
+
+- bin/upload_session.py one-click tester session upload (v0.12.4) (6fd99a8)
+
+### Fixed
+
+- canonical_pipeline.py robustness — partial-success mode (+46 points) (607d3ce)
+- move consumer depth to server postprocess contract (30abd90)
+
+
+## [0.12.2] - 2026-05-27
+
+### Fixed
+
+- self-locating paths + bundle 5 missing scripts (v0.12.2) (ff44036)
+- multi-layout session discovery (BUG-3, v0.12.2) (750275a)
+- ExtraDiskSpaceRequired=2GB to catch low-disk testers (BUG-14) (9c93743)
+
+
+## [0.12.0] - 2026-05-27
+
+### Added
+
+- preflight self-audit + Chinese handoff doc for v0.11.20 (6fe8ce0)
+
+### Fixed
+
+- remove stale Mojang asset 01bbb775 from post-fetch checklist (2090aff)
+
+### Other
+
+- docs: PERFECT_VERSION_INTEGRATION — v0.11.20 verified, all 8 criteria ✅ (45a481d)
+
+
+## [0.11.20] - 2026-05-26
+
+### Fixed
+
+- bundle VC++ Redist 2015-2022 (x64) into installer (#100) (76b1894)
+- bundle VC++ Redist in bundled installer pipeline (R05E) (bfc6364)
+
+### Other
+
+- docs: PERFECT_VERSION_INTEGRATION.md — v0.11.20 integration manifest (S131+launcher+MC+JRE+VC++) (417eb05)
+
+
+## [0.11.19] - 2026-05-26
+
+### Other
+
+- docs(specs): S130 — bundle VC++ Redist 2015-2022 x64 into installer (fix tester fresh-Windows crash) (0c8e4a2)
+
+
+## [0.11.17] - 2026-05-26
+
+### Other
+
+- ci(backend): add production provider smoke guard (9039e50)
+
+
+## [0.11.16] - 2026-05-26
+
+### Fixed
+
+- guard production provider config (2013f8f)
+
+
+## [0.11.15] - 2026-05-26
+
+### Fixed
+
+- tolerate concurrent manual release (e16f3f8)
+
+
+## [0.11.14] - 2026-05-26
+
+### Other
+
+- chore(prod): publish readiness gate report (02b410b)
+
+
+## [0.11.13] - 2026-05-25
+
+### Other
+
+- chore(prod): require installer signing in readiness gate (df1cbdd)
+
+
+## [0.11.12] - 2026-05-25
+
+### Fixed
+
+- make HTTPS backend the default gate (84a59eb)
+
+
+## [0.11.11] - 2026-05-25
+
+### Fixed
+
+- sync source anchor before tagging (a9b9e5a)
+
+### Other
+
+- chore(release): align consumer anchor to v0.11.10 (2a32bdc)
+
+
+## [0.11.10] - 2026-05-25
+
+### Other
+
+- chore(release): align consumer anchor to v0.11.9 (4537711)
+- chore(release): guard latest anchor drift (6e97b3b)
+- chore(prod): add production readiness gate (a41ac7f)
+
+
+## [0.11.9] - 2026-05-25
+
+### Fixed
+
+- require game window before strict recorder launch (12d9e73)
+
+### Other
+
+- chore(ci): format windows smoke contract test (d12e4e4)
+
+
+## [0.11.8] - 2026-05-24
+
+### Fixed
+
+- keep detected game handle send-safe (b64de9e)
+- align release contract with v0.11.7 (6b241e4)
+- clean stale recorder before strict session (81bc3d4)
+
+
+## [0.11.7] - 2026-05-24
+
+### Fixed
+
+- harden CI auto-record no-popup path (73a8e50)
+
+### Other
+
+- ci(recorder): maximize Minecraft in strict smoke (e29ef91)
+- ci(recorder): default Windows smokes to no-gui preflight (e2eafeb)
+
+
+## [0.11.6] - 2026-05-24
+
+### Other
+
+- ci(recorder): verify Minecraft foreground in real session smoke (d17830e)
+- ci(recorder): enable CI capture mode for real session smoke (e8cf5c8)
+- ci(recorder): trigger F9 video chain in strict smoke (2719f58)
+
+
+## [0.11.5] - 2026-05-24
+
+### Other
+
+- ci(recorder): harden strict session smoke entry (cc78ec3)
+- ci(recorder): use named splatting for strict smoke (5ca076c)
+- test(recorder): focus Minecraft during strict smoke (f1ae232)
+
+
+## [0.11.4] - 2026-05-24
+
+### Other
+
+- test(recorder): require strict real-session evidence (d9124fd)
+- ci(recorder): add strict Windows real-session workflow (9c4b6e8)
+- test(recorder): force upload config in strict session smoke (0fb396c)
+
+
+## [0.11.2] - 2026-05-24
+
+### Other
+
+- ci(installer): require OBS runtime in Windows package (775c23d)
+
+
+## [0.11.1] - 2026-05-23
+
+### Other
+
+- docs: align version docs with v0.11.0 (7c79a4d)
+- docs(release): codify channel fallback contract (2ebb1c4)
+
+
+## [0.11.0] - 2026-05-22
+
+### Added
+
+- codify recorder pipeline contract (72168ff)
+
+### Other
+
+- ci(backend): smoke current production backend (d5e246f)
+- chore(recorder): align submodule to current main (30b1d34)
+
+
+## [0.10.0] - 2026-05-22
+
+### Added
+
+- add plug-and-play plugin profiles (13ad27a)
+- add smoke-ready single-player adapters (72e8e88)
+
+### Other
+
+- ci(backend): tolerate appcast sync race (44c4feb)
+
+
+## [0.9.4] - 2026-05-22
+
+### Fixed
+
+- accept recorder LEM sessions (f84a7ce)
+
+### Other
+
+- ci(release): sync backend appcast after auto release (a4b603f)
+
+
+## [0.9.3] - 2026-05-22
+
+### Fixed
+
+- harden Windows real session cleanup (027a0db)
+
+### Other
+
+- ci(mc-mod): make fabric watcher permission aware (830d1e7)
+- test(recorder): add Windows real session smoke harness (0889d2e)
+
+
+## [0.9.2] - 2026-05-22
+
+### Other
+
+- ci(backend): add optional admin state smoke (f54c366)
+
+
+## [0.9.1] - 2026-05-22
+
+### Other
+
+- ci(backend): script GCP appcast release sync (299cada)
+
+
+## [0.9.0] - 2026-05-22
+
+### Added
+
+- add admin state summary (947ce58)
+
+
+## [0.8.15] - 2026-05-22
+
+### Fixed
+
+- require explicit tester admin token (0ef7801)
+
+
+## [0.8.14] - 2026-05-22
+
+### Fixed
+
+- persist stub state across restarts (f199d3b)
+
+
+## [0.8.13] - 2026-05-22
+
+### Other
+
+- ci(backend): sync appcast metadata on deploy (a66182c)
+
+
+## [0.8.12] - 2026-05-22
+
+### Fixed
+
+- align appcast with latest recorder release (4942868)
+
+### Other
+
+- ci(release): harden auto release race handling (cbdb980)
+
+
+## [0.8.11] - 2026-05-22
+
+### Other
+
+- ci(installer): report Authenticode status in smoke (ee7c033)
+- test(backend): harden deployed recorder smoke (991d692)
+- test(backend): avoid unresolved metadata literals (6043539)
+
+
+## [0.8.10] - 2026-05-21
+
+### Other
+
+- ci(installer): harden Windows signing gates (540853e)
+- ci(installer): unify EV signing secret (2b3ada4)
+
+
+## [0.8.9] - 2026-05-21
+
+### Other
+
+- ci(backend): require deployed recorder e2e smoke (84b4f97)
+
+
+## [0.8.8] - 2026-05-21
+
+### Fixed
+
+- update income on session upload (cf0a605)
+
+### Other
+
+- style(test): format backend deploy contract (dfc25ba)
+
+
+## [0.8.7] - 2026-05-21
+
+### Other
+
+- ci(backend): add Fly deploy workflow (c344395)
+- ci(release): verify recorder tray launch (3075d7d)
+- ci(backend): codify deploy smoke release blocker (eee00b8)
+
+
+## [0.8.6] - 2026-05-21
+
+### Other
+
+- ci(release): smoke latest installer distribution (9260f24)
+- ci(backend): add remote smoke guard (2267b11)
+- ci(release): smoke Windows installer install path (54d6eda)
+
+
+## [0.8.5] - 2026-05-21
+
+### Fixed
+
+- retry installer asset carry-forward (788d68e)
+- publish installer assets atomically (2e87915)
+- document installer in release notes (b710188)
+
+
+## [0.8.4] - 2026-05-21
+
+### Fixed
+
+- carry installer assets onto auto releases (0e53778)
+
+
+## [0.8.3] - 2026-05-21
+
+### Fixed
+
+- tolerate missing process metrics in load test (16c6377)
+- isolate gh cli absence check (6f5d76d)
+
+### Other
+
+- docs: PARTNER_BRIEF_v0.8.2.md — Bruno review, first real .exe + 36h progress (b5ecb4d)
+
+
+## [0.8.2] - 2026-05-21
+
+### Fixed
+
+- unblock workflow environment checks (73ac2f3)
+- support python 3.10 toml parsing (f5576bf)
+- honor explicit iron law diff base (7d2946b)
+
+
+## [0.8.1] - 2026-05-21
+
+### Fixed
+
+- replace fake mareangler/iscc-action with real choco install Inno Setup (#90) (9573f4d)
+- skip missing enrichment submodule (#91) (59321b2)
+- update recorder lock and version parsing (#92) (c4af85c)
+- shorten recorder cargo target path (#93) (40627b9)
+- scope runner temp env to recorder job (#94) (cfe42fa)
+- use fixed short cargo target path (#95) (caf24d5)
+- pin recorder submodule to v2.6.0 release (7718de6)
+- remove --locked from cargo build (Layer 6 unblock) (#96) (71b31fc)
+- Layer 7 — workflow looks for gamedata-recorder.exe not oyster-recorder.exe (#97) (2864df7)
+- Layer 8 pre-emptive — .iss references gamedata-recorder.exe (#98) (3f14638)
+- normalize recorder binary for installer (062c18e)
+- use single-line recorder artifact paths (add0631)
+- Layer 8 — correct upload path to installer/installer/output/ (where ISCC actually writes) (#99) (cce7f8c)
+- write setup artifact to expected output dir (4587890)
+- upload recorder artifact from final output dir (a750adb)
+- stabilize recorder tests and release automation (62e8d79)
+
+### Other
+
+- docs(specs): S60v2 imperative — fix fake mareangler/iscc-action with real choco install (6c15927)
+- docs(specs): S60v3 skip missing enrichment submodule (d6b81ac)
+- docs(specs): S121 — fix 6+ Rust compile errors (TrayIcon::menu, missing rand/urlencoding/hex/fastrand, Notification::timeout_ms API) (3cc7e49)
+- docs(specs): S60v7 — remove --locked flag (Layer 6 CI fix) (7799e77)
+
+
+## v0.4.1 · 2026-05-19
+
+### Added
+- `--strict-buyer` flag on `bin/end_to_end_gate_smoke.py`: BLOCK on SKIP/PASS_DEGRADED for H8/S1/V1/V2/B2 gates. Required for production buyer deliverables.
+- `bin/provenance_verify.py`: Ed25519-signed batch manifest verifier with `--expect-pubkey` fingerprint check.
+- `verify.sh` bundle script: one-command integrity check for buyer tarballs.
+
+### Changed
+- Gate smoke test now distinguishes DEMO mode (SKIP permitted) from production mode (`--strict-buyer`).
+- Provenance verification returns distinct exit codes: 0=OK, 1=verify fail, 2=pubkey mismatch.
+
+### Fixed
+- Yaw drift fix in adapter clamp.
+- bot.position nesting fix in `_position_from_obs`.
+- Pathfinder hang fix (move_radius 1.5, weights 25% move).
+
+---
+
+## v0.1.0-rc2 · 2026-05-02
+
+### Added
+- Vendor PRD package (PRD.md, VENDOR_ONBOARDING.md, SUBMISSION_FORMAT.md)
+- Real capture scripts (mc_launcher_real.py, spectator_follow.py, real_depth_filler.py)
+- Vendor toolchain (generate_manifest.py, upload_s3.sh, doctor.sh, sprint_dashboard.py)
+- Internationalization (PRD_EN.md, FAQ.md)
+- Phase 2 integration (obs_capture_real.py, depth_inference_pipeline.py, semantic_validator.py)
+
+### Fixed
+- Yaw drift, bot.position nesting, pathfinder hang, Phase 2 test imports, OBS WebSocket mocking, DepthAnything lazy import.

@@ -31,6 +31,7 @@ testing (``--dry-run`` prints the constructed ``javaw`` command line
 without executing). Windows-specific code (registry, MessageBox) is
 gated by ``os.name == 'nt'`` checks.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -66,7 +67,7 @@ EXPECTED_FABRIC_MAIN = "net.fabricmc.loader.impl.launch.knot.KnotClient"
 MC_READY_MARKERS = (
     "Loading Minecraft",  # Fabric prints this
     "with Fabric Loader",
-    "Setting user:",      # vanilla print after auth
+    "Setting user:",  # vanilla print after auth
     "[Render thread/INFO]",  # standard MC log line, very early
 )
 
@@ -114,8 +115,7 @@ def mc_instance_dir(root: Path) -> Path:
     return root / "mc-instance"
 
 
-def fabric_profile_json(root: Path,
-                        profile_name: str = FABRIC_PROFILE_NAME) -> Path:
+def fabric_profile_json(root: Path, profile_name: str = FABRIC_PROFILE_NAME) -> Path:
     """Path to the LEAF Fabric profile JSON.
 
     Layout matches the spec:
@@ -182,22 +182,39 @@ def get_desktop_path() -> Path:
         # FOLDERID_Desktop = {B4BFCC3A-DB2C-424C-B029-7FE99A87C641}
         FOLDERID_Desktop = ctypes.c_byte * 16
         guid = FOLDERID_Desktop(
-            0x3A, 0xCC, 0xBF, 0xB4, 0x2C, 0xDB, 0x4C, 0x42,
-            0xB0, 0x29, 0x7F, 0xE9, 0x9A, 0x87, 0xC6, 0x41,
+            0x3A,
+            0xCC,
+            0xBF,
+            0xB4,
+            0x2C,
+            0xDB,
+            0x4C,
+            0x42,
+            0xB0,
+            0x29,
+            0x7F,
+            0xE9,
+            0x9A,
+            0x87,
+            0xC6,
+            0x41,
         )
 
         SHGetKnownFolderPath = ctypes.windll.shell32.SHGetKnownFolderPath
         SHGetKnownFolderPath.argtypes = [
             ctypes.c_void_p,  # rfid (REFKNOWNFOLDERID)
-            wintypes.DWORD,    # dwFlags
-            wintypes.HANDLE,   # hToken
+            wintypes.DWORD,  # dwFlags
+            wintypes.HANDLE,  # hToken
             ctypes.POINTER(ctypes.c_wchar_p),  # ppszPath
         ]
         SHGetKnownFolderPath.restype = wintypes.LONG
 
         path_ptr = ctypes.c_wchar_p()
         hr = SHGetKnownFolderPath(
-            ctypes.byref(guid), 0, None, ctypes.byref(path_ptr),
+            ctypes.byref(guid),
+            0,
+            None,
+            ctypes.byref(path_ptr),
         )
         if hr == 0 and path_ptr.value:
             return Path(path_ptr.value)
@@ -220,6 +237,7 @@ class ResolvedProfile:
     ``jvm_args`` come ONLY from the leaf; ``libraries`` and
     ``asset_index`` are accumulated from the whole chain.
     """
+
     main_class: str
     jvm_args: tuple[str, ...]
     game_args: tuple[str, ...]
@@ -315,16 +333,13 @@ def resolve_profile_chain(
     while parent_profile.get("inheritsFrom"):
         parent_name = parent_profile["inheritsFrom"]
         if parent_name in visited:
-            raise ValueError(
-                f"inheritsFrom cycle detected at '{parent_name}' (chain: {chain})"
-            )
+            raise ValueError(f"inheritsFrom cycle detected at '{parent_name}' (chain: {chain})")
         parent_path = versions_root / parent_name / f"{parent_name}.json"
         if not parent_path.is_file():
             # Vanilla profile may instead be ``versions/1.21.4/1.21.4.json``
             # which we already covered above. Anything else is an error.
             raise FileNotFoundError(
-                f"inheritsFrom '{parent_name}' points to missing profile: "
-                f"{parent_path}"
+                f"inheritsFrom '{parent_name}' points to missing profile: " f"{parent_path}"
             )
         parent_profile = _load_json(parent_path)
         visited.add(parent_name)
@@ -422,11 +437,40 @@ def offline_uuid(username: str) -> str:
 @dataclass(frozen=True)
 class LaunchPlan:
     """All the inputs needed to actually call ``subprocess.Popen``."""
+
     cmd: tuple[str, ...]
     cwd: Path
     log_file: Path
     instance_dir: Path
     main_class: str  # for assertion in tests
+    pause_on_lost_focus_disabled: bool
+
+
+def ensure_pause_on_lost_focus_disabled(instance_dir: Path) -> bool:
+    """Force Minecraft to keep rendering when the recorder/window focus changes."""
+
+    options_path = Path(instance_dir) / "options.txt"
+    options_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        lines = options_path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except FileNotFoundError:
+        lines = []
+
+    patched: list[str] = []
+    saw_key = False
+    for line in lines:
+        key, sep, _value = line.partition(":")
+        if sep and key == "pauseOnLostFocus":
+            patched.append("pauseOnLostFocus:false")
+            saw_key = True
+        else:
+            patched.append(line)
+
+    if not saw_key:
+        patched.append("pauseOnLostFocus:false")
+
+    options_path.write_text("\n".join(patched) + "\n", encoding="utf-8")
+    return True
 
 
 def build_launch_plan(
@@ -445,6 +489,7 @@ def build_launch_plan(
     instance = mc_instance_dir(install_root_path)
     leaf_path = fabric_profile_json(install_root_path, profile_name=profile_name)
     resolved = resolve_profile_chain(leaf_path)
+    pause_on_lost_focus_disabled = ensure_pause_on_lost_focus_disabled(instance)
 
     # Sanity check — bug-fix #1 sentinel.
     if resolved.main_class != EXPECTED_FABRIC_MAIN:
@@ -525,17 +570,28 @@ def build_launch_plan(
     # --- Game arguments ---
     player_uuid = offline_uuid(username)
     game_args = [
-        "--username", username,
-        "--version", resolved.leaf_profile_name,
-        "--gameDir", str(instance),
-        "--assetsDir", str(instance / "assets"),
-        "--assetIndex", resolved.asset_index,
-        "--uuid", player_uuid,
-        "--accessToken", "0",
-        "--clientId", "",
-        "--xuid", "",
-        "--userType", "legacy",
-        "--versionType", "release",
+        "--username",
+        username,
+        "--version",
+        resolved.leaf_profile_name,
+        "--gameDir",
+        str(instance),
+        "--assetsDir",
+        str(instance / "assets"),
+        "--assetIndex",
+        resolved.asset_index,
+        "--uuid",
+        player_uuid,
+        "--accessToken",
+        "0",
+        "--clientId",
+        "",
+        "--xuid",
+        "",
+        "--userType",
+        "legacy",
+        "--versionType",
+        "release",
     ]
     cmd.extend(game_args)
 
@@ -545,6 +601,7 @@ def build_launch_plan(
         log_file=log_file,
         instance_dir=instance,
         main_class=resolved.main_class,
+        pause_on_lost_focus_disabled=pause_on_lost_focus_disabled,
     )
 
 
@@ -558,6 +615,7 @@ def _show_messagebox(title: str, body: str) -> None:
     if os.name == "nt":
         try:
             import ctypes
+
             MB_ICONERROR = 0x10
             ctypes.windll.user32.MessageBoxW(0, body, title, MB_ICONERROR)
             return
@@ -592,6 +650,7 @@ def launch_javaw(
     launcher can exit while MC keeps running.
     """
     plan.instance_dir.mkdir(parents=True, exist_ok=True)
+    ensure_pause_on_lost_focus_disabled(plan.instance_dir)
     plan.log_file.parent.mkdir(parents=True, exist_ok=True)
 
     creation_flags = 0
@@ -674,8 +733,7 @@ def verify_install(
     must_exist: list[Path] = [
         javaw_path(install_root_path),
         fabric_profile_json(install_root_path, profile_name),
-        mc_instance_dir(install_root_path) / "versions" / MC_VERSION /
-        f"{MC_VERSION}.jar",
+        mc_instance_dir(install_root_path) / "versions" / MC_VERSION / f"{MC_VERSION}.jar",
     ]
     missing = [str(p) for p in must_exist if not p.exists()]
     return InstallStatus(ok=not missing, missing=tuple(missing))
@@ -688,18 +746,29 @@ def verify_install(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--install-root", type=Path,
-                        default=None,
-                        help="Override install root (default: %%LOCALAPPDATA%%\\OysterRecorder)")
-    parser.add_argument("--username", default="Player",
-                        help="Minecraft username (offline mode UUID)")
+    parser.add_argument(
+        "--install-root",
+        type=Path,
+        default=None,
+        help="Override install root (default: %%LOCALAPPDATA%%\\OysterRecorder)",
+    )
+    parser.add_argument(
+        "--username", default="Player", help="Minecraft username (offline mode UUID)"
+    )
     parser.add_argument("--xmx", default="4G", help="Java max heap (e.g. 4G)")
-    parser.add_argument("--profile-name", default=FABRIC_PROFILE_NAME,
-                        help="Fabric loader profile dir name")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Print the constructed javaw command line and exit (no JVM spawned).")
-    parser.add_argument("--no-wait", action="store_true",
-                        help="Spawn javaw and exit immediately (don't wait or surface stderr).")
+    parser.add_argument(
+        "--profile-name", default=FABRIC_PROFILE_NAME, help="Fabric loader profile dir name"
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print the constructed javaw command line and exit (no JVM spawned).",
+    )
+    parser.add_argument(
+        "--no-wait",
+        action="store_true",
+        help="Spawn javaw and exit immediately (don't wait or surface stderr).",
+    )
     parser.add_argument("--ready-timeout", type=float, default=60.0)
     parser.add_argument("--verbose", action="store_true")
 
@@ -733,6 +802,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"install_root  : {root}")
         print(f"main_class    : {plan.main_class}")
         print(f"profile_name  : {args.profile_name}")
+        print("pauseOnLostFocus: false")
         print(f"log_file      : {plan.log_file}")
         print(f"cwd           : {plan.cwd}")
         print(f"argc          : {len(plan.cmd)}")
@@ -751,8 +821,10 @@ def main(argv: list[str] | None = None) -> int:
     log = latest_log_path(root)
     ready = wait_for_mc_ready(log, timeout_sec=args.ready_timeout)
     if not ready:
-        print(f"WARN: MC ready marker not seen in {args.ready_timeout}s — "
-              f"continuing anyway, log={log}")
+        print(
+            f"WARN: MC ready marker not seen in {args.ready_timeout}s — "
+            f"continuing anyway, log={log}"
+        )
 
     rc = proc.wait()
     if rc != 0:
