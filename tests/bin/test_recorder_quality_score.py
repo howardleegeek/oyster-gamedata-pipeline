@@ -46,6 +46,14 @@ class TestComputeScore:
         assert score == 10.0
         assert farming is False
 
+    def test_critical_failure_forces_zero(self):
+        score, farming = qs.compute_score(
+            {"anomalies": [], "metrics": {}},
+            critical_failures=["missing_scorable_input"],
+        )
+        assert score == 0.0
+        assert farming is False
+
     def test_low_entropy_only(self):
         score, farming = qs.compute_score(
             {"anomalies": ["low_action_entropy:1.0<2.0"], "metrics": {}}
@@ -91,9 +99,27 @@ class TestBuildClipData:
 class TestScoreClip:
     def test_writes_payload_with_required_fields(self, clip_dir):
         payload = qs.score_clip(clip_dir)
-        for key in ("clip_id", "score", "farming_detected", "anomalies", "metrics", "scored_at"):
+        for key in (
+            "clip_id",
+            "score",
+            "farming_detected",
+            "critical_failures",
+            "anomalies",
+            "metrics",
+            "scored_at",
+        ):
             assert key in payload, f"missing key {key}"
         assert 0.0 <= payload["score"] <= 10.0
+
+    def test_empty_clip_scores_zero_not_ten(self, tmp_path):
+        clip = tmp_path / "empty-clip"
+        clip.mkdir()
+
+        payload = qs.score_clip(clip)
+
+        assert payload["score"] == 0.0
+        assert "missing_scorable_input" in payload["critical_failures"]
+        assert "critical_failure:missing_scorable_input" in payload["anomalies"]
 
 
 class TestMain:
@@ -108,3 +134,13 @@ class TestMain:
         assert out.exists()
         loaded = json.loads(out.read_text())
         assert "score" in loaded
+
+    def test_empty_clip_returns_1_and_writes_low_score(self, tmp_path):
+        clip = tmp_path / "empty-clip"
+        clip.mkdir()
+
+        rc = qs.main(["--clip-dir", str(clip)])
+
+        assert rc == 1
+        loaded = json.loads((clip / "qa_score.json").read_text())
+        assert loaded["score"] == 0.0

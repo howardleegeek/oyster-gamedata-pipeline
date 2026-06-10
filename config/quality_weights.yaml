@@ -1,0 +1,31 @@
+# Quality scorer component weights (tunable for A/B testing)
+# Total must sum to 100 (before anti-pattern penalty)
+components:
+  audit_norm:
+    max_points: 30
+    description: "Normalized audit score (0-105 mapped to 0-30)"
+  action_diversity:
+    max_points: 10
+    description: "Entropy of WASD key distribution"
+  camera_motion:
+    max_points: 15
+    description: "Bounding-box volume x angular variance"
+  failure_recovery:
+    max_points: 10
+    description: "Deaths with recovery within 60s"
+  label_density:
+    max_points: 15
+    description: "Subgoal/keystep label density from SPEC #03"
+  multimodal:
+    max_points: 10
+    description: "Depth + audio + game_state alignment completeness"
+
+anti_pattern:
+  max_penalty: 10
+  description: "Idle time, alt-tab, pause-menu penalties"
+
+# Percentile thresholds for buyer tiering
+tiers:
+  top_tier: 0.90      # 90th percentile and above
+  premium: 0.75       # 75th percentile and above
+  standard: 0.50      # 50th percentile and above

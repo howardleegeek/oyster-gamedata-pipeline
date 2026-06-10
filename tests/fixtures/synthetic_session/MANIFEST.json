@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "files": [
+    "recording.mp4",
+    "action_camera.json",
+    "game_state.jsonl"
+  ]
+}
