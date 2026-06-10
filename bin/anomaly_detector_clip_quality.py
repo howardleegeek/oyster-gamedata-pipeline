@@ -13,10 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import os
 import sys
-import tempfile
-from collections import Counter
 from pathlib import Path
 from typing import Any, Optional
 
@@ -244,12 +241,12 @@ def main(argv: list[str]) -> int:
         if results['status'] == 'error':
             print(f"Error: {results.get('message', 'Unknown error')}")
         else:
-            print(f"Analysis complete:")
+            print("Analysis complete:")
             print(f"  Total clips: {results['total_clips']}")
             print(f"  Clips with anomalies: {results['clips_with_anomalies']}")
             print(f"  Farming patterns detected: {results['farming_patterns_detected']}")
             if results['anomalies']:
-                print(f"\nAnomalous clips:")
+                print("\nAnomalous clips:")
                 for anomaly in results['anomalies']:
                     if 'clip_id' in anomaly:
                         print(f"  - {anomaly['clip_id']}: {anomaly.get('anomalies', [])}")

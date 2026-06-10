@@ -1,0 +1,76 @@
+name: Backend Remote Smoke
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      backend_url:
+        description: Backend URL to smoke-test.
+        required: false
+        default: https://oyster-backend-6qup7rrx2q-uc.a.run.app
+      expected_backend_mode:
+        description: Optional /healthz mode to require, e.g. production.
+        required: false
+        default: ""
+      require_real_providers:
+        description: Fail if /healthz reports mock/local/simulator providers.
+        required: false
+        type: boolean
+        default: false
+  schedule:
+    - cron: "47 * * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'release' || vars.BACKEND_SMOKE_URL != '' }}
+    runs-on: ubuntu-latest
+    env:
+      BACKEND_URL: ${{ inputs.backend_url || vars.BACKEND_SMOKE_URL || 'https://oyster-backend-6qup7rrx2q-uc.a.run.app' }}
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_EVENT_TAG: ${{ github.event.release.tag_name }}
+      EXPECTED_BACKEND_MODE: ${{ inputs.expected_backend_mode || '' }}
+      REQUIRE_REAL_PROVIDERS: ${{ inputs.require_real_providers || 'false' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install smoke dependencies
+        run: python -m pip install --upgrade httpx
+
+      - name: Resolve latest recorder release tag
+        run: |
+          set -euo pipefail
+          if [ -n "${RELEASE_EVENT_TAG:-}" ]; then
+            echo "RECORDER_RELEASE_TAG=${RELEASE_EVENT_TAG}" >> "$GITHUB_ENV"
+          else
+            echo "RECORDER_RELEASE_TAG=$(gh release view --json tagName --jq .tagName)" >> "$GITHUB_ENV"
+          fi
+
+      - name: Smoke-test backend
+        run: |
+          set -euo pipefail
+          args=(
+            --url "$BACKEND_URL"
+            --verbose
+            --expected-recorder-tag "$RECORDER_RELEASE_TAG"
+            --appcast-retry-seconds 120
+            --appcast-retry-interval 5
+          )
+          if [ -n "$EXPECTED_BACKEND_MODE" ]; then
+            args+=(--expected-backend-mode "$EXPECTED_BACKEND_MODE")
+          fi
+          if [ "$REQUIRE_REAL_PROVIDERS" = "true" ]; then
+            args+=(--require-real-providers)
+          fi
+          python scripts/verify_deployed_backend.py "${args[@]}"
+
+      - name: Run recorder backend E2E
+        run: python bin/remote_recorder_backend_e2e.py --backend-url "$BACKEND_URL"

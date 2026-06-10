@@ -1,0 +1,35 @@
+# Oyster Monitor Thresholds Configuration
+# All threshold values for alerting and health checks.
+# Secrets (webhook URLs) are NEVER stored here — use environment variables.
+
+disk_free_min_gb: 5
+upload_backlog_max_gb: 100
+error_rate_per_min: 10
+health_check_consecutive_failures: 2
+daemon_stuck_minutes: 30
+
+# Polling interval in seconds
+poll_interval_seconds: 60
+
+# Alert deduplication window in seconds
+alert_dedup_window_seconds: 60
+
+# Escalation: re-alert after this many seconds if still failing
+alert_escalation_seconds: 300
+
+# Health check endpoints
+health_endpoints:
+  marketplace_api: "http://localhost:8000/api/health"
+  dashboard: "http://localhost:3000/api/health"
+  payout_engine: "http://localhost:8001/api/health"
+  depth_endpoint: "https://oyster-depth.modal.run/health"
+
+# SSH config for minipc1 disk check
+minipc1_host: "minipc1"
+minipc1_user: "oyster"
+
+# Local paths
+oyster_dir: "~/.oyster"
+daemon_state_file: "~/.oyster/daemon_state.json"
+metrics_file: "~/.oyster/monitor_metrics.jsonl"
+alerts_file: "~/.oyster/monitor_alerts.jsonl"

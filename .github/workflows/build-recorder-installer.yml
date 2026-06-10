@@ -95,6 +95,11 @@ jobs:
       # mid-pipeline with UnicodeEncodeError. UTF-8 is the only sane default.
       PYTHONIOENCODING: utf-8
       PYTHONUTF8: '1'
+      EV_CERT_PFX: ${{ secrets.EV_CERT_PFX || secrets.EV_CERT_PFX_BASE64 }}
+      EV_CERT_PASSWORD: ${{ secrets.EV_CERT_PASSWORD }}
+      RECORDER_RUNTIME_REPO: howardleegeek/gamedata-recorder
+      RECORDER_RUNTIME_TAG: v2.6.15
+      RECORDER_RUNTIME_ASSET: gamedata-recorder-windows-x64.zip
 
     steps:
       # ---------------------------------------------------------------------
@@ -171,13 +176,13 @@ jobs:
           python -m pip install --upgrade pip
           # PyInstaller drives both R05C (OysterPlay.exe compile) and the
           # OysterRecorder onedir step. Keep this list narrow — anything
-          # the recorder needs at runtime (depth-anything, pynput, etc.)
-          # will be pulled in by recorder_consumer_lite.py via PyInstaller's
-          # --collect-all directives, not pinned at the workflow level.
+          # the raw-only recorder needs at runtime will be pulled in by
+          # recorder_consumer_lite.py via PyInstaller's --collect-all
+          # directives, not pinned at the workflow level. DA-V2/depth deps
+          # stay server-side.
           pip install "pyinstaller>=6.0"
           pip install pynput pillow numpy pyyaml
-          pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
-          pip install transformers "imageio[ffmpeg]" OpenEXR Imath huggingface_hub
+          pip install -r bin/build_bundled_installer/requirements-recorder.txt
           python -c "import PyInstaller, sys; print(f'PyInstaller {PyInstaller.__version__} on Python {sys.version.split()[0]}')"
 
       # ---------------------------------------------------------------------
@@ -210,6 +215,16 @@ jobs:
       # ---------------------------------------------------------------------
       # 5. Caches — JRE, MC, Fabric blobs are content-pinned via manifest.json
       # ---------------------------------------------------------------------
+
+      - name: Download VC++ Redistributable (S131)
+        shell: pwsh
+        run: |
+          $url = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+          $out = "bin/build_bundled_installer/vc_redist.x64.exe"
+          Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing
+          $size = (Get-Item $out).Length
+          if ($size -lt 10000000) { Write-Error "vc_redist too small: $size"; exit 1 }
+          Write-Host "Downloaded vc_redist.x64.exe ($size bytes)"
       - name: Cache bundled-installer fetch artifacts
         uses: actions/cache@v4
         with:
@@ -275,6 +290,35 @@ jobs:
             exit 1
           }
 
+      - name: Generate static Minecraft @argfile template
+        shell: pwsh
+        run: |
+          python bin/build_bundled_installer/gen_mc_args_template.py
+          $template = 'bin/build_bundled_installer/mc_args_template.txt'
+          if (-not (Test-Path $template)) {
+            Write-Error "Minecraft @argfile template was not generated: $template"
+            exit 1
+          }
+          $content = Get-Content -Raw -LiteralPath $template
+          if ($content -notmatch '\{ROOT\}') {
+            Write-Error "Minecraft @argfile template is missing the literal {ROOT} token"
+            exit 1
+          }
+          if ($content -notmatch '"-DFabricMcEmu= net\.minecraft\.client\.main\.Main"') {
+            Write-Error "Minecraft @argfile template is missing the quoted FabricMcEmu JVM arg"
+            exit 1
+          }
+          if ($content -match '\\') {
+            Write-Error "Minecraft @argfile template contains backslashes; paths must use forward slashes"
+            exit 1
+          }
+          $lineCount = ($content -split "`n" | Where-Object { $_ -ne '' }).Count
+          if ($lineCount -ne 33) {
+            Write-Error "Minecraft @argfile template must be 33 non-empty lines, got $lineCount"
+            exit 1
+          }
+          Write-Host "Generated $template ($lineCount lines)"
+
       # ---------------------------------------------------------------------
       # 9. R05C — compile OysterPlay.py → OysterPlay.exe
       # ---------------------------------------------------------------------
@@ -314,14 +358,12 @@ jobs:
           if_no_artifact_found: fail
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Stage mod jars (all 9 into bundle + release-extras)
+      - name: Stage mod jars (single bundled + all release-extras)
         shell: pwsh
         run: |
-          # All 9 mod jars (one per supported MC version) go into the
-          # bundled mods dir so the bundled installer ships the full set —
-          # users can switch which MC version they target without
-          # re-downloading. The same 9 jars also go to release-extras/ for
-          # the standalone-mod-jar download path on the Release page.
+          # Only the 1.21.4 recorder mod goes into the bundled MC instance.
+          # All supported-version jars still go to release-extras/ for the
+          # standalone-mod-jar download path on the Release page.
           New-Item -ItemType Directory -Force -Path 'bundle/mc-instance/mods' | Out-Null
           New-Item -ItemType Directory -Force -Path 'release-extras' | Out-Null
           $allJars = Get-ChildItem -Recurse mod-jars -Filter '*.jar' `
@@ -337,14 +379,26 @@ jobs:
             if ($seen.ContainsKey($jar.Name)) { continue }
             $seen[$jar.Name] = $true
             Copy-Item $jar.FullName -Destination 'release-extras/' -Force
-            Copy-Item $jar.FullName -Destination 'bundle/mc-instance/mods/' -Force
           }
-          $bundleCount = (Get-ChildItem 'bundle/mc-instance/mods' -Filter '*.jar').Count
+          $bundleJar = $allJars |
+            Where-Object { $_.Name -match '-mc1\.21\.4\.jar$' } |
+            Select-Object -First 1
+          if (-not $bundleJar) {
+            Write-Error "Could not find a 1.21.4 mod jar to bundle into the Minecraft instance"
+            exit 1
+          }
+          Copy-Item $bundleJar.FullName -Destination 'bundle/mc-instance/mods/' -Force
+          $bundleRecorderMods = Get-ChildItem 'bundle/mc-instance/mods' `
+            -Filter 'oyster-recorder-mod-*.jar'
           $extraCount  = (Get-ChildItem 'release-extras' -Filter '*.jar').Count
-          Write-Host "Bundled mods: $bundleCount (in bundle/mc-instance/mods/)"
+          Write-Host "Bundled recorder mod: $($bundleJar.Name)"
           Write-Host "Release-extras: $extraCount (uploaded as standalone Release assets)"
-          if ($bundleCount -lt 9) {
-            Write-Error "After staging only $bundleCount mod jars in bundle, expected 9"
+          if ($bundleRecorderMods.Count -ne 1) {
+            Write-Error "Expected exactly one bundled recorder mod, found $($bundleRecorderMods.Count)"
+            exit 1
+          }
+          if ($extraCount -lt 9) {
+            Write-Error "After staging only $extraCount mod jars in release-extras, expected 9"
             exit 1
           }
 
@@ -355,11 +409,6 @@ jobs:
       # onedir form for the bundled installer (Inno Setup ships a folder,
       # not a wrapped single-file .exe), so we skip the --onefile build
       # entirely here.
-      - name: Pre-download DepthAnything V2 weights
-        shell: pwsh
-        run: |
-          python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='depth-anything/Depth-Anything-V2-Small-hf', local_dir='hf_cache/depth-anything-v2-small-hf')"
-
       - name: Download ffmpeg (Windows x64, GPL static)
         shell: pwsh
         run: |
@@ -368,6 +417,10 @@ jobs:
           Expand-Archive -Path ffmpeg.zip -DestinationPath ffmpeg-extracted -Force
           $ffmpegBin = Get-ChildItem -Recurse ffmpeg-extracted -Filter 'ffmpeg.exe' | Select-Object -First 1
           Copy-Item $ffmpegBin.FullName -Destination 'ffmpeg.exe' -Force
+          Get-Item ffmpeg.exe | Format-List Length, FullName
+          $ffprobeBin = Get-ChildItem -Recurse ffmpeg-extracted -Filter 'ffprobe.exe' | Select-Object -First 1
+          Copy-Item $ffprobeBin.FullName -Destination 'ffprobe.exe' -Force
+          Get-Item ffprobe.exe | Format-List Length, FullName
 
       - name: Download Fabric installer jar
         shell: pwsh
@@ -397,6 +450,7 @@ jobs:
             --distpath bundle `
             --workpath build/OysterRecorder-onedir `
             --add-binary "ffmpeg.exe;." `
+            --add-binary "ffprobe.exe;." `
             --add-data "bin/lint_v3_prd_grounded.py;." `
             --add-data "bin/generate_systeminfo_json.py;." `
             --add-data "bin/generate_gameinfo_xlsx.py;." `
@@ -405,19 +459,14 @@ jobs:
             --add-data "bin/game_state_overlay.py;." `
             --add-data "fabric-installer.jar;." `
             --add-data "oyster-recorder-mod.jar;." `
-            --add-data "hf_cache;hf_cache" `
             --paths bin `
             --collect-all tkinter `
             --collect-all pynput `
             --collect-all numpy `
             --collect-all PIL `
             --collect-all yaml `
-            --collect-all torch `
-            --collect-all transformers `
-            --collect-all OpenEXR `
-            --collect-all Imath `
-            --collect-all imageio `
-            --collect-all imageio_ffmpeg `
+            --collect-all windows_capture `
+            --collect-all mss `
             --hidden-import pynput.keyboard._win32 `
             --hidden-import pynput.mouse._win32 `
             --hidden-import lint_v3_prd_grounded `
@@ -426,12 +475,149 @@ jobs:
             --hidden-import depth_anything_v2_inference `
             --hidden-import install_fabric_loader `
             --hidden-import game_state_overlay `
+            --hidden-import windows_capture `
+            --hidden-import mss `
             --hidden-import PIL.Image `
+            --exclude-module torch `
+            --exclude-module torchvision `
+            --exclude-module transformers `
+            --exclude-module OpenEXR `
+            --exclude-module Imath `
+            --exclude-module imageio `
+            --exclude-module imageio_ffmpeg `
+            --exclude-module huggingface_hub `
             bin/recorder_consumer_lite.py
           if (-not (Test-Path 'bundle/OysterRecorder-onedir/OysterRecorder-onedir.exe')) {
             Write-Error "PyInstaller did not produce bundle/OysterRecorder-onedir/OysterRecorder-onedir.exe"
             exit 1
           }
+
+      - name: Stage OBS Studio portable into OysterRecorder onedir
+        shell: pwsh
+        run: |
+          # v0.19: ship OBS Studio portable inside the PyInstaller onedir
+          # bundle. The recorder runtime owns profile/scene generation and
+          # launch args; CI only stages the official portable OBS tree.
+          $obsVersion = "30.2.3"
+          $obsZipName = "OBS-Studio-$obsVersion-Windows.zip"
+          $obsUrl = "https://github.com/obsproject/obs-studio/releases/download/$obsVersion/$obsZipName"
+          $obsSha256 = "c5bf721258f6d8b2342ed39f04e65cdd3a07a9d1300654471d4be91d87fee65b"
+          $obsExpectedBytes = 158525553
+          Write-Host "Downloading OBS Studio portable $obsVersion from $obsUrl"
+          Invoke-WebRequest -Uri $obsUrl -OutFile $obsZipName
+          $obsZip = Get-Item $obsZipName
+          if ($obsZip.Length -ne $obsExpectedBytes) {
+            Write-Error "OBS Studio zip size mismatch: expected $obsExpectedBytes bytes, got $($obsZip.Length)"
+            exit 1
+          }
+          $obsHash = (Get-FileHash $obsZipName -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($obsHash -ne $obsSha256) {
+            Write-Error "OBS Studio zip SHA256 mismatch: expected $obsSha256, got $obsHash"
+            exit 1
+          }
+          Write-Host "Verified OBS Studio portable ${obsVersion}: $($obsZip.Length) bytes, sha256:$obsHash"
+
+          $obsExtractDir = "obs-studio-extracted"
+          Remove-Item -Recurse -Force $obsExtractDir -ErrorAction SilentlyContinue
+          Expand-Archive -Path $obsZipName -DestinationPath $obsExtractDir -Force
+          $obsExe = Get-ChildItem -Path $obsExtractDir -Recurse -Filter "obs64.exe" |
+            Where-Object { $_.FullName -match '\\bin\\64bit\\obs64\.exe$' } |
+            Select-Object -First 1
+          if (-not $obsExe) {
+            Write-Error "OBS Studio portable extraction did not contain bin/64bit/obs64.exe"
+            exit 1
+          }
+          $obsRoot = $obsExe.Directory.Parent.Parent.FullName
+          $obsDest = "bundle/OysterRecorder-onedir/_internal/obs"
+          Remove-Item -Recurse -Force $obsDest -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $obsDest | Out-Null
+          Copy-Item -Path (Join-Path $obsRoot "*") -Destination $obsDest -Recurse -Force
+
+          # Official OBS portable mode uses portable_mode.txt. Keep the
+          # spec-named marker too; it is harmless and makes the bundle intent
+          # obvious to humans inspecting the tree.
+          New-Item -ItemType File -Force -Path (Join-Path $obsDest "portable_mode.txt") | Out-Null
+          New-Item -ItemType File -Force -Path (Join-Path $obsDest "obs_portable.txt") | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $obsDest "config") | Out-Null
+
+          $requiredObsPaths = @(
+            "bin/64bit/obs64.exe",
+            "bin/64bit/obs-amf-test.exe",
+            "bin/64bit/obs-nvenc-test.exe",
+            "bin/64bit/obs-qsv-test.exe",
+            "data",
+            "obs-plugins",
+            "obs-plugins/64bit/obs-ffmpeg.dll",
+            "obs-plugins/64bit/obs-qsv11.dll",
+            "obs-plugins/64bit/obs-websocket.dll",
+            "obs-plugins/64bit/win-capture.dll",
+            "portable_mode.txt",
+            "obs_portable.txt"
+          )
+          foreach ($relative in $requiredObsPaths) {
+            $candidate = Join-Path $obsDest $relative
+            if (-not (Test-Path $candidate)) {
+              Write-Error "Bundled OBS Studio is missing required path: $relative"
+              exit 1
+            }
+          }
+          $bundledObsExe = Resolve-Path (Join-Path $obsDest "bin/64bit/obs64.exe")
+          Write-Host "Bundled OBS Studio version: $obsVersion"
+          Write-Host "Bundled obs64.exe path: $bundledObsExe"
+
+      - name: Stage Rust gamedata-recorder runtime
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $downloadDir = "rust-recorder-download"
+          $extractDir = "rust-recorder-extracted"
+          $bundleDir = "bundle/gamedata-recorder"
+          Remove-Item -Recurse -Force $downloadDir, $extractDir, $bundleDir -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $downloadDir, $extractDir, $bundleDir | Out-Null
+
+          gh release download $env:RECORDER_RUNTIME_TAG `
+            -R $env:RECORDER_RUNTIME_REPO `
+            -p $env:RECORDER_RUNTIME_ASSET `
+            -D $downloadDir `
+            --clobber
+
+          $zipPath = Join-Path $downloadDir $env:RECORDER_RUNTIME_ASSET
+          if (-not (Test-Path $zipPath)) {
+            Write-Error "Rust recorder asset download missing: $zipPath"
+            exit 1
+          }
+          Expand-Archive -Path $zipPath -DestinationPath $extractDir -Force
+          $rustExe = Get-ChildItem -Path $extractDir -Recurse -Filter 'gamedata-recorder.exe' |
+            Select-Object -First 1
+          if (-not $rustExe) {
+            Write-Error "Rust recorder archive did not contain gamedata-recorder.exe"
+            exit 1
+          }
+          $runtimeRoot = $rustExe.Directory.FullName
+          Copy-Item -Path (Join-Path $runtimeRoot '*') -Destination $bundleDir -Recurse -Force
+
+          $required = @(
+            'gamedata-recorder.exe',
+            'obs.dll',
+            'libobs-d3d11.dll',
+            'libobs-opengl.dll',
+            'libobs-winrt.dll',
+            'obs-ffmpeg-mux.exe',
+            'data',
+            'obs-plugins',
+            'obs-plugins/64bit/win-capture.dll',
+            'obs-plugins/64bit/obs-x264.dll'
+          )
+          foreach ($relative in $required) {
+            $candidate = Join-Path $bundleDir $relative
+            if (-not (Test-Path $candidate)) {
+              Write-Error "Staged Rust recorder runtime missing required path: $relative"
+              exit 1
+            }
+          }
+          $size_mb = [math]::Round((Get-ChildItem -Recurse $bundleDir | Measure-Object -Property Length -Sum).Sum / 1MB, 1)
+          Write-Host "Staged Rust recorder runtime from $env:RECORDER_RUNTIME_REPO@$env:RECORDER_RUNTIME_TAG ($size_mb MB)"
 
       # ---------------------------------------------------------------------
       # 12. Stage the full bundle layout that installer.iss expects
@@ -440,7 +626,9 @@ jobs:
       # `[Files]` block (kept in sync deliberately):
       #   Source: "{#BundleRoot}\jre\*"                  -> bundle/jre/...
       #   Source: "{#BundleRoot}\mc-instance\*"          -> bundle/mc-instance/...
+      #   Source: "{#BundleRoot}\gamedata-recorder\*"    -> bundle/gamedata-recorder/
       #   Source: "{#BundleRoot}\OysterRecorder-onedir\*"-> bundle/OysterRecorder-onedir/
+      #   Source: "{#BundleRoot}\OysterRecorder-onedir\_internal\obs\*"-> bundled OBS Studio portable
       #   Source: "{#BundleRoot}\OysterPlay.exe"         -> bundle/OysterPlay.exe
       #   Source: "{#BundleRoot}\manifest.json"          -> bundle/manifest.json
       - name: Compose bundle/ layout
@@ -456,7 +644,13 @@ jobs:
             'bundle/mc-instance/versions/fabric-loader-0.16.10-1.21.4/fabric-loader-0.16.10-1.21.4.json',
             'bundle/mc-instance/mods',
             'bundle/OysterPlay.exe',
-            'bundle/OysterRecorder-onedir/OysterRecorder-onedir.exe'
+            'bundle/gamedata-recorder/gamedata-recorder.exe',
+            'bundle/gamedata-recorder/obs-plugins/64bit/win-capture.dll',
+            'bundle/gamedata-recorder/obs-plugins/64bit/obs-x264.dll',
+            'bundle/OysterRecorder-onedir/OysterRecorder-onedir.exe',
+            'bundle/OysterRecorder-onedir/_internal/obs/bin/64bit/obs64.exe',
+            'bundle/OysterRecorder-onedir/_internal/obs/portable_mode.txt',
+            'bundle/OysterRecorder-onedir/_internal/obs/obs_portable.txt'
           )
           foreach ($p in $required) {
             if (-not (Test-Path $p)) {
@@ -466,6 +660,7 @@ jobs:
           }
           $size_mb = [math]::Round((Get-ChildItem -Recurse bundle | Measure-Object -Property Length -Sum).Sum / 1MB, 1)
           Write-Host "Bundle staged. Total size: ${size_mb} MB"
+          Write-Host "Expected v0.19.4 raw-only reduction: removed DA-V2 hf_cache weights plus torch/transformers/OpenEXR/imageio depth-only payloads; OBS portable bundling remains intact."
 
       # ---------------------------------------------------------------------
       # 13. Compose bundle/manifest.json — SHA-256 of every top-level artifact
@@ -520,6 +715,22 @@ jobs:
             Write-Error "R05D artifact missing: $iss (check spec R05D_inno_setup_installer.md)"
             exit 1
           }
+          $obsVersion = "30.2.3"
+          $bundledObsExe = "bundle/OysterRecorder-onedir/_internal/obs/bin/64bit/obs64.exe"
+          $portableMarker = "bundle/OysterRecorder-onedir/_internal/obs/portable_mode.txt"
+          $specMarker = "bundle/OysterRecorder-onedir/_internal/obs/obs_portable.txt"
+          $rustRecorderExe = "bundle/gamedata-recorder/gamedata-recorder.exe"
+          $rustWinCapture = "bundle/gamedata-recorder/obs-plugins/64bit/win-capture.dll"
+          $mcArgsTemplate = "bin/build_bundled_installer/mc_args_template.txt"
+          foreach ($p in @($bundledObsExe, $portableMarker, $specMarker, $rustRecorderExe, $rustWinCapture, $mcArgsTemplate)) {
+            if (-not (Test-Path $p)) {
+              Write-Error "Installer compile preflight missing bundled recorder artifact: $p"
+              exit 1
+            }
+          }
+          Write-Host "Preflight bundled OBS Studio version: $obsVersion"
+          Write-Host "Preflight bundled obs64.exe path: $(Resolve-Path $bundledObsExe)"
+          Write-Host "Preflight bundled Rust recorder path: $(Resolve-Path $rustRecorderExe)"
           # /Qp = quiet w/ progress (no /SILENT), /D injects preprocessor symbol.
           iscc.exe /Qp "/DAppVersion=$env:APP_VERSION" $iss
           if ($LASTEXITCODE -ne 0) {
@@ -542,24 +753,55 @@ jobs:
           Copy-Item -Force $issOut $finalExe
           $size_mb = [math]::Round((Get-Item $finalExe).Length / 1MB, 1)
           Write-Host "Installer built: $finalExe (${size_mb} MB)"
+          if (-not (Test-Path $bundledObsExe)) {
+            Write-Error "Bundled OBS Studio artifact disappeared after installer compile: $bundledObsExe"
+            exit 1
+          }
+          Write-Host "Installer bundles OBS Studio $obsVersion"
+          Write-Host "Bundled obs64.exe path: $(Resolve-Path $bundledObsExe)"
           # Iron-law size sanity gate (mirrors build_all.ps1 stage 8).
           $bytes = (Get-Item $finalExe).Length
           if ($bytes -lt (400 * 1MB)) {
             Write-Error "Installer is too small (${size_mb} MiB < 400 MiB) — JRE / MC bundle may be missing"
             exit 1
           }
-          if ($bytes -gt (1000 * 1MB)) {
+          if ($bytes -gt (1200 * 1MB)) {
             # rc7 target is ~800 MB (rc6 was ~460 MB before bundling MC
-            # asset objects). 1000 MB ceiling absorbs the ~390 MB of
-            # objects + minor mod / weight bloat without falsely failing
-            # a healthy build. Mirrors build_all.ps1's gate — keep both
-            # in sync when re-tuning.
-            Write-Error "Installer is too large (${size_mb} MiB > 1000 MiB) — investigate Solid compression"
+            # asset objects). OBS portable adds ~150 MB compressed on top,
+            # so the ceiling allows that plus minor mod / weight bloat
+            # without falsely failing a healthy build.
+            Write-Error "Installer is too large (${size_mb} MiB > 1200 MiB) — investigate Solid compression"
             exit 1
           }
 
       # ---------------------------------------------------------------------
-      # 15. SHA-256 the final installer + emit SHA-256-manifest.txt
+      # 15. Optional Authenticode signing
+      # ---------------------------------------------------------------------
+      # Sign before hashing/upload so SHA-256-manifest.txt matches the exact
+      # consumer-facing executable attached to the Release page.
+      - name: Sign bundled installer (EV cert)
+        if: env.EV_CERT_PFX != ''
+        shell: pwsh
+        run: |
+          $installer = "dist/OysterRecorder-Setup-$env:RELEASE_TAG.exe"
+          if (-not (Test-Path $installer)) {
+            Write-Error "Bundled installer not found at $installer"
+            exit 1
+          }
+          & installer\sign_installer.ps1 -FilePath $installer
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Warn — bundled installer is unsigned
+        if: env.EV_CERT_PFX == ''
+        shell: pwsh
+        run: |
+          Write-Warning "EV_CERT_PFX secret not set — bundled installer will be distributed UNSIGNED."
+          Write-Warning "Add EV_CERT_PFX (or legacy EV_CERT_PFX_BASE64) and EV_CERT_PASSWORD to repository secrets to enable signing."
+
+      # ---------------------------------------------------------------------
+      # 16. SHA-256 the final installer + emit SHA-256-manifest.txt
       # ---------------------------------------------------------------------
       - name: SHA-256 installer + write SHA-256-manifest.txt
         shell: pwsh
@@ -586,7 +828,7 @@ jobs:
           Get-Content $manifestPath | Select-Object -First 20 | ForEach-Object { Write-Host "  $_" }
 
       # ---------------------------------------------------------------------
-      # 16. Generate release_notes.md from git log between previous tag and HEAD
+      # 17. Generate release_notes.md from git log between previous tag and HEAD
       # ---------------------------------------------------------------------
       # IRON LAW: never include build credentials in notes. We only call
       # `git log` and `git tag` — no env, no secrets are echoed in.
@@ -601,7 +843,7 @@ jobs:
           {
             echo "# Oyster Recorder ${RELEASE_TAG}"
             echo
-            echo "Single-file Windows installer with bundled JRE + Minecraft 1.21.4 + Fabric loader + Oyster recording mod. Double-click \`OysterRecorder-Setup-${RELEASE_TAG}.exe\` to install (no admin required, installs to \`%LOCALAPPDATA%\\OysterRecorder\\\`)."
+            echo "Single-file Windows installer with bundled JRE + Minecraft 1.21.4 + Fabric loader + Oyster recording mod. Double-click \`OysterRecorder-Setup-${RELEASE_TAG}.exe\` to install (no admin required, installs to \`%LOCALAPPDATA%\\OysterRecorder\\\`). The installer launches OysterPlay by default on Finish, and OysterPlay opens the bundled Minecraft instance."
             echo
             echo "## What's in this release"
             echo
@@ -632,7 +874,7 @@ jobs:
           head -40 release_notes.md
 
       # ---------------------------------------------------------------------
-      # 17. Upload everything to the GitHub Release (tag-push only)
+      # 18. Upload everything to the GitHub Release (tag-push only)
       # ---------------------------------------------------------------------
       # `gh release create` is idempotent only via `--clobber` on upload,
       # NOT on create itself. So we split: create-if-not-exists, then upload
@@ -672,7 +914,7 @@ jobs:
             --clobber
 
       # ---------------------------------------------------------------------
-      # 18. Always upload the artifacts to the workflow run for inspection
+      # 19. Always upload the artifacts to the workflow run for inspection
       # ---------------------------------------------------------------------
       # Including on workflow_dispatch (smoke) — that's the whole point of
       # the smoke mode: verify the pipeline produced the right artifacts

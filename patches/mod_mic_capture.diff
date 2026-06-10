@@ -1,0 +1,172 @@
+--- a/src/mod/audio_event_tracker.rs
++++ b/src/mod/audio_event_tracker.rs
+@@ -0,0 +1,187 @@
++// mod_mic_capture.diff — Fabric mod patch
++// Hooks SoundEngine.play(SoundInstance) to emit audio_events.jsonl rows
++// Each row: {t_ns, sound_id, volume, distance_from_player}
++// This provides the EVENT TRACK paired with the audio.flac waveform
++// for QM3 (SNR) and QM4 (RMS) audit metrics.
++
++package net.oyster.mod;
++
++import net.minecraft.client.sound.SoundEngine;
++import net.minecraft.client.sound.SoundInstance;
++import net.minecraft.client.sound.SoundManager;
++import net.minecraft.util.math.Vec3d;
++import org.spongepowered.asm.mixin.Mixin;
++import org.spongepowered.asm.mixin.injection.At;
++import org.spongepowered.asm.mixin.injection.Inject;
++import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
++
++import java.io.BufferedWriter;
++import java.io.IOException;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.nio.file.StandardOpenOption;
++import java.util.concurrent.atomic.AtomicLong;
++
++/**
++ * AudioEventTracker — emits one JSONL row per game-audio event.
++ *
++ * Output file: audio_events.jsonl
++ * Schema per line:
++ *   {"t_ns": 1716000000000000000, "sound_id": "minecraft:entity.zombie.ambient",
++ *    "volume": 0.85, "distance_from_player": 12.3}
++ *
++ * Game audio capture is ON by default (no biometric risk).
++ * Voice/mic capture is handled separately by the Rust recorder
++ * with explicit consent gating.
++ */
++@Mixin(SoundEngine.class)
++public abstract class AudioEventTracker {
++
++    private static final AtomicLong EVENT_COUNTER = new AtomicLong(0);
++    private static volatile BufferedWriter eventWriter;
++    private static volatile boolean initialized = false;
++
++    /**
++     * Initialize the audio event log file on first use.
++     * Thread-safe via double-checked locking.
++     */
++    private static BufferedWriter getWriter() throws IOException {
++        if (!initialized) {
++            synchronized (AudioEventTracker.class) {
++                if (!initialized) {
++                    Path logDir = Path.of(System.getProperty("user.home"), ".oyster", "logs");
++                    Files.createDirectories(logDir);
++                    Path logFile = logDir.resolve("audio_events.jsonl");
++                    eventWriter = Files.newBufferedWriter(
++                        logFile,
++                        StandardOpenOption.CREATE,
++                        StandardOpenOption.APPEND,
++                        StandardOpenOption.WRITE
++                    );
++                    initialized = true;
++                }
++            }
++        }
++        return eventWriter;
++    }
++
++    /**
++     * Hook into SoundEngine.play(SoundInstance) to capture every
++     * game-audio event with timing, identity, volume, and spatial info.
++     *
++     * This is the canonical injection point — all game sounds flow
++     * through SoundEngine.play() before reaching the OpenAL mixer.
++     */
++    @Inject(method = "play(Lnet/minecraft/client/sound/SoundInstance;)V",
++            at = @At("HEAD"))
++    private void onPlaySound(SoundInstance sound, CallbackInfo ci) {
++        try {
++            long tNs = System.nanoTime();
++            long seq = EVENT_COUNTER.incrementAndGet();
++
++            String soundId = sound.getId().toString();
++            float volume = sound.getVolume();
++
++            // Compute distance from player position
++            Vec3d soundPos = sound.getPos();
++            double distance = computeDistanceFromPlayer(soundPos);
++
++            // Write JSONL row
++            String json = String.format(
++                "{\"t_ns\":%d,\"seq\":%d,\"sound_id\":\"%s\",\"volume\":%.4f,\"distance_from_player\":%.2f}%n",
++                tNs, seq, escapeJson(soundId), volume, distance
++            );
++
++            BufferedWriter w = getWriter();
++            synchronized (w) {
++                w.write(json);
++                // Flush every 64 events to balance I/O and durability
++                if (seq % 64 == 0) {
++                    w.flush();
++                }
++            }
++        } catch (IOException e) {
++            // Non-fatal: audio event logging should never crash the game
++            System.err.println("[oyster] audio_events.jsonl write failed: " + e.getMessage());
++        }
++    }
++
++    /**
++     * Compute Euclidean distance from the player's current position
++     * to the sound source position.
++     */
++    private double computeDistanceFromPlayer(Vec3d soundPos) {
++        try {
++            // Access player position via Minecraft client singleton
++            net.minecraft.client.MinecraftClient client =
++                net.minecraft.client.MinecraftClient.getInstance();
++            if (client.player != null) {
++                Vec3d playerPos = client.player.getPos();
++                return playerPos.distanceTo(soundPos);
++            }
++        } catch (Exception e) {
++            // Fallback: return -1 if player context unavailable
++        }
++        return -1.0;
++    }
++
++    /**
++     * Minimal JSON string escaping for sound IDs.
++     * Sound IDs are resource-location strings (e.g. "minecraft:entity.zombie.ambient")
++     * so only basic escaping is needed.
++     */
++    private static String escapeJson(String s) {
++        if (s == null) return "";
++        return s.replace("\\", "\\\\")
++                .replace("\"", "\\\"")
++                .replace("\n", "\\n")
++                .replace("\r", "\\r")
++                .replace("\t", "\\t");
++    }
++
++    /**
++     * Flush and close the event writer on mod unload.
++     */
++    public static void shutdown() {
++        if (eventWriter != null) {
++            try {
++                synchronized (eventWriter) {
++                    eventWriter.flush();
++                    eventWriter.close();
++                }
++            } catch (IOException e) {
++                System.err.println("[oyster] audio_events.jsonl flush failed: " + e.getMessage());
++            }
++        }
++        initialized = false;
++    }
++}
+--- a/src/mod/OysterMod.java
++++ b/src/mod/OysterMod.java
+@@ -45,6 +45,10 @@ public class OysterMod implements ModInitializer {
+         GameStateTracker.start();
+         InputCapture.start();
++
++        // Register shutdown hook for audio event tracker
++        Runtime.getRuntime().addShutdownHook(
++            new Thread(AudioEventTracker::shutdown, "oyster-audio-shutdown"));
+     }
+ }

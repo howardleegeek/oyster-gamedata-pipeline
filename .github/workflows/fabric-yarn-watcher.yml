@@ -42,7 +42,8 @@ jobs:
       - name: Extend build matrix and create PR
         if: steps.check.outputs.count != '0'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.FABRIC_WATCHER_PAT || secrets.GITHUB_TOKEN }}
+          FABRIC_WATCHER_PAT: ${{ secrets.FABRIC_WATCHER_PAT }}
           CHECK_RESULT: ${{ steps.check.outputs.result }}
         run: |
           set -euo pipefail
@@ -163,8 +164,15 @@ jobs:
           BRANCH="auto/extend-matrix-mc-${FIRST_VERSION}"
           DATE=$(date -u +%Y-%m-%d)
 
+          if [ -z "${FABRIC_WATCHER_PAT:-}" ]; then
+            echo "::warning::FABRIC_WATCHER_PAT is not configured; cannot push workflow-file changes. Printing patch and exiting successfully."
+            git diff -- .github/workflows/build-mc-mod.yml mc-mod/build.gradle
+            exit 0
+          fi
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${FABRIC_WATCHER_PAT}@github.com/${GITHUB_REPOSITORY}.git"
           git checkout -b "$BRANCH"
           git add .github/workflows/build-mc-mod.yml mc-mod/build.gradle
           git commit -m "chore(mc-mod): auto-extend matrix to MC ${ADDED} (Fabric yarn shipped ${DATE})"
