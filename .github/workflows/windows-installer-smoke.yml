@@ -1,0 +1,390 @@
+name: Windows Installer Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      launch_tray_smoke:
+        description: 'Launch gamedata-recorder.exe after install'
+        required: true
+        type: boolean
+        default: true
+  schedule:
+    - cron: "23 10 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  install-uninstall:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download latest installer assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $release = gh release view --json tagName,assets | ConvertFrom-Json
+          $installerAsset = $release.assets |
+            Where-Object { $_.name -match '^OysterRecorder-[Ss]etup-.*\.exe$' } |
+            Select-Object -First 1
+          if (-not $installerAsset) {
+            throw "Latest release $($release.tagName) has no OysterRecorder setup exe"
+          }
+          gh release download $release.tagName --pattern $installerAsset.name --dir dist
+          gh release download $release.tagName --pattern SHA-256-manifest.txt --dir dist
+          "INSTALLER_NAME=$($installerAsset.name)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "RELEASE_TAG=$($release.tagName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Verify checksum
+        shell: pwsh
+        run: |
+          $installer = Join-Path "dist" $env:INSTALLER_NAME
+          if (-not (Test-Path $installer)) {
+            throw "Installer not downloaded: $installer"
+          }
+          if (-not (Test-Path "dist\SHA-256-manifest.txt")) {
+            throw "SHA-256-manifest.txt not downloaded"
+          }
+          $line = Select-String -Path "dist\SHA-256-manifest.txt" -Pattern ([regex]::Escape($env:INSTALLER_NAME)) |
+            Select-Object -First 1
+          if (-not $line) {
+            throw "SHA-256-manifest.txt does not mention $env:INSTALLER_NAME"
+          }
+          $expected = ($line.Line -split '\s+')[0].ToLowerInvariant()
+          $actual = (Get-FileHash -Algorithm SHA256 -Path $installer).Hash.ToLowerInvariant()
+          if ($expected -ne $actual) {
+            throw "SHA256 mismatch. expected=$expected actual=$actual"
+          }
+
+      - name: Report Authenticode signature
+        shell: pwsh
+        env:
+          REQUIRE_SIGNED_INSTALLER: ${{ vars.REQUIRE_SIGNED_INSTALLER }}
+        run: |
+          $installer = Join-Path "dist" $env:INSTALLER_NAME
+          if (-not (Test-Path $installer)) {
+            throw "Installer not downloaded: $installer"
+          }
+
+          $signature = Get-AuthenticodeSignature -FilePath $installer
+          Write-Host "Authenticode status: $($signature.Status)"
+          Write-Host "Authenticode status message: $($signature.StatusMessage)"
+          if ($signature.SignerCertificate) {
+            Write-Host "Authenticode signer subject: $($signature.SignerCertificate.Subject)"
+            Write-Host "Authenticode signer thumbprint: $($signature.SignerCertificate.Thumbprint)"
+          } else {
+            Write-Host "Authenticode signer subject: <none>"
+          }
+
+          if ($env:REQUIRE_SIGNED_INSTALLER -ceq "true" -and $signature.Status -ne "Valid") {
+            throw "REQUIRE_SIGNED_INSTALLER=true but Authenticode status is $($signature.Status)"
+          }
+
+      - name: Silent install
+        shell: pwsh
+        run: |
+          $installer = Join-Path "dist" $env:INSTALLER_NAME
+          $installLog = Join-Path $env:TEMP "OysterRecorder-install.log"
+          $args = @(
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART",
+            "/LOG=$installLog"
+          )
+          $process = Start-Process -FilePath $installer -ArgumentList $args -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            Get-Content $installLog -ErrorAction SilentlyContinue
+            throw "Installer exited with $($process.ExitCode)"
+          }
+
+      - name: Resolve installed layout
+        shell: pwsh
+        run: |
+          $installDir = Join-Path $env:LOCALAPPDATA "OysterRecorder"
+          $legacyExe = Join-Path $installDir "gamedata-recorder.exe"
+          $bundledLauncher = Join-Path $installDir "OysterPlay.exe"
+          $bundledRecorder = Join-Path $installDir "OysterRecorder-onedir\OysterRecorder-onedir.exe"
+
+          # Detect bundled FIRST: the R05E bundled installer ships the
+          # OysterPlay launcher and/or the OysterRecorder-onedir runtime, and
+          # since the installer stages the Rust runtime at {app} it ALSO drops
+          # gamedata-recorder.exe at the install root. So a root gamedata-
+          # recorder.exe is no longer a reliable "legacy" signal — the presence
+          # of a bundled marker is. Only classify legacy when no bundled marker
+          # exists.
+          if ((Test-Path $bundledLauncher) -or (Test-Path $bundledRecorder)) {
+            $layout = "bundled"
+            if (Test-Path $bundledRecorder) {
+              $recorderExe = $bundledRecorder
+              $recorderWorkDir = Split-Path -Parent $bundledRecorder
+            } else {
+              $recorderExe = $legacyExe
+              $recorderWorkDir = $installDir
+            }
+          } elseif (Test-Path $legacyExe) {
+            $layout = "legacy"
+            $recorderExe = $legacyExe
+            $recorderWorkDir = $installDir
+          } else {
+            Get-ChildItem -Recurse -Force $installDir -ErrorAction SilentlyContinue
+            throw "Installed recorder entrypoint missing: $legacyExe or $bundledRecorder"
+          }
+
+          "INSTALL_LAYOUT=$layout" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "RECORDER_EXE=$recorderExe" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "RECORDER_WORKDIR=$recorderWorkDir" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "Resolved install layout: $layout"
+          Write-Host "Recorder exe: $recorderExe"
+
+          $run = Get-ItemProperty `
+            -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" `
+            -Name "OysterRecorder" `
+            -ErrorAction SilentlyContinue
+          if ($layout -eq "legacy") {
+            if (-not $run) {
+              throw "Legacy installer did not create HKCU Run value"
+            }
+            if ($run.OysterRecorder -notmatch "gamedata-recorder\.exe" -or $run.OysterRecorder -notmatch "--tray") {
+              throw "Unexpected OysterRecorder Run value: $($run.OysterRecorder)"
+            }
+          } elseif ($run) {
+            throw "Bundled installer should not create legacy HKCU Run value: $($run.OysterRecorder)"
+          }
+
+      - name: Verify OBS runtime dependencies
+        shell: pwsh
+        run: |
+          $installDir = Join-Path $env:LOCALAPPDATA "OysterRecorder"
+          if ($env:INSTALL_LAYOUT -eq "bundled") {
+            $requiredPaths = @(
+              "OysterPlay.exe",
+              "OysterRecorder-onedir\OysterRecorder-onedir.exe",
+              "jre\bin\javaw.exe",
+              "mc-instance\versions\1.21.4\1.21.4.jar",
+              "mc-instance\versions\fabric-loader-0.16.10-1.21.4\fabric-loader-0.16.10-1.21.4.json",
+              "mc-instance\mods"
+            )
+            foreach ($relative in $requiredPaths) {
+              $path = Join-Path $installDir $relative
+              if (-not (Test-Path $path)) {
+                Get-ChildItem -Recurse -Force $installDir -ErrorAction SilentlyContinue |
+                  Select-Object -First 200 FullName, Length, LastWriteTime
+                throw "Bundled runtime dependency missing: $relative"
+              }
+            }
+
+            $onedir = Join-Path $installDir "OysterRecorder-onedir"
+            $ffmpeg = Get-ChildItem -Path $onedir -Recurse -Filter "ffmpeg.exe" |
+              Select-Object -First 1
+            if (-not $ffmpeg) {
+              Get-ChildItem -Recurse -Force $onedir -ErrorAction SilentlyContinue |
+                Select-Object -First 200 FullName, Length, LastWriteTime
+              throw "Bundled recorder ffmpeg.exe missing"
+            }
+            $ffprobe = Get-ChildItem -Path $onedir -Recurse -Filter "ffprobe.exe" |
+              Select-Object -First 1
+            if (-not $ffprobe) {
+              Get-ChildItem -Recurse -Force $onedir -ErrorAction SilentlyContinue |
+                Select-Object -First 200 FullName, Length, LastWriteTime
+              throw "Bundled recorder ffprobe.exe missing"
+            }
+            Write-Host "Verified bundled runtime dependencies"
+            return
+          }
+
+          $requiredFiles = @(
+            "obs.dll",
+            "libobs-d3d11.dll",
+            "libobs-opengl.dll",
+            "libobs-winrt.dll",
+            "obs-ffmpeg-mux.exe"
+          )
+          foreach ($name in $requiredFiles) {
+            $path = Join-Path $installDir $name
+            if (-not (Test-Path $path)) {
+              Get-ChildItem -Recurse -Force $installDir -ErrorAction SilentlyContinue |
+                Select-Object -First 200 FullName, Length, LastWriteTime
+              throw "OBS runtime dependency missing: $name"
+            }
+          }
+
+          $requiredDirs = @(
+            "obs-plugins",
+            "data"
+          )
+          foreach ($name in $requiredDirs) {
+            $path = Join-Path $installDir $name
+            if (-not (Test-Path $path -PathType Container)) {
+              Get-ChildItem -Recurse -Force $installDir -ErrorAction SilentlyContinue |
+                Select-Object -First 200 FullName, Length, LastWriteTime
+              throw "OBS runtime directory missing: $name"
+            }
+          }
+
+      - name: Verify installed PE architecture
+        shell: pwsh
+        run: |
+          $installDir = Join-Path $env:LOCALAPPDATA "OysterRecorder"
+
+          function Get-PeMachine([string]$Path) {
+            $stream = [System.IO.File]::OpenRead($Path)
+            $reader = New-Object System.IO.BinaryReader($stream)
+            try {
+              $stream.Seek(0x3C, [System.IO.SeekOrigin]::Begin) | Out-Null
+              $peOffset = $reader.ReadInt32()
+              $stream.Seek($peOffset + 4, [System.IO.SeekOrigin]::Begin) | Out-Null
+              return $reader.ReadUInt16()
+            } finally {
+              $reader.Close()
+              $stream.Close()
+            }
+          }
+
+          $resolvedInstallDir = (Resolve-Path $installDir).Path
+          $allowedX86RuntimeHelpers = @(
+            "data\obs-plugins\win-capture\get-graphics-offsets32.exe",
+            "data\obs-plugins\win-capture\graphics-hook32.dll",
+            "data\obs-plugins\win-capture\inject-helper32.exe",
+            "data\obs-plugins\win-dshow\obs-virtualcam-module32.dll"
+          )
+          $peFiles = Get-ChildItem `
+            -Path $installDir `
+            -Recurse `
+            -Include *.exe, *.dll |
+            Where-Object { $_.Name -notlike "unins*.exe" }
+          foreach ($file in $peFiles) {
+            $machine = Get-PeMachine $file.FullName
+            $relativePath = [System.IO.Path]::GetRelativePath(
+              $resolvedInstallDir,
+              $file.FullName
+            ).Replace("/", "\")
+            # Bundled (onedir) layouts nest the OBS runtime under
+            # OysterRecorder-onedir\_internal\obs\..., so match the known
+            # 32-bit helpers by path suffix instead of an exact install-root
+            # relative path. Still restricted to the four known helpers in
+            # their proper obs-plugins subpath.
+            $isAllowedHelper = $false
+            foreach ($helper in $allowedX86RuntimeHelpers) {
+              if ($relativePath -eq $helper -or $relativePath.EndsWith("\" + $helper)) {
+                $isAllowedHelper = $true
+                break
+              }
+            }
+            if ($machine -eq 0x014C -and $isAllowedHelper) {
+              Write-Host "Allowed OBS 32-bit runtime helper: $relativePath"
+              continue
+            }
+            if ($machine -ne 0x8664) {
+              $machineHex = "0x{0:X4}" -f $machine
+              throw "Installed PE architecture mismatch: $($file.FullName) machine=$machineHex expected=0x8664 (x86-64)"
+            }
+          }
+          Write-Host "Verified installed PE architecture: x86-64"
+
+      - name: Launch installed recorder in tray mode
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.launch_tray_smoke == true }}
+        shell: pwsh
+        run: |
+          $launchOutputDir = Join-Path $env:TEMP "OysterRecorder-ci-output"
+          New-Item -ItemType Directory -Force -Path $launchOutputDir | Out-Null
+
+          $env:GAMEDATA_CI_MODE = "1"
+          $env:GAMEDATA_OUTPUT_DIR = $launchOutputDir
+          $env:RUST_BACKTRACE = "1"
+
+          $process = Start-Process `
+            -FilePath $env:RECORDER_EXE `
+            -ArgumentList @("--tray") `
+            -WorkingDirectory $env:RECORDER_WORKDIR `
+            -PassThru
+
+          Start-Sleep -Seconds 12
+          if ($process.HasExited) {
+            $logCandidates = @(
+              (Join-Path $env:APPDATA "GameData Recorder\gamedata-recorder-debug.log"),
+              (Join-Path $env:LOCALAPPDATA "GameData Recorder\gamedata-recorder-debug.log")
+            )
+            foreach ($logPath in $logCandidates) {
+              if (Test-Path $logPath) {
+                Write-Host "==== $logPath ===="
+                Get-Content $logPath -Tail 200 -ErrorAction SilentlyContinue
+              }
+            }
+            throw "Recorder exited during tray launch smoke with code $($process.ExitCode)"
+          }
+
+          "RECORDER_PID=$($process.Id)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "Recorder process is running with pid $($process.Id)"
+
+      - name: Silent uninstall
+        if: always()
+        shell: pwsh
+        run: |
+          if ($env:RECORDER_PID) {
+            Stop-Process -Id ([int]$env:RECORDER_PID) -Force -ErrorAction SilentlyContinue
+          }
+          Get-Process -Name "gamedata-recorder" -ErrorAction SilentlyContinue |
+            Stop-Process -Force -ErrorAction SilentlyContinue
+          Get-Process -Name "OysterRecorder-onedir" -ErrorAction SilentlyContinue |
+            Stop-Process -Force -ErrorAction SilentlyContinue
+          Get-Process -Name "OysterPlay" -ErrorAction SilentlyContinue |
+            Stop-Process -Force -ErrorAction SilentlyContinue
+
+          $installDir = Join-Path $env:LOCALAPPDATA "OysterRecorder"
+          $uninstaller = Join-Path $installDir "unins000.exe"
+          if (Test-Path $uninstaller) {
+            $uninstallLog = Join-Path $env:TEMP "OysterRecorder-uninstall.log"
+            $args = @(
+              "/VERYSILENT",
+              "/SUPPRESSMSGBOXES",
+              "/NORESTART",
+              "/LOG=$uninstallLog"
+            )
+            $process = Start-Process -FilePath $uninstaller -ArgumentList $args -Wait -PassThru
+            if ($process.ExitCode -ne 0) {
+              Get-Content $uninstallLog -ErrorAction SilentlyContinue
+              throw "Uninstaller exited with $($process.ExitCode)"
+            }
+          }
+          Remove-ItemProperty `
+            -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" `
+            -Name "OysterRecorder" `
+            -ErrorAction SilentlyContinue
+
+      - name: Verify uninstall cleanup
+        shell: pwsh
+        run: |
+          $installDir = Join-Path $env:LOCALAPPDATA "OysterRecorder"
+          $entrypoints = @(
+            (Join-Path $installDir "gamedata-recorder.exe"),
+            (Join-Path $installDir "OysterPlay.exe"),
+            (Join-Path $installDir "OysterRecorder-onedir\OysterRecorder-onedir.exe")
+          )
+          foreach ($exe in $entrypoints) {
+            if (Test-Path $exe) {
+              throw "Recorder entrypoint still exists after uninstall: $exe"
+            }
+          }
+          $run = Get-ItemProperty `
+            -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" `
+            -Name "OysterRecorder" `
+            -ErrorAction SilentlyContinue
+          if ($run) {
+            throw "OysterRecorder Run value still exists after uninstall"
+          }
+
+      - name: Upload smoke logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-smoke-logs
+          path: |
+            ${{ runner.temp }}/OysterRecorder-install.log
+            ${{ runner.temp }}/OysterRecorder-uninstall.log
+            ${{ runner.temp }}/OysterRecorder-ci-output/**
+            ~/AppData/Roaming/GameData Recorder/*.log
+            ~/AppData/Local/GameData Recorder/*.log
+          if-no-files-found: ignore

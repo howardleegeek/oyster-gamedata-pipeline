@@ -1,0 +1,6 @@
+{
+  "os": "linux",
+  "cpu": "x86_64",
+  "gpu": "none",
+  "ram_gb": 8
+}

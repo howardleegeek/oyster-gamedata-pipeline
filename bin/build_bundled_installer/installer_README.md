@@ -16,7 +16,10 @@
 | `fetch_jre.py` | Stage 1: downloads + verifies the portable JRE (R05A). |
 | `fetch_minecraft.py` | Stage 2: downloads + verifies vanilla MC 1.21.4 client + libs (R05B). |
 | `fetch_fabric.py` | Stage 3: downloads + verifies Fabric loader 0.16.10 (R05B). |
-| `build_oysterplay_exe.py` | Stage 4: PyInstaller `OysterPlay.exe` single-button launcher (R05C). |
+| `OysterPlay.bat` | Static double-click entry: starts Rust recorder, waits 2s, calls `launch_mc.bat`. |
+| `launch_mc.bat` | Static Fabric Minecraft launcher used by `OysterPlay.bat`. |
+| `gamedata_recorder_config.json` | Preseeded Rust v2.6.0 config installed as `%APPDATA%\GameData Recorder\config.json`. |
+| `build_oysterplay_exe.py` | Stage 4: PyInstaller `OysterPlay.exe` fallback payload; shortcuts no longer depend on it. |
 | `installer_README.md` | This file. |
 
 ## Output
@@ -85,7 +88,8 @@ resulting `.exe` to the GitHub Release page.
 1. fetch_jre.py            -> bundle/jre/                        (~145 MB)
 2. fetch_minecraft.py      -> bundle/mc-instance/                (~190 MB)
 3. fetch_fabric.py         -> bundle/mc-instance/versions/...    (~  3 MB)
-4. build_oysterplay_exe.py -> dist/OysterPlay.exe -> bundle/     (~  5 MB)
+4. build_oysterplay_exe.py -> dist/OysterPlay.exe -> bundle/     (~  5 MB fallback)
+4b. static launcher/config -> {app}/OysterPlay.bat + %APPDATA% config
 5. pyinstaller --onedir    -> bundle/OysterRecorder-onedir/      (~120 MB)
 6. copy 9 mod jars         -> bundle/mc-instance/mods/           (~  3 MB)
 6b. copy manifest.json     -> bundle/manifest.json               (<  1 KB)
@@ -100,7 +104,10 @@ flag — SHA-256 checks always run.
 
 ```
 %LOCALAPPDATA%\OysterRecorder\
-├── OysterPlay.exe                              # double-click target
+├── OysterPlay.bat                              # double-click target
+├── launch_mc.bat                               # static MC launcher
+├── gamedata-recorder.exe                       # Rust v2.6.0 recorder entry
+├── OysterPlay.exe                              # PyInstaller fallback only
 ├── manifest.json                               # SHA-256 pin record
 ├── unins000.exe                                # per-user uninstaller
 ├── unins000.dat
@@ -128,6 +135,14 @@ flag — SHA-256 checks always run.
 ├── logs\                                       # empty, user-modify
 └── runtime\                                    # PyInstaller --runtime-tmpdir
 ```
+
+The installer also overwrites `%APPDATA%\GameData Recorder\config.json` with
+`gamedata_recorder_config.json`. This shape was checked against
+`~/Downloads/gamedata-recorder` tag `v2.6.0`: top-level `preferences` contains
+camelCase fields, but nested `Preferences.games.*` values are `GameConfig`,
+which has no `rename_all`; therefore per-game fields must be
+`use_window_capture` and `capture_mode`, and `CaptureMode::GameHook` is stored
+as `game_hook`.
 
 Plus shortcuts (created on first install):
 
