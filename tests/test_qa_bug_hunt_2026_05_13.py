@@ -107,9 +107,7 @@ def test_lint_audio_channels_inspects_real_files() -> None:
 
         rpt = L.run_all_checks(pkg)
         ch = next(r for r in rpt.results if r.criterion_id == 9)
-        assert not ch.passed, (
-            "QA1 #6 regression: criterion 9 should fail when no audio files exist"
-        )
+        assert not ch.passed, "QA1 #6 regression: criterion 9 should fail when no audio files exist"
 
 
 def test_lint_sample_rate_inspects_real_files() -> None:
@@ -124,9 +122,9 @@ def test_lint_sample_rate_inspects_real_files() -> None:
 
         rpt = L.run_all_checks(pkg)
         sr = next(r for r in rpt.results if r.criterion_id == 10)
-        assert not sr.passed, (
-            "QA1 #6 regression: criterion 10 should fail when no audio files exist"
-        )
+        assert (
+            not sr.passed
+        ), "QA1 #6 regression: criterion 10 should fail when no audio files exist"
 
 
 def test_lint_route_distribution_inspects_real_files() -> None:
@@ -141,9 +139,9 @@ def test_lint_route_distribution_inspects_real_files() -> None:
 
         rpt = L.run_all_checks(pkg)
         rd = next(r for r in rpt.results if r.criterion_id == 11)
-        assert not rd.passed, (
-            "QA1 #6 regression: criterion 11 should fail when no route files exist"
-        )
+        assert (
+            not rd.passed
+        ), "QA1 #6 regression: criterion 11 should fail when no route files exist"
 
 
 def test_lint_overlay_criteria_are_deprecated() -> None:
@@ -165,9 +163,9 @@ def test_lint_overlay_criteria_are_deprecated() -> None:
             r = next(x for x in rpt.results if x.criterion_id == cid)
             assert r.deprecated, f"criterion {cid} should be deprecated post-fix"
         # And they're excluded from total_checks.
-        assert rpt.total_checks == 21, (
-            f"total_checks should be 24 - 3 deprecated = 21, got {rpt.total_checks}"
-        )
+        assert (
+            rpt.total_checks == 21
+        ), f"total_checks should be 24 - 3 deprecated = 21, got {rpt.total_checks}"
 
 
 # ---------------------------------------------------------------------------
@@ -236,9 +234,9 @@ def test_lint_message_consistent_with_boolean() -> None:
         for r in rpt.results:
             if not r.passed:
                 lower = r.message.lower()
-                assert "passed" not in lower and "valid" not in lower, (
-                    f"criterion {r.criterion_id}: passed=False but message says: {r.message!r}"
-                )
+                assert (
+                    "passed" not in lower and "valid" not in lower
+                ), f"criterion {r.criterion_id}: passed=False but message says: {r.message!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -302,7 +300,11 @@ def test_botjs_parseargs_rejects_invalid_ports() -> None:
     )
     out = result.stdout
     # Once fixed, all three should be REJECTED. Currently all are ACCEPTED.
-    accepted = sum(1 for s in ["PORT_ZERO_ACCEPTED", "PORT_NEGATIVE_ACCEPTED", "PORT_HUGE_ACCEPTED"] if s in out)
+    accepted = sum(
+        1
+        for s in ["PORT_ZERO_ACCEPTED", "PORT_NEGATIVE_ACCEPTED", "PORT_HUGE_ACCEPTED"]
+        if s in out
+    )
     assert accepted == 0, (
         f"BUG-08 confirmed: {accepted}/3 invalid ports accepted by parseArgs.\n" + out
     )
