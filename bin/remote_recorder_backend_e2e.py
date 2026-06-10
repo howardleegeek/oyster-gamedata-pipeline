@@ -2,7 +2,7 @@
 """remote_recorder_backend_e2e.py — End-to-end smoke test against a REAL deployed backend.
 
 Usage:
-    python3 bin/remote_recorder_backend_e2e.py --backend-url https://oyster-backend-stub.fly.dev
+    python3 bin/remote_recorder_backend_e2e.py --backend-url https://oyster-backend-6qup7rrx2q-uc.a.run.app
 
 Steps (all must pass for exit 0):
   1. healthz check

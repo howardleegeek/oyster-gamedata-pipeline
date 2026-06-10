@@ -112,7 +112,7 @@ class TestMissingConfigFallsBack:
     def test_default_config_has_expected_values(self, tmp_path: Path) -> None:
         nonexistent = tmp_path / "nope.json"
         cfg = load(config_path=nonexistent)
-        assert cfg["backend_url"] == "https://oyster-backend-stub.fly.dev"
+        assert cfg["backend_url"] == "https://oyster-backend-6qup7rrx2q-uc.a.run.app"
         assert cfg["update_server"] == "https://updates.oyster.example"
         assert cfg["auto_update_check_hours"] == 24
         assert cfg["income_notification_time"] == "20:00"
@@ -136,7 +136,7 @@ class TestMissingConfigFallsBack:
         # 1. nonexistent (doesn't exist) → skip
         # 2. installer/default_config.json (exists) → use it
         cfg = load(config_path=nonexistent)
-        assert cfg["backend_url"] == "https://oyster-backend-stub.fly.dev"
+        assert cfg["backend_url"] == "https://oyster-backend-6qup7rrx2q-uc.a.run.app"
 
 
 # ---------------------------------------------------------------------------

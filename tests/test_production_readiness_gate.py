@@ -208,4 +208,4 @@ def test_cli_default_backend_is_https(capsys) -> None:
     code = main(["--mode", "internal"])
 
     assert code == 0
-    assert "https://136-109-41-170.sslip.io" in capsys.readouterr().out
+    assert "https://oyster-backend-6qup7rrx2q-uc.a.run.app" in capsys.readouterr().out

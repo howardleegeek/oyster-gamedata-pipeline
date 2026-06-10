@@ -45,7 +45,7 @@ import bin.remote_recorder_backend_e2e as e2e_mod
 # Constants
 # ---------------------------------------------------------------------------
 
-BACKEND_URL = "https://oyster-backend-stub.fly.dev"
+BACKEND_URL = "https://oyster-backend-6qup7rrx2q-uc.a.run.app"
 
 # ---------------------------------------------------------------------------
 # Fixtures

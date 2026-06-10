@@ -252,7 +252,7 @@ def check_appcast(
                     False,
                     f"expected {tag} release URL, got: {url}",
                 )
-            if version.removeprefix("v") != tag.removeprefix("v"):
+            if version.removeprefix("v") != _version_from_tag(tag):
                 return CheckResult(
                     "GET /api/v1/updates/appcast.xml",
                     False,
@@ -359,6 +359,11 @@ def _xml_attr(element: ET.Element, local_name: str) -> str:
         if key == local_name or key.endswith(f"}}{local_name}"):
             return value
     return ""
+
+
+def _version_from_tag(tag: str) -> str:
+    """Bare semver from either consumer scheme (recorder-v2.6.15 -> 2.6.15)."""
+    return tag.strip().removeprefix("recorder-").removeprefix("v")
 
 
 def _normalise_release_tag(tag: str) -> str:

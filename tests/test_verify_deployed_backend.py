@@ -692,3 +692,11 @@ def test_normalise_release_tag_handles_both_consumer_schemes() -> None:
     assert _normalise_release_tag("recorder-v2.6.15") == "recorder-v2.6.15"
     assert _normalise_release_tag("v0.16.0") == "v0.16.0"
     assert _normalise_release_tag("2.6.15") == "v2.6.15"
+
+
+def test_version_from_tag_strips_both_scheme_prefixes() -> None:
+    from scripts.verify_deployed_backend import _version_from_tag
+
+    assert _version_from_tag("recorder-v2.6.15") == "2.6.15"
+    assert _version_from_tag("v0.16.0") == "0.16.0"
+    assert _version_from_tag("2.6.15") == "2.6.15"

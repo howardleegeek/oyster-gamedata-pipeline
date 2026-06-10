@@ -8,7 +8,7 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir fastapi uvicorn python-multipart
+RUN pip install --no-cache-dir fastapi uvicorn python-multipart google-cloud-storage
 
 COPY backend_stub/ backend_stub/
 COPY src/oyster_agent_runner/ src/oyster_agent_runner/

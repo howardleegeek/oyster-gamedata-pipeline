@@ -14,7 +14,7 @@ def test_production_readiness_workflow_runs_internal_gate_on_push() -> None:
     assert "workflow_dispatch:" in text
     assert "GATE_MODE: ${{ inputs.mode || 'internal' }}" in text
     assert (
-        "BACKEND_URL: ${{ inputs.backend_url || vars.BACKEND_SMOKE_URL || 'https://136-109-41-170.sslip.io' }}"
+        "BACKEND_URL: ${{ inputs.backend_url || vars.BACKEND_SMOKE_URL || 'https://oyster-backend-6qup7rrx2q-uc.a.run.app' }}"
         in text
     )
     assert "python3 scripts/production_readiness_gate.py" in text
