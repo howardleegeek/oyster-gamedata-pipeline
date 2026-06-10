@@ -292,18 +292,49 @@ def step2_trim_mp4(sess: pathlib.Path, start_offset: int = 180, target_dur: int 
 def step3_extract_audio(sess: pathlib.Path) -> None:
     step("3/10 Extract audio.flac from mp4")
     src = _require_video(sess)
+    out = sess / "audio.flac"
+    existing_ok = out.exists() and out.stat().st_size >= 256
+    tmp = sess / ".audio.extract.tmp.flac"
+    # Many recorder sessions store video without an audio stream (audio is a
+    # separate track). `ffmpeg -vn -c:a flac` then exits non-zero. Extract to a
+    # temp file with check=False so a missing audio stream never crashes the
+    # whole pipeline; only replace audio.flac on a real success.
+    r = run(
+        ["ffmpeg", "-y", "-i", str(src), "-vn", "-c:a", "flac", str(tmp)],
+        check=False,
+    )
+    if r.returncode == 0 and tmp.exists() and tmp.stat().st_size >= 1024:
+        os.replace(tmp, out)
+        return
+    if tmp.exists():
+        tmp.unlink()
+    if existing_ok:
+        print("  step3: video has no extractable audio; kept existing audio.flac")
+        return
+    # No source audio and no recorder-provided track: synthesize a silent
+    # FLAC matching the video duration so downstream audio steps still run.
+    try:
+        _frames, dur = ffprobe_frames(src)
+    except Exception:
+        dur = 0.0
+    dur = dur if dur and dur > 0 else 1.0
     run(
         [
             "ffmpeg",
             "-y",
+            "-f",
+            "lavfi",
+            "-t",
+            f"{dur:.3f}",
             "-i",
-            str(src),
-            "-vn",
+            "anullsrc=r=48000:cl=stereo",
             "-c:a",
             "flac",
-            str(sess / "audio.flac"),
-        ]
+            str(out),
+        ],
+        check=False,
     )
+    print(f"  step3: synthesized {dur:.1f}s silent audio.flac (source had no audio)")
 
 
 def step4_denormalize_inputs(sess: pathlib.Path) -> None:

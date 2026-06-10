@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import types
 from pathlib import Path
@@ -178,3 +179,116 @@ def test_oysterplay_auto_arms_recorder_even_when_log_ready_marker_is_missing(
     assert sess.armed is True
     assert clicked[0] == m.RECORDER_BUTTON_LABEL
     assert clicked[-1] == m.RECORDER_DISARM_LABEL
+
+
+def test_oysterplay_prefers_bundled_rust_recorder(tmp_path: Path) -> None:
+    m = _import_oyster_play()
+    rust = tmp_path / "gamedata-recorder" / "gamedata-recorder.exe"
+    python_fallback = tmp_path / "OysterRecorder-onedir" / "OysterRecorder-onedir.exe"
+    rust.parent.mkdir()
+    python_fallback.parent.mkdir()
+    rust.write_text("rust", encoding="utf-8")
+    python_fallback.write_text("python", encoding="utf-8")
+
+    assert m.find_recorder_exe(tmp_path) == rust
+
+
+def test_oysterplay_spawns_rust_recorder_with_shippable_config(monkeypatch, tmp_path: Path) -> None:
+    m = _import_oyster_play()
+    rust = tmp_path / "install" / "gamedata-recorder" / "gamedata-recorder.exe"
+    rust.parent.mkdir(parents=True)
+    rust.write_text("rust", encoding="utf-8")
+    recordings_dir = tmp_path / "User" / "AppData" / "Local" / "GameData Recorder" / "recordings"
+    config_path = tmp_path / "User" / "AppData" / "Roaming" / "GameData Recorder" / "config.json"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_bytes(
+        b"\xef\xbb\xbf" + json.dumps({"preferences": {"honk": True}}).encode("utf-8")
+    )
+    popen_calls: list[dict[str, Any]] = []
+
+    class _FakePopen:
+        def __init__(self, args: list[str], **kwargs: Any) -> None:
+            popen_calls.append({"args": args, **kwargs})
+
+    monkeypatch.setattr(m.os, "name", "nt", raising=False)
+    monkeypatch.setattr(m, "is_recorder_running", lambda: False)
+    monkeypatch.setattr(m, "rust_recorder_config_path", lambda: config_path)
+    monkeypatch.setattr(m, "rust_recorder_recordings_dir", lambda: recordings_dir)
+    monkeypatch.setattr(m.subprocess, "Popen", _FakePopen)
+    monkeypatch.setenv("GAMEDATA_CI_MODE", "1")
+    monkeypatch.setenv("GAMEDATA_SKIP_API_KEY", "1")
+    monkeypatch.setenv("GAMEDATA_OUTPUT_DIR", str(tmp_path / "ci-output"))
+
+    proc = m.spawn_recorder(rust)
+
+    assert isinstance(proc, _FakePopen)
+    assert popen_calls[0]["args"] == [str(rust)]
+    assert popen_calls[0]["cwd"] == str(rust.parent)
+    env = popen_calls[0]["env"]
+    assert "GAMEDATA_CI_MODE" not in env
+    assert "GAMEDATA_SKIP_API_KEY" not in env
+    assert "GAMEDATA_OUTPUT_DIR" not in env
+    assert env["OYSTER_CAPTURE_MODE"] == "game"
+
+    raw_config = config_path.read_bytes()
+    assert not raw_config.startswith(b"\xef\xbb\xbf")
+    config = json.loads(raw_config.decode("utf-8"))
+    assert config["credentials"]["hasConsented"] is True
+    assert config["credentials"]["consentGivenAtVersion"] == "2.6.0"
+    assert config["preferences"]["autoUploadOnCompletion"] is False
+    assert config["preferences"]["recordMicrophone"] is False
+    assert config["preferences"]["recordingLocation"] == str(recordings_dir)
+    assert config["preferences"]["honk"] is True
+    assert config["preferences"]["games"]["javaw"] == {
+        "capture_mode": "game_hook",
+        "use_window_capture": False,
+    }
+    assert config["preferences"]["games"]["minecraft"] == {
+        "capture_mode": "game_hook",
+        "use_window_capture": False,
+    }
+
+
+def test_oysterplay_rust_recorder_skips_legacy_uia_clicks(monkeypatch, tmp_path: Path) -> None:
+    m = _import_oyster_play()
+    rust = tmp_path / "gamedata-recorder" / "gamedata-recorder.exe"
+    rust.parent.mkdir()
+    rust.write_text("rust", encoding="utf-8")
+
+    class _FakeJava:
+        pid = 1234
+
+        def wait(self) -> int:
+            return 0
+
+    monkeypatch.setattr(
+        m.launcher,
+        "verify_install",
+        lambda *_args, **_kwargs: SimpleNamespace(ok=True, missing=[]),
+    )
+    monkeypatch.setattr(
+        m.launcher,
+        "build_launch_plan",
+        lambda **_kwargs: SimpleNamespace(cmd=["javaw"], main_class="KnotClient"),
+    )
+    monkeypatch.setattr(m, "find_recorder_exe", lambda _root: rust)
+    monkeypatch.setattr(m, "spawn_recorder", lambda _recorder: None)
+    monkeypatch.setattr(m.launcher, "launch_javaw", lambda *_args, **_kwargs: _FakeJava())
+    monkeypatch.setattr(m.launcher, "latest_log_path", lambda _root: tmp_path / "latest.log")
+    monkeypatch.setattr(m.launcher, "wait_for_mc_ready", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(
+        m,
+        "wait_for_recorder_window",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("UIA wait not expected")),
+    )
+    monkeypatch.setattr(
+        m,
+        "click_recorder_button",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("UIA click not expected")),
+    )
+
+    sess = m.run_session(install_root_path=tmp_path)
+
+    assert sess.failure_reason == ""
+    assert sess.armed is True
+    assert sess.recorder_window is None

@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from backend_stub.appcast_server import (
     DEFAULT_INSTALLER_NAME,
     DEFAULT_RECORDER_SHA256,
+    DEFAULT_RECORDER_TAG,
     DEFAULT_RECORDER_VERSION,
     router,
 )
@@ -26,9 +27,23 @@ def test_appcast_returns_xml() -> None:
 def test_appcast_contains_version() -> None:
     r = _client().get("/api/v1/updates/appcast.xml")
     assert f"v{DEFAULT_RECORDER_VERSION}" in r.text or DEFAULT_RECORDER_VERSION in r.text
-    assert f"releases/download/v{DEFAULT_RECORDER_VERSION}/{DEFAULT_INSTALLER_NAME}" in r.text
+    assert f"releases/download/{DEFAULT_RECORDER_TAG}/{DEFAULT_INSTALLER_NAME}" in r.text
     assert DEFAULT_RECORDER_SHA256 in r.text
     assert "PLACE" + "HOLDER" not in r.text
+
+
+def test_appcast_defaults_track_release_channels_contract() -> None:
+    """No drift: appcast defaults must come from the single source of truth in
+    release_channels.py, not a duplicated hardcoded constant set."""
+    from oyster_agent_runner.release_channels import (
+        CURRENT_CONSUMER_INSTALLER,
+        CURRENT_CONSUMER_SHA256,
+        CURRENT_CONSUMER_TAG,
+    )
+
+    assert DEFAULT_RECORDER_TAG == CURRENT_CONSUMER_TAG
+    assert DEFAULT_INSTALLER_NAME == CURRENT_CONSUMER_INSTALLER
+    assert DEFAULT_RECORDER_SHA256 == CURRENT_CONSUMER_SHA256
 
 
 def test_appcast_has_sparkle_namespace() -> None:

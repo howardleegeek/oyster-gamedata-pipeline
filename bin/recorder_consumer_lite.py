@@ -96,7 +96,7 @@ _trace(f"os.name={os.name}")
 # under. Out-of-sync versions cause v0.13 onedir installs to think
 # they're v0.8 and "update" themselves to v0.9 single-file, breaking
 # the bundled _internal/ layout. See v0.14.0 commit for postmortem.
-RECORDER_VERSION = "lite-v0.19.6"
+RECORDER_VERSION = "lite-v0.26.0"
 RAW_ONLY_DEPTH_SKIP_REASON = "DA-V2 weights not bundled in raw-only build"
 
 # R01 iron-law: supported MC versions for real game-state Fabric mod.

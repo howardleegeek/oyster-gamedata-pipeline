@@ -8,9 +8,11 @@ from oyster_agent_runner.release_channels import (
     CURRENT_CONSUMER_TAG,
     RECORDER_SOURCE_PIN,
     ReleaseChannel,
+    ReleaseInfo,
     appcast_channel,
     classify_asset_name,
     fallback_order,
+    latest_consumer_release,
 )
 
 
@@ -36,7 +38,7 @@ def test_appcast_is_consumer_installer_only() -> None:
     assert contract.channel == ReleaseChannel.CONSUMER_INSTALLER
     assert contract.appcast_allowed is True
     assert contract.known_good_anchor == CURRENT_CONSUMER_TAG
-    assert contract.required_companion_assets == ("SHA256SUMS.txt",)
+    assert contract.required_companion_assets == ("SHA-256-manifest.txt",)
     assert "appcast" in " ".join(contract.promotion_gates)
 
     for channel, candidate in CHANNELS.items():
@@ -46,15 +48,83 @@ def test_appcast_is_consumer_installer_only() -> None:
 
 
 def test_known_anchors_capture_current_successful_lines() -> None:
-    assert CURRENT_CONSUMER_TAG == "v0.16.0"
-    assert CURRENT_CONSUMER_INSTALLER == "OysterRecorder-Setup-v0.16.0.exe"
+    assert CURRENT_CONSUMER_TAG == "recorder-v2.6.15"
+    assert CURRENT_CONSUMER_INSTALLER == "OysterRecorder-Setup-recorder-v2.6.15.exe"
     assert (
         CURRENT_CONSUMER_SHA256
-        == "aaf65aec8e54ef27adcb5e50d6aeb1e45d5f6871d61be77fb283b80376d98a00"
+        == "7afe5c5c72bbe9e217a63ddf0bfed5d77127495f47077eae17af5c2ede558a44"
     )
     assert len(CURRENT_CONSUMER_SHA256) == 64
     assert BUNDLED_REFERENCE_TAG == "recorder-v0.28.0-rc19.0.3"
     assert RECORDER_SOURCE_PIN.startswith("7de8a38")
+
+
+def test_latest_consumer_release_requires_consumer_manifest_companion() -> None:
+    """An installer-named exe alone is not enough — the SHA-256-manifest.txt
+    companion (R05E single-file consumer output) is the discriminator. The
+    verified consumer anchor recorder-v2.6.15 qualifies; a newer release that
+    is missing the manifest must NOT shadow it."""
+
+    releases = (
+        ReleaseInfo(
+            tag="recorder-v2.6.15",
+            published_at="2026-06-01T21:28:18Z",
+            asset_names=(
+                "OysterRecorder-Setup-recorder-v2.6.15.exe",
+                "OysterRecorder-onedir.zip",
+                "oyster-recorder-mod-0.1.0-real-game-state-mc1.21.5.jar",
+                "SHA-256-manifest.txt",
+            ),
+        ),
+        ReleaseInfo(
+            tag="recorder-v2.6.16-incomplete",
+            published_at="2026-06-02T00:00:00Z",
+            asset_names=("OysterRecorder-Setup-recorder-v2.6.16.exe",),
+        ),
+    )
+
+    resolved = latest_consumer_release(releases)
+
+    assert resolved is not None
+    assert resolved.tag == "recorder-v2.6.15"
+
+
+def test_latest_consumer_release_picks_newest_among_compliant() -> None:
+    releases = (
+        ReleaseInfo(
+            tag="recorder-v2.6.15",
+            published_at="2026-06-01T21:28:18Z",
+            asset_names=(
+                "OysterRecorder-Setup-recorder-v2.6.15.exe",
+                "SHA-256-manifest.txt",
+            ),
+        ),
+        ReleaseInfo(
+            tag="recorder-v2.6.16",
+            published_at="2026-06-04T09:00:00Z",
+            asset_names=(
+                "OysterRecorder-Setup-recorder-v2.6.16.exe",
+                "SHA-256-manifest.txt",
+            ),
+        ),
+    )
+
+    resolved = latest_consumer_release(releases)
+
+    assert resolved is not None
+    assert resolved.tag == "recorder-v2.6.16"
+
+
+def test_latest_consumer_release_returns_none_when_no_compliant_release() -> None:
+    releases = (
+        ReleaseInfo(
+            tag="recorder-v2.6.15-nomanifest",
+            published_at="2026-06-01T21:28:18Z",
+            asset_names=("OysterRecorder-Setup-recorder-v2.6.15.exe",),
+        ),
+    )
+
+    assert latest_consumer_release(releases) is None
 
 
 def test_fallback_order_is_explicit_and_ordered() -> None:

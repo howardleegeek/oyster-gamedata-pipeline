@@ -406,7 +406,7 @@ def analyze_game_state(game_state_path: Path | None) -> dict[str, Any]:
 
 def _event_text(payload: dict[str, Any]) -> str:
     parts = []
-    for key in ("type", "event", "kind", "action", "name", "input_type"):
+    for key in ("type", "event", "event_type", "kind", "action", "name", "input_type"):
         value = payload.get(key)
         if isinstance(value, str):
             parts.append(value.lower())
