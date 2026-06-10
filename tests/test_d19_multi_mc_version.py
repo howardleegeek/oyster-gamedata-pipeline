@@ -147,3 +147,14 @@ def test_ci_matrix_subset_of_gradle_matrix():
             f"build.gradle MC_MATRIX first"
         )
         assert v in yaml_src, f"GHA workflow missing CI version {v}"
+
+
+def test_fabric_yarn_watcher_is_pat_gated_for_workflow_edits():
+    """The watcher edits a workflow file, so the default GITHUB_TOKEN
+    cannot push the auto branch. It must no-op cleanly unless a PAT with
+    workflow scope is configured."""
+    src = _read(".github/workflows/fabric-yarn-watcher.yml")
+    assert "FABRIC_WATCHER_PAT" in src
+    assert "cannot push workflow-file changes" in src
+    assert "git diff -- .github/workflows/build-mc-mod.yml mc-mod/build.gradle" in src
+    assert "git remote set-url origin" in src

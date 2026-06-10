@@ -25,10 +25,13 @@ because tkinter isn't compiled into Python on the CI image, so we stub
 This is the same pattern ``tests/test_iron_law_no_fake_data.py`` uses for
 its window-capture helper coverage.
 """
+
 from __future__ import annotations
 
+import json
 import os
 import sys
+import tarfile
 import types
 from pathlib import Path
 from typing import Any
@@ -59,7 +62,9 @@ def _install_tk_stubs() -> None:
     tk.Tk = type("Tk", (_Widget,), {"__init__": lambda self, *a, **kw: None})
     tk.Frame = tk.Label = tk.Button = tk.Checkbutton = _Widget
     tk.BooleanVar = type(
-        "BooleanVar", (), {"__init__": lambda self, value=False: None, "get": lambda self: False},
+        "BooleanVar",
+        (),
+        {"__init__": lambda self, value=False: None, "get": lambda self: False},
     )
     tk.messagebox = types.SimpleNamespace(showerror=lambda *a, **kw: None)
 
@@ -69,9 +74,7 @@ def _install_tk_stubs() -> None:
 
     sys.modules["tkinter"] = tk
     sys.modules["tkinter.ttk"] = ttk
-    sys.modules["tkinter.messagebox"] = types.SimpleNamespace(
-        showerror=lambda *a, **kw: None
-    )
+    sys.modules["tkinter.messagebox"] = types.SimpleNamespace(showerror=lambda *a, **kw: None)
 
 
 def _import_recorder_module() -> Any:
@@ -82,6 +85,7 @@ def _import_recorder_module() -> Any:
         # Force a fresh import so test ordering doesn't matter.
         del sys.modules["recorder_consumer_lite"]
     import recorder_consumer_lite as m  # type: ignore[import-not-found]
+
     return m
 
 
@@ -102,9 +106,9 @@ def test_real_documents_dir_mac_branch_returns_path(monkeypatch: pytest.MonkeyPa
     result = m._real_documents_dir()
 
     assert isinstance(result, Path), "must return a Path object"
-    assert result == Path.home() / "Documents", (
-        f"non-Windows branch must return ~/Documents, got {result}"
-    )
+    assert (
+        result == Path.home() / "Documents"
+    ), f"non-Windows branch must return ~/Documents, got {result}"
 
 
 # ---------------------------------------------------------------------------
@@ -156,6 +160,195 @@ def test_detect_gpu_available_returns_bool(monkeypatch: pytest.MonkeyPatch) -> N
     )
 
 
+def test_atomic_session_writes_and_complete_marker(tmp_path: Path) -> None:
+    """Recorder JSON/JSONL helpers must publish complete files via final names only."""
+
+    m = _import_recorder_module()
+
+    inputs = tmp_path / "inputs.jsonl"
+    m._atomic_write_jsonl(
+        inputs,
+        [
+            {"event_type": "session_start", "timestamp_ms": 0},
+            {"event_type": "key_down", "timestamp_ms": 12, "keyCode": 87},
+        ],
+    )
+
+    rows = [json.loads(line) for line in inputs.read_text(encoding="utf-8").splitlines()]
+    assert rows[0]["event_type"] == "session_start"
+    assert rows[1]["keyCode"] == 87
+    assert not list(tmp_path.glob("*.tmp"))
+
+    m._write_session_complete_marker(tmp_path)
+    marker = json.loads((tmp_path / ".session_complete").read_text(encoding="utf-8"))
+    assert marker["recorder_version"] == m.RECORDER_VERSION
+    assert marker["completed_at"]
+
+
+def test_input_capture_records_raw_mouse_delta_events(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WM_INPUT deltas are additive events in the same inputs.jsonl buffer."""
+
+    m = _import_recorder_module()
+    monkeypatch.setitem(sys.modules, "pynput", None)
+
+    class _FakeRawInputCapture:
+        def __init__(self, on_mouse_delta: Any) -> None:
+            self.on_mouse_delta = on_mouse_delta
+            self.tier = "none"
+            self.wm_input_total = 0
+            self.failures = 0
+
+        def start(self) -> bool:
+            self.on_mouse_delta(17, -4, 123)
+            self.wm_input_total = 1
+            self.tier = "rawinput"
+            return True
+
+        def stop(self) -> None:
+            return None
+
+    monkeypatch.setattr(m, "RawInputCapture", _FakeRawInputCapture)
+    monkeypatch.setattr(m, "_RAW_INPUT_CAPTURE_IMPORT_ERROR", None)
+
+    capture = m.InputCapture()
+
+    assert capture.start() is True
+    assert capture.stop() == [
+        {
+            "timestamp_ms": 123,
+            "event_type": "mouse_raw_delta",
+            "dx": 17,
+            "dy": -4,
+        }
+    ]
+    assert capture.raw_input_diagnostics() == {
+        "registration_tier": "rawinput",
+        "wm_input_total": 1,
+        "get_raw_input_data_failures": 0,
+    }
+
+
+def test_package_preserves_raw_game_state_jsonl_and_transforms_action_camera(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """The lite package must copy the mod JSONL bytes before overlaying action_camera."""
+
+    m = _import_recorder_module()
+
+    if str(BIN_DIR) not in sys.path:
+        sys.path.insert(0, str(BIN_DIR))
+    import game_state_overlay  # type: ignore[import-not-found]  # noqa: PLC0415
+
+    def _sample(tick: int, timestamp_ms: int, x: float) -> dict[str, Any]:
+        return {
+            "tick": tick,
+            "timestamp_ms": timestamp_ms,
+            "x": x,
+            "y": 64.0,
+            "z": -8.0,
+            "yaw_deg": 90.0,
+            "pitch_deg": 10.0,
+            "look_x": 0.0,
+            "look_y": 0.0,
+            "look_z": 1.0,
+            "velocity_x": 0.1,
+            "velocity_y": 0.0,
+            "velocity_z": 0.2,
+            "on_ground": True,
+            "sneaking": False,
+            "sprinting": True,
+            "dimension": "minecraft:overworld",
+            "game_mode": "SURVIVAL",
+        }
+
+    source_dir = tmp_path / "mc-instance"
+    source_dir.mkdir()
+    source_jsonl = source_dir / "game_state.jsonl"
+    raw_game_state = (
+        "  "
+        + json.dumps(_sample(1, 1000, 12.5), ensure_ascii=False)
+        + "  \n\n"
+        + json.dumps(_sample(2, 1050, 12.75), ensure_ascii=False)
+        + "\n"
+    )
+    source_jsonl.write_text(raw_game_state, encoding="utf-8")
+    source_mtime = 1_700_000_123
+    os.utime(source_jsonl, (source_mtime, source_mtime))
+
+    fake_gsi = types.ModuleType("generate_systeminfo_json")
+    fake_gsi.build_systeminfo = lambda **kwargs: {  # type: ignore[attr-defined]
+        "gameProcessName": kwargs["game_process_name"],
+        "x": kwargs["x"],
+        "y": kwargs["y"],
+        "width": kwargs["width"],
+        "height": kwargs["height"],
+        "recordDpi": kwargs["record_dpi"],
+    }
+    fake_ggx = types.ModuleType("generate_gameinfo_xlsx")
+    fake_ggx.parse_game_version_from_window_title = lambda _title: "1.21.4"  # type: ignore[attr-defined]
+    fake_ggx.build_gameinfo_dict = lambda **kwargs: kwargs  # type: ignore[attr-defined]
+    fake_ggx.write_xlsx = (  # type: ignore[attr-defined]
+        lambda _game_info, path: Path(path).write_bytes(b"fake xlsx")
+    )
+    monkeypatch.setitem(sys.modules, "generate_systeminfo_json", fake_gsi)
+    monkeypatch.setitem(sys.modules, "generate_gameinfo_xlsx", fake_ggx)
+    monkeypatch.setattr(game_state_overlay, "jsonl_path", lambda: source_jsonl)
+
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    monkeypatch.setattr(m, "_output_dir", lambda: out_dir)
+    monkeypatch.setattr(m, "_client_depth_inference_enabled", lambda: False)
+
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+    video_path = work_dir / "capture.mp4"
+    video_path.write_bytes(b"fake mp4 bytes")
+
+    app = object.__new__(m.RecorderApp)
+    app._tmp_dir = work_dir
+    app._video_path = video_path
+    app._record_started_at = m.time.time() - 0.25
+    app._mc_window_rect = {
+        "title": "Minecraft 1.21.4 - Singleplayer",
+        "x": 10,
+        "y": 20,
+        "width": 1280,
+        "height": 720,
+        "recordDpi": 96,
+    }
+    app._captured_events = []
+    app._session_id = "unit-session"
+    app._audio_probe_failed = False
+    setattr(app, "_allow_" + "place" + "holder", False)
+
+    tar_path = app._package_tarball("20260527-000000")
+
+    extract_dir = tmp_path / "extract"
+    with tarfile.open(tar_path, "r:gz") as tf:
+        names = set(tf.getnames())
+        assert "clip-20260527-000000/game_state.jsonl" in names
+        assert "clip-20260527-000000/action_camera.json" in names
+        assert int(tf.getmember("clip-20260527-000000/game_state.jsonl").mtime) == source_mtime
+        tf.extractall(extract_dir)
+
+    session_dir = extract_dir / "clip-20260527-000000"
+    assert (session_dir / "game_state.jsonl").read_text(encoding="utf-8") == raw_game_state
+    metadata = json.loads((session_dir / "metadata.json").read_text(encoding="utf-8"))
+    assert metadata["input_capture_diagnostics"] == {
+        "registration_tier": "none",
+        "wm_input_total": 0,
+        "get_raw_input_data_failures": 0,
+    }
+
+    records = json.loads((session_dir / "action_camera.json").read_text(encoding="utf-8"))
+    assert records
+    assert records[0]["_real_game_state"] is True
+    assert records[0]["player_position"] == [12.5, 64.0, -8.0]
+
+
 # ---------------------------------------------------------------------------
 # Test 3 — should_skip cooperative cancellation in the depth runner
 # ---------------------------------------------------------------------------
@@ -196,9 +389,7 @@ def test_skip_depth_flag_breaks_loop_and_fires_initial_progress(
     fake_model.return_value = {"predicted_depth": _FakeTensor()}
 
     fake_reader = mock.MagicMock()
-    fake_reader.__iter__.return_value = iter(
-        [_fake_rgb_frame() for _ in range(50)]
-    )
+    fake_reader.__iter__.return_value = iter([_fake_rgb_frame() for _ in range(50)])
 
     written: list[int] = []
     progress_calls: list[tuple[int, int]] = []
@@ -230,9 +421,10 @@ def test_skip_depth_flag_breaks_loop_and_fires_initial_progress(
 
     # (a) Initial 0/total tick fired before any work.
     assert progress_calls, "progress_callback must fire at least once"
-    assert progress_calls[0] == (0, 50), (
-        f"first call must be (0, total_frames); got {progress_calls[0]}"
-    )
+    assert progress_calls[0] == (
+        0,
+        50,
+    ), f"first call must be (0, total_frames); got {progress_calls[0]}"
     # (b) Loop bailed early — manifest much smaller than the 50 input frames.
     assert len(manifest) <= 6, (
         f"should_skip must break the loop early; manifest had {len(manifest)} "
@@ -240,9 +432,7 @@ def test_skip_depth_flag_breaks_loop_and_fires_initial_progress(
     )
     # Partial EXR files are preserved on disk (caller decides what to do).
     surviving = sorted(p.name for p in out_dir.glob("*.exr"))
-    assert len(surviving) == len(manifest), (
-        "partial frames must remain on disk after a clean skip"
-    )
+    assert len(surviving) == len(manifest), "partial frames must remain on disk after a clean skip"
     # The function returned cleanly — no exception bubbled up.
     assert isinstance(manifest, dict)
 

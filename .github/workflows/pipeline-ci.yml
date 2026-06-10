@@ -1,0 +1,66 @@
+name: pipeline-ci
+"on":
+  push:
+    branches: [main, 'feat/**', 'fix/**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install ruff
+      - run: ruff check bin/ tests/ oyster_provenance/ dashboard/ server/ docs/ || true
+
+  test:
+    runs-on: ubuntu-22.04
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install -e ".[test,exr]" pytest
+      - run: |
+          # Fast slice only — live slice skipped (no reference session in CI)
+          python3 -m pytest tests/test_canonical_pipeline_score.py \
+                  tests/test_provenance.py \
+                  tests/test_route_planner.py \
+                  tests/test_state_machine.py \
+                  -v --tb=short -m "not integration"
+
+  security:
+    runs-on: ubuntu-22.04
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install bandit
+      - run: bandit -r bin/ oyster_provenance/ server/ dashboard/ -ll -ii || true
+        # -ll = level low+, -ii = confidence low+; non-zero exit just warns
+
+  audit-smoke:
+    runs-on: ubuntu-22.04
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Install ffmpeg for audit fixtures
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: pip install -e ".[test,exr]"
+      - run: |
+          # Build a synthetic minimal session, run audit, assert sane output
+          python3 tests/fixtures/build_minimal_session.py /tmp/fixture
+          python3 bin/prd_compliance_audit.py /tmp/fixture --json | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)
+          items = d.get('items', [])
+          counts = {}
+          for it in items: counts[it.get('status','U')] = counts.get(it.get('status','U'),0)+1
+          print('CI smoke audit:', counts)
+          assert sum(counts.values()) == 105, f'audit total changed: {counts}'
+          "
