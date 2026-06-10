@@ -82,8 +82,8 @@ class XffSpoofingTest(unittest.TestCase):
         self.assertEqual(
             len(buckets),
             256,
-            f"Attacker fragments rate-limit across 256 buckets — "
-            f"effective limit becomes 256× the configured one",
+            "Attacker fragments rate-limit across 256 buckets — "
+            "effective limit becomes 256× the configured one",
         )
 
     def test_recommended_fix_trust_only_vercel_appended_position(self) -> None:
