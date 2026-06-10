@@ -37,10 +37,10 @@ import pytest
 
 from bin import upload_tarball_signed as ut
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _free_port() -> int:
     with socket.socket() as s:
@@ -168,6 +168,7 @@ def sample_tarball(tmp_path: Path) -> tuple[Path, str]:
 # Unit: compute_sha256_streaming
 # ---------------------------------------------------------------------------
 
+
 def test_compute_sha256_streaming_matches_stdlib(sample_tarball: tuple[Path, str]) -> None:
     path, expected = sample_tarball
     got = ut.compute_sha256_streaming(path)
@@ -178,6 +179,7 @@ def test_compute_sha256_streaming_matches_stdlib(sample_tarball: tuple[Path, str
 # ---------------------------------------------------------------------------
 # Unit: build_hmac_header
 # ---------------------------------------------------------------------------
+
 
 def test_build_hmac_header_shape_and_verifiable() -> None:
     tester_id = str(uuid.uuid4())
@@ -212,6 +214,7 @@ def test_build_hmac_header_changes_with_body() -> None:
 # ---------------------------------------------------------------------------
 # Integration: sign() against stub server
 # ---------------------------------------------------------------------------
+
 
 def test_sign_posts_expected_json(stub_server) -> None:
     state, base = stub_server
@@ -295,6 +298,7 @@ def test_sign_raises_server_error_on_500(stub_server) -> None:
 # Integration: finalize()
 # ---------------------------------------------------------------------------
 
+
 def test_finalize_posts_sha256_and_hmac(stub_server) -> None:
     state, base = stub_server
     tid = str(uuid.uuid4())
@@ -319,9 +323,8 @@ def test_finalize_posts_sha256_and_hmac(stub_server) -> None:
 # Integration: upload() orchestrates all three calls
 # ---------------------------------------------------------------------------
 
-def test_upload_runs_three_steps_in_order(
-    stub_server, sample_tarball: tuple[Path, str]
-) -> None:
+
+def test_upload_runs_three_steps_in_order(stub_server, sample_tarball: tuple[Path, str]) -> None:
     state, base = stub_server
     path, sha = sample_tarball
     tid = str(uuid.uuid4())
@@ -412,9 +415,7 @@ def test_upload_raises_when_tarball_missing(tmp_path: Path) -> None:
         )
 
 
-def test_upload_put_failure_propagates(
-    stub_server, sample_tarball: tuple[Path, str]
-) -> None:
+def test_upload_put_failure_propagates(stub_server, sample_tarball: tuple[Path, str]) -> None:
     state, base = stub_server
     path, sha = sample_tarball
     tid = str(uuid.uuid4())
@@ -449,15 +450,14 @@ def test_upload_put_failure_propagates(
 # CLI: exit codes
 # ---------------------------------------------------------------------------
 
+
 def test_cli_returns_1_when_missing_base_url(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.delenv("UPLOAD_BASE_URL", raising=False)
     p = tmp_path / "a.tar.gz"
     p.write_bytes(b"x")
-    rc = ut.main(
-        ["--tester-id", str(uuid.uuid4()), "--duration-seconds", "1", str(p)]
-    )
+    rc = ut.main(["--tester-id", str(uuid.uuid4()), "--duration-seconds", "1", str(p)])
     assert rc == 1
 
 
