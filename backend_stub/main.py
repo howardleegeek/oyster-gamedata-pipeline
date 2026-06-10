@@ -314,6 +314,39 @@ def _admin_state_summary() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+def _gcs_signed_put_url(bucket_name: str, key: str) -> str:
+    """V4 signed PUT URL so recorder clips stream straight to GCS.
+
+    Uploads must NOT pass through this service (256Mi container, large
+    clips). On Cloud Run there is no key file, so sign via IAM signBlob
+    using the runtime service account (needs
+    roles/iam.serviceAccountTokenCreator on itself).
+    """
+    import datetime as dt
+
+    from google.cloud import storage  # lazy: only imported in bucket mode
+
+    client = storage.Client()
+    blob = client.bucket(bucket_name).blob(key)
+    kwargs: dict = {
+        "version": "v4",
+        "expiration": dt.timedelta(hours=1),
+        "method": "PUT",
+    }
+    try:
+        from google.auth import default as ga_default
+        from google.auth.transport import requests as ga_requests
+
+        creds, _ = ga_default()
+        if not getattr(creds, "private_key", None) and hasattr(creds, "service_account_email"):
+            creds.refresh(ga_requests.Request())
+            kwargs["service_account_email"] = creds.service_account_email
+            kwargs["access_token"] = creds.token
+    except Exception:
+        pass  # local dev: key file / emulator can sign without signBlob
+    return blob.generate_signed_url(**kwargs)
+
+
 def create_app(accelerate: float = 1.0, interval: float = 300.0) -> FastAPI:
     _configure_persistence()
     _validate_production_backend_config()
@@ -335,6 +368,7 @@ def create_app(accelerate: float = 1.0, interval: float = 300.0) -> FastAPI:
     # Health check
     # ------------------------------------------------------------------
     @app.get("/healthz")
+    @app.get("/api/v1/healthz")
     async def healthz():
         return {
             "status": "ok",
@@ -411,6 +445,13 @@ def create_app(accelerate: float = 1.0, interval: float = 300.0) -> FastAPI:
         body = await request.json()
         key = body.get("key", f"uploads/{uuid.uuid4().hex}.bin")
         expires_at = (_dt.datetime.now(_dt.timezone.utc) + _dt.timedelta(hours=1)).isoformat()
+        bucket_name = os.getenv("OYSTER_GCS_BUCKET")
+        if bucket_name:
+            return {
+                "url": _gcs_signed_put_url(bucket_name, str(key)),
+                "expires_at": expires_at,
+                "key": key,
+            }
         escaped_key = quote(str(key), safe="/")
         return {
             "url": f"{str(request.base_url).rstrip('/')}/api/v1/upload/object/{escaped_key}",

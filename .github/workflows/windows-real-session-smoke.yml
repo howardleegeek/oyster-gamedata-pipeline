@@ -10,7 +10,7 @@ on:
       backend_url:
         description: 'Backend base URL'
         required: true
-        default: 'https://136-109-41-170.sslip.io'
+        default: 'https://oyster-backend-6qup7rrx2q-uc.a.run.app'
       manual_session_minutes:
         description: 'Minutes to keep the manual Minecraft play window open'
         required: true

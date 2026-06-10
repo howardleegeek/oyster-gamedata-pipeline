@@ -2,7 +2,7 @@
 """remote_recorder_backend_e2e.py — End-to-end smoke test against a REAL deployed backend.
 
 Usage:
-    python3 bin/remote_recorder_backend_e2e.py --backend-url https://oyster-backend-stub.fly.dev
+    python3 bin/remote_recorder_backend_e2e.py --backend-url https://oyster-backend-6qup7rrx2q-uc.a.run.app
 
 Steps (all must pass for exit 0):
   1. healthz check
@@ -52,6 +52,12 @@ def step_healthz(client: httpx.Client, backend_url: str) -> bool:
     """Step 1: healthz check."""
     logger.info("[1/7] healthz check → %s/healthz", backend_url)
     resp = client.get(f"{backend_url}/healthz", timeout=REQUEST_TIMEOUT)
+    if resp.status_code == 404:
+        # Cloud Run's Google frontend intercepts /healthz on *.run.app and
+        # answers its own 404 before the container sees the request — fall
+        # back to the unreserved alias serving the same rich body.
+        logger.info("  → /healthz intercepted (404); trying /api/v1/healthz")
+        resp = client.get(f"{backend_url}/api/v1/healthz", timeout=REQUEST_TIMEOUT)
     assert resp.status_code == 200, f"healthz returned {resp.status_code}: {resp.text}"
     data = resp.json()
     assert data.get("status") == "ok", f"healthz status not ok: {data}"

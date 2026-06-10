@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GATE_MODE: ${{ inputs.mode || 'internal' }}
-      BACKEND_URL: ${{ inputs.backend_url || vars.BACKEND_SMOKE_URL || 'https://136-109-41-170.sslip.io' }}
+      BACKEND_URL: ${{ inputs.backend_url || vars.BACKEND_SMOKE_URL || 'https://oyster-backend-6qup7rrx2q-uc.a.run.app' }}
       OAUTH_PROVIDER: ${{ inputs.oauth_provider || 'mock' }}
       STORAGE_PROVIDER: ${{ inputs.storage_provider || 'local' }}
       PAYOUT_PROVIDER: ${{ inputs.payout_provider || 'simulator' }}
