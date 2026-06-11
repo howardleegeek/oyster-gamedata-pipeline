@@ -30,7 +30,9 @@ sys.path.insert(0, str(REPO_ROOT / "bin"))
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="BUG-01: zero-byte empty package passes 22/24 lints", strict=True)  # documents pre-existing bug
+@pytest.mark.xfail(
+    reason="BUG-01: zero-byte empty package passes 22/24 lints", strict=True
+)  # documents pre-existing bug
 def test_zero_byte_package_fails_lint() -> None:
     """An empty package (all zero-byte required files) MUST fail."""
     import lint_v3_prd_grounded as L
@@ -172,7 +174,9 @@ def test_lint_overlay_criteria_are_deprecated() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="BUG-04: nested keyCode bypasses lint check", strict=True)  # documents pre-existing bug
+@pytest.mark.xfail(
+    reason="BUG-04: nested keyCode bypasses lint check", strict=True
+)  # documents pre-existing bug
 def test_lint_keycode_catches_nested_strings() -> None:
     """A record array with string keyCode values must fail keyCode lint."""
     import lint_v3_prd_grounded as L
@@ -219,7 +223,9 @@ def test_lint_depth_samples_more_than_15_files() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="BUG-06: message string inconsistent with passed boolean", strict=True)  # documents pre-existing bug
+@pytest.mark.xfail(
+    reason="BUG-06: message string inconsistent with passed boolean", strict=True
+)  # documents pre-existing bug
 def test_lint_message_consistent_with_boolean() -> None:
     """When `passed=False`, the message MUST NOT say "passed"/"valid"/"complete"."""
     import lint_v3_prd_grounded as L
