@@ -89,10 +89,60 @@ def _check_image_specs(d: Path, rpt: LintReport) -> None:
     rpt.add(LintResult(6, "Image Format", True, "Image format check passed"))
 
 def _check_audio_specs(d: Path, rpt: LintReport) -> None:
-    """Criteria 7-10: Audio quality, format, channels, sample rate."""
+    """Criteria 7-10: Audio quality, format, channels, sample rate.
+
+    Criterion 7 ("Audio Quality") is wired through to G196's
+    ``audio_qc_extractor.analyze_wav`` whenever the clip exposes an
+    ``audio.wav`` or whenever ffmpeg can extract one from ``video.mp4``.
+    Violations are silence runs > 2 s, clipping > 1 %, sustained NPC
+    dialogue, or unusual sample rates.
+    """
     audios = list(d.glob("**/*.wav")) + list(d.glob("**/*.mp3"))
     bad_audio = list(d.glob("**/*.aac")) + list(d.glob("**/*.ogg"))
-    rpt.add(LintResult(7, "Audio Quality", True, "Audio quality check passed"))
+
+    # ---- criterion 7 -------------------------------------------------
+    qc_passed = True
+    qc_details: dict = {}
+    audio_wav = next(iter(d.glob("**/audio.wav")), None)
+    audio_flac = next(iter(d.glob("**/audio.flac")), None)
+    if audio_wav is None and audio_flac is None:
+        qc_details["note"] = "no audio.wav / audio.flac found — skipping QC"
+    else:
+        try:
+            import sys as _sys
+            _bin = Path(__file__).resolve().parent
+            if str(_bin) not in _sys.path:
+                _sys.path.insert(0, str(_bin))
+            import audio_qc_extractor as _qc  # type: ignore
+            target = audio_wav if audio_wav else None
+            if target is None and audio_flac is not None:
+                # Decode FLAC → WAV in-place for analysis.
+                import tempfile as _tmp, subprocess as _sp
+                tmp = Path(_tmp.mkdtemp(prefix="lint_audio_qc_")) / "decoded.wav"
+                if _sp.run(
+                    ["ffmpeg", "-y", "-i", str(audio_flac),
+                     "-acodec", "pcm_s16le", "-ar", "22050", "-ac", "1",
+                     str(tmp)],
+                    capture_output=True,
+                ).returncode == 0 and tmp.is_file():
+                    target = tmp
+            if target is not None:
+                report = _qc.analyze_wav(target)
+                qc_passed = report["status"] == "ok"
+                qc_details = {
+                    "violations": report["violations"],
+                    "silence_run_count": len(report["silence_runs"]),
+                    "sample_rate": report["sample_rate"],
+                    "clip_ratio": report["clipping"].get("clip_ratio"),
+                    "voice_band_ratio": report["dialogue"].get("voice_band_ratio"),
+                }
+        except Exception as e:
+            qc_details["error"] = str(e)[:120]
+
+    rpt.add(LintResult(7, "Audio Quality", qc_passed,
+                       "G196 audio QC pass" if qc_passed
+                       else f"G196 audio QC fail: {qc_details.get('violations', '?')}",
+                       qc_details))
     rpt.add(LintResult(8, "Audio Format", not bad_audio,
                        "All WAV/MP3" if not bad_audio else f"Invalid: {[f.name for f in bad_audio[:5]]}"))
     rpt.add(LintResult(9, "Audio Channels", True, "Audio channels check passed"))

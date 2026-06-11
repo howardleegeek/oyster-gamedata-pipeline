@@ -256,29 +256,216 @@ def _load_manifest(manifest_path: Path) -> List[Path]:
     return [Path(c) for c in data["clips"]]
 
 
+# ---------------------------------------------------------------------------
+# G197 — scene-continuity (≤ 30 min) + duplicate-clip fraud detection.
+#
+# Operates over a flat list of *clip metadata* dicts. Each entry should
+# expose ``clip_id``, ``operator_id``, ``scene_id``, ``duration_s``, and
+# optionally ``content_hash`` and ``start_time``.
+# ---------------------------------------------------------------------------
+
+SCENE_DURATION_CAP_S = 30 * 60        # PRD §3.1 — "同一地图场景 ≤ 30 分钟"
+
+
+def _group_by_operator_scene(metas: List[Dict[str, Any]]) -> Dict[Tuple[str, str], List[Dict[str, Any]]]:
+    """Bucket clip metadata by ``(operator_id, scene_id)`` pairs."""
+    groups: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
+    for m in metas:
+        key = (str(m.get("operator_id", "?")), str(m.get("scene_id", "?")))
+        groups.setdefault(key, []).append(m)
+    return groups
+
+
+def analyze_scene_continuity(
+    metas: List[Dict[str, Any]],
+    cap_seconds: float = SCENE_DURATION_CAP_S,
+) -> Dict[str, Any]:
+    """Compute the aggregate duration per (operator, scene) and flag any
+    bucket that exceeds the PRD §3.1 scene cap.
+
+    Returns a dict with::
+
+        {
+          "total_duration_s": float,
+          "scene_minute_cap_violation": bool,
+          "cap_seconds": int,
+          "groups": [
+            {
+              "operator_id": "...", "scene_id": "...",
+              "clip_ids": [...], "duration_s": float, "violation": bool,
+            },
+            ...
+          ]
+        }
+    """
+    groups: List[Dict[str, Any]] = []
+    total = 0.0
+    any_violation = False
+    for (op, scene), clips in sorted(_group_by_operator_scene(metas).items()):
+        dur = sum(float(c.get("duration_s", 0.0)) for c in clips)
+        total += dur
+        violation = dur > cap_seconds
+        any_violation = any_violation or violation
+        groups.append({
+            "operator_id": op,
+            "scene_id": scene,
+            "clip_ids": [c.get("clip_id", "?") for c in clips],
+            "clip_count": len(clips),
+            "duration_s": round(dur, 3),
+            "violation": violation,
+        })
+    return {
+        "cap_seconds": cap_seconds,
+        "total_duration_s": round(total, 3),
+        "scene_minute_cap_violation": any_violation,
+        "groups": groups,
+    }
+
+
+def detect_duplicate_clips(metas: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Flag clips that share the same ``content_hash`` AND the same
+    ``start_time`` — strong fraud signal (re-submitted recording).
+
+    Records with a missing or falsy hash / start are ignored (we can't
+    claim duplicates without both keys).
+    """
+    buckets: Dict[Tuple[str, float], List[str]] = {}
+    for m in metas:
+        h = m.get("content_hash")
+        st = m.get("start_time")
+        if not h or st is None:
+            continue
+        try:
+            st_f = float(st)
+        except (TypeError, ValueError):
+            continue
+        # Round start_time to 3 decimals so float drift doesn't break grouping.
+        buckets.setdefault((str(h), round(st_f, 3)), []).append(
+            str(m.get("clip_id", "?"))
+        )
+    duplicates: List[Dict[str, Any]] = []
+    for (hash_val, start), ids in buckets.items():
+        if len(ids) >= 2:
+            duplicates.append({
+                "content_hash": hash_val,
+                "start_time": start,
+                "clip_ids": sorted(ids),
+                "count": len(ids),
+            })
+    return duplicates
+
+
+def run_continuity_report(
+    metas: List[Dict[str, Any]],
+    output_path: Path,
+    cap_seconds: float = SCENE_DURATION_CAP_S,
+) -> int:
+    """Compute continuity + duplicate analysis and write
+    ``scene_continuity_report.json``. Returns 0 when clean, 1 when any
+    violation or duplicate is flagged (CI-friendly)."""
+    continuity = analyze_scene_continuity(metas, cap_seconds=cap_seconds)
+    dupes = detect_duplicate_clips(metas)
+    payload = {
+        "tool": "multi_clip_stitcher",
+        "mode": "continuity",
+        "cap_seconds": continuity["cap_seconds"],
+        "total_duration_s": continuity["total_duration_s"],
+        "scene_minute_cap_violation": continuity["scene_minute_cap_violation"],
+        "groups": continuity["groups"],
+        "duplicates": dupes,
+    }
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    _save_json(output_path, payload)
+    return 1 if (continuity["scene_minute_cap_violation"] or dupes) else 0
+
+
+def _load_meta_file(path: Path) -> List[Dict[str, Any]]:
+    """Load clip metadata from a flat JSON list, a {'clips':[...]} dict,
+    or a directory of per-clip JSON files."""
+    if path.is_dir():
+        metas: List[Dict[str, Any]] = []
+        for fp in sorted(path.glob("*.json")):
+            try:
+                data = json.loads(fp.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.warning("skipping %s: %s", fp, exc)
+                continue
+            if isinstance(data, list):
+                metas.extend(data)
+            elif isinstance(data, dict):
+                if "clips" in data and isinstance(data["clips"], list):
+                    metas.extend(data["clips"])
+                else:
+                    data.setdefault("clip_id", fp.stem)
+                    metas.append(data)
+        return metas
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict) and "clips" in payload:
+        return payload["clips"]
+    if isinstance(payload, dict):
+        return [payload]
+    raise ValueError(f"unrecognised metadata payload in {path}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build and return the argument parser."""
     p = argparse.ArgumentParser(
         prog="multi_clip_stitcher",
-        description="Combine N short same-scene clips into a longer episode.",
+        description="Combine N short same-scene clips into a longer episode, "
+                    "or run G197 scene-continuity / duplicate analysis.",
     )
-    g = p.add_mutually_exclusive_group(required=True)
-    g.add_argument("--clips", nargs="+", type=Path, help="Ordered clip directories.")
-    g.add_argument("--manifest", type=Path, help="YAML/JSON manifest of clip dirs.")
-    p.add_argument("--output", "-o", type=Path, required=True, help="Output directory.")
-    p.add_argument("--no-copy-frames", action="store_true", help="Metadata-only dry run.")
-    p.add_argument("--verbose", "-v", action="store_true", help="Verbose logging.")
+    p.add_argument("--clips", nargs="+", type=Path,
+                   help="Ordered clip directories (stitch mode).")
+    p.add_argument("--manifest", type=Path,
+                   help="YAML/JSON manifest of clip dirs (stitch mode).")
+    p.add_argument("--output", "-o", type=Path,
+                   help="Output path (directory for stitch, JSON file for "
+                        "continuity).")
+    p.add_argument("--no-copy-frames", action="store_true",
+                   help="Stitch mode: metadata-only dry run.")
+    p.add_argument("--continuity", action="store_true",
+                   help="Run G197 scene-continuity + duplicate analysis.")
+    p.add_argument("--metadata", type=Path,
+                   help="Continuity mode: JSON list / dir of clip metadata.")
+    p.add_argument("--cap-seconds", type=float, default=SCENE_DURATION_CAP_S,
+                   help="Per-scene duration cap (default: 1800 s = 30 min).")
+    p.add_argument("--verbose", "-v", action="store_true",
+                   help="Verbose logging.")
     return p
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    """Entry point for the multi-clip stitcher CLI."""
+    """Entry point — dispatches between stitch and continuity modes."""
     args = build_parser().parse_args(argv)
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
-    clip_dirs = _load_manifest(args.manifest) if args.manifest else [p.resolve() for p in args.clips]
+
+    # ---- continuity mode --------------------------------------------------
+    if args.continuity:
+        if args.metadata is None:
+            logger.error("--continuity requires --metadata <path>")
+            return 1
+        try:
+            metas = _load_meta_file(args.metadata)
+        except Exception as exc:
+            logger.error("failed to load metadata: %s", exc)
+            return 1
+        out = args.output or Path("scene_continuity_report.json")
+        return run_continuity_report(metas, out, cap_seconds=args.cap_seconds)
+
+    # ---- stitch mode ------------------------------------------------------
+    if args.clips is None and args.manifest is None:
+        logger.error("provide --clips, --manifest, or --continuity")
+        return 1
+    if args.output is None:
+        logger.error("stitch mode requires --output <dir>")
+        return 1
+    clip_dirs = (_load_manifest(args.manifest) if args.manifest
+                 else [p.resolve() for p in args.clips])
     for cd in clip_dirs:
         if not cd.is_dir():
             logger.error("Clip directory does not exist: %s", cd)
