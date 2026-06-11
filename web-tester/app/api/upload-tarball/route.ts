@@ -27,6 +27,10 @@ import { getSupabaseServiceClient } from '../../../lib/supabase-server';
 import { env, isSupabaseConfigured } from '../../../lib/env';
 import { checkRateLimit, clientIpFromHeaders } from '../../../lib/rate-limit';
 import { log } from '../../../lib/log';
+import {
+  authenticateUpload,
+  getUploadAuthConfig,
+} from '../../../lib/upload-auth';
 
 export const runtime = 'nodejs'; // need Buffer / fs / crypto
 export const maxDuration = 300; // long uploads OK
@@ -129,6 +133,38 @@ export async function POST(req: NextRequest) {
     return rateLimitResponse('tester', testerRl);
   }
 
+  // ---- HMAC token gate (production gap #6) -----------------------------
+  // Verifies that the caller possesses the per-tester HMAC token issued at
+  // download time. Backwards-compatible: warn-only unless both
+  // UPLOAD_HMAC_SECRET is set AND UPLOAD_REQUIRE_TOKEN=true.
+  const authCfg = getUploadAuthConfig();
+  const auth = authenticateUpload(tester_id, req.headers, authCfg);
+  if (auth.kind === 'unconfigured') {
+    // Operator hasn't set UPLOAD_HMAC_SECRET. Surface this loudly so it gets
+    // noticed in prod logs without blocking the upload.
+    log.warn('upload.auth_unconfigured', { ip, tester_id });
+  } else if (auth.kind === 'unauthorized') {
+    log.warn('upload.auth_failed', {
+      ip,
+      tester_id,
+      reason: auth.reason,
+      enforced: authCfg.requireToken,
+    });
+    if (authCfg.requireToken) {
+      return NextResponse.json(
+        {
+          error: 'Unauthorized',
+          details:
+            auth.reason === 'missing'
+              ? 'Missing X-Upload-Token header. Recorder must include the HMAC token issued at download time.'
+              : 'Invalid X-Upload-Token. The token did not match the expected HMAC for this tester_id.',
+        },
+        { status: 401 }
+      );
+    }
+    // else: log-only fallback — proceed.
+  }
+
   const file = form.get('tarball');
   if (!(file instanceof Blob)) {
     return NextResponse.json({ error: 'Missing field: tarball (file)' }, { status: 400 });
@@ -227,13 +263,22 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
+  const cfg = getUploadAuthConfig();
   return NextResponse.json(
     {
       endpoint: '/api/upload-tarball',
       method: 'POST',
       content_type: 'multipart/form-data',
       fields: ['tester_id', 'duration_seconds', 'sha256?', 'tarball'],
+      headers: ['X-Upload-Token'],
       max_bytes: MAX_BYTES,
+      auth: {
+        hmac_configured: Boolean(cfg.secret),
+        // True when the server will 401 on missing/invalid tokens.
+        // Recorders should call /api/tester/auth (or read the token embedded
+        // in the .exe filename) to populate X-Upload-Token before POST.
+        token_required: cfg.requireToken && Boolean(cfg.secret),
+      },
     },
     { status: 200 }
   );
