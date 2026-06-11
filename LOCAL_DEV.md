@@ -125,3 +125,45 @@ Delete lock files and retry:
 cd web-tester && rm -rf node_modules package-lock.json && npm install
 cd web-buyer  && rm -rf node_modules package-lock.json && npm install
 ```
+
+## Testing the upload HMAC gate (PRODUCTION_GAPS.md #6)
+
+By default, local dev runs with `UPLOAD_HMAC_SECRET` unset — the upload
+route logs `upload.auth_unconfigured` and accepts uploads as before. To
+exercise the gate:
+
+```bash
+# 1. Pick a secret (any non-empty string works for dev).
+export UPLOAD_HMAC_SECRET="dev-secret-not-for-production"
+export UPLOAD_REQUIRE_TOKEN=true   # 401 on missing/invalid tokens
+
+cd web-tester && npm run dev &
+# 2. Hit /api/upload-tarball without a token → 401.
+curl -F tester_id=11111111-2222-3333-4444-555555555555 \
+     -F duration_seconds=60 \
+     -F tarball=@samples/swarm_real_tiny.tar.gz \
+     http://localhost:3000/api/upload-tarball
+
+# 3. Compute a token and retry → success.
+TOKEN=$(python3 -c '
+import os, sys
+sys.path.insert(0, "."); from bin.upload_auth import compute_token
+print(compute_token("11111111-2222-3333-4444-555555555555", os.environ["UPLOAD_HMAC_SECRET"]))')
+
+curl -F tester_id=11111111-2222-3333-4444-555555555555 \
+     -F duration_seconds=60 \
+     -F tarball=@samples/swarm_real_tiny.tar.gz \
+     -H "X-Upload-Token: $TOKEN" \
+     http://localhost:3000/api/upload-tarball
+```
+
+Or use the reference Python client:
+
+```bash
+UPLOAD_HMAC_SECRET=dev-secret-not-for-production \
+bin/upload_to_web_tester.py samples/swarm_real_tiny.tar.gz \
+    --base-url http://localhost:3000 \
+    --tester-id 11111111-2222-3333-4444-555555555555 \
+    --duration-seconds 60 \
+    --verbose
+```

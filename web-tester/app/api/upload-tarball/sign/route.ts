@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
   }
   const { tester_id, filename, size_bytes, sha256, duration_seconds } = parsed.data;
 
-  // ---- HMAC auth (Gap #6 — placeholder until Engineer B's branch lands) -
+  // ---- HMAC auth (Gap #6 — stub_mode until Engineer B's branch lands) -
   // The HMAC is computed over sha256(raw body bytes) so a single header
   // protects every field the client claims.
   const bodyHash = sha256Hex(rawBody);
@@ -299,7 +299,7 @@ export async function POST(req: NextRequest) {
     size_bytes,
     bucket,
     ttl_seconds: ttlSec,
-    placeholder_auth: auth.placeholder,
+    stub_mode_auth: auth.stub_mode,
     latency_ms: Date.now() - startedAt,
   });
 

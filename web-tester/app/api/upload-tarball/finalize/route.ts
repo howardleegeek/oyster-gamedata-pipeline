@@ -320,7 +320,7 @@ export async function POST(req: NextRequest) {
     tarball_id,
     sha256,
     bytes: updated.size_bytes,
-    placeholder_auth: auth.placeholder,
+    stub_mode_auth: auth.stub_mode,
     latency_ms: Date.now() - startedAt,
   });
 

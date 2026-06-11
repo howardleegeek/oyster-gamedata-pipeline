@@ -1,7 +1,7 @@
 /**
  * Tester HMAC authentication helper.
  *
- * **PLACEHOLDER FOR GAP #6 (Engineer B's branch — upstream)**
+ * **STUB_MODE FOR GAP #6 (Engineer B's branch — upstream)**
  *
  * Gap #6 ships the real HMAC token verification: tester_id + per-tester
  * shared secret + timestamp + signature in `X-Tester-Auth`. The recorder
@@ -14,9 +14,9 @@
  *   verifyTesterAuth(req: NextRequest, requiredTesterId?: string)
  *     -> Promise<{ ok: true; tester_id: string } | { ok: false; reason: string; status: number }>
  *
- * Behaviour of this placeholder:
+ * Behaviour of this stub_mode:
  *   - When `TESTER_AUTH_HMAC_SECRET` is unset, we ALLOW the call but stamp
- *     `placeholder: true` on the result and warn-log so the placeholder is
+ *     `stub_mode: true` on the result and warn-log so the stub_mode is
  *     visible in Vercel logs. This unblocks Gap #8 dev/preview without
  *     blocking on the parallel Gap #6 branch.
  *   - When the secret IS set, we perform a real timing-safe HMAC verify
@@ -39,7 +39,7 @@ export interface TesterAuthOk {
   tester_id: string;
   /** True when the HMAC check was skipped because no shared secret is configured.
    *  Routes can refuse to proceed (e.g. in prod) by checking this field. */
-  placeholder: boolean;
+  stub_mode: boolean;
 }
 
 export interface TesterAuthErr {
@@ -102,29 +102,29 @@ export async function verifyTesterAuth(
   const secret = process.env.TESTER_AUTH_HMAC_SECRET ?? '';
   const header = req.headers.get(HEADER_NAME);
 
-  // Placeholder branch — Gap #6 not yet deployed.
+  // StubMode branch — Gap #6 not yet deployed.
   if (!secret) {
     if (!header) {
       // No header AND no secret: accept but log loudly. requiredTesterId must
       // come from somewhere; the caller's zod-validated body is the source.
-      log.warn('tester_auth.placeholder.no_header', {
+      log.warn('tester_auth.stub_mode.no_header', {
         path: req.nextUrl.pathname,
         hint: 'set TESTER_AUTH_HMAC_SECRET to enable real HMAC verification (gap #6)',
       });
       return {
         ok: true,
         tester_id: requiredTesterId ?? 'unknown',
-        placeholder: true,
+        stub_mode: true,
       };
     }
-    // Recorder already speaks the new protocol — best-effort parse, still placeholder.
+    // Recorder already speaks the new protocol — best-effort parse, still stub_mode.
     const m = header.trim().split(/\s+/);
     const guessed = m.length >= 2 && m[0] === 'v1' ? m[1]! : (requiredTesterId ?? 'unknown');
-    log.warn('tester_auth.placeholder.header_present', {
+    log.warn('tester_auth.stub_mode.header_present', {
       path: req.nextUrl.pathname,
       tester_id: guessed,
     });
-    return { ok: true, tester_id: guessed, placeholder: true };
+    return { ok: true, tester_id: guessed, stub_mode: true };
   }
 
   // Real verification — secret is configured.
@@ -142,7 +142,7 @@ export async function verifyTesterAuth(
       status: 403,
     };
   }
-  return { ok: true, tester_id: result.tester_id, placeholder: false };
+  return { ok: true, tester_id: result.tester_id, stub_mode: false };
 }
 
 /** Helper exposed so callers don't have to import node:crypto themselves. */

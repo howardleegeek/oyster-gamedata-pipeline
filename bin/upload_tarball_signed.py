@@ -333,7 +333,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         "--auth-secret",
         default=os.environ.get("TESTER_AUTH_HMAC_SECRET", ""),
         help="Per-tester HMAC secret (default $TESTER_AUTH_HMAC_SECRET). "
-        "Optional only when the server is also in placeholder mode (gap #6 not yet deployed).",
+        "Optional only when the server is also in stub_mode mode (gap #6 not yet deployed).",
     )
     p.add_argument(
         "--sha256",

@@ -14,7 +14,7 @@
  *   later move to Vitest, the assertions translate one-for-one.
  *
  * What we cover:
- *   - tester-auth: placeholder mode allows requests, real-secret mode
+ *   - tester-auth: stub_mode mode allows requests, real-secret mode
  *     accepts a valid HMAC and rejects mismatched signatures.
  *   - sign route:
  *     - 400 on malformed JSON / wrong sha256 length
@@ -236,14 +236,14 @@ function makeReq(opts: {
 // tester-auth tests
 // ---------------------------------------------------------------------------
 
-test('tester-auth: placeholder mode allows no-header requests', async () => {
+test('tester-auth: stub_mode mode allows no-header requests', async () => {
   delete process.env.TESTER_AUTH_HMAC_SECRET;
   const { verifyTesterAuth } = await import('../lib/tester-auth.ts');
   const req = makeReq({ body: { tester_id: 'abc' } });
   const result = await verifyTesterAuth(req, 'somesha', 'abc');
   assert.equal(result.ok, true);
   if (result.ok) {
-    assert.equal(result.placeholder, true);
+    assert.equal(result.stub_mode, true);
     assert.equal(result.tester_id, 'abc');
   }
 });
@@ -276,7 +276,7 @@ test('tester-auth: real mode accepts valid signature', async () => {
   const result = await verifyTesterAuth(req, bodyHash, tester_id);
   assert.equal(result.ok, true);
   if (result.ok) {
-    assert.equal(result.placeholder, false);
+    assert.equal(result.stub_mode, false);
     assert.equal(result.tester_id, tester_id);
   }
   delete process.env.TESTER_AUTH_HMAC_SECRET;

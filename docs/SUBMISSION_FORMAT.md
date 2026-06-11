@@ -161,7 +161,7 @@ TESTER_AUTH_HMAC_SECRET=<from onboarding email> \
 - `SUPABASE_SIGNED_UPLOAD_URL_TTL_SECONDS` (default `900`)
 - `TESTER_AUTH_HMAC_SECRET` — when set, gap #6 HMAC verification is enforced.
   When unset, the server logs a warning per request and accepts unsigned calls
-  (placeholder mode — only safe in dev/preview until gap #6 ships).
+  (stub_mode mode — only safe in dev/preview until gap #6 ships).
 
 **Abandoned uploads:** if a recorder gets a signed URL and crashes before
 PUTting or finalizing, the `tarballs` row sticks at `upload_status =
@@ -456,9 +456,9 @@ Self-lint: 200/200 PASS
 
 ### 7.6 EXR
 ```
-[7/8] FAIL: depth/000123.exr is 4 bytes (placeholder, not real depth)
+[7/8] FAIL: depth/000123.exr is 4 bytes (stub_mode, not real depth)
 ```
-**原因**: 跑了 placeholder e2e,没装 PyTorch / DepthAnything
+**原因**: 跑了 stub_mode e2e,没装 PyTorch / DepthAnything
 **修复**: 完成 [STEP 5/8](VENDOR_ONBOARDING.md#step-5--装-obs-studio--depthanything-v2真画面真深度) 装真推理
 
 ### 7.7 EXR_COUNT
