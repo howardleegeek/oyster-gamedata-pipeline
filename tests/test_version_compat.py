@@ -115,24 +115,18 @@ class TestLookupEntry:
 
 class TestCheckRecorderCompat:
     def test_supported_version(self):
-        result = vcc.check_recorder_compat(
-            "v0.28.0-rc19.0.0", matrix=_matrix()
-        )
+        result = vcc.check_recorder_compat("v0.28.0-rc19.0.0", matrix=_matrix())
         assert result.accepted is True
         assert result.matched_entry == "v0.28.0-rc19.0.0"
         assert result.lint_version == 37
 
     def test_wildcard_family_supported(self):
-        result = vcc.check_recorder_compat(
-            "v0.28.0-rc19.0.5", matrix=_matrix()
-        )
+        result = vcc.check_recorder_compat("v0.28.0-rc19.0.5", matrix=_matrix())
         assert result.accepted is True
         assert result.matched_entry == "v0.28.0-rc19.x"
 
     def test_unknown_version_rejected(self):
-        result = vcc.check_recorder_compat(
-            "v9.9.9-future", matrix=_matrix()
-        )
+        result = vcc.check_recorder_compat("v9.9.9-future", matrix=_matrix())
         assert result.accepted is False
         assert result.matched_entry is None
         assert "upgrade" in result.reason.lower()
@@ -269,7 +263,9 @@ class TestManifestExtraction:
 
 
 class TestTarballExtraction:
-    def _make_tarball(self, tmp_path: Path, manifest_text: str, name: str = "MANIFEST.json") -> Path:
+    def _make_tarball(
+        self, tmp_path: Path, manifest_text: str, name: str = "MANIFEST.json"
+    ) -> Path:
         tar_path = tmp_path / "clip.tar.gz"
         with tarfile.open(tar_path, "w:gz") as tar:
             info = tarfile.TarInfo(name=f"clip/{name}")

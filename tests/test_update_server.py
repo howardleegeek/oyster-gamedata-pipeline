@@ -87,10 +87,7 @@ class TestParseVersion:
         assert pre
         # The rc19 should be encoded with numeric extraction (1,"rc",19)
         assert any(
-            isinstance(seg, tuple)
-            and len(seg) == 3
-            and seg[1] == "rc"
-            and seg[2] == 19
+            isinstance(seg, tuple) and len(seg) == 3 and seg[1] == "rc" and seg[2] == 19
             for seg in pre
         )
 
@@ -115,12 +112,8 @@ class TestIsNewer:
         assert usp.is_newer("v0.29.0-rc1", "v0.28.0-rc19.0.1") is True
 
     def test_rc_progression(self):
-        assert (
-            usp.is_newer("v0.28.0-rc20", "v0.28.0-rc19.0.1") is True
-        ), "rc20 > rc19.x"
-        assert (
-            usp.is_newer("v0.28.0-rc19.0.2", "v0.28.0-rc19.0.1") is True
-        )
+        assert usp.is_newer("v0.28.0-rc20", "v0.28.0-rc19.0.1") is True, "rc20 > rc19.x"
+        assert usp.is_newer("v0.28.0-rc19.0.2", "v0.28.0-rc19.0.1") is True
 
     def test_rc100_vs_rc19_numeric_aware(self):
         assert usp.is_newer("v0.28.0-rc100", "v0.28.0-rc19") is True
@@ -230,9 +223,7 @@ class TestResolveUpdate:
         def fake_fetch(url: str, headers: dict[str, str]) -> dict[str, Any]:
             return _sample_release(tag="v0.28.0-rc19.0.1")
 
-        info = usp.resolve_update(
-            "v0.28.0-rc19.0.1", cache=fresh_cache, fetch=fake_fetch
-        )
+        info = usp.resolve_update("v0.28.0-rc19.0.1", cache=fresh_cache, fetch=fake_fetch)
         assert info["update_available"] is False
 
     def test_force_release_propagates(self, fresh_cache):
@@ -242,9 +233,7 @@ class TestResolveUpdate:
                 body="[FORCE] critical fix — please upgrade immediately",
             )
 
-        info = usp.resolve_update(
-            "v0.28.0-rc19.0.1", cache=fresh_cache, fetch=fake_fetch
-        )
+        info = usp.resolve_update("v0.28.0-rc19.0.1", cache=fresh_cache, fetch=fake_fetch)
         assert info["force"] is True
         assert info["update_available"] is True
 
