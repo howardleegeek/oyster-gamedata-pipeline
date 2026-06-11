@@ -1,0 +1,43 @@
+{
+  "_meta": {
+    "schema_version": 1,
+    "description": "G251 · recorder <-> pipeline compatibility matrix. Buyer pipeline (lint + ingest) reads this to decide whether to accept tarballs from a given recorder version. New recorder releases append a row here; never edit existing rows in-place.",
+    "updated": "2026-05-13",
+    "authoritative_source": "docs/MC_STACK_VERSIONS.md"
+  },
+  "entries": {
+    "v0.26.0": {
+      "min_pipeline": "0.1.0-rc4",
+      "lint_version": 33,
+      "deprecated": true,
+      "deprecation_reason": "pre-rc7 — depth EXR objects not bundled; use v0.27 or newer",
+      "support_window_end": "2026-04-30"
+    },
+    "v0.27.0-rc7": {
+      "min_pipeline": "0.1.0-rc6",
+      "lint_version": 35,
+      "deprecated": false
+    },
+    "v0.27.0-rc8": {
+      "min_pipeline": "0.1.0-rc7",
+      "lint_version": 36,
+      "deprecated": false
+    },
+    "v0.28.0-rc19.0.0": {
+      "min_pipeline": "0.1.0-rc8",
+      "lint_version": 37,
+      "deprecated": false
+    },
+    "v0.28.0-rc19.0.1": {
+      "min_pipeline": "0.1.0-rc8",
+      "lint_version": 38,
+      "deprecated": false
+    },
+    "v0.28.0-rc19.x": {
+      "min_pipeline": "0.1.0-rc8",
+      "lint_version": 38,
+      "deprecated": false,
+      "_note": "wildcard family entry — matches any v0.28.0-rc19.* not explicitly listed above"
+    }
+  }
+}
