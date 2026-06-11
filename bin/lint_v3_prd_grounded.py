@@ -7,7 +7,7 @@ Criteria: video/image specs, audio quality, camera intrinsics fx==fy, quaternion
 depth invalid-pixel ratio, keyCode int format, 5-6 min duration, 1920x1080, no UI/logo/popup.
 
 QA1 finding #6 fix (BUG_REPORT_2026_05_13.md): seven criteria were stubs
-that returned True unconditionally. A zero-byte placeholder package
+that returned True unconditionally. A zero-byte empty package
 trivially passed 22/24 checks. Now:
 
   - cr-7 (Audio Quality), cr-9 (Audio Channels), cr-10 (Sample Rate):

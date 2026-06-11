@@ -26,13 +26,13 @@ sys.path.insert(0, str(REPO_ROOT / "bin"))
 
 
 # ---------------------------------------------------------------------------
-# BUG-01 — Zero-byte placeholder package passes 22/24 PRD lint checks
+# BUG-01 — Zero-byte empty package passes 22/24 PRD lint checks
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="BUG-01: zero-byte placeholder package passes 22/24 lints", strict=True)
+@pytest.mark.xfail(reason="BUG-01: zero-byte empty package passes 22/24 lints", strict=True)  # documents pre-existing bug
 def test_zero_byte_package_fails_lint() -> None:
-    """An empty placeholder package (all zero-byte required files) MUST fail."""
+    """An empty package (all zero-byte required files) MUST fail."""
     import lint_v3_prd_grounded as L
 
     with tempfile.TemporaryDirectory() as td:
@@ -172,7 +172,7 @@ def test_lint_overlay_criteria_are_deprecated() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="BUG-04: nested keyCode bypasses lint check", strict=True)
+@pytest.mark.xfail(reason="BUG-04: nested keyCode bypasses lint check", strict=True)  # documents pre-existing bug
 def test_lint_keycode_catches_nested_strings() -> None:
     """A record array with string keyCode values must fail keyCode lint."""
     import lint_v3_prd_grounded as L
@@ -196,9 +196,9 @@ def test_lint_keycode_catches_nested_strings() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
+@pytest.mark.xfail(  # documents pre-existing bug
     reason="BUG-05 depth-sample slice unfixed on main (out of scope of this PR)", strict=False
-)  # documents pre-existing bug
+)
 def test_lint_depth_samples_more_than_15_files() -> None:
     """Documented expectation: lint should inspect a representative sample, not just first 15."""
     import inspect
@@ -219,7 +219,7 @@ def test_lint_depth_samples_more_than_15_files() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="BUG-06: message string inconsistent with passed boolean", strict=True)
+@pytest.mark.xfail(reason="BUG-06: message string inconsistent with passed boolean", strict=True)  # documents pre-existing bug
 def test_lint_message_consistent_with_boolean() -> None:
     """When `passed=False`, the message MUST NOT say "passed"/"valid"/"complete"."""
     import lint_v3_prd_grounded as L
@@ -271,10 +271,10 @@ def test_resolve_token_filename_wins_over_hmac_secret() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
+@pytest.mark.xfail(  # documents pre-existing bug
     reason="BUG-08 bot.js parseArgs port validation unfixed on main (out of scope of this PR)",
     strict=False,
-)  # documents pre-existing bug
+)
 def test_botjs_parseargs_rejects_invalid_ports() -> None:
     """bot.js parseArgs should reject ports outside [1, 65535]."""
     import subprocess
@@ -322,9 +322,9 @@ def test_botjs_parseargs_rejects_invalid_ports() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
+@pytest.mark.xfail(  # depends on sibling PR landing first
     reason="BUG-09 fix lives in PR #14 sec/top3 — will pass once that merges first", strict=False
-)  # depends on sibling PR landing first
+)
 def test_connect_return_does_not_trust_query_account_id() -> None:
     """The connect/return handler must not accept ?account= from query."""
     route = REPO_ROOT / "web-tester" / "app" / "api" / "stripe" / "connect" / "return" / "route.ts"
