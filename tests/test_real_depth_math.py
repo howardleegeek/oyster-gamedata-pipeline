@@ -30,7 +30,6 @@ from bin.real_depth_validator import (
     linearize_buffer,
 )
 
-
 # ---------------------------------------------------------------- classic-z
 
 
@@ -93,14 +92,12 @@ class TestLinearDepthClassic:
         for metric in [1.0, 5.0, 10.0, 25.0]:
             # Forward: z_ndc = (far+near)/(far-near) - (2*near*far)/((far-near)*metric)
             # i.e. solve linear formula for z_ndc.
-            z_ndc = ((far + near) / (far - near)) - (
-                (2.0 * near * far) / ((far - near) * metric)
-            )
+            z_ndc = ((far + near) / (far - near)) - ((2.0 * near * far) / ((far - near) * metric))
             z_buf = (z_ndc + 1.0) / 2.0
             recovered = linear_depth_classic(z_buf, near, far)
-            assert math.isclose(recovered, metric, rel_tol=1e-3), (
-                f"round-trip failed: metric={metric} → z_buf={z_buf} → recovered={recovered}"
-            )
+            assert math.isclose(
+                recovered, metric, rel_tol=1e-3
+            ), f"round-trip failed: metric={metric} → z_buf={z_buf} → recovered={recovered}"
 
 
 # ---------------------------------------------------------------- reversed-z

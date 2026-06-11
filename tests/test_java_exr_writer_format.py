@@ -50,10 +50,7 @@ def _box2i(x_min: int, y_min: int, x_max: int, y_max: int) -> bytes:
 
 def _write_attr(name: str, type_: str, data: bytes) -> bytes:
     return (
-        name.encode("utf-8") + b"\x00"
-        + type_.encode("utf-8") + b"\x00"
-        + _le32(len(data))
-        + data
+        name.encode("utf-8") + b"\x00" + type_.encode("utf-8") + b"\x00" + _le32(len(data)) + data
     )
 
 
@@ -63,19 +60,19 @@ def _build_header(width: int, height: int) -> bytes:
     # + chlist terminator (null)
     chlist = (
         b"Z\x00"
-        + _le32(2)            # FLOAT
-        + b"\x00"             # pLinear
-        + b"\x00\x00\x00"     # reserved
-        + _le32(1)            # xSampling
-        + _le32(1)            # ySampling
-        + b"\x00"             # chlist terminator
+        + _le32(2)  # FLOAT
+        + b"\x00"  # pLinear
+        + b"\x00\x00\x00"  # reserved
+        + _le32(1)  # xSampling
+        + _le32(1)  # ySampling
+        + b"\x00"  # chlist terminator
     )
     parts = [
         _write_attr("channels", "chlist", chlist),
-        _write_attr("compression", "compression", b"\x00"),       # NO_COMPRESSION
+        _write_attr("compression", "compression", b"\x00"),  # NO_COMPRESSION
         _write_attr("dataWindow", "box2i", _box2i(0, 0, width - 1, height - 1)),
         _write_attr("displayWindow", "box2i", _box2i(0, 0, width - 1, height - 1)),
-        _write_attr("lineOrder", "lineOrder", b"\x00"),           # INCREASING_Y
+        _write_attr("lineOrder", "lineOrder", b"\x00"),  # INCREASING_Y
         _write_attr("pixelAspectRatio", "float", _float_le(1.0)),
         _write_attr("screenWindowCenter", "v2f", _float_le(0.0) + _float_le(0.0)),
         _write_attr("screenWindowWidth", "float", _float_le(1.0)),
@@ -150,9 +147,7 @@ def test_python_port_pixel_values_roundtrip(tmp_path: Path) -> None:
     import OpenEXR
 
     H, W = 8, 8
-    depth = np.array(
-        [[i * 8 + j for j in range(W)] for i in range(H)], dtype=np.float32
-    )
+    depth = np.array([[i * 8 + j for j in range(W)] for i in range(H)], dtype=np.float32)
     raw = python_port_write_exr(depth)
     out = tmp_path / "rt.exr"
     out.write_bytes(raw)

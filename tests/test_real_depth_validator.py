@@ -43,9 +43,7 @@ def _write_synth_exr(path: Path, depth_m: np.ndarray) -> None:
         import Imath  # noqa: PLC0415
 
         header = OpenEXR.Header(w, h)
-        header["channels"] = {
-            "Z": Imath.Channel(Imath.PixelType(Imath.PixelType.FLOAT))
-        }
+        header["channels"] = {"Z": Imath.Channel(Imath.PixelType(Imath.PixelType.FLOAT))}
         out = OpenEXR.OutputFile(str(path), header)
         out.writePixels({"Z": depth_m.astype(np.float32).tobytes()})
         out.close()
@@ -53,8 +51,7 @@ def _write_synth_exr(path: Path, depth_m: np.ndarray) -> None:
         # OpenEXR 3.x without Imath: use the new File() API directly.
         from OpenEXR import File  # noqa: PLC0415
 
-        header = {"compression": OpenEXR.NO_COMPRESSION,
-                  "type": OpenEXR.scanlineimage}
+        header = {"compression": OpenEXR.NO_COMPRESSION, "type": OpenEXR.scanlineimage}
         channels = {"Z": depth_m.astype(np.float32)}
         f = File(header, channels)
         f.write(str(path))
@@ -78,8 +75,7 @@ def _make_scene(width: int, height: int, sky_ratio: float, seed: int) -> np.ndar
     return depth
 
 
-def _populate_dir(out_dir: Path, count: int, width: int, height: int,
-                  sky_ratio: float) -> None:
+def _populate_dir(out_dir: Path, count: int, width: int, height: int, sky_ratio: float) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     for i in range(count):
         d = _make_scene(width, height, sky_ratio, seed=i)
@@ -191,9 +187,14 @@ class TestLinearizeBufferEdgeCases:
         assert np.all(out > 0.0)
 
     def test_threshold_matches_constant(self) -> None:
-        depth = np.array([INVALID_DEPTH_THRESHOLD - 0.0001,
-                          INVALID_DEPTH_THRESHOLD,
-                          INVALID_DEPTH_THRESHOLD + 0.0001], dtype=np.float32)
+        depth = np.array(
+            [
+                INVALID_DEPTH_THRESHOLD - 0.0001,
+                INVALID_DEPTH_THRESHOLD,
+                INVALID_DEPTH_THRESHOLD + 0.0001,
+            ],
+            dtype=np.float32,
+        )
         out = linearize_buffer(depth, near=0.5, far=30.0)
         assert out[0] > 0.0
         assert out[1] == 0.0
