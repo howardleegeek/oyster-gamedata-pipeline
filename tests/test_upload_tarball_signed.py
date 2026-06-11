@@ -24,11 +24,9 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import io
 import json
 import socket
 import threading
-import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
