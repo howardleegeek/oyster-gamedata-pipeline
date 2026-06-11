@@ -16,15 +16,21 @@
  *      `crypto.timingSafeEqual` (constant-time compare, no timing oracle).
  *
  * Gating (`UPLOAD_REQUIRE_TOKEN`):
- *   - `false` (default): missing/invalid tokens are logged but the request
- *     proceeds — backwards-compatible for dev and for recorder builds that
- *     don't yet support HMAC.
- *   - `true`: missing/invalid tokens return 401.
+ *   - `true` (default, 2026-05-13): missing/invalid tokens return 401. This is
+ *     the safe-by-default mode — a fresh deploy of web-tester rejects
+ *     anonymous uploads. The fix for QA1 finding #2 (BUG-15): previously the
+ *     default was `false`, which meant a fresh `vercel deploy` of web-tester
+ *     still accepted anonymous uploads and defeated the whole gap-#6 fix
+ *     until an operator flipped the flag manually.
+ *   - `false`: explicit operator opt-out for legacy v0.26.x deploys that
+ *     haven't rolled out HMAC-aware recorder builds yet. Missing/invalid
+ *     tokens are logged but the request proceeds. Use only during migration.
  *
- * Iron-law: when `UPLOAD_HMAC_SECRET` is unset, this module behaves as if HMAC
- * is not configured (warn-only, never reject) — so a misconfigured deploy
- * doesn't silently block legitimate uploads. Operators MUST set both
- * `UPLOAD_HMAC_SECRET` and `UPLOAD_REQUIRE_TOKEN=true` for the gate to bite.
+ * Iron-law: when `UPLOAD_HMAC_SECRET` is unset, this module hard-fails
+ * (`unconfigured` outcome) — operators must set both `UPLOAD_HMAC_SECRET` and
+ * `UPLOAD_REQUIRE_TOKEN` (or explicitly opt out). The route handler maps the
+ * `unconfigured` outcome to 503 (matching the iron-law pattern used by
+ * `isSupabaseConfigured`).
  */
 
 import crypto from 'node:crypto';
@@ -48,13 +54,45 @@ export interface UploadAuthConfig {
 /**
  * Read the upload-auth config from process.env. Pulled out as a function (not
  * a top-level const) so test code can mutate env between cases.
+ *
+ * QA1 finding #2 fix (BUG-15): `UPLOAD_REQUIRE_TOKEN` defaults to `true`. A
+ * fresh deploy with `UPLOAD_HMAC_SECRET` set but no explicit `UPLOAD_REQUIRE_TOKEN`
+ * now enforces the HMAC gate. Operators must explicitly set
+ * `UPLOAD_REQUIRE_TOKEN=false` to opt OUT during the v0.26.x migration window.
  */
 export function getUploadAuthConfig(): UploadAuthConfig {
+  const raw = (process.env.UPLOAD_REQUIRE_TOKEN ?? '').toLowerCase().trim();
+  // Default to TRUE (fail-closed). Explicit opt-out: 'false' / '0' / 'no'.
+  const requireToken = !(raw === 'false' || raw === '0' || raw === 'no');
   return {
     secret: process.env.UPLOAD_HMAC_SECRET ?? '',
-    requireToken:
-      (process.env.UPLOAD_REQUIRE_TOKEN ?? '').toLowerCase() === 'true',
+    requireToken,
   };
+}
+
+/**
+ * Startup-time consistency check. Returns a list of operator-facing warnings.
+ * Intended to be called once during route bootstrap (or in a `next dev`/`next build`
+ * hook). The route handler also calls `assertConfigCoherent()` per-request to fail
+ * fast on a misconfigured deploy.
+ *
+ * The fail-fast cases:
+ *   - `UPLOAD_REQUIRE_TOKEN=true` (the default) AND `UPLOAD_HMAC_SECRET` unset:
+ *     this is a misconfiguration — the gate is on but no secret exists to
+ *     verify against. We MUST refuse uploads (503) rather than silently
+ *     accepting them as "unauthorized but log-only".
+ */
+export function describeConfigIssues(cfg: UploadAuthConfig = getUploadAuthConfig()): string[] {
+  const issues: string[] = [];
+  if (cfg.requireToken && !cfg.secret) {
+    issues.push(
+      'UPLOAD_REQUIRE_TOKEN=true but UPLOAD_HMAC_SECRET is unset. ' +
+        'Generate a 32-byte hex secret (e.g. `openssl rand -hex 32`) and set ' +
+        '`UPLOAD_HMAC_SECRET` in the web-tester deploy env. To opt OUT of the ' +
+        'gate during migration, set `UPLOAD_REQUIRE_TOKEN=false` explicitly.',
+    );
+  }
+  return issues;
 }
 
 /**
@@ -132,11 +170,16 @@ export type AuthOutcome =
   /** Token present and verified. */
   | { kind: 'ok' }
   /**
-   * HMAC isn't configured (`UPLOAD_HMAC_SECRET` empty). The route MUST proceed
-   * but should `log.warn` once so operators notice. Never returned when
-   * `UPLOAD_REQUIRE_TOKEN=true`.
+   * HMAC isn't configured (`UPLOAD_HMAC_SECRET` empty).
+   *
+   * - When `requireToken=true` (the new default): operator misconfig — the
+   *   gate is on but no secret exists. Route MUST return 503 (matches the
+   *   iron-law pattern in `isSupabaseConfigured`).
+   * - When `requireToken=false` (explicit opt-out): legacy v0.26.x mode.
+   *   Route logs and proceeds. This is the only path that preserves the
+   *   pre-Gap-#6 "warn-only" behaviour.
    */
-  | { kind: 'unconfigured' }
+  | { kind: 'unconfigured'; requireToken: boolean }
   /**
    * Token missing or wrong. If `requireToken` is true, the route MUST reject
    * with 401. If false, the route logs and proceeds.
@@ -148,17 +191,22 @@ export type AuthOutcome =
  * decides what to do under the current config, and returns a discriminated
  * union. The route handler interprets `unconfigured` and `unauthorized` per
  * its own logging + status conventions.
+ *
+ * QA1 finding #2 fix (BUG-15): when `cfg.secret` is empty, the outcome now
+ * carries `requireToken` so the route handler can fail-fast with a 503 on
+ * the default deploy (where `requireToken=true`) rather than silently
+ * accepting anonymous uploads.
  */
 export function authenticateUpload(
   testerId: string,
   headers: Headers,
   cfg: UploadAuthConfig = getUploadAuthConfig()
 ): AuthOutcome {
-  // HMAC unconfigured — warn-only fallback regardless of REQUIRE_TOKEN.
-  // (REQUIRE_TOKEN without HMAC_SECRET is a misconfig, but the safer
-  // failure mode is "allow with a warning" so we don't brick the recorder.)
+  // HMAC unconfigured. Surface the `requireToken` flag so the caller can
+  // decide between "fail-fast 503" (the default) and "warn-only" (explicit
+  // legacy opt-out via `UPLOAD_REQUIRE_TOKEN=false`).
   if (!cfg.secret) {
-    return { kind: 'unconfigured' };
+    return { kind: 'unconfigured', requireToken: cfg.requireToken };
   }
 
   const presented = headers.get(UPLOAD_TOKEN_HEADER);

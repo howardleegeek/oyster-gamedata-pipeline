@@ -135,14 +135,40 @@ export async function POST(req: NextRequest) {
 
   // ---- HMAC token gate (production gap #6) -----------------------------
   // Verifies that the caller possesses the per-tester HMAC token issued at
-  // download time. Backwards-compatible: warn-only unless both
-  // UPLOAD_HMAC_SECRET is set AND UPLOAD_REQUIRE_TOKEN=true.
+  // download time.
+  //
+  // QA1 finding #2 fix (BUG-15): the gate is now ENFORCED BY DEFAULT.
+  //   - `UPLOAD_REQUIRE_TOKEN` defaults to `true`.
+  //   - When `requireToken=true` AND `UPLOAD_HMAC_SECRET` is unset, the route
+  //     returns 503 (iron-law: a misconfigured deploy MUST NOT silently
+  //     accept anonymous uploads). Operators must either set the secret or
+  //     explicitly opt-out with `UPLOAD_REQUIRE_TOKEN=false` (legacy mode).
   const authCfg = getUploadAuthConfig();
   const auth = authenticateUpload(tester_id, req.headers, authCfg);
   if (auth.kind === 'unconfigured') {
-    // Operator hasn't set UPLOAD_HMAC_SECRET. Surface this loudly so it gets
-    // noticed in prod logs without blocking the upload.
-    log.warn('upload.auth_unconfigured', { ip, tester_id });
+    if (auth.requireToken) {
+      // Fail-fast: default deploy is enforcing the gate but no secret to
+      // verify against. Surface a 503 with a clear operator-facing message.
+      log.warn('upload.auth_misconfigured', {
+        ip,
+        tester_id,
+        detail: 'UPLOAD_REQUIRE_TOKEN=true but UPLOAD_HMAC_SECRET unset',
+      });
+      return NextResponse.json(
+        {
+          error: 'Service Unavailable',
+          details:
+            'Upload authentication is enabled but the server is not configured. ' +
+            'Operator: set UPLOAD_HMAC_SECRET (32 random hex bytes) in the web-tester ' +
+            'deploy env, or set UPLOAD_REQUIRE_TOKEN=false to opt out during the ' +
+            'v0.26.x migration window.',
+          envVars: ['UPLOAD_HMAC_SECRET'],
+        },
+        { status: 503 },
+      );
+    }
+    // Explicit legacy opt-out — log loudly but proceed.
+    log.warn('upload.auth_unconfigured', { ip, tester_id, legacyOptOut: true });
   } else if (auth.kind === 'unauthorized') {
     log.warn('upload.auth_failed', {
       ip,

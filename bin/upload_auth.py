@@ -60,9 +60,15 @@ class UploadAuthConfig:
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "UploadAuthConfig":
         e = env if env is not None else os.environ
+        raw = e.get("UPLOAD_REQUIRE_TOKEN", "").lower().strip()
+        # QA1 finding #2 fix (BUG-15): default to TRUE (fail-closed). A fresh
+        # deploy with no explicit `UPLOAD_REQUIRE_TOKEN` enforces the HMAC
+        # gate. Operators must explicitly opt OUT during the v0.26.x
+        # migration window with `UPLOAD_REQUIRE_TOKEN=false|0|no`.
+        require_token = raw not in ("false", "0", "no")
         return cls(
             secret=e.get("UPLOAD_HMAC_SECRET", ""),
-            require_token=(e.get("UPLOAD_REQUIRE_TOKEN", "").lower() == "true"),
+            require_token=require_token,
         )
 
     @property

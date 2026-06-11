@@ -74,8 +74,55 @@ export async function POST(req: NextRequest) {
   const buyerId = (session.metadata?.buyer_id ?? '').trim();
   const licenseType =
     session.metadata?.license_type === 'research' ? 'research' : 'commercial';
-  const idsStr = session.metadata?.tarball_ids ?? '';
-  const tarballIds = idsStr.split(',').map((s) => s.trim()).filter(Boolean);
+
+  // QA1 finding #3 fix (BUG-10): the checkout route chunks `tarball_ids`
+  // across `tarball_ids_1`, `tarball_ids_2`, ... metadata fields to stay
+  // under Stripe's 500-char/value limit. Reassemble them here. Legacy
+  // sessions (before the chunking fix) still have a flat `tarball_ids`
+  // field, so we support both.
+  const meta = session.metadata ?? {};
+  const tarballIds: string[] = [];
+
+  // New chunked form. Sort by numeric suffix so `tarball_ids_2` doesn't
+  // come before `tarball_ids_10` (insertion order is not contractual on
+  // session.metadata).
+  const chunkKeys = Object.keys(meta)
+    .filter((k) => /^tarball_ids_\d+$/.test(k))
+    .sort((a, b) => {
+      const ai = parseInt(a.slice('tarball_ids_'.length), 10);
+      const bi = parseInt(b.slice('tarball_ids_'.length), 10);
+      return ai - bi;
+    });
+  for (const k of chunkKeys) {
+    for (const id of String(meta[k] ?? '').split(',')) {
+      const trimmed = id.trim();
+      if (trimmed) tarballIds.push(trimmed);
+    }
+  }
+  // Legacy fallback — single flat key.
+  if (tarballIds.length === 0) {
+    const idsStr = meta.tarball_ids ?? '';
+    for (const id of idsStr.split(',')) {
+      const trimmed = id.trim();
+      if (trimmed) tarballIds.push(trimmed);
+    }
+  }
+
+  // Defence-in-depth: the chunk count and total count should agree with
+  // what we reconstructed. If Stripe silently dropped a metadata field
+  // (shouldn't happen, but we'd rather 400-and-retry than under-fulfil
+  // the purchase), refuse to proceed.
+  const expectedCount = parseInt(meta.tarball_ids_count ?? '', 10);
+  if (Number.isFinite(expectedCount) && expectedCount !== tarballIds.length) {
+    return NextResponse.json(
+      {
+        error: 'Reassembled tarball_ids count mismatch — webhook will retry',
+        expected: expectedCount,
+        got: tarballIds.length,
+      },
+      { status: 400 },
+    );
+  }
 
   if (!buyerId || tarballIds.length === 0) {
     return NextResponse.json(

@@ -19,7 +19,12 @@ export function readCartCookie(): string[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((s) => typeof s === 'string');
+    // QA1 finding #4 fix: dedup on read. If a pre-fix client wrote a
+    // cookie with duplicate ids (or an attacker crafted one), don't
+    // propagate them into the checkout array — buyer would otherwise pay
+    // for the same tarball multiple times for a single download.
+    const strs = parsed.filter((s): s is string => typeof s === 'string');
+    return Array.from(new Set(strs));
   } catch {
     return [];
   }
