@@ -46,6 +46,7 @@ Repro
 =====
 Logic-level demonstration of the duplicate-row leak.
 """
+
 from __future__ import annotations
 
 import unittest

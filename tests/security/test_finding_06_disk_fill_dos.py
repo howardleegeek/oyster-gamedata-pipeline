@@ -29,6 +29,7 @@ Repro
 Show that 720 GiB/day is realistically reachable for one tester within
 the documented rate-limit ceiling.
 """
+
 from __future__ import annotations
 
 import unittest
@@ -44,12 +45,7 @@ def daily_uploads_per_tester(
     """Theoretical daily byte-volume one tester can push."""
     seconds_per_window = rl_per_tester_window_ms / 1000
     windows_per_day = 86400 / seconds_per_window
-    return int(
-        rl_per_tester_limit
-        * windows_per_day
-        * max_bytes
-        * vercel_instance_multiplier
-    )
+    return int(rl_per_tester_limit * windows_per_day * max_bytes * vercel_instance_multiplier)
 
 
 class DiskFillDosTest(unittest.TestCase):
@@ -86,9 +82,7 @@ class DiskFillDosTest(unittest.TestCase):
         Skeleton:
         """
 
-        def upload_allowed(
-            current_used: int, new_size: int, quota_per_day: int
-        ) -> bool:
+        def upload_allowed(current_used: int, new_size: int, quota_per_day: int) -> bool:
             return current_used + new_size <= quota_per_day
 
         gib = 1024**3

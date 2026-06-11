@@ -37,6 +37,7 @@ Repro
 Demonstrate that the signed URL survives a license revocation that
 happens after mint but before TTL expiry.
 """
+
 from __future__ import annotations
 
 import time
@@ -80,9 +81,7 @@ class SignedUrlTtlTest(unittest.TestCase):
         on EVERY byte request. The signed URL approach checks ONCE at mint.
         """
 
-        def can_download_through_proxy(
-            purchase_id: str, *, revoked_purchases: set[str]
-        ) -> bool:
+        def can_download_through_proxy(purchase_id: str, *, revoked_purchases: set[str]) -> bool:
             return purchase_id not in revoked_purchases
 
         revoked: set[str] = set()

@@ -44,6 +44,7 @@ Severity: LOW-MEDIUM (CVSS 5.0 — cart-row DoS, unbounded growth)
 Repro
 =====
 """
+
 from __future__ import annotations
 
 import unittest
@@ -132,9 +133,7 @@ class CartInjectArbitraryUuidTest(unittest.TestCase):
         )
         # Bogus UUID rejected.
         self.assertEqual(
-            fixed_route(
-                cart, buyer, {"tarball_id": str(uuid.uuid4())}, catalog={legit}
-            )["status"],
+            fixed_route(cart, buyer, {"tarball_id": str(uuid.uuid4())}, catalog={legit})["status"],
             404,
         )
 

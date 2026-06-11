@@ -37,20 +37,18 @@ gameplay. An attacker who phishes a tester's filename can:
   - exhaust the tester's storage_path namespace
   - corrupt the tester's reputation (d5 rejection rate)
 """
+
 from __future__ import annotations
 
-import hmac
 import hashlib
+import hmac
 import unittest
-
 
 SECRET = "deadbeef" * 8  # 64-hex realistic prod secret
 
 
 def compute_token(tester_id: str, secret: str = SECRET) -> str:
-    return hmac.new(
-        secret.encode("utf-8"), tester_id.encode("utf-8"), hashlib.sha256
-    ).hexdigest()
+    return hmac.new(secret.encode("utf-8"), tester_id.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 class HmacReplayTest(unittest.TestCase):

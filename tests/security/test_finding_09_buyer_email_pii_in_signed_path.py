@@ -45,6 +45,7 @@ Demonstrate that the policy would block a legitimate buyer-download flow
 if it were ever consulted. (i.e., the policy is wrong for the actual
 threat model.)
 """
+
 from __future__ import annotations
 
 import unittest
@@ -93,9 +94,7 @@ class TesterStorageRlsTest(unittest.TestCase):
             tarballs: list[dict],
         ) -> bool:
             tarball_path = object_name
-            tarball = next(
-                (t for t in tarballs if t["storage_path"] == tarball_path), None
-            )
+            tarball = next((t for t in tarballs if t["storage_path"] == tarball_path), None)
             if not tarball:
                 return False
             return any(

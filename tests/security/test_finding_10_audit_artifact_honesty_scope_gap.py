@@ -42,9 +42,9 @@ Show that introducing a `dev_session_FAKE_xxx` literal in route.ts or a
 fabricated `acct_mock_*` returned from a route handler is INVISIBLE to the
 existing audit script.
 """
+
 from __future__ import annotations
 
-import textwrap
 import unittest
 from pathlib import Path
 
