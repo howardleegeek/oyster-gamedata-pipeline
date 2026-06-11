@@ -24,6 +24,8 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 import { env } from '../../../../lib/env';
+import { computeTokenPrefix, isHmacConfigured } from '../../../../lib/upload-auth';
+import { log } from '../../../../lib/log';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -40,12 +42,31 @@ export async function GET(
   }
   const testerId = parsed.data;
   const shortId = testerId.slice(0, 8);
-  const filename = `OysterRecorder-${shortId}-${testerId}.exe`;
+
+  // Production gap #6 (PRODUCTION_GAPS.md): embed an HMAC token prefix in
+  // the filename so the recorder can self-authenticate on upload. When
+  // UPLOAD_HMAC_SECRET is unset, fall back to the legacy filename — no
+  // gate yet — so dev environments keep working.
+  let filename: string;
+  if (isHmacConfigured()) {
+    const tokenPrefix = computeTokenPrefix(testerId, process.env.UPLOAD_HMAC_SECRET ?? '');
+    filename = `OysterRecorder-${shortId}-${testerId}-${tokenPrefix}.exe`;
+  } else {
+    log.warn('download.hmac_unconfigured', { tester_id: testerId });
+    filename = `OysterRecorder-${shortId}-${testerId}.exe`;
+  }
 
   // ---- External URL -> redirect with attribution param ----------------
   if (/^https?:\/\//i.test(env.recorderExeUrl)) {
     const redirectUrl = new URL(env.recorderExeUrl);
     redirectUrl.searchParams.set('tester_id', testerId);
+    // Also expose the token prefix to the CDN/origin so a future hosted
+    // build can read it from the URL if the filename gets lost. The CDN
+    // ignores unknown query params; this is purely informational.
+    if (isHmacConfigured()) {
+      const tokenPrefix = computeTokenPrefix(testerId, process.env.UPLOAD_HMAC_SECRET ?? '');
+      redirectUrl.searchParams.set('token', tokenPrefix);
+    }
     return NextResponse.redirect(redirectUrl.toString(), { status: 302 });
   }
 
