@@ -55,6 +55,29 @@ def _lazy_import_anthropic():
     return anthropic, APIError, APIStatusError, RateLimitError
 
 
+def _build_anthropic_client(anthropic_module, api_key: str):
+    """Construct ``anthropic.Anthropic`` resiliently across httpx versions.
+
+    Older ``anthropic`` SDKs (<0.40) eagerly forward ``proxies=`` to the
+    underlying ``httpx.Client`` constructor. ``httpx>=0.28`` removed that
+    keyword which causes ``TypeError: Client.__init__() got an unexpected
+    keyword argument 'proxies'`` even when the user never asked for a
+    proxy. Newer SDKs avoid this. To stay compatible with both, we pass
+    an explicit ``http_client=`` when constructing fails for that reason,
+    bypassing the SDK's internal ``SyncHttpxClientWrapper`` factory.
+    """
+    try:
+        return anthropic_module.Anthropic(api_key=api_key)
+    except TypeError as exc:
+        if "proxies" not in str(exc):
+            raise
+        try:
+            import httpx  # type: ignore[import-not-found]
+        except ImportError:  # pragma: no cover
+            raise exc
+        return anthropic_module.Anthropic(api_key=api_key, http_client=httpx.Client())
+
+
 class ClaudeVisionProvider:
     """LLMProvider backed by Anthropic Claude with PNG image-content support.
 
@@ -93,7 +116,7 @@ class ClaudeVisionProvider:
         self.model = model
         self.max_tokens = max_tokens
         self.image_media_type = image_media_type
-        self._client = anthropic.Anthropic(api_key=resolved_key)
+        self._client = _build_anthropic_client(anthropic, resolved_key)
         self._next_frame: bytes | None = None
 
     # Vision hook -------------------------------------------------------------

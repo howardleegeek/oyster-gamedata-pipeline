@@ -153,6 +153,11 @@ class TestSynthesizeDepthDir:
 
     def test_synthesize_depth_dir_creates_files(self):
         """Test that synthesize_depth_dir creates the expected number of files."""
+        # synthesize_depth_dir uses the optional OpenEXR + Imath bindings; the
+        # builder treats fake EXR bytes as an iron-law violation (would
+        # corrupt D5 authenticity checks). Skip when the deps are absent.
+        pytest.importorskip("OpenEXR")
+        pytest.importorskip("Imath")
         with tempfile.TemporaryDirectory() as tmpdir:
             count = synthesize_depth_dir(tmpdir, count=10)
 
@@ -169,6 +174,8 @@ class TestSynthesizeDepthDir:
 
     def test_synthesize_depth_dir_minimal_size(self):
         """Test that depth files have minimal size."""
+        pytest.importorskip("OpenEXR")
+        pytest.importorskip("Imath")
         with tempfile.TemporaryDirectory() as tmpdir:
             synthesize_depth_dir(tmpdir, count=5)
 
@@ -183,6 +190,10 @@ class TestBuildSampleTarball:
 
     def test_build_sample_tarball_packages_all_4_assets(self):
         """Test that build_sample_tarball creates tarball with all required assets."""
+        # build_sample_tarball produces gameinfo.xlsx via openpyxl; the
+        # builder refuses to emit fake xlsx bytes (would corrupt buyer-side
+        # tarball validation). Skip when openpyxl is absent.
+        pytest.importorskip("openpyxl")
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = os.path.join(tmpdir, "test.tar.gz")
 
@@ -209,6 +220,7 @@ class TestBuildSampleTarball:
 
     def test_skip_flags_work(self):
         """Test that skip_video and skip_depth flags work correctly."""
+        pytest.importorskip("openpyxl")
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = os.path.join(tmpdir, "test_skip.tar.gz")
 
@@ -234,6 +246,7 @@ class TestBuildSampleTarball:
 
     def test_build_sample_tarball_sha256_output(self):
         """Test that build_sample_tarball outputs correct SHA-256."""
+        pytest.importorskip("openpyxl")
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = os.path.join(tmpdir, "test_sha.tar.gz")
 
@@ -261,6 +274,9 @@ class TestMain:
 
     def test_main_argparse(self):
         """Test that main() correctly parses command line arguments."""
+        # End-to-end via main() exercises build_sample_tarball → create_gameinfo_xlsx
+        # which requires openpyxl. Skip when absent so CI without the dep stays green.
+        pytest.importorskip("openpyxl")
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = os.path.join(tmpdir, "cli_test.tar.gz")
 
@@ -290,6 +306,7 @@ class TestMain:
 
     def test_main_default_output(self):
         """Test that main() uses default output path."""
+        pytest.importorskip("openpyxl")
         with tempfile.TemporaryDirectory() as tmpdir:
             # Change to temp directory
             original_cwd = os.getcwd()
@@ -321,6 +338,9 @@ class TestGameinfoXlsx:
 
     def test_create_gameinfo_xlsx_creates_file(self):
         """Test that gameinfo.xlsx is created with correct structure."""
+        # create_gameinfo_xlsx requires openpyxl; the iron-law guard refuses
+        # to emit fake xlsx bytes. Skip when the dep is unavailable.
+        pytest.importorskip("openpyxl")
         with tempfile.TemporaryDirectory() as tmpdir:
             xlsx_path = os.path.join(tmpdir, "gameinfo.xlsx")
 

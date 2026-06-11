@@ -61,6 +61,26 @@ def _lazy_import_anthropic():
     return anthropic, APIError, APIStatusError, RateLimitError
 
 
+def _build_anthropic_client(anthropic_module, api_key: str):
+    """Construct ``anthropic.Anthropic`` resiliently across httpx versions.
+
+    See ``providers.claude_vision._build_anthropic_client`` for context —
+    older anthropic SDKs forward ``proxies=`` to httpx 0.28+, which
+    rejects the kwarg. Providing an explicit ``http_client=`` bypasses
+    the SDK's internal wrapper.
+    """
+    try:
+        return anthropic_module.Anthropic(api_key=api_key)
+    except TypeError as exc:
+        if "proxies" not in str(exc):
+            raise
+        try:
+            import httpx  # type: ignore[import-not-found]
+        except ImportError:  # pragma: no cover
+            raise exc
+        return anthropic_module.Anthropic(api_key=api_key, http_client=httpx.Client())
+
+
 class ClaudeThinkingProvider:
     """LLMProvider backed by Claude with extended thinking enabled.
 
@@ -122,7 +142,7 @@ class ClaudeThinkingProvider:
         self.model = model
         self.max_tokens = max_tokens
         self.thinking_budget = thinking_budget
-        self._client = anthropic.Anthropic(api_key=resolved_key)
+        self._client = _build_anthropic_client(anthropic, resolved_key)
         # Captured from the most recent `chat()` call. None before the
         # first call. Empty string if the response had no thinking blocks
         # (e.g. SDK degradation), which the runner can distinguish from

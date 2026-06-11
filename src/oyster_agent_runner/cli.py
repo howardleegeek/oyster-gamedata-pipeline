@@ -18,6 +18,29 @@ UTC = UTC
 from pathlib import Path
 from typing import Annotated
 
+import click.core as _click_core
+
+# --- Click 8.3 / typer 0.12.5 compatibility shim ----------------------------
+# Click 8.3 redefined ``flag_value=None`` to mean "this option is implicitly a
+# flag" (because the sentinel changed from ``None`` to ``UNSET``). Typer
+# 0.12.5 still passes ``flag_value=None`` by default for every option,
+# which incorrectly marks plain string/int/path options as boolean flags
+# (so ``--env mock`` is parsed as ``--env`` flag + a stray positional ``mock``).
+#
+# We patch ``click.core.Option.__init__`` to coerce ``flag_value=None`` back
+# to ``UNSET`` when ``is_flag`` was not explicitly opted-in by the caller.
+# Idempotent so re-import of this module is safe.
+if not getattr(_click_core.Option.__init__, "_oyster_typer_click_shim", False):
+    _orig_click_option_init = _click_core.Option.__init__
+
+    def _shimmed_click_option_init(self, *args, **kwargs):  # type: ignore[no-redef]
+        if kwargs.get("flag_value", _click_core.UNSET) is None and kwargs.get("is_flag") is None:
+            kwargs["flag_value"] = _click_core.UNSET
+        return _orig_click_option_init(self, *args, **kwargs)
+
+    _shimmed_click_option_init._oyster_typer_click_shim = True  # type: ignore[attr-defined]
+    _click_core.Option.__init__ = _shimmed_click_option_init  # type: ignore[assignment]
+
 import typer
 from rich.console import Console
 from rich.panel import Panel
@@ -287,7 +310,13 @@ def schema_cmd() -> None:
 @app.command("list-envs")
 def list_envs_cmd(
     as_json: Annotated[
-        bool, typer.Option("--json", help="Emit machine-readable JSON instead of a table")
+        bool,
+        typer.Option(
+            "--json",
+            help="Emit machine-readable JSON instead of a table",
+            is_flag=True,
+            flag_value=True,
+        ),
     ] = False,
 ) -> None:
     """Print the registered environments available to `oyster-agent run`."""
@@ -306,7 +335,13 @@ def list_envs_cmd(
 @app.command("list-providers")
 def list_providers_cmd(
     as_json: Annotated[
-        bool, typer.Option("--json", help="Emit machine-readable JSON instead of a table")
+        bool,
+        typer.Option(
+            "--json",
+            help="Emit machine-readable JSON instead of a table",
+            is_flag=True,
+            flag_value=True,
+        ),
     ] = False,
 ) -> None:
     """Print the registered LLM providers available to `oyster-agent run`."""
@@ -327,7 +362,12 @@ def validate_task_cmd(
     task_path: Annotated[Path, typer.Argument(help="Path to a JSON AgentTask file.")],
     as_json: Annotated[
         bool,
-        typer.Option("--json", help="Emit the validated task as JSON on success."),
+        typer.Option(
+            "--json",
+            help="Emit the validated task as JSON on success.",
+            is_flag=True,
+            flag_value=True,
+        ),
     ] = False,
 ) -> None:
     """Validate an `AgentTask` JSON file against the schema.
@@ -577,13 +617,20 @@ def replay_cmd(
     ],
     check: Annotated[
         bool,
-        typer.Option("--check", help="Run verify_consistency() and print the report."),
+        typer.Option(
+            "--check",
+            help="Run verify_consistency() and print the report.",
+            is_flag=True,
+            flag_value=True,
+        ),
     ] = False,
     re_execute: Annotated[
         bool,
         typer.Option(
             "--re-execute",
             help="Replay actions against a fresh MockEnvironment and report drift.",
+            is_flag=True,
+            flag_value=True,
         ),
     ] = False,
 ) -> None:
@@ -686,6 +733,8 @@ def package_trajectory_cmd(
         typer.Option(
             "--verify",
             help="After packaging, round-trip extract the zip and check checksums.",
+            is_flag=True,
+            flag_value=True,
         ),
     ] = False,
 ) -> None:
@@ -887,11 +936,18 @@ def quote_cmd(
         typer.Option(
             "--include-replay-cost",
             help="Add a replay --re-execute cost line (currently $0; see note).",
+            is_flag=True,
+            flag_value=True,
         ),
     ] = False,
     as_json: Annotated[
         bool,
-        typer.Option("--json", help="Emit machine-readable JSON instead of text."),
+        typer.Option(
+            "--json",
+            help="Emit machine-readable JSON instead of text.",
+            is_flag=True,
+            flag_value=True,
+        ),
     ] = False,
 ) -> None:
     """Print a sales-grade token + dollar quote for a task trajectory."""
