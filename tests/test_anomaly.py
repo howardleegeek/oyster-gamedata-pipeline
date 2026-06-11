@@ -6,6 +6,7 @@ trajectory dupes) live alongside the new ``batch_outliers()`` and
 ``run_batch()`` entry points. Tests synthesise a batch of metric snapshots
 and verify that >3 σ outliers are flagged.
 """
+
 from __future__ import annotations
 
 import json
@@ -19,10 +20,10 @@ sys.path.insert(0, str(BIN))
 
 import anomaly_detector_clip_quality as ad  # noqa: E402
 
-
 # ---------------------------------------------------------------------------
 # helpers — build synthetic clip metric files
 # ---------------------------------------------------------------------------
+
 
 def make_metric_dir(tmp_path: Path, clips: list[dict]) -> Path:
     """Drop one JSON per clip into a fresh directory."""
@@ -34,8 +35,14 @@ def make_metric_dir(tmp_path: Path, clips: list[dict]) -> Path:
     return out
 
 
-def baseline_clip(clip_id: str, *, fps: float = 30.0, size_mb: float = 800.0,
-                  depth_invalid: float = 0.02, action_entropy: float = 2.5) -> dict:
+def baseline_clip(
+    clip_id: str,
+    *,
+    fps: float = 30.0,
+    size_mb: float = 800.0,
+    depth_invalid: float = 0.02,
+    action_entropy: float = 2.5,
+) -> dict:
     return {
         "clip_id": clip_id,
         "metrics": {
@@ -50,6 +57,7 @@ def baseline_clip(clip_id: str, *, fps: float = 30.0, size_mb: float = 800.0,
 # ---------------------------------------------------------------------------
 # batch outlier core
 # ---------------------------------------------------------------------------
+
 
 def test_batch_outliers_flags_3sigma():
     """Clip with fps far below mean (>3 σ) is flagged."""
@@ -85,6 +93,7 @@ def test_batch_outliers_multiple_metrics_per_clip():
 # CLI / batch runner
 # ---------------------------------------------------------------------------
 
+
 def test_run_batch_writes_json_and_csv(tmp_path):
     clips = [baseline_clip(f"c{i:03d}", fps=30.0 + (i % 3) * 0.2) for i in range(15)]
     clips.append(baseline_clip("bad", fps=5.0, depth_invalid=0.5))
@@ -112,12 +121,18 @@ def test_cli_batch_mode(tmp_path):
     batch_dir = make_metric_dir(tmp_path, clips)
     out_json = tmp_path / "an.json"
     out_csv = tmp_path / "an.csv"
-    rc = ad.main([
-        "--batch", str(batch_dir),
-        "--output-json", str(out_json),
-        "--output-csv", str(out_csv),
-        "--sigma", "3.0",
-    ])
+    rc = ad.main(
+        [
+            "--batch",
+            str(batch_dir),
+            "--output-json",
+            str(out_json),
+            "--output-csv",
+            str(out_csv),
+            "--sigma",
+            "3.0",
+        ]
+    )
     assert out_json.is_file()
     assert out_csv.is_file()
     data = json.loads(out_json.read_text())
@@ -127,6 +142,7 @@ def test_cli_batch_mode(tmp_path):
 # ---------------------------------------------------------------------------
 # regression: existing per-clip analyse_clip still works
 # ---------------------------------------------------------------------------
+
 
 def test_analyze_clip_still_supported():
     clip = {
@@ -143,6 +159,7 @@ def test_analyze_clip_still_supported():
 # ---------------------------------------------------------------------------
 # Outlier on metric with zero variance shouldn't NaN
 # ---------------------------------------------------------------------------
+
 
 def test_zero_variance_metric_safe():
     """If all clips have identical depth_invalid_ratio, we shouldn't crash

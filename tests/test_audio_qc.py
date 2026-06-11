@@ -14,6 +14,7 @@ for the analysis core (the extract path uses ffmpeg only when invoked
 against a real .mp4). Tests that touch ffmpeg are gated by the
 ``ffmpeg_available`` helper.
 """
+
 from __future__ import annotations
 
 import json
@@ -29,21 +30,24 @@ import pytest
 
 # Add bin/ to path so we can import the extractor as a module.
 import sys
+
 BIN = Path(__file__).resolve().parents[1] / "bin"
 sys.path.insert(0, str(BIN))
 
 import audio_qc_extractor as qc  # noqa: E402
 
-
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
 
+
 def ffmpeg_available() -> bool:
     try:
         subprocess.run(
-            ["ffmpeg", "-version"], stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL, check=True,
+            ["ffmpeg", "-version"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=True,
         )
         return True
     except (FileNotFoundError, subprocess.CalledProcessError):
@@ -72,14 +76,17 @@ def synth_tone(freq_hz: float, dur_s: float, sr: int = 44100, amp: float = 0.3) 
 # silence-run detection
 # ---------------------------------------------------------------------------
 
+
 def test_silence_run_below_threshold_passes(tmp_path):
     sr = 22050
     # 1 second of tone, 1 second of silence, 1 second of tone.
-    sig = np.concatenate([
-        synth_tone(440, 1.0, sr),
-        np.zeros(sr),
-        synth_tone(440, 1.0, sr),
-    ])
+    sig = np.concatenate(
+        [
+            synth_tone(440, 1.0, sr),
+            np.zeros(sr),
+            synth_tone(440, 1.0, sr),
+        ]
+    )
     wav = tmp_path / "audio.wav"
     write_wav(wav, sig, sr=sr)
     report = qc.analyze_wav(wav)
@@ -91,11 +98,13 @@ def test_silence_run_below_threshold_passes(tmp_path):
 def test_silence_run_above_threshold_flagged(tmp_path):
     sr = 22050
     # 3 seconds of silence — should violate the 2 s rule.
-    sig = np.concatenate([
-        synth_tone(440, 0.5, sr),
-        np.zeros(int(sr * 3)),
-        synth_tone(440, 0.5, sr),
-    ])
+    sig = np.concatenate(
+        [
+            synth_tone(440, 0.5, sr),
+            np.zeros(int(sr * 3)),
+            synth_tone(440, 0.5, sr),
+        ]
+    )
     wav = tmp_path / "audio.wav"
     write_wav(wav, sig, sr=sr)
     report = qc.analyze_wav(wav)
@@ -107,6 +116,7 @@ def test_silence_run_above_threshold_flagged(tmp_path):
 # ---------------------------------------------------------------------------
 # clipping / saturation
 # ---------------------------------------------------------------------------
+
 
 def test_no_clipping(tmp_path):
     sr = 22050
@@ -132,6 +142,7 @@ def test_clipping_detected(tmp_path):
 # sample-rate consistency
 # ---------------------------------------------------------------------------
 
+
 def test_sample_rate_recorded(tmp_path):
     sr = 48000
     sig = synth_tone(440, 0.5, sr)
@@ -155,6 +166,7 @@ def test_unusual_sample_rate_flagged(tmp_path):
 # ---------------------------------------------------------------------------
 # NPC dialogue / sustained voice frequency
 # ---------------------------------------------------------------------------
+
 
 def test_pure_tone_not_flagged_as_dialogue(tmp_path):
     # A pure 440 Hz tone is in the musical range, not dialogue.
@@ -187,6 +199,7 @@ def test_sustained_voice_band_flagged(tmp_path):
 # BGM vs SFX ratio
 # ---------------------------------------------------------------------------
 
+
 def test_bgm_sfx_balance_reported(tmp_path):
     # Steady background tone (BGM) + occasional impulses (SFX).
     sr = 22050
@@ -208,6 +221,7 @@ def test_bgm_sfx_balance_reported(tmp_path):
 # ---------------------------------------------------------------------------
 # directory ingestion
 # ---------------------------------------------------------------------------
+
 
 def test_directory_ingestion_with_wav(tmp_path):
     """When a directory contains a pre-extracted audio.wav, the extractor
@@ -263,6 +277,7 @@ def test_tarball_ingestion_with_audio(tmp_path):
 # ---------------------------------------------------------------------------
 # CLI smoke test
 # ---------------------------------------------------------------------------
+
 
 def test_cli_directory(tmp_path, capsys):
     sr = 22050
