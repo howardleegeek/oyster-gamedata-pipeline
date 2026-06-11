@@ -277,7 +277,7 @@ outlier check, scene-continuity check).
 ### `audio_qc_extractor.py` says `no_audio_stream`
 The vendor's `video.mp4` was muxed without an audio track. Sample
 tarballs (`samples/buyer-spec-v1-rc1.tar.gz`) are intentionally video-only
-placeholders — this is the expected outcome there. For real submissions
+stub bundles — this is the expected outcome there. For real submissions
 this is a PRD violation; reject the clip.
 
 ### `audio_qc_extractor.py` says `sustained_npc_dialogue`

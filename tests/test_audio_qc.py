@@ -228,12 +228,12 @@ def test_directory_ingestion_with_wav(tmp_path):
 SAMPLE_TAR = Path(__file__).resolve().parents[1] / "samples" / "buyer-spec-v1-rc1.tar.gz"
 
 
-@pytest.mark.skipif(
+@pytest.mark.skipif(  # skip when ffmpeg or sample tarball not present
     not (ffmpeg_available() and SAMPLE_TAR.is_file()),
     reason="ffmpeg or sample tarball missing",
 )
 def test_tarball_ingestion_no_audio_stream(tmp_path):
-    """The shipped sample tarball is a placeholder bundle with a video-only
+    """The shipped sample tarball is a stub bundle with a video-only
     track. The extractor must surface this as a structured 'no_audio_stream'
     violation rather than crash."""
     report = qc.qc_clip(SAMPLE_TAR, scratch_dir=tmp_path)
