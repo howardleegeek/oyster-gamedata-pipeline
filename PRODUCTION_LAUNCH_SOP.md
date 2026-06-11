@@ -115,7 +115,8 @@ require credentials or decisions only Howard can supply.
 | 2 | Apply Supabase migrations to prod project (`supabase db push` × 2) | 5 min | $0 | **YES** — schema doesn't exist on prod |
 | 3 | Code-signing cert for the recorder `.exe` | 24-72h provisioning | $80-$200/yr | NO (testers can click through SmartScreen) |
 | 4 | Stripe Connect strategy decision | 30 min decision + 1d wire | varies | NO for buyer-browse-only launch; YES for buyer purchases or tester payouts |
-| 6 + 8 | Recorder v0.27.0 with HMAC token + direct-to-Supabase upload | ~5h | $0 | NO at launch (current upload route works for <4.5 MB tarballs); YES for real-sized recordings on Vercel |
+| 6a | Set `UPLOAD_HMAC_SECRET` (server) + roll out recorder v0.27.0 with `X-Upload-Token` | ~1h server + 1h recorder | $0 | NO at launch (warn-only fallback); YES before flipping `UPLOAD_REQUIRE_TOKEN=true` |
+| 6b + 8 | Direct-to-Supabase signed-URL upload (lifts the 4.5 MB Vercel body cap) | ~3h | $0 | NO at launch (current upload route works for <4.5 MB tarballs); YES for real-sized recordings on Vercel |
 
 **Order of operations** (recommended):
 
@@ -125,7 +126,57 @@ require credentials or decisions only Howard can supply.
 2. **Smoke against live URLs** — `TESTER_URL=https://... BUYER_URL=https://... ./watch.sh` for 30 min, verify steady-state green.
 3. **Optional #3 (recorder code-signing)** — only if your first wave of testers is sensitive to SmartScreen warnings. Otherwise brief them ("Click 'More info → Run anyway' — it's expected for new releases").
 4. **#4 (Stripe Connect)** — gate this on a decision: ship a buyer-browse-only launch first to validate catalog appeal, OR wire Stripe before opening doors. Either is iron-law-honest as long as the amber panels stay honest.
-5. **#6 + #8 (recorder v0.27.0)** — schedule for week 2 of production. Server-side server-side groundwork is ready (HMAC verify route + signed-URL split paths designed in PRODUCTION_GAPS.md gap #6 + #8); recorder bump is the missing half.
+5. **#6a (Upload HMAC token setup)** — server-side groundwork is done (see "Upload HMAC token setup" below). Schedule the recorder bump (v0.27.0 with `X-Upload-Token`) for week 2; flip the enforcement gate after rollout.
+6. **#6b + #8 (direct-to-Supabase upload)** — schedule for week 2-3 of production. Lifts the Vercel 4.5 MB body cap so multi-hour sessions work end-to-end.
+
+### Upload HMAC token setup (PRODUCTION_GAPS.md #6)
+
+Two server env vars on Vercel (web-tester project only):
+
+```bash
+# Generate a fresh 32-byte hex secret. Store this in 1Password / secrets vault.
+openssl rand -hex 32
+# → e.g. 9f3c4d... (64 hex chars). Use as UPLOAD_HMAC_SECRET.
+
+# Phase A (now): server issues + accepts tokens, but logs warnings instead
+# of rejecting when a recorder doesn't supply X-Upload-Token. Lets v0.26.x
+# recorders keep uploading while v0.27.0 is rolling out.
+vercel env add UPLOAD_HMAC_SECRET production
+# paste the openssl output. Leave UPLOAD_REQUIRE_TOKEN unset (or =false).
+
+# Phase B (after recorder v0.27.0 ships): flip the gate.
+vercel env add UPLOAD_REQUIRE_TOKEN production
+# value: true
+```
+
+What this changes:
+
+- **`/api/download/[testerId]`** — embeds the 16-hex token prefix in the
+  `.exe` filename: `OysterRecorder-<short>-<uuid>-<token16>.exe`. The
+  recorder reads this token from its own filename at startup.
+- **`/api/upload-tarball`** — verifies `HMAC_SHA256(UPLOAD_HMAC_SECRET,
+  tester_id)` matches the presented token. Constant-time compare via
+  `crypto.timingSafeEqual`. Rejects with 401 when `UPLOAD_REQUIRE_TOKEN=true`
+  and the token is missing/invalid; logs `upload.auth_failed` when the
+  gate is in warn-only mode.
+- **`/api/tester/auth`** — new endpoint. Signed-in tester can `GET` it
+  to retrieve their token (used for installer config files, paranoid
+  manual upload via `bin/upload_to_web_tester.py`). Service-role callers
+  can pass `?tester_id=<uuid>` to mint a token for any tester.
+
+Reference clients:
+
+- Python: `bin/upload_to_web_tester.py` (resolves token from
+  `--token` > `OYSTER_UPLOAD_TOKEN` > .exe filename > local `UPLOAD_HMAC_SECRET`).
+- Rust recorder: contract documented in `bin/upload_auth.py` and
+  `web-tester/lib/upload-auth.ts`. The TS/Python parity is locked by
+  `tests/test_upload_auth_hmac.py::test_ts_python_parity_full_token`.
+
+**Rotation:** generate a new `UPLOAD_HMAC_SECRET`, paste it into Vercel
+**before** issuing new download URLs. Already-issued tokens stop working
+the moment the secret rotates — that's the desired behaviour for kicking
+a compromised UUID. Run a 24-hour grace window with both secrets in
+warn-only mode if you have many active testers in flight.
 
 ---
 
