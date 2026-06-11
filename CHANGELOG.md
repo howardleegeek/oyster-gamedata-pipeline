@@ -1,5 +1,55 @@
 # CHANGELOG
 
+## [v0.1.0-rc12] - 2026-06-10
+
+### Minecraft Phase 1 — CoT + metadata + inputs trajectory pipeline
+- `mineflayer/bot.js` — Node.js subprocess implementing the
+  Mineflayer half of the JSON-line stdio protocol (`hello`, `spawn`,
+  `action`, `observation`, `error`, `goodbye` messages); supports four
+  Phase 1 actions: `move_to`, `dig`, `look`, `chat`. Defensive against
+  malformed parent input, mineflayer crashes, and unknown ops.
+- `mineflayer/protocol.md` — versioned wire-protocol contract.
+- `MinecraftEnvironment` upgraded from stub to a Mineflayer-backed
+  `Environment` implementation. Spawns the bot as a subprocess, performs
+  hello+spawn handshake, dispatches actions, surfaces fatal errors as
+  `RuntimeError` so the runner's fail-safe handles them. MineRL path
+  remains stubbed for Phase 3+.
+- `ClaudeThinkingProvider` — Anthropic Messages API wrapper with
+  `thinking={"type":"enabled","budget_tokens":16000}` enabled by default.
+  Captures all `thinking`-type content blocks into `last_thinking` for
+  the runner to emit as a separate `LLM_THINKING` event. Forces
+  `temperature=1.0` per Anthropic API requirement.
+- Runner change: when `provider.wants_thinking_capture` is True, emit a
+  new `LLM_THINKING` event (with the full chain-of-thought text) before
+  the `LLM_REASONING` event each step. Backwards-compatible — providers
+  without the flag see no behavior change.
+- `MinecraftStreamWriter` — Phase 1 multi-stream demuxer that writes
+  `cot.jsonl` (thinking + reasoning + actions), `metadata.jsonl`
+  (observations + ticks), `inputs.jsonl` (action stream), and
+  `manifest.json` (session metadata + alignment proof) sharing a single
+  wall-clock anchor.
+- `oyster-agent run-mc` CLI command — drives a single Phase 1
+  trajectory end-to-end: load task JSON → spawn bot → run agent loop →
+  demux trajectory.jsonl into the four Phase 1 files.
+- `tasks/MC-tutorial-001.json` — first task definition (punch a tree,
+  collect 1 log) following the spec § 4 schema.
+- `docs/PHASE1_RUNBOOK.md` — operator-facing runbook covering Paper
+  server install, npm install, the run command, expected output sizes,
+  cost estimates, troubleshooting.
+- `bin/smoke_phase1.sh` — automated Phase 1 §6 smoke test (detects
+  java/node/npm, downloads pinned Paper 1.20.4 build 499, runs the four
+  Phase 1 outputs end-to-end). Skips informationally when host tools are
+  absent (exit 0). `--dry-run` flag walks plumbing without launching
+  Paper, used by CI.
+- 42 new tests (all mock-based, no Minecraft server required for CI):
+  Mineflayer protocol parser (17 tests in `test_minecraft_env_protocol`),
+  env lifecycle with fake subprocess, `ClaudeThinkingProvider` with
+  mocked SDK responses (11 tests), runner thinking-event emission
+  semantics (4 tests), multi-stream writer (6 tests), Phase 1 smoke
+  script (4 tests). Total project test count post-rc12: 962 collected
+  (917 passing, 32 unrelated environmental failures, 12 skipped).
+
+
 ## [0.16.0] - 2026-05-27
 
 ### Added
