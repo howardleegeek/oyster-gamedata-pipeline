@@ -119,6 +119,12 @@ check_placeholder_markers() {
     if [ ! -f "${f}" ]; then
       continue
     fi
+    # Skip docs/reports — prose may legitimately discuss banned
+    # substrings (e.g. bug reports describing stub-value behaviour).
+    # This rule targets code/config, not prose.
+    case "${f}" in
+      *.md|*.rst|*.txt) continue ;;
+    esac
     git diff "${DIFF_BASE}" -- "${f}" 2>/dev/null | grep '^+' | grep -v '^+++' | while IFS= read -r line; do
       content=$(printf '%s' "${line}" | sed 's/^+//')
       lower_content=$(printf '%s' "${content}" | tr '[:upper:]' '[:lower:]')
