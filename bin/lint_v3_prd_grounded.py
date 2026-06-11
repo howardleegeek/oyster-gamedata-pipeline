@@ -1294,7 +1294,7 @@ def _check_video_content_health(d: Path, rpt: LintReport) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Criteria 26-27: Stream V additions (placeholder pass-through — these
+# Criteria 26-27: Stream V additions (pass-through stub — these
 # already existed on rc17.0-integrated; preserved unchanged so we don't
 # regress Stream V's contribution. The original implementations should
 # already be defined on the integrated branch; here we record the IDs
