@@ -1,0 +1,2 @@
+windows-capture==2.0.0
+mss==10.2.0

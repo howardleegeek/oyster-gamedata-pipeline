@@ -5,6 +5,7 @@ Tests for bin/real_depth_filler.py
 
 from __future__ import annotations
 
+import builtins
 import os
 import sys
 from pathlib import Path
@@ -16,6 +17,19 @@ import pytest
 # Skip the whole module if numpy isn't installed (Windows minipc / vendor
 # without ML stack will skip rather than error during collection).
 np = pytest.importorskip("numpy")
+
+
+def _block_depth_model_imports(monkeypatch: pytest.MonkeyPatch) -> None:
+    real_import = builtins.__import__
+
+    def _blocked_import(name, globals=None, locals=None, fromlist=(), level=0):  # noqa: ANN001
+        if name == "torch" or name.startswith("torch."):
+            raise ImportError("blocked torch for missing-dependency test")
+        if name == "transformers" or name.startswith("transformers."):
+            raise ImportError("blocked transformers for missing-dependency test")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", _blocked_import)
 
 
 class TestNormalizeDepth:
@@ -195,6 +209,7 @@ class TestInferBatch:
 
             importlib.reload(real_depth_filler)
 
+            _block_depth_model_imports(monkeypatch)
             with pytest.raises(RuntimeError, match="Missing dependencies"):
                 real_depth_filler.infer_batch(str(rgb_dir), str(out_dir))
         finally:
@@ -313,6 +328,7 @@ class TestLazyLoad:
 
             importlib.reload(real_depth_filler)
 
+            _block_depth_model_imports(monkeypatch)
             with pytest.raises(RuntimeError, match="Missing dependencies"):
                 real_depth_filler.lazy_load_depth_pipeline()
         finally:

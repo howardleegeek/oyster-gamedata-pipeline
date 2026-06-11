@@ -22,6 +22,32 @@ Before proceeding, ensure the following requirements are met:
 pip install beamngpy>=1.27
 ```
 
+### CI / Cluster Dry-Run
+
+BeamNG has a pure-Python mock mode for smoke checks on macOS, Linux, and
+headless cluster workers. It does not require BeamNG.drive, BeamNGpy, Steam, or
+research mode, but it emits the same observation envelope as the real adapter:
+`timestamp`, `ego_pose`, `camera`, `vehicle_sensors`, and `source`.
+
+```bash
+PYTHONPATH=src python -m oyster_agent_runner.environments.beamng_drive \
+  --mock \
+  --duration 1 \
+  --frequency 10 \
+  --output /tmp/beamng_mock_observations.json
+```
+
+Verify the dry-run output is JSON and follows the plug-and-play contract:
+
+```bash
+jq '.[0] | keys' /tmp/beamng_mock_observations.json
+jq '.[0].source' /tmp/beamng_mock_observations.json
+```
+
+Use the real BeamNGpy path only on a Windows host with BeamNG.drive installed
+and research mode enabled. If the SDK is missing, the adapter raises a clear
+`RuntimeError` telling the operator to install `beamngpy` or run `--mock`.
+
 ---
 
 ## 2. Enable Research Mode

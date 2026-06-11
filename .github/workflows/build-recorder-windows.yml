@@ -1,0 +1,417 @@
+---
+# ============================================================================
+# build-recorder-windows.yml
+# ============================================================================
+# Builds the OysterRecorder Rust binary + Inno Setup installer on Windows.
+#
+# Triggers:
+#   - Tag push matching recorder-v*
+#   - Push to main when vendor/recorder/** changes
+#   - Manual workflow_dispatch
+#
+# Steps:
+#   1. Checkout + submodule init
+#   2. Install Rust stable toolchain
+#   3. cargo build --release
+#   4. Inno Setup compile (choco + ISCC.exe)
+#   5. Optional EV cert signing (if EV_CERT_PFX / EV_CERT_PFX_BASE64 exists)
+#   6. Upload setup exe as workflow artifact (90-day retention)
+#   7. If tag triggered -> attach to GitHub release
+# ============================================================================
+
+name: Build Recorder (Windows)
+
+# yamllint disable-line rule:truthy
+on:
+  push:
+    tags:
+      - 'recorder-v*'
+    branches:
+      - main
+    paths:
+      - 'vendor/recorder/**'
+      - 'installer/oyster-recorder.iss'
+      - '.github/workflows/build-recorder-windows.yml'
+  workflow_dispatch:
+    inputs:
+      version_override:
+        description: >
+          Override version string (e.g. 1.2.3).
+          Leave empty to auto-detect from tag or Cargo.toml.
+        required: false
+        default: ''
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_TARGET_DIR: 'D:\a\cargo-target'
+  RECORDER_RUNTIME_REPO: howardleegeek/gamedata-recorder
+  RECORDER_RUNTIME_TAG: v2.6.0
+  RECORDER_RUNTIME_ASSET: gamedata-recorder-windows-x64.zip
+
+jobs:
+  build-and-package:
+    name: Build & Package OysterRecorder
+    runs-on: windows-latest
+    env:
+      EV_CERT_PFX: >-
+        ${{ secrets.EV_CERT_PFX || secrets.EV_CERT_PFX_BASE64 }}
+      EV_CERT_PASSWORD: >-
+        ${{ secrets.EV_CERT_PASSWORD }}
+
+    steps:
+      # --------------------------------------------------------------
+      # 1. Checkout repository + submodules
+      # --------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 0
+
+      - name: Init recorder submodules
+        shell: bash
+        run: |
+          git submodule update --init --depth 1 vendor/recorder vendor/input-logger
+
+      # --------------------------------------------------------------
+      # 2. Install Rust stable toolchain
+      # --------------------------------------------------------------
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      # --------------------------------------------------------------
+      # 3. Cache cargo registry & build artifacts
+      # --------------------------------------------------------------
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ env.CARGO_TARGET_DIR }}
+          key: >-
+            ${{ runner.os }}-cargo-${{
+            hashFiles('vendor/recorder/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      # --------------------------------------------------------------
+      # 4. Resolve version string
+      # --------------------------------------------------------------
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $version = ""
+
+          # Priority 1: workflow_dispatch override
+          if ("${{ github.event_name }}" -eq "workflow_dispatch" `
+              -and "${{ github.event.inputs.version_override }}" -ne "") {
+            $version = "${{ github.event.inputs.version_override }}"
+          }
+
+          # Priority 2: git tag
+          if ($version -eq "" `
+              -and "${{ github.ref_type }}" -eq "tag") {
+            $version = "${{ github.ref_name }}" `
+              -replace "^recorder-v", ""
+          }
+
+          # Priority 3: Cargo.toml
+          if ($version -eq "") {
+            $cargoPath = "vendor/recorder/Cargo.toml"
+            if (Test-Path $cargoPath) {
+              $line = Select-String -Path $cargoPath `
+                -Pattern '^version\s*=' | Select-Object -First 1
+              if ($line) {
+                $version = ($line.Line -replace '^version\s*=\s*"', "") `
+                  -replace '"', ''
+              }
+            }
+          }
+
+          if ($version -eq "") {
+            Write-Error "Could not resolve version"
+            exit 1
+          }
+
+          Write-Host "Resolved version: $version"
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT `
+            -Append
+
+      # --------------------------------------------------------------
+      # 5. cargo build --release
+      # --------------------------------------------------------------
+      - name: Build recorder (release)
+        shell: pwsh
+        run: |
+          Set-Location vendor/recorder
+          New-Item -ItemType Directory -Force `
+            -Path $env:CARGO_TARGET_DIR | Out-Null
+          cargo build --release --locked
+          Write-Host "Build complete. Checking binary..."
+          $releaseDirs = @(
+            "$env:CARGO_TARGET_DIR/release",
+            "$env:CARGO_TARGET_DIR/x86_64-pc-windows-msvc/release"
+          )
+          $binNames = @(
+            "gamedata-recorder.exe",
+            "oyster-recorder.exe"
+          )
+          $bin = $null
+          foreach ($releaseDir in $releaseDirs) {
+            foreach ($binName in $binNames) {
+              $candidate = Join-Path $releaseDir $binName
+              if (Test-Path $candidate) {
+                $bin = $candidate
+                break
+              }
+            }
+            if ($bin) {
+              break
+            }
+          }
+          if ($bin -and (Test-Path $bin)) {
+            $targetBin = Join-Path (Split-Path $bin -Parent) `
+              "oyster-recorder.exe"
+            if ((Split-Path $bin -Leaf) -ne "oyster-recorder.exe") {
+              Copy-Item -Path $bin -Destination $targetBin -Force
+            }
+            Write-Host "OK recorder binary exists at $targetBin"
+            Get-Item $targetBin |
+              Select-Object Length, LastWriteTime
+          } else {
+            Write-Error "Recorder binary NOT found"
+            exit 1
+          }
+
+      # --------------------------------------------------------------
+      # 6. Install Inno Setup
+      # --------------------------------------------------------------
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      # --------------------------------------------------------------
+      # 6b. Download VC++ Redistributable for bundling (S130)
+      # --------------------------------------------------------------
+      - name: Download VC++ Redistributable
+        shell: pwsh
+        run: |
+          $url = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+          $out = "installer/vc_redist.x64.exe"
+          Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing
+          $size = (Get-Item $out).Length
+          if ($size -lt 10000000) {
+            Write-Error "vc_redist.x64.exe download too small: $size bytes"
+            exit 1
+          }
+          Write-Host "Downloaded vc_redist.x64.exe ($size bytes)"
+
+      # --------------------------------------------------------------
+      # 7. Compile Inno Setup installer
+      # Compatible with mareangler/iscc-action@v1; direct ISCC keeps signing
+      # and artifact path checks explicit in one PowerShell flow.
+      # --------------------------------------------------------------
+      - name: Compile installer
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ver = "${{ steps.version.outputs.version }}"
+          $srcDirs = @(
+            "$env:CARGO_TARGET_DIR/release",
+            "$env:CARGO_TARGET_DIR/x86_64-pc-windows-msvc/release"
+          )
+          $srcDir = $srcDirs |
+            Where-Object {
+              Test-Path (Join-Path $_ "oyster-recorder.exe")
+            } |
+            Select-Object -First 1
+          if (-not $srcDir) {
+            Write-Error "Compiled recorder output directory not found"
+            exit 1
+          }
+          $stageDir = "installer\staging"
+          if (Test-Path $stageDir) {
+            Remove-Item -Recurse -Force $stageDir
+          }
+          New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
+
+          $runtimeZip = Join-Path $env:RUNNER_TEMP $env:RECORDER_RUNTIME_ASSET
+          $runtimeExtract = Join-Path $env:RUNNER_TEMP "recorder-runtime-x64"
+          if (Test-Path $runtimeExtract) {
+            Remove-Item -Recurse -Force $runtimeExtract
+          }
+          New-Item -ItemType Directory -Force -Path $runtimeExtract | Out-Null
+
+          Write-Host "Downloading recorder runtime $env:RECORDER_RUNTIME_REPO@$env:RECORDER_RUNTIME_TAG/$env:RECORDER_RUNTIME_ASSET"
+          gh release download $env:RECORDER_RUNTIME_TAG `
+            --repo $env:RECORDER_RUNTIME_REPO `
+            --pattern $env:RECORDER_RUNTIME_ASSET `
+            --dir $env:RUNNER_TEMP `
+            --clobber
+
+          if (-not (Test-Path $runtimeZip)) {
+            Write-Error "Recorder runtime asset was not downloaded: $runtimeZip"
+            exit 1
+          }
+          Expand-Archive -Path $runtimeZip -DestinationPath $runtimeExtract -Force
+
+          $runtimeExe = Get-ChildItem `
+            -Path $runtimeExtract `
+            -Recurse `
+            -Filter "gamedata-recorder.exe" |
+            Select-Object -First 1
+          if (-not $runtimeExe) {
+            Write-Error "Downloaded recorder runtime does not contain gamedata-recorder.exe"
+            exit 1
+          }
+          $runtimeDir = Split-Path $runtimeExe.FullName -Parent
+          Write-Host "Staging recorder runtime from $runtimeDir"
+          Copy-Item -Path (Join-Path $runtimeDir "*") `
+            -Destination $stageDir `
+            -Recurse `
+            -Force
+
+          $builtExe = Join-Path $srcDir "gamedata-recorder.exe"
+          if (-not (Test-Path $builtExe)) {
+            $builtExe = Join-Path $srcDir "oyster-recorder.exe"
+          }
+          if (-not (Test-Path $builtExe)) {
+            Write-Error "Built recorder exe missing from $srcDir"
+            exit 1
+          }
+          Copy-Item -Path $builtExe `
+            -Destination (Join-Path $stageDir "gamedata-recorder.exe") `
+            -Force
+
+          $requiredRuntime = @(
+            "gamedata-recorder.exe",
+            "obs.dll",
+            "libobs-d3d11.dll",
+            "libobs-opengl.dll",
+            "libobs-winrt.dll",
+            "obs-ffmpeg-mux.exe",
+            "obs-plugins",
+            "data"
+          )
+          foreach ($relative in $requiredRuntime) {
+            $candidate = Join-Path $stageDir $relative
+            if (-not (Test-Path $candidate)) {
+              Write-Error "Staged installer runtime missing required OBS asset: $relative"
+              exit 1
+            }
+          }
+
+          function Get-PeMachine([string]$Path) {
+            $stream = [System.IO.File]::OpenRead($Path)
+            $reader = New-Object System.IO.BinaryReader($stream)
+            try {
+              $stream.Seek(0x3C, [System.IO.SeekOrigin]::Begin) | Out-Null
+              $peOffset = $reader.ReadInt32()
+              $stream.Seek($peOffset + 4, [System.IO.SeekOrigin]::Begin) | Out-Null
+              return $reader.ReadUInt16()
+            } finally {
+              $reader.Close()
+              $stream.Close()
+            }
+          }
+
+          $resolvedStageDir = (Resolve-Path $stageDir).Path
+          $allowedX86RuntimeHelpers = @(
+            "data\obs-plugins\win-capture\get-graphics-offsets32.exe",
+            "data\obs-plugins\win-capture\graphics-hook32.dll",
+            "data\obs-plugins\win-capture\inject-helper32.exe",
+            "data\obs-plugins\win-dshow\obs-virtualcam-module32.dll"
+          )
+          $peFiles = Get-ChildItem `
+            -Path $stageDir `
+            -Recurse `
+            -Include *.exe, *.dll
+          foreach ($file in $peFiles) {
+            $machine = Get-PeMachine $file.FullName
+            $relativePath = [System.IO.Path]::GetRelativePath(
+              $resolvedStageDir,
+              $file.FullName
+            ).Replace("/", "\")
+            if ($machine -eq 0x014C -and $allowedX86RuntimeHelpers -contains $relativePath) {
+              Write-Host "Allowed OBS 32-bit runtime helper: $relativePath"
+              continue
+            }
+            if ($machine -ne 0x8664) {
+              $machineHex = "0x{0:X4}" -f $machine
+              Write-Error "Staged runtime PE architecture mismatch: $($file.FullName) machine=$machineHex expected=0x8664 (x86-64)"
+              exit 1
+            }
+          }
+          Write-Host "Verified staged runtime PE architecture: x86-64"
+
+          $srcDir = (Resolve-Path $stageDir).Path
+          New-Item -ItemType Directory -Force `
+            -Path "installer\output" | Out-Null
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            "/DAppVersion=$ver" `
+            "/DSourceDir=$srcDir" `
+            "installer\oyster-recorder.iss"
+
+      # --------------------------------------------------------------
+      # 8. Optional: EV certificate signing
+      # --------------------------------------------------------------
+      - name: Sign installer with EV certificate
+        if: env.EV_CERT_PFX != ''
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.version.outputs.version }}"
+          $setupExe = "installer\output\" +
+            "OysterRecorder-setup-v${ver}.exe"
+          if (-not (Test-Path $setupExe)) {
+            Write-Error "Setup exe not found at $setupExe"
+            exit 1
+          }
+          & installer\sign_installer.ps1 -FilePath $setupExe
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Warn — installer is unsigned
+        if: env.EV_CERT_PFX == ''
+        shell: pwsh
+        run: |
+          Write-Warning "EV_CERT_PFX secret not set — installer will be distributed UNSIGNED."
+          Write-Warning "Add EV_CERT_PFX (or legacy EV_CERT_PFX_BASE64) and EV_CERT_PASSWORD to repository secrets to enable signing."
+
+      # --------------------------------------------------------------
+      # 9. Upload workflow artifact (90-day retention)
+      # --------------------------------------------------------------
+      - name: Upload setup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OysterRecorder-setup-v${{ steps.version.outputs.version }}
+          path: installer/output/OysterRecorder-setup-v${{ steps.version.outputs.version }}.exe
+          retention-days: 90
+          if-no-files-found: error
+
+      # --------------------------------------------------------------
+      # 10. Attach to GitHub release (only on tag push)
+      # --------------------------------------------------------------
+      - name: Attach to GitHub Release
+        if: >-
+          startsWith(github.ref,
+          'refs/tags/recorder-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: installer/output/OysterRecorder-setup-v${{ steps.version.outputs.version }}.exe
+          tag_name: ${{ github.ref_name }}
+          name: OysterRecorder ${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: >-
+            ${{ contains(
+            steps.version.outputs.version, '-') }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

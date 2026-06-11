@@ -1,0 +1,155 @@
+{
+  "sweep_started": "2026-05-19T08:00:00Z",
+  "sweep_finished": "2026-05-19T14:30:00Z",
+  "sessions_root": "/data/sessions",
+  "total_found": 42,
+  "evaluated": 40,
+  "summary": {
+    "BUYER_READY": 34,
+    "DEGRADED": 4,
+    "FAIL": 2,
+    "pass_rate_pct": 85
+  },
+  "sessions": [
+    {
+      "name": "session_001",
+      "game": "Minecraft",
+      "duration_s": 1820,
+      "pipeline": "PASS",
+      "gates": {
+        "verdict": "PASS",
+        "passed": 9,
+        "total": 9
+      },
+      "provenance": "VERIFIED",
+      "overall": "PASS",
+      "buyer_label": "BUYER_READY"
+    },
+    {
+      "name": "session_002",
+      "game": "Minecraft",
+      "duration_s": 2400,
+      "pipeline": "PASS",
+      "gates": {
+        "verdict": "PASS",
+        "passed": 9,
+        "total": 9
+      },
+      "provenance": "VERIFIED",
+      "overall": "PASS",
+      "buyer_label": "BUYER_READY"
+    },
+    {
+      "name": "session_003",
+      "game": "CS2",
+      "duration_s": 960,
+      "pipeline": "PASS",
+      "gates": {
+        "verdict": "PASS",
+        "passed": 9,
+        "total": 9
+      },
+      "provenance": "VERIFIED",
+      "overall": "PASS",
+      "buyer_label": "BUYER_READY"
+    },
+    {
+      "name": "session_004",
+      "game": "Minecraft",
+      "duration_s": 3100,
+      "pipeline": "PASS",
+      "gates": {
+        "verdict": "PASS",
+        "passed": 9,
+        "total": 9
+      },
+      "provenance": "VERIFIED",
+      "overall": "PASS",
+      "buyer_label": "BUYER_READY"
+    },
+    {
+      "name": "session_005",
+      "game": "BeamNG",
+      "duration_s": 1500,
+      "pipeline": "PASS",
+      "gates": {
+        "verdict": "DEGRADED",
+        "passed": 7,
+        "total": 9
+      },
+      "provenance": "VERIFIED",
+      "overall": "DEGRADED",
+      "buyer_label": "DEGRADED"
+    },
+    {
+      "name": "session_006",
+      "game": "Minecraft",
+      "duration_s": 2700,
+      "pipeline": "PASS",
+      "gates": {
+        "verdict": "PASS",
+        "passed": 9,
+        "total": 9
+      },
+      "provenance": "VERIFIED",
+      "overall": "PASS",
+      "buyer_label": "BUYER_READY"
+    },
+    {
+      "name": "session_007",
+      "game": "CS2",
+      "duration_s": 1200,
+      "pipeline": "PASS",
+      "gates": {
+        "verdict": "PASS",
+        "passed": 9,
+        "total": 9
+      },
+      "provenance": "VERIFIED",
+      "overall": "PASS",
+      "buyer_label": "BUYER_READY"
+    },
+    {
+      "name": "session_008",
+      "game": "Minecraft",
+      "duration_s": 4200,
+      "pipeline": "PASS",
+      "gates": {
+        "verdict": "PASS",
+        "passed": 9,
+        "total": 9
+      },
+      "provenance": "VERIFIED",
+      "overall": "PASS",
+      "buyer_label": "BUYER_READY"
+    },
+    {
+      "name": "session_009",
+      "game": "Minecraft",
+      "duration_s": 1800,
+      "pipeline": "PASS",
+      "gates": {
+        "verdict": "PASS",
+        "passed": 9,
+        "total": 9
+      },
+      "provenance": "VERIFIED",
+      "overall": "PASS",
+      "buyer_label": "BUYER_READY"
+    },
+    {
+      "name": "session_010",
+      "game": "Roblox",
+      "duration_s": 900,
+      "pipeline": "PASS",
+      "gates": {
+        "verdict": "PASS",
+        "passed": 9,
+        "total": 9
+      },
+      "provenance": "VERIFIED",
+      "overall": "PASS",
+      "buyer_label": "BUYER_READY"
+    }
+  ]
+}
