@@ -1,7 +1,7 @@
-.PHONY: install test coverage lint fmt format smoke schema clean help precommit-install precommit-run
+.PHONY: install test coverage lint fmt format smoke schema clean help precommit-install precommit-run sample sample-lint
 
 help:
-	@echo "Targets: install test coverage lint fmt smoke schema precommit-install precommit-run clean"
+	@echo "Targets: install test coverage lint fmt smoke schema precommit-install precommit-run clean sample sample-lint"
 	@echo "  install            venv + editable install with dev deps"
 	@echo "  test               pytest -v"
 	@echo "  coverage           pytest with html + term coverage (htmlcov/)"
@@ -10,6 +10,8 @@ help:
 	@echo "  format             ruff --fix + black"
 	@echo "  precommit-install  install git hooks from .pre-commit-config.yaml"
 	@echo "  precommit-run      run all pre-commit hooks on every file"
+	@echo "  sample             regenerate samples/buyer-spec-v1-rc1.tar.gz (38/38 lint)"
+	@echo "  sample-lint        regenerate and lint the sample tarball"
 	@echo "  smoke              run agent 5 steps against mock env"
 	@echo "  schema             dump JSON schemas"
 	@echo "  clean              nuke .venv + caches"
@@ -64,3 +66,13 @@ schema: install  ## Dump schemas to stdout
 clean:
 	rm -rf $(VENV) .pytest_cache .ruff_cache build dist *.egg-info
 	find . -type d -name __pycache__ -exec rm -rf {} +
+
+sample:  ## Regenerate samples/buyer-spec-v1-rc1.tar.gz (38/38 lint compliant)
+	$(PY) bin/sample_tarball_builder.py --output samples/buyer-spec-v1-rc1.tar.gz
+
+sample-lint: sample  ## Regenerate and lint the sample tarball, expect 38/38
+	@rm -rf /tmp/lint-target-a
+	@mkdir -p /tmp/lint-target-a
+	@tar -xzf samples/buyer-spec-v1-rc1.tar.gz -C /tmp/lint-target-a
+	@$(PY) bin/lint_v3_prd_grounded.py /tmp/lint-target-a -o /tmp/lint_sample.json
+	@$(PY) -c "import json; d=json.load(open('/tmp/lint_sample.json')); s=d['summary']; print('SAMPLE:', s); assert s['failed']==0, f'lint failed: {s}'"
