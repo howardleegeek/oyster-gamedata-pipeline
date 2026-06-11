@@ -142,7 +142,7 @@ _APPDATA_RE = re.compile(r"\\AppData\\(Local|Roaming)\\", flags=re.IGNORECASE)
 
 
 def scrub_pii(blob: str) -> str:
-    """Replace personal-identifying patterns with anonymised placeholders.
+    """Replace personal-identifying patterns with anonymised tokens.
 
     Order matters:
       1. _WIN_USER_RE redacts the Howard segment under C:\\Users\\
