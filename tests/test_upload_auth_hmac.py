@@ -362,9 +362,9 @@ def _node_available() -> bool:
     return shutil.which("node") is not None
 
 
-@pytest.mark.skipif(
+@pytest.mark.skipif(  # skip when node runtime is unavailable in CI
     not _node_available(), reason="node not on PATH"
-)  # skip when node runtime is unavailable in CI
+)
 def test_ts_python_parity_full_token(tmp_path: Path) -> None:
     """Run the TS ``computeToken`` through Node and compare with Python.
 
@@ -400,9 +400,9 @@ def test_ts_python_parity_full_token(tmp_path: Path) -> None:
     )
 
 
-@pytest.mark.skipif(
+@pytest.mark.skipif(  # skip when node runtime is unavailable in CI
     not _node_available(), reason="node not on PATH"
-)  # skip when node runtime is unavailable in CI
+)
 def test_ts_verify_token_round_trip(tmp_path: Path) -> None:
     """Compute a token in Python, hand it to the TS verifier via Node,
     and assert the verifier accepts it.
