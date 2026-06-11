@@ -8,8 +8,6 @@ lint v3 #15 + #16 would report on the same data.
 
 from __future__ import annotations
 
-import math
-import os
 import sys
 from pathlib import Path
 
