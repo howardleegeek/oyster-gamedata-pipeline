@@ -299,7 +299,10 @@ def test_adapter_action_camera_records_have_all_fields(basic_bundle: Path, tmp_p
     assert isinstance(records, list)
     assert len(records) == 2  # two observations in fixture
     for rec in records:
-        assert set(rec.keys()) == set(BUYER_SPEC_FIELDS)
+        # All BUYER_SPEC_FIELDS must be present; is_padded is an extra
+        # transparency flag added by the adapter (False for real records).
+        assert set(BUYER_SPEC_FIELDS).issubset(set(rec.keys()))
+        assert rec.get("is_padded") is False
 
 
 def test_adapter_player_position_left_hand_conversion(basic_bundle: Path, tmp_path: Path) -> None:
