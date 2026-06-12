@@ -116,18 +116,36 @@ class ClaudeThinkingProvider:
                 f"max_tokens ({max_tokens}) must exceed thinking_budget ({thinking_budget}); "
                 f"thinking output is counted against max_tokens by the API."
             )
-        anthropic, self._APIError, self._APIStatusError, self._RateLimitError = (
-            _lazy_import_anthropic()
-        )
+        # Defer SDK import + client creation to first chat() call so that
+        # unit tests can inject a fake _client without needing anthropic installed.
+        self._resolved_key: str = resolved_key
+        self._client: object | None = None
+        self._APIError: type | None = None
+        self._APIStatusError: type | None = None
+        self._RateLimitError: type | None = None
         self.model = model
         self.max_tokens = max_tokens
         self.thinking_budget = thinking_budget
-        self._client = anthropic.Anthropic(api_key=resolved_key)
         # Captured from the most recent `chat()` call. None before the
         # first call. Empty string if the response had no thinking blocks
         # (e.g. SDK degradation), which the runner can distinguish from
         # None to know whether thinking-mode was actually requested.
         self.last_thinking: str | None = None
+
+    # Internals ---------------------------------------------------------------
+
+    def _ensure_client(self) -> None:
+        """Lazily create the Anthropic client on first use.
+
+        Deferring this lets unit tests inject a fake ``_client`` attribute
+        without needing the ``anthropic`` package installed.
+        """
+        if self._client is not None:
+            return
+        anthropic, self._APIError, self._APIStatusError, self._RateLimitError = (
+            _lazy_import_anthropic()
+        )
+        self._client = anthropic.Anthropic(api_key=self._resolved_key)
 
     # LLMProvider protocol ----------------------------------------------------
 
@@ -142,6 +160,8 @@ class ClaudeThinkingProvider:
         # Thinking mode is incompatible with non-default temperature; force it
         # to 1.0 regardless of what the runner passed in.
         del temperature
+
+        self._ensure_client()
 
         last_exc: Exception | None = None
         for attempt in range(MAX_RETRIES):
