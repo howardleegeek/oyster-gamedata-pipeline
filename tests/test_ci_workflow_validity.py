@@ -39,8 +39,8 @@ class TestCIWorkflowValidity:
 
     @pytest.fixture
     def recorder_ci_path(self, workflow_dir):
-        """Return the recorder-ci.yml path."""
-        return workflow_dir / "recorder-ci.yml"
+        """Return the recorder-cargo-check.yml path."""
+        return workflow_dir / "recorder-cargo-check.yml"
 
     def test_workflow_directory_exists(self, workflow_dir):
         """Test that .github/workflows directory exists."""
@@ -136,23 +136,21 @@ class TestCIWorkflowValidity:
         assert "pull_request" in on_config, "Pipeline CI should trigger on pull requests"
 
     @pytest.mark.skipif(not HAS_YAML, reason="PyYAML not installed")
-    def test_recorder_ci_has_build_jobs(self, recorder_ci_path):
-        """Test that recorder-ci.yml has build jobs for multiple platforms."""
+    def test_recorder_ci_has_cargo_check_job(self, recorder_ci_path):
+        """Test that recorder-cargo-check.yml has a cargo-check job."""
         with open(recorder_ci_path) as f:
             content = yaml.safe_load(f)
 
         jobs = content.get("jobs", {})
-        assert "build-linux" in jobs, "Recorder CI should have build-linux job"
-        assert "build-windows" in jobs, "Recorder CI should have build-windows job"
+        assert "cargo-check" in jobs, "Recorder CI should have cargo-check job"
 
     @pytest.mark.skipif(not HAS_YAML, reason="PyYAML not installed")
     def test_recorder_ci_uses_cargo(self, recorder_ci_path):
-        """Test that recorder-ci.yml uses cargo for Rust builds."""
+        """Test that recorder-cargo-check.yml uses cargo for Rust builds."""
         with open(recorder_ci_path) as f:
             content = f.read()
 
-        assert "cargo build" in content, "Recorder CI should use cargo build"
-        assert "cargo test" in content, "Recorder CI should use cargo test"
+        assert "cargo check" in content, "Recorder CI should use cargo check"
 
     def test_no_common_typos_in_pipeline_ci(self, pipeline_ci_path):
         """Test for common typos in pipeline-ci.yml."""
