@@ -29,5 +29,9 @@
 - Result: committed aa7e98df
 
 ## Round 8 @ 2026-06-12T12:15:00Z
-- Picked: Fix failing `tests/test_gpt_thinking_provider.py::test_provider_not_available_when_openai_missing` — `GPTThinkingProvider.__init__` unconditionally imported `openai` at construction time, so the test (which patches `builtins.__import__` to block `openai`) failed with `ModuleNotFoundError` during instantiation. Deferring the import to `complete()` call time matches the pattern already used in `ClaudeThinkingProvider` (Round 5 style) and lets the stub path work without the optional SDK installed.
+- Picked: Fix failing `tests/test_gpt_thinking_provider.py::test_provider_not_available_when_openai_missing` — `GPTThinkingProvider.__init__` unconditionally imported `openai` at construction time, so the test (which patches `builtins.__import__` to block `openai`) failed with `ModuleNotFoundError` during instantiation. Deferred import to `complete()` call time.
 - Result: committed 39661cc2
+
+## Round 9 @ 2026-06-12T12:30:00Z
+- Picked: Apply same lazy-init pattern to `ClaudeThinkingProvider` — `__init__` unconditionally imported `anthropic` and created a real client, blocking unit tests from injecting a fake `_client`. Added `_ensure_client()` method that defers SDK import + client creation to first `chat()` call, matching the Round 8 fix for `GPTThinkingProvider`.
+- Result: committed 63e4bbdc
