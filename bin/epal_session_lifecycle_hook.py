@@ -258,6 +258,18 @@ class WebhookHandler(BaseHTTPRequestHandler):
         return self.headers.get("X-EPAL-Secret", "") == secret
 
     def do_POST(self) -> None:  # noqa: N802
+        """Handle POST requests for session_start or session_end webhooks.
+
+        Parses the request body, validates the webhook secret, and dispatches
+        to the appropriate handler based on the request path.
+
+        Routes:
+            - /v1/epal/session_start: calls handle_session_start
+            - /v1/epal/session_end: calls handle_session_end
+
+        Returns:
+            Sends JSON response with handler result or error.
+        """
         if not self._verify_secret():
             self._send_json(401, {"error": "unauthorized"})
             return
