@@ -11,3 +11,7 @@
 ## Round 3 @ 2026-06-12T10:53:18Z
 - Picked: Fix global pytest collection failure — `tests/test_batch_bundler.py` failed with `ImportError: cannot import name 'build_manifest'` because pytest discovered tests in `patches/cluster-week3-2026-05-18/B1-bundler-broken/`, which added its directory to sys.path, causing the broken `batch_bundler.py` in patches to shadow `bin/batch_bundler.py`.
 - Result: committed 90488dee
+
+## Round 4 @ 2026-06-12T11:10:00Z
+- Picked: Fix failing `tests/test_ci_workflow_validity.py::TestCIWorkflowValidity::test_recorder_ci_file_exists` — test referenced non-existent `recorder-ci.yml` but actual workflow file is `recorder-cargo-check.yml`. Updated fixture path and adjusted assertions to match the real workflow (cargo-check job, cargo check command).
+- Result: committed 35f917e7
