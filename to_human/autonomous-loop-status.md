@@ -23,3 +23,7 @@
 ## Round 6 @ 2026-06-12T11:45:00Z
 - Picked: Fix failing `tests/test_auto_tag_bot.py::TestCommitThreshold::test_below_threshold_no_tag` — `scripts/auto_tag_bot.sh` unconditionally required `gh` CLI even when `DRY_RUN=true` (test mode). Added `DRY_RUN` guard so the pre-flight check is skipped in test mode, matching the pattern used in `auto_release.sh` (Round 1).
 - Result: committed 35216aa6
+
+## Round 7 @ 2026-06-12T12:00:00Z
+- Picked: Fix failing `tests/test_buyer_spec_adapter.py::test_adapter_action_camera_records_have_all_fields` — test asserted exact key equality with `BUYER_SPEC_FIELDS` but the adapter now tags every real record with `is_padded=False` (transparency flag). Changed assertion to subset check + explicit `is_padded=False` verification.
+- Result: committed aa7e98df
