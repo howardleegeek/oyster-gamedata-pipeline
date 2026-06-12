@@ -15,3 +15,7 @@
 ## Round 4 @ 2026-06-12T11:10:00Z
 - Picked: Fix failing `tests/test_ci_workflow_validity.py::TestCIWorkflowValidity::test_recorder_ci_file_exists` — test referenced non-existent `recorder-ci.yml` but actual workflow file is `recorder-cargo-check.yml`. Updated fixture path and adjusted assertions to match the real workflow (cargo-check job, cargo check command).
 - Result: committed 35f917e7
+
+## Round 5 @ 2026-06-12T11:30:00Z
+- Picked: Fix global pytest collection INTERNALERROR — `scripts/upload_to_r2.py` called `sys.exit(1)` at module level when `boto3` was not installed, killing pytest collection for all tests. Replaced with `_MissingBoto3` sentinel that defers the error to call time and supports `mock.patch` attribute access.
+- Result: committed 1b624d87
