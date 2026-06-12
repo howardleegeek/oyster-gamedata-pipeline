@@ -27,3 +27,7 @@
 ## Round 7 @ 2026-06-12T12:00:00Z
 - Picked: Fix failing `tests/test_buyer_spec_adapter.py::test_adapter_action_camera_records_have_all_fields` — test asserted exact key equality with `BUYER_SPEC_FIELDS` but the adapter now tags every real record with `is_padded=False` (transparency flag). Changed assertion to subset check + explicit `is_padded=False` verification.
 - Result: committed aa7e98df
+
+## Round 8 @ 2026-06-12T12:15:00Z
+- Picked: Fix failing `tests/test_gpt_thinking_provider.py::test_provider_not_available_when_openai_missing` — `GPTThinkingProvider.__init__` unconditionally imported `openai` at construction time, so the test (which patches `builtins.__import__` to block `openai`) failed with `ModuleNotFoundError` during instantiation. Deferring the import to `complete()` call time matches the pattern already used in `ClaudeThinkingProvider` (Round 5 style) and lets the stub path work without the optional SDK installed.
+- Result: committed 39661cc2
