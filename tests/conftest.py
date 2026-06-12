@@ -92,9 +92,9 @@ collect_ignore = [
     "phase2/test_semantic_validator.py",
     # buyer_spec_adapter: pre-existing import wiring issue on CI
     "test_buyer_spec_adapter.py",
-    # test_i18n_coverage expects ./dashboard/i18n/en.json which doesn't
-    # exist in git (never been created). Pre-existing fixture gap.
-    "test_i18n_coverage.py",
+    # (FIXED in Round 1) test_i18n_coverage now passes — dashboard/i18n/
+    # fixtures created with en.json, zh-CN.json, ja-JP.json.
+    # "test_i18n_coverage.py",
     # test_video_metadata_extractor needs ffmpeg on CI runner (not present)
     "utilities/test_video_metadata_extractor.py",
     # test_r23_video_codec uses an odd mock path
