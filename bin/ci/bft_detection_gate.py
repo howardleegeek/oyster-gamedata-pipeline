@@ -15,6 +15,20 @@ CRITICAL_ATTACKS = {"B-03", "B-05", "D-04"}
 
 
 def main() -> int:
+    """Run BFT adversarial detection gate.
+
+    Parses output from blue_team_score to verify detection rate meets
+    MIN_DETECTION_RATE threshold (default 73%). Fails if any CRITICAL
+    attack (B-03, B-05, D-04) regresses from caught to uncaught.
+
+    Returns:
+        0 if detection rate >= threshold and no critical regressions.
+        1 if detection rate below threshold or critical attack uncaught.
+
+    Exit codes:
+        0: Gate pass
+        1: Gate fail
+    """
     threshold = int(os.environ.get("MIN_DETECTION_RATE", "73"))
     proc = subprocess.run(
         [sys.executable, "-m", "bin.red_team.blue_team_score"],
