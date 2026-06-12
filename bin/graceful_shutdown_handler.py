@@ -169,6 +169,12 @@ class GracefulShutdownHandler:
             self.shutdown()
     
     def is_shutting_down(self) -> bool:
+        """Check whether graceful shutdown has been initiated.
+
+        Returns:
+            True if shutdown has been triggered (SIGTERM/SIGINT received),
+            False otherwise.
+        """
         return self._shutdown.is_set()
     
     def wait_for_shutdown(self, timeout: Optional[float] = None) -> bool:
