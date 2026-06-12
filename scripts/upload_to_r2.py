@@ -16,13 +16,27 @@ import os
 import sys
 from pathlib import Path
 
+class _MissingBoto3:
+    """Placeholder so the module is importable without boto3 installed.
+
+    Supports arbitrary attribute access so that ``mock.patch`` can still
+    target ``upload_to_r2.boto3.Session`` etc.  Real usage is guarded at
+    call time with a clear error message.
+    """
+
+    def __getattr__(self, _name: str):
+        return self
+
+
 try:
     import boto3
     from botocore.config import Config
     from botocore.exceptions import ClientError, NoCredentialsError
 except ImportError:
-    print("ERROR: boto3 is required. Install with: pip install boto3", file=sys.stderr)
-    sys.exit(1)
+    boto3 = _MissingBoto3()  # type: ignore[assignment]
+    Config = _MissingBoto3()  # type: ignore[assignment]
+    ClientError = _MissingBoto3()  # type: ignore[assignment]
+    NoCredentialsError = _MissingBoto3()  # type: ignore[assignment]
 
 
 REQUIRED_ENV_VARS = [
@@ -83,6 +97,10 @@ def upload_to_r2(
         FileNotFoundError: If the local file does not exist.
         SystemExit: On upload failure.
     """
+    if isinstance(boto3, _MissingBoto3):
+        print("ERROR: boto3 is required. Install with: pip install boto3", file=sys.stderr)
+        sys.exit(1)
+
     local_path = Path(file_path)
     if not local_path.is_file():
         print(f"ERROR: File not found: {file_path}", file=sys.stderr)
