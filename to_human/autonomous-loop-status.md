@@ -35,3 +35,7 @@
 ## Round 9 @ 2026-06-12T12:30:00Z
 - Picked: Apply same lazy-init pattern to `ClaudeThinkingProvider` — `__init__` unconditionally imported `anthropic` and created a real client, blocking unit tests from injecting a fake `_client`. Added `_ensure_client()` method that defers SDK import + client creation to first `chat()` call, matching the Round 8 fix for `GPTThinkingProvider`.
 - Result: committed 63e4bbdc
+
+## Round 10 @ 2026-06-12T12:30:00Z
+- Picked: Fix deprecated Pillow `img.getdata()` in `bin/scene_lighting_metadata.py` (same issue fixed in Round 9 for anti_replay_check.py) — replaced with `get_flattened_data()` to avoid Pillow 11.0+ deprecation warning.
+- Result: committed 75150b33
