@@ -46,7 +46,7 @@ tag_exists() {
 # Pre-flight
 # ---------------------------------------------------------------------------
 
-if ! command -v gh &>/dev/null; then
+if [ "${DRY_RUN:-false}" != "true" ] && ! command -v gh &>/dev/null; then
   die "gh CLI is required but not found"
 fi
 
