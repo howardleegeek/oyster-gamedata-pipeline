@@ -12,9 +12,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch, MagicMock, mock_open
 
-# Add bin directory to path
+# Add local directory to path for the zbuffer_to_exr module
 import sys
-sys.path.insert(0, str(Path(__file__).parent.parent / 'bin'))
+sys.path.insert(0, str(Path(__file__).parent))
 
 from zbuffer_to_exr import (
     parse_bin_header,
