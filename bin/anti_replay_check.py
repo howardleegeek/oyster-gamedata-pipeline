@@ -153,7 +153,7 @@ def compute_perceptual_hash(image_path: str | Path) -> str:
         .convert("L")
         .resize((PERCEPTUAL_HASH_SIZE, PERCEPTUAL_HASH_SIZE), Image.LANCZOS)
     )
-    pixels = list(img.getdata())
+    pixels = list(img.get_flattened_data())
     avg = sum(pixels) / len(pixels)
     bits = "".join("1" if p > avg else "0" for p in pixels)
 
