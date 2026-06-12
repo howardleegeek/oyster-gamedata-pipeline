@@ -99,8 +99,11 @@ class _FakeOpenAIClient:
 
 
 def test_provider_not_available_when_openai_missing(monkeypatch: pytest.MonkeyPatch) -> None:
-    """If `openai` can't be imported, instantiation raises ProviderNotAvailable
-    with a `pip install openai` hint — distinct from a missing-key error."""
+    """If `openai` can't be imported, `complete()` raises ProviderNotAvailable
+    with a `pip install openai` hint — distinct from a missing-key error.
+
+    The import is deferred to call time so the stub path (no key, no
+    client) works without the optional SDK installed."""
     real_import = builtins.__import__
 
     def fake_import(name: str, *args: Any, **kwargs: Any) -> Any:
@@ -109,9 +112,11 @@ def test_provider_not_available_when_openai_missing(monkeypatch: pytest.MonkeyPa
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", fake_import)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-do-not-use")
 
+    prov = GPTThinkingProvider()
     with pytest.raises(ProviderNotAvailable, match="pip install openai"):
-        GPTThinkingProvider()
+        prov.complete(messages=[{"role": "user", "content": "test"}])
 
 
 def test_instantiation_with_mock_client_succeeds() -> None:

@@ -165,11 +165,9 @@ class GPTThinkingProvider:
         *,
         client: object | None = None,
     ) -> None:
-        # Verify the optional SDK is present before we promise anything.
-        # Even when an explicit `client` is passed (test path), we still
-        # attempt the import so misconfigured environments fail loudly
-        # at construction rather than silently at first call.
-        _lazy_import_openai()
+        # Defer the SDK import to `complete()` — the stub path (no key,
+        # no client) must work without `openai` installed. Only the real
+        # SDK path needs the import, and we check it there.
         self.model = model
         self.reasoning_effort = reasoning_effort
         self.max_tokens = max_tokens
