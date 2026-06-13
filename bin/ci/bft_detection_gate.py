@@ -33,10 +33,6 @@ def main() -> int:
     caught, total, pct = int(m.group(1)), int(m.group(2)), int(m.group(3))
 
     # Regression: any CRITICAL attack uncaught
-    row_re = re.compile(
-        r"^(B-\d+|C-\d+|D-\d+)\s+\S+\s+(\S+)\s+(\S+\s*\S*)\s",
-        re.MULTILINE,
-    )
     uncaught_critical = []
     for line in output.splitlines():
         parts = line.split()
