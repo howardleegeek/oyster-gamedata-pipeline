@@ -116,7 +116,7 @@ def _detect_gaps(
     """Detect silent gaps in audio exceeding *min_gap_ms*.
     Returns list of dicts with keys: start_sec, end_sec, duration_ms."""
     np = _get_numpy()
-    if np is None:
+    if np is None or samples is None:
         return []
     threshold = 10.0 ** (threshold_db / 20.0)
     min_gap_samples = int(min_gap_ms / 1000.0 * sample_rate)
