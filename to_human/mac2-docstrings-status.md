@@ -80,7 +80,13 @@
 
 ## Round @ 2026-06-13T09:13:24Z
 - File: bin/graceful_shutdown_handler.py::wait_for_shutdown
-- Added: docstring=Y, type-hints=N (already had type hints)
+- Added: docstring=Y, type-hints=Y
+- Commit: f4fce35d1
+
+## Round @ 2026-06-14T10:00:00Z
+- File: bin/graceful_shutdown_handler.py::_register_signals and _handle_signal
+- Added: docstring=Y, type-hints=Y
+- Commit: b71155521 type-hints=N (already had type hints)
 - Commit: cbe9f9a93
 
 ## Round @ 2026-05-20T02:45:00Z
