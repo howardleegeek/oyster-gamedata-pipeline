@@ -143,6 +143,20 @@ def load_player_position(world_dir: str, frame_index: int) -> Tuple[float, float
         return (0.0, 0.0, 0.0)
 
 def extract_voxel_window(world_dir: str, player_pos: Tuple[float, float, float], frame_index: int) -> Optional[VoxelWindow]:
+    """Extract 3x3x3 voxel window around player position from block data.
+
+    Reads a binary block data file and constructs a voxel window centered
+    on the player's position. The window contains 27 block IDs representing
+    a 3x3x3 region around the player.
+
+    Args:
+        world_dir: Path to the world directory containing block binary files.
+        player_pos: Tuple of (x, y, z) player coordinates.
+        frame_index: The frame index used to locate the block data file.
+
+    Returns:
+        A VoxelWindow instance if block data exists, or None if file not found.
+    """
     blocks_path = os.path.join(world_dir, f"blocks_{frame_index}.bin")
     if not os.path.exists(blocks_path): return None
     try:
