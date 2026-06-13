@@ -28,7 +28,7 @@ def read_actions(input_path: str) -> List[str]:
     """Read actions from file or stdin, skipping empty lines and comments."""
     lines = sys.stdin if input_path == "-" else open(input_path, "r", encoding="utf-8")
     with lines:
-        return [l.strip() for l in lines if l.strip() and not l.strip().startswith("#")]
+        return [line.strip() for line in lines if line.strip() and not line.strip().startswith("#")]
 
 
 def analyze_actions(actions: List[str], threshold: Optional[float] = None) -> Dict:
@@ -102,8 +102,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 0
     
     # Human-readable output
-    print(f"Action Stream Entropy Analysis")
-    print(f"================================")
+    print("Action Stream Entropy Analysis")
+    print("================================")
     print(f"Total actions:    {result['action_count']}")
     print(f"Unique actions:   {result['unique_actions']}")
     print(f"Entropy:          {result['entropy_bits']} bits")
