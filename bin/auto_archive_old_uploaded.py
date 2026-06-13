@@ -3,11 +3,9 @@
 Cron job: archive sessions older than 14 days that have been confirmed uploaded.
 """
 
-import os
 import json
 import shutil
 import subprocess
-import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import List, Optional
