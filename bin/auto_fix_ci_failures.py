@@ -12,14 +12,11 @@ Known fixes:
 """
 
 import argparse
+import os
 import re
 import subprocess
 import sys
-import tempfile
-import os
-from pathlib import Path
-from typing import List, Optional, Tuple, Dict, Any
-import json
+from typing import Dict, List, Optional, Tuple
 
 
 def run_command(cmd: List[str], cwd: Optional[str] = None) -> Tuple[int, str, str]:
