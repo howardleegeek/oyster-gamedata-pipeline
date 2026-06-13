@@ -38,7 +38,15 @@ class InventorySlot:
 class VoxelWindow:
     centre: Tuple[int, int, int] = (0, 0, 0)
     block_ids: List[int] = field(default_factory=lambda: [DEFAULT_BLOCK_ID] * 27)
-    def to_array(self) -> Any: 
+    def to_array(self) -> Any:
+        """Convert block IDs to a 3x3x3 numpy array.
+
+        Returns:
+            numpy.ndarray: 3x3x3 array of block IDs, dtype=int32.
+
+        Raises:
+            ImportError: If numpy is not installed.
+        """
         np = _np()
         if np is None: raise ImportError("numpy required")
         return np.array(self.block_ids, dtype=np.int32).reshape(3, 3, 3)
