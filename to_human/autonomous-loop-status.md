@@ -39,3 +39,7 @@
 ## Round 10 @ 2026-06-12T12:30:00Z
 - Picked: Fix deprecated Pillow `img.getdata()` in `bin/scene_lighting_metadata.py` (same issue fixed in Round 9 for anti_replay_check.py) — replaced with `get_flattened_data()` to avoid Pillow 11.0+ deprecation warning.
 - Result: committed 75150b33
+
+## Round 11 @ 2026-06-12T13:45:00Z
+- Picked: Fix 2 lint errors in `bin/adversarial_quality_check.py` — remove unused variable `deaths` (F841) and rename ambiguous variable `l` to `line` (E741).
+- Result: committed 2a1b9605
