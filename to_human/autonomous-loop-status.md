@@ -43,3 +43,11 @@
 ## Round 11 @ 2026-06-12T13:45:00Z
 - Picked: Fix 2 lint errors in `bin/adversarial_quality_check.py` — remove unused variable `deaths` (F841) and rename ambiguous variable `l` to `line` (E741).
 - Result: committed 2a1b9605
+
+## Round 12 @ 2026-06-13T08:11:53Z
+- Picked: Fix lint errors in bin/alert_dispatcher.py — remove unused imports (pathlib.Path, typing.Any) and sort import block.
+- Result: committed c3298996
+
+## Round 13 @ 2026-06-13T12:00:00Z
+- Picked: No good candidate — scanned for failing tests (all passing), bare except (3 found but legitimate JSON parsing handlers), sys.exit at module level (none breaking pytest), deprecated Pillow APIs (none), TODOs (legitimate spec documentation). Codebase is healthy.
+- Result: skipped (no good candidate)
