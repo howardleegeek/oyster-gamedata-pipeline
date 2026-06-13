@@ -281,6 +281,18 @@ def lint_dir(spec_dir: Path) -> int:
 
 
 def main() -> int:
+    """Lint spec files in a directory for iron-law compliance.
+
+    Args:
+        None. Uses argparse to parse command-line arguments.
+
+    Returns:
+        int: Exit code — 0 if all specs pass, 1 if violations found,
+             2 if linter itself errors.
+
+    Raises:
+        SystemExit: Propagates from argparse on --help/-h.
+    """
     parser = argparse.ArgumentParser(
         description="Lint Oyster spec packs for the REAL-ONLY iron law."
     )
