@@ -98,7 +98,6 @@ def check_game_state(sess: pathlib.Path) -> dict:
     positions = []
     velocities = []
     monotonic = True
-    deaths = 0
     line_count = 0
 
     with gs.open() as f:
@@ -156,7 +155,7 @@ def check_action_camera(sess: pathlib.Path) -> dict:
         rows = json.load(ac.open())
     except json.JSONDecodeError:
         # try JSONL
-        rows = [json.loads(l) for l in ac.open() if l.strip()]
+        rows = [json.loads(line) for line in ac.open() if line.strip()]
     if not rows:
         return {"ok": False, "reason": "empty"}
     times = [r.get("time") for r in rows if isinstance(r.get("time"), (int, float))]
