@@ -64,3 +64,7 @@
 ## Round 15 @ 2026-06-13T12:50:22Z
 - Picked: Fix failing  — tests used  string path which fails when onnxruntime is not installed (ModuleNotFoundError). Added import check + skipTest, and changed all 5 patches to use  instead.
 - Result: committed ece28139
+
+## Round 14 @ 2026-06-13T12:30:00Z
+- Picked: Fix `bin/audio_track_extractor.py` - `_detect_gaps()` didn't handle `samples=None` case, which could happen if `_get_numpy()` returns None. Added None check before proceeding with audio analysis.
+- Result: committed a784edf8
