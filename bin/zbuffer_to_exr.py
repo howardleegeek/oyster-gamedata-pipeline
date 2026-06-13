@@ -7,18 +7,19 @@ Output: active_session/depth/*.exr (OpenEXR format with Z channel)
 Marker: kind: engine_zbuffer
 """
 
-import os
-import sys
 import glob
-import struct
-import numpy as np
-from pathlib import Path
 import json
+import os
+import struct
+import sys
+from pathlib import Path
+
+import numpy as np
 
 # Try to import OpenEXR
 try:
-    import OpenEXR
     import Imath
+    import OpenEXR
     HAS_EXR = True
 except ImportError:
     HAS_EXR = False
