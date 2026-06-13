@@ -187,22 +187,18 @@ def write_exr_z(path: pathlib.Path, depth: np.ndarray) -> None:
 
 def write_source_marker(output_dir: pathlib.Path) -> None:
     """Write .source marker to disambiguate backend used."""
+    import json
 
     source_path = output_dir / ".source"
-    source_path.write_text(
-        "\n".join(
-            [
-                "kind: monocular_da_v2",
-                "backend: onnxruntime",
-                f"timestamp: {datetime.now(timezone.utc).isoformat()}",
-                "model: depth-anything/Depth-Anything-V2-Small-hf",
-                "units: relative",
-                "view_space_z: false",
-                "legacy_kind: monocular_da_v2_onnx",
-            ]
-        )
-        + "\n"
-    )
+    source_data = {
+        "kind": "monocular_da_v2_onnx",
+        "backend": "onnxruntime",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "model": "depth-anything/Depth-Anything-V2-Small-hf",
+        "units": "relative",
+        "view_space_z": False,
+    }
+    source_path.write_text(json.dumps(source_data, indent=2) + "\n")
 
 
 def main():
