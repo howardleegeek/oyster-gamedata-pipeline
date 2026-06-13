@@ -177,11 +177,28 @@ def load_npy_actions(path: str) -> np.ndarray:
 
 
 def save_bundle(bundle: dict[str, Any], path: str) -> None:
+    """Save a buyer-spec v2 bundle to a JSON file.
+
+    Args:
+        bundle: Dictionary containing the action chunk bundle data.
+        path: Filesystem path to the output JSON file.
+
+    Returns:
+        None.
+    """
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(bundle, fh, indent=2)
 
 
 def load_bundle(path: str) -> dict[str, Any]:
+    """Load a buyer-spec v2 bundle from a JSON file.
+
+    Args:
+        path: Filesystem path to the input JSON file.
+
+    Returns:
+        Dictionary containing the bundle data.
+    """
     with open(path, encoding="utf-8") as fh:
         return json.load(fh)
 
