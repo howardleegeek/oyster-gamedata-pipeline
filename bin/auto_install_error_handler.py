@@ -22,14 +22,12 @@ from __future__ import annotations
 
 import argparse
 import atexit
-import functools
 import logging
-import os
 import sys
 import tempfile
 import traceback
 from pathlib import Path
-from typing import Any, Callable, Optional, TextIO, Type
+from typing import Any, Optional, Type
 
 # Module-level constants
 _MODULE_NAME = "auto_install_error_handler"
