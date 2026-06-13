@@ -22,7 +22,10 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +96,7 @@ def _decode_to_wav(audio_path: Path, wav_path: Path) -> bool:
     return wav_path.exists() and wav_path.stat().st_size > 44
 
 
-def _read_pcm_samples(wav_path: Path) -> Optional["np.ndarray"]:  # type: ignore[name-defined]
+def _read_pcm_samples(wav_path: Path) -> Optional["np.ndarray"]:
     """Read PCM samples from a WAV file, return numpy array of floats [-1,1]."""
     np = _get_numpy()
     if np is None:
@@ -108,7 +111,7 @@ def _read_pcm_samples(wav_path: Path) -> Optional["np.ndarray"]:  # type: ignore
 
 
 def _detect_gaps(
-    samples: "np.ndarray",  # type: ignore[name-defined]
+    samples: "np.ndarray",
     sample_rate: int,
     threshold_db: float = SILENCE_THRESHOLD_DB,
     min_gap_ms: float = MAX_GAP_MS,
@@ -147,7 +150,7 @@ def _detect_gaps(
 
 
 def _analyze_volume_and_distortion(
-    samples: "np.ndarray",  # type: ignore[name-defined]
+    samples: "np.ndarray",
 ) -> Dict[str, Any]:
     """Compute RMS volume (dBFS), peak level, and clipping ratio."""
     np = _get_numpy()
