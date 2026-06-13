@@ -81,6 +81,14 @@ def attack_drop_systeminfo(b: Path) -> None:
 
 
 def attack_drop_video(b: Path):
+    """Remove video.mp4 from the batch directory.
+
+    Args:
+        b: Path to the batch directory containing video.mp4.
+
+    Returns:
+        None. Side effect: deletes the video file.
+    """
     (b / "video.mp4").unlink()
 
 
