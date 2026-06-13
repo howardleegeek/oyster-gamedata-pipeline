@@ -671,6 +671,27 @@ def harness_loop(once: bool = False, dry_run: bool = False) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI entry point for the harness loop daemon.
+
+    Parses command-line arguments and either runs a single iteration
+    or starts the continuous harness loop.
+
+    Args:
+        argv: Command-line arguments (sys.argv if None). Exposed for testing.
+
+    Returns:
+        Exit code: 0 on success, 1 on dispatch failure, 2 on invalid gap id.
+
+    Examples:
+        # Run single iteration
+        python3 bin/harness_loop.py --once
+
+        # Dry run (no actual dispatch)
+        python3 bin/harness_loop.py --dry-run
+
+        # Force-dispatch specific gap
+        python3 bin/harness_loop.py --gap G001
+    """
     p = argparse.ArgumentParser()
     p.add_argument("--once", action="store_true", help="Run a single iteration")
     p.add_argument("--dry-run", action="store_true", help="No actual dispatch/commit, log plans")
