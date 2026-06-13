@@ -4,14 +4,13 @@ Quality Metrics Audit Extension
 Implements 10 quality dimensions for data collection quality assessment.
 """
 
-import os
 import json
 import math
+import os
 import statistics
 import subprocess
-import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Any, Dict, List
 
 
 def audit_group_quality(session) -> List[Dict[str, Any]]:
@@ -340,9 +339,9 @@ def check_depth_entropy(session) -> Dict[str, Any]:
         
         # Try to import OpenEXR
         try:
-            import OpenEXR
             import Imath
             import numpy as np
+            import OpenEXR
         except ImportError:
             return {"id": "QM6", "status": "SKIP", "evidence": "OpenEXR not installed", "value": None}
         
