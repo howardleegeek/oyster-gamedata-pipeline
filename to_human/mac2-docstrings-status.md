@@ -102,3 +102,13 @@
 - File: bin/graceful_shutdown_handler.py::GracefulShutdownHandler.is_shutting_down
 - Added: docstring=Y, type-hints=N (already had type hints)
 - Commit: 6e3a1700140734b2442b0fbd1abd918e0599cc5c
+
+## Round @ 2026-05-17T14:00:00Z
+- File: bin/inventory_voxel_capture.py::capture_frame
+- Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: 34c868f43
+
+## Round @ 2026-06-13T03:33:22Z
+- File: src/oyster_agent_runner/buyer_spec_v2_action_chunks.py::save_bundle/load_bundle
+- Added: docstring=Y, type-hints=Y (already had type hints)
+- Commit: 4c494fa9dfcaba4c44f47cf79d3f4de9057ab5bd
