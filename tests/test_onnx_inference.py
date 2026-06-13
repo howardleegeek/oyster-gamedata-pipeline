@@ -118,11 +118,16 @@ class TestProviderFallback(unittest.TestCase):
 
     def test_provider_selection_order(self):
         """Providers should be selected in correct priority order."""
+        try:
+            import onnxruntime
+        except ImportError:
+            self.skipTest("onnxruntime not installed")
+
         # Mock ort.get_available_providers to simulate different environments
         from bin.run_da_v2_depth_onnx import get_providers
 
         # Simulate Windows with DirectML
-        with patch("onnxruntime.get_available_providers") as mock_prov:
+        with patch.object(onnxruntime, "get_available_providers") as mock_prov:
             mock_prov.return_value = [
                 "DmlExecutionProvider",
                 "CPUExecutionProvider",
@@ -132,7 +137,7 @@ class TestProviderFallback(unittest.TestCase):
             self.assertIn("CPUExecutionProvider", providers)
 
         # Simulate Mac with CoreML
-        with patch("onnxruntime.get_available_providers") as mock_prov:
+        with patch.object(onnxruntime, "get_available_providers") as mock_prov:
             mock_prov.return_value = [
                 "CoreMLExecutionProvider",
                 "CPUExecutionProvider",
@@ -141,7 +146,7 @@ class TestProviderFallback(unittest.TestCase):
             self.assertEqual(providers[0], "CoreMLExecutionProvider")
 
         # Simulate Linux with CUDA
-        with patch("onnxruntime.get_available_providers") as mock_prov:
+        with patch.object(onnxruntime, "get_available_providers") as mock_prov:
             mock_prov.return_value = [
                 "CUDAExecutionProvider",
                 "CPUExecutionProvider",
@@ -150,14 +155,19 @@ class TestProviderFallback(unittest.TestCase):
             self.assertEqual(providers[0], "CUDAExecutionProvider")
 
         # Simulate CPU-only
-        with patch("onnxruntime.get_available_providers") as mock_prov:
+        with patch.object(onnxruntime, "get_available_providers") as mock_prov:
             mock_prov.return_value = ["CPUExecutionProvider"]
             providers = get_providers()
             self.assertEqual(providers, ["CPUExecutionProvider"])
 
     def test_fallback_to_cpu_when_directml_unavailable(self):
         """When DirectML is not available, should fall back to CPU."""
-        with patch("onnxruntime.get_available_providers") as mock_prov:
+        try:
+            import onnxruntime
+        except ImportError:
+            self.skipTest("onnxruntime not installed")
+
+        with patch.object(onnxruntime, "get_available_providers") as mock_prov:
             mock_prov.return_value = ["CPUExecutionProvider"]
             from bin.run_da_v2_depth_onnx import get_providers
 
