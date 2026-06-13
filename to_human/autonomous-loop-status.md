@@ -51,3 +51,8 @@
 ## Round 13 @ 2026-06-13T12:00:00Z
 - Picked: No good candidate — scanned for failing tests (all passing), bare except (3 found but legitimate JSON parsing handlers), sys.exit at module level (none breaking pytest), deprecated Pillow APIs (none), TODOs (legitimate spec documentation). Codebase is healthy.
 - Result: skipped (no good candidate)
+
+## Round 14 @ 2026-06-13T12:15:00Z
+- Picked: Fix 3 lint errors in bin/dashboard_app.py — unused import `os`, trailing whitespace on line 92, missing newline at end of file. These were introduced in the previous Round 13 commit that fixed a bare except.
+- Result: committed dd423e5d
+
