@@ -26,12 +26,10 @@ import argparse
 import datetime as dt
 import hashlib
 import json
-import os
 import re
 import subprocess
 import sys
 from pathlib import Path
-
 
 # ---------------------------------------------------------------------------
 # Patch 1+2+3: metadata.json — device_id, UTC timestamps, recording_started_utc
