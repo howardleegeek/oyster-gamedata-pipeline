@@ -78,6 +78,11 @@
 - Added: docstring=N (already had docstring), type-hints=Y
 - Commit: 87694dfb0
 
+## Round @ 2026-06-13T09:13:24Z
+- File: bin/graceful_shutdown_handler.py::wait_for_shutdown
+- Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: a619a6f01
+
 ## Round @ 2026-05-17T13:00:00Z
 - File: bin/anonymous_first_run.py::ClipMetadata.to_dict/from_dict
 - Added: docstr
