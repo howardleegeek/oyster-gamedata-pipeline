@@ -87,6 +87,7 @@
 - Added: docstring=Y, type-hints=Y (already had type hints)
 - Commit: 3282f595a
 
+
 ## Round @ 2026-05-17T13:30:00Z
 - File: bin/ci/bft_detection_gate.py::main
 - Added: docstring=Y, type-hints=Y (already had type hints)
@@ -122,3 +123,8 @@
 - File: bin/upload_tarball.py::main
 - Added: docstring=Y, type-hints=Y (already had type hints)
 - Commit: 3282f595a
+
+## Round @ 2026-01-14T12:00:00Z
+- File: bin/inventory_voxel_capture.py::extract_voxel_window
+- Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: f08873d6de69211ea1fbb953d54fde6083c41f61
