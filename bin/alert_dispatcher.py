@@ -21,18 +21,17 @@ Features:
   - Local-first: queues alerts if network is down
 """
 
+import hashlib
 import json
+import logging
 import os
 import sys
 import time
-import logging
-import hashlib
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
-import yaml
 import requests
+import yaml
 
 # ---------------------------------------------------------------------------
 # Paths & Config
