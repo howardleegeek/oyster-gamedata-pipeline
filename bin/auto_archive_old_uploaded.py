@@ -6,7 +6,7 @@ Cron job: archive sessions older than 14 days that have been confirmed uploaded.
 import json
 import shutil
 import subprocess
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, Optional
 
@@ -217,7 +217,7 @@ if __name__ == "__main__":
         # Archive old uploaded files
         stats = archive_old_files()
         
-        print(f"Archive operation completed:")
+        print("Archive operation completed:")
         print(f"  Found {stats['total_found']} old uploaded files")
         print(f"  Archived {stats['archived']} files")
         if stats['compressed'] > 0:
