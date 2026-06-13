@@ -11,7 +11,7 @@ import logging
 import signal
 import sys
 import argparse
-from typing import Optional
+from typing import Any, Optional
 from enum import IntEnum
 
 
@@ -180,7 +180,13 @@ def spectate_loop(
     # Setup signal handler for graceful shutdown
     stop_requested = False
     
-    def signal_handler(sig, frame):
+    def signal_handler(sig: int, frame: Any) -> None:
+        """Handle SIGINT/SIGTERM for graceful shutdown.
+
+        Args:
+            sig: Signal number (e.g., signal.SIGINT).
+            frame: Current stack frame (unused, required by signal handler signature).
+        """
         nonlocal stop_requested
         logging.info("Received interrupt signal, stopping...")
         stop_requested = True
