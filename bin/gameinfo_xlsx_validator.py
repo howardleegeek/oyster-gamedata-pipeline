@@ -61,6 +61,17 @@ def validate_xlsx(xlsx_path: str) -> dict:
 
 
 def main() -> None:
+    """Validate the gameinfo.xlsx file against the buyer-spec.
+
+    Parses the xlsx file, validates required sheets and fields are present,
+    and exits with code 0 on success or 1 on validation failure.
+
+    Returns:
+        None: Exits via sys.exit() on validation failure.
+
+    Raises:
+        SystemExit: If the xlsx file is missing or invalid.
+    """
     parser = argparse.ArgumentParser(description="Validate gameinfo.xlsx per buyer-spec")
     parser.add_argument("--xlsx", required=True, help="Path to gameinfo.xlsx")
     args = parser.parse_args()
