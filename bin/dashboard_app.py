@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import csv
 import logging
-import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -89,7 +88,7 @@ def load_data(data_dir: Path) -> Tuple[List[str], List[Dict[str, str]], str]:
     if not data_dir.is_dir():
         return [], [], ""
     
-    for pattern, reader in [("*.csv", read_csv), ("*.tsv", read_csv), 
+    for pattern, reader in [("*.csv", read_csv), ("*.tsv", read_csv),
                            ("*.xlsx", read_excel), ("*.xls", read_excel)]:
         for f in sorted(data_dir.glob(pattern)):
             headers, rows = reader(f)
