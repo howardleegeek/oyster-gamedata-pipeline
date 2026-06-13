@@ -32,6 +32,10 @@
 - Picked: Fix failing `tests/test_gpt_thinking_provider.py::test_provider_not_available_when_openai_missing` — `GPTThinkingProvider.__init__` unconditionally imported `openai` at construction time, so the test (which patches `builtins.__import__` to block `openai`) failed with `ModuleNotFoundError` during instantiation. Deferred import to `complete()`
 - Result: committed 1b624d87
 
+## Round 20 @ 2026-06-13T21:31:42Z
+- Picked: Fix failing test_source_marker_kind in test_onnx_inference.py - write_source_marker was writing YAML-like text but test expected JSON
+- Result: committed e62ec4c9
+
 ## Round 19 @ 2026-06-19T
 - Picked: Fix lint errors in bin/auto_archive_old_uploaded.py - F541 f-string without placeholders and W292 missing newline at end of file
 - Result: committed 092c9a2f method to allow test to patch it.
