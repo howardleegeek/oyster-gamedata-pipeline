@@ -39,7 +39,13 @@ class GracefulShutdownHandler:
         atexit.register(self._atexit)
         self._register_signals()
     
-    def _register_signals(self):
+    def _register_signals(self) -> None:
+        """Register OS signal handlers for graceful shutdown.
+
+        On Windows, uses SetConsoleCtrlHandler to intercept Ctrl+C, Ctrl+Break,
+        and other console events. On POSIX, registers SIGTERM and SIGINT handlers.
+        Logs a warning if Windows API is unavailable.
+        """
         if sys.platform == "win32":
             try:
                 import ctypes
@@ -59,7 +65,13 @@ class GracefulShutdownHandler:
             signal.signal(signal.SIGINT, self._handle_signal)
         logger.info("Signal handlers registered")
     
-    def _handle_signal(self, signum, frame):
+    def _handle_signal(self, signum: int, frame: Any) -> None:
+        """Handle incoming OS signals by initiating graceful shutdown.
+
+        Args:
+            signum: Signal number (e.g., signal.SIGTERM, signal.SIGINT).
+            frame: Current stack frame (unused, required by signal handler signature).
+        """
         logger.info("Signal %s received", signum)
         self.shutdown()
     
