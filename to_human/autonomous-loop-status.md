@@ -56,3 +56,11 @@
 - Picked: Fix 3 lint errors in bin/dashboard_app.py — unused import `os`, trailing whitespace on line 92, missing newline at end of file. These were introduced in the previous Round 13 commit that fixed a bare except.
 - Result: committed dd423e5d
 
+## Round 15 @ 2026-06-13T12:30:00Z
+- Picked: Fix failing tests/test_onnx_inference.py::TestProviderFallback - tests used patch("onnxruntime.get_available_providers") string path which fails when onnxruntime is not installed (ModuleNotFoundError). Added import check + skipTest, changed all 5 patches to use patch.object(onnxruntime, ...) instead.
+- Result: committed ece28139
+
+
+## Round 15 @ 2026-06-13T12:50:22Z
+- Picked: Fix failing  — tests used  string path which fails when onnxruntime is not installed (ModuleNotFoundError). Added import check + skipTest, and changed all 5 patches to use  instead.
+- Result: committed ece28139
