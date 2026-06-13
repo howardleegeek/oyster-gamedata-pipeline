@@ -81,3 +81,11 @@
 - Picked: Fix ruff lint errors in bin/audit_quality_metrics.py - removed unused `sys`, `Optional`, `Tuple` imports, fixed import ordering (I001), and added trailing newline (W292)
 - Result: committed ceab3c4a
 
+
+## Round 21 @ 2026-06-13T12:00:00Z
+- Picked: Fix ruff lint errors in bin/auto_install_error_handler.py - removed unused imports (functools, os, Callable, TextIO) and fixed missing trailing newline.
+- Result: committed 665fa942
+
+## Round 22 @ 2026-06-13T12:30:00Z
+- Picked: Fix ruff lint errors in bin/auto_fix_ci_failures.py - removed unused imports (tempfile, pathlib.Path, json, Any), fixed import ordering (I001), added trailing newline (W292).
+- Result: committed f4264420
