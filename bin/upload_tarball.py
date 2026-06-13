@@ -83,6 +83,17 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Upload a tarball to the configured storage backend.
+
+    Args:
+        argv: Command-line arguments (excluding script name). If None,
+            defaults to sys.argv[1:].
+
+    Returns:
+        Exit code: 0 on success (including idempotent skip),
+        1 for bad input/missing tarball, 2 for invalid D5 verdict,
+        3 for backend errors.
+    """
     args = _parse_args(argv if argv is not None else sys.argv[1:])
     logging.basicConfig(
         level=logging.INFO if args.verbose else logging.WARNING,
