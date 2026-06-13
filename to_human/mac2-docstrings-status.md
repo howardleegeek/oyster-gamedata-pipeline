@@ -82,6 +82,11 @@
 - File: bin/anonymous_first_run.py::ClipMetadata.to_dict/from_dict
 - Added: docstr
 
+## Round @ 2026-05-17T13:15:00Z
+- File: bin/upload_tarball.py::main
+- Added: docstring=Y, type-hints=Y (already had type hints)
+- Commit: 3282f595a
+
 ## Round @ 2026-05-17T13:30:00Z
 - File: bin/ci/bft_detection_gate.py::main
 - Added: docstring=Y, type-hints=Y (already had type hints)
@@ -112,3 +117,8 @@
 - File: src/oyster_agent_runner/buyer_spec_v2_action_chunks.py::save_bundle/load_bundle
 - Added: docstring=Y, type-hints=Y (already had type hints)
 - Commit: 4c494fa9dfcaba4c44f47cf79d3f4de9057ab5bd
+
+## Round @ 2026-06-13T13:25:00Z
+- File: bin/upload_tarball.py::main
+- Added: docstring=Y, type-hints=Y (already had type hints)
+- Commit: 3282f595a
