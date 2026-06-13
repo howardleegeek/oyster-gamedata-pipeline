@@ -150,7 +150,25 @@ def extract_voxel_window(world_dir: str, player_pos: Tuple[float, float, float],
         logger.error(f"Failed to extract voxel window {blocks_path}: {e}")
         return None
 
-def capture_frame(world_dir: str, frame_index: int, player_pos_override: Optional[Tuple[float, float, float]] = None, extract_voxel: bool = True) -> FrameCapture:
+def capture_frame(
+    world_dir: str,
+    frame_index: int,
+    player_pos_override: Optional[Tuple[float, float, float]] = None,
+    extract_voxel: bool = True,
+) -> FrameCapture:
+    """Capture a single frame's inventory and voxel window data.
+
+    Args:
+        world_dir: Path to the MineWorld world directory.
+        frame_index: Index of the frame to capture.
+        player_pos_override: Optional player position (x, y, z) to use instead of
+            loading from world data.
+        extract_voxel: Whether to extract the 3x3x3 voxel window around the player.
+
+    Returns:
+        FrameCapture containing inventory, player position, voxel window, and
+        timestamp for the captured frame.
+    """
     inventory = load_inventory(world_dir, frame_index)
     player_pos = player_pos_override if player_pos_override else load_player_position(world_dir, frame_index)
     voxel = extract_voxel_window(world_dir, player_pos, frame_index) if extract_voxel else None
