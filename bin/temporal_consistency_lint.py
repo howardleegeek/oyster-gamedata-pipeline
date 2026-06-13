@@ -20,11 +20,12 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import sys
-import tempfile
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple
+
+if TYPE_CHECKING:
+    import numpy as np
 
 # ---------------------------------------------------------------------------
 # Lazy imports — heavy deps only loaded when actually needed
@@ -63,7 +64,7 @@ SUPPORTED_EXTENSIONS: Tuple[str, ...] = (
 logger = logging.getLogger(__name__)
 
 
-def _load_frame(path: Path) -> "np.ndarray":  # type: ignore[name-defined]
+def _load_frame(path: Path) -> "np.ndarray":
     """Load an image file and return it as a grayscale float32 array."""
     np = _get_numpy()
     Image = _get_pil_image()
@@ -72,9 +73,9 @@ def _load_frame(path: Path) -> "np.ndarray":  # type: ignore[name-defined]
 
 
 def _compute_flow_magnitude(
-    prev: "np.ndarray",  # type: ignore[name-defined]
-    curr: "np.ndarray",   # type: ignore[name-defined]
-) -> "np.ndarray":  # type: ignore[name-defined]
+    prev: "np.ndarray",
+    curr: "np.ndarray",
+) -> "np.ndarray":
     """
     Approximate optical-flow magnitude between two consecutive frames.
 
@@ -111,7 +112,7 @@ def _compute_flow_magnitude(
     return np.sqrt(u ** 2 + v ** 2)
 
 
-def _mean_flow(flow: "np.ndarray") -> float:  # type: ignore[name-defined]
+def _mean_flow(flow: "np.ndarray") -> float:
     """Return the mean flow magnitude, ignoring border pixels."""
     np = _get_numpy()
     # Exclude 1-pixel border where gradients are zero
@@ -156,7 +157,7 @@ def detect_temporal_artifacts(
     logger.info("Loaded %d frames from %s", len(candidates), frame_dir)
 
     # Pre-load all frames
-    frames: List["np.ndarray"] = []  # type: ignore[name-defined]
+    frames: List["np.ndarray"] = []
     for p in candidates:
         frames.append(_load_frame(p))
 
