@@ -92,7 +92,15 @@ def attack_drop_video(b: Path):
     (b / "video.mp4").unlink()
 
 
-def attack_drop_action_camera(b: Path):
+def attack_drop_action_camera(b: Path) -> None:
+    """Remove the action_camera.json file from the given directory.
+
+    Args:
+        b: Path to the directory containing action_camera.json.
+
+    Returns:
+        None. Side effect: deletes the action_camera.json file.
+    """
     (b / "action_camera.json").unlink()
 
 
