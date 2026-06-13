@@ -178,6 +178,17 @@ class GracefulShutdownHandler:
         return self._shutdown.is_set()
     
     def wait_for_shutdown(self, timeout: Optional[float] = None) -> bool:
+        """Wait for shutdown signal to be triggered.
+
+        Blocks until the shutdown event is set (signal received) or the
+        optional timeout expires.
+
+        Args:
+            timeout: Maximum seconds to wait. None blocks indefinitely.
+
+        Returns:
+            True if shutdown was triggered, False if timeout expired.
+        """
         return self._shutdown.wait(timeout)
     
     def register_clip_write(self, clip_id: str, file_path: Path, data: bytes) -> None:
