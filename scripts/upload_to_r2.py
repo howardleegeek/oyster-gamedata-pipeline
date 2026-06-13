@@ -16,6 +16,7 @@ import os
 import sys
 from pathlib import Path
 
+
 class _MissingBoto3:
     """Placeholder so the module is importable without boto3 installed.
 
