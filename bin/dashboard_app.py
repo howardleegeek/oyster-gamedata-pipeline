@@ -241,7 +241,7 @@ def create_app(data_dir: Path) -> Any:
         """Pagination endpoint."""
         try:
             p = int(flask.request.args.get("p", "0"))
-        except:
+        except ValueError:
             p = 0
         page_size = 50
         start = p * page_size
