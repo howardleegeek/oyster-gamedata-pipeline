@@ -259,8 +259,8 @@ def process_crash_file(filepath: Path, backend_url: str) -> None:
 
 def _watch_directory(watch_dir: str, backend_url: str) -> None:
     """Watch a directory for new crash-*.log files using watchdog."""
-    from watchdog.observers import Observer
     from watchdog.events import FileSystemEventHandler
+    from watchdog.observers import Observer
 
     class CrashFileHandler(FileSystemEventHandler):
         def on_created(self, event):  # type: ignore[override]
