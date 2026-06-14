@@ -156,3 +156,7 @@
 - Picked: Fix ruff I001/W292 in bin/batch_dashboard.py — sorted imports (collections before pathlib, pandas before streamlit), added trailing newline.
 - Result: committed e4d10b97
 
+
+## Round 39 @ 2026-06-14T11:14:16Z
+- Picked: Fix ruff F541 in bin/build_bundled_installer/fetch_minecraft.py — remove extraneous f-string prefix from string literal with no placeholders (the braces are literal characters).
+- Result: committed 855b1142 (pushed to main)
