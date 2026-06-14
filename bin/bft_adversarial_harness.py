@@ -6,6 +6,7 @@ and feeds the corrupted frame to V1/V2/V3 verifiers. BFT consensus needs
 Run: ``python3 -m bin.bft_adversarial_harness``. No JSON, no producer
 imports, no validator modifications. V2's R02 sign-bug stays buggy.
 """
+
 from __future__ import annotations
 
 import copy
@@ -82,13 +83,19 @@ def _safe_call(fn: Callable[..., Any], rec: dict) -> tuple[bool, str]:
         return False, f"PASS residual={out.residual:.4g}"
     if hasattr(out, "passed"):  # V1 ResidualResult dataclass
         passed = bool(out.passed)
-        return (not passed), f"{'FAIL' if not passed else 'PASS'} residual={out.residual:.4g} note={getattr(out, 'note', '')!r}"
+        return (
+            (not passed),
+            f"{'FAIL' if not passed else 'PASS'} residual={out.residual:.4g} note={getattr(out, 'note', '')!r}",
+        )
     if isinstance(out, dict) and "passed" in out:  # V2 dict result
-        return (not bool(out["passed"])), f"{'FAIL' if not out['passed'] else 'PASS'} residual={out.get('residual'):.4g}"
+        return (
+            not bool(out["passed"])
+        ), f"{'FAIL' if not out['passed'] else 'PASS'} residual={out.get('residual'):.4g}"
     return False, f"unknown result type: {type(out).__name__}"
 
 
 # Fault-injection mutators -----------------------------------------------------
+
 
 def _fi01_swap_quat_order(rec: dict) -> dict:
     """[x,y,z,w] -> [w,x,y,z]. Identity [0,0,0,1] becomes [1,0,0,0] = 180 pitch."""
@@ -147,10 +154,10 @@ def _votes_for(rec: dict, residual_id: str) -> list[VerifierVote]:
 
 FI_CASES: tuple[tuple[str, str, Callable[[dict], dict], str], ...] = (
     ("FI-01", "quaternion order [x,y,z,w] -> [w,x,y,z]", _fi01_swap_quat_order, "R02"),
-    ("FI-02", "keyCode W (87) -> 88",                    _fi02_keycode_W_to_88, "R09"),
-    ("FI-03", "fps 30.0 -> 25.0",                        _fi03_fps_30_to_25,    "R12"),
-    ("FI-04", "mouse_x list[0.5] -> scalar 0.5",         _fi04_mouse_x_scalar,  "R07"),
-    ("FI-05", "fx 1080 -> 900 (fy still 1080)",          _fi05_fx_1080_to_900,  "R08"),
+    ("FI-02", "keyCode W (87) -> 88", _fi02_keycode_W_to_88, "R09"),
+    ("FI-03", "fps 30.0 -> 25.0", _fi03_fps_30_to_25, "R12"),
+    ("FI-04", "mouse_x list[0.5] -> scalar 0.5", _fi04_mouse_x_scalar, "R07"),
+    ("FI-05", "fx 1080 -> 900 (fy still 1080)", _fi05_fx_1080_to_900, "R08"),
 )
 
 
