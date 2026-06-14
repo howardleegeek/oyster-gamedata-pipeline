@@ -324,7 +324,7 @@ def create_app() -> Any:
     Returns:
         Configured FastAPI app instance.
     """
-    from fastapi import FastAPI, UploadFile, File, HTTPException
+    from fastapi import FastAPI, File, HTTPException, UploadFile
     from fastapi.responses import JSONResponse
     from pydantic import BaseModel
 
