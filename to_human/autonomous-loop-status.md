@@ -29,7 +29,8 @@
 - Result: committed aa7e98df
 
 ## Round 8 @ 2026-06-12T12:15:00Z
-- Picked: Fix failing `tests/test_gpt_thinking_provider.py::test_provider_not_available_when_openai_missing` — `GPTThinkingProvider.__init__` unconditionally imported `openai` at construction time, so the test (which patches `builtins.__import__` to block `openai`) failed with `ModuleNotFoundError` during instantiation. Deferred import to `complete()`
+- Picked: Fix failing `tests/test_gpt_thinking_provider.py::test_provider_not_available_when_openai_missing` — `GPTThinkingProvider.__init__` unconditionally imported `openai` at construction time, so the test (which patches `builtins.__import__` to block `openai`) failed with `ModuleNotFoundError` during instantiation. Deferred import to `complete()` method.
+- Result: committed 03d6786c`
 - Result: committed 1b624d87
 
 ## Round 20 @ 2026-06-13T21:31:42Z
@@ -121,3 +122,7 @@
 ## Round 30 @ 2026-06-14T01:48:00Z
 - Picked: Fix ruff F401 unused-imports and I001 unsorted-imports in `bin/version_compat_checker.py` (`io` and `typing.Iterable` were both unreferenced; `dataclass, asdict` was out of alpha order). `tests/test_version_compat.py` covers the module — 40/40 still green.
 - Result: committed 9ce93e7e
+
+## Round 31 @ 2026-06-19T12:15:00Z
+- Picked: Fix ruff W292 missing trailing newline in bin/battery_aware_pause.py
+- Result: committed 33336989
