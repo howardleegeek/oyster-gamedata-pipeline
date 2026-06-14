@@ -8,15 +8,15 @@ Usage:
 
 import json
 import sys
-from pathlib import Path
 from collections import defaultdict
+from pathlib import Path
 from typing import Any, Dict
 
 try:
-    import streamlit as st
     import pandas as pd
     import plotly.express as px
     import plotly.graph_objects as go
+    import streamlit as st
 except ImportError:
     print("Required packages not installed. Run: pip install streamlit pandas plotly")
     sys.exit(1)
