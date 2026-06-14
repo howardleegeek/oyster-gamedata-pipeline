@@ -126,3 +126,11 @@
 ## Round 31 @ 2026-06-19T12:15:00Z
 - Picked: Fix ruff W292 missing trailing newline in bin/battery_aware_pause.py
 - Result: committed 33336989
+
+## Round 32 @ 2026-06-19T12:45:00Z
+- Picked: Fix ruff I001 import sorting in bin/backend_ingest_handler.py (FastAPI imports were unsorted)
+- Result: committed 3a3b739d
+
+## Round 33 @ 2026-06-19T13:00:00Z
+- Picked: Fix ruff F401 unused `subprocess` import in bin/buyer_tarball_make_real.py
+- Result: committed 4e6c76fa
