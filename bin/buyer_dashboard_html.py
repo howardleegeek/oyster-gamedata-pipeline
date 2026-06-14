@@ -9,14 +9,11 @@ Generates a buyer-friendly HTML report summarizing a single video clip with:
 """
 
 import argparse
-import base64
-import json
-import os
+import importlib.util
 import sys
-import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 
 class ClipAnalyzer:
@@ -40,7 +37,7 @@ class ClipAnalyzer:
         """Extract preview frames from the clip."""
         # Try to import PIL for image processing
         try:
-            from PIL import Image
+            importlib.util.find_spec("PIL")
             HAS_PIL = True
         except ImportError:
             HAS_PIL = False
