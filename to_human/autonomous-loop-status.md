@@ -97,3 +97,7 @@
 ## Round 24 @ 2026-06-13T23:51:24Z
 - Picked: Fix ruff E741/F541/W292 in bin/autoresearch_action_entropy.py (in-progress fix left staged by prior session; verified ruff clean and smoke-tested CLI output before commit)
 - Result: committed 277bf97e
+
+## Round 25 @ 2026-06-13T23:59:50Z
+- Picked: Fix ruff F401/F821 in bin/temporal_consistency_lint.py — removed unused `os`/`tempfile` imports and added `TYPE_CHECKING` guard for `numpy as np` so the existing `"np.ndarray"` forward-ref annotations resolve, mirroring the pattern in bin/audio_track_extractor.py, bin/real_depth_filler.py, and bin/autoresearch_depth_quality.py. Dropped the now-redundant `# type: ignore[name-defined]` comments.
+- Result: committed c1cae04e
