@@ -113,3 +113,11 @@
 ## Round 28 @ 2026-06-14T02:00:00Z
 - Picked: Fix ruff F401 unused `Dict` import and W292 missing trailing newline in bin/autoresearch_recovery_time.py
 - Result: committed f565cd4e
+
+## Round 29 @ 2026-06-19T12:00:00Z
+- Picked: Fix ruff I001 import sorting issues in bin/autoresearch_failure_modes.py (multiple imports on one line) and bin/autoresearch_throughput.py (unsorted dataclasses import)
+- Result: committed c0b919d2
+
+## Round 30 @ 2026-06-14T01:48:00Z
+- Picked: Fix ruff F401 unused-imports and I001 unsorted-imports in `bin/version_compat_checker.py` (`io` and `typing.Iterable` were both unreferenced; `dataclass, asdict` was out of alpha order). `tests/test_version_compat.py` covers the module — 40/40 still green.
+- Result: committed 9ce93e7e

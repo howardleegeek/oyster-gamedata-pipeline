@@ -56,15 +56,13 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
-import io
 import json
 import re
 import sys
 import tarfile
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Iterable, Optional
-
+from typing import Any, Optional
 
 # ---------------------------------------------------------------------------
 # Paths & constants
