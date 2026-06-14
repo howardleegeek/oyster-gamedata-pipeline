@@ -601,7 +601,6 @@ def _build_buyer_records(
     # The padding still replicates last real position (better than None
     # for any model that requires a 9000-frame buffer), but the buyer
     # can now choose: use only real frames, or use full padded buffer.
-    real_record_count = len(records)
     for r in records:
         r.setdefault("is_padded", False)
 
