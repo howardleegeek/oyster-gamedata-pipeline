@@ -30,6 +30,11 @@
 
 ## Round 8 @ 2026-06-12T12:15:00Z
 - Picked: Fix failing `tests/test_gpt_thinking_provider.py::test_provider_not_available_when_openai_missing` — `GPTThinkingProvider.__init__` unconditionally imported `openai` at construction time, so the test (which patches `builtins.__import__` to block `openai`) failed with `ModuleNotFoundError` during instantiation. Deferred import to `complete()`
+- Result: committed <sha>
+
+## Round 9 @ 2026-06-12T12:30:00Z
+- Picked: Remove unused variable `real_record_count` (F841 lint error) in `src/oyster_agent_runner/buyer_spec_adapter.py` — dead code left from debugging/incomplete refactor
+- Result: committed dacead7f`
 - Result: committed aa7e98df
 
 ## Round 9 @ 2026-06-14T01:04:00Z
