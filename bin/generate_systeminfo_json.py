@@ -5,7 +5,6 @@ Generate systeminfo.json file with Minecraft window information.
 
 import argparse
 import json
-import os
 import subprocess
 import sys
 from typing import Optional

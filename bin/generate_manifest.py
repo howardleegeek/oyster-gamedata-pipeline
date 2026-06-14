@@ -13,7 +13,6 @@ import sys
 import tarfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 
 def compute_sha256(path: str, chunk_size: int = 65536) -> str:
@@ -310,7 +309,7 @@ def validate_manifest(manifest_path: str) -> tuple[bool, list[str]]:
         return (False, errors)
     
     # Check required fields
-    required_fields = ['batch_id', 'vendor_id', 'spec_version', 'upload_date', 
+    required_fields = ['batch_id', 'vendor_id', 'spec_version', 'upload_date',
                        'total_clips', 'total_size_gb', 'operators', 'clips', 'manifest_sha256']
     
     for field in required_fields:
