@@ -29,7 +29,12 @@
 - Result: committed aa7e98df
 
 ## Round 8 @ 2026-06-12T12:15:00Z
-- Picked: Fix failing `tests/test_gpt_thinking_provider.py::test_provider_not_available_when_openai_missing` — `GPTThinkingProvider.__init__` unconditionally imported `openai` at construction time, so the test (which patches `builtins.__import__` to block `openai`) failed with `ModuleNotFoundError` during instantiation. Deferred import to `complete()` method.
+- Picked: Fix failing `tests/test_gpt_thinking_provider.py::test_provider_not_available_when_openai_missing` — `GPTThinkingProvider.__init__` unconditionally imported `openai` at construction time, so the test (which patches `builtins.__import__` to block `openai`) failed with `ModuleNotFoundError` during instantiation. Deferred import to `complete()`
+- Result: committed aa7e98df
+
+## Round 9 @ 2026-06-14T01:04:00Z
+- Picked: Add `tests/dashboard/` and `active_session/` to `.gitignore` to prevent accidental commits of test runtime outputs
+- Result: committed 4e297002 method.
 - Result: committed 03d6786c`
 - Result: committed 1b624d87
 
