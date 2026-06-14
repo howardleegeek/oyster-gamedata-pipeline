@@ -109,3 +109,7 @@
 ## Round 27 @ 2026-06-14T01:32:00Z
 - Picked: Fix ruff lint errors in bin/autoresearch_depth_quality.py (I001 import sorting, E401 multi-line imports, F401 unused os import)
 - Result: committed c14c0be3
+
+## Round 28 @ 2026-06-14T02:00:00Z
+- Picked: Fix ruff F401 unused `Dict` import and W292 missing trailing newline in bin/autoresearch_recovery_time.py
+- Result: committed f565cd4e
