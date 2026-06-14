@@ -138,3 +138,7 @@
 ## Round 34 @ 2026-06-19T14:00:00Z
 - Picked: Fix ruff F401 unused imports (base64, json, os, tempfile, PIL.Image) in bin/buyer_dashboard_html.py — replaced PIL.Image import with importlib.util.find_spec for runtime availability check
 - Result: committed 1b7b82ef
+
+## Round 35 @ 2026-06-14T07:03:03Z
+- Picked: Fix ruff I001 import-sort in bin/depth_from_mineflayer_raycast.py — `numpy` was in its own (blank-line) group, ruff wants it alphabetized with `Imath` and `OpenEXR`. Preserved the explanatory comment block, applied `ruff check --fix`. tests/test_depth_from_mineflayer_raycast.py: 6/6 pass. Module behavior unchanged (same three imports at load time).
+- Result: committed 641183f3 (pushed to main)
