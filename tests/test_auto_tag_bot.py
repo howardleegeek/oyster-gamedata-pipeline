@@ -12,10 +12,28 @@ Tests cover:
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
+
+
+def _shellcheck_available() -> bool:
+    """Check if shellcheck is installed and actually functional."""
+    sc = shutil.which("shellcheck")
+    if sc is None:
+        return False
+    # Verify shellcheck actually works (not just exists as a stub)
+    try:
+        result = subprocess.run(
+            ["shellcheck", "--version"],
+            capture_output=True,
+        )
+        return result.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        # shellcheck exists but can't be executed (e.g., stub file)
+        return False
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -398,6 +416,7 @@ class TestNoPreviousTag:
 
 
 class TestShellcheck:
+    @pytest.mark.skipif(not _shellcheck_available(), reason="shellcheck not available")
     def test_shellcheck_passes(self):
         """scripts/auto_tag_bot.sh must pass shellcheck."""
         result = subprocess.run(
