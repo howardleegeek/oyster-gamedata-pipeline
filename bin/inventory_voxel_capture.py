@@ -241,6 +241,11 @@ def run_demo() -> int:
     return 0
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build and return the command-line argument parser.
+
+    Returns:
+        argparse.ArgumentParser: Configured argument parser for the CLI.
+    """
     p = argparse.ArgumentParser(prog="inventory_voxel_capture", description="Per-frame inventory + 3x3x3 voxel-window block-ID capture.")
     p.add_argument("--world", "-w", type=str, default=None, help="MineWorld world directory.")
     p.add_argument("--frame", "-f", type=int, default=0, help="Frame index (default: 0).")
