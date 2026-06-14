@@ -15,7 +15,6 @@ Usage:
 import json
 import math
 import os
-import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
