@@ -95,3 +95,7 @@ specs/auto/*
 # rebuild these from pinned URLs in bin/build_bundled_installer/manifest.json
 # at CI time, so checking them in would just rot. ~100MB+ of binary blobs.
 bundle/
+
+# Test outputs — generated at test runtime, never commit
+tests/dashboard/
+active_session/
