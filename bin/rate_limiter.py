@@ -6,7 +6,11 @@ Production utility to enforce per-day clip budget on adapter side.
 
 from __future__ import annotations
 
-import argparse, json, sys, threading, time
+import argparse
+import json
+import sys
+import threading
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -115,10 +119,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--budget", type=int, default=DEFAULT_DAILY_BUDGET, help="Daily token budget")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p = sub.add_parser("check", help="Check if tokens available"); p.add_argument("vendor_id"); p.add_argument("--tokens", type=float, default=1.0)
-    p = sub.add_parser("consume", help="Consume tokens"); p.add_argument("vendor_id"); p.add_argument("--tokens", type=float, default=1.0)
-    p = sub.add_parser("status", help="Show vendor status"); p.add_argument("vendor_id")
-    p = sub.add_parser("reset", help="Reset vendor bucket"); p.add_argument("vendor_id")
+    p = sub.add_parser("check", help="Check if tokens available")
+    p.add_argument("vendor_id")
+    p.add_argument("--tokens", type=float, default=1.0)
+    p = sub.add_parser("consume", help="Consume tokens")
+    p.add_argument("vendor_id")
+    p.add_argument("--tokens", type=float, default=1.0)
+    p = sub.add_parser("status", help="Show vendor status")
+    p.add_argument("vendor_id")
+    p = sub.add_parser("reset", help="Reset vendor bucket")
+    p.add_argument("vendor_id")
 
     args = parser.parse_args(argv)
     limiter = VendorRateLimiter(state_file=args.state_file, default_budget=args.budget)
