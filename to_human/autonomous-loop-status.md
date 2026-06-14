@@ -101,3 +101,7 @@
 ## Round 25 @ 2026-06-13T23:59:50Z
 - Picked: Fix ruff F401/F821 in bin/temporal_consistency_lint.py — removed unused `os`/`tempfile` imports and added `TYPE_CHECKING` guard for `numpy as np` so the existing `"np.ndarray"` forward-ref annotations resolve, mirroring the pattern in bin/audio_track_extractor.py, bin/real_depth_filler.py, and bin/autoresearch_depth_quality.py. Dropped the now-redundant `# type: ignore[name-defined]` comments.
 - Result: committed c1cae04e
+
+## Round 26 @ 2026-06-14T00:26:33Z
+- Picked: Fix ruff I001 import sorting in bin/automatic_diversity_metric.py and W292 missing newline in bin/autoresearch_compression_ratio.py
+- Result: committed 5ea68801
