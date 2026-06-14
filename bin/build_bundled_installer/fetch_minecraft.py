@@ -418,7 +418,7 @@ def _fetch_client_jar(per_version: dict[str, Any], version_id: str) -> int:
     downloads = per_version.get("downloads", {})
     client = downloads.get("client")
     if not client or "url" not in client or "sha1" not in client or "size" not in client:
-        _err(f"per-version manifest missing downloads.client.{{url,sha1,size}}")
+        _err("per-version manifest missing downloads.client.{url,sha1,size}")
         sys.exit(7)
 
     versions_dir = MC_INSTANCE_DIR / "versions" / version_id
