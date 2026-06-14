@@ -39,11 +39,10 @@ import math
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-
 # OpenEXR / Imath are required — depth maps are the load-bearing buyer-spec
 # artifact and we refuse to silently fall back to a non-EXR format.
 import Imath
+import numpy as np
 import OpenEXR
 
 # Default Minecraft render distance (in blocks/metres). The bot can't see
