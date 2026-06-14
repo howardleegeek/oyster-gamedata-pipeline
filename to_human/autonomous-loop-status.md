@@ -134,3 +134,7 @@
 ## Round 33 @ 2026-06-19T13:00:00Z
 - Picked: Fix ruff F401 unused `subprocess` import in bin/buyer_tarball_make_real.py
 - Result: committed 4e6c76fa
+
+## Round 34 @ 2026-06-19T14:00:00Z
+- Picked: Fix ruff F401 unused imports (base64, json, os, tempfile, PIL.Image) in bin/buyer_dashboard_html.py — replaced PIL.Image import with importlib.util.find_spec for runtime availability check
+- Result: committed 1b7b82ef
