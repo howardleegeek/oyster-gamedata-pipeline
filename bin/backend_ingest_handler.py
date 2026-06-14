@@ -325,7 +325,6 @@ def create_app() -> Any:
         Configured FastAPI app instance.
     """
     from fastapi import FastAPI, File, HTTPException, UploadFile
-    from fastapi.responses import JSONResponse
     from pydantic import BaseModel
 
     class IngestResponse(BaseModel):
@@ -446,7 +445,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             return 1
         result = process_tarball(tarball_path, args.vendor_id)
         if result["success"]:
-            print(f"✓ Successfully processed tarball")
+            print("✓ Successfully processed tarball")
             print(f"  Vendor ID: {result['vendor_id']}")
             print(f"  SHA256: {result['sha256']}")
             print(f"  Duration: {result['duration']}s")
