@@ -6304,6 +6304,28 @@ class RecorderApp(tk.Tk):
         else:
             _trace("package: video.mp4 missing; continuing with data-only session")
 
+        # 1b. Timestamp sidecar — wall-clock anchor for frame-to-unix alignment.
+        recording_started_unix_ns = self.__dict__.get("_recording_started_unix_ns")
+        if recording_started_unix_ns is not None:
+            profile = self.__dict__.get("_video_output_profile")
+            fps: float | None = None
+            if profile is not None:
+                try:
+                    fps = float(profile.fps)
+                except (AttributeError, TypeError):
+                    pass
+            timestamps_data: dict[str, Any] = {
+                "schema_version": 1,
+                "recording_started_unix_ns": recording_started_unix_ns,
+                "recording_started_monotonic_ns": self.__dict__.get(
+                    "_recording_started_monotonic_ns"
+                ),
+                "fps": fps,
+                "capture_layer": str(self.__dict__.get("_video_capture_mode", "unknown")),
+                "video_file": "video.mp4",
+            }
+            _atomic_write_json(clip_dir / "timestamps.json", timestamps_data)
+
         # Preserve all mod-side raw artifacts before transforms. This is a
         # copy, not a move, so active_session survives any later package error.
         _copy_active_session_into_clip(active_dir, clip_dir)
@@ -7091,6 +7113,8 @@ class RecorderApp(tk.Tk):
                     }
                 )
                 _trace(f"video_capture: selected layer={layer}")
+                self._recording_started_unix_ns = time.time_ns()
+                self._recording_started_monotonic_ns = time.perf_counter_ns()
                 return
             except Exception as exc:  # noqa: BLE001
                 error = f"{layer}: {exc}"
