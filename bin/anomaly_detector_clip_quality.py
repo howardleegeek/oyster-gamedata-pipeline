@@ -85,7 +85,7 @@ def analyze_clip(clip_data: dict[str, Any], config: dict[str, Any]) -> dict[str,
         'anomalies': [],
         'metrics': {},
     }
-    
+
     # Check action entropy
     actions = clip_data.get('actions', [])
     if actions:
@@ -95,7 +95,7 @@ def analyze_clip(clip_data: dict[str, Any], config: dict[str, Any]) -> dict[str,
         threshold = config.get('action_entropy_threshold', 2.0)
         if entropy < threshold:
             result['anomalies'].append(f'low_action_entropy:{entropy:.3f}<{threshold}')
-    
+
     # Check camera variance
     camera_data = clip_data.get('camera', [])
     if camera_data:
@@ -107,12 +107,12 @@ def analyze_clip(clip_data: dict[str, Any], config: dict[str, Any]) -> dict[str,
         threshold = config.get('camera_variance_threshold', 0.5)
         if combined_var < threshold:
             result['anomalies'].append(f'low_camera_variance:{combined_var:.3f}<{threshold}')
-    
+
     # Check trajectory pattern
     trajectory = clip_data.get('trajectory', [])
     if trajectory:
         result['metrics']['trajectory_hash'] = _hash_trajectory(trajectory)
-    
+
     return result
 
 
@@ -123,7 +123,7 @@ def detect_farming(clip_results: list[dict[str, Any]], n_clips: int = 3) -> list
         traj_hash = result.get('metrics', {}).get('trajectory_hash')
         if traj_hash:
             hash_groups.setdefault(traj_hash, []).append(result)
-    
+
     farming_patterns = []
     for traj_hash, clips in hash_groups.items():
         if len(clips) >= n_clips:
@@ -178,16 +178,16 @@ def run_detection(input_path: Path, config: dict[str, Any], output_path: Optiona
             'anomalies': [],
             'farming_patterns': [],
         }
-    
+
     clip_results = [analyze_clip(clip, config) for clip in clips]
     farming_patterns = detect_farming(clip_results, config.get('farming_n_clips', 3))
-    
+
     all_anomalies = []
     for result in clip_results:
         if result['anomalies']:
             all_anomalies.append({'clip_id': result['clip_id'], 'anomalies': result['anomalies'], 'metrics': result['metrics']})
     all_anomalies.extend(farming_patterns)
-    
+
     results = {
         'status': 'complete',
         'total_clips': len(clips),
@@ -196,7 +196,7 @@ def run_detection(input_path: Path, config: dict[str, Any], output_path: Optiona
         'anomalies': all_anomalies,
         'farming_patterns': farming_patterns,
     }
-    
+
     if output_path:
         with open(output_path, 'w') as f:
             json.dump(results, f, indent=2)
@@ -223,11 +223,11 @@ def main(argv: list[str]) -> int:
         'camera_variance_threshold': args.camera_variance_threshold,
         'farming_n_clips': args.farming_n_clips,
     }
-    
+
     if not args.input.exists():
         print(f"Error: Input path does not exist: {args.input}", file=sys.stderr)
         return 1
-    
+
     try:
         results = run_detection(args.input, config, args.output)
     except ImportError as e:
@@ -236,7 +236,7 @@ def main(argv: list[str]) -> int:
     except Exception as e:
         print(f"Error during analysis: {e}", file=sys.stderr)
         return 1
-    
+
     if not args.quiet:
         if results['status'] == 'error':
             print(f"Error: {results.get('message', 'Unknown error')}")
@@ -252,7 +252,7 @@ def main(argv: list[str]) -> int:
                         print(f"  - {anomaly['clip_id']}: {anomaly.get('anomalies', [])}")
                     else:
                         print(f"  - Farming: {anomaly.get('count')} clips with identical trajectory")
-    
+
     return 1 if (results['clips_with_anomalies'] > 0 or results['farming_patterns_detected'] > 0) else 0
 
 
