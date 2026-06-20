@@ -6,13 +6,13 @@ Post-recording redact PII from screen captures (frames containing Discord
 names, emails, phone numbers) via OCR + regex on rgb/ frames.
 """
 
-import json
-import re
 import hashlib
+import json
 import logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
