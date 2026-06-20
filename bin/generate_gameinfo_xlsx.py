@@ -13,11 +13,9 @@ import os
 import re
 import sys
 import zipfile
-from datetime import date, datetime
-from io import BytesIO
+from datetime import date
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
-
 
 logger = logging.getLogger(__name__)
 
@@ -385,8 +383,7 @@ def write_xlsx(data: Dict[str, Any], out_path: str) -> None:
     """
     try:
         from openpyxl import Workbook
-        from openpyxl.utils import get_column_letter
-        
+
         wb = Workbook()
         ws = wb.active
         ws.title = "gameinfo"
