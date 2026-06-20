@@ -135,7 +135,7 @@ def main(argv: List[str] | None = None) -> int:
     if args.json:
         print(json.dumps(summary, indent=2))
     else:
-        print(f"\n[G066] Summary")
+        print("\n[G066] Summary")
         print(f"  Total time   : {summary['total_s']:.3f}s")
         print(f"  Avg / iter   : {summary['avg_s']:.3f}s")
         print(f"  SLA pass     : {summary['sla_pass_count']}/{summary['iterations']} "
