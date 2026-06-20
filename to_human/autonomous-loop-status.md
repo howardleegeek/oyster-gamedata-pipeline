@@ -175,3 +175,7 @@
 - Picked: Fix ruff F401 unused imports (datetime.datetime, io.BytesIO, openpyxl.utils.get_column_letter) and I001 import sort in bin/generate_gameinfo_xlsx.py - has tests (test_generate_gameinfo_xlsx.py: 16/16 pass)
 - Result: committed c7248a7f
 
+
+## Round 44 @ 2026-06-21T13:00:00Z
+- Picked: Fix ruff F401 unused imports in bin/quality_scorer.py — removed `import sys` and `from pathlib import Path` (verified unused via grep). Has tests: test_quality_scorer.py: 53/53 pass.
+- Result: committed 31c82233 (pushed to main)
