@@ -165,3 +165,7 @@
 ## Round 39 @ 2026-06-14T11:14:16Z
 - Picked: Fix ruff F541 in bin/build_bundled_installer/fetch_minecraft.py — remove extraneous f-string prefix from string literal with no placeholders (the braces are literal characters).
 - Result: committed 855b1142 (pushed to main)
+
+## Round 40 @ 2026-06-20T20:47:50Z
+- Picked: Fix ruff F541 f-string-without-placeholders in `bin/vendor_scenario_no_gpu.py:138` — single one-line change, no semantic effect, byte-identical output.
+- Result: committed 606aa1fe (pushed to main after rebase)
