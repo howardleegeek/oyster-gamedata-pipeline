@@ -169,3 +169,9 @@
 ## Round 40 @ 2026-06-20T20:47:50Z
 - Picked: Fix ruff F541 f-string-without-placeholders in `bin/vendor_scenario_no_gpu.py:138` — single one-line change, no semantic effect, byte-identical output.
 - Result: committed 606aa1fe (pushed to main after rebase)
+
+
+## Round 41 @ 2026-06-21T00:00:00Z
+- Picked: Fix ruff F401 unused imports (datetime.datetime, io.BytesIO, openpyxl.utils.get_column_letter) and I001 import sort in bin/generate_gameinfo_xlsx.py - has tests (test_generate_gameinfo_xlsx.py: 16/16 pass)
+- Result: committed c7248a7f
+
