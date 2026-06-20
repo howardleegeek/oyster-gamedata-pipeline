@@ -241,7 +241,19 @@ class GracefulShutdownHandler:
             self._queue["cursor"] = cursor
 
 
-def main(argv=None) -> int:
+def main(argv: list[str] | None = None) -> int:
+    """Run the graceful shutdown handler as a CLI application.
+
+    Initializes a GracefulShutdownHandler with the given state directory and
+    flush timeout, then optionally runs as a daemon waiting for shutdown signals.
+
+    Args:
+        argv: Command-line arguments (including program name). If None,
+            uses sys.argv. Defaults to None.
+
+    Returns:
+        Exit code: 0 for normal exit, non-zero for errors.
+    """
     parser = argparse.ArgumentParser(description="Graceful shutdown handler")
     parser.add_argument("--state-dir", type=Path, required=True,
                        help="Directory for state and checkpoints")
