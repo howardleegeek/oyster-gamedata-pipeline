@@ -3,10 +3,9 @@
 Standalone CLI for disk health check.
 """
 
-import os
-import sys
 import json
 import shutil
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -15,11 +14,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
     from bin.recorder_rate_limiter import (
-        load_config,
-        count_sessions_today,
-        sum_pending_uploads_gb,
+        SESSION_DIR,
         can_record_now,
-        SESSION_DIR
+        count_sessions_today,
+        load_config,
+        sum_pending_uploads_gb,
     )
 except ImportError:
     # Fallback implementation if import fails
@@ -126,18 +125,18 @@ def main():
     # Display results
     print("=== Oyster Disk Health Check ===")
     print()
-    print(f"Disk space:")
+    print("Disk space:")
     print(f"  Free: {free_gb:.1f} GB ({free_percent:.1f}%)")
     print(f"  Used: {used_gb:.1f} GB")
     print(f"  Total: {total_gb:.1f} GB")
     print(f"  Threshold: {config.get('min_free_gb', 10.0)} GB minimum free")
     print()
-    print(f"Sessions today:")
+    print("Sessions today:")
     print(f"  Count: {today_count}")
     print(f"  Limit: {config.get('max_daily_sessions', 50)}")
     print(f"  Remaining: {config.get('max_daily_sessions', 50) - today_count}")
     print()
-    print(f"Pending uploads:")
+    print("Pending uploads:")
     print(f"  Size: {pending_gb:.1f} GB")
     print(f"  Limit: {config.get('max_pending_gb', 100.0)} GB")
     print()
@@ -153,7 +152,7 @@ def main():
             archive_size = sum(f.stat().st_size for f in archive_dir.rglob('*') if f.is_file())
             archive_gb = archive_size / 1e9
             archive_count = len(list(archive_dir.rglob('*.tar.gz*')))
-            print(f"Archive:")
+            print("Archive:")
             print(f"  Size: {archive_gb:.1f} GB")
             print(f"  Files: {archive_count}")
         except (OSError, AttributeError):
