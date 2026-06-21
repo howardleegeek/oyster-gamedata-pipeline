@@ -18,16 +18,15 @@ import json
 import os
 import sys
 import time
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 # Try to import requests, fall back to urllib
 try:
     import requests
     HAS_REQUESTS = True
 except ImportError:
-    import urllib.request
     import urllib.error
+    import urllib.request
     HAS_REQUESTS = False
 
 
