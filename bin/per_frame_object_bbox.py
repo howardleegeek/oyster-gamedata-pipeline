@@ -245,6 +245,13 @@ def draw_overlay(image_path: Path, frame: FrameData,
 # -- CLI --------------------------------------------------------------------
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build and return an ArgumentParser for the bbox tool.
+
+    Returns:
+        argparse.ArgumentParser: Configured argument parser with options for
+            input/output files, format selection, filtering thresholds, and
+            optional image overlay.
+    """
     p = argparse.ArgumentParser(
         description="Per-frame 2D + 3D bounding boxes for visible NPCs/items.")
     p.add_argument("--input", "-i", required=True, type=Path,
