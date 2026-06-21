@@ -30,6 +30,11 @@
 
 ## Round 8 @ 2026-06-12T12:15:00Z
 - Picked: Fix failing `tests/test_gpt_thinking_provider.py::test_provider_not_available_when_openai_missing` — `GPTThinkingProvider.__init__` unconditionally imported `openai` at construction time, so the test (which patches `builtins.__import__` to block `openai`) failed with `ModuleNotFoundError` during instantiation. Deferred import to `complete()`
+- Result: committed 03a5cf07
+
+## Round 51 @ 2026-06-20T03:20:00Z
+- Picked: Replace bare `except:` with `except Exception` in bin/spectator_follow.py and bin/daemon_control.py — bare except catches KeyboardInterrupt and SystemExit, which is bad practice
+- Result: committed 03a5cf07
 - Result: committed <sha>
 
 ## Round 9 @ 2026-06-12T12:30:00Z
@@ -199,3 +204,7 @@
 ## Round 50 @ 2026-06-21T01:28:05Z
 - Picked: Fix ruff F401/W292/I001 in bin/route_planner.py — removed 3 confirmed-unused imports (os, sys, typing.Optional; verified via grep that none are referenced in the file), added trailing newline (W292), alphabetized typing line Dict, Any -> Any, Dict per PEP 8 I001. Has tests: tests/test_route_planner.py — 14/14 pass. Module imports cleanly. Picked because it's a tight 1-file bounded cleanup (3 unused imports + 1 newline) with a direct test file as a safety net.
 - Result: committed bdbbc1eb
+
+## Round 51 @ 2026-06-21T02:00:00Z
+- Picked: Fix ruff F401 unused imports (collections.defaultdict, pathlib.Path) in bin/input_latency_telemetry.py — verified both truly unused via grep, module imports cleanly, has tests (test_input_latency_telemetry.py: 10/10 pass).
+- Result: committed ce2a6f11 (pushed to main)
