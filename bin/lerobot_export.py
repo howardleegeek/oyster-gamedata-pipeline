@@ -11,7 +11,14 @@ Usage:
 """
 from __future__ import annotations
 
-import argparse, csv, json, logging, os, sys, tarfile, tempfile
+import argparse
+import csv
+import json
+import logging
+import os
+import sys
+import tarfile
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -20,16 +27,20 @@ logger = logging.getLogger(__name__)
 # -- lazy imports for heavy optional deps -----------------------------------
 
 def _numpy():
-    import numpy as np; return np  # noqa: F401
+    import numpy as np  # noqa: F401
+    return np
 
 def _pil_image():
-    from PIL import Image; return Image  # noqa: F401
+    from PIL import Image  # noqa: F401
+    return Image
 
 def _yaml():
-    import yaml; return yaml  # noqa: F401
+    import yaml  # noqa: F401
+    return yaml
 
 def _huggingface_hub():
-    from huggingface_hub import HfApi; return HfApi  # noqa: F401
+    from huggingface_hub import HfApi  # noqa: F401
+    return HfApi
 
 # -- core logic -------------------------------------------------------------
 
