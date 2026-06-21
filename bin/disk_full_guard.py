@@ -8,13 +8,13 @@ truncated tarballs. This independent guard runs alongside capture, kills
 the parent if free space < threshold.
 """
 
-import os
-import sys
-import signal
-import time
 import argparse
 import logging
+import os
 import shutil
+import signal
+import sys
+import time
 from typing import Optional
 
 # Configure logging to stderr
