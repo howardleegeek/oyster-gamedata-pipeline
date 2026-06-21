@@ -171,6 +171,11 @@ class TrajectoryMemory:
         return [self.add(t) for t in texts]
 
     def clear(self) -> None:
+        """Clear all stored records from memory.
+
+        Removes all MemoryRecord instances from the internal store.
+        The embedder remains unchanged for subsequent add() calls.
+        """
         self._records.clear()
 
     # --- queries -------------------------------------------------------------
