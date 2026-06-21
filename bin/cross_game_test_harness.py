@@ -15,7 +15,7 @@ import sys
 import time
 import traceback
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List
 
 
 class TestHarness:
@@ -243,7 +243,7 @@ class TestHarness:
         print(f"Tests: {r['passed_tests']}/{r['total_tests']} passed")
         
         if r['failed_envs']:
-            print(f"\nFailed:")
+            print("\nFailed:")
             for env in r['failed_envs']:
                 print(f"  - {env}")
         
