@@ -75,6 +75,12 @@ def insert_clip_record(
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build and return the argument parser for this CLI.
+
+    Returns:
+        argparse.ArgumentParser: Configured parser with arguments for clip-dir,
+            clip-id, db-path, output-json, dry-run, and verbose options.
+    """
     p = argparse.ArgumentParser(
         description="Generate per-clip UUID4, persist to systeminfo, suffix filenames.")
     p.add_argument("--clip-dir", type=Path, help="Directory of clip files to process.")
