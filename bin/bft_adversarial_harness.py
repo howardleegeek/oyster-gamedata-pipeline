@@ -15,24 +15,50 @@ from typing import Any, Callable
 
 from bin.v1_claude_residuals.residuals import (
     r02_euler_quat_consistency as v1_r02,
+)
+from bin.v1_claude_residuals.residuals import (
     r07_mouse_range as v1_r07,
+)
+from bin.v1_claude_residuals.residuals import (
     r08_fx_eq_fy as v1_r08,
+)
+from bin.v1_claude_residuals.residuals import (
     r09_keycode_vk as v1_r09,
+)
+from bin.v1_claude_residuals.residuals import (
     r12_fps_range as v1_r12,
 )
 from bin.v2_minimax_residuals.residuals import (
     r02_euler_quat_consistency as v2_r02,
+)
+from bin.v2_minimax_residuals.residuals import (
     r07_mouse_range as v2_r07,
+)
+from bin.v2_minimax_residuals.residuals import (
     r08_fx_eq_fy as v2_r08,
+)
+from bin.v2_minimax_residuals.residuals import (
     r09_keycode_vk as v2_r09,
+)
+from bin.v2_minimax_residuals.residuals import (
     r12_fps_range as v2_r12,
 )
 from bin.v3_physics_oracle.residuals import (
     Verdict,
+)
+from bin.v3_physics_oracle.residuals import (
     r02_oula_quat_table as v3_r02,
+)
+from bin.v3_physics_oracle.residuals import (
     r07_mouse_range_strict as v3_r07,
+)
+from bin.v3_physics_oracle.residuals import (
     r08_intrinsics_symmetric as v3_r08,
+)
+from bin.v3_physics_oracle.residuals import (
     r09_keycode_vk_known as v3_r09,
+)
+from bin.v3_physics_oracle.residuals import (
     r12_fps_fixed_30 as v3_r12,
 )
 
