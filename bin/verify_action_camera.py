@@ -44,7 +44,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-
 EPS_QUAT_NORM = 0.01           # ‖q‖ within ±1%
 EPS_PITCH_DEG = 0.1            # pitch in [-90.1°, 90.1°]
 EPS_EULER_RT_DEG = 0.5         # round-trip euler tolerance (degrees)
@@ -314,7 +313,7 @@ def main(argv: list[str] | None = None) -> int:
     elif isinstance(data, list):
         records = data
     else:
-        print(f"ERROR: unrecognized action_camera.json shape", file=sys.stderr)
+        print("ERROR: unrecognized action_camera.json shape", file=sys.stderr)
         return 99
 
     requested = {int(x) for x in args.layer.split(",") if x.strip()}
