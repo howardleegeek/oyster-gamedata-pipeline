@@ -38,9 +38,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# JWT Configuration
-JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret-change-in-production")
-JWT_ALGORITHM = "HS256"
+# JWT Configuration (imported from oauth.py)
+from oauth import JWT_SECRET, JWT_ALGORITHM
 
 # Mock database
 MOCK_SESSIONS = {}

@@ -16,13 +16,14 @@ from datetime import datetime
 
 import jwt
 
-from server import JWT_ALGORITHM, JWT_SECRET, app
+from oauth import JWT_ALGORITHM, JWT_SECRET
+import server
 
 
 @pytest.fixture
 def client():
     """Create test client."""
-    return TestClient(app)
+    return TestClient(server.app)
 
 
 @pytest.fixture
