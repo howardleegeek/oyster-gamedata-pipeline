@@ -26,9 +26,9 @@ from urllib.parse import urlencode
 
 # Lazy imports for optional dependencies
 try:
+    import uvicorn
     from fastapi import Depends, FastAPI, HTTPException, Query, Request
     from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-    import uvicorn
     HAS_FASTAPI = True
 except ImportError:
     HAS_FASTAPI = False
