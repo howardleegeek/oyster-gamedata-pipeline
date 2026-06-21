@@ -349,3 +349,7 @@
 ## Round 80 @ 2026-06-24T07:00:00Z
 - Picked: Fix ruff F841×6 (unused `status_parser`, `pause_parser`, `resume_parser`, `stop_parser`, `logs_parser`, `start_parser` variables) in bin/daemon_control.py — argparse subparser objects are created but never used after creation, causing lint errors. Removed the unused variable assignments, keeping only the `subparsers.add_parser()` calls. Module compiles and imports cleanly, targeted tests pass (test_state_machine.py: 18/18). Single-file bounded change. Self-review: pure cosmetic lint fix, no behavior change, no module-level side effects added, no silent error swallow, no race condition, no security change, no off-by-one, no tests touched.
 - Result: committed 35238c9f (pushed to main)
+
+## Round 81 @ 2026-06-24T12:00:00Z
+- Picked: Commit pre-existing lint fix in staged `bin/mineflayer_runner.py` — remove unused `os` and `time` imports (F401). Verified ruff clean, tests pass (538/538 in tests/bin/).
+- Result: committed e1cf1cc1 (pushed to main)
