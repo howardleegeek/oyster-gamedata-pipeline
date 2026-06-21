@@ -15,14 +15,13 @@ Honest measurement, no synthesis.
 Method: wasd_press_to_velocity_change
 """
 
-import json
-import sys
-import os
-import time
 import argparse
+import json
+import os
+import sys
+import time
 from collections import defaultdict
 from pathlib import Path
-
 
 # WASD key codes and their corresponding velocity component
 WASD_MAP = {
