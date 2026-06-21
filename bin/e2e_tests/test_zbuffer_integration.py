@@ -43,7 +43,7 @@ def find_depth_source_marker(session_dir: str) -> Optional[Dict[str, Any]]:
             try:
                 with open(path) as f:
                     return json.load(f)
-            except:
+            except Exception:
                 pass
     
     return None
@@ -88,7 +88,7 @@ def validate_zbuffer_marker(source_marker: Dict[str, Any]) -> Dict[str, Any]:
 def main():
     parser = argparse.ArgumentParser(description="ZBuffer integration test")
     parser.add_argument("--session-dir", required=True, help="Session directory")
-    parser.add_argument("--force", action="store_true", 
+    parser.add_argument("--force", action="store_true",
                         help="Force test even if mod patch not detected")
     args = parser.parse_args()
     
