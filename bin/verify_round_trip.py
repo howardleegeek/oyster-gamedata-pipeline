@@ -173,6 +173,20 @@ def replay_key_events(events: list[tuple[int, str, int]],
 
 
 def check1_keyboard(records: list[dict[str, Any]]) -> dict[str, Any]:
+    """Check that keyboard events can be reconstructed from frame records.
+
+    Verifies the round-trip integrity of keyboard event recording by:
+      1. Reconstructing key events from the frame records
+      2. Replaying those events to regenerate frame key states
+      3. Comparing original vs reconstructed key codes
+
+    Args:
+        records: List of frame dictionaries containing key state data.
+
+    Returns:
+        Dict with check results including pass/fail status, mismatch count,
+        and sample mismatch details for debugging.
+    """
     events = reconstruct_key_events(records)
     replayed = replay_key_events(events, len(records))
     mismatches: list[tuple[int, list[int], list[int]]] = []
