@@ -191,3 +191,7 @@
 ## Round 47 @ 2026-06-21T00:17:28Z
 - Picked: Fix silent exception swallow in bin/preflight_recorder.py::check_display_resolution — the prior handler did `except: pass` then referenced `e` via a runtime `dir()` lookup, which silently dropped the real reason xrandr failed (binary missing, timeout, permission denied). Replaced with two explicit fallbacks: (1) xrandr-invocation exception → return `xrandr failed: <e>` as structured error, (2) xrandr ran but no parseable WxH token → return `could not determine`. Both paths keep `ok=False`. Picked because it was an in-progress fix from prior session with a clear bounded scope (16-line diff in one function), and the silent-swallow is a real production-gate concern (operators can't diagnose failed preflights).
 - Result: committed cce926bc (pushed to main)
+
+## Round 48 @ 2026-06-21T00:29:25Z
+- Picked: Fix ruff W293 trailing whitespace on blank lines in bin/audit_quality_metrics.py — 106 lines had trailing whitespace (spaces on otherwise empty lines). Used sed to strip trailing whitespace, verified ruff clean.
+- Result: committed 7f67e99d (pushed to main)
