@@ -301,5 +301,7 @@
 - Result: committed ccebc538 (pushed to main)
 
 ## Round 73 @ 2026-06-22T07:00:00Z
+- Picked: no good candidate found this round — all tests pass, bin/*.py compiles cleanly, no documented PRD gaps with clear acceptance criteria
+- Result: skipped (no good candidate)
 - Picked: Remove unused `sys` import in `bin/secure_subprocess.py` (ruff F401). Verified `sys` appears only on the import line via `grep -n "sys"` returning exactly one match; no tests reference the module (grep on `tests/` returned no hits); `python3 -m py_compile` passes; `from secure_subprocess import safe_run, quote_for_shell, ALLOWED_BINARIES` works; live smoke test of `safe_run(['/bin/echo','hello'])` returns rc=0 and stdout='hello'; `pytest -k "secure or subprocess"` passes 1/1; `ruff check bin/secure_subprocess.py` → "All checks passed!" Single-file bounded fix, ONE logical change. Self-review: pure unused-import removal — no silent error swallow, no race condition, no security change, no off-by-one, no broken tests masked as passing. Reverted runtime artifacts (dashboard/merge_failures.log, dashboard/replay_attacks.json, tests/_payout_cron_test.log) per one-logical-change rule.
 - Result: committed eec9359b (pushed to main)
