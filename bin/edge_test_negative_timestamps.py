@@ -14,10 +14,7 @@ import argparse
 import datetime
 import json
 import sys
-import tempfile
-import time
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 
 def validate_timestamp_schema(timestamp: Any) -> bool:
@@ -55,7 +52,7 @@ def validate_timestamp_schema(timestamp: Any) -> bool:
                 dt = datetime.datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
             except ValueError:
                 # Try other common formats
-                for fmt in ['%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', 
+                for fmt in ['%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S',
                            '%Y-%m-%d', '%Y/%m/%d %H:%M:%S']:
                     try:
                         dt = datetime.datetime.strptime(timestamp, fmt)
@@ -277,7 +274,7 @@ def run_all_tests(verbose: bool = False) -> Dict[str, Any]:
     failed = total - passed
     
     # Print summary
-    print(f"\nTest Results Summary:")
+    print("\nTest Results Summary:")
     print(f"  Total tests: {total}")
     print(f"  Passed: {passed}")
     print(f"  Failed: {failed}")
@@ -375,7 +372,7 @@ Examples:
                     print(f"Date: {dt}")
                     print(f"Year: {dt.year}")
                 except (ValueError, OverflowError, OSError):
-                    print(f"Date: Invalid timestamp for platform")
+                    print("Date: Invalid timestamp for platform")
             
             return 0 if is_valid else 1
             
