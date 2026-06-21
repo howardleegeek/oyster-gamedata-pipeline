@@ -230,6 +230,18 @@ class GracefulShutdownHandler:
                 self._writes[clip_id]["completed"] = True
     
     def open_tarball(self, path: Path, mode: str = "w:gz") -> tarfile.TarFile:
+        """Open a tarball and track it for graceful shutdown.
+
+        Opens the specified tarball file with the given mode and registers
+        it with the handler so it can be properly closed during shutdown.
+
+        Args:
+            path: Path to the tarball file.
+            mode: Tarfile open mode (default "w:gz" for gzip compression).
+
+        Returns:
+            The opened tarfile.TarFile object.
+        """
         with self._lock:
             tar = tarfile.open(path, mode)
             self._tarballs[str(path)] = tar
