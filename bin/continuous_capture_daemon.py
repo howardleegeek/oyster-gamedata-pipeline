@@ -4,13 +4,11 @@ Continuous capture daemon for Oyster Minecraft recording.
 State machine: IDLE → ARMED → RECORDING → FINALIZING → UPLOADING → COOLDOWN
 """
 
-import os
 import sys
 import json
 import time
 import logging
 import subprocess
-import threading
 from datetime import datetime, timedelta
 from pathlib import Path
 from enum import Enum
