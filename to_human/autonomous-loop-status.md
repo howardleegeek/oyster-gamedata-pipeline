@@ -345,3 +345,7 @@
 ## Round 79 @ 2026-06-21T21:20:11Z
 - Picked: Fix ruff F401×4 (unused tempfile, time, pathlib.Path, typing.Union) + I001 (import sort after removal) + W291×2 (trailing whitespace on lines 55 and 58) + F541×2 (f-strings without placeholders at lines 280 and 378) + W292 (missing trailing newline) in `bin/edge_test_negative_timestamps.py`. Verified unused imports via grep (0 matches each), f-strings fixed by removing extraneous f-prefix, trailing whitespace removed, newline added. Module compiles and imports cleanly, no tests reference this module so none broken. Self-review: pure cosmetic lint cleanup, no behavior change, no silent error swallow, no race condition, no security change, no off-by-one.
 - Result: committed 7a4d4adc (pushed to main)
+
+## Round 80 @ 2026-06-24T07:00:00Z
+- Picked: Fix ruff F841×6 (unused `status_parser`, `pause_parser`, `resume_parser`, `stop_parser`, `logs_parser`, `start_parser` variables) in bin/daemon_control.py — argparse subparser objects are created but never used after creation, causing lint errors. Removed the unused variable assignments, keeping only the `subparsers.add_parser()` calls. Module compiles and imports cleanly, targeted tests pass (test_state_machine.py: 18/18). Single-file bounded change. Self-review: pure cosmetic lint fix, no behavior change, no module-level side effects added, no silent error swallow, no race condition, no security change, no off-by-one, no tests touched.
+- Result: committed 35238c9f (pushed to main)
