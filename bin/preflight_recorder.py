@@ -56,14 +56,22 @@ def check_display_resolution() -> dict:
                             "expected": f"{EXPECTED_RESOLUTION[0]}x{EXPECTED_RESOLUTION[1]}"
                         }
     except Exception as e:
-        pass
-    
-    # Fallback: check common display env vars or return unknown
+        # Fallback: surface the real reason xrandr failed (binary missing,
+        # timeout, permission denied) instead of swallowing the exception.
+        return {
+            "name": "display_resolution",
+            "ok": False,
+            "value": "unknown",
+            "error": f"xrandr failed: {e}"
+        }
+
+    # Fallback: xrandr ran successfully but the output did not contain a
+    # recognizable `WxH` resolution token (e.g. headless CI, virtual display).
     return {
         "name": "display_resolution",
         "ok": False,
         "value": "unknown",
-        "error": str(e) if 'e' in dir() else "could not determine"
+        "error": "could not determine"
     }
 
 
