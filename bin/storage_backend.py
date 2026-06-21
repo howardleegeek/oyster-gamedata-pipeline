@@ -61,9 +61,9 @@ import subprocess
 import time
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 logger = logging.getLogger("oyster.storage")
 

@@ -7,11 +7,9 @@ Outputs pii_audit.json with verdict and recommendations.
 
 import json
 import re
-import hashlib
-import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
 
 # Regex patterns for PII detection
 PATTERNS = {
@@ -250,7 +248,7 @@ def main():
     
     parser = argparse.ArgumentParser(description='PII Auditor - Scan session for PII')
     parser.add_argument('session_dir', type=Path, help='Session directory to scan')
-    parser.add_argument('-o', '--output', type=Path, default=Path('pii_audit.json'), 
+    parser.add_argument('-o', '--output', type=Path, default=Path('pii_audit.json'),
                         help='Output file for audit results')
     
     args = parser.parse_args()

@@ -1,21 +1,15 @@
-import time
-import threading
 import queue
+import sys
+import threading
+import time
 from pathlib import Path
 from typing import Optional, Tuple
-import sys
 
 try:
     import mss
     import mss.tools
 except ImportError:
     raise ImportError("mss library required for screen capture")
-
-try:
-    import imageio.v3 as iio
-except ImportError:
-    raise ImportError("imageio library required for video encoding")
-
 
 def record_screen_region(
     output_path: Path,
