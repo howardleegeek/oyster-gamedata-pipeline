@@ -94,13 +94,27 @@ def compute_dedup_key(error_class: str, traceback_text: str,
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def create_engine(db_url: str):
-    """Create SQLAlchemy engine with pool_pre_ping."""
+def create_engine(db_url: str) -> Any:
+    """Create SQLAlchemy engine with pool_pre_ping.
+
+    Args:
+        db_url: PostgreSQL connection URL (e.g., postgresql://user:pass@host/db).
+
+    Returns:
+        SQLAlchemy Engine instance with pool_pre_ping enabled.
+    """
     return _sa().create_engine(db_url, pool_pre_ping=True)
 
 
-def get_session(db_url: str):
-    """Return a new bound session."""
+def get_session(db_url: str) -> Any:
+    """Return a new bound session.
+
+    Args:
+        db_url: PostgreSQL connection URL.
+
+    Returns:
+        SQLAlchemy Session bound to the engine.
+    """
     return _sessionmaker()(bind=create_engine(db_url))
 
 
