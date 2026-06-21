@@ -4,15 +4,15 @@ RCON-based spectator follow script for Minecraft.
 Continuously sends /spectate commands to keep a spectator following a bot.
 """
 
-import socket
-import struct
-import time
+import argparse
 import logging
 import signal
+import socket
+import struct
 import sys
-import argparse
-from typing import Optional
+import time
 from enum import IntEnum
+from typing import Optional
 
 
 class PacketType(IntEnum):
@@ -62,7 +62,7 @@ class RconClient:
         
         # Build packet: length + id + type + body + null terminators
         body_bytes = body.encode('utf-8') + b'\x00'
-        packet = struct.pack('<iii', 
+        packet = struct.pack('<iii',
                             len(body_bytes) + 10,  # length of id(4) + type(4) + body + nulls
                             packet_id,
                             packet_type) + body_bytes
@@ -259,9 +259,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--rcon-password", required=True, help="RCON password")
     parser.add_argument("--bot", required=True, help="Bot username to follow")
     parser.add_argument("--spectator", required=True, help="Spectator username")
-    parser.add_argument("--interval", type=float, default=5.0, 
+    parser.add_argument("--interval", type=float, default=5.0,
                        help="Interval between spectate commands (seconds)")
-    parser.add_argument("--duration", type=float, 
+    parser.add_argument("--duration", type=float,
                        help="Total duration to run (seconds). If not set, runs until interrupted")
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable debug logging")
     
