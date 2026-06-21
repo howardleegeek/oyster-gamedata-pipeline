@@ -266,3 +266,12 @@
 - Picked: Fix ruff I001 (unsorted imports) in bin/continuous_capture_daemon.py — sorted top-level imports alphabetically, fixed inline imports in main() function, added trailing newline. Verified tests pass (18/18 in test_state_machine.py).
 - Result: committed 52bd3874 (pushed to main)
 
+
+## Round 66 @ 2026-06-22T00:00:00Z
+- Picked: Fix ruff F401 unused `os` import in bin/vendor_scenario_low_disk.py — verified `os` is not used anywhere in the file (grep returned empty). Removed 1 line. Module imports cleanly, tests pass (test_iron_law_no_fake_data.py: 25/25), ruff check clean.
+- Result: committed 73729fe1 (pushed to main)
+
+## Round 67 @ 2026-06-22T06:45:00Z
+- Picked: Fix ruff F401 (unused `typing.Any` import) and W292 (missing trailing newline) in `bin/vendor_scenario_alpha_week.py` — verified `Any` is referenced only by the import line itself (grep -c = 1), and the file ended with `exit(main())` without a newline. Removed `Any` from the `typing` import (kept `Dict, List, Optional` — each referenced elsewhere) and added trailing newline. No tests reference the module (verified via grep on `tests/`). Module imports cleanly under both imports-by-name and module path. Ruff check now `All checks passed!` for this file. Targeted sanity run: `pytest tests/bin/ -q` passes 538/538 (no skip/xfail counted as green).
+- Result: committed (pushed to main)
+
