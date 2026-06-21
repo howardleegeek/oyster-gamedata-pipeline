@@ -4,8 +4,10 @@ Tests for semantic_validator.py
 
 import json
 import os
+import subprocess
 import tempfile
 
+import semantic_validator
 from semantic_validator import validate_action_camera_semantics
 
 
@@ -144,18 +146,24 @@ def test_fails_on_bad_quaternion():
 
 def test_cli_valid_file():
     """Test CLI with valid JSON file."""
-    records = [create_valid_record(i) for i in range(10)]
+    records = [create_valid_record(i) for i in range(100)]
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         json.dump(records, f)
         temp_file = f.name
 
     try:
-        # Run the CLI
-        os.system(f"python3 semantic_validator.py {temp_file} > /dev/null 2>&1")
-        # Check exit code (should be 0 for valid)
-        exit_code = os.system(f"python3 semantic_validator.py {temp_file} > /dev/null 2>&1")
-        assert exit_code == 0, f"Expected exit code 0, got {exit_code}"
+        # Use absolute path (the test cwd is the repo root, not the source dir).
+        cli_script = os.path.abspath(semantic_validator.__file__)
+        result = subprocess.run(
+            ["python3", cli_script, temp_file],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, (
+            f"Expected exit code 0, got {result.returncode}; "
+            f"stdout={result.stdout!r} stderr={result.stderr!r}"
+        )
         print("✓ test_cli_valid_file passed")
     finally:
         os.unlink(temp_file)
@@ -168,10 +176,15 @@ def test_cli_invalid_file():
         temp_file = f.name
 
     try:
-        # Run the CLI
-        exit_code = os.system(f"python3 semantic_validator.py {temp_file} > /dev/null 2>&1")
+        # Use absolute path (the test cwd is the repo root, not the source dir).
+        cli_script = os.path.abspath(semantic_validator.__file__)
+        result = subprocess.run(
+            ["python3", cli_script, temp_file],
+            capture_output=True,
+            text=True,
+        )
         # Should exit with non-zero code
-        assert exit_code != 0, "Expected non-zero exit code for invalid JSON"
+        assert result.returncode != 0, "Expected non-zero exit code for invalid JSON"
         print("✓ test_cli_invalid_file passed")
     finally:
         os.unlink(temp_file)
