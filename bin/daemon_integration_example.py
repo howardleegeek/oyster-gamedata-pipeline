@@ -4,10 +4,9 @@ Example integration with continuous_capture_daemon.py
 This shows how to integrate the rate limiter with the daemon.
 """
 
-import os
+import logging
 import sys
 import time
-import logging
 from pathlib import Path
 
 # Add parent directory to path to import our modules
