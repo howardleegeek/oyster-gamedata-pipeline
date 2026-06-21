@@ -23,7 +23,10 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, List, Optional, Sequence
+
+if TYPE_CHECKING:
+    import numpy as np
 
 _np = None
 _pil_image = None
@@ -64,7 +67,7 @@ def extract_frames(video_path: str, max_frames: int = 30,
     os.makedirs(output_dir, exist_ok=True)
     cmd = [
         "ffmpeg", "-y", "-i", video_path,
-        "-vf", f"fps=1/5,scale=256:256",
+        "-vf", "fps=1/5,scale=256:256",
         "-frames:v", str(max_frames), "-q:v", "3",
         os.path.join(output_dir, "frame_%04d.jpg"),
     ]
@@ -74,7 +77,7 @@ def extract_frames(video_path: str, max_frames: int = 30,
     return sorted(str(f) for f in Path(output_dir).glob("frame_*.jpg"))
 
 
-def compute_histogram(image_path: str, bins: int = 32) -> "numpy.ndarray":
+def compute_histogram(image_path: str, bins: int = 32) -> "np.ndarray":
     """Compute normalized RGB histogram for an image.
 
     Args:
@@ -94,7 +97,7 @@ def compute_histogram(image_path: str, bins: int = 32) -> "numpy.ndarray":
     return hist / (hist.sum() + 1e-10)
 
 
-def compute_frame_histograms(frame_paths: List[str], bins: int = 32) -> "numpy.ndarray":
+def compute_frame_histograms(frame_paths: List[str], bins: int = 32) -> "np.ndarray":
     """Compute histograms for all frames.
 
     Args:
@@ -120,7 +123,7 @@ def compute_frame_histograms(frame_paths: List[str], bins: int = 32) -> "numpy.n
     return np.stack(histograms, axis=0)
 
 
-def compute_diversity_score(histograms: "numpy.ndarray") -> float:
+def compute_diversity_score(histograms: "np.ndarray") -> float:
     """Compute scene diversity score from frame histograms.
 
     Uses pairwise histogram distances to measure visual diversity.
