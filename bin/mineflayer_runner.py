@@ -4,12 +4,10 @@
 from __future__ import annotations
 
 import argparse
-import os
 import shutil
 import signal
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 VALID_MODES = {"normal", "wasd_balanced", "special", "loop"}
