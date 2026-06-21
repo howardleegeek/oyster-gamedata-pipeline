@@ -10,9 +10,7 @@ from __future__ import annotations
 
 import argparse
 import datetime
-import json
 import sys
-import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -70,7 +68,7 @@ def render_dashboard(metrics: dict[str, Any]) -> str:
 
     # Header
     lines.append("=" * width)
-    lines.append(f"  VENDOR ALPHA DASHBOARD".center(width))
+    lines.append("  VENDOR ALPHA DASHBOARD".center(width))
     lines.append(f"  Vendor: {metrics['vendor_id']}".center(width))
     lines.append(f"  Date: {metrics['date']}".center(width))
     lines.append("=" * width)
