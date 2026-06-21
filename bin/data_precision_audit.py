@@ -227,67 +227,6 @@ def p2_mouse_camera_coherence(inputs: list, action_camera: list, game_state: lis
             else "DECOUPLED at 1-sec window (mouse and camera independent)"
         ),
     }
-    # Legacy code below is dead-stripped — return above
-
-    n_frames = len(action_camera)
-    mouse_dx_per_frame = [0.0] * n_frames
-    frame_dur_s = 1.0 / 30.0
-
-    for e in inputs:
-        if e.get("event_type") != "MOUSE_MOVE":
-            continue
-        ts = e.get("timestamp", 0)
-        if not isinstance(ts, (int, float)):
-            continue
-        ea = e.get("event_args", [])
-        if not isinstance(ea, list) or len(ea) < 1:
-            continue
-        dx = ea[0] if isinstance(ea[0], (int, float)) else 0
-        frame_idx = int((ts - ts0) / frame_dur_s)
-        if 0 <= frame_idx < n_frames:
-            mouse_dx_per_frame[frame_idx] += dx
-
-    # Get camera yaw delta per frame from action_camera oula
-    yaws = []
-    for row in action_camera:
-        oula = row.get("camera_rotation_oula")
-        if isinstance(oula, list) and len(oula) >= 2:
-            yaws.append(oula[1])  # yaw is index 1 in [pitch, yaw, roll]
-        else:
-            yaws.append(None)
-
-    # Compute yaw deltas
-    yaw_deltas = []
-    for i in range(1, len(yaws)):
-        if yaws[i] is None or yaws[i - 1] is None:
-            yaw_deltas.append(0.0)
-        else:
-            d = yaws[i] - yaws[i - 1]
-            # Wrap around -180/180
-            if d > 180:
-                d -= 360
-            elif d < -180:
-                d += 360
-            yaw_deltas.append(d)
-    yaw_deltas.append(0.0)  # pad to match length
-
-    # Cross-correlate
-    result = cross_correlation(mouse_dx_per_frame, yaw_deltas, max_lag=15)  # ±500ms at 30fps
-    if not result.get("ok"):
-        return result
-    peak_lag_frames = result["peak_lag"]
-    peak_lag_ms = peak_lag_frames * 1000 / 30
-    return {
-        "ok": True,
-        "peak_correlation": result["peak_corr"],
-        "peak_lag_frames": peak_lag_frames,
-        "peak_lag_ms": round(peak_lag_ms, 1),
-        "verdict": (
-            "STRONG (mouse drives camera)" if abs(result["peak_corr"]) > 0.4
-            else "weak (possible decoupling)" if abs(result["peak_corr"]) > 0.15
-            else "DECOUPLED (mouse data not actually controlling camera — fake?)"
-        ),
-    }
 
 
 def p3_input_to_effect_latency(inputs: list, game_state: list) -> dict:
