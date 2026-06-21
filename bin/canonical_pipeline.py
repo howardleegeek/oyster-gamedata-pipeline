@@ -54,6 +54,43 @@ def step(msg: str) -> None:
     print(f"\n[{dt.datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
+def detect_best_backend() -> str:
+    """Detect the best available depth inference backend for this platform.
+
+    Returns:
+        "local-onnx-directml" - Windows with DirectML
+        "local-mps" - macOS with MPS
+        "skip" - no suitable backend available (Linux without GPU, etc.)
+    """
+    import platform
+
+    system = platform.system()
+
+    # Check Windows with DirectML
+    if system == "Windows":
+        try:
+            import onnxruntime as ort
+
+            providers = ort.get_available_providers()
+            if "DmlExecutionProvider" in providers:
+                return "local-onnx-directml"
+        except ImportError:
+            pass
+
+    # Check macOS with MPS
+    if system == "Darwin":
+        try:
+            import torch
+
+            if torch.backends.mps.is_available():
+                return "local-mps"
+        except ImportError:
+            pass
+
+    # No suitable backend found
+    return "skip"
+
+
 def run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
     print(f"  $ {' '.join(map(str, cmd))}", flush=True)
     return subprocess.run(cmd, check=check, capture_output=False)
