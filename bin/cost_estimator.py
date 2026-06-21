@@ -10,7 +10,7 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 
 class StorageClass(Enum):
@@ -119,19 +119,19 @@ def print_report(report: Dict[str, Any], output_format: str = "text") -> None:
         print(f"{'='*50}")
         print(f"Report Date: {report['report_date']}")
         m = report['metrics']
-        print(f"\n--- Storage Metrics ---")
+        print("\n--- Storage Metrics ---")
         print(f"  Size:           {m['size_gb']:.2f} GB")
         print(f"  Objects:        {m['object_count']:,}")
         print(f"  Storage Class:  {m['storage_class']}")
         print(f"  Egress:         {m['egress_gb']:.2f} GB")
         print(f"  Avg Age:        {m['avg_object_age_days']} days")
         c = report['cost_breakdown']
-        print(f"\n--- Cost Breakdown (Monthly) ---")
+        print("\n--- Cost Breakdown (Monthly) ---")
         print(f"  Storage:        ${c['storage_monthly_usd']:.4f}")
         print(f"  Egress:         ${c['egress_monthly_usd']:.4f}")
         print(f"  TOTAL:          ${c['total_monthly_usd']:.4f}")
         lp = report['lifecycle_projection']
-        print(f"\n--- Lifecycle Projection ---")
+        print("\n--- Lifecycle Projection ---")
         print(f"  Current Class:      {lp['current_class']}")
         print(f"  Recommended Class:  {lp['recommended_class']}")
         print(f"  Potential Savings:  ${lp['monthly_savings_usd']:.4f}/month")
