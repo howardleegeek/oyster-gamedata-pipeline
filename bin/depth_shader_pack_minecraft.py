@@ -21,7 +21,7 @@ import struct
 import sys
 import zlib
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 # Constants
 DEFAULT_FPS = 6
@@ -157,8 +157,8 @@ void main() {
     vec3 packedDepth = texture2D(colortex0, v_texcoord).rgb;
     
     // Unpack depth from RGB channels
-    float depth = (packedDepth.r / 255.0) + 
-                  (packedDepth.g / (255.0 * 255.0)) + 
+    float depth = (packedDepth.r / 255.0) +
+                  (packedDepth.g / (255.0 * 255.0)) +
                   (packedDepth.b / (255.0 * 255.0 * 255.0));
     
     // Apply temporal dithering to reduce banding

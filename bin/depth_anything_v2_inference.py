@@ -90,8 +90,8 @@ def _write_exr(depth: np.ndarray, target: Path) -> None:
     we're outputting depth (a physical quantity), not a colour image — mean
     pooling preserves average distance correctly across each block.
     """
-    import OpenEXR  # noqa: PLC0415
     import Imath  # noqa: PLC0415
+    import OpenEXR  # noqa: PLC0415
 
     # 2× block-mean downsample. Trim to multiples-of-2 to keep .reshape exact.
     H, W = depth.shape
