@@ -253,3 +253,7 @@
 ## Round 61 @ 2026-06-21T15:30:00Z
 - Picked: Fix ruff F401/I001/W291/W292 in bin/pii_auditor.py (remove unused hashlib/os, fix import sort, trailing whitespace), bin/screen_capture_recorder.py (remove unused imageio import), bin/storage_backend.py (remove unused datetime.timedelta/typing.Iterator). All have tests.
 - Result: committed 7e3e4cf0 (pushed to main)
+
+## Round 9 @ 2026-06-21T04:45:00Z
+- Picked: Commit pre-existing `detect_best_backend()` function in `bin/canonical_pipeline.py` that detects best depth inference backend (DirectML for Windows, MPS for macOS, skip otherwise).
+- Result: committed 3e90562d
