@@ -201,7 +201,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             entry = log.add_entry(
                 user_id=args.user_id, game=args.game, opt_in_version=args.version
             )
-            print(f"Added consent entry:")
+            print("Added consent entry:")
             print(f"  User: {entry.user_id}")
             print(f"  Game: {entry.game}")
             print(f"  Timestamp: {entry.timestamp}")
