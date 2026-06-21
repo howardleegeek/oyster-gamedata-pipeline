@@ -11,7 +11,6 @@ Drop-in replacement for subprocess.run(cmd, shell=True) with:
 
 import shlex
 import subprocess
-import sys
 
 ALLOWED_BINARIES: set[str] = {
     "/usr/bin/git", "/usr/bin/java", "/usr/bin/python3",
