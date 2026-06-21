@@ -13,10 +13,13 @@ import shutil
 import sys
 import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 from PIL import Image
+
+if TYPE_CHECKING:
+    import torch
 
 
 def lazy_import_torch():
@@ -32,8 +35,8 @@ def lazy_import_torch():
 def lazy_import_openexr():
     """Lazy import OpenEXR modules for depth map I/O."""
     try:
-        import OpenEXR
         import Imath
+        import OpenEXR
 
         return OpenEXR, Imath
     except ImportError as exc:
