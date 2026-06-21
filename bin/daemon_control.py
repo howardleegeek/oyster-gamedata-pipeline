@@ -81,7 +81,7 @@ class DaemonControl:
                             disk_free = data.get('disk_free_gb', 0)
                             
                             print(f"  {timestamp}: {state} | Sessions: {sessions} | Uploads: {uploads} | Disk: {disk_free:.1f} GB")
-                        except:
+                        except Exception:
                             print(f"  {line.strip()}")
                 else:
                     print("\nNo heartbeat data yet")

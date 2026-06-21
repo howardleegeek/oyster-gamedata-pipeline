@@ -106,7 +106,7 @@ class RconClient:
             # Also receive the empty command response
             try:
                 self._receive_packet()
-            except:
+            except Exception:
                 pass
                 
             # Auth succeeds if response ID matches our packet ID
