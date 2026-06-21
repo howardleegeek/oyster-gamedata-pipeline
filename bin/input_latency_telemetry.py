@@ -20,8 +20,6 @@ import json
 import os
 import sys
 import time
-from collections import defaultdict
-from pathlib import Path
 
 # WASD key codes and their corresponding velocity component
 WASD_MAP = {
