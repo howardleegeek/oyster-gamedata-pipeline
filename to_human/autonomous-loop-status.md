@@ -183,3 +183,11 @@
 ## Round 45 @ 2026-06-20T23:20:05Z
 - Picked: Fix ruff I001/F401/F541/W292 in bin/disk_health_check.py — prior session had in-progress F541 edits (drop f-prefix on 4 static print calls) but left the other three lint categories behind. Completed the full cleanup: removed unused `os` import (F401), alphabetized stdlib and recorder_rate_limiter imports (I001), added trailing newline (W292).
 - Result: committed f4a272a1 (pushed to main)
+
+## Round 46 @ 2026-06-21T14:00:00Z
+- Picked: Fix ruff I001 import sort in bin/input_latency_telemetry.py — reordered stdlib imports alphabetically (json, os, sys before argparse, collections before pathlib). Has tests: test_input_latency_telemetry.py: 10/10 pass.
+- Result: committed f5e39b1d (pushed to main)
+
+## Round 47 @ 2026-06-21T00:17:28Z
+- Picked: Fix silent exception swallow in bin/preflight_recorder.py::check_display_resolution — the prior handler did `except: pass` then referenced `e` via a runtime `dir()` lookup, which silently dropped the real reason xrandr failed (binary missing, timeout, permission denied). Replaced with two explicit fallbacks: (1) xrandr-invocation exception → return `xrandr failed: <e>` as structured error, (2) xrandr ran but no parseable WxH token → return `could not determine`. Both paths keep `ok=False`. Picked because it was an in-progress fix from prior session with a clear bounded scope (16-line diff in one function), and the silent-swallow is a real production-gate concern (operators can't diagnose failed preflights).
+- Result: committed cce926bc (pushed to main)
