@@ -9,7 +9,14 @@ Usage:
 Closes C6.
 """
 from __future__ import annotations
-import argparse, json, logging, os, sqlite3, sys, uuid
+
+import argparse
+import json
+import logging
+import os
+import sqlite3
+import sys
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
