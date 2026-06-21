@@ -13,9 +13,8 @@ import hashlib
 import json
 import pathlib
 import sys
-import time
-import urllib.request
 import urllib.error
+import urllib.request
 
 # Aliyun OSS mirror (primary, China-resilient)
 ALIYUN_URL = "https://oyster-models.oss-cn-hangzhou.aliyuncs.com/da-v2-small/v1/"
