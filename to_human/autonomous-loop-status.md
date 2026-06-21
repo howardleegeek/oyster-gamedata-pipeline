@@ -241,3 +241,11 @@
 ## Round 58 @ 2026-06-21T07:21:19Z
 - Picked: Fix failing test collection in tests/test_dashboard_api.py - ModuleNotFoundError for server.oauth. Created dashboard/oauth.py with JWT exports, updated server.py to import from it, fixed test imports.
 - Result: committed cd29f1a3 (pushed to main)
+
+## Round 59 @ 2026-06-21T09:52:20Z
+- Picked: Fix ruff W293 trailing whitespace on blank lines in bin/auto_archive_old_uploaded.py (25 lines had trailing whitespace on otherwise-empty lines). Tests pass (31/31). Single-file bounded change.
+- Result: committed a92d3e47 (pushed to main)
+
+## Round 60 @ 2026-06-21T10:18:33Z
+- Picked: Strip 61 lines of unreachable legacy code from `bin/data_precision_audit.py:p2_mouse_camera_coherence` — the function already returned a result dict, but a 61-line block of per-frame cross-correlation code sat after the return (and was annotated "Legacy code below is dead-stripped — return above"). No tests reference the removed lines; ruff check clean; module imports cleanly; all 4 p*_ functions still importable. Working tree also had a half-finished refactor of `bin/export_da_v2_to_onnx.py` introducing 5 F821 errors (removed module-level torch/PIL imports without replacing usages); reverted that and the 3 unrelated runtime artifacts to honor the one-logical-change rule. Self-review: cosmetic dead-code removal only, no behavior change, no signature change, no imports added/removed at module level, no silent error swallow, no race condition, no security change, no off-by-one, no broken tests masked as passing.
+- Result: committed 074dc1ce (pushed to main)
