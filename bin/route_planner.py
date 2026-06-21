@@ -8,10 +8,8 @@ Usage:
 
 import argparse
 import json
-import os
-import sys
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict
 
 # Default quota per route_type (can be overridden per scene)
 DEFAULT_QUOTA = {
