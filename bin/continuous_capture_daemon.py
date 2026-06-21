@@ -4,15 +4,16 @@ Continuous capture daemon for Oyster Minecraft recording.
 State machine: IDLE → ARMED → RECORDING → FINALIZING → UPLOADING → COOLDOWN
 """
 
-import sys
 import json
-import time
 import logging
-import subprocess
-from datetime import datetime, timedelta
-from pathlib import Path
-from enum import Enum
 import platform
+import subprocess
+import sys
+import time
+from datetime import datetime, timedelta
+from enum import Enum
+from pathlib import Path
+
 import psutil
 
 # Add project root to path
@@ -472,17 +473,19 @@ def main():
             return
     
     # Default: run as daemon
-    import daemon as python_daemon
     import daemon.pidfile
-    
+
+    import daemon as python_daemon
+
     pid_file = Path.home() / ".oyster" / "daemon.pid"
-    
+
     with python_daemon.DaemonContext(
         pidfile=daemon.pidfile.PIDLockFile(str(pid_file)),
         stdout=open(Path.home() / ".oyster" / "daemon.out", "w"),
         stderr=open(Path.home() / ".oyster" / "daemon.err", "w")
     ):
         daemon.run()
+
 
 if __name__ == "__main__":
     main()
