@@ -203,6 +203,15 @@ def capture_frame(
     )
 
 def run_demo() -> int:
+    """Run a self-contained demonstration of inventory and voxel capture.
+
+    Creates a temporary directory with sample game data (inventory.json,
+    player_pos.json, blocks.bin), captures a frame using capture_frame(),
+    prints the results, and saves outputs in both NPZ and JSON formats.
+
+    Returns:
+        int: Exit code (0 on success).
+    """
     print("Running demonstration of inventory_voxel_capture...")
     with tempfile.TemporaryDirectory() as tmp:
         print(f"Created temporary directory: {tmp}")
