@@ -249,3 +249,7 @@
 ## Round 60 @ 2026-06-21T10:18:33Z
 - Picked: Strip 61 lines of unreachable legacy code from `bin/data_precision_audit.py:p2_mouse_camera_coherence` — the function already returned a result dict, but a 61-line block of per-frame cross-correlation code sat after the return (and was annotated "Legacy code below is dead-stripped — return above"). No tests reference the removed lines; ruff check clean; module imports cleanly; all 4 p*_ functions still importable. Working tree also had a half-finished refactor of `bin/export_da_v2_to_onnx.py` introducing 5 F821 errors (removed module-level torch/PIL imports without replacing usages); reverted that and the 3 unrelated runtime artifacts to honor the one-logical-change rule. Self-review: cosmetic dead-code removal only, no behavior change, no signature change, no imports added/removed at module level, no silent error swallow, no race condition, no security change, no off-by-one, no broken tests masked as passing.
 - Result: committed 074dc1ce (pushed to main)
+
+## Round 61 @ 2026-06-21T15:30:00Z
+- Picked: Fix ruff F401/I001/W291/W292 in bin/pii_auditor.py (remove unused hashlib/os, fix import sort, trailing whitespace), bin/screen_capture_recorder.py (remove unused imageio import), bin/storage_backend.py (remove unused datetime.timedelta/typing.Iterator). All have tests.
+- Result: committed 7e3e4cf0 (pushed to main)
