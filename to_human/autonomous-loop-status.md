@@ -237,3 +237,7 @@
 - Picked: Fix ruff F541 (extraneous f-prefix on static string) and W292 (no newline at end of file) in `bin/consent_log_signed.py` — both are mechanical cosmetic fixes. Related tests (test_first_run_consent.py, test_mic_consent.py: 49/49 pass).
 - Result: committed 3cb01f7b (pushed to main)
 
+
+## Round 58 @ 2026-06-21T07:21:19Z
+- Picked: Fix failing test collection in tests/test_dashboard_api.py - ModuleNotFoundError for server.oauth. Created dashboard/oauth.py with JWT exports, updated server.py to import from it, fixed test imports.
+- Result: committed cd29f1a3 (pushed to main)
