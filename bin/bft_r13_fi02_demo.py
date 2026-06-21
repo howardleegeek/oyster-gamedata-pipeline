@@ -21,10 +21,11 @@ import json
 import tempfile
 from pathlib import Path
 
+from bin.v1_claude_residuals.r13_keycode_replay import r13_keycode_replay
 from bin.v1_claude_residuals.residuals import r09_keycode_vk as v1_r09
 from bin.v2_minimax_residuals.residuals import r09_keycode_vk as v2_r09
-from bin.v3_physics_oracle.residuals import r09_keycode_vk_known as v3_r09, Verdict
-from bin.v1_claude_residuals.r13_keycode_replay import r13_keycode_replay
+from bin.v3_physics_oracle.residuals import Verdict
+from bin.v3_physics_oracle.residuals import r09_keycode_vk_known as v3_r09
 
 
 def _build_inputs_jsonl(events: list[dict], fps: float = 30.0) -> Path:

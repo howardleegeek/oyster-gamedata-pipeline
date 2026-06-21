@@ -19,7 +19,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Optional, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 
 def _lazy_import_yaml() -> Optional[Any]:
@@ -324,7 +324,7 @@ class BuyerSpecValidator:
         print(f"\n{'='*50}", file=sys.stderr)
         
         if total_errors + strict_errors > 0:
-            print(f"FAILED: {total_errors + strict_errors} error(s), {total_warnings} warning(s)", 
+            print(f"FAILED: {total_errors + strict_errors} error(s), {total_warnings} warning(s)",
                   file=sys.stderr)
             return 1
         
