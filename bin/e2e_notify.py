@@ -79,8 +79,8 @@ class TelegramNotifier(NotifierBase):
             message += f"{emoji} {name}: {status}\n"
         
         # Send via Telegram API
-        import urllib.request
         import urllib.parse
+        import urllib.request
         
         url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
         data = {
@@ -141,8 +141,8 @@ class SlackNotifier(NotifierBase):
         }
         
         # Send via webhook
-        import urllib.request
         import urllib.parse
+        import urllib.request
         
         try:
             req = urllib.request.Request(
