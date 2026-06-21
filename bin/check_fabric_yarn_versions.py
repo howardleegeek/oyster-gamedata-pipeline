@@ -16,12 +16,11 @@ Usage:
 Output (stdout): JSON with current matrix, available_to_add, and skip reasons.
 Exit code: always 0 (report-only, never crashes cron).
 """
-
 import json
 import re
 import sys
-import urllib.request
 import urllib.error
+import urllib.request
 
 FABRIC_META = "https://meta.fabricmc.net/v2"
 FABRIC_MAVEN = "https://maven.fabricmc.net"
@@ -76,7 +75,7 @@ def get_latest_loader():
     data, err = fetch_json(f"{FABRIC_META}/versions/loader")
     if err:
         return None, f"loader API error: {err}"
-    stable = [l for l in data if l.get("stable")]
+    stable = [loader for loader in data if loader.get("stable")]
     if not stable:
         return None, "no stable loader found"
     return stable[0]["version"], None
