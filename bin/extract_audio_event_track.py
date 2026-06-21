@@ -17,13 +17,12 @@ Writes audio_check.json with:
 }
 """
 
+import argparse
 import json
 import math
+import os
 import subprocess
 import sys
-import os
-import re
-import argparse
 from pathlib import Path
 
 
