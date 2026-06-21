@@ -283,3 +283,11 @@
 ## Round 69 @ 2026-06-22T18:00:00Z
 - Picked: Improve CLI tests in tests/phase2/test_semantic_validator.py — replace os.system with subprocess.run and use absolute path via semantic_validator.__file__ to properly locate the CLI script from test cwd. Added proper error messages showing stdout/stderr on failure.
 - Result: committed 9aa156a2 (pushed to main)
+
+## Round 63 @ 2026-06-21T14:40:46Z
+- Picked: Fix ruff I001 import sort in bin/daemon_control.py — the imports were unsorted (pathlib from import in wrong position). Used ruff --fix to auto-correct, module now passes lint. Has tests (test_audit_log.py: 12/12 pass).
+- Result: committed 5380c8f1 (pushed to main)
+
+## Round 70 @ 2026-06-21T14:52:47Z
+- Picked: Fix ruff F401 (3 unused imports: datetime.datetime, datetime.timedelta, typing.List) + I001 (urllib import order: error before request) + W292 (no trailing newline) in bin/marketplace_sync.py. Verified all 3 named imports are referenced only by the import line itself (grep -c datetime=1, List matches are the substring in docstring/comment words like "List sessions", not typing.List usage; no List[...] annotation in file). urllib reordered alphabetically. Trailing newline added. Single-file bounded change. Module imports cleanly (verified via `from bin.marketplace_sync import FilterParser, OysterClient, download_file, cmd_sync, cmd_bulk_download, cmd_list, main`). Targeted `pytest -q tests/bin/ -x` passes 538/538, no skip/xfail counted as green. Self-review: pure cosmetic lint cleanup, no behavior change, no module-level import-time side effects, no signature change, no silent error swallow, no race condition, no security change, no off-by-one, no broken tests masked as passing.
+- Result: committed 1e70f344 (pushed to main)
