@@ -131,6 +131,11 @@
 - Added: docstring=Y, type-hints=Y
 - Commit: 954a75ad3
 
+## Round @ 2026-06-21T21:11:31Z
+- File: bin/fps_overhead_monitor.py::FPSMetrics.reset
+- Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: 0a30dc4df
+
 ## Round @ 2026-06-13T17:13:39Z
 - File: bin/redteam_lint.py::attack_drop_action_camera
 - Added: docstring=Y, type-hints=Y
