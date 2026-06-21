@@ -235,22 +235,22 @@ def main():
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
     
     # Status command
-    status_parser = subparsers.add_parser("status", help="Show current state and recent activity")
+    subparsers.add_parser("status", help="Show current state and recent activity")
     
     # Pause command
-    pause_parser = subparsers.add_parser("pause", help="Pause auto-arming of new sessions")
+    subparsers.add_parser("pause", help="Pause auto-arming of new sessions")
     
     # Resume command
-    resume_parser = subparsers.add_parser("resume", help="Resume auto-arming of new sessions")
+    subparsers.add_parser("resume", help="Resume auto-arming of new sessions")
     
     # Stop command
-    stop_parser = subparsers.add_parser("stop", help="Stop the daemon gracefully")
+    subparsers.add_parser("stop", help="Stop the daemon gracefully")
     
     # Logs command
-    logs_parser = subparsers.add_parser("logs", help="Show daemon logs")
+    subparsers.add_parser("logs", help="Show daemon logs")
     
     # Start command
-    start_parser = subparsers.add_parser("start", help="Start the daemon")
+    subparsers.add_parser("start", help="Start the daemon")
     
     args = parser.parse_args()
     
