@@ -80,6 +80,7 @@ class FPSMetrics:
         return stdev(self.samples) if len(self.samples) >= 2 else 0.0
 
     def reset(self) -> None:
+        """Reset all metrics samples and timestamps to initial state."""
         self.samples.clear()
         self.start_time = self.end_time = 0.0
 
