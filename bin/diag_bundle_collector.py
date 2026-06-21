@@ -21,7 +21,7 @@ import sys
 import tarfile
 import tempfile
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import List, Optional
 
 MODULE_VERSION = "1.0.0"
 DEFAULT_LOG_DIRS = ["/var/log", "./logs"]
@@ -45,7 +45,7 @@ def get_system_info() -> dict:
     try:
         if platform.system() == "Linux":
             with open("/proc/meminfo") as f:
-                info["memory"] = [l.strip() for l in f.readlines()[:5]]
+                info["memory"] = [line.strip() for line in f.readlines()[:5]]
     except OSError:
         pass
     return info
