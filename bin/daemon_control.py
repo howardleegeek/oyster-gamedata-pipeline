@@ -3,13 +3,13 @@
 CLI control for Oyster continuous capture daemon
 """
 
-import os
-import sys
-import json
-import subprocess
-import signal
-from pathlib import Path
 import argparse
+import json
+import os
+import signal
+import subprocess
+import sys
+from pathlib import Path
 
 class DaemonControl:
     def __init__(self):
@@ -94,7 +94,7 @@ class DaemonControl:
                 with open(self.daemon_log, 'r') as f:
                     lines = f.readlines()
                 
-                error_lines = [l for l in lines[-20:] if 'ERROR' in l or 'WARNING' in l]
+                error_lines = [ln for ln in lines[-20:] if 'ERROR' in ln or 'WARNING' in ln]
                 if error_lines:
                     print(f"\nRecent Errors/Warnings (last {min(5, len(error_lines))}):")
                     for line in error_lines[-5:]:
