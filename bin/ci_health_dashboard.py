@@ -20,7 +20,7 @@ import subprocess
 import sys
 from collections import Counter
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 
 @dataclass
