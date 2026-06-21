@@ -235,7 +235,7 @@ def build_gameinfo_dict(
 ) -> Dict[str, Any]:
     """
     Build a dictionary with all 14 gameinfo fields.
-    
+
     Args:
         game_name: Name of the game
         game_version: Version of the game
@@ -251,13 +251,13 @@ def build_gameinfo_dict(
         video_duration_sec: Video duration in seconds
         route_type: Route type (1, 2, or 3)
         notes: Additional notes
-    
+
     Returns:
         Dictionary with all 14 fields
     """
     if recording_date is None:
         recording_date = date.today().isoformat()
-    
+
     return {
         "game_name": game_name,
         "game_version": game_version,
@@ -293,7 +293,7 @@ def _write_xlsx_fallback(data: Dict[str, Any], out_path: str) -> None:
     """
     # Ensure field order matches FIELD_NAMES
     values = ["" if data.get(field) is None else str(data.get(field, "")) for field in FIELD_NAMES]
-    
+
     # Build worksheet XML
     cells_xml = ""
     for col_idx, value in enumerate(values):
@@ -307,9 +307,9 @@ def _write_xlsx_fallback(data: Dict[str, Any], out_path: str) -> None:
             cell_type = 't="inlineStr"'
             cell_value = f"<is><t>{_escape_xml(value)}</t></is>"
         cells_xml += f'<cell r="{cell_ref}" {cell_type}>{cell_value}</cell>\n'
-    
+
     # Build sheet XML
-    sheet_xml = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    sheet_xml = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
     <sheetViews>
         <sheetView tabSelected="1" workbookViewId="0"/>
@@ -324,7 +324,7 @@ def _write_xlsx_fallback(data: Dict[str, Any], out_path: str) -> None:
         col_letter = chr(65 + col_idx)
         cell_ref = f"{col_letter}1"
         sheet_xml += f'            <cell r="{cell_ref}" t="inlineStr"><is><t>{_escape_xml(field)}</t></is></cell>\n'
-    
+
     sheet_xml += '''        </row>
         <row r="2">
 '''
@@ -332,7 +332,7 @@ def _write_xlsx_fallback(data: Dict[str, Any], out_path: str) -> None:
     sheet_xml += '''        </row>
     </sheetData>
 </worksheet>'''
-    
+
     # Build workbook.xml
     workbook_xml = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -340,7 +340,7 @@ def _write_xlsx_fallback(data: Dict[str, Any], out_path: str) -> None:
         <sheet name="gameinfo" sheetId="1" r:id="rId1"/>
     </sheets>
 </workbook>'''
-    
+
     # Build [Content_Types].xml
     content_types = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -349,19 +349,19 @@ def _write_xlsx_fallback(data: Dict[str, Any], out_path: str) -> None:
     <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
     <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
 </Types>'''
-    
+
     # Build _rels/.rels
     rels = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
     <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
 </Relationships>'''
-    
+
     # Build xl/_rels/workbook.xml.rels
     workbook_rels = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
     <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
 </Relationships>'''
-    
+
     # Write the XLSX file
     with zipfile.ZipFile(out_path, 'w', zipfile.ZIP_DEFLATED) as zf:
         zf.writestr('[Content_Types].xml', content_types)
@@ -374,9 +374,9 @@ def _write_xlsx_fallback(data: Dict[str, Any], out_path: str) -> None:
 def write_xlsx(data: Dict[str, Any], out_path: str) -> None:
     """
     Write data to an XLSX file.
-    
+
     Uses openpyxl if available, otherwise falls back to stdlib zipfile.
-    
+
     Args:
         data: Dictionary with field names as keys
         out_path: Path to output XLSX file
@@ -387,18 +387,18 @@ def write_xlsx(data: Dict[str, Any], out_path: str) -> None:
         wb = Workbook()
         ws = wb.active
         ws.title = "gameinfo"
-        
+
         # Write header row (field names)
         for col_idx, field in enumerate(FIELD_NAMES, start=1):
             ws.cell(row=1, column=col_idx, value=field)
-        
+
         # Write data row
         for col_idx, field in enumerate(FIELD_NAMES, start=1):
             value = data.get(field, "")
             ws.cell(row=2, column=col_idx, value=value)
-        
+
         wb.save(out_path)
-        
+
     except ImportError:
         # Fallback: use stdlib zipfile to create XLSX
         _write_xlsx_fallback(data, out_path)
@@ -407,21 +407,21 @@ def write_xlsx(data: Dict[str, Any], out_path: str) -> None:
 def read_xlsx(path: str) -> Dict[str, Any]:
     """
     Read an XLSX file and return a dictionary.
-    
+
     Reads the first sheet: row 1 as keys, row 2 as values.
-    
+
     Args:
         path: Path to the XLSX file
-    
+
     Returns:
         Dictionary with field names as keys
     """
     try:
         from openpyxl import load_workbook
-        
+
         wb = load_workbook(path, data_only=True)
         ws = wb.active
-        
+
         # Read header row
         keys = []
         col = 1
@@ -431,35 +431,35 @@ def read_xlsx(path: str) -> Dict[str, Any]:
                 break
             keys.append(str(cell_value))
             col += 1
-        
+
         # Read data row. Preserve blank cells in the middle of the schema.
         values = [ws.cell(row=2, column=col).value for col in range(1, len(keys) + 1)]
-        
+
         # Combine keys and values
         result = {}
         for key, value in zip(keys, values):
             result[key] = value
-        
+
         return result
-        
+
     except ImportError:
         # Fallback: parse XML manually
         with zipfile.ZipFile(path, 'r') as zf:
             with zf.open('xl/worksheets/sheet1.xml') as f:
                 content = f.read().decode('utf-8')
-        
+
         # Extract cell values using regex
         # Find row 1 (header)
         keys = []
         values = []
-        
+
         # Simple XML parsing with regex
         cell_pattern = re.compile(r'<cell r="([A-Z]+)(\d+)"[^>]*>(.*?)</cell>')
         for match in cell_pattern.finditer(content):
             col_letter = match.group(1)
             row_num = int(match.group(2))
             cell_content = match.group(3)
-            
+
             # Extract text from <is><t>...</t></is> or direct value
             text_match = re.search(r'<t>(.*?)</t>', cell_content, re.DOTALL)
             if text_match:
@@ -467,16 +467,16 @@ def read_xlsx(path: str) -> Dict[str, Any]:
             else:
                 # Numeric value
                 cell_value = cell_content.strip()
-            
+
             if row_num == 1:
                 keys.append(cell_value)
             elif row_num == 2:
                 values.append(cell_value)
-        
+
         result = {}
         for key, value in zip(keys, values):
             result[key] = value
-        
+
         return result
 
 
@@ -488,23 +488,23 @@ def validate_route_type(route_type: int) -> bool:
 def main(argv: Optional[List[str]] = None) -> int:
     """
     CLI entry point.
-    
+
     Args:
         argv: Command line arguments (defaults to sys.argv)
-    
+
     Returns:
         Exit code (0 for success, non-zero for error)
     """
     parser = argparse.ArgumentParser(
         description="Generate a gameinfo.xlsx file with 14 fields"
     )
-    
+
     parser.add_argument(
         "--output", "-o",
         required=True,
         help="Output XLSX file path"
     )
-    
+
     parser.add_argument("--game-name", default="Minecraft")
     parser.add_argument(
         "--game-version",
@@ -536,15 +536,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--video-duration-sec", type=float, default=300.0)
     parser.add_argument("--route-type", type=int, default=1)
     parser.add_argument("--notes", default="")
-    
+
     args = parser.parse_args(argv)
-    
+
     # Validate route_type
     if not validate_route_type(args.route_type):
-        print(f"Error: route_type must be 1, 2, or 3, got {args.route_type}", 
+        print(f"Error: route_type must be 1, 2, or 3, got {args.route_type}",
               file=sys.stderr)
         return 1
-    
+
     output_path = Path(args.output)
     session_dir = Path(args.session_dir) if args.session_dir else output_path.parent
     game_version = args.game_version.strip() if isinstance(args.game_version, str) else args.game_version
@@ -576,7 +576,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         route_type=args.route_type,
         notes=args.notes,
     )
-    
+
     # Write the XLSX file
     try:
         write_xlsx(data, args.output)
