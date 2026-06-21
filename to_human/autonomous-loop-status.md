@@ -353,3 +353,7 @@
 ## Round 81 @ 2026-06-24T12:00:00Z
 - Picked: Commit pre-existing lint fix in staged `bin/mineflayer_runner.py` — remove unused `os` and `time` imports (F401). Verified ruff clean, tests pass (538/538 in tests/bin/).
 - Result: committed e1cf1cc1 (pushed to main)
+
+## Round 82 @ 2026-06-21T23:58:58Z
+- Picked: Fix ruff W292 (missing trailing newline) in `bin/vendor_scenario_resume_after_crash.py` — file ended with `sys.exit(main())` and no `\n`, triggering a single ruff error. No module-level side effect, no test exists for this script. Added trailing newline; `ruff check bin/vendor_scenario_resume_after_crash.py` → "All checks passed!", `python3 -m py_compile` succeeds, broader regression `pytest -q tests/bin/ -x` → 538/538 pass with no skip/xfail counted as green. `git add` of a single file, pushed to main.
+- Result: committed 1008f93d (pushed to main)
