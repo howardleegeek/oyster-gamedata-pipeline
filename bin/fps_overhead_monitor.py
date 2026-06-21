@@ -275,6 +275,12 @@ def main(argv: Optional[list[str]] = None) -> int:
     shutdown_requested = False
 
     def signal_handler(signum: int, frame: Any) -> None:
+        """Handle SIGINT/SIGTERM to gracefully stop monitoring.
+
+        Args:
+            signum: Signal number (signal.SIGINT or signal.SIGTERM).
+            frame: Current stack frame (unused, required by signal handler signature).
+        """
         nonlocal shutdown_requested
         shutdown_requested = True
         monitor.stop()
