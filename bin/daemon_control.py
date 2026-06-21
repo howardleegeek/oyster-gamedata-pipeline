@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-CLI control for Oyster continuous capture daemon
-"""
+"""CLI control for Oyster continuous capture daemon"""
 
 import argparse
 import json
@@ -10,6 +8,7 @@ import signal
 import subprocess
 import sys
 from pathlib import Path
+
 
 class DaemonControl:
     def __init__(self):
