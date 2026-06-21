@@ -275,3 +275,11 @@
 - Picked: Fix ruff F401 (unused `typing.Any` import) and W292 (missing trailing newline) in `bin/vendor_scenario_alpha_week.py` — verified `Any` is referenced only by the import line itself (grep -c = 1), and the file ended with `exit(main())` without a newline. Removed `Any` from the `typing` import (kept `Dict, List, Optional` — each referenced elsewhere) and added trailing newline. No tests reference the module (verified via grep on `tests/`). Module imports cleanly under both imports-by-name and module path. Ruff check now `All checks passed!` for this file. Targeted sanity run: `pytest tests/bin/ -q` passes 538/538 (no skip/xfail counted as green).
 - Result: committed (pushed to main)
 
+## Round 68 @ 2026-06-22T12:00:00Z
+- Picked: Fix ruff E741 (ambiguous variable `l` → `ln`) and I001 (alphabetize imports) in `bin/daemon_control.py` — changed list comprehension variable from single-letter `l` to descriptive `ln`, sorted imports alphabetically (argparse, json, os, signal, subprocess, sys, pathlib), added trailing newline. No tests reference this module, module imports cleanly.
+- Result: committed f5fff4d8 (pushed to main)
+
+
+## Round 69 @ 2026-06-22T18:00:00Z
+- Picked: Improve CLI tests in tests/phase2/test_semantic_validator.py — replace os.system with subprocess.run and use absolute path via semantic_validator.__file__ to properly locate the CLI script from test cwd. Added proper error messages showing stdout/stderr on failure.
+- Result: committed 9aa156a2 (pushed to main)
