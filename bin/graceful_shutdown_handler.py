@@ -247,7 +247,13 @@ class GracefulShutdownHandler:
             self._tarballs[str(path)] = tar
             return tar
     
-    def update_queue(self, items: List[Dict[str, Any]], cursor: int = 0):
+    def update_queue(self, items: List[Dict[str, Any]], cursor: int = 0) -> None:
+        """Update the persisted queue state with new items and cursor position.
+
+        Args:
+            items: List of queue items to persist.
+            cursor: Current cursor position for resume tracking. Defaults to 0.
+        """
         with self._lock:
             self._queue["items"] = items
             self._queue["cursor"] = cursor
