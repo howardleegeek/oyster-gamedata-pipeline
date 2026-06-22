@@ -15,7 +15,10 @@ Usage:
 """
 from __future__ import annotations
 
-import argparse, hashlib, json, sys
+import argparse
+import hashlib
+import json
+import sys
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -246,27 +249,40 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _cmd_init(a: argparse.Namespace) -> int:
-    alembic_upgrade(a.db_url); print("errors table created."); return 0
+    alembic_upgrade(a.db_url)
+    print("errors table created.")
+    return 0
+
 
 def _cmd_down(a: argparse.Namespace) -> int:
-    alembic_downgrade(a.db_url); print("errors table dropped."); return 0
+    alembic_downgrade(a.db_url)
+    print("errors table dropped.")
+    return 0
+
 
 def _cmd_insert(a: argparse.Namespace) -> int:
     rid = insert_error(a.db_url, a.severity, a.source, a.error_class,
                        a.traceback, a.user_id, json.loads(a.context))
-    print(f"inserted error id={rid}"); return 0
+    print(f"inserted error id={rid}")
+    return 0
+
 
 def _cmd_query(a: argparse.Namespace) -> int:
     rows = query_errors(a.db_url, a.severity, a.source, a.user_id,
                         a.dedup_key, a.limit, a.offset)
-    print(json.dumps(rows, indent=2, default=str)); return 0
+    print(json.dumps(rows, indent=2, default=str))
+    return 0
+
 
 def _cmd_purge(a: argparse.Namespace) -> int:
     n = purge_old_errors(a.db_url, a.retention_days)
-    print(f"deleted {n} records older than {a.retention_days} days."); return 0
+    print(f"deleted {n} records older than {a.retention_days} days.")
+    return 0
+
 
 def _cmd_stats(a: argparse.Namespace) -> int:
-    print(json.dumps(get_stats(a.db_url), indent=2, default=str)); return 0
+    print(json.dumps(get_stats(a.db_url), indent=2, default=str))
+    return 0
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
