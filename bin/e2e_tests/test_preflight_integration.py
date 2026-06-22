@@ -10,7 +10,6 @@ Runs bin/preflight_recorder.py on the session, parses preflight_report.json:
 
 import argparse
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
