@@ -369,3 +369,7 @@
 ## Round 85 @ 2026-06-22T04:47:01Z
 - Picked: Fix ruff W292 (No newline at end of file) in `bin/edge_test_min_int_values.py` — file ended at byte 96 with `s.exit(main())` and no trailing `\n` (verified via xxd: last bytes `73 79 73 2e 65 78 69 74 28 6d 61 69 6e 28 29 29` with no 0a). Added single newline. Verified: `ruff check` → "All checks passed!", `python3 -m py_compile` succeeds, `importlib.util.spec_from_file_location` loads module cleanly with `INT64_MIN = -9223372036854775808` intact. No tests reference this module (grep on `tests/` returned empty). Targeted regression: `pytest -q tests/bin/ --tb=short` → 538/538 pass with no skip/xfail counted as green. Self-review: pure cosmetic W292, no behavior change, no signature change, no import-time side effect added or removed, no silent error swallow, no race condition, no security change, no off-by-one, no broken tests masked as passing, no brand cross-reference.
 - Result: committed e0c964f5 (pushed to main)
+
+## Round 86 @ 2026-06-22T05:17:57Z
+- Picked: Commit leftover unstaged ruff I001 (import sort) + W292 (missing trailing newline) fix in bin/release_notes_from_git.py — the working tree had an uncommitted edit from a prior tick that was never landed. Justification (per charter §3 priority): lowest tier (stale WIP), but it is the concrete item actually present in the working tree this tick, and a clean single-file bounded change beats a speculative refactor.
+- Result: committed ec1eab99 (pushed below)
