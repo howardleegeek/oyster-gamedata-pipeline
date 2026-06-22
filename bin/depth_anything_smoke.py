@@ -57,7 +57,6 @@ def create_rgb_sample(width: int = 640, height: int = 480) -> Image.Image:
 
 def load_depth_anything_v2_small():
     """Load DepthAnything V2 Small model or return mock if unavailable."""
-    torch = lazy_import_torch()
     try:
         from depth_anything_v2.dpt import DepthAnythingV2
 
