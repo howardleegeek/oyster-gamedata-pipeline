@@ -54,20 +54,20 @@ def _g234_excepthook(exc_type: Type[BaseException], exc_value: BaseException,
                      exc_tb: Optional[Any]) -> None:
     """
     Global exception hook for G234 error handling.
-    
+
     Logs uncaught exceptions with full context and optionally writes to
     a temp file for post-mortem analysis.
     """
     formatted = _format_exception(exc_type, exc_value, exc_tb)
-    
+
     # Log to stderr
     sys.stderr.write(formatted)
     sys.stderr.flush()
-    
+
     # Log via logging module
     _logger.critical("Uncaught exception: %s: %s", exc_type.__name__, exc_value)
     _logger.debug("Full traceback:\n%s", formatted)
-    
+
     # Write to temp file for post-mortem
     try:
         temp_dir = _get_temp_dir()
@@ -91,7 +91,7 @@ def _cleanup_temp_resources() -> None:
 def _install_hooks() -> bool:
     """
     Install G234 global Python error handling hooks.
-    
+
     Returns:
         True if hooks were installed, False if already installed.
     """
@@ -99,20 +99,20 @@ def _install_hooks() -> bool:
     if getattr(sys, _G234_HOOK_INSTALLED_FLAG, False):
         _logger.debug("G234 hooks already installed, skipping")
         return False
-    
+
     # Install exception hook
     original_excepthook = sys.excepthook
     sys.excepthook = _g234_excepthook
-    
+
     # Store original for potential restoration
     setattr(sys, "_g234_original_excepthook", original_excepthook)
-    
+
     # Register cleanup
     atexit.register(_cleanup_temp_resources)
-    
+
     # Mark as installed
     setattr(sys, _G234_HOOK_INSTALLED_FLAG, True)
-    
+
     _logger.info("G234 error handling hooks installed successfully")
     return True
 
@@ -120,22 +120,22 @@ def _install_hooks() -> bool:
 def _uninstall_hooks() -> bool:
     """
     Uninstall G234 hooks and restore original handlers.
-    
+
     Returns:
         True if hooks were uninstalled, False if not installed.
     """
     if not getattr(sys, _G234_HOOK_INSTALLED_FLAG, False):
         return False
-    
+
     # Restore original excepthook
     original = getattr(sys, "_g234_original_excepthook", sys.__excepthook__)
     sys.excepthook = original
-    
+
     # Clear flags
     delattr(sys, _G234_HOOK_INSTALLED_FLAG)
     if hasattr(sys, "_g234_original_excepthook"):
         delattr(sys, "_g234_original_excepthook")
-    
+
     _logger.info("G234 error handling hooks uninstalled")
     return True
 
@@ -148,10 +148,10 @@ def is_installed() -> bool:
 def main(argv: Optional[list[str]] = None) -> int:
     """
     CLI entry point for auto_install_error_handler.
-    
+
     Args:
         argv: Command-line arguments (defaults to sys.argv[1:]).
-    
+
     Returns:
         Exit code (0 for success, non-zero for errors).
     """
@@ -179,31 +179,31 @@ def main(argv: Optional[list[str]] = None) -> int:
         action="store_true",
         help="Enable verbose output"
     )
-    
+
     args = parser.parse_args(argv)
-    
+
     # Configure logging
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(
         level=log_level,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
     )
-    
+
     if args.check:
         installed = is_installed()
         print(f"G234 hooks installed: {installed}")
         return 0 if installed else 1
-    
+
     if args.install:
         success = _install_hooks()
         print(f"G234 hooks {'installed' if success else 'already installed'}")
         return 0
-    
+
     if args.uninstall:
         success = _uninstall_hooks()
         print(f"G234 hooks {'uninstalled' if success else 'were not installed'}")
         return 0
-    
+
     # Default: install hooks
     _install_hooks()
     print("G234 error handling hooks installed (default mode)")
