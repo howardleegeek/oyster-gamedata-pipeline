@@ -1942,4 +1942,4 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 
 ## Round 114 @ 2026-06-22T17:26:05Z
 - Picked: Fix ruff E722 bare `except:` in dashboard/login_page.py:211 (logout() helper) — bare except catches BaseException (KeyboardInterrupt/SystemExit/GeneratorExit) and silently swallows every error in the dashboard auth logout path. Security/auth-adjacent silent error swallow. Narrowed to `except Exception:` so logout endpoint failures still get swallowed (preserving the documented 'best-effort logout call before clearing local session state' UX) while letting shutdown signals propagate. Same pattern as Round 113 fix in server/auth_middleware.py:62.
-- Result: pending commit
+- Result: committed 79f41c0d (fix) + 6a0d442d (status log) (pushed to main)
