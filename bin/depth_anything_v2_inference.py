@@ -33,7 +33,7 @@ _PIPELINE: Any = None  # cached HF pipeline
 _PROGRESS_CALLBACK_EVERY_N_FRAMES = 15
 
 
-def load_model(variant: str = "vits", device: str = "cpu"):
+def load_model(variant: str = "vits", device: str = "cpu") -> Any:
     """Load and cache the DepthAnything V2 model via HF transformers pipeline.
 
     Args:
