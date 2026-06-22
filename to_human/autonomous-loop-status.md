@@ -395,3 +395,7 @@
 ## Round 90 @ 2026-06-24T14:30:00Z
 - Picked: Fix ruff W293 (blank line contains whitespace) in bin/auto_install_error_handler.py — 22 instances of trailing whitespace on blank lines (5 required --unsafe-fixes). Verified module compiles and imports cleanly, targeted tests pass (51 passed, 1 skipped). Self-review: pure cosmetic W293 fix, no behavior change, no module-level side effects added or removed, no silent error swallow, no race condition, no security change, no off-by-one.
 - Result: committed bbb06462 (pushed to main)
+
+## Round 91 @ 2026-06-22T07:49:16Z
+- Picked: Fix ruff F401×2 (unused `os` and `time` imports) in bin/error_report_service.py — verified via grep that 0 real module references exist (17 grep hits were docstring/field-name mentions of the literal word "os", not `os` module usage). `Path`, `_dt.datetime`, `_dt.timezone` all remain imported and used. Module compiles and imports cleanly, targeted tests pass (46/46 in tests/test_error_report.py), broader regression tests/bin/ → 538/538. Single-file bounded change, no test changes, no module-level side effects added or removed. Self-review: pure cosmetic F401 fix, no behavior change, no silent error swallow, no race condition, no security change, no off-by-one, no new lint errors.
+- Result: committed e7bffe87 (pushed to main)
