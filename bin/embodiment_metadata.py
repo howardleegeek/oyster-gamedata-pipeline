@@ -8,6 +8,7 @@ agent_geometry, and locomotion_mode attributes.
 Reference: arxiv 2505.05753 scaling-laws axis for embodiment characterization.
 """
 from __future__ import annotations
+
 import argparse
 import json
 import sys
