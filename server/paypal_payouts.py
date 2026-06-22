@@ -3,12 +3,12 @@ PayPal Payouts API Fallback
 Used for contributors in countries not supported by Stripe Connect.
 """
 
-import os
 import logging
-import uuid
-import requests
+import os
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
+import requests
 
 logger = logging.getLogger(__name__)
 
