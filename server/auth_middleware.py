@@ -59,7 +59,7 @@ async def get_current_user_optional(request: Request) -> Optional[dict]:
     token = auth_header.split(" ")[1]
     try:
         return verify_jwt_token(token)
-    except:
+    except Exception:
         return None
 
 
