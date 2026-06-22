@@ -1935,3 +1935,7 @@ E722 Do not use bare `except`
 Found 472 errors (341 fixed, 131 remaining).
 No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` option).. Verified module compiles cleanly, tests pass (538/538 in tests/bin/). Single-file bounded change. Self-review: cosmetic lint fixes, no behavior change, no signature/import/exception/threading/auth change, no module-level side effect, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing, no brand cross-reference.
 - Result: committed 3a3c596d (pushed to main)
+
+## Round 113 @ 2026-06-22T16:47:45Z
+- Picked: Fix ruff E722 bare `except:` in server/auth_middleware.py:62 (get_current_user_optional) — bare except catches BaseException (KeyboardInterrupt/SystemExit/GeneratorExit) and silently swallows every error including programmer mistakes. Security-relevant silent error swallow flagged by RSI §2. Narrowed to `except Exception:` so normal auth failures still return None (preserving the documented 'doesn't raise if no token' semantic) while letting shutdown signals propagate. Matches the pattern already used in AuthMiddleware.dispatch above in the same file.
+- Result: committed c73d227a (pushed to main)
