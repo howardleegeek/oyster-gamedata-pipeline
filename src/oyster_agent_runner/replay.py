@@ -102,6 +102,14 @@ class ConsistencyReport:
     manifest_matches_streams: bool = True
 
     def add(self, issue: str) -> None:
+        """Add a consistency issue to the report.
+
+        Args:
+            issue: Description of the consistency problem found.
+
+        Returns:
+            None. Modifies this object in-place.
+        """
         self.issues.append(issue)
         self.ok = False
 
