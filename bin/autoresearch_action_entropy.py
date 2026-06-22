@@ -36,7 +36,7 @@ def analyze_actions(actions: List[str], threshold: Optional[float] = None) -> Di
     entropy = calculate_entropy(actions)
     unique_count = len(set(actions))
     max_entropy = math.log2(unique_count) if unique_count > 1 else 0.0
-    
+
     result = {
         "action_count": len(actions),
         "unique_actions": unique_count,
@@ -44,14 +44,14 @@ def analyze_actions(actions: List[str], threshold: Optional[float] = None) -> Di
         "max_entropy_bits": round(max_entropy, 4),
         "entropy_ratio": round(entropy / max_entropy, 4) if max_entropy > 0 else 0.0,
     }
-    
+
     if threshold is not None:
         result.update({
             "threshold": threshold,
             "is_low_entropy": entropy < threshold,
             "classification": "LIKELY_SCRIPTED" if entropy < threshold else "LIKELY_HUMAN",
         })
-    
+
     return result
 
 
@@ -77,30 +77,30 @@ def main(argv: Optional[List[str]] = None) -> int:
                         help="Show detailed frequency breakdown")
     parser.add_argument("-q", "--quiet", action="store_true",
                         help="Suppress all output (exit code only)")
-    
+
     args = parser.parse_args(argv)
-    
+
     try:
         actions = read_actions(args.input_file)
     except FileNotFoundError:
         if not args.quiet:
             print(f"Error: File not found: {args.input_file}", file=sys.stderr)
         return 1
-    
+
     if not actions:
         if not args.quiet:
             print("Error: No valid actions found in input", file=sys.stderr)
         return 1
-    
+
     result = analyze_actions(actions, args.threshold)
-    
+
     if args.quiet:
         return 0 if not args.threshold or not result.get("is_low_entropy") else 2
-    
+
     if args.json:
         print(json.dumps(result, indent=2))
         return 0
-    
+
     # Human-readable output
     print("Action Stream Entropy Analysis")
     print("================================")
@@ -109,16 +109,16 @@ def main(argv: Optional[List[str]] = None) -> int:
     print(f"Entropy:          {result['entropy_bits']} bits")
     print(f"Max entropy:      {result['max_entropy_bits']} bits")
     print(f"Entropy ratio:    {result['entropy_ratio']:.2%}")
-    
+
     if args.threshold is not None:
         print(f"\nThreshold:        {result['threshold']} bits")
         print(f"Classification:   {result['classification']}")
-    
+
     if args.verbose:
         print("\nTop actions:")
         for action, count, pct in get_top_actions(actions):
             print(f"  {action}: {count} ({pct:.1f}%)")
-    
+
     return 2 if args.threshold is not None and result.get("is_low_entropy") else 0
 
 
