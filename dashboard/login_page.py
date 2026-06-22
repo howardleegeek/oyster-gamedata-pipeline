@@ -208,7 +208,7 @@ def logout():
                 json={"refresh_token": st.session_state["refresh_token"]},
                 timeout=5.0
             )
-        except:
+        except Exception:
             pass
     
     # Clear session state
