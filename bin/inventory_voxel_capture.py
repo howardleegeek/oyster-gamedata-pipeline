@@ -269,6 +269,17 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 def main(argv: Sequence[str]) -> int:
+    """Main entry point for inventory and voxel capture.
+
+    Parses command-line arguments, loads world data, captures frame(s),
+    and outputs results in the requested format (JSON or NPZ).
+
+    Args:
+        argv: Command-line arguments (typically sys.argv[1:]).
+
+    Returns:
+        Exit code: 0 on success, non-zero on error.
+    """
     parser = build_parser()
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
