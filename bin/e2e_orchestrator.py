@@ -91,8 +91,8 @@ def pull_session_via_tar(host: str, user: str, session_id: str, local_stage_dir:
             stderr=subprocess.PIPE
         )
         
-        # Extract locally
-        tar_extract = subprocess.run(
+        # Extract locally (ignore return code - tar will error via proc if extraction fails)
+        subprocess.run(
             ["tar", "-x", "-f", "-", "-C", local_stage_dir],
             stdin=proc.stdout,
             stderr=subprocess.PIPE
