@@ -62,7 +62,7 @@ def wait_for_first_clip(clip_dir: Path, timeout: float = 60.0, poll_interval: fl
     start_time = time.time()
     initial_files = set(clip_dir.glob("*")) if clip_dir.exists() else set()
     clip_extensions = {".mp4", ".avi", ".mov", ".mkv"}
-    
+
     while time.time() - start_time < timeout:
         current_files = set(clip_dir.glob("*")) if clip_dir.exists() else set()
         new_clips = [f for f in (current_files - initial_files) if f.suffix.lower() in clip_extensions]
@@ -100,11 +100,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--timeout", type=float, default=60.0, help="Timeout per trial in seconds")
     parser.add_argument("--output", type=Path, help="Output JSON file for results")
     args = parser.parse_args(argv)
-    
+
     if not args.clip_dir.exists():
         logger.error("Clip directory does not exist: %s", args.clip_dir)
         return 1
-    
+
     with tempfile.TemporaryDirectory() as workdir:
         recovery_times: List[float] = []
         for trial in range(1, args.trials + 1):
@@ -113,11 +113,11 @@ def main(argv: Optional[List[str]] = None) -> int:
             if result is not None:
                 recovery_times.append(result)
             time.sleep(1.0)
-        
+
         if not recovery_times:
             logger.error("No successful trials")
             return 1
-        
+
         results = {
             "trials": args.trials, "successful_trials": len(recovery_times),
             "recovery_times": recovery_times, "mean_recovery_time": sum(recovery_times) / len(recovery_times),
@@ -125,7 +125,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         }
         logger.info("=== Results ===\nMean: %.2fs, Min: %.2fs, Max: %.2fs",
                     results["mean_recovery_time"], results["min_recovery_time"], results["max_recovery_time"])
-        
+
         if args.output:
             args.output.write_text(json.dumps(results, indent=2))
             logger.info("Results written to %s", args.output)
