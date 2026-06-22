@@ -12,7 +12,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
+from typing import Dict, Set
 
 
 def extract_placeholders(text: str) -> Set[str]:
