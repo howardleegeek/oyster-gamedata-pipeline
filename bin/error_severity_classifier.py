@@ -12,7 +12,6 @@ Version: 1.0.0
 
 import argparse
 import json
-import os
 import re
 import sys
 from pathlib import Path
