@@ -179,11 +179,21 @@ void main() {
 
 
 def generate_depth_capture_helper(fps: int) -> str:
-    """Generate Python helper script for depth capture."""
-    return f'''#!/usr/bin/env python3
+    """Generate Python helper script for depth capture.
+
+    NOTE: The template body contains nested f-strings (e.g.
+    ``f"Depth capture started at {self.fps} FPS"``) that reference
+    names which only exist in the *generated* script's runtime scope.
+    Wrapping the whole template in an outer f-string would cause
+    ``NameError`` at format time and produce an unparseable helper
+    script. We use a plain string with a ``__FPS__`` placeholder so
+    the inner braces are emitted verbatim and the fps value is
+    substituted afterwards.
+    """
+    return '''#!/usr/bin/env python3
 """
 Depth Capture Helper for Minecraft Iris/Sodium shader pack.
-Automates depth buffer export at {fps} FPS.
+Automates depth buffer export at __FPS__ FPS.
 """
 
 import os
@@ -208,75 +218,75 @@ except ImportError:
 
 class DepthCapture:
     """Manages depth buffer capture from Minecraft."""
-    
-    def __init__(self, output_dir: Path, fps: int = {fps}):
+
+    def __init__(self, output_dir: Path, fps: int = __FPS__):
         self.output_dir = Path(output_dir)
         self.fps = fps
         self.interval = 1.0 / fps
         self.running = False
         self.capture_thread: Optional[threading.Thread] = None
-        
+
         # Create output directory
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Frame counter
         self.frame_count = 0
-        
+
     def start(self) -> None:
         """Start depth capture thread."""
         if self.running:
             return
-            
+
         self.running = True
         self.capture_thread = threading.Thread(target=self._capture_loop)
         self.capture_thread.daemon = True
         self.capture_thread.start()
         print(f"Depth capture started at {self.fps} FPS")
         print(f"Output directory: {self.output_dir}")
-        
+
     def stop(self) -> None:
         """Stop depth capture."""
         self.running = False
         if self.capture_thread:
             self.capture_thread.join(timeout=2.0)
         print(f"Depth capture stopped. Captured {self.frame_count} frames")
-        
+
     def _capture_loop(self) -> None:
         """Main capture loop."""
         last_capture = time.time()
-        
+
         while self.running:
             current_time = time.time()
             elapsed = current_time - last_capture
-            
+
             if elapsed >= self.interval:
                 self._capture_frame()
                 last_capture = current_time
                 self.frame_count += 1
-                
+
             # Sleep to prevent CPU spinning
             time.sleep(0.001)
-            
+
     def _capture_frame(self) -> None:
         """Capture a single depth frame."""
         # In practice, this would:
         # 1. Read depth texture from GPU via OpenGL
         # 2. Convert to numpy array
         # 3. Save as 16-bit PNG for precision
-        
+
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         frame_num = self.frame_count
         filename = self.output_dir / f"depth_{timestamp}_{frame_num:06d}.png"
-        
+
         # Simulate depth data (replace with actual GPU read)
         width, height = 1920, 1080
         depth_data = np.random.rand(height, width).astype(np.float32)
-        
+
         # Convert to 16-bit PNG
         depth_16bit = (depth_data * 65535).astype(np.uint16)
         img = Image.fromarray(depth_16bit, mode='I;16')
         img.save(filename)
-        
+
         if self.frame_count % 10 == 0:
             print(f"Captured frame {self.frame_count}: {filename.name}")
 
@@ -288,7 +298,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Depth buffer capture helper for Minecraft shader pack"
     )
-    parser.add_argument("output_dir", type=Path, 
+    parser.add_argument("output_dir", type=Path,
                        help="Output directory for depth frames")
     parser.add_argument("--fps", type=int, default={fps},
                        help=f"Capture FPS (default: {fps})")
@@ -322,7 +332,7 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-'''
+'''.replace("__FPS__", str(fps))
 
 
 def generate_shader_config(fps: int) -> str:
