@@ -29,7 +29,12 @@
 - Result: committed aa7e98df
 
 ## Round 8 @ 2026-06-12T12:15:00Z
-- Picked: Fix failing `tests/test_gpt_thinking_provider.py::test_provider_not_available_when_openai_missing` — `GPTThinkingProvider.__init__` unconditionally imported `openai` at construction time, so the test (which patches `builtins.__import__` to block `openai`) failed with `ModuleNotFoundError` during instantiation. Deferred import to `complete()`
+- Picked: Fix failing `tests/test_gpt_thinking_provider.py::test_provider_not_available_when_openai_missing` — `GPTThinkingProvider.__init__` unconditionally imported `openai` at construction time, so the test (which patches `builtins.__import__` to block `openai`) failed with `ModuleNotFoundError` during instantiation. Deferred import to `complete()`.
+- Result: committed <sha>
+
+## Round 9 @ 2026-06-22T00:30:00Z
+- Picked: Fix ruff lint errors in test files — import order issue in test_dashboard_api.py (I001) and unused math import in test_recorder_lite_timestamp_sidecar.py (F401).
+- Result: committed 16c28bfd`
 - Result: committed 03a5cf07
 
 ## Round 51 @ 2026-06-20T03:20:00Z
