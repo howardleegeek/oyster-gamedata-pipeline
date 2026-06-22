@@ -231,3 +231,13 @@
 - File: bin/harness_loop.py::main
 - Added: docstring=Y, type-hints=Y
 - Commit: 954a75ad3
+
+## Round @ 2026-06-22T06:52:41Z
+- File: bin/lint_v3_prd_grounded.py::LintReport.add
+- Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: 513a8fb83
+
+## Round @ 2026-06-21T14:30:00Z
+- File: bin/spec_lint.py::LintResult.ok
+- Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: 2ee67e85c
