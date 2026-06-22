@@ -1947,3 +1947,7 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 ## Round 115 @ 2026-06-22T19:08:58Z
 - Picked: Fix ruff F401 unused `os` import in bin/e2e_tests/test_preflight_integration.py:13 — `os` is imported but never referenced (confirmed via grep). Trivial lint cleanup, same flavor as the ongoing ruff sweep in Rounds 101-114. Single unused-import removal, no behavior change, file referenced only as a subprocess name in bin/e2e_orchestrator.py (not imported), so no test impact. Module parses cleanly, ruff check passes, tests/test_preflight.py (18 tests, the only related test file) still green.
 - Result: committed e56e19fd (pushed to main)
+
+## Round 116 @ 2026-06-22T19:30:00Z
+- Picked: Fix ruff F401 unused imports (json, timedelta, Optional) in server/s3_presigned_url.py — continuation of the ongoing ruff cleanup sweep from Rounds 101-115. Single-file bounded change, verified module compiles cleanly, tests/test_upload_resume.py passes (7 passed, 1 skipped).
+- Result: committed 2a138cf1 (pushed to main)
