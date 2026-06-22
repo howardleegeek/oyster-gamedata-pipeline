@@ -4,11 +4,11 @@ Extract release notes from git commits between two references.
 Groups commits by type (feat/fix/docs/test) and outputs formatted release notes.
 """
 
-import subprocess
 import argparse
+import subprocess
 import sys
-from typing import Dict, List, Tuple
 from collections import defaultdict
+from typing import Dict, List, Tuple
 
 
 def run_git_log(since_ref: str, until_ref: str = "HEAD") -> str:
