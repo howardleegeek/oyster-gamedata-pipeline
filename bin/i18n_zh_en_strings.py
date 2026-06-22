@@ -139,7 +139,7 @@ class I18NStringLoader:
                     return translated
         
         # Fall back to built-in strings
-        if (self.current_locale in self.fallback_strings and 
+        if (self.current_locale in self.fallback_strings and
             message_id in self.fallback_strings[self.current_locale]):
             translated = self.fallback_strings[self.current_locale][message_id]
             try:
@@ -193,8 +193,8 @@ class I18NStringLoader:
         output_file = output_dir / f'{self.DOMAIN}.po'
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(f'# {locale} translations\n')
-            f.write(f'msgid ""\nmsgstr ""\n')
-            f.write(f'"Content-Type: text/plain; charset=UTF-8\\n"\n')
+            f.write('msgid ""\nmsgstr ""\n')
+            f.write('"Content-Type: text/plain; charset=UTF-8\\n"\n')
             f.write(f'"Language: {locale}\\n"\n\n')
             
             for msgid in sorted(self.fallback_strings['en_US'].keys()):
