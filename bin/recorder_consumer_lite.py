@@ -774,6 +774,15 @@ class InputCapture:
         }
 
     def stop(self) -> list[dict[str, Any]]:
+        """Stop keyboard/mouse listeners and return captured events.
+
+        Stops both the keyboard and mouse event listeners (if running),
+        then acquires the lock and returns a copy of all captured events
+        as a list of dictionaries.
+
+        Returns:
+            List of event dictionaries captured since start() was called.
+        """
         for L in (self._kbd_listener, self._mouse_listener):
             try:
                 if L is not None:
