@@ -8,7 +8,6 @@ Designed for operational monitoring and health checks.
 
 import argparse
 import json
-import os
 import sys
 import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
