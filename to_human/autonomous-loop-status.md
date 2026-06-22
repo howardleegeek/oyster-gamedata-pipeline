@@ -1972,3 +1972,7 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 ## Round 120 @ 2026-06-22T23:48:40Z
 - Picked: Fix ruff F401 unused `tempfile` import in bin/epal_payout_passthrough.py:24 — continuation of the ongoing ruff cleanup sweep from Rounds 101-119. `tempfile` is genuinely unused (verified via grep: zero references outside the import line). Single-line bounded change, no behavior change, file has no direct test references (referenced by name only), module parses cleanly, 538/538 tests in tests/bin/ still pass. 1-line diff, 1 file, matches the pattern of prior F401 fixes (Rounds 115, 117, 118, 119).
 - Result: committed ca118bab (pushed to main)
+
+## Round 121 @ 2026-06-23T00:08:00Z
+- Picked: Fix ruff F401 unused `from datetime import datetime, timezone` in bin/observability_metrics_emitter.py:16 (F401 + I001 isort side effect) — continuation of the ongoing ruff cleanup sweep from Rounds 101-120. Verified `datetime` and `timezone` are genuinely unused (grep returns zero references beyond the import line). Single-file bounded change, 2-line diff (1 import removal + 1 blank-line removal isort I001 normalization), no behavior change. File is referenced only by name in bin/spec_generator.py (catalog text, not a Python import) so no import dependency can break. Module parses cleanly, ruff check passes, 538/538 tests in tests/bin/ still pass. Same pattern as Round 118 (F401+I001 combined) and Rounds 115/116/117/119/120 (F401 single-import).
+- Result: committed a2a6bdf9 (pushed to main)
