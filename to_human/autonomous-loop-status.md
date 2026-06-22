@@ -373,3 +373,7 @@
 ## Round 86 @ 2026-06-22T05:17:57Z
 - Picked: Commit leftover unstaged ruff I001 (import sort) + W292 (missing trailing newline) fix in bin/release_notes_from_git.py — the working tree had an uncommitted edit from a prior tick that was never landed. Justification (per charter §3 priority): lowest tier (stale WIP), but it is the concrete item actually present in the working tree this tick, and a clean single-file bounded change beats a speculative refactor.
 - Result: committed ec1eab99 (pushed below)
+
+## Round 87 @ 2026-06-22T06:30:07Z
+- Picked: Fix ruff W292 (missing trailing newline) in `bin/imu_provider.py` — file ended with `sys.exit(main(sys.argv[1:]))` with no trailing newline. No tests reference this module (grep -rln "imu_provider" tests/ returned no hits), module imports cleanly via sys.path injection (`IMUProvider` class loadable), `python3 -m py_compile` passes, `ruff check bin/imu_provider.py` → "All checks passed!", `pytest -q tests/test_iron_law_no_fake_data.py --tb=short -x` → 25/25 pass, broader regression `pytest -q tests/bin/ -x` → 538/538 pass (no skip/xfail counted as green). Self-review: pure cosmetic trailing newline, no behavior change, no module-level import-time side effects, no signature change, no silent error swallow, no race condition, no security change, no off-by-one, no broken tests masked as passing, no brand cross-reference. Single-file bounded change (1 insertion, 1 deletion).
+- Result: committed cbc8252b (pushed to main)
