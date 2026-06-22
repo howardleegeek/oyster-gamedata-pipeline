@@ -49,6 +49,11 @@ class LintReport:
     failed_count: int = 0
 
     def add(self, r: LintResult) -> None:
+        """Add a lint result to the report.
+
+        Args:
+            r: The LintResult to add.
+        """
         self.results.append(r)
         if r.passed:
             self.passed_count += 1
