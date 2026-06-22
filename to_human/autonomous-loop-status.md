@@ -1968,3 +1968,7 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 ## Round 119 @ 2026-06-22T20:20:00Z
 - Picked: Fix ruff F401 unused `os` import in bin/fps_overhead_monitor.py:15 — `os` is imported but never referenced (confirmed via grep: only the import line matches). Trivial lint cleanup, same flavor as the ongoing ruff sweep in Rounds 101-118. Single unused-import removal, no behavior change. File is referenced only as a string id ("G229") in bin/spec_generator.py:654, not imported by any test or runtime code, so no test impact. Module parses cleanly, ruff check passes for this file, tests/bin/ (538 tests) still green.
 - Result: committed bdd77171 (pushed to main)
+
+## Round 120 @ 2026-06-22T23:48:40Z
+- Picked: Fix ruff F401 unused `tempfile` import in bin/epal_payout_passthrough.py:24 — continuation of the ongoing ruff cleanup sweep from Rounds 101-119. `tempfile` is genuinely unused (verified via grep: zero references outside the import line). Single-line bounded change, no behavior change, file has no direct test references (referenced by name only), module parses cleanly, 538/538 tests in tests/bin/ still pass. 1-line diff, 1 file, matches the pattern of prior F401 fixes (Rounds 115, 117, 118, 119).
+- Result: committed ca118bab (pushed to main)
