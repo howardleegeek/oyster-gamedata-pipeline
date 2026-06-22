@@ -20,10 +20,8 @@ import hashlib
 import json
 import os
 import sys
-import tempfile
-from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import parse_qs, urlparse
 
@@ -253,28 +251,28 @@ class ErrorDashboardHandler(BaseHTTPRequestHandler):
     <title>Error Dashboard</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                background: #f5f5f5; color: #333; line-height: 1.6; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; }
         header { margin-bottom: 30px; }
         h1 { color: #2c3e50; margin-bottom: 10px; }
         .subtitle { color: #7f8c8d; font-size: 1.1em; }
-        .filters { background: white; border-radius: 8px; padding: 20px; 
+        .filters { background: white; border-radius: 8px; padding: 20px;
                    margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .filter-row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px; }
         .filter-group { flex: 1; min-width: 200px; }
         label { display: block; margin-bottom: 5px; font-weight: 600; color: #2c3e50; }
-        select, input { width: 100%; padding: 8px 12px; border: 1px solid #ddd; 
+        select, input { width: 100%; padding: 8px 12px; border: 1px solid #ddd;
                         border-radius: 4px; font-size: 14px; }
         .actions { display: flex; gap: 10px; margin-top: 20px; }
-        button { padding: 10px 20px; border: none; border-radius: 4px; 
+        button { padding: 10px 20px; border: none; border-radius: 4px;
                  cursor: pointer; font-weight: 600; transition: background 0.2s; }
         .btn-primary { background: #3498db; color: white; }
         .btn-primary:hover { background: #2980b9; }
         .btn-secondary { background: #95a5a6; color: white; }
         .btn-secondary:hover { background: #7f8c8d; }
         .error-count { margin: 20px 0; font-size: 1.2em; color: #2c3e50; }
-        .error-table { background: white; border-radius: 8px; overflow: hidden; 
+        .error-table { background: white; border-radius: 8px; overflow: hidden;
                        box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         table { width: 100%; border-collapse: collapse; }
         th { background: #2c3e50; color: white; text-align: left; padding: 15px; }
@@ -286,12 +284,12 @@ class ErrorDashboardHandler(BaseHTTPRequestHandler):
         .severity-warning { background: #fef9e7; color: #b7950b; }
         .severity-error { background: #fdedec; color: #c0392b; }
         .severity-critical { background: #f2d7d5; color: #922b21; }
-        .traceback { font-family: monospace; font-size: 12px; white-space: pre-wrap; 
-                     background: #f8f9fa; padding: 10px; border-radius: 4px; 
-                     border-left: 3px solid #3498db; margin-top: 5px; max-height: 200px; 
+        .traceback { font-family: monospace; font-size: 12px; white-space: pre-wrap;
+                     background: #f8f9fa; padding: 10px; border-radius: 4px;
+                     border-left: 3px solid #3498db; margin-top: 5px; max-height: 200px;
                      overflow-y: auto; }
         .loading { text-align: center; padding: 40px; color: #7f8c8d; }
-        .error { color: #e74c3c; padding: 10px; background: #fdedec; border-radius: 4px; 
+        .error { color: #e74c3c; padding: 10px; background: #fdedec; border-radius: 4px;
                  margin: 10px 0; }
         .timestamp { font-size: 0.9em; color: #7f8c8d; }
         .user-list { font-size: 0.9em; color: #3498db; }
@@ -303,7 +301,7 @@ class ErrorDashboardHandler(BaseHTTPRequestHandler):
             <h1>Error Dashboard</h1>
             <p class="subtitle">Monitor and analyze application errors</p>
         </header>
-        
+
         <div class="filters">
             <div class="filter-row">
                 <div class="filter-group">
@@ -340,24 +338,24 @@ class ErrorDashboardHandler(BaseHTTPRequestHandler):
                 <button class="btn-secondary" onclick="resetFilters()">Reset</button>
             </div>
         </div>
-        
+
         <div id="error-count" class="error-count"></div>
         <div id="error-table" class="error-table">
             <div class="loading">Loading error data...</div>
         </div>
     </div>
-    
+
     <script>
         let currentFilters = {};
-        
+
         function formatTimestamp(iso) {
             return new Date(iso).toLocaleString();
         }
-        
+
         function severityClass(severity) {
             return 'severity severity-' + severity;
         }
-        
+
         function loadMeta() {
             fetch('/admin/errors/api/meta')
                 .then(r => r.json())
@@ -370,7 +368,7 @@ class ErrorDashboardHandler(BaseHTTPRequestHandler):
                         opt.textContent = s.charAt(0).toUpperCase() + s.slice(1);
                         severitySelect.appendChild(opt);
                     });
-                    
+
                     // Populate source dropdown
                     const sourceSelect = document.getElementById('source');
                     meta.sources.forEach(s => {
@@ -379,7 +377,7 @@ class ErrorDashboardHandler(BaseHTTPRequestHandler):
                         opt.textContent = s;
                         sourceSelect.appendChild(opt);
                     });
-                    
+
                     // Populate user dropdown
                     const userSelect = document.getElementById('user');
                     meta.users.forEach(u => {
@@ -391,7 +389,7 @@ class ErrorDashboardHandler(BaseHTTPRequestHandler):
                 })
                 .catch(err => console.error('Failed to load meta:', err));
         }
-        
+
         function buildQueryString(filters) {
             const params = new URLSearchParams();
             if (filters.severity) params.set('severity', filters.severity);
@@ -401,7 +399,7 @@ class ErrorDashboardHandler(BaseHTTPRequestHandler):
             if (filters.time_to) params.set('time_to', filters.time_to);
             return params.toString();
         }
-        
+
         function loadErrors() {
             const filters = {
                 severity: document.getElementById('severity').value,
@@ -411,13 +409,13 @@ class ErrorDashboardHandler(BaseHTTPRequestHandler):
                 time_to: document.getElementById('time-to').value
             };
             currentFilters = filters;
-            
+
             const query = buildQueryString(filters);
             const url = '/admin/errors/api/groups' + (query ? '?' + query : '');
-            
-            document.getElementById('error-table').innerHTML = 
+
+            document.getElementById('error-table').innerHTML =
                 '<div class="loading">Loading error data...</div>';
-            
+
             fetch(url)
                 .then(r => {
                     if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -427,46 +425,46 @@ class ErrorDashboardHandler(BaseHTTPRequestHandler):
                     renderErrors(groups);
                 })
                 .catch(err => {
-                    document.getElementById('error-table').innerHTML = 
+                    document.getElementById('error-table').innerHTML =
                         '<div class="error">Failed to load errors: ' + err.message + '</div>';
                 });
         }
-        
+
         function renderErrors(groups) {
             const container = document.getElementById('error-table');
-            
+
             if (groups.length === 0) {
                 container.innerHTML = '<div class="loading">No errors found matching filters</div>';
                 document.getElementById('error-count').textContent = 'No errors found';
                 return;
             }
-            
-            document.getElementById('error-count').textContent = 
+
+            document.getElementById('error-count').textContent =
                 `Showing ${groups.length} error group${groups.length === 1 ? '' : 's'}`;
-            
+
             let html = '<table><thead><tr>' +
                 '<th>Count</th><th>Severity</th><th>Source</th><th>Message</th>' +
                 '<th>First Seen</th><th>Last Seen</th><th>Affected Users</th></tr></thead><tbody>';
-            
+
             groups.forEach(group => {
                 html += '<tr>' +
                     '<td><strong>' + group.count + '</strong></td>' +
-                    '<td><span class="' + severityClass(group.severity) + '">' + 
+                    '<td><span class="' + severityClass(group.severity) + '">' +
                         group.severity + '</span></td>' +
                     '<td>' + (group.source || '—') + '</td>' +
-                    '<td>' + group.message + 
-                    '<div class="traceback">' + (group.sample_traceback || 'No traceback') + 
+                    '<td>' + group.message +
+                    '<div class="traceback">' + (group.sample_traceback || 'No traceback') +
                     '</div></td>' +
                     '<td class="timestamp">' + formatTimestamp(group.first_seen) + '</td>' +
                     '<td class="timestamp">' + formatTimestamp(group.last_seen) + '</td>' +
                     '<td class="user-list">' + (group.users.join(', ') || '—') + '</td>' +
                     '</tr>';
             });
-            
+
             html += '</tbody></table>';
             container.innerHTML = html;
         }
-        
+
         function resetFilters() {
             document.getElementById('severity').value = '';
             document.getElementById('source').value = '';
@@ -475,7 +473,7 @@ class ErrorDashboardHandler(BaseHTTPRequestHandler):
             document.getElementById('time-to').value = '';
             loadErrors();
         }
-        
+
         // Load meta data and initial errors on page load
         document.addEventListener('DOMContentLoaded', () => {
             loadMeta();
