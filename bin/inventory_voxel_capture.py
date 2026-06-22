@@ -64,6 +64,15 @@ class FrameCapture:
     metadata: Dict[str, Any] = field(default_factory=dict)
     
     def to_dict(self) -> Dict[str, Any]:
+        """Convert FrameCapture to a JSON-serializable dictionary.
+
+        Returns:
+            Dict[str, Any]: Dictionary representation with voxel data flattened
+                into 'voxel_block_ids' and 'voxel_centre' keys.
+
+        Note:
+            The 'voxel' key is removed and replaced with flattened fields.
+        """
         d = asdict(self)
         if self.voxel:
             d["voxel_block_ids"] = self.voxel.block_ids
