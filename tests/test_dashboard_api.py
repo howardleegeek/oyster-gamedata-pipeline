@@ -5,19 +5,17 @@ Verifies all 7 endpoints return correct shapes and auth headers are respected.
 
 import os
 import sys
-
-import pytest
-from fastapi.testclient import TestClient
-
-# Add dashboard to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "dashboard"))
-
 from datetime import datetime
 
 import jwt
+import pytest
+from fastapi.testclient import TestClient
 
-from oauth import JWT_ALGORITHM, JWT_SECRET
-import server
+# Add dashboard to path - must be after standard library imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "dashboard"))
+from oauth import JWT_ALGORITHM, JWT_SECRET  # noqa: E402
+
+import server  # noqa: E402
 
 
 @pytest.fixture
