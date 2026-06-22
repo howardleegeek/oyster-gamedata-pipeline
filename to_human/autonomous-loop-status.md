@@ -1939,3 +1939,7 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 ## Round 113 @ 2026-06-22T16:47:45Z
 - Picked: Fix ruff E722 bare `except:` in server/auth_middleware.py:62 (get_current_user_optional) — bare except catches BaseException (KeyboardInterrupt/SystemExit/GeneratorExit) and silently swallows every error including programmer mistakes. Security-relevant silent error swallow flagged by RSI §2. Narrowed to `except Exception:` so normal auth failures still return None (preserving the documented 'doesn't raise if no token' semantic) while letting shutdown signals propagate. Matches the pattern already used in AuthMiddleware.dispatch above in the same file.
 - Result: committed c73d227a (pushed to main)
+
+## Round 114 @ 2026-06-22T17:26:05Z
+- Picked: Fix ruff E722 bare `except:` in dashboard/login_page.py:211 (logout() helper) — bare except catches BaseException (KeyboardInterrupt/SystemExit/GeneratorExit) and silently swallows every error in the dashboard auth logout path. Security/auth-adjacent silent error swallow. Narrowed to `except Exception:` so logout endpoint failures still get swallowed (preserving the documented 'best-effort logout call before clearing local session state' UX) while letting shutdown signals propagate. Same pattern as Round 113 fix in server/auth_middleware.py:62.
+- Result: pending commit
