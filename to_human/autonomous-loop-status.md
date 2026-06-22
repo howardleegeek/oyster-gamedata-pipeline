@@ -1943,3 +1943,7 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 ## Round 114 @ 2026-06-22T17:26:05Z
 - Picked: Fix ruff E722 bare `except:` in dashboard/login_page.py:211 (logout() helper) — bare except catches BaseException (KeyboardInterrupt/SystemExit/GeneratorExit) and silently swallows every error in the dashboard auth logout path. Security/auth-adjacent silent error swallow. Narrowed to `except Exception:` so logout endpoint failures still get swallowed (preserving the documented 'best-effort logout call before clearing local session state' UX) while letting shutdown signals propagate. Same pattern as Round 113 fix in server/auth_middleware.py:62.
 - Result: committed 79f41c0d (fix) + 6a0d442d (status log) (pushed to main)
+
+## Round 115 @ 2026-06-22T19:08:58Z
+- Picked: Fix ruff F401 unused `os` import in bin/e2e_tests/test_preflight_integration.py:13 — `os` is imported but never referenced (confirmed via grep). Trivial lint cleanup, same flavor as the ongoing ruff sweep in Rounds 101-114. Single unused-import removal, no behavior change, file referenced only as a subprocess name in bin/e2e_orchestrator.py (not imported), so no test impact. Module parses cleanly, ruff check passes, tests/test_preflight.py (18 tests, the only related test file) still green.
+- Result: committed e56e19fd (pushed to main)
