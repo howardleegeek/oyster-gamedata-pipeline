@@ -88,6 +88,13 @@ class ErrorPayload:
         self.python_version = sys.version
 
     def to_dict(self) -> Dict[str, Any]:
+        """Convert the error payload to a dictionary.
+
+        Returns:
+            Dictionary containing error_id, timestamp, error_type,
+            error_message, traceback, context, hostname, pid, and
+            python_version fields.
+        """
         return {
             "error_id": self.error_id,
             "timestamp": self.timestamp,
