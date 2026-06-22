@@ -10,11 +10,10 @@ Runs oyster_provenance/verify.py on a session with backfilled provenance.json:
 
 import argparse
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 
 def run_provenance_verify(session_dir: str) -> Dict[str, Any]:
