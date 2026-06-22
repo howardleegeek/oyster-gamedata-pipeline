@@ -9,13 +9,11 @@ Runs bin/route_planner.py against a fake batch with quota {1:3, 2:5, 3:2}:
 
 import argparse
 import json
-import os
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, Optional
-
+from typing import Any, Dict
 
 # Test quota configuration
 TEST_QUOTA = {1: 3, 2: 5, 3: 2}
