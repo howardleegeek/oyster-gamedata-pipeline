@@ -21,7 +21,6 @@ import json
 import logging
 import os
 import sys
-import tempfile
 import urllib.parse
 from datetime import datetime
 from http.client import HTTPSConnection, HTTPConnection
