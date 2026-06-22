@@ -33,6 +33,14 @@ class TokenBucket:
         self.last_refill = now
 
     def consume(self, tokens: float = 1.0) -> bool:
+        """Consume tokens from the bucket.
+
+        Args:
+            tokens: Number of tokens to consume. Defaults to 1.0.
+
+        Returns:
+            True if tokens were successfully consumed, False if insufficient tokens.
+        """
         with self._lock:
             self._refill()
             if self.tokens >= tokens:
