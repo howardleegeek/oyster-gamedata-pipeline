@@ -2563,6 +2563,18 @@ def _try_install_mod_first_launch() -> None:
 
 
 def main() -> int:
+    """Entry point for OysterRecorder CLI.
+
+    Parses command-line arguments, initializes the RecorderApp, and runs
+    the GUI event loop. Returns exit code: 0 on success, 2 on error.
+
+    Args:
+        --allow-placeholder: If set, allows placeholder camera/player
+            fields (marks tarball as non-real data).
+
+    Returns:
+        Exit code: 0 for normal exit, 2 for error.
+    """
     import argparse  # noqa: PLC0415
     parser = argparse.ArgumentParser(description="OysterRecorder")
     parser.add_argument(
