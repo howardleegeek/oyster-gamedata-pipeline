@@ -1951,3 +1951,7 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 ## Round 116 @ 2026-06-22T19:30:00Z
 - Picked: Fix ruff F401 unused imports (json, timedelta, Optional) in server/s3_presigned_url.py — continuation of the ongoing ruff cleanup sweep from Rounds 101-115. Single-file bounded change, verified module compiles cleanly, tests/test_upload_resume.py passes (7 passed, 1 skipped).
 - Result: committed 2a138cf1 (pushed to main)
+
+## Round 117 @ 2026-06-22T19:55:00Z
+- Picked: Fix ruff F401 unused `typing.List` and `typing.Tuple` imports in bin/i18n_lint.py — continuation of the ongoing ruff cleanup sweep from Rounds 101-116. Confirmed only `Dict` (in load_json_file return type) and `Set` (in extract_placeholders return type) are referenced in the rest of the file. No test file references this module (verified via grep). Module parses cleanly, --help still works.
+- Result: committed bdb29229 (pushed to main)
