@@ -13,7 +13,6 @@ import json
 import sys
 from typing import Any, Dict, List, Tuple
 
-
 # Canonical schema for action_camera records (known fields only)
 ACTION_CAMERA_SCHEMA: Dict[str, type] = {
     "brand": str,
