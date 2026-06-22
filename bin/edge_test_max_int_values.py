@@ -2,8 +2,8 @@
 """Edge test: int64 max for frame_id - confirm no overflow in adapter math."""
 
 import argparse
-import sys
 import json
+import sys
 from typing import Any
 
 
@@ -66,7 +66,7 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(
         description="Test int64 max values for frame_id overflow."
     )
-    parser.add_argument("--run-all", action="store_true", 
+    parser.add_argument("--run-all", action="store_true",
                        help="Run all boundary tests")
     parser.add_argument("--frame-id", type=int, help="Test specific frame_id")
     parser.add_argument("--output", help="JSON output file")
