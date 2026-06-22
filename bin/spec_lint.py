@@ -88,6 +88,7 @@ class LintResult:
 
     @property
     def ok(self) -> bool:
+        """Returns True if the linted file passed all checks, False otherwise."""
         return not self.failures
 
 
