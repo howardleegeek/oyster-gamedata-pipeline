@@ -382,3 +382,7 @@
 ## Round 88 @ 2026-06-22T06:38:51Z
 - Picked: Fix ruff W292 (missing trailing newline) in `bin/redteam_attacks_v2.py` — file ended with `sys.exit(main())` and no `\n`, triggering a single ruff error. No module-level side effect, no test exists for this script. Added trailing newline; `ruff check bin/redteam_attacks_v2.py` → "All checks passed!", `python3 -m py_compile` succeeds, broader regression `pytest -q tests/bin/ -x` → 538/538 pass with no skip/xfail counted as green. `git add` of a single file, pushed to main.
 - Result: committed e4583cfa (pushed to main)
+
+## Round 89 @ 2026-06-21T23:45:00Z
+- Picked: Fix F841 lint error in bin/depth_anything_smoke.py - unused local variable `torch` assigned but never used in `load_depth_anything_v2_small()`.
+- Result: committed 7e664917 (pushed to main)
