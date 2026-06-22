@@ -49,11 +49,17 @@ class TokenBucket:
             return False
 
     def get_available(self) -> float:
+        """Return the number of available tokens after refill.
+
+        Returns:
+            Number of tokens currently available in the bucket.
+        """
         with self._lock:
             self._refill()
             return self.tokens
 
     def reset(self) -> None:
+        """Reset the bucket to full capacity and update refill timestamp."""
         with self._lock:
             self.tokens = float(self.capacity)
             self.last_refill = time.time()
