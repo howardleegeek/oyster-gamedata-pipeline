@@ -6,16 +6,16 @@ Provides presigned URLs for multipart S3 uploads with automatic URL refresh
 on expiry.
 """
 
-import os
-import json
-import time
 import hashlib
-import uuid
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List
+import os
+import time
+import uuid
 from dataclasses import dataclass, field
-from flask import Flask, request, jsonify
+from datetime import datetime
+from typing import Any, Dict, List
+
+from flask import Flask, jsonify, request
 
 # Configure logging
 logging.basicConfig(
