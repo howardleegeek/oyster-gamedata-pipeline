@@ -6,8 +6,8 @@ import sys
 import tempfile
 import unittest
 
-# Ensure bin/ is importable
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "bin"))
+# Ensure bin/ is importable (project root, not tests/bin/)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "bin"))
 
 from gameinfo_xlsx_validator import EXPECTED_SHEETS, REQUIRED_FIELDS, validate_xlsx
 
