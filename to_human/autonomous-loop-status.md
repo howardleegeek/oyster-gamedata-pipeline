@@ -1959,3 +1959,12 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 ## Round 118 @ 2026-06-22T22:57:46Z
 - Picked: Fix ruff F401 (unused `uuid`) + I001 (unsorted import block) in server/paypal_payouts.py — continuation of the ongoing ruff cleanup sweep from Rounds 101-117. Single-file bounded change, removed the unused `uuid` import and reorganized the block to stdlib → third-party (per PEP 8/ruff convention), alphabetized the typing names. No behavior change. Confirmed `Any` is still used in `get_payout_status` return type (line 163) and `os.getenv` is still used in module-level config (lines 16-18). Module parses cleanly, `from server.paypal_payouts import execute_paypal_payout, get_access_token, _get_headers, get_payout_status` works, all 18 tests in tests/test_payout_engine.py pass.
 - Result: committed e23d172c (pushed to main)
+
+
+## Round 119 @ 2026-06-22T23:20:47Z
+- Picked: Fix ruff F401 unused `os` import in bin/error_severity_classifier.py:15 — continuation of the ongoing ruff cleanup sweep from Rounds 101-118. Single-file bounded change, removed unused `os` import. Verified module imports cleanly, pytest tests/bin/test_audit_artifact_honesty.py (5 tests) + tests/bin/test_audit_log.py (12 tests) pass. No behavior change, no test impact.
+- Result: committed df731ead (pushed to main)
+
+## Round 119 @ 2026-06-22T20:20:00Z
+- Picked: Fix ruff F401 unused `os` import in bin/fps_overhead_monitor.py:15 — `os` is imported but never referenced (confirmed via grep: only the import line matches). Trivial lint cleanup, same flavor as the ongoing ruff sweep in Rounds 101-118. Single unused-import removal, no behavior change. File is referenced only as a string id ("G229") in bin/spec_generator.py:654, not imported by any test or runtime code, so no test impact. Module parses cleanly, ruff check passes for this file, tests/bin/ (538 tests) still green.
+- Result: committed bdd77171 (pushed to main)
