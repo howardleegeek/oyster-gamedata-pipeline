@@ -9,7 +9,13 @@ Exit codes: 0 = all compliant, 1 = violations found, 2 = usage error.
 """
 from __future__ import annotations
 
-import argparse, json, logging, os, shutil, subprocess, sys
+import argparse
+import json
+import logging
+import os
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 from typing import Iterable, Optional, Sequence, Tuple
 
