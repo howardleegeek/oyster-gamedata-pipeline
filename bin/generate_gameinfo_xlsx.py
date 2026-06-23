@@ -456,7 +456,6 @@ def read_xlsx(path: str) -> Dict[str, Any]:
         # Simple XML parsing with regex
         cell_pattern = re.compile(r'<cell r="([A-Z]+)(\d+)"[^>]*>(.*?)</cell>')
         for match in cell_pattern.finditer(content):
-            col_letter = match.group(1)
             row_num = int(match.group(2))
             cell_content = match.group(3)
 
