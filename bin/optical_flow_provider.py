@@ -224,8 +224,8 @@ class OpticalFlowProvider:
     def _extract_frames(self, video_path: Path, output_dir: Path) -> List[Path]:
         """Extract frames from video file."""
         try:
-            from PIL import Image
             import imageio.v3 as iio
+            from PIL import Image
 
             frames = []
             for idx, frame in enumerate(iio.imiter(str(video_path))):
