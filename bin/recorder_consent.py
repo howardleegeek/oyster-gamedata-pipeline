@@ -5,23 +5,21 @@ Uses loopback OAuth (localhost callback) for desktop apps as per RFC 8252.
 More reliable than custom URL schemes like oyster://callback.
 """
 
-import os
-import sys
-import json
-import time
-import secrets
-import socket
-import threading
-import webbrowser
 import hashlib
+import json
+import os
+import socket
+import sys
+import threading
+import time
+import webbrowser
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from urllib.parse import urlparse, parse_qs
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from urllib.parse import parse_qs, urlparse
 
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import httpx
 import jwt
 
 
