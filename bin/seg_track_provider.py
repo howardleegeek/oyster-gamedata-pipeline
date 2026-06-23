@@ -71,6 +71,12 @@ class Config:
     format: str = "png"
 
     def validate(self) -> List[str]:
+        """Validate the configuration parameters.
+
+        Returns:
+            List[str]: List of validation error messages. Empty list if all
+                validations pass.
+        """
         errors = []
         if self.target_fps <= 0 or self.target_fps > 60:
             errors.append("target_fps must be 1-60")
