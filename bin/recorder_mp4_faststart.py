@@ -15,7 +15,7 @@ import os
 import sys
 import subprocess
 import shlex
-from typing import List, Optional
+from typing import List
 
 
 def parse_args(argv: List[str]) -> argparse.Namespace:
