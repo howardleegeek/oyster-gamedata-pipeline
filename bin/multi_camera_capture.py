@@ -342,7 +342,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
 
     try:
-        results = run_capture(rig, settings, dry_run=args.dry_run)
+        run_capture(rig, settings, dry_run=args.dry_run)
     except Exception as exc:
         logger.error("Capture failed: %s", exc)
         return 1
