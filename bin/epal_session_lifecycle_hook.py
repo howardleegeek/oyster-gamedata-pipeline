@@ -292,6 +292,12 @@ class WebhookHandler(BaseHTTPRequestHandler):
         self._send_json(200 if result["status"] != "error" else 400, result)
 
     def log_message(self, fmt: str, *args: Any) -> None:
+        """Log an HTTP request message.
+
+        Args:
+            fmt: Format string for the log message.
+            *args: Arguments to be formatted into the fmt string.
+        """
         logger.info(fmt, *args)
 
 
