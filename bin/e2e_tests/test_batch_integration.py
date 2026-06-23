@@ -55,7 +55,7 @@ def run_route_planner(session_dir: str, quota: Dict[int, int]) -> Dict[str, Any]
         
         # Run route planner
         try:
-            result = subprocess.run(
+            subprocess.run(
                 [sys.executable, str(planner_script), "--batch", str(manifest_path)],
                 capture_output=True,
                 text=True,
