@@ -5,9 +5,15 @@ Per-frame inventory + 3×3×3 voxel-window block-IDs around player.
 MineDojo / MineWorld multimodal observation capture tool.
 """
 from __future__ import annotations
-import argparse, json, logging, os, struct, sys, tempfile
-from dataclasses import dataclass, field, asdict
 
+import argparse
+import json
+import logging
+import os
+import struct
+import sys
+import tempfile
+from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 logger = logging.getLogger(__name__)
@@ -19,29 +25,45 @@ DEFAULT_BLOCK_ID = 0
 _numpy = _yaml = None
 def _np() -> Any:
     global _numpy
-    if _numpy is None: 
-        try: import numpy as np; _numpy = np
-        except ImportError: _numpy = None
+    if _numpy is None:
+        try:
+            import numpy as np
+            _numpy = np
+        except ImportError:
+            _numpy = None
     return _numpy
+
+
 def _yaml_mod() -> Any:
     global _yaml
-    if _yaml is None: 
-        try: import yaml; _yaml = yaml
-        except ImportError: _yaml = None
+    if _yaml is None:
+        try:
+            import yaml
+            _yaml = yaml
+        except ImportError:
+            _yaml = None
     return _yaml
 
 @dataclass
 class InventorySlot:
-    slot: int; item_id: int; count: int; damage: int = 0; nbt_hash: str = ""
+    slot: int
+    item_id: int
+    count: int
+    damage: int = 0
+    nbt_hash: str = ""
+
 
 @dataclass
 class VoxelWindow:
     centre: Tuple[int, int, int] = (0, 0, 0)
     block_ids: List[int] = field(default_factory=lambda: [DEFAULT_BLOCK_ID] * 27)
-    def to_array(self) -> Any: 
+
+    def to_array(self) -> Any:
         np = _np()
-        if np is None: raise ImportError("numpy required")
+        if np is None:
+            raise ImportError("numpy required")
         return np.array(self.block_ids, dtype=np.int32).reshape(3, 3, 3)
+
     @classmethod
     def from_array(cls, arr: Any, centre: Tuple[int, int, int]) -> "VoxelWindow":
         return cls(centre=centre, block_ids=arr.reshape(-1).tolist())
@@ -54,7 +76,7 @@ class FrameCapture:
     voxel: Optional[VoxelWindow] = None
     timestamp_ms: int = 0
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
         if self.voxel:
@@ -62,19 +84,20 @@ class FrameCapture:
             d["voxel_centre"] = self.voxel.centre
             del d["voxel"]
         return d
-    
+
     def to_json(self, indent: Optional[int] = 2) -> str:
         return json.dumps(self.to_dict(), indent=indent)
-    
+
     def to_npz(self, path: str) -> None:
         np = _np()
-        if np is None: raise ImportError("numpy required")
+        if np is None:
+            raise ImportError("numpy required")
         data = {
             "frame_index": np.array([self.frame_index], dtype=np.int64),
             "player_pos": np.array(self.player_pos, dtype=np.float64),
             "timestamp_ms": np.array([self.timestamp_ms], dtype=np.int64),
         }
-        if self.voxel: 
+        if self.voxel:
             data["voxel_block_ids"] = self.voxel.to_array()
             data["voxel_centre"] = np.array(self.voxel.centre, dtype=np.int32)
         if self.inventory:
@@ -86,7 +109,8 @@ class FrameCapture:
 
 def load_inventory(world_dir: str, frame_index: int) -> List[InventorySlot]:
     inv_path = os.path.join(world_dir, f"inventory_{frame_index}.json")
-    if not os.path.exists(inv_path): return []
+    if not os.path.exists(inv_path):
+        return []
     try:
         with open(inv_path, 'r') as f:
             inv_data = json.load(f)
@@ -103,7 +127,8 @@ def load_inventory(world_dir: str, frame_index: int) -> List[InventorySlot]:
 
 def load_player_position(world_dir: str, frame_index: int) -> Tuple[float, float, float]:
     pos_path = os.path.join(world_dir, f"player_pos_{frame_index}.json")
-    if not os.path.exists(pos_path): return (0.0, 0.0, 0.0)
+    if not os.path.exists(pos_path):
+        return (0.0, 0.0, 0.0)
     try:
         with open(pos_path, 'r') as f:
             pos_data = json.load(f)
@@ -114,7 +139,8 @@ def load_player_position(world_dir: str, frame_index: int) -> Tuple[float, float
 
 def extract_voxel_window(world_dir: str, player_pos: Tuple[float, float, float], frame_index: int) -> Optional[VoxelWindow]:
     blocks_path = os.path.join(world_dir, f"blocks_{frame_index}.bin")
-    if not os.path.exists(blocks_path): return None
+    if not os.path.exists(blocks_path):
+        return None
     try:
         centre_x, centre_y, centre_z = int(round(player_pos[0])), int(round(player_pos[1])), int(round(player_pos[2]))
         block_ids = [DEFAULT_BLOCK_ID] * 27
@@ -155,15 +181,17 @@ def run_demo() -> int:
             json.dump({"x": 5.0, "y": 5.0, "z": 5.0}, fh)
         # Create dummy blocks file
         with open(os.path.join(tmp, "blocks_0.bin"), "wb") as fh:
-            for i in range(1000): fh.write(struct.pack("<i", i % 10))
+            for i in range(1000):
+                fh.write(struct.pack("<i", i % 10))
         # Capture
         cap = capture_frame(tmp, 0, (5.0, 5.0, 5.0))
-        print(f"\nFrame capture results:")
+        print("\nFrame capture results:")
         print(f"  Frame index: {cap.frame_index}")
         print(f"  Player position: {cap.player_pos}")
         print(f"  Inventory slots occupied: {sum(1 for s in cap.inventory if s.count > 0)}")
         for s in cap.inventory:
-            if s.count > 0: print(f"    Slot {s.slot}: item_id={s.item_id}, count={s.count}")
+            if s.count > 0:
+                print(f"    Slot {s.slot}: item_id={s.item_id}, count={s.count}")
         if cap.voxel:
             print(f"  Voxel centre: {cap.voxel.centre}")
             print(f"  Unique non-air blocks: {set(cap.voxel.block_ids) - {0}}")
@@ -173,7 +201,8 @@ def run_demo() -> int:
             cap.to_npz(npz_path)
             print(f"\nSaved NPZ to: {npz_path}")
         json_path = os.path.join(tmp, "capture.json")
-        with open(json_path, "w") as fh: fh.write(cap.to_json())
+        with open(json_path, "w") as fh:
+            fh.write(cap.to_json())
         print(f"Saved JSON to: {json_path}")
         print("\nDemo completed successfully!")
     return 0
@@ -195,51 +224,81 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str]) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    if args.demo: return run_demo()
-    if args.world is None: logger.error("World directory must be specified with --world"); return 1
-    if not os.path.isdir(args.world): logger.error(f"World directory does not exist: {args.world}"); return 1
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    if args.demo:
+        return run_demo()
+    if args.world is None:
+        logger.error("World directory must be specified with --world")
+        return 1
+    if not os.path.isdir(args.world):
+        logger.error(f"World directory does not exist: {args.world}")
+        return 1
     config = {}
     if args.config:
         try:
             yaml = _yaml_mod()
-            if yaml is None: logger.error("PyYAML not installed"); return 1
-            with open(args.config, 'r') as f: config = yaml.safe_load(f) or {}
-        except Exception as e: logger.error(f"Failed to load config {args.config}: {e}"); return 1
+            if yaml is None:
+                logger.error("PyYAML not installed")
+                return 1
+            with open(args.config, 'r') as f:
+                config = yaml.safe_load(f) or {}
+        except Exception as e:
+            logger.error(f"Failed to load config {args.config}: {e}")
+            return 1
     player_pos_override = tuple(args.player_pos) if args.player_pos else None
-    if args.frame_range: frames = range(args.frame_range[0], args.frame_range[1] + 1); is_single = False
-    else: frames = [args.frame]; is_single = True
+    if args.frame_range:
+        frames = range(args.frame_range[0], args.frame_range[1] + 1)
+        is_single = False
+    else:
+        frames = [args.frame]
+        is_single = True
     captures = []
     for frame_idx in frames:
         logger.info(f"Processing frame {frame_idx}")
         try:
             cap = capture_frame(args.world, frame_idx, player_pos_override, not args.no_voxel)
             captures.append(cap)
-        except Exception as e: logger.error(f"Failed to capture frame {frame_idx}: {e}"); return 1
+        except Exception as e:
+            logger.error(f"Failed to capture frame {frame_idx}: {e}")
+            return 1
     if args.output:
         if is_single:
             cap = captures[0]
             if args.format == "json":
-                with open(args.output, 'w') as f: f.write(cap.to_json())
+                with open(args.output, 'w') as f:
+                    f.write(cap.to_json())
                 logger.info(f"Saved JSON to {args.output}")
             else:
-                try: cap.to_npz(args.output); logger.info(f"Saved NPZ to {args.output}")
-                except ImportError: logger.error("numpy required for NPZ output"); return 1
+                try:
+                    cap.to_npz(args.output)
+                    logger.info(f"Saved NPZ to {args.output}")
+                except ImportError:
+                    logger.error("numpy required for NPZ output")
+                    return 1
         else:
             os.makedirs(args.output, exist_ok=True)
             for cap in captures:
                 base = f"frame_{cap.frame_index:06d}"
                 if args.format == "json":
                     path = os.path.join(args.output, f"{base}.json")
-                    with open(path, 'w') as f: f.write(cap.to_json())
+                    with open(path, 'w') as f:
+                        f.write(cap.to_json())
                 else:
                     path = os.path.join(args.output, f"{base}.npz")
-                    try: cap.to_npz(path)
-                    except ImportError: logger.error("numpy required for NPZ output"); return 1
+                    try:
+                        cap.to_npz(path)
+                    except ImportError:
+                        logger.error("numpy required for NPZ output")
+                        return 1
                 logger.info(f"Saved frame {cap.frame_index} to {path}")
     else:
-        if is_single: print(captures[0].to_json())
-        else: print(json.dumps([cap.to_dict() for cap in captures], indent=2))
+        if is_single:
+            print(captures[0].to_json())
+        else:
+            print(json.dumps([cap.to_dict() for cap in captures], indent=2))
     return 0
 
 if __name__ == "__main__":
