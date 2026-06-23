@@ -28,11 +28,11 @@ BATCH_DIR = Path(__file__).parent.parent
 def load_batch_manifest() -> Dict[str, Any]:
     """Load the batch manifest file."""
     manifest_path = BATCH_DIR / "batch_manifest.json"
-    
+
     if manifest_path.exists():
         with open(manifest_path, 'r') as f:
             return json.load(f)
-    
+
     return {
         "batch_id": "no-batch",
         "scene": "unknown",
@@ -50,12 +50,12 @@ def load_session_grade(session_id: str) -> Dict[str, Any]:
         BATCH_DIR / session_id / "session_grade.json",
         BATCH_DIR / f"{session_id}_grade.json",
     ]
-    
+
     for path in possible_paths:
         if path.exists():
             with open(path, 'r') as f:
                 return json.load(f)
-    
+
     return {}
 
 
@@ -74,14 +74,14 @@ def calculate_statistics(manifest: Dict[str, Any]) -> Dict[str, Any]:
     """Calculate various statistics from the manifest."""
     sessions = manifest.get("sessions", [])
     quota = manifest.get("quota", {"1": 10, "2": 10, "3": 10, "4": 5})
-    
+
     # Count by route_type
     route_counts = defaultdict(lambda: {"total": 0, "pass": 0, "fail": 0, "pending": 0})
-    
+
     for session in sessions:
         route_type = str(session.get("route_type", 0))
         grade = session.get("grade", "PENDING")
-        
+
         route_counts[route_type]["total"] += 1
         if grade == "PASS":
             route_counts[route_type]["pass"] += 1
@@ -89,7 +89,7 @@ def calculate_statistics(manifest: Dict[str, Any]) -> Dict[str, Any]:
             route_counts[route_type]["fail"] += 1
         else:
             route_counts[route_type]["pending"] += 1
-    
+
     # Calculate quota status
     quota_status = {}
     for rt, target in quota.items():
@@ -100,7 +100,7 @@ def calculate_statistics(manifest: Dict[str, Any]) -> Dict[str, Any]:
             "remaining": max(0, target - current),
             "met": current >= target
         }
-    
+
     # Extract audit scores
     audit_scores = []
     for session in sessions:
@@ -110,7 +110,7 @@ def calculate_statistics(manifest: Dict[str, Any]) -> Dict[str, Any]:
             audit_scores.append(int(achieved))
         except (ValueError, AttributeError):
             pass
-    
+
     # Get failed session reasons
     failed_sessions = []
     for session in sessions:
@@ -122,7 +122,7 @@ def calculate_statistics(manifest: Dict[str, Any]) -> Dict[str, Any]:
                 "reason": grade_info.get("failure_reason", "Unknown"),
                 "details": grade_info.get("failure_details", "")
             })
-    
+
     return {
         "total_sessions": len(sessions),
         "route_counts": dict(route_counts),
@@ -140,13 +140,13 @@ def render_dashboard():
         page_icon="📊",
         layout="wide"
     )
-    
+
     st.title("📊 Batch Progress Dashboard")
-    
+
     # Load manifest
     manifest = load_batch_manifest()
     stats = calculate_statistics(manifest)
-    
+
     # Header info
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -157,12 +157,12 @@ def render_dashboard():
         st.metric("Operator", manifest.get("operator_id", "N/A"))
     with col4:
         st.metric("Total Sessions", stats["total_sessions"])
-    
+
     st.divider()
-    
+
     # Quota Progress Section
     st.header("📈 Quota Progress by Route Type")
-    
+
     quota_data = []
     for rt, status in stats["quota_status"].items():
         quota_data.append({
@@ -173,13 +173,13 @@ def render_dashboard():
             "Remaining": status["remaining"],
             "Status": "✅ Met" if status["met"] else "⚠️ In Progress"
         })
-    
+
     quota_df = pd.DataFrame(quota_data)
     st.dataframe(quota_df, use_container_width=True)
-    
+
     # Visual progress bars
     col1, col2 = st.columns(2)
-    
+
     with col1:
         st.subheader("Quota Completion")
         fig = go.Figure()
@@ -199,7 +199,7 @@ def render_dashboard():
             height=300
         )
         st.plotly_chart(fig, use_container_width=True)
-    
+
     with col2:
         st.subheader("Session Distribution")
         labels = [f"Type {rt}" for rt in stats["route_counts"].keys()]
@@ -209,17 +209,17 @@ def render_dashboard():
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("No sessions recorded yet")
-    
+
     st.divider()
-    
+
     # Pass Rate Section
     st.header("✅ Pass Rate Analysis")
-    
+
     col1, col2 = st.columns(2)
-    
+
     with col1:
         st.metric("Overall Pass Rate", f"{stats['pass_rate']:.1f}%")
-    
+
     with col2:
         pass_rate_data = []
         for rt, counts in stats["route_counts"].items():
@@ -233,18 +233,18 @@ def render_dashboard():
                     "Fail": counts["fail"],
                     "Pending": counts["pending"]
                 })
-        
+
         if pass_rate_data:
             pass_df = pd.DataFrame(pass_rate_data)
             st.dataframe(pass_df, use_container_width=True)
         else:
             st.info("No graded sessions yet")
-    
+
     st.divider()
-    
+
     # Audit Score Histogram
     st.header("📊 Audit Score Distribution")
-    
+
     if stats["audit_scores"]:
         fig = px.histogram(
             x=stats["audit_scores"],
@@ -255,23 +255,23 @@ def render_dashboard():
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("No audit scores recorded yet")
-    
+
     st.divider()
-    
+
     # Failed Sessions
     st.header("❌ Failed Sessions")
-    
+
     if stats["failed_sessions"]:
         failed_df = pd.DataFrame(stats["failed_sessions"])
         st.dataframe(failed_df, use_container_width=True)
     else:
         st.success("No failed sessions! 🎉")
-    
+
     st.divider()
-    
+
     # Re-record Requests
     st.header("🔄 Re-record Requests (Quota Not Met)")
-    
+
     re_record_needed = []
     for rt, status in stats["quota_status"].items():
         if not status["met"]:
@@ -282,25 +282,25 @@ def render_dashboard():
                 "Current": status["current"],
                 "Target": status["target"]
             })
-    
+
     if re_record_needed:
         st.warning("⚠️ Some route types need more recordings")
         re_record_df = pd.DataFrame(re_record_needed)
         st.dataframe(re_record_df, use_container_width=True)
     else:
         st.success("✅ All quotas met! Batch is complete.")
-    
+
     st.divider()
-    
+
     # Sessions Table
     st.header("📋 All Sessions")
-    
+
     if manifest.get("sessions"):
         sessions_df = pd.DataFrame(manifest["sessions"])
         st.dataframe(sessions_df, use_container_width=True)
     else:
         st.info("No sessions recorded yet")
-    
+
     # Refresh button
     if st.button("🔄 Refresh Data"):
         st.rerun()
