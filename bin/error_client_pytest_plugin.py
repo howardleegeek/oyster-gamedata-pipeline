@@ -28,20 +28,19 @@ Usage
     pytest --no-error-report        # opt-out via CLI flag
 """
 
+import argparse
+import hashlib
+import json
 import os
 import sys
-import json
-import hashlib
-import argparse
 import traceback
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
+from urllib.error import HTTPError, URLError
 
 # ---------------------------------------------------------------------------
 # stdlib-only HTTP client (no requests dependency)
 # ---------------------------------------------------------------------------
 from urllib.request import Request, urlopen
-from urllib.error import URLError, HTTPError
-
 
 # ── helpers ────────────────────────────────────────────────────────────────
 
