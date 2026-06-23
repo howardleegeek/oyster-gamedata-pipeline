@@ -19,15 +19,13 @@ Environment Variables:
 
 import argparse
 import hashlib
-import json
+import logging
 import os
 import sys
 import time
-import logging
-from datetime import datetime, timedelta
-from typing import Any, Optional
 from collections import defaultdict
 from threading import Lock
+from typing import Any, Optional
 
 # Lazy imports for optional dependencies
 FastAPI: Optional[Any] = None
@@ -43,9 +41,9 @@ def _lazy_imports() -> None:
     """Lazily import optional dependencies to meet vendor constraints."""
     global FastAPI, HTTPException, Request, BaseModel, psycopg2
     if FastAPI is None:
+        import psycopg2
         from fastapi import FastAPI, HTTPException, Request
         from pydantic import BaseModel
-        import psycopg2
         # Store in module globals
         globals()['FastAPI'] = FastAPI
         globals()['HTTPException'] = HTTPException
@@ -397,7 +395,7 @@ def main(argv: list[str]) -> int:
     # Validate required arguments
     if not args.database_url:
         logger.error("DATABASE_URL is required")
-        print("Error: --database-url or DATABASE_URL environment variable is required", 
+        print("Error: --database-url or DATABASE_URL environment variable is required",
               file=sys.stderr)
         return 1
 
