@@ -337,6 +337,18 @@ def _build_argparser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Parse a CS2 demo file and write engine telemetry to a sidecar JSON.
+
+    Args:
+        argv: Command-line arguments (sys.argv by default). If provided,
+            should be a list of strings similar to sys.argv.
+
+    Returns:
+        Exit code: 0 on success, 2 if demo file not found.
+
+    Raises:
+        SystemExit: Re-raised from argparse errors (exit code 1).
+    """
     args = _build_argparser().parse_args(argv)
     if not args.demo.is_file():
         sys.stderr.write(f"demo file not found: {args.demo}\n")
