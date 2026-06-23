@@ -11,12 +11,12 @@ Date: 2024
 """
 
 import argparse
-import sys
-import random
-from typing import List, Tuple, Dict, Any
-import json
 import csv
+import json
+import random
+import sys
 from pathlib import Path
+from typing import Any, Dict, List
 
 
 def generate_route_distribution(num_routes: int) -> List[Dict[str, Any]]:
@@ -104,12 +104,12 @@ def calculate_statistics(routes: List[Dict[str, Any]]) -> Dict[str, Any]:
     
     # Calculate percentages
     type_percentages = {
-        f'type_{k}': f"{(v/total)*100:.1f}%" 
+        f'type_{k}': f"{(v/total)*100:.1f}%"
         for k, v in type_counts.items()
     }
-    
+
     wasd_percentages = {
-        f'key_{k}': f"{(v/total)*100:.1f}%" 
+        f'key_{k}': f"{(v/total)*100:.1f}%"
         for k, v in wasd_counts.items()
     }
     
@@ -284,7 +284,7 @@ def main(argv: List[str]) -> int:
             s_percent = (stats['wasd_distribution'].get('S', 0) / stats['total_routes']) * 100
             d_percent = (stats['wasd_distribution'].get('D', 0) / stats['total_routes']) * 100
             
-            print(f"\nWASD Distribution:")
+            print("\nWASD Distribution:")
             print(f"  W: {w_percent:.1f}% (target: 40%)")
             print(f"  A: {a_percent:.1f}% (target: 20%)")
             print(f"  S: {s_percent:.1f}% (target: 20%)")
@@ -294,7 +294,7 @@ def main(argv: List[str]) -> int:
             type_deviation = abs(type1_percent - 50) + abs(type2_percent - 50)
             wasd_deviation = abs(w_percent - 40) + abs(a_percent - 20) + abs(s_percent - 20) + abs(d_percent - 20)
             
-            print(f"\nTotal deviation from spec:")
+            print("\nTotal deviation from spec:")
             print(f"  Route types: {type_deviation:.1f}% (lower is better)")
             print(f"  WASD keys: {wasd_deviation:.1f}% (lower is better)")
             
