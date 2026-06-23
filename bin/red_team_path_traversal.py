@@ -9,7 +9,6 @@ Purpose: Verify security of extraction logic against directory traversal.
 """
 
 import argparse
-import os
 import sys
 import tarfile
 import tempfile
