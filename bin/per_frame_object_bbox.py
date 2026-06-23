@@ -14,10 +14,8 @@ import math
 import sys
 import tempfile
 from dataclasses import dataclass, field
-from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-
 
 # -- lazy imports -----------------------------------------------------------
 
