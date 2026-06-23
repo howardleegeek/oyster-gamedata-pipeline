@@ -16,7 +16,6 @@ on exit via atexit handlers.
 import argparse
 import atexit
 import logging
-import os
 import signal
 import subprocess
 import sys
