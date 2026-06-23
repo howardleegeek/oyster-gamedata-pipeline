@@ -50,6 +50,7 @@
 ## Round 9 @ 2026-06-22T00:30:00Z
 - Picked: Fix ruff lint errors in test files — import order issue in test_dashboard_api.py (I001) and unused math import in test_recorder_lite_timestamp_sidecar.py (F401).
 - Result: committed 16c28bfd`
+
 - Result: committed 03a5cf07
 
 ## Round 51 @ 2026-06-20T03:20:00Z
@@ -2064,3 +2065,19 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 ## Round 138 @ 2026-06-23T04:00:00Z
 - Picked: Fix ruff F401 unused `import os`, `import time`, and `from typing import Any` in bin/preflight_recorder.py:9,11,15 — continuation of the ongoing ruff cleanup sweep from Rounds 101-137. Verified all three are genuinely unused (grep for `os.`, `time.` (excluding `timeout=` and `from datetime`), and `Any` in the file returned zero hits beyond the import lines). Single-file bounded change, 3-line diff (3 import removals), no behavior change. File has test coverage via tests/test_preflight.py (18 tests), all pass after fix. Pre-existing W291 trailing whitespace (4 instances) is out of scope for this F401 fix and was left untouched. Module parses cleanly, ruff check on the file shows 1 pre-existing W291 error (down from 4 after my change since removing the imports also removed one trailing-whitespace context). Self-review: pure unused-import removal — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing, no brand cross-reference.
 - Result: committed 1d8f29b4 (pushed to main)
+
+## Round 139 @ 2026-06-23T04:57:00Z
+- Picked: Fix ruff F401+I001+W292 cleanup in server/oauth.py — continuation of the ongoing ruff cleanup sweep from Rounds 101-138. Removed unused `import json` (verified: only `.json()` attribute on httpx Response objects is used, never the `json` module), `fastapi.Depends`, `fastapi.Response`. Sorted import block (stdlib alphabetized, third-party block sorted). Added trailing newline to file. 5-line diff, no behavior change. tests/test_oauth_flow.py + tests/test_oauth_login_server.py (42 passed) confirm. Self-review: pure lint cleanup — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing, no brand cross-reference. Verified Optional, datetime, timedelta, os, hashlib, secrets, time, httpx, jwt, APIRouter, HTTPException, Request, RedirectResponse, BaseModel all still used after the change.
+- Result: committed a47b40a5 (pushed to main)
+
+## Round 140 @ 2026-06-23T05:15:00Z
+- Picked: Fix ruff I001 import sort in bin/epal_companion_quality_score.py — split consolidated 'import argparse, json, sys' into separate lines per ruff I001. Continuation of the ongoing ruff cleanup sweep from Rounds 101-139. Module parses cleanly, syntax verified, no behavior change. Self-review: pure import reorganization — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing, no brand cross-reference.
+- Result: committed 9601786d (pushed to main)
+
+## Round 141 @ 2026-06-23T05:30:00Z
+- Picked: Fix ruff F401 unused `import sys` + I001 import sort in bin/run_da_v2_depth.py — continuation of the ongoing ruff cleanup sweep from Rounds 101-140. Verified `sys` is genuinely unused (grep returns zero references beyond the import line). Reordered stdlib block alphabetically (argparse, pathlib, time, warnings) and third-party block alphabetically (Imath, numpy, OpenEXR, torch, PIL, transformers). 4 insertions / 5 deletions, no behavior change. File has test coverage via tests/test_canonical_pipeline_score.py::test_da_v2_script_is_importable (existence check, passes). Self-review: pure lint cleanup — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing, no brand cross-reference. Pre-existing torch ModuleNotFoundError in bin/export_da_v2_to_onnx.py is unrelated to this change and out of scope.
+- Result: committed c2ce96c2 (pushed to main)
+
+## Round 142 @ 2026-06-23T05:27:53Z
+- Picked: Fix ruff F841 unused `crlf` local in bin/recorder_clip_uploader.py:121 — continuation of the ongoing ruff cleanup sweep from Rounds 101-141. Verified `crlf` is genuinely unused (grep returns only the declaration line, zero references; the multipart body is hand-rolled as raw f-string bytes with embedded `\r\n` rather than composed via the unused `crlf` constant). Single-file bounded change, 1-line diff, no behavior change, file has direct test coverage (tests/bin/test_recorder_clip_uploader.py, 12 tests) — all pass post-change. Module parses cleanly, ruff F841 is now clean for this file. Self-review: pure lint cleanup — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing, no brand cross-reference.
+- Result: committed a5d1a098 (pushed to main)
