@@ -23,6 +23,16 @@ import tarfile
 import tempfile
 from pathlib import Path
 
+# Lazy import LintResult after lint module is loaded
+_LintResult: Any = None
+
+def _get_lint_result_type() -> Any:
+    global _LintResult
+    if _LintResult is None:
+        from oyster_agent_runner.lint.lint_buyer_spec import LintResult
+        _LintResult = LintResult
+    return _LintResult
+
 # Make src importable
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
@@ -35,8 +45,15 @@ except Exception as e:
     sys.exit(2)
 
 
-def lint_buyer_bundle(tarball_path: str):
-    """Adapter: lint expects an unpacked dir, redteam works in tarballs."""
+def lint_buyer_bundle(tarball_path: str) -> "LintResult":
+    """Lint a buyer-spec tarball by unpacking and running the lint directory.
+
+    Args:
+        tarball_path: Path to the .tar.gz buyer-spec bundle.
+
+    Returns:
+        LintResult: The aggregate lint result from lint_buyer_spec.
+    """
     import tarfile as _t
     with tempfile.TemporaryDirectory() as td:
         td = Path(td)
