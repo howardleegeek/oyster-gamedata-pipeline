@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """Paper server health probe - TCP connect and parse Minecraft handshake response."""
 
-import argparse, json, socket, struct, sys
+import argparse
+import json
+import socket
+import struct
+import sys
+
 
 def encode_varint(value):
     """Encode integer as Minecraft VarInt."""
@@ -10,7 +15,8 @@ def encode_varint(value):
         b = value & 0x7F
         value >>= 7
         result.append(b | 0x80 if value else b)
-        if not value: break
+        if not value:
+            break
     return bytes(result)
 
 def decode_varint(sock):
@@ -19,7 +25,8 @@ def decode_varint(sock):
     while True:
         b = sock.recv(1)[0]
         result |= (b & 0x7F) << shift
-        if not (b & 0x80): break
+        if not (b & 0x80):
+            break
         shift += 7
     return result
 
