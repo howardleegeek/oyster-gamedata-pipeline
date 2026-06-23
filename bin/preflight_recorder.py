@@ -6,13 +6,10 @@ Fails fast if the system can't produce a buyer-acceptable session.
 """
 
 import json
-import os
 import subprocess
 import sys
-import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 # Configuration
 OUTPUT_DIR = Path("/private/tmp/cluster-2026-05-17-preflight08")
