@@ -104,7 +104,7 @@ class HealthChecker:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "error": f"Timeout on {url}",
             }
-        except Exception as _:
+        except Exception as e:
             return {
                 "name": name,
                 "url": url,
@@ -283,7 +283,7 @@ class DiskChecker:
                 "error": "ssh command not found",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
-        except Exception as _:
+        except Exception as e:
             return {
                 "status": "error",
                 "free_disk_gb": None,
