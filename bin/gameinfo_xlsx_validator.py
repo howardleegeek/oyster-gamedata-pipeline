@@ -4,7 +4,6 @@
 import argparse
 import sys
 
-
 REQUIRED_FIELDS = {
     "metadata": ["game_id", "game_name", "version", "developer", "publisher"],
     "scene_table": ["scene_id", "scene_name", "scene_type", "background_asset"],
