@@ -7,8 +7,8 @@ Validates camera positions in metric units are within world cube bounds.
 
 import argparse
 import json
-import sys
 import math
+import sys
 from typing import Any, Dict, List, Tuple
 
 

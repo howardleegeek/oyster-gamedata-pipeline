@@ -5,11 +5,11 @@ Test utility to enforce maximum 30-minute duration per scene.
 """
 
 import argparse
-import sys
 import json
+import sys
 import time
 from datetime import datetime
-from typing import Dict, List
+from typing import List
 
 
 def main(argv: List[str]) -> int:
@@ -73,8 +73,8 @@ def main(argv: List[str]) -> int:
     if args.json:
         print(json.dumps(results, indent=2))
     else:
-        print(f"Scene Clock Cap Test Results")
-        print(f"=============================")
+        print("Scene Clock Cap Test Results")
+        print("=============================")
         print(f"Scene ID:      {results['scene_id']}")
         print(f"Duration:      {results['duration_minutes']} minutes")
         print(f"Threshold:     {results['threshold_minutes']} minutes")
