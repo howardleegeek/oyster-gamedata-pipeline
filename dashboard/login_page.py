@@ -1,11 +1,12 @@
 """Streamlit login UI with Google + Discord OAuth buttons."""
 
 import os
-import streamlit as st
-import httpx
-import jwt
 from datetime import datetime
 from typing import Optional
+
+import httpx
+import jwt
+import streamlit as st
 
 # Configuration
 API_BASE_URL = os.environ.get("OYSTER_API_URL", "http://localhost:8000")
