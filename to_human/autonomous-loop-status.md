@@ -2010,3 +2010,11 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 - Result: committed 147c7f65 (pushed to main)
 
 ## Round 127 @ 2026-06-23T01:15:00Z
+
+## Round 129 @ 2026-06-23T01:40:33Z
+- Picked: Fix ruff F401 unused `os` import in bin/network_throttle_aware.py:12 — continuation of the ongoing ruff cleanup sweep from Rounds 101-128. Verified `os` is genuinely unused (grep returns zero references beyond the import line). Single-file bounded change, 1-line diff, no behavior change. Verified no Python module imports `network_throttle_aware` (only catalog-text reference in bin/spec_generator.py:715, not a Python import), so removing the import cannot break any caller. ruff check passes for the file, module parses cleanly, 538/538 tests in tests/bin/ still pass. Same pattern as Rounds 115, 117, 118, 119, 120, 121, 122, 123, 127, 128 (F401 single-import sweep).
+- Result: committed c6aa1420 (pushed to main)
+
+## Round 129 @ 2026-06-23T00:35:00Z
+- Picked: Fix ruff F401 (unused `timedelta`, `typing.List`, `fastapi.Depends`) + I001 (unsorted/3-group import block) in server/payout_engine.py — continuation of the ongoing ruff cleanup sweep from Rounds 101-128. This is the live contributor payout path, so high blast radius — picked it specifically because all three unused names were verified to have zero references beyond the import line via grep, and ruff F401 is a no-op behavior change. Single-file bounded change, 6-line diff, 18/18 tests in tests/test_payout_engine.py pass, ruff check clean for the file, module imports cleanly. Self-review: confirmed `json` (used in 2 log writes), `asdict` (line 243 in payout queue persistence), `field` (line 108 `default_factory=datetime.utcnow`), `Optional` (lines 92-93, 113, 169, 409), `Dict` (module-level queues), `Any` (line 113 `parse_datetime`), `BackgroundTasks`/`FastAPI`/`HTTPException` all still used. No silent error swallow, no race condition, no off-by-one, no security issue.
+- Result: committed 22661d8c (pushed to main)
