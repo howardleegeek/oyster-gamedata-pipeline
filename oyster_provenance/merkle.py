@@ -6,8 +6,8 @@ frame against the root without downloading all frames.
 """
 
 import hashlib
-from typing import List, Tuple, Optional
 from dataclasses import dataclass
+from typing import List, Optional, Tuple
 
 
 def sha256(data: bytes) -> str:
