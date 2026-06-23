@@ -25,11 +25,10 @@ import sys
 import tarfile
 import tempfile
 import threading
+import tkinter as tk
 import traceback
 from pathlib import Path
-
-import tkinter as tk
-from tkinter import filedialog, scrolledtext, messagebox
+from tkinter import filedialog, messagebox, scrolledtext
 
 # When PyInstaller-frozen, bundled modules live in sys._MEIPASS. When run from
 # source, the bin/ dir holds lint_v3_prd_grounded.py next to this file.
@@ -42,7 +41,6 @@ if str(_BUNDLE_ROOT) not in sys.path:
     sys.path.insert(0, str(_BUNDLE_ROOT))
 
 import lint_v3_prd_grounded as lint_mod  # noqa: E402  (path mutation above)
-
 
 GREEN = "#2e7d32"
 RED = "#c62828"
