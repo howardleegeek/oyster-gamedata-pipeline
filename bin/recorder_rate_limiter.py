@@ -3,10 +3,8 @@
 Recorder rate limiter - prevents continuous-capture daemon from filling disk.
 """
 
-import os
 import json
 import shutil
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Tuple
