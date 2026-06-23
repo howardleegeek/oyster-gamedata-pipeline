@@ -19,12 +19,10 @@ The file is rewritten in place via ffmpeg `-c copy -metadata`. No re-encode.
 from __future__ import annotations
 
 import argparse
-import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
-
 
 REAL_COMMENT_TAG = "oyster-real-screen-capture"
 
