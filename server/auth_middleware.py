@@ -1,12 +1,12 @@
 """JWT verification middleware for protected routes."""
 
-from typing import Optional, Callable
-from fastapi import Request, HTTPException, Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from starlette.middleware.base import BaseHTTPMiddleware
-import jwt
+from typing import Optional
 
-from server.oauth import verify_jwt_token, JWT_SECRET, JWT_ALGORITHM
+from fastapi import Depends, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from starlette.middleware.base import BaseHTTPMiddleware
+
+from server.oauth import verify_jwt_token
 
 security = HTTPBearer()
 
