@@ -23,17 +23,16 @@ Outputs:
   - session_grade.json
 """
 
+import ctypes
 import json
+import logging
 import os
+import signal
 import sys
 import time
-import signal
-import subprocess
-import ctypes
-import logging
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 
 # ---------------------------------------------------------------------------
 # Configuration (all thresholds in seconds)
