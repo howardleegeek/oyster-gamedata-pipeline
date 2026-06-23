@@ -8,15 +8,12 @@ writes status to local SQLite, emits acceptance event.
 
 import argparse
 import json
-import os
-import shutil
 import sqlite3
 import sys
 import tarfile
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
 
 # Lazy import boto3 to allow module import without AWS credentials
 boto3 = None
