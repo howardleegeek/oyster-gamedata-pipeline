@@ -1,5 +1,13 @@
 
 
+## Round 203 @ 2026-06-25T05:00:00Z
+- Picked: Fix ruff F841 (unused variable `torch`) in bin/optical_flow_provider.py. The `_load_model` method was assigning the result of `_get_torch()` to a variable that was never used. The function call is still needed for its side effect (importing and caching torch). Single-file bounded change, no behavior change. Module imports cleanly, F841 check clean. Self-review: F841 fix — no signature/exception/threading/auth change, no silent error swallow (_get_torch caches in global, still called for side effect), no race condition, no security change, no off-by-one, no test masked as passing (no tests exist for this file), no brand cross-reference.
+- Result: committed c21f6057 (pushed to fix/prd-test-action-per-second-ruff)
+
+## Round 202 @ 2026-06-25T04:00:00Z
+- Picked: Fix ruff F841 (unused variable NETWORK_COST_TYPE_UNKNOWN) in bin/network_throttle_aware.py. Single-file bounded change, no behavior change. Module imports cleanly, F841 check clean. Self-review: F841 fix — no signature/exception/threading/auth change, no silent error swallow (other constants still used for comparison), no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference.
+- Result: committed ce4800aa (pushed to fix/prd-test-action-per-second-ruff)
+
 ## Round 201 @ 2026-06-25T03:00:00Z
 - Picked: Fix ruff F841 (unused variable `f`) in bin/recorder_watchdog.py. Single-file bounded change, no behavior change. Module imports cleanly, F841 check clean. Self-review: F841 fix — no signature/exception/threading/auth change, no silent error swallow (file truncation still works via open().close()), no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference.
 - Result: committed 13559286 (pushed to fix/prd-test-action-per-second-ruff)
