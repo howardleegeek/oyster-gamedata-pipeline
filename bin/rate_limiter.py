@@ -116,6 +116,14 @@ class VendorRateLimiter:
         return result
 
     def get_remaining(self, vendor_id: str) -> float:
+        """Get the number of remaining tokens for a vendor.
+
+        Args:
+            vendor_id: Unique vendor identifier.
+
+        Returns:
+            Number of tokens currently available for the vendor.
+        """
         return self.get_bucket(vendor_id).get_available()
 
     def reset_vendor(self, vendor_id: str) -> None:
