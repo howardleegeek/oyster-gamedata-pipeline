@@ -379,6 +379,23 @@ def make_supabase_client(
     *,
     allow_mock: bool = False,
 ) -> SupabaseClient | MockSupabaseClient:
+    """Create a Supabase client from environment variables.
+
+    Attempts to create a real Supabase client using SUPABASE_URL and
+    SUPABASE_SERVICE_ROLE_KEY environment variables. Falls back to a
+    mock client if allow_mock=True and env vars are not set.
+
+    Args:
+        allow_mock: If True, return a MockSupabaseClient when env vars
+            are missing instead of raising an error. Default False.
+
+    Returns:
+        SupabaseClient if env vars are set, otherwise MockSupabaseClient
+        if allow_mock is True.
+
+    Raises:
+        RuntimeError: If required env vars are missing and allow_mock is False.
+    """
     url = os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "") or os.environ.get("SUPABASE_URL", "")
     key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
     if url and key:
