@@ -23,7 +23,7 @@ import os
 import sys
 import urllib.parse
 from datetime import datetime
-from http.client import HTTPSConnection, HTTPConnection
+from http.client import HTTPConnection, HTTPSConnection
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
