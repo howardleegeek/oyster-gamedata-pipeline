@@ -312,6 +312,19 @@ def check2_mouse_position(records: list[dict[str, Any]]) -> dict[str, Any]:
 # ---- Check 3 — Quaternion ↔ Euler round-trip --------------------------------
 
 def check3_quat_euler(records: list[dict[str, Any]]) -> dict[str, Any]:
+    """Verify quaternion-to-Euler round-trip conversion is lossless.
+
+    Converts each record's quaternion to Euler angles (zyx convention) and
+    compares against the stored camera_rotation_euler or camera_rotation_oula
+    values. Records the maximum angular error in degrees.
+
+    Args:
+        records: List of action camera records with quaternion and Euler fields.
+
+    Returns:
+        Dict with check number, name, pass/fail status, mismatch count,
+        max error in degrees, tolerance threshold, and sample mismatches.
+    """
     has_euler_field = any(
         "camera_rotation_euler" in r or "camera_rotation_oula" in r
         for r in records
