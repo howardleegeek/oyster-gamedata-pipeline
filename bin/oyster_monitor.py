@@ -84,7 +84,7 @@ class HealthChecker:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "error": None,
             }
-        except requests.exceptions.ConnectionError as e:
+        except requests.exceptions.ConnectionError as _:
             return {
                 "name": name,
                 "url": url,
@@ -94,7 +94,7 @@ class HealthChecker:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "error": f"ConnectionError on {url}",
             }
-        except requests.exceptions.Timeout as e:
+        except requests.exceptions.Timeout as _:
             return {
                 "name": name,
                 "url": url,
@@ -104,7 +104,7 @@ class HealthChecker:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "error": f"Timeout on {url}",
             }
-        except Exception as e:
+        except Exception as _:
             return {
                 "name": name,
                 "url": url,
@@ -283,7 +283,7 @@ class DiskChecker:
                 "error": "ssh command not found",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
-        except Exception as e:
+        except Exception as _:
             return {
                 "status": "error",
                 "free_disk_gb": None,
@@ -443,8 +443,8 @@ class OysterMonitor:
         while self.running:
             try:
                 self.poll()
-            except Exception as e:
-                log.error(f"Poll cycle failed: {e}", exc_info=True)
+            except Exception as exc:
+                log.error(f"Poll cycle failed: {exc}", exc_info=True)
 
             # Sleep in small increments so we can respond to signals
             for _ in range(self.poll_interval):
