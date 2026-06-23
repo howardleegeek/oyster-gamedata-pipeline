@@ -18,7 +18,10 @@ Usage:
 Author: G254 Engineering  |  Version: 1.0
 """
 from __future__ import annotations
-import argparse, json, sys
+
+import argparse
+import json
+import sys
 from pathlib import Path
 from typing import Any, Optional
 
