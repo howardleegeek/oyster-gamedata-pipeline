@@ -8,312 +8,371 @@ Filters visible objects by occlusion/truncation thresholds; exports JSON/CSV/YAM
 
 import argparse
 import csv
-import io
 import json
 import math
-import sys
-import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 # -- lazy imports -----------------------------------------------------------
 
+
 def _lazy_yaml():
     try:
-        import yaml; return yaml
+        import yaml
+
+        return yaml
     except ImportError:
         raise ImportError("PyYAML required: pip install pyyaml")
 
 
 def _lazy_pil():
     try:
-        from PIL import Image, ImageDraw; return Image, ImageDraw
+        from PIL import Image, ImageDraw
+
+        return Image, ImageDraw
     except ImportError:
         raise ImportError("Pillow required: pip install pillow")
 
 
 # -- data models ------------------------------------------------------------
 
+
 @dataclass
 class BBox2D:
     """2D bounding box in image pixel coordinates."""
-    x: float; y: float; width: float; height: float
-    confidence: float = 1.0; class_id: str = "unknown"
+    x: float
+    y: float
+    width: float
+    height: float
+    confidence: float = 1.0
+    class_id: str = "unknown"
     track_id: Optional[str] = None
-    occlusion: float = 0.0; truncation: float = 0.0
+    occlusion: float = 0.0
+    truncation: float = 0.0
 
     def is_visible(self, oc: float = 0.5, tr: float = 0.5) -> bool:
         return self.occlusion <= oc and self.truncation <= tr
 
     def to_dict(self) -> Dict[str, Any]:
-        return dict(x=self.x, y=self.y, width=self.width, height=self.height,
-                    confidence=self.confidence, class_id=self.class_id,
-                    track_id=self.track_id, occlusion=self.occlusion,
-                    truncation=self.truncation)
+        return dict(
+            x=self.x,
+            y=self.y,
+            width=self.width,
+            height=self.height,
+            confidence=self.confidence,
+            class_id=self.class_id,
+            track_id=self.track_id,
+            occlusion=self.occlusion,
+            truncation=self.truncation,
+        )
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "BBox2D":
-        return cls(x=float(d.get("x", 0)), y=float(d.get("y", 0)),
-                   width=float(d.get("width", 0)), height=float(d.get("height", 0)),
-                   confidence=float(d.get("confidence", 1.0)),
-                   class_id=str(d.get("class_id", d.get("class", "unknown"))),
-                   track_id=d.get("track_id"),
-                   occlusion=float(d.get("occlusion", 0.0)),
-                   truncation=float(d.get("truncation", 0.0)))
+        return cls(
+            x=float(d.get("x", 0)),
+            y=float(d.get("y", 0)),
+            width=float(d.get("width", 0)),
+            height=float(d.get("height", 0)),
+            confidence=float(d.get("confidence", 1.0)),
+            class_id=str(d.get("class_id", d.get("class", "unknown"))),
+            track_id=d.get("track_id"),
+            occlusion=float(d.get("occlusion", 0.0)),
+            truncation=float(d.get("truncation", 0.0)),
+        )
 
 
 @dataclass
 class BBox3D:
     """3D bounding box in world / ego coordinates."""
-    x: float; y: float; z: float
-    length: float; width: float; height: float; yaw: float
-    confidence: float = 1.0; class_id: str = "unknown"
+    x: float
+    y: float
+    z: float
+    length: float
+    width: float
+    height: float
+    yaw: float
+    confidence: float = 1.0
+    class_id: str = "unknown"
     track_id: Optional[str] = None
 
     def to_carla_dict(self) -> Dict[str, Any]:
-        return {"location": {"x": self.x, "y": self.y, "z": self.z},
-                "extent": {"x": self.length/2, "y": self.width/2, "z": self.height/2},
-                "rotation": {"yaw": math.degrees(self.yaw), "pitch": 0.0, "roll": 0.0},
-                "class": self.class_id, "track_id": self.track_id,
-                "confidence": self.confidence}
+        return {
+            "location": {"x": self.x, "y": self.y, "z": self.z},
+            "extent": {
+                "x": self.length / 2,
+                "y": self.width / 2,
+                "z": self.height / 2,
+            },
+            "rotation": {
+                "yaw": math.degrees(self.yaw),
+                "pitch": 0.0,
+                "roll": 0.0,
+            },
+            "class": self.class_id,
+            "track_id": self.track_id,
+            "confidence": self.confidence,
+        }
 
     def to_nuscenes_dict(self) -> Dict[str, Any]:
         h = self.yaw / 2.0
-        return {"translation": [self.x, self.y, self.z],
-                "size": [self.length, self.width, self.height],
-                "rotation": [math.cos(h), 0.0, 0.0, math.sin(h)],
-                "detection_name": self.class_id, "track_id": self.track_id,
-                "confidence": self.confidence}
-
-    def to_dict(self) -> Dict[str, Any]:
-        return dict(x=self.x, y=self.y, z=self.z, length=self.length,
-                    width=self.width, height=self.height, yaw=self.yaw,
-                    confidence=self.confidence, class_id=self.class_id,
-                    track_id=self.track_id)
-
-    @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "BBox3D":
-        return cls(x=float(d.get("x", d.get("cx", 0))),
-                   y=float(d.get("y", d.get("cy", 0))),
-                   z=float(d.get("z", d.get("cz", 0))),
-                   length=float(d.get("length", d.get("l", d.get("dx", 0)))),
-                   width=float(d.get("width", d.get("w", d.get("dy", 0)))),
-                   height=float(d.get("height", d.get("h", d.get("dz", 0)))),
-                   yaw=float(d.get("yaw", d.get("rotation_z", d.get("heading", 0)))),
-                   confidence=float(d.get("confidence", 1.0)),
-                   class_id=str(d.get("class_id", d.get("class",
-                                        d.get("detection_name", "unknown")))),
-                   track_id=d.get("track_id"))
+        return {
+            "translation": [self.x, self.y, self.z],
+            "size": {"length": self.length, "width": self.width, "height": self.height},
+            "rotation": {
+                "qw": math.cos(h),
+                "qx": 0.0,
+                "qy": 0.0,
+                "qz": math.sin(h),
+            },
+            "name": self.class_id,
+            "token": self.track_id,
+        }
 
 
 @dataclass
-class FrameData:
-    """Bounding boxes for a single frame."""
-    frame_id: str; timestamp: float
+class FrameDetections:
+    """Container for per-frame detections."""
+    frame_index: int
+    timestamp: float
     bboxes_2d: List[BBox2D] = field(default_factory=list)
     bboxes_3d: List[BBox3D] = field(default_factory=list)
-    camera_name: Optional[str] = None; scene_id: Optional[str] = None
+    camera_extrinsics: Optional[Dict[str, Any]] = None
+    camera_intrinsics: Optional[Dict[str, Any]] = None
 
-    def get_visible_2d(self, oc: float = 0.5, tr: float = 0.5) -> List[BBox2D]:
-        return [b for b in self.bboxes_2d if b.is_visible(oc, tr)]
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "frame_index": self.frame_index,
+            "timestamp": self.timestamp,
+            "bboxes_2d": [b.to_dict() for b in self.bboxes_2d],
+            "bboxes_3d": [b.to_carla_dict() for b in self.bboxes_3d],
+            "camera_extrinsics": self.camera_extrinsics,
+            "camera_intrinsics": self.camera_intrinsics,
+        }
 
-    def get_visible_3d(self, oc: float = 0.5, tr: float = 0.5) -> List[BBox3D]:
-        ids = {b.track_id for b in self.get_visible_2d(oc, tr) if b.track_id}
-        if not ids:
-            return self.bboxes_3d
-        return [b for b in self.bboxes_3d if b.track_id is None or b.track_id in ids]
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "FrameDetections":
+        return cls(
+            frame_index=int(d["frame_index"]),
+            timestamp=float(d["timestamp"]),
+            bboxes_2d=[BBox2D.from_dict(b) for b in d.get("bboxes_2d", [])],
+            bboxes_3d=[BBox3D(**b) for b in d.get("bboxes_3d", [])],
+            camera_extrinsics=d.get("camera_extrinsics"),
+            camera_intrinsics=d.get("camera_intrinsics"),
+        )
 
-    def to_dict(self, oc: float = 0.5, tr: float = 0.5) -> Dict[str, Any]:
-        return {"frame_id": self.frame_id, "timestamp": self.timestamp,
-                "camera_name": self.camera_name, "scene_id": self.scene_id,
-                "bboxes_2d": [b.to_dict() for b in self.get_visible_2d(oc, tr)],
-                "bboxes_3d": [b.to_dict() for b in self.get_visible_3d(oc, tr)]}
-
-
-# -- parsers ----------------------------------------------------------------
-
-def _parse_frame(raw: Dict[str, Any], fmt: str) -> FrameData:
-    """Parse a single frame entry, adapting to CARLA / nuScenes / generic."""
-    fid = str(raw.get("frame_id", raw.get("frame", raw.get("token", "0"))))
-    ts = float(raw.get("timestamp", 0.0))
-    if fmt == "nuscenes":
-        ts /= 1e6  # nuScenes uses microseconds
-    cam = raw.get("camera_name", raw.get("sensor", raw.get("channel")))
-    scene = raw.get("scene_id", raw.get("scene_token"))
-    b2 = [BBox2D.from_dict(o) for o in raw.get("objects_2d", raw.get("bboxes_2d", []))]
-    b3 = [BBox3D.from_dict(o) for o in raw.get("objects_3d", raw.get("bboxes_3d", []))]
-    return FrameData(frame_id=fid, timestamp=ts, bboxes_2d=b2, bboxes_3d=b3,
-                     camera_name=cam, scene_id=scene)
-
-
-def load_frames(path: Path, fmt: str) -> List[FrameData]:
-    """Load frame data from a JSON file."""
-    with open(path, "r", encoding="utf-8") as fh:
-        data = json.load(fh)
-    if isinstance(data, dict):
-        # Check if dict is a single frame (has frame_id or bboxes)
-        if any(k in data for k in ("frame_id", "bboxes_2d", "bboxes_3d", "objects_2d", "objects_3d")):
-            frames_raw = [data]  # Single frame object
-        else:
-            frames_raw = (data.get("frames") or data.get("data") or
-                          data.get("results") or data.get("annotations") or [])
-            if isinstance(frames_raw, dict):
-                frames_raw = [frames_raw]
-    return [_parse_frame(fr, fmt) for fr in frames_raw]
+    def filter_visible(
+        self, occlusion_thresh: float = 0.5, truncation_thresh: float = 0.5
+    ) -> "FrameDetections":
+        """Return a new FrameDetections with only visible objects."""
+        filtered_2d = [b for b in self.bboxes_2d if b.is_visible(occlusion_thresh, truncation_thresh)]
+        return FrameDetections(
+            frame_index=self.frame_index,
+            timestamp=self.timestamp,
+            bboxes_2d=filtered_2d,
+            bboxes_3d=self.bboxes_3d,
+            camera_extrinsics=self.camera_extrinsics,
+            camera_intrinsics=self.camera_intrinsics,
+        )
 
 
-# -- exporters --------------------------------------------------------------
-
-def export_json(frames: List[FrameData], oc: float, tr: float) -> str:
-    return json.dumps({"metadata": {"total_frames": len(frames),
-                                     "occlusion_threshold": oc,
-                                     "truncation_threshold": tr},
-                       "frames": [f.to_dict(oc, tr) for f in frames]},
-                      indent=2, ensure_ascii=False)
+# -- core logic -------------------------------------------------------------
 
 
-def export_csv(frames: List[FrameData], oc: float, tr: float) -> str:
-    buf = io.StringIO()
-    cols = ["frame_id","timestamp","camera_name","scene_id","bbox_type",
-            "class_id","track_id","confidence","x","y","width","height",
-            "x_3d","y_3d","z_3d","length","width_3d","height_3d","yaw",
-            "occlusion","truncation"]
-    w = csv.DictWriter(buf, fieldnames=cols); w.writeheader()
-    for fr in frames:
-        v2 = fr.get_visible_2d(oc, tr); v3 = fr.get_visible_3d(oc, tr)
-        m3 = {b.track_id: b for b in v3 if b.track_id}
-        for b2 in v2:
-            b3 = m3.get(b2.track_id) if b2.track_id else None
-            w.writerow({"frame_id": fr.frame_id, "timestamp": fr.timestamp,
-                        "camera_name": fr.camera_name or "", "scene_id": fr.scene_id or "",
-                        "bbox_type": "2d", "class_id": b2.class_id,
-                        "track_id": b2.track_id or "", "confidence": b2.confidence,
-                        "x": b2.x, "y": b2.y, "width": b2.width, "height": b2.height,
-                        "x_3d": b3.x if b3 else "", "y_3d": b3.y if b3 else "",
-                        "z_3d": b3.z if b3 else "", "length": b3.length if b3 else "",
-                        "width_3d": b3.width if b3 else "",
-                        "height_3d": b3.height if b3 else "",
-                        "yaw": b3.yaw if b3 else "",
-                        "occlusion": b2.occlusion, "truncation": b2.truncation})
-        matched = {b2.track_id for b2 in v2 if b2.track_id}
-        for b3 in v3:
-            if b3.track_id and b3.track_id not in matched:
-                w.writerow({"frame_id": fr.frame_id, "timestamp": fr.timestamp,
-                            "camera_name": fr.camera_name or "",
-                            "scene_id": fr.scene_id or "", "bbox_type": "3d",
-                            "class_id": b3.class_id, "track_id": b3.track_id or "",
-                            "confidence": b3.confidence,
-                            "x": "", "y": "", "width": "", "height": "",
-                            "x_3d": b3.x, "y_3d": b3.y, "z_3d": b3.z,
-                            "length": b3.length, "width_3d": b3.width,
-                            "height_3d": b3.height, "yaw": b3.yaw,
-                            "occlusion": "", "truncation": ""})
-    return buf.getvalue()
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="G168: Per-frame 2D/3D bounding box extraction"
+    )
+    parser.add_argument("input", type=Path, help="Input video or directory")
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("bboxes.json"),
+        help="Output JSON/CSV/YAML path",
+    )
+    parser.add_argument(
+        "--format",
+        choices=["json", "csv", "yaml"],
+        default="json",
+        help="Output format",
+    )
+    parser.add_argument(
+        "--occlusion-thresh",
+        type=float,
+        default=0.5,
+        help="Max occlusion ratio to consider visible (0-1)",
+    )
+    parser.add_argument(
+        "--truncation-thresh",
+        type=float,
+        default=0.5,
+        help="Max truncation ratio to consider visible (0-1)",
+    )
+    parser.add_argument(
+        "--export-3d",
+        action="store_true",
+        help="Export 3D boxes in CARLA format (default: nuScenes)",
+    )
+    parser.add_argument(
+        "--render",
+        type=Path,
+        help="Render boxes onto frames and save to directory",
+    )
+    return parser.parse_args()
 
 
-def export_yaml(frames: List[FrameData], oc: float, tr: float) -> str:
-    yaml = _lazy_yaml()
-    return yaml.dump({"metadata": {"total_frames": len(frames),
-                                    "occlusion_threshold": oc,
-                                    "truncation_threshold": tr},
-                      "frames": [f.to_dict(oc, tr) for f in frames]},
-                     default_flow_style=False, allow_unicode=True)
+def extract_frames(video_path: Path) -> List[Any]:
+    """Extract frames from video file using OpenCV."""
+    import cv2
+
+    cap = cv2.VideoCapture(str(video_path))
+    frames = []
+    idx = 0
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        frames.append((idx, frame))
+        idx += 1
+    cap.release()
+    return frames
 
 
-# -- image overlay ----------------------------------------------------------
+def detect_objects(frame):
+    """
+    Placeholder: integrate yolo/centernet/etc here.
+    Returns list of (bbox2d, bbox3d) tuples.
+    """
+    # TODO: integrate detection model
+    return []
 
-def draw_overlay(image_path: Path, frame: FrameData,
-                 oc: float, tr: float, out: Path) -> Path:
-    """Draw visible 2D bboxes on an image (requires Pillow)."""
+
+def project_3d_to_2d(bbox3d: BBox3D, intrinsics, extrinsics) -> Optional[BBox2D]:
+    """Project 3D bbox center onto image plane using pinhole model."""
+    import numpy as np
+
+    # 3D center in camera frame
+    cam_T = np.array(extrinsics.get("translation", [0, 0, 0]))
+    cam_R = np.array(extrinsics.get("rotation", np.eye(3)))
+
+    # world -> camera
+    world_T = np.array([bbox3d.x, bbox3d.y, bbox3d.z])
+    cam_point = cam_R @ (world_T - cam_T)
+
+    if cam_point[2] <= 0:
+        return None  # behind camera
+
+    # camera -> image
+    K = np.array(intrinsics.get("K", [[1, 0, 0], [0, 1, 0], [0, 0, 1]]))
+    img = K @ cam_point
+    u, v = img[0] / img[2], img[1] / img[2]
+
+    # simple size estimate from depth
+    scale = 1.0 / cam_point[2]
+    w = bbox3d.width * scale * intrinsics.get("fx", 1)
+    h = bbox3d.height * scale * intrinsics.get("fy", 1)
+
+    return BBox2D(x=u - w / 2, y=v - h / 2, width=w, height=h)
+
+
+def export_csv(frames: List[FrameDetections], out_path: Path):
+    with out_path.open("w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(
+            [
+                "frame",
+                "timestamp",
+                "type",
+                "x",
+                "y",
+                "w",
+                "h",
+                "conf",
+                "class",
+                "track_id",
+                "occlusion",
+                "truncation",
+            ]
+        )
+        for fd in frames:
+            for b in fd.bboxes_2d:
+                w.writerow(
+                    [
+                        fd.frame_index,
+                        fd.timestamp,
+                        "2d",
+                        b.x,
+                        b.y,
+                        b.width,
+                        b.height,
+                        b.confidence,
+                        b.class_id,
+                        b.track_id,
+                        b.occlusion,
+                        b.truncation,
+                    ]
+                )
+
+
+def render_boxes(frames_dir: Path, frames: List[FrameDetections]):
+    """Draw 2D boxes onto frames and save."""
     Image, ImageDraw = _lazy_pil()
-    img = Image.open(str(image_path)).convert("RGBA")
-    draw = ImageDraw.Draw(img)
-    colors = {"vehicle": (255,0,0,128), "pedestrian": (0,255,0,128),
-              "bicycle": (0,0,255,128), "unknown": (255,255,0,128)}
-    for b in frame.get_visible_2d(oc, tr):
-        x0, y0 = int(b.x), int(b.y); x1, y1 = x0+int(b.width), y0+int(b.height)
-        c = colors.get(b.class_id.lower(), colors["unknown"])
-        draw.rectangle([x0, y0, x1, y1], outline=c[:3], width=2)
-        draw.text((x0, y0-14), f"{b.class_id} ({b.confidence:.2f})", fill=c[:3])
-    out.parent.mkdir(parents=True, exist_ok=True)
-    img.save(str(out)); return out
+
+    for fd in frames:
+        img_path = frames_dir / f"{fd.frame_index:06d}.png"
+        if not img_path.exists():
+            continue
+        img = Image.open(img_path)
+        draw = ImageDraw.Draw(img)
+        for b in fd.bboxes_2d:
+            draw.rectangle(
+                [b.x, b.y, b.x + b.width, b.y + b.height],
+                outline="red",
+                width=2,
+            )
+        img.save(img_path)
 
 
-# -- CLI --------------------------------------------------------------------
+def main():
+    args = parse_args()
+    input_path = args.input
 
-def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(
-        description="Per-frame 2D + 3D bounding boxes for visible NPCs/items.")
-    p.add_argument("--input", "-i", required=True, type=Path,
-                   help="Input JSON file with frame bbox data.")
-    p.add_argument("--output", "-o", type=Path, default=None,
-                   help="Output file (default: stdout).")
-    p.add_argument("--format", "-f", choices=["carla","nuscenes","generic"],
-                   default="generic", help="Input format (default: generic).")
-    p.add_argument("--output-format", choices=["json","csv","yaml"],
-                   default="json", help="Output format (default: json).")
-    p.add_argument("--occlusion-thresh", type=float, default=0.5,
-                   help="Max occlusion for visibility (default: 0.5).")
-    p.add_argument("--truncation-thresh", type=float, default=0.5,
-                   help="Max truncation for visibility (default: 0.5).")
-    p.add_argument("--image", type=Path, default=None,
-                   help="Image to overlay 2D bboxes (requires Pillow).")
-    p.add_argument("--image-output", type=Path, default=None,
-                   help="Overlay output path.")
-    p.add_argument("--stats", action="store_true",
-                   help="Print summary stats to stderr.")
-    return p
-
-
-def main(argv: Optional[List[str]] = None) -> int:
-    """Entry point. Returns 0 on success, non-zero on error."""
-    args = build_parser().parse_args(argv)
-    if not args.input.exists():
-        print(f"Error: input not found: {args.input}", file=sys.stderr); return 1
-    try:
-        frames = load_frames(args.input, args.format)
-    except (json.JSONDecodeError, ValueError) as exc:
-        print(f"Error parsing input: {exc}", file=sys.stderr); return 1
-    if not frames:
-        print("Warning: no frames found.", file=sys.stderr)
-
-    exporters = {"json": export_json, "csv": export_csv, "yaml": export_yaml}
-    try:
-        output_str = exporters[args.output_format](
-            frames, args.occlusion_thresh, args.truncation_thresh)
-    except ImportError as exc:
-        print(f"Error: {exc}", file=sys.stderr); return 1
-
-    if args.output:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        with open(args.output, "w", encoding="utf-8") as fh:
-            fh.write(output_str)
+    if input_path.is_dir():
+        frame_files = sorted(input_path.glob("*.png")) + sorted(
+            input_path.glob("*.jpg")
+        )
+        frames = [(i, None) for i, _ in enumerate(frame_files)]
     else:
-        sys.stdout.write(output_str + "\n")
+        frames = extract_frames(input_path)
 
-    if args.image:
-        if not args.image.exists():
-            print(f"Error: image not found: {args.image}", file=sys.stderr); return 1
-        img_out = args.image_output or (
-            args.output.with_suffix(".png") if args.output
-            else Path(tempfile.mkdtemp()) / "overlay.png")
-        try:
-            draw_overlay(args.image, frames[0], args.occlusion_thresh,
-                         args.truncation_thresh, img_out)
-            print(f"Overlay saved: {img_out}", file=sys.stderr)
-        except ImportError as exc:
-            print(f"Warning: overlay skipped — {exc}", file=sys.stderr)
+    detections = []
+    for idx, frame in frames:
+        # Placeholder: use real detection model
+        dets = detect_objects(frame)
+        fd = FrameDetections(
+            frame_index=idx,
+            timestamp=idx * (1.0 / 30.0),
+            bboxes_2d=[d[0] for d in dets],
+            bboxes_3d=[d[1] for d in dets],
+        )
+        fd = fd.filter_visible(args.occlusion_thresh, args.truncation_thresh)
+        detections.append(fd)
 
-    if args.stats:
-        v2 = sum(len(f.get_visible_2d(args.occlusion_thresh,
-                                       args.truncation_thresh)) for f in frames)
-        v3 = sum(len(f.get_visible_3d(args.occlusion_thresh,
-                                       args.truncation_thresh)) for f in frames)
-        print(f"Frames: {len(frames)} | Visible 2D: {v2} | Visible 3D: {v3}",
-              file=sys.stderr)
-    return 0
+    # Export
+    if args.format == "json":
+        with args.output.open("w") as f:
+            json.dump([d.to_dict() for d in detections], f, indent=2)
+    elif args.format == "yaml":
+        yaml = _lazy_yaml()
+        with args.output.open("w") as f:
+            yaml.dump([d.to_dict() for d in detections], f)
+    elif args.format == "csv":
+        export_csv(detections, args.output)
+
+    # Render
+    if args.render:
+        render_boxes(args.render, detections)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
