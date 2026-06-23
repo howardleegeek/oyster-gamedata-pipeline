@@ -2027,3 +2027,7 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 ## Round 130 @ 2026-06-23T02:32:51Z
 - Picked: Fix ruff F401 unused `pathlib.Path` import in bin/inventory_voxel_capture.py:10 — continuation of the ongoing ruff cleanup sweep. Verified `Path` is genuinely unused (grep returns zero references beyond the import line). Single-file bounded change, no behavior change. Module parses cleanly, ruff check passes, 538/538 tests in tests/bin/ still pass.
 - Result: committed 65c91f66 (pushed to main)
+
+## Round 131 @ 2026-06-23T02:40:02Z
+- Picked: Fix ruff F401 unused `import sys` and `typing.List` in bin/upload_status.py:6,11 + I001 import sort — continuation of the ongoing ruff cleanup sweep from Rounds 101-130. Verified both are genuinely unused (grep returns zero references beyond the import lines). Single-file bounded change, 4-line diff (2 import removals + 2-line isort I001 normalization alphabetizing argparse/json stdlib and Any/Dict typing names), no behavior change. File has no Python import references from other modules (grep for `upload_status` across the repo returned zero hits) and no test coverage, so removing the imports cannot break any caller. Module parses cleanly, ruff check passes, 538/538 tests/bin/ still pass. Same pattern as Round 118 (F401+I001 combined) and Rounds 115/116/117/119/120/123 (F401 single-import sweep).
+- Result: committed 829a0570 (pushed to main)
