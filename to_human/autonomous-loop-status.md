@@ -1,3 +1,8 @@
+## Round 187 @ 2026-06-23T16:30:00Z
+- Picked: Fix ruff F401 in bin/synthesize_real_depth.py — removed unused `tempfile` import (verified zero usages via grep). Continuation of the ongoing ruff cleanup sweep from Rounds 101-186. Single-file bounded change, 1 deletion, no behavior change. Module imports cleanly, F401 check clean. Self-review: pure unused-import removal (F401) — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference, no module-level side effect.
+- Result: committed 42610675 (pushed to fix/prd-test-action-per-second-ruff)
+
+## Round 186 @ 2026-06-23T16:00:00Z
 
 
 ## Round 186 @ 2026-06-23T16:00:00Z
