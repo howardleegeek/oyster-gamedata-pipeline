@@ -29,7 +29,12 @@
 - Result: committed aa7e98df
 
 ## Round 8 @ 2026-06-12T12:15:00Z
-- Picked: Fix failing `tests/test_gpt_thinking_provider.py::test_provider_not_available_when_openai_missing` — `GPTThinkingProvider.__init__` unconditionally imported `openai` at construction time, so the test (which patches `builtins.__import__` to block `openai`) failed with `ModuleNotFoundError` during instantiation. Deferred import to `complete()`
+- Picked: Fix failing `tests/test_gpt_thinking_provider.py::test_provider_not_available_when_openai_missing` — `GPTThinkingProvider.__init__` unconditionally imported `openai` at construction time, so the test (which patches `builtins.__import__` to block `openai`) failed with `ModuleNotFoundError` during instantiation. Deferred import to `complete()` method.
+- Result: committed e8c6e4a5
+
+## Round 134 @ 2026-06-23T03:11:16Z
+- Picked: Fix ruff F401+I001+F541 lint errors in edge test scripts — sorted imports in 4 files and removed extraneous f-string prefixes.
+- Result: committed 36905687
 - Result: committed aa7e98df
 
 ## Round 9 @ 2026-06-22T17:45:00Z
@@ -2040,3 +2045,7 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 - Picked: Fix ruff F401 unused `os` import in bin/parquet_manifest_writer.py — continuation of the ongoing ruff cleanup sweep from Rounds 101-132. Verified `os` is genuinely unused (grep returns zero references beyond the import line). Single-file bounded change, 1-line diff, no behavior change. Module parses cleanly, ruff check passes. Same pattern as prior F401 fixes.
 - Result: committed 53bd316c (pushed to main)
 
+
+## Round 135 @ 2026-06-23T03:25:00Z
+- Picked: Fix ruff I001 import sort in bin/health_check_endpoint.py — alphabetized `HTTPServer, BaseHTTPRequestHandler` to `BaseHTTPRequestHandler, HTTPServer` and removed the redundant trailing blank line in the import block. Continuation of the ongoing ruff cleanup sweep from Rounds 101-134. Single-file bounded change, 1 line reordered + 1 blank line removed, no behavior change. Module parses cleanly, CLI `--help` runs, tests/bin/ 538/538 pass. Self-review: no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing, no brand cross-reference.
+- Result: committed 018be850 (pushed to main)
