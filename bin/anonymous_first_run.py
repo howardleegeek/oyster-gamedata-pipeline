@@ -122,6 +122,11 @@ class AnonymousStorage:
     CLIPS_SUBDIR = "clips"
 
     def __init__(self, base_path: Optional[Path] = None) -> None:
+        """Initialize anonymous storage with optional base path.
+
+        Args:
+            base_path: Root directory for storage. Defaults to user home.
+        """
         self._base = base_path or Path.home()
         self.root = self._base / self.DIR_NAME
         self.config_path = self.root / self.CONFIG_FILE
