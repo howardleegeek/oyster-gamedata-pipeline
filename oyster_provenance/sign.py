@@ -5,7 +5,6 @@ Uses ed25519 (NOT RSA — smaller, modern) for signing session manifests.
 """
 
 import json
-import os
 import time
 from pathlib import Path
 from typing import Optional, Tuple, Union

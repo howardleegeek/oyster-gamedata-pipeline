@@ -14,7 +14,6 @@ Usage:
 """
 
 import argparse
-import json
 import os
 import sys
 import hashlib
@@ -27,9 +26,9 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from oyster_provenance.manifest import SessionManifest, load_manifest
-from oyster_provenance.merkle import compute_file_hashes, build_merkle_root_from_files
-from oyster_provenance.sign import load_public_key, verify_json_signature, get_public_key_info
-from oyster_provenance.anchor import AnchorChain, load_weekly_anchor, get_week_range, format_week_id
+from oyster_provenance.merkle import compute_file_hashes
+from oyster_provenance.sign import verify_json_signature
+from oyster_provenance.anchor import load_weekly_anchor, get_week_range, format_week_id
 
 
 # ANSI colors
