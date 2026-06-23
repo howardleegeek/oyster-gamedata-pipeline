@@ -12,21 +12,20 @@ Polls:
 Outputs to ~/.oyster/monitor_metrics.jsonl (one line per poll).
 """
 
+import glob
 import json
+import logging
 import os
+import re
+import signal
+import subprocess
 import sys
 import time
-import signal
-import logging
-import subprocess
-import glob
-import re
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
-import yaml
 import requests
+import yaml
 
 # ---------------------------------------------------------------------------
 # Paths & Config
