@@ -12,9 +12,8 @@ Usage:
 import argparse
 import json
 import subprocess
-import sys
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict
 
 # Route type descriptions for on-screen display
 ROUTE_TYPE_INFO = {
