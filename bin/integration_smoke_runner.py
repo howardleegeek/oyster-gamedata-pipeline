@@ -33,7 +33,7 @@ def main():
     placeholders = os.path.abspath(args.placeholders)
     output = os.path.abspath(args.output)
 
-    print(f"=== Running e2e_smoke.sh ===")
+    print("=== Running e2e_smoke.sh ===")
     print(f"Placeholders: {placeholders}, Output: {output}")
 
     # Step 1: Run e2e_smoke.sh
