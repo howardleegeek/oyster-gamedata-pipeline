@@ -199,6 +199,7 @@
 - Picked: Fix ruff I001 import-sort in bin/depth_from_mineflayer_raycast.py — `numpy` was in its own (blank-line) group, ruff wants it alphabetized with `Imath` and `OpenEXR`. Preserved the explanatory comment block, applied `ruff check --fix`. tests/test_depth_from_mineflayer_raycast.py: 6/6 pass. Module behavior unchanged (same three imports at load time).
 - Result: committed 641183f3 (pushed to main)
 
+
 ## Round 36 @ 2026-06-14T08:42:33Z
 - Picked: Fix ruff F401 unused imports in bin/buyer_evaluation_harness.py (math, os, tempfile), bin/generate_manifest.py (typing.Any), and bin/generate_systeminfo_json.py (os). All have tests: test_v4_buyer_signed, test_generate_manifest, test_generate_systeminfo_json.
 - Result: committed a6fe34c8
