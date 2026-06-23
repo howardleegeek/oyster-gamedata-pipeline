@@ -1,5 +1,6 @@
 ## Round 178 @ 2026-06-23T12:45:00Z
 
+
 - Picked: Fix ruff I001 import sort in bin/red_team/__init__.py — alphabetized the from-import block (ATTACK_CATALOG before AttackCase before AttackResult per PEP 8). Continuation of the ongoing ruff cleanup sweep from Rounds 101-177. Single-file bounded change, 2 insertions / 2 deletions, no behavior change. `ruff check bin/red_team/__init__.py` clean, module imports cleanly, 538/538 tests in tests/bin/ pass. Self-review: cosmetic import reorder only — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference, no module-level side effect.
 - Result: committed 09c33c4f (pushed to fix/prd-test-action-per-second-ruff)
 
@@ -2225,3 +2226,9 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 ## Round 179 @ 2026-06-23T13:28:59Z
 - Picked: Fix ruff F401 cleanup in bin/server_ingest.py — removed 4 genuinely-unused imports (`os`, `shutil`, `typing.Any`, `typing.Optional`). Verified via grep that all 4 have zero body references in the 354-line file. Continuation of the ongoing ruff cleanup sweep from Rounds 101-178. Single-file bounded change, 3 deletions, 0 additions, no behavior change. Module imports cleanly, `ruff check bin/server_ingest.py` is now clean (was 4 F401 errors), 538/538 tests in tests/bin/ pass. File has no direct test coverage (referenced by name only from bin/server_ingest_worker.py:3 docstring) so no test impact beyond the suite-level regression run. Self-review: pure lint cleanup — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing, no brand cross-reference, no module-level side effect.
 - Result: committed 49414444 (pushed to fix/prd-test-action-per-second-ruff)
+
+## Round 180 @ 2026-06-23T14:00:00Z
+
+- Picked: Fix ruff I001+E302+E303+E701+W291 cleanup in bin/per_frame_object_bbox.py — continuation of the ongoing ruff cleanup sweep from Rounds 101-179. Alphabetized import block, removed unused imports (io, sys, tempfile), split semicolon-separated dataclass field declarations onto separate lines, added blank lines around top-level function/class defs, stripped trailing whitespace. Single-file bounded change in bin/, 312 insertions / 253 deletions, no behavior change. `ruff check bin/per_frame_object_bbox.py` clean, module imports cleanly, 538/538 tests in tests/bin/ pass. Self-review: cosmetic import + whitespace cleanup — no signature change, no exception flow touched, no threading or concurrency change, no auth or security change, no off-by-one, no silent error swallow, no test masked as passing (no skip/xfail added), no brand cross-reference, no module-level side effect.
+- Result: committed 3bc41a57 (pushed to fix/prd-test-action-per-second-ruff)
+
