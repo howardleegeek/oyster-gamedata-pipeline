@@ -2274,3 +2274,8 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 ## Round 188 @ 2026-06-23T16:30:00Z
 - Picked: Fix ruff F401 in bin/server_ingest_worker.py — removed unused `time` import (verified zero `time.*` usages via grep; line 193 uses `datetime.now(timezone.utc)`, not `time.time/sleep`). Continuation of the ongoing ruff cleanup sweep from Rounds 101-187. Single-file bounded change, 1 deletion, no behavior change. `ruff check bin/server_ingest_worker.py` no longer reports F401 (the I001 import-sort error is pre-existing and out of scope for this round). Module still compiles and parses cleanly. Self-review: pure unused-import removal (F401) — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing (no tests exist for this module), no brand cross-reference, no module-level side effect.
 - Result: committed 3bafa1f8 (pushed to fix/prd-test-action-per-second-ruff)
+
+## Round 189 @ 2026-06-23T16:30:00Z
+
+- Picked: Fix ruff F401 in bin/uninstall_clean.py — removed unused `os` import (verified zero usages via grep). Continuation of the ongoing ruff cleanup sweep from Rounds 101-188. Single-file bounded change, 1 deletion, no behavior change. `ruff check bin/uninstall_clean.py` clean, module imports cleanly. Self-review: pure unused-import removal (F401) — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference, no module-level side effect.
+- Result: committed 47e46904 (pushed to fix/prd-test-action-per-second-ruff)
