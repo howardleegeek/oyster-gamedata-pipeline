@@ -41,9 +41,9 @@ from pathlib import Path
 from threading import Lock, Thread
 
 try:
+    import uvicorn
     from fastapi import FastAPI, HTTPException
     from pydantic import BaseModel, Field
-    import uvicorn
 except ImportError as e:
     raise SystemExit(
         "missing deps: pip install fastapi uvicorn pydantic"
