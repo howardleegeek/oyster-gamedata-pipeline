@@ -6,15 +6,12 @@ removes from S3 + dashboard + payout history after grace period.
 Logs deletion audit trail to ~/.oyster/deletions.jsonl
 """
 
-import json
-import os
-import sys
-import hashlib
 import argparse
-from pathlib import Path
+import hashlib
+import json
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Any, Optional
-
+from pathlib import Path
+from typing import Any, Dict, List
 
 # Default config
 OYSTER_DIR = Path.home() / '.oyster'
