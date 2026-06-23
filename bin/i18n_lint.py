@@ -127,7 +127,7 @@ def lint_translations(i18n_dir: Path) -> bool:
         print("✅ All checks passed!")
     
     # Summary
-    print(f"\n📊 Summary:")
+    print("\n📊 Summary:")
     print(f"  English keys: {len(en_keys)}")
     print(f"  Chinese keys: {len(zh_keys)}")
     print(f"  Japanese keys: {len(ja_keys)}")
