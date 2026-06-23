@@ -396,8 +396,8 @@ def synthesize_depth_dir(out_dir: str, count: int = 1800) -> int:
 
     # Lazy import OpenEXR
     try:
-        import OpenEXR
         import Imath
+        import OpenEXR
     except ImportError:
         raise RuntimeError(
             "sample_tarball_builder requires OpenEXR + Imath to create depth EXRs. "
