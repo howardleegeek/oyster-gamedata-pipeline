@@ -5,18 +5,17 @@ Per PRD audit's evidence string 'rc19.0.3 DA-V2', this IS the expected
 depth-estimation method when GL framebuffer hook is not available.
 """
 
-import sys
-import time
-import pathlib
 import argparse
+import pathlib
+import time
 import warnings
 
+import Imath
 import numpy as np
+import OpenEXR
 import torch
 from PIL import Image
 from transformers import AutoImageProcessor, AutoModelForDepthEstimation
-import OpenEXR
-import Imath
 
 warnings.filterwarnings("ignore")
 
