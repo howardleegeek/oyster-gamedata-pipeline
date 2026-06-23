@@ -1,5 +1,10 @@
 
 
+## Round 183 @ 2026-06-23T14:30:00Z
+
+- Picked: Fix ruff F401 in bin/recorder_replay_mod_installer.py — removed unused `shutil` import (verified zero usages via grep). Continuation of the ongoing ruff cleanup sweep from Rounds 101-182. Single-file bounded change, 1 deletion, no behavior change. `ruff check bin/recorder_replay_mod_installer.py` clean, module imports cleanly, 12/12 tests in tests/bin/test_recorder_replay_mod_installer.py pass. Self-review: pure unused-import removal (F401) — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference, no module-level side effect.
+- Result: committed 5b4a2972 (pushed to fix/prd-test-action-per-second-ruff)
+
 ## Round 179 @ 2026-06-23T13:30:00Z
 
 
