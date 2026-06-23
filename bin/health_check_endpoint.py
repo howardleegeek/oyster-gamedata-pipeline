@@ -10,11 +10,10 @@ import argparse
 import json
 import sys
 import time
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from shutil import disk_usage
 from typing import Optional
-
 
 # Module-level constants
 DEFAULT_HOST = "0.0.0.0"
