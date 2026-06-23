@@ -6,15 +6,14 @@ Provides programmatic access to browse, filter, download, and approve sessions.
 
 import hashlib
 import hmac
-import os
 import time
 import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
 app = FastAPI(
