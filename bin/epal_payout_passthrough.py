@@ -327,7 +327,7 @@ Examples:
         elif args.output == 'yaml' and YAML_AVAILABLE:
             print(yaml.dump(result, default_flow_style=False))
         else:
-            print(f"Bonus payout successful!")
+            print("Bonus payout successful!")
             print(f"  Companion: {args.companion_id}")
             print(f"  Amount: {args.amount} {args.currency}")
             if 'payout_id' in result:
