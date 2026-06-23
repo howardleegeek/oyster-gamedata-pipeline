@@ -121,7 +121,7 @@ class RconClient:
         if not self.sock:
             raise RuntimeError("Not connected")
             
-        packet_id = self._send_packet(PacketType.COMMAND, cmd)
+        self._send_packet(PacketType.COMMAND, cmd)
         
         # Receive response
         response_id, response_type, body = self._receive_packet()
