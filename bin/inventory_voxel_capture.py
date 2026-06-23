@@ -236,7 +236,6 @@ def main(argv: Sequence[str]) -> int:
     if not os.path.isdir(args.world):
         logger.error(f"World directory does not exist: {args.world}")
         return 1
-    config = {}
     if args.config:
         try:
             yaml = _yaml_mod()
@@ -244,7 +243,7 @@ def main(argv: Sequence[str]) -> int:
                 logger.error("PyYAML not installed")
                 return 1
             with open(args.config, 'r') as f:
-                config = yaml.safe_load(f) or {}
+                yaml.safe_load(f) or {}
         except Exception as e:
             logger.error(f"Failed to load config {args.config}: {e}")
             return 1
