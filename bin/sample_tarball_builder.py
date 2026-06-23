@@ -127,8 +127,6 @@ def synthesize_action_camera(
 
     # Cycle through W/A/S/D weighted 40/20/20/20.
     wasd_pattern = [87] * 40 + [65] * 20 + [83] * 20 + [68] * 20  # 100 frames
-    SCREEN_W = 1920  # for mouse_dx/dy normalization to [-1, 1] per lint
-    DEG_TO_PIXEL = 6.67  # 1800 DPI default Minecraft sensitivity (PDF p8)
     base_time = datetime(2026, 5, 2, 12, 0, 0)
     records = []
     prev_yaw = 0.0
