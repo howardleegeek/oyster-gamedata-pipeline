@@ -9,7 +9,6 @@ and macOS NWPath; provides upload throttling on metered connections.
 from __future__ import annotations
 
 import argparse
-import os
 import platform
 import sys
 import threading
