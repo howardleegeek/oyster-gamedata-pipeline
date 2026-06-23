@@ -90,7 +90,7 @@ def run_stress_test(iterations: int, max_rss_mb: float, verbose: bool = False) -
             print(f"  {stat}")
 
         if rss_growth > max_rss_mb:
-            print(f"\nFAIL: RSS growth exceeds threshold")
+            print("\nFAIL: RSS growth exceeds threshold")
             return 1
         print("\nPASS: RSS growth within threshold")
         return 0

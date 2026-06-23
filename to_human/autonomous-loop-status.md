@@ -1,4 +1,9 @@
 
+
+## Round 195 @ 2026-06-24T13:00:00Z
+- Picked: Fix ruff E701 (multiple statements on one line, 5 instances) and I001 (unsorted imports) in bin/red_team_wrong_obs_key.py. Continuation of the ongoing ruff cleanup sweep. Single-file bounded change, no behavior change. Module imports cleanly, E701+I001 checks clean. Self-review: pure formatting fix — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference.
+- Result: committed 78d630ee (pushed to fix/prd-test-action-per-second-ruff)
+
 ## Round 194 @ 2026-06-24T12:00:00Z
 - Picked: Fix ruff E701 (multiple statements on one line) in bin/red_team_sigkill_mid_write.py lines 65-67 and 107-108. Continuation of the ongoing ruff cleanup sweep. Single-file bounded change, no behavior change. Module imports cleanly. Self-review: pure formatting fix (E701) — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference.
 - Result: committed 1ee6a76b (pushed to fix/prd-test-action-per-second-ruff)
@@ -2326,3 +2331,7 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 ## Round 194 @ 2026-06-23T19:00:00Z
 - Picked: Fix ruff W292 in bin/stress_test_burst_50_clips.py — added trailing newline at EOF (last line was `sys.exit(main())` with no \n). Continuation of the ongoing ruff cleanup sweep from Rounds 101-193. Single-file bounded change, 1 byte added (newline), no behavior change. Module parses cleanly via ast.parse, `ruff check bin/stress_test_burst_50_clips.py` clean, no tests target this file (find tests -name '*burst*' returns empty). Self-review: pure PEP-8 trailing-newline fix (W292) — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference, no module-level side effect.
 - Result: committed 9a721af2 (pushed to fix/prd-test-action-per-second-ruff)
+
+## Round 196 @ 2026-06-23T19:17:32Z
+- Picked: Fix ruff W292 (no newline at end of file) and F541 (f-string without placeholders) in bin/stress_test_memory_leak_check.py. Continuation of the ongoing ruff cleanup sweep. Single-file bounded change, 2 minor formatting fixes, no behavior change. Module imports cleanly; ruff check clean; no tests reference the file. Self-review: pure formatting fix (W292+F541) — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference.
+- Result: pending commit
