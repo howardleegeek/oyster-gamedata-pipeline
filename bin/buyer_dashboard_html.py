@@ -18,21 +18,21 @@ from typing import Any, Dict, List, Optional, Tuple
 
 class ClipAnalyzer:
     """Analyzes video clips and generates HTML reports."""
-    
+
     def __init__(self, clip_path: str, output_path: str):
         self.clip_path = Path(clip_path)
         self.output_path = Path(output_path)
         self.preview_frames: List[Tuple[Optional[Any], float]] = []
         self.lint_results: Dict[str, Any] = {}
         self.diversity_stats: Dict[str, Any] = {}
-        
+
     def validate_clip(self) -> bool:
         """Validate that the clip exists and is accessible."""
         if not self.clip_path.exists():
             print(f"Error: Clip not found at {self.clip_path}", file=sys.stderr)
             return False
         return True
-    
+
     def extract_preview_frames(self, num_frames: int = 6) -> bool:
         """Extract preview frames from the clip."""
         # Try to import PIL for image processing
@@ -41,7 +41,7 @@ class ClipAnalyzer:
             HAS_PIL = True
         except ImportError:
             HAS_PIL = False
-            
+
         # Create placeholder frames
         for i in range(num_frames):
             timestamp = i / max(num_frames, 1)
@@ -53,7 +53,7 @@ class ClipAnalyzer:
             else:
                 self.preview_frames.append((None, timestamp))
         return True
-    
+
     def run_lint_analysis(self) -> Dict[str, Any]:
         """Run lint analysis on the clip."""
         self.lint_results = {
@@ -70,7 +70,7 @@ class ClipAnalyzer:
             }
         }
         return self.lint_results
-    
+
     def calculate_diversity_stats(self) -> Dict[str, Any]:
         """Calculate diversity statistics for the clip."""
         self.diversity_stats = {
@@ -89,13 +89,13 @@ class ClipAnalyzer:
             }
         }
         return self.diversity_stats
-    
+
     def format_timestamp(self, seconds: float) -> str:
         """Format seconds as MM:SS."""
         minutes = int(seconds // 60)
         secs = int(seconds % 60)
         return f"{minutes:02d}:{secs:02d}"
-    
+
     def generate_html(self) -> str:
         """Generate HTML report."""
         # Prepare frame data
@@ -117,7 +117,7 @@ class ClipAnalyzer:
                         <div class="placeholder">Frame {i+1}<br>{time_str}</div>
                     </div>
                 </div>'''
-        
+
         # Prepare lint issues
         lint_html = ""
         for issue in self.lint_results.get("issues", []):
@@ -127,7 +127,7 @@ class ClipAnalyzer:
                 <strong>{issue["type"].upper()}</strong>: {issue["description"]}
                 <span class="float-end">{self.format_timestamp(issue["timestamp"])}</span>
             </div>'''
-        
+
         # Generate HTML
         return f'''<!DOCTYPE html>
 <html lang="en">
@@ -154,7 +154,7 @@ class ClipAnalyzer:
             <p><small>Generated {datetime.now().strftime('%Y-%m-%d %H:%M')}</small></p>
         </div>
     </div>
-    
+
     <div class="container mt-4">
         <div class="row">
             <div class="col-md-8">
@@ -164,7 +164,7 @@ class ClipAnalyzer:
                         <div class="row">{frames_html}</div>
                     </div>
                 </div>
-                
+
                 <div class="card mb-4">
                     <div class="card-header"><h4>Quality Analysis</h4></div>
                     <div class="card-body">
@@ -186,7 +186,7 @@ class ClipAnalyzer:
                     </div>
                 </div>
             </div>
-            
+
             <div class="col-md-4">
                 <div class="card mb-4">
                     <div class="card-header"><h4>Diversity Stats</h4></div>
@@ -194,23 +194,23 @@ class ClipAnalyzer:
                         <div class="score text-center mb-3">
                             {self.diversity_stats["summary"]["overall_diversity_score"] * 100:.0f}%
                         </div>
-                        
+
                         <h6>Color Palette:</h6>
                         <div class="mb-3">
                             {"".join(f'<span class="color-swatch" style="background:{c}" title="{c}"></span>' for c in self.diversity_stats["color"]["palette"])}
                         </div>
-                        
+
                         <h6>Shot Types:</h6>
                         <p>{", ".join(self.diversity_stats["composition"]["shot_types"])}</p>
-                        
+
                         <h6>Strengths:</h6>
                         <p>{" • ".join(self.diversity_stats["summary"]["strengths"])}</p>
-                        
+
                         <h6>Improvements:</h6>
                         <p>{" • ".join(self.diversity_stats["summary"]["areas_for_improvement"])}</p>
                     </div>
                 </div>
-                
+
                 <div class="card">
                     <div class="card-header"><h4>Clip Info</h4></div>
                     <div class="card-body">
@@ -220,30 +220,30 @@ class ClipAnalyzer:
             </div>
         </div>
     </div>
-    
+
     <div class="footer">
         <div class="container text-center">
             <p class="mb-0">Generated by buyer_dashboard_html.py • Static HTML Report</p>
         </div>
     </div>
-    
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>'''
-    
+
     def generate_report(self) -> bool:
         """Generate the complete HTML report."""
         if not self.validate_clip():
             return False
-        
+
         print(f"Analyzing: {self.clip_path.name}", file=sys.stderr)
-        
+
         self.extract_preview_frames()
         self.run_lint_analysis()
         self.calculate_diversity_stats()
-        
+
         html = self.generate_html()
-        
+
         try:
             self.output_path.parent.mkdir(parents=True, exist_ok=True)
             self.output_path.write_text(html, encoding='utf-8')
@@ -260,17 +260,17 @@ def main(argv: List[str]) -> int:
     parser.add_argument("--clip", "-c", required=True, help="Input video clip path")
     parser.add_argument("--output", "-o", required=True, help="Output HTML file path")
     parser.add_argument("--frames", "-f", type=int, default=6, help="Number of preview frames")
-    
+
     try:
         args = parser.parse_args(argv[1:])
     except SystemExit:
         return 1
-    
+
     analyzer = ClipAnalyzer(args.clip, args.output)
     if args.frames != 6:
         analyzer.preview_frames = []
         analyzer.extract_preview_frames(args.frames)
-    
+
     return 0 if analyzer.generate_report() else 1
 
 
