@@ -63,7 +63,8 @@ def _run_sigkill_trial(
     os.close(r_fd)
     time.sleep(0.05)
     if proc.poll() is None:
-        proc.kill(); proc.wait(timeout=5)
+        proc.kill()
+        proc.wait(timeout=5)
     tmp_files = list(work_dir.glob(".action_camera_*.tmp"))
     final_files = list(work_dir.glob("action_camera.dat"))
     return {
