@@ -2018,3 +2018,12 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 ## Round 129 @ 2026-06-23T00:35:00Z
 - Picked: Fix ruff F401 (unused `timedelta`, `typing.List`, `fastapi.Depends`) + I001 (unsorted/3-group import block) in server/payout_engine.py — continuation of the ongoing ruff cleanup sweep from Rounds 101-128. This is the live contributor payout path, so high blast radius — picked it specifically because all three unused names were verified to have zero references beyond the import line via grep, and ruff F401 is a no-op behavior change. Single-file bounded change, 6-line diff, 18/18 tests in tests/test_payout_engine.py pass, ruff check clean for the file, module imports cleanly. Self-review: confirmed `json` (used in 2 log writes), `asdict` (line 243 in payout queue persistence), `field` (line 108 `default_factory=datetime.utcnow`), `Optional` (lines 92-93, 113, 169, 409), `Dict` (module-level queues), `Any` (line 113 `parse_datetime`), `BackgroundTasks`/`FastAPI`/`HTTPException` all still used. No silent error swallow, no race condition, no off-by-one, no security issue.
 - Result: committed 22661d8c (pushed to main)
+
+
+## Round 118 @ 2026-06-23T02:13:25Z
+- Picked: Fix ruff F401 unused imports (sys, Optional, Dict) in bin/launcher_integration.py — continuation of the ongoing ruff cleanup sweep from Rounds 101-117. Removed unused `sys`, unused `Optional`, and reordered `Dict, Any` to `Any, Dict` for proper import sorting. Single-file bounded change, verified module compiles cleanly, tests/test_route_planner.py passes (14/14).
+- Result: committed ec457b1e (pushed to main)
+
+## Round 130 @ 2026-06-23T02:32:51Z
+- Picked: Fix ruff F401 unused `pathlib.Path` import in bin/inventory_voxel_capture.py:10 — continuation of the ongoing ruff cleanup sweep. Verified `Path` is genuinely unused (grep returns zero references beyond the import line). Single-file bounded change, no behavior change. Module parses cleanly, ruff check passes, 538/538 tests in tests/bin/ still pass.
+- Result: committed 65c91f66 (pushed to main)
