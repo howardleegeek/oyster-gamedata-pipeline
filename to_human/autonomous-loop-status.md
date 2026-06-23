@@ -1,3 +1,8 @@
+
+## Round 190 @ 2026-06-23T18:30:00Z
+- Picked: Fix ruff E702 (multiple statements on one line) in 2 files — bin/recorder_utc_timestamps.py line 85 and bin/red_team/blue_team_score.py line 59. Continuation of the ongoing ruff cleanup sweep. Single-file bounded change, 2 files, no behavior change. Tests pass. Self-review: pure formatting fix (E702) — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference.
+- Result: committed c741d3bd (pushed to fix/prd-test-action-per-second-ruff)
+
 ## Round 189 @ 2026-06-23T17:30:00Z
 - Picked: Fix ruff F401 in oyster_provenance/merkle.py — removed unused `json` import (verified zero `json.` usages via grep). Continuation of the ongoing ruff cleanup sweep from Rounds 101-188. Single-file bounded change, 1 deletion, no behavior change. Module imports cleanly, F401 check clean. All 45 tests in tests/test_provenance* pass. Self-review: pure unused-import removal (F401) — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference, no module-level side effect.
 - Result: committed 26c574a3 (pushed to fix/prd-test-action-per-second-ruff)
@@ -2288,3 +2293,8 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 
 - Picked: Fix ruff F401 in bin/uninstall_clean.py — removed unused `os` import (verified zero usages via grep). Continuation of the ongoing ruff cleanup sweep from Rounds 101-188. Single-file bounded change, 1 deletion, no behavior change. `ruff check bin/uninstall_clean.py` clean, module imports cleanly. Self-review: pure unused-import removal (F401) — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference, no module-level side effect.
 - Result: committed 47e46904 (pushed to fix/prd-test-action-per-second-ruff)
+
+
+## Round 191 @ 2026-06-23T18:37:00Z
+- Picked: Fix ruff F401 in oyster_provenance/sign.py, manifest.py, verify.py — removed unused imports: os from sign.py, Any Union from typing and field from dataclasses in manifest.py, json from verify.py. All verified with grep for zero usages. Continuation of the ongoing ruff cleanup sweep from Rounds 101-190. 3 files changed, no behavior change. All 35 provenance tests pass. Self-review: pure unused-import removal (F401) — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference, no module-level side effect.
+- Result: committed d05e2ecf (pushed to fix/prd-test-action-per-second-ruff)
