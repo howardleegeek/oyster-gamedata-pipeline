@@ -3,18 +3,18 @@ Contributor Payout Engine - FastAPI Service
 Handles automatic payouts via Stripe Connect (default) or PayPal (fallback).
 """
 
-import os
 import json
 import logging
+import os
 import uuid
-from datetime import datetime, timedelta
-from typing import Optional, List, Dict, Any
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
 from enum import Enum
-from dataclasses import dataclass, field, asdict
+from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
-from pydantic import BaseModel, Field
 import stripe
+from fastapi import BackgroundTasks, FastAPI, HTTPException
+from pydantic import BaseModel, Field
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
