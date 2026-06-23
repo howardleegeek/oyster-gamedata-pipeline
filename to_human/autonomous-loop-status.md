@@ -1,5 +1,10 @@
 
 
+## Round 186 @ 2026-06-23T16:00:00Z
+
+- Picked: Fix ruff F401 in bin/mc_launcher_real.py — replaced unused `import minecraft_launcher_lib` with a noqa comment to fix the F401 error while preserving the original try/except ImportError logic that the tests depend on for mocking. This is a targeted fix that maintains backward compatibility with the test mock. All 17 tests pass. Self-review: import kept as side-effect check (not used in function body), noqa added to silence F401 — no signature change, no exception behavior change, no silent error swallow, no security impact.
+- Result: committed c96f4add (pushed to fix/prd-test-action-per-second-ruff)
+
 ## Round 185 @ 2026-06-23T15:30:00Z
 
 - Picked: Fix ruff F401 in 2 files — removed unused `ast` import from bin/red_team_nan_coordinates.py and unused `os` import from bin/red_team_path_traversal.py. Continuation of the ongoing ruff cleanup sweep from Rounds 101-184. 2 files changed, no behavior change. Both modules import cleanly, ruff checks clean. Self-review: pure unused-import removal (F401) — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing, no brand cross-reference, no module-level side effect.
