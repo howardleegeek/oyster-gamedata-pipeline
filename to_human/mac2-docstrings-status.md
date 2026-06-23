@@ -296,3 +296,8 @@
 - File: bin/inventory_voxel_capture.py::FrameCapture.to_dict
 - Added: docstring=Y, type-hints=N (already had type hints)
 - Commit: db599ecfb
+
+## Round @ 2026-06-21T14:15:00Z
+- File: bin/lint_v3_prd_grounded.py::LintReport.to_dict
+- Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: 15a2493ea28f060bcaf50e8cf7368a62bab5ff82
