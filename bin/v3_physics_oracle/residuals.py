@@ -98,9 +98,12 @@ def _hamilton_single_axis_quat(axis: int, deg: float) -> tuple[float, float, flo
     half = math.radians(deg) / 2
     s = math.sin(half)
     c = math.cos(half)
-    if axis == 0: return (s, 0.0, 0.0, c)
-    if axis == 1: return (0.0, s, 0.0, c)
-    if axis == 2: return (0.0, 0.0, s, c)
+    if axis == 0:
+        return (s, 0.0, 0.0, c)
+    if axis == 1:
+        return (0.0, s, 0.0, c)
+    if axis == 2:
+        return (0.0, 0.0, s, c)
     return (0.0, 0.0, 0.0, 1.0)  # identity
 
 
