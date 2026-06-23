@@ -118,7 +118,6 @@ def build_multipart_body(tarball_path: Path,
     the same script run inside the standalone Windows .exe bundle.
     """
     boundary = f"----OysterRecorderBoundary{uuid.uuid4().hex}"
-    crlf = b"\r\n"
     pre = (
         f"--{boundary}\r\n"
         f'Content-Disposition: form-data; name="vendor_id"\r\n\r\n'
