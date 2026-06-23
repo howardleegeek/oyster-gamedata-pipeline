@@ -19,7 +19,6 @@ import subprocess
 
 from .residuals import ResidualResult
 
-
 _FFPROBE_CMD = (
     "ffprobe", "-v", "error", "-select_streams", "v:0",
     "-show_entries", "stream=avg_frame_rate",

@@ -20,7 +20,6 @@ from pathlib import Path
 
 from .residuals import ResidualResult
 
-
 _FFPROBE_CMD = ("ffprobe", "-v", "error", "-show_streams", "-of", "json")
 _EXPECTED_CODEC = "hevc"
 _EXPECTED_WIDTH = 1920

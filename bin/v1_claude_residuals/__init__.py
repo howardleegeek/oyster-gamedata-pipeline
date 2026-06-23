@@ -7,7 +7,6 @@ so callers can write::
 """
 from __future__ import annotations
 
-from .residuals import ResidualResult
 from .r13_keycode_replay import r13_keycode_replay
 from .r15_fps_consistency import r15_fps_consistency
 from .r16_depth_count import r16_depth_count
@@ -23,6 +22,7 @@ from .r20_drift import (
 from .r21_monotonic_frame import r21_monotonic_frame
 from .r22_depth_hash import r22_depth_hash
 from .r23_video_codec import r23_video_codec
+from .residuals import ResidualResult
 
 __all__ = [
     "ResidualResult",

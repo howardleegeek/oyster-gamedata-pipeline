@@ -35,7 +35,6 @@ from pathlib import Path
 
 from .residuals import ResidualResult
 
-
 _CHUNK = 1 << 20  # 1 MiB — keeps a 1080p EXR (~8 MB) at 8 reads.
 
 

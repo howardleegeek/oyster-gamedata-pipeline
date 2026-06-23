@@ -18,14 +18,14 @@ in its table, V₃'s vote breaks the tie. Outside V₃'s table → ABSTAIN.
 IRON LAW IL3 enforced: this module imports nothing from V₁/V₂/V₄/producer.
 """
 from .residuals import (
-    Verdict,
     OracleResult,
+    Verdict,
+    r01_quat_unit_norm,
     r02_oula_quat_table,
+    r07_mouse_range_strict,
     r08_intrinsics_symmetric,
     r09_keycode_vk_known,
     r12_fps_fixed_30,
-    r07_mouse_range_strict,
-    r01_quat_unit_norm,
 )
 
 __all__ = [
