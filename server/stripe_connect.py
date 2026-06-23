@@ -4,9 +4,10 @@ Handles onboarding and transfer execution for contributor payouts.
 Uses test mode by default; production toggle via STRIPE_LIVE=true.
 """
 
-import os
 import logging
-from typing import Optional, Dict, Any
+import os
+from typing import Any, Dict, Optional
+
 import stripe
 
 logger = logging.getLogger(__name__)
