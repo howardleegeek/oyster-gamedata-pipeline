@@ -38,7 +38,7 @@ import sys
 import time
 import zipfile
 from pathlib import Path
-from urllib import request, error
+from urllib import error, request
 
 # ---------------------------------------------------------------------------
 

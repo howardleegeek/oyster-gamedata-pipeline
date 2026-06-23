@@ -26,7 +26,6 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-
 REAL = "REAL"
 PLACEHOLDER = "PLACEHOLDER"
 UNKNOWN = "UNKNOWN"

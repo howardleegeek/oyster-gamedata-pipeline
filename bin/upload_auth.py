@@ -27,8 +27,8 @@ control could be on any HTTP client).
 
 from __future__ import annotations
 
-import hmac
 import hashlib
+import hmac
 import os
 import re
 from dataclasses import dataclass
