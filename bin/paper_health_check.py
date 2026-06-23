@@ -25,7 +25,7 @@ def encode_varint(value: int) -> bytes:
     return bytes(result)
 
 
-def decode_varint(sock) -> int:
+def decode_varint(sock: socket.socket) -> int:
     """Decode Minecraft VarInt from socket.
 
     Args:
