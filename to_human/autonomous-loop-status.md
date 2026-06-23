@@ -1,5 +1,13 @@
 
 
+## Round 201 @ 2026-06-25T03:00:00Z
+- Picked: Fix ruff F841 (unused variable `f`) in bin/recorder_watchdog.py. Single-file bounded change, no behavior change. Module imports cleanly, F841 check clean. Self-review: F841 fix — no signature/exception/threading/auth change, no silent error swallow (file truncation still works via open().close()), no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference.
+- Result: committed 13559286 (pushed to fix/prd-test-action-per-second-ruff)
+
+## Round 200 @ 2026-06-25T02:00:00Z
+- Picked: Fix ruff F841 (unused variable `results`) in bin/multi_camera_capture.py. Single-file bounded change, no behavior change. Module imports cleanly, F841 check clean. Self-review: F841 fix — no signature/exception/threading/auth change, no silent error swallow (run_capture result still used internally), no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference.
+- Result: committed 17cce530 (pushed to fix/prd-test-action-per-second-ruff)
+
 ## Round 199 @ 2026-06-25T01:00:00Z
 - Picked: Fix ruff F841 (unused exception variables) in bin/oyster_monitor.py. Single-file bounded change, no behavior change. Module imports cleanly, F841 check clean. Self-review: F841 fix — no signature/exception/threading/auth change, no silent error swallow (error is still logged via str(exc)), no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference.
 - Result: committed e095ba80 (pushed to fix/prd-test-action-per-second-ruff)
