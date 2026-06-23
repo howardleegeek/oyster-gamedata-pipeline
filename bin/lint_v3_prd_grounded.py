@@ -37,6 +37,7 @@ Stream BC new criteria:
 --strict promotes "dependency-missing" results from PASS to FAIL.
 """
 from __future__ import annotations
+
 import argparse
 import json
 import logging
