@@ -29,7 +29,7 @@ import traceback
 from pathlib import Path
 
 import tkinter as tk
-from tkinter import ttk, filedialog, scrolledtext, messagebox
+from tkinter import filedialog, scrolledtext, messagebox
 
 # When PyInstaller-frozen, bundled modules live in sys._MEIPASS. When run from
 # source, the bin/ dir holds lint_v3_prd_grounded.py next to this file.
