@@ -11,7 +11,6 @@ keys (clip_id, frame_idx) to shard file paths.
 
 import argparse
 import json
-import os
 import sys
 import tempfile
 from pathlib import Path
