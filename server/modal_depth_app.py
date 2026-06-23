@@ -4,13 +4,13 @@ Modal serverless depth endpoint — DA-V2 monocular depth inference.
 Deploy with: modal deploy server/modal_depth_app.py
 """
 
-import modal
+import io
 import os
 import subprocess
 import tarfile
 import tempfile
-import struct
-import io
+
+import modal
 import numpy as np
 
 # ---------------------------------------------------------------------------
@@ -23,7 +23,6 @@ stub = modal.Stub("oyster-depth")
 # ---------------------------------------------------------------------------
 def download_model():
     """Pre-download DA-V2 model weights into the image layer."""
-    import os
     from huggingface_hub import snapshot_download
 
     model_dir = "/root/.cache/da_v2_model"
@@ -74,16 +73,11 @@ def compute_depth(video_bytes: bytes, fps: int = 6) -> bytes:
       4. Write EXRs with kind: server_da_v2
       5. tar.gz the depth/ dir, return bytes
     """
+    import glob
+
+    import numpy as np
     import torch
     from PIL import Image
-    import numpy as np
-    import OpenEXR
-    import Imath
-    import tarfile
-    import io
-    import os
-    import subprocess
-    import glob
 
     with tempfile.TemporaryDirectory() as tmpdir:
         video_path = os.path.join(tmpdir, "in.mp4")
@@ -164,8 +158,8 @@ def compute_depth(video_bytes: bytes, fps: int = 6) -> bytes:
 
 def write_exr(path: str, depth_array: np.ndarray):
     """Write a single-channel float32 EXR file."""
-    import OpenEXR
     import Imath
+    import OpenEXR
 
     height, width = depth_array.shape
     header = OpenEXR.Header(width, height)
@@ -197,7 +191,6 @@ def depth_endpoint(req):
              -F "fps=6" \
              -o depth_output.tar.gz
     """
-    from fastapi import UploadFile, Form
 
     # req is a FastAPI Request-like object from Modal
     # Modal web_endpoint passes the request body directly
@@ -205,7 +198,6 @@ def depth_endpoint(req):
 
     # Extract video bytes and fps from the request
     # Modal's web_endpoint provides the raw request
-    import io
 
     # Get form data
     video_bytes = None
@@ -250,7 +242,7 @@ async def depth_endpoint_async(req):
     Async HTTP entry for depth computation.
     Accepts multipart form data with 'video' file field and optional 'fps' field.
     """
-    from fastapi import UploadFile, Form
+    from fastapi import UploadFile
     from fastapi.responses import Response
 
     form = await req.form()
