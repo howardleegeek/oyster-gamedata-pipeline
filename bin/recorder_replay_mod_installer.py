@@ -34,7 +34,6 @@ import hashlib
 import json
 import os
 import platform
-import shutil
 import sys
 import urllib.error
 import urllib.request
