@@ -32,6 +32,11 @@
 - Picked: Fix failing `tests/test_gpt_thinking_provider.py::test_provider_not_available_when_openai_missing` — `GPTThinkingProvider.__init__` unconditionally imported `openai` at construction time, so the test (which patches `builtins.__import__` to block `openai`) failed with `ModuleNotFoundError` during instantiation. Deferred import to `complete()`
 - Result: committed aa7e98df
 
+## Round 9 @ 2026-06-22T17:45:00Z
+- Picked: Fix ruff I001 import sort in backend/codex_api.py — `uvicorn` was imported after `fastapi` in the try block, causing unsorted import error.
+- Result: committed 8d1852e2
+- Result: committed aa7e98df
+
 ## Round 124 @ 2026-06-19T00:00:00Z
 - Picked: Ruff F401+I001+W291 in bin/error_reporting_service.py - removed unused json, datetime, timedelta imports; fixed import sorting; fixed trailing whitespace.
 - Result: committed 6f56152a.
