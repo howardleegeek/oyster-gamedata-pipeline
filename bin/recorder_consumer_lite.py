@@ -43,6 +43,7 @@ using PyInstaller --onefile --windowed with bundled ffmpeg.exe (added via
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import math
@@ -50,10 +51,9 @@ import os
 import queue
 import re
 import shutil
-import base64
 import socket
-import subprocess
 import struct
+import subprocess
 import sys
 import tarfile
 import tempfile
