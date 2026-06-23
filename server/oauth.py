@@ -1,17 +1,17 @@
 """OAuth login router for Google and Discord with JWT authentication."""
 
-import os
 import hashlib
+import os
 import secrets
 import time
 from datetime import datetime, timedelta
 from typing import Optional
-import json
+
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+import jwt
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
-import jwt
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
