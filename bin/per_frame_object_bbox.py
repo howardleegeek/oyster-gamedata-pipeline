@@ -168,6 +168,16 @@ def load_frames(path: Path, fmt: str) -> List[FrameData]:
 # -- exporters --------------------------------------------------------------
 
 def export_json(frames: List[FrameData], oc: float, tr: float) -> str:
+    """Export frame bounding boxes to JSON format.
+
+    Args:
+        frames: List of FrameData objects to serialize.
+        oc: Occlusion threshold (0.0-1.0) for filtering visible objects.
+        tr: Truncation threshold (0.0-1.0) for filtering visible objects.
+
+    Returns:
+        JSON string containing metadata and per-frame bounding boxes.
+    """
     return json.dumps({"metadata": {"total_frames": len(frames),
                                      "occlusion_threshold": oc,
                                      "truncation_threshold": tr},
