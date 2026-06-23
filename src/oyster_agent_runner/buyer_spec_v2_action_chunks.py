@@ -81,6 +81,17 @@ class ActionChunk:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> ActionChunk:
+        """Deserialize an ActionChunk from a JSON-compatible dict.
+
+        Args:
+            d: Dictionary with keys 'data', 'horizon', 'policy', and optionally 'step_id'.
+
+        Returns:
+            A new ActionChunk instance.
+
+        Raises:
+            KeyError: If required keys are missing.
+        """
         return cls(
             data=np.array(d["data"], dtype=np.float32),
             horizon=d["horizon"],
