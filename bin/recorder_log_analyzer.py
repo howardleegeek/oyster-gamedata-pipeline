@@ -169,6 +169,12 @@ class Report:
     unclassified_errors: list[str] = field(default_factory=list)
 
     def to_json(self) -> str:
+        """Serialize the report to a JSON string.
+
+        Returns:
+            JSON string representation of the report with run info,
+            issues, and summary counts.
+        """
         return json.dumps(
             {
                 "source": self.source,
