@@ -198,6 +198,9 @@
 
 ## Round 41 @ 2026-06-21T00:00:00Z
 - Picked: Fix ruff F401 unused imports (datetime.datetime, io.BytesIO, openpyxl.utils.get_column_letter) and I001 import sort in bin/generate_gameinfo_xlsx.py - has tests (test_generate_gameinfo_xlsx.py: 16/16 pass)
+## Round 120 @ 2026-06-23T00:00:00Z
+- Picked: Fix ruff I001 (import block unsorted) in bin/error_message_translator.py — continuation of the ongoing ruff cleanup sweep from Rounds 101-119. Split the multi-line import and ran `ruff check --fix` to properly sort. No behavior change. Module parses cleanly, --help works.
+- Result: committed 1bd634b2 (pushed to main)
 - Result: committed c7248a7f
 
 
