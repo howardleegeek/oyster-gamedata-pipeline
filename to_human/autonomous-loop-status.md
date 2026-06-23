@@ -2340,3 +2340,8 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 ## Round 199 @ 2026-06-24T17:00:00Z
 - Picked: Fix ruff F401 (unused imports: os, MagicMock, mock_open) and I001 (import sort order) in patches/cluster-week1-2026-05-18/D2-zbuffer-exr/test_zbuffer_to_exr.py. Continuation of the ongoing ruff cleanup sweep. Single-file bounded change, no behavior change. All 14 tests in the file pass. Self-review: pure unused-import cleanup + I001 sort order — no signature change, no exception flow touched, no threading or concurrency change, no auth or security change, no off-by-one, no silent error swallow, no test masked as passing (no skip/xfail added), no brand cross-reference, no module-level side effect.
 - Result: committed f4e4c1fa (pushed to fix/prd-test-action-per-second-ruff)
+
+## Round 196 @ 2026-06-24T13:10:00Z
+- Picked: Fix ruff I001 (unsorted imports) in bin/sample_tarball_builder.py line 399 — swapped import order for OpenEXR and Imath to be alphabetical. Continuation of the ongoing ruff cleanup sweep from Rounds 101-195. Single-file bounded change, 1 line swapped, no behavior change. Module imports cleanly, I001+E701+E702 checks clean. All 13 tests in tests/bin/test_sample_tarball_builder.py pass. Self-review: pure import-sort fix — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference.
+- Result: committed 4952936c (pushed to fix/prd-test-action-per-second-ruff)
+
