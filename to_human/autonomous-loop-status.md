@@ -15,6 +15,10 @@
 - Picked: Fix ruff F541 (extraneous f-string prefix) in bin/epal_payout_passthrough.py line 330 — removed unnecessary 'f' prefix from string literal `f"Bonus payout successful!"`. Continuation of the ongoing ruff cleanup sweep from Rounds 101-144. Single-file bounded change, 1 character removed, no behavior change. `ruff check bin/epal_payout_passthrough.py` clean, module imports cleanly. Self-review: cosmetic string change only — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing, no brand cross-reference, no module-level side effect.
 - Result: committed bd087db3 (pushed to main)
 
+## Round 147 @ 2026-06-23T07:00:00Z
+- Picked: Fix ruff F841 unused variable `col_letter` in bin/generate_gameinfo_xlsx.py — continuation of the ongoing ruff cleanup sweep from Rounds 101-146. Verified variable was assigned but never used (col_letter = match.group(1) extracted but not used later in the loop). Single-file bounded change, 1-line diff, no behavior change. Also fixed unused `result` variable in bin/e2e_tests/test_batch_integration.py. Ruff check clean on both files, corresponding tests pass (16/16 in tests/bin/test_generate_gameinfo_xlsx.py). Self-review: cosmetic variable removal — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing, no brand cross-reference.
+- Result: committed 725283c5 and 3bfae6c6 (pushed to main)
+
 ## Round 146 @ 2026-06-23T07:25:00Z
 - Picked: Fix ruff W292 (no newline at end of file) in bin/red_team_clock_skew.py — added trailing newline to EOF so `sys.exit(main())` line ends with `\n` per PEP 8. Continuation of the ongoing ruff cleanup sweep from Rounds 101-168. Single-file bounded change, 1 byte added (newline), no behavior change. `ruff check bin/red_team_clock_skew.py` clean (0 errors), module imports cleanly, pytest collection works (3294 tests). Self-review: pure trailing-whitespace change — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing, no brand cross-reference, no module-level side effect.
 - Result: committed eaafa2fc (pushed to main)
@@ -2163,7 +2167,15 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 ## Round 154 @ 2026-06-23T08:30:00Z
 - Picked: Fix ruff E401+I001 import sort + E701 multiline in bin/paper_health_check.py — split 1-line imports into separate lines per ruff E401, alphabetized imports per ruff I001, and fixed multiple statements on one line per ruff E701. Continuation of the ongoing ruff cleanup sweep from Rounds 101-153. Single-file bounded change, 10 insertions/3 deletions, no behavior change. Module parses cleanly, ruff check passes, 538/538 tests in tests/bin/ pass. Self-review: cosmetic import/format change — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing, no brand cross-reference, no module-level side effect.
 - Result: committed e3820acf (pushed to main)
--e 
+-
+## Round 169 @ 2026-06-23T10:15:00Z
+- Picked: Fix ruff F841 unused variable in bin/generate_manifest.py line 296 — removed unused `current_key = None` assignment in the fallback YAML parser. Continuation of the ongoing ruff cleanup sweep from Rounds 101-168. Single-file bounded change, 1 line removed, no behavior change. `ruff check bin/generate_manifest.py --select=F` clean, module imports cleanly, 19/19 tests in tests/bin/test_generate_manifest.py pass. Self-review: removed unused assignment — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing, no brand cross-reference, no module-level side effect.
+- Result: committed 979eb750 (pushed to main)
+
 ## Round 168 @ 2026-06-23T09:00:12Z
 - Picked: Fix ruff F401 unused imports in bin/multi_camera_capture.py — removed unused `dataclasses.field` and `numpy` imports. Verified both are genuinely unused (grep returns zero references beyond the import lines). Continuation of the ongoing ruff cleanup sweep from Rounds 101-167. Single-file bounded change, 2-line diff (2 unused imports removed), no behavior change. Module parses cleanly, ruff check passes, 538/538 tests in tests/bin/ pass. Self-review: cosmetic import removal only — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing, no brand cross-reference, no module-level side effect.
 - Result: committed ea0da893 (pushed to main)
+
+## Round 169 @ 2026-06-23T09:18:23Z
+- Picked: Fix ruff F401 unused imports in bin/preflight_check_v2.py — removed unused subprocess and typing.Any imports. Continuation of the ongoing ruff cleanup sweep from Rounds 101-168. Single-file bounded change, 2 lines removed, no behavior change. File not referenced by any tests or other modules (verified via grep), module parses cleanly, ruff check passes. Self-review: cosmetic import removal only — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing, no brand cross-reference, no module-level side effect.
+- Result: committed 42eaabb8 (pushed to main)
