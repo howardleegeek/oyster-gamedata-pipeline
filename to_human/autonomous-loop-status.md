@@ -2005,3 +2005,8 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 ## Round 126 @ 2026-06-23T01:05:00Z
 - Picked: Continue ruff F401+I001 sweep — finish uncommitted cleanup in server/modal_depth_app.py (F401 unused `import struct`; F401 dead `from fastapi import UploadFile, Form` in depth_endpoint which uses raw bytes; F401 redundant re-imports of os/numpy/tarfile/io/OpenEXR/Imath/subprocess inside compute_depth (all already at module scope or unused); kept glob/torch/PIL/numpy inside compute_depth (function-scoped) and UploadFile in depth_endpoint_async (used as type annotation); I001 reorder io to stdlib block, OpenEXR+Imath in write_exr). Same pattern as Rounds 115-125. 1 file, 1 logical change, single file git add, no behavior change.
 - Result: committed e19fc022 (pushed to main)
+## Round 128 @ 2026-06-23T02:00:00Z
+- Picked: Fix ruff F401 unused imports (json, shlex, dataclass, field) in bin/harness_loop.py — continuation of the ongoing ruff cleanup sweep from Rounds 101-127. Verified each import is genuinely unused via grep. Single-file bounded change, 4-line diff, no behavior change. Module imports cleanly, ruff check passes, 538/538 tests/bin/ pass. Same pattern as prior F401 fixes.
+- Result: committed 147c7f65 (pushed to main)
+
+## Round 127 @ 2026-06-23T01:15:00Z
