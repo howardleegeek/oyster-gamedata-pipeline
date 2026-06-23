@@ -7,7 +7,7 @@ MineDojo / MineWorld multimodal observation capture tool.
 from __future__ import annotations
 import argparse, json, logging, os, struct, sys, tempfile
 from dataclasses import dataclass, field, asdict
-from pathlib import Path
+
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 logger = logging.getLogger(__name__)

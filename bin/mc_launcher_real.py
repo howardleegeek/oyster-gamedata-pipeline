@@ -9,13 +9,11 @@ R001 · bin/mc_launcher_real.py — 启动真 Minecraft Java 1.20.4 客户端 (o
 
 import argparse
 import hashlib
-import json
 import os
 import socket
 import struct
 import subprocess
 import sys
-import tempfile
 import threading
 import time
 import uuid
