@@ -7,9 +7,9 @@ Usage:
 """
 
 import argparse
+import os
 import subprocess
 import sys
-import os
 
 
 def run_cmd(cmd, cwd=None):
