@@ -7,10 +7,10 @@ Purpose:
 """
 
 import argparse
-import sys
 import math
-import tempfile
 import os
+import sys
+import tempfile
 from typing import List, Optional, Tuple
 
 

@@ -8,7 +8,12 @@ Usage:  python3 bin/edge_test_leap_second.py [--verbose] [--strict]
 Exit:   0 = all passed, 1 = one or more failed
 """
 from __future__ import annotations
-import argparse, datetime as _dt, json, sys, tempfile
+
+import argparse
+import datetime as _dt
+import json
+import sys
+import tempfile
 from typing import Any, Dict, List, Tuple
 
 LEAP_SECOND_SCENARIOS: List[Dict[str, Any]] = [

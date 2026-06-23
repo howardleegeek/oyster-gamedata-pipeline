@@ -11,7 +11,7 @@ import json
 import os
 import sys
 import tempfile
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 
 class AdapterError(Exception):

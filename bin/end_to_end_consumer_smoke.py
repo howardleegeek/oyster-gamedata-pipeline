@@ -12,15 +12,16 @@ from __future__ import annotations
 
 import argparse
 import ast
+import json
 import shutil
 import subprocess
 import sys
 import tempfile
 import time
-import json
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
 
 # Lazy imports for optional dependencies
 def _lazy_import_pydantic():
@@ -313,8 +314,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         print("\n" + "=" * 60)
         print("SMOKE TEST PASSED")
         print("=" * 60)
-        print(f"  - Installer: OK")
-        print(f"  - Game Launch: OK")
+        print("  - Installer: OK")
+        print("  - Game Launch: OK")
         print(f"  - Trajectory: {len(trajectory_data)} points")
         print(f"  - Tarball: {tarball_creator.tarball_path}")
         print(f"  - G165 Lint: {G165_LINT_COUNT}/{G165_LINT_COUNT} PASS")
