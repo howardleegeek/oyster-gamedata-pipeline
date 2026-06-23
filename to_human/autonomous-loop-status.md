@@ -1,5 +1,9 @@
 
 
+## Round 196 @ 2026-06-23T20:37:00Z
+- Picked: Fix ruff I001 (import sorting) in bin/synthesize_real_depth.py. Continuation of the ongoing ruff cleanup sweep. Single-file bounded change, no behavior change. Module imports cleanly, I001 check clean. Self-review: pure formatting fix — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference.
+- Result: committed 3a5ffc6a (pushed to fix/prd-test-action-per-second-ruff)
+
 ## Round 195 @ 2026-06-24T13:00:00Z
 - Picked: Fix ruff E701 (multiple statements on one line, 5 instances) and I001 (unsorted imports) in bin/red_team_wrong_obs_key.py. Continuation of the ongoing ruff cleanup sweep. Single-file bounded change, no behavior change. Module imports cleanly, E701+I001 checks clean. Self-review: pure formatting fix — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference.
 - Result: committed 78d630ee (pushed to fix/prd-test-action-per-second-ruff)
