@@ -9,13 +9,10 @@ Runs bin/recorder_watchdog.py on known-bad and known-good fixture sessions:
 
 import argparse
 import json
-import os
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
-from typing import Any, Dict, Optional
-
+from typing import Any, Dict
 
 # Known-good fixture session (Howard's 2026-05-16 session)
 KNOWN_GOOD_SESSION = "session_20260516_213817_d137a341"
