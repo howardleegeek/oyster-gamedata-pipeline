@@ -35,7 +35,6 @@ import struct
 import sys
 from pathlib import Path
 
-
 # ---------------------------------------------------------------------------
 # Minimal EXR writer (no OpenEXR dependency)
 # ---------------------------------------------------------------------------
