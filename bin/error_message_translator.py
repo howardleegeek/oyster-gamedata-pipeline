@@ -5,7 +5,12 @@ Usage:
     python3 bin/error_message_translator.py [--input FILE] [--format text|json] [--verbose]
 """
 from __future__ import annotations
-import argparse, json, re, sys, textwrap
+
+import argparse
+import json
+import re
+import sys
+import textwrap
 from dataclasses import dataclass, field
 from typing import List, Optional
 
