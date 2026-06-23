@@ -52,6 +52,16 @@ class VoxelWindow:
         return np.array(self.block_ids, dtype=np.int32).reshape(3, 3, 3)
     @classmethod
     def from_array(cls, arr: Any, centre: Tuple[int, int, int]) -> "VoxelWindow":
+        """Create a VoxelWindow from a 3x3x3 numpy array of block IDs.
+
+        Args:
+            arr: A numpy array or array-like object containing 27 block IDs.
+                Expected shape: (3, 3, 3).
+            centre: Tuple of (x, y, z) coordinates for the voxel center.
+
+        Returns:
+            VoxelWindow: New instance with the flattened block IDs and center.
+        """
         return cls(centre=centre, block_ids=arr.reshape(-1).tolist())
 
 @dataclass
