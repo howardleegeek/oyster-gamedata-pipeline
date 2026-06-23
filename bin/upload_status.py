@@ -3,12 +3,11 @@
 CLI tool to query upload daemon state.
 """
 
-import sys
-import json
 import argparse
-from pathlib import Path
+import json
 from datetime import datetime, timedelta
-from typing import Dict, Any, List
+from pathlib import Path
+from typing import Any, Dict
 
 STATE_FILE = Path.home() / ".oyster" / "upload_state.json"
 
