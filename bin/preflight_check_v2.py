@@ -12,9 +12,7 @@ import json
 import os
 import shutil
 import socket
-import subprocess
 import sys
-from typing import Any
 
 
 def check_disk_free(path: str = '/tmp', min_gb: float = 100) -> dict:
