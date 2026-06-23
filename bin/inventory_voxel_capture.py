@@ -91,6 +91,14 @@ class FrameCapture:
         return d
     
     def to_json(self, indent: Optional[int] = 2) -> str:
+        """Serialize the FrameCapture to a JSON string.
+
+        Args:
+            indent: Number of spaces for JSON indentation. Defaults to 2.
+
+        Returns:
+            str: JSON-formatted string representation of this FrameCapture.
+        """
         return json.dumps(self.to_dict(), indent=indent)
     
     def to_npz(self, path: str) -> None:
