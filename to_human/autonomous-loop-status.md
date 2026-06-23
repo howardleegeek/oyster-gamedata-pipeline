@@ -1,5 +1,10 @@
 
 
+
+## Round 205 @ 2026-06-25T06:00:00Z
+- Picked: Fix ruff F541 (f-string without any placeholders) in bin/stress_test_huge_tarball_5gb.py and bin/upload_session.py. Two files had extraneous f-prefix on string literals with no placeholders. Single-file bounded change, no behavior change. Lint check clean. Self-review: F541 fix — no runtime behavior change, strings are pure literals, no silent error swallow, no security/threading/auth change.
+- Result: committed e7070f94 (pushed to fix/prd-test-action-per-second-ruff)
+
 ## Round 204 @ 2026-06-23T23:19:47Z
 - Picked: Fix ruff F841 (unused variable `boot_time`) in bin/recorder_health_telemetry.py. Single-file bounded change, no behavior change. The variable was calculated but never used - removing it does not affect the function's core logic (calculating process uptime). Module imports cleanly, F841 check clean. Self-review: F841 fix — no signature/exception/threading/auth change, no silent error swallow (the calculation was simply unused, not suppressing any error), no race condition, no security change, no off-by-one, no test masked as passing (no tests exist for this file), no brand cross-reference.
 - Result: committed 6f5d50f1 (pushed to fix/prd-test-action-per-second-ruff)
@@ -2415,3 +2420,7 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 - Picked: Fix ruff F821 (undefined name `e`) in bin/oyster_monitor.py — regression introduced by Round 200 (commit e095ba80) which renamed `except Exception as e:` to `except Exception as _:` in 2 spots of HealthChecker._check_endpoint and DiskChecker.check, but the except-bodies still reference `e` (the F841 fix was applied to the wrong target — the bodies use `e`, so the `as _` rename made the bodies raise NameError at runtime). Restoring the original `as e:` binding makes the error string non-empty in the failure path. Single-file bounded change, 2 insertions / 2 deletions, no behavior change in any happy path, restores intended error reporting. `ruff check bin/oyster_monitor.py` clean (down from 2 F821 errors), AST parses, `python3 -c "import bin.oyster_monitor"` would import (untested because file reads config at import time; ruff+AST+syntax verification used as the narrower quality gate since no tests reference this file). Verified the regression is real by reading the diff of e095ba80: lines 107 and 286 of pre-fix file have `as _:` but the body uses `str(e)`.
 - Self-review: F821 fix — no signature change, no new exception flow introduced (restoring an existing one), no threading or concurrency change, no auth or security change, no off-by-one, no test masked as passing (no tests for this file exist), no brand cross-reference, no module-level side effect added. The except body is otherwise identical to the original e095ba80-pre state; only the `as _:` token was changed back to `as e:`.
 - Result: committed 10f110fc (pushed to fix/prd-test-action-per-second-ruff)
+## Round 206 @ 2026-06-23T23:49:06Z
+- Picked: Fix ruff F841 (unused variable file_mb) in bin/red_team_oversized_json.py. The variable was assigned but never used - it was calculating file size in MB but not used. Single-file bounded change, no behavior change. Module imports cleanly, F841 check clean. Self-review: F841 fix — no runtime behavior change, no silent error swallow, no security/threading/auth change.
+- Result: committed 1486ae19 (pushed to fix/prd-test-action-per-second-ruff)
+
