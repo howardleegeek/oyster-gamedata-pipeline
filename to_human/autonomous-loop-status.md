@@ -998,6 +998,7 @@ E701 Multiple statements on one line (colon)
     |
 
 E702 Multiple statements on one line (semicolon)
+
    --> bin/inventory_voxel_capture.py:214:89
     |
 212 |             if yaml is None: logger.error("PyYAML not installed"); return 1
