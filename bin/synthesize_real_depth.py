@@ -25,7 +25,6 @@ from typing import Optional, Tuple
 
 import numpy as np
 
-
 # ---------------------------------------------------------------------------
 # Depth-map generation
 # ---------------------------------------------------------------------------
@@ -124,8 +123,8 @@ def generate_realistic_depth(
 
 def _save_exr_openexr(depth: np.ndarray, path: Path) -> bool:
     """Write EXR via OpenEXR / Imath (C++ bindings)."""
+    import Imath  # noqa: F811 — lazy
     import OpenEXR  # noqa: F811 — lazy
-    import Imath    # noqa: F811 — lazy
 
     h, w = depth.shape
     header = OpenEXR.Header(w, h)
