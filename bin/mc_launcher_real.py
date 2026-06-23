@@ -63,9 +63,7 @@ def find_minecraft_launcher() -> str:
     """
     try:
         # Try to import minecraft-launcher-lib
-        import minecraft_launcher_lib
-
-        # Use the library's command
+        import minecraft_launcher_lib  # noqa: F401
         return "minecraft-launcher-lib"
     except ImportError:
         # Fallback to system binary
@@ -471,7 +469,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         latest_log = log_files[0]
 
         # Wait for join
-        print(f"Waiting for client to join (timeout: 60s)...")
+        print("Waiting for client to join (timeout: 60s)...")
         if wait_for_join(str(latest_log), args.username, timeout_sec=60.0):
             print("Client joined successfully")
 
