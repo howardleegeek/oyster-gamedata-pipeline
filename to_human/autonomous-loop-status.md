@@ -2357,3 +2357,8 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 - Picked: Fix ruff I001 (unsorted imports) in bin/sample_tarball_builder.py line 399 — swapped import order for OpenEXR and Imath to be alphabetical. Continuation of the ongoing ruff cleanup sweep from Rounds 101-195. Single-file bounded change, 1 line swapped, no behavior change. Module imports cleanly, I001+E701+E702 checks clean. All 13 tests in tests/bin/test_sample_tarball_builder.py pass. Self-review: pure import-sort fix — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference.
 - Result: committed 4952936c (pushed to fix/prd-test-action-per-second-ruff)
 
+
+## Round 199 @ 2026-06-23T21:20:43Z
+- Picked: Fix ruff F841 (unused local variable) in bin/sample_tarball_builder.py: remove SCREEN_W and DEG_TO_PIXEL (lines 130-131) inside synthesize_action_camera. Confirmed via grep: not used anywhere else in bin/, tests/, or src/; mouse_dx is computed via genuine differential (mouse_x_curr - mouse_x_prev) and does not depend on these constants. Continuation of the ongoing ruff cleanup sweep. Single-file bounded change, no behavior change. Module imports cleanly, F841 check clean.
+- Self-review: pure dead-code removal — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference.
+- Result: committed 8549dabb (pushed to fix/prd-test-action-per-second-ruff)
