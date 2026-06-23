@@ -61,6 +61,12 @@ class LintReport:
             self.failed_count += 1
 
     def to_dict(self) -> Dict[str, Any]:
+        """Convert lint report to a dictionary for serialization.
+
+        Returns:
+            Dict containing data_dir, summary with counts and pass_rate,
+            and results list with individual lint check details.
+        """
         return {
             "data_dir": str(self.data_dir),
             "summary": {"total": self.total_checks, "passed": self.passed_count,
