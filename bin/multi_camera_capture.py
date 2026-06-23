@@ -19,12 +19,11 @@ import logging
 import sys
 import tempfile
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
 from PIL import Image, ImageDraw
 
 logger = logging.getLogger(__name__)
