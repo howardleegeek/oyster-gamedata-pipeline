@@ -208,7 +208,7 @@ def check_minecraft_window() -> dict:
                         width, height = int(parts[0]), int(parts[1])
             
             # Check if fullscreen and covers full screen
-            is_fullscreen = (width == EXPECTED_RESOLUTION[0] and 
+            is_fullscreen = (width == EXPECTED_RESOLUTION[0] and
                            height == EXPECTED_RESOLUTION[1] and
                            x == 0 and y == 0)
             
