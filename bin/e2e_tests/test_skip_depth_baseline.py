@@ -7,14 +7,11 @@ asserts audit returns PASS >= 89 (contributor mode baseline).
 """
 
 import argparse
-import json
-import os
 import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
-
+from typing import Any, Dict
 
 # Minimum baseline score for contributor mode
 MIN_BASELINE_SCORE = 89
