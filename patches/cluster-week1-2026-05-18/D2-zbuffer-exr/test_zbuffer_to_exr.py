@@ -5,12 +5,11 @@ Tests for zbuffer_to_exr.py
 
 import json
 import numpy as np
-import os
 import struct
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch, MagicMock, mock_open
+from unittest.mock import patch
 
 # Add local directory to path for the zbuffer_to_exr module
 import sys
