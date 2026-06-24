@@ -24,7 +24,7 @@ class ConsentLogError(Exception):
 
 class ConsentEntry:
     """Represents a single consent log entry with HMAC signature."""
-    
+
     def __init__(
         self,
         user_id: str,
@@ -38,7 +38,7 @@ class ConsentEntry:
         self.timestamp = timestamp or datetime.now(timezone.utc).isoformat()
         self.opt_in_version = opt_in_version
         self.signature = signature
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "user_id": self.user_id,
@@ -47,7 +47,7 @@ class ConsentEntry:
             "opt_in_version": self.opt_in_version,
             "signature": self.signature
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ConsentEntry":
         return cls(
@@ -64,9 +64,9 @@ class ConsentLogSigned:
     HMAC-signed consent log for recording user consent sessions.
     Provides tamper-evident storage for GDPR/CCPA/COPPA compliance.
     """
-    
+
     MIN_KEY_LENGTH = 16
-    
+
     def __init__(
         self,
         log_file: Union[str, Path],
@@ -75,7 +75,7 @@ class ConsentLogSigned:
     ):
         self.log_file = Path(log_file)
         self.key_file = Path(key_file) if key_file else None
-        
+
         if secret_key is not None:
             self.secret_key = secret_key
         elif self.key_file and self.key_file.exists():
@@ -84,30 +84,30 @@ class ConsentLogSigned:
             self.secret_key = os.urandom(32)
             if self.key_file:
                 self._save_key()
-        
+
         self._validate_key()
         self._ensure_log_file()
-    
+
     def _validate_key(self) -> None:
         if len(self.secret_key) < self.MIN_KEY_LENGTH:
             raise ConsentLogError(f"Secret key must be at least {self.MIN_KEY_LENGTH} bytes")
-    
+
     def _load_key(self) -> bytes:
         try:
             return base64.b64decode(self.key_file.read_text().strip())
         except Exception as e:
             raise ConsentLogError(f"Failed to load key file: {e}")
-    
+
     def _save_key(self) -> None:
         self.key_file.parent.mkdir(parents=True, exist_ok=True)
         self.key_file.write_text(base64.b64encode(self.secret_key).decode())
         self.key_file.chmod(0o600)
-    
+
     def _ensure_log_file(self) -> None:
         self.log_file.parent.mkdir(parents=True, exist_ok=True)
         if not self.log_file.exists():
             self._write_entries([])
-    
+
     def _compute_signature(self, entry: ConsentEntry) -> str:
         """Compute HMAC-SHA256 signature for a consent entry."""
         canonical = f"{entry.user_id}|{entry.game}|{entry.timestamp}|{entry.opt_in_version}"
@@ -115,14 +115,14 @@ class ConsentLogSigned:
             self.secret_key, canonical.encode("utf-8"), hashlib.sha256
         ).digest()
         return base64.b64encode(signature).decode()
-    
+
     def _read_entries(self) -> List[ConsentEntry]:
         try:
             data = json.loads(self.log_file.read_text())
             return [ConsentEntry.from_dict(e) for e in data.get("entries", [])]
         except json.JSONDecodeError as e:
             raise ConsentLogError(f"Invalid log file format: {e}")
-    
+
     def _write_entries(self, entries: List[ConsentEntry]) -> None:
         data = {
             "version": "1.0",
@@ -130,7 +130,7 @@ class ConsentLogSigned:
             "entries": [e.to_dict() for e in entries]
         }
         self.log_file.write_text(json.dumps(data, indent=2))
-    
+
     def add_entry(
         self,
         user_id: str,
@@ -147,23 +147,23 @@ class ConsentLogSigned:
         entries.append(entry)
         self._write_entries(entries)
         return entry
-    
+
     def verify_entry(self, entry: ConsentEntry) -> bool:
         """Verify the signature of a consent entry."""
         if not entry.signature:
             return False
         expected = self._compute_signature(entry)
         return hmac.compare_digest(entry.signature, expected)
-    
+
     def verify_all(self) -> Tuple[int, List[ConsentEntry]]:
         """Verify all entries. Returns (valid_count, list of invalid entries)."""
         entries = self._read_entries()
         invalid = [e for e in entries if not self.verify_entry(e)]
         return len(entries) - len(invalid), invalid
-    
+
     def get_entries_by_user(self, user_id: str) -> List[ConsentEntry]:
         return [e for e in self._read_entries() if e.user_id == user_id]
-    
+
     def get_entries_by_game(self, game: str) -> List[ConsentEntry]:
         return [e for e in self._read_entries() if e.game == game]
 
@@ -175,28 +175,28 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     parser.add_argument("-l", "--log-file", default="consent_log.json", help="Log file path")
     parser.add_argument("-k", "--key-file", help="Secret key file path")
-    
+
     subparsers = parser.add_subparsers(dest="command", required=True)
-    
+
     add_parser = subparsers.add_parser("add", help="Add a new consent entry")
     add_parser.add_argument("-u", "--user-id", required=True, help="User ID")
     add_parser.add_argument("-g", "--game", required=True, help="Game identifier")
     add_parser.add_argument("-v", "--version", default="1.0", help="Opt-in version")
-    
+
     subparsers.add_parser("verify", help="Verify all log entries")
-    
+
     list_parser = subparsers.add_parser("list", help="List log entries")
     list_parser.add_argument("-u", "--user-id", help="Filter by user ID")
     list_parser.add_argument("-g", "--game", help="Filter by game")
-    
+
     args = parser.parse_args(argv)
-    
+
     try:
         log = ConsentLogSigned(
             log_file=args.log_file,
             key_file=getattr(args, "key_file", None)
         )
-        
+
         if args.command == "add":
             entry = log.add_entry(
                 user_id=args.user_id, game=args.game, opt_in_version=args.version
@@ -208,7 +208,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"  Version: {entry.opt_in_version}")
             print(f"  Signature: {entry.signature[:16]}...")
             return 0
-        
+
         elif args.command == "verify":
             valid_count, invalid = log.verify_all()
             print(f"Verified {valid_count} valid entries")
@@ -218,7 +218,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                     print(f"  - {e.user_id}/{e.game} at {e.timestamp}")
                 return 1
             return 0
-        
+
         elif args.command == "list":
             entries = log._read_entries()
             if args.user_id:
@@ -229,14 +229,14 @@ def main(argv: Optional[List[str]] = None) -> int:
                 sig_status = "✓" if log.verify_entry(e) else "✗"
                 print(f"{sig_status} {e.timestamp} | {e.user_id} | {e.game} | v{e.opt_in_version}")
             return 0
-        
+
     except ConsentLogError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
     except Exception as e:
         print(f"Unexpected error: {e}", file=sys.stderr)
         return 2
-    
+
     return 0
 
 
