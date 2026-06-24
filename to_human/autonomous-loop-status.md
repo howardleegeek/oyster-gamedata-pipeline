@@ -1,3 +1,8 @@
+## Round 247 @ 2025-01-27T05:45:00Z
+
+- Picked: no good candidate found this round — exiting
+- Result: skipped (lint clean: src/ tests/ bin/ all pass ruff. Sampled tests pass: iron_law_check 13/13, iron_law_no_fake_data 25/25. PRD gaps in PRODUCTION_GAPS.md require credentials (Vercel tokens, Supabase migrations, code signing), not code changes. Active code fully resolved.)
+
 ## Round 246 @ 2025-01-27T05:15:00Z
 
 - Picked: no good candidate found this round — exiting
