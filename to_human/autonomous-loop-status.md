@@ -18,7 +18,11 @@
 - Result: committed 6f5d50f1 (pushed to fix/prd-test-action-per-second-ruff)
 
 ## Round 209 @ 2026-06-29T06:00:00Z
-- Picked: Fix ruff F841 (unused variable `event`) in server/webhook_dispatcher.py. The `event` dict was assigned but never used - the `emit_event` function was building a dict but only calling `dispatch_event` with the raw parameters. Single-file bounded change, no behavior change. Lint check clean. Self-review: F841 fix — no runtime behavior change, dispatch_event still called with event_type and payload, no silent error swallow, no security/threading/auth change.
+- Picked: Fix ruff F841 (unused variable `event`) in server/webhook_dispatcher.py. The `event` dict was assigned but never used - the `emit_event` function was building a dict but only calling `dispatch_event` with the raw parameters. Single-file bounded change, no behavior change. Lint check clean. Self-review: F841 fix — no runtime behavior change, dispatch_event still called with event_type and payload, no silent error swallow, no security/threading/auth ch
+
+## Round 210 @ 2026-07-13T06:00:00Z
+- Picked: Fix ruff F841 (unused variables) in tests/bin/test_mc_launcher_real.py. Six unused variables (result, process, mock_rcon) across multiple test functions. The test functions call mc_launcher_real functions for side effects (assertions on mock calls), so the return values are unused. Single-file bounded change, no behavior change. Tests pass. Self-review: F841 fix — no runtime behavior change, functions still called for side effects, no silent error swallow, no security/threading/auth change.
+- Result: committed abf80c54 (pushed to fix/prd-test-action-per-second-ruff)ange.
 - Result: committed c34232e0 (pushed to fix/prd-test-action-per-second-ruff)
 
 ## Round 208 @ 2026-06-28T06:00:00Z
