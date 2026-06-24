@@ -1,6 +1,10 @@
 
 
 
+## Round 207 @ 2026-06-27T06:00:00Z
+- Picked: Fix ruff F841 (unused variables) in bin/stress_test_huge_tarball_5gb.py, bin/temporal_consistency_lint.py, and bin/upload_daemon.py. Three files had variables assigned but never used: `meta`, `np`, and `start_time`. The function calls remain for their side effects (create_capture writes meta.json, _get_numpy caches module, no timing needed). Single-file bounded change, no behavior change. Lint check clean. Self-review: F841 fixes — no runtime behavior change, functions still called for side effects, no silent error swallow, no security/threading/auth change.
+- Result: committed fb5a77d3 (pushed to fix/prd-test-action-per-second-ruff)
+
 ## Round 206 @ 2026-06-26T06:00:00Z
 - Picked: Fix ruff F841 (unused variables `tester_id` and `income_data`) in bin/remote_recorder_backend_e2e.py. Two variables were assigned but never used. The function calls remain for their side effects (applying tester, fetching income). Single-file bounded change, no behavior change. Tests pass. Self-review: F841 fix — no runtime behavior change, functions still called for side effects, no silent error swallow, no security/threading/auth change.
 - Result: committed 4f20b1b0 (pushed to fix/prd-test-action-per-second-ruff)
