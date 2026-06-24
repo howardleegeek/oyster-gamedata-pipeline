@@ -113,9 +113,7 @@ def tool_catalog_prompt(tools: list[Tool]) -> str:
     lines = ["Available tools (invoke via `call_tool` action):"]
     for t in tools:
         lines.append(f"  - {t.name}: {t.description}")
-    lines.append(
-        "\nTo invoke a tool, emit: " '`{"op": "call_tool", "tool": "<name>", "args": {...}}`'
-    )
+    lines.append('\nTo invoke a tool, emit: `{"op": "call_tool", "tool": "<name>", "args": {...}}`')
     return "\n".join(lines)
 
 
