@@ -209,6 +209,9 @@ class TestKeyGeneration:
         # The key point is no "Generated new keypair" message
         # Since we used a valid 32-byte seed, it should just use it
         # (Note: all-zero seed is valid for Ed25519)
+        assert os.path.getmtime(tmp_keyfile) == original_mtime, (
+            "keyfile was unexpectedly regenerated"
+        )
 
 
 class TestSelfCheck:
