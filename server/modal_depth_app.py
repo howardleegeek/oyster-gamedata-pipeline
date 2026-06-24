@@ -204,7 +204,8 @@ def depth_endpoint(req):
     fps = 6
 
     if hasattr(req, "form"):
-        form_data = req.form  # This may be async
+        # Parse form data for video_bytes and fps if needed
+        pass
     else:
         # Fallback: treat body as raw video bytes
         video_bytes = req.body if hasattr(req, "body") else bytes(req)
