@@ -50,6 +50,7 @@ def attach_to_root(root: Any, is_armed_callable, on_close_confirmed) -> None:
     ``on_close_confirmed`` -> callable: invoked when the user picks Yes
                               (typical: ``root.destroy``).
     """
+
     def _handler() -> None:
         if is_armed_callable():
             if not confirm_close_while_recording(parent=root):
@@ -62,5 +63,6 @@ def attach_to_root(root: Any, is_armed_callable, on_close_confirmed) -> None:
 if __name__ == "__main__":
     # Smoke test: only runs when a display is available.
     import sys
+
     print("decision=", confirm_close_while_recording())
     sys.exit(0)
