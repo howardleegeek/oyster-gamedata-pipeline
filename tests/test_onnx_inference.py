@@ -17,10 +17,24 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
+# Check onnxruntime availability for tests that require it
+try:
+    import onnxruntime  # noqa: F401 - needed for test patches
+    _onnxruntime_available = True
+except ImportError:
+    _onnxruntime_available = False
+
 # Ensure bin/ is on path
 BIN_DIR = pathlib.Path(__file__).parent.parent / "bin"
 if str(BIN_DIR) not in sys.path:
     sys.path.insert(0, str(BIN_DIR))
+
+# Check torch availability for tests that require it
+try:
+    import torch  # noqa: F401
+    _torch_available = True
+except ImportError:
+    _torch_available = False
 
 
 class TestONNXOutputEquivalence(unittest.TestCase):
@@ -286,7 +300,8 @@ class TestManifestGeneration(unittest.TestCase):
         else:
             # Verify the export script would produce correct structure
             # by checking the code path
-            from bin.export_da_v2_to_onnx import sha256_file
+            # Use download_da_v2_onnx instead of export_da_v2_to_onnx to avoid torch dependency
+            from bin.download_da_v2_onnx import sha256_file
 
             # Test sha256_file function
             test_file = pathlib.Path("/tmp/poc_onnx_out/depth_anything_v2_small.onnx")
@@ -298,6 +313,7 @@ class TestManifestGeneration(unittest.TestCase):
 class TestCanonicalPipeline(unittest.TestCase):
     """Test canonical_pipeline.py backend detection."""
 
+    @unittest.skipUnless(_onnxruntime_available, "onnxruntime not installed")
     def test_detect_best_backend_windows(self):
         """Should detect DirectML on Windows."""
         with patch("platform.system", return_value="Windows"):
@@ -311,6 +327,7 @@ class TestCanonicalPipeline(unittest.TestCase):
                 backend = detect_best_backend()
                 self.assertEqual(backend, "local-onnx-directml")
 
+    @unittest.skipUnless(_torch_available, "torch not installed")
     def test_detect_best_backend_macos(self):
         """Should detect MPS on macOS."""
         with patch("platform.system", return_value="Darwin"):
