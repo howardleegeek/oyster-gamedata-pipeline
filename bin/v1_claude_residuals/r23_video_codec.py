@@ -9,6 +9,7 @@ failure → ABSTAIN (passed=False, residual=NaN, note="ABSTAIN:<reason>").
 
 Threshold: 0 (strict). residual = count of mismatched fields.
 """
+
 from __future__ import annotations
 
 import json
@@ -55,7 +56,10 @@ def r23_video_codec(
     try:
         proc = subprocess.run(
             [*_FFPROBE_CMD, path_str],
-            capture_output=True, text=True, timeout=10, check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
         )
     except (subprocess.TimeoutExpired, OSError) as e:
         return _abstain(f"ffprobe_failed:{type(e).__name__}")
@@ -66,7 +70,8 @@ def r23_video_codec(
         data = json.loads(proc.stdout)
         streams = data.get("streams", [])
         video_stream = next(
-            (s for s in streams if s.get("codec_type") == "video"), None,
+            (s for s in streams if s.get("codec_type") == "video"),
+            None,
         )
         if video_stream is None and streams:
             video_stream = streams[0]
