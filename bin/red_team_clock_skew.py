@@ -44,6 +44,11 @@ class ClockAdapter:
 
     @property
     def current_source(self) -> ClockSource:
+        """Get the currently active clock source.
+
+        Returns:
+            ClockSource: The active clock source (SYSTEM or MONOTONIC).
+        """
         return self._state.source
 
     @property
