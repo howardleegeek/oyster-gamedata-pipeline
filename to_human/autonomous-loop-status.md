@@ -2448,3 +2448,8 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 ## Round 210 @ 2026-06-28T06:30:00Z
 - Picked: Fix F841 unused variable in oyster_provenance/verify.py line 139 - the exception binding `e` was assigned but never used. Also addresses silent error swallow pattern since the except block silently returns (False, None) regardless of the exception. Changed `except Exception as e:` to `except Exception:` per F841. Tests: 25/25 pass in test_provenance.py. Single-file bounded change, no behavior change. Self-review: F841 fix — no runtime behavior change (exception still caught and silently swallowed), no signature/threading/auth change, no race condition, no off-by-one, no test masked as passing.
 - Result: committed c45bf47a (pushed to fix/prd-test-action-per-second-ruff)
+
+## Round 211 @ 2026-06-24T01:27:59Z
+- Picked: Fix ruff I001 (unsorted import block) in oyster_provenance/manifest.py. Continuation of the ongoing ruff cleanup sweep from Rounds 101-210. Single-file bounded change, 5 insertions / 6 deletions, no behavior change. `ruff check oyster_provenance/manifest.py` clean (0 errors, down from 1). 55/55 tests pass across tests/test_provenance.py, tests/test_provenance_sign_verify.py, and tests/test_provenance_offline_bundle.py. Module imports cleanly.
+- Self-review: I001 fix — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference, no module-level side effect.
+- Result: committed 3d9e1153 (pushed to fix/prd-test-action-per-second-ruff)
