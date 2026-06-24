@@ -20,6 +20,7 @@ recommends ed25519 long-term (§ 3.3) but defers to HMAC for v1 bring-up
 IRON LAW IL12 enforced: V₄ MUST emit ABSTAIN whenever any of the signing
 preconditions fail; it MUST NEVER return passed=True in those cases.
 """
+
 from .verifier import (
     canonical_record,
     compute_signature,
