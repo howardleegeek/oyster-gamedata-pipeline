@@ -43,18 +43,18 @@ def test_privacy_exists() -> None:
 def test_tos_under_500_lines() -> None:
     """TOS must not exceed 500 lines."""
     lines = TOS_PATH.read_text(encoding="utf-8").splitlines()
-    assert (
-        len(lines) <= MAX_LINES
-    ), f"TERMS_OF_SERVICE.md has {len(lines)} lines, exceeds {MAX_LINES}-line limit"
+    assert len(lines) <= MAX_LINES, (
+        f"TERMS_OF_SERVICE.md has {len(lines)} lines, exceeds {MAX_LINES}-line limit"
+    )
 
 
 @pytest.mark.unit
 def test_privacy_under_500_lines() -> None:
     """Privacy Policy must not exceed 500 lines."""
     lines = PRIVACY_PATH.read_text(encoding="utf-8").splitlines()
-    assert (
-        len(lines) <= MAX_LINES
-    ), f"PRIVACY_POLICY.md has {len(lines)} lines, exceeds {MAX_LINES}-line limit"
+    assert len(lines) <= MAX_LINES, (
+        f"PRIVACY_POLICY.md has {len(lines)} lines, exceeds {MAX_LINES}-line limit"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -73,9 +73,9 @@ def test_tos_contains_as_is() -> None:
 def test_tos_contains_delaware() -> None:
     """TOS must specify Delaware as governing law."""
     text = TOS_PATH.read_text(encoding="utf-8")
-    assert (
-        "Delaware" in text
-    ), "TERMS_OF_SERVICE.md must reference 'Delaware' as governing law jurisdiction"
+    assert "Delaware" in text, (
+        "TERMS_OF_SERVICE.md must reference 'Delaware' as governing law jurisdiction"
+    )
 
 
 @pytest.mark.unit
@@ -101,18 +101,18 @@ def test_privacy_contains_oauth() -> None:
 def test_privacy_contains_delete() -> None:
     """Privacy Policy must describe the right to delete."""
     text = PRIVACY_PATH.read_text(encoding="utf-8")
-    assert (
-        "delete" in text.lower()
-    ), "PRIVACY_POLICY.md must reference the right to 'delete' account/data"
+    assert "delete" in text.lower(), (
+        "PRIVACY_POLICY.md must reference the right to 'delete' account/data"
+    )
 
 
 @pytest.mark.unit
 def test_privacy_contains_anonymized() -> None:
     """Privacy Policy must describe anonymized data sharing."""
     text = PRIVACY_PATH.read_text(encoding="utf-8")
-    assert (
-        "anonymized" in text.lower()
-    ), "PRIVACY_POLICY.md must reference 'anonymized' data sharing"
+    assert "anonymized" in text.lower(), (
+        "PRIVACY_POLICY.md must reference 'anonymized' data sharing"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -149,18 +149,18 @@ def test_privacy_references_tos() -> None:
 def test_tos_has_draft_disclaimer() -> None:
     """TOS must carry a 'not legal advice' draft disclaimer."""
     text = TOS_PATH.read_text(encoding="utf-8")
-    assert (
-        "draft" in text.lower() and "legal advice" in text.lower()
-    ), "TERMS_OF_SERVICE.md must include a draft / not-legal-advice disclaimer"
+    assert "draft" in text.lower() and "legal advice" in text.lower(), (
+        "TERMS_OF_SERVICE.md must include a draft / not-legal-advice disclaimer"
+    )
 
 
 @pytest.mark.unit
 def test_privacy_has_draft_disclaimer() -> None:
     """Privacy Policy must carry a 'not legal advice' draft disclaimer."""
     text = PRIVACY_PATH.read_text(encoding="utf-8")
-    assert (
-        "draft" in text.lower() and "legal advice" in text.lower()
-    ), "PRIVACY_POLICY.md must include a draft / not-legal-advice disclaimer"
+    assert "draft" in text.lower() and "legal advice" in text.lower(), (
+        "PRIVACY_POLICY.md must include a draft / not-legal-advice disclaimer"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -193,15 +193,15 @@ def test_privacy_has_contact_email() -> None:
 def test_privacy_mentions_gdpr() -> None:
     """Privacy Policy must acknowledge GDPR."""
     text = PRIVACY_PATH.read_text(encoding="utf-8")
-    assert (
-        "GDPR" in text or "General Data Protection Regulation" in text
-    ), "PRIVACY_POLICY.md must acknowledge GDPR"
+    assert "GDPR" in text or "General Data Protection Regulation" in text, (
+        "PRIVACY_POLICY.md must acknowledge GDPR"
+    )
 
 
 @pytest.mark.unit
 def test_privacy_mentions_ccpa() -> None:
     """Privacy Policy must acknowledge CCPA."""
     text = PRIVACY_PATH.read_text(encoding="utf-8")
-    assert (
-        "CCPA" in text or "California Consumer Privacy Act" in text
-    ), "PRIVACY_POLICY.md must acknowledge CCPA"
+    assert "CCPA" in text or "California Consumer Privacy Act" in text, (
+        "PRIVACY_POLICY.md must acknowledge CCPA"
+    )
