@@ -15,8 +15,9 @@ import sys
 def run_cmd(cmd, cwd=None):
     """Execute shell command, return (success, stdout, stderr)."""
     try:
-        result = subprocess.run(cmd, shell=True, cwd=cwd,
-                                capture_output=True, text=True, timeout=300)
+        result = subprocess.run(
+            cmd, shell=True, cwd=cwd, capture_output=True, text=True, timeout=300
+        )
         return result.returncode == 0, result.stdout, result.stderr
     except subprocess.TimeoutExpired:
         return False, "", "Command timed out"
