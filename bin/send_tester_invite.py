@@ -48,8 +48,7 @@ def main() -> None:
         resp = httpx.post(url, headers=headers, timeout=10)
     except httpx.ConnectError:
         print(
-            f"ERROR: Could not connect to {args.base_url}. "
-            "Is the backend stub running?",
+            f"ERROR: Could not connect to {args.base_url}. Is the backend stub running?",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -61,14 +60,10 @@ def main() -> None:
         print(f"ERROR: Tester '{args.tester_id}' not found.", file=sys.stderr)
         sys.exit(1)
     if resp.status_code == 409:
-        print(
-            f"ERROR: {resp.json().get('detail', 'Already processed')}", file=sys.stderr
-        )
+        print(f"ERROR: {resp.json().get('detail', 'Already processed')}", file=sys.stderr)
         sys.exit(1)
     if resp.status_code != 200:
-        print(
-            f"ERROR: Unexpected status {resp.status_code}: {resp.text}", file=sys.stderr
-        )
+        print(f"ERROR: Unexpected status {resp.status_code}: {resp.text}", file=sys.stderr)
         sys.exit(1)
 
     data = resp.json()
