@@ -34,9 +34,9 @@ def test_fabric_mod_json_has_server_entrypoint():
     data = json.loads(p.read_text())
     assert "server" in data["entrypoints"], "no server entrypoint declared"
     server_entries = data["entrypoints"]["server"]
-    assert any(
-        "OysterServerMod" in e for e in server_entries
-    ), f"no OysterServerMod found in server entrypoints: {server_entries}"
+    assert any("OysterServerMod" in e for e in server_entries), (
+        f"no OysterServerMod found in server entrypoints: {server_entries}"
+    )
 
 
 def test_server_environment_is_star_or_dedicated():
@@ -64,9 +64,9 @@ def test_server_capture_uses_canonical_GameStateSample():
     ).read_text()
     assert "GameStateSample" in src, "ServerStateCapture must use canonical GameStateSample type"
     # Ensure it doesn't define a SECOND record/class with the same shape
-    assert not re.search(
-        r"\brecord\s+ServerSample\b", src
-    ), "Don't define a second sample type — reuse GameStateSample"
+    assert not re.search(r"\brecord\s+ServerSample\b", src), (
+        "Don't define a second sample type — reuse GameStateSample"
+    )
 
 
 def test_server_session_dir_path_convention():
@@ -92,9 +92,9 @@ def test_server_session_dir_path_convention():
 def test_cli_has_game_state_jsonl_flag():
     """The adapt-buyer-spec CLI command must accept --game-state-jsonl."""
     src = (REPO_ROOT / "src" / "oyster_agent_runner" / "cli.py").read_text()
-    assert (
-        "--game-state-jsonl" in src
-    ), "cli.py adapt-buyer-spec must expose --game-state-jsonl flag"
+    assert "--game-state-jsonl" in src, (
+        "cli.py adapt-buyer-spec must expose --game-state-jsonl flag"
+    )
 
 
 def test_adapter_signature_accepts_game_state_jsonl():
@@ -103,9 +103,9 @@ def test_adapter_signature_accepts_game_state_jsonl():
     from oyster_agent_runner.buyer_spec_adapter import adapt_phase1_to_buyer_spec
 
     sig = inspect.signature(adapt_phase1_to_buyer_spec)
-    assert (
-        "game_state_jsonl" in sig.parameters
-    ), "adapt_phase1_to_buyer_spec missing game_state_jsonl kwarg"
+    assert "game_state_jsonl" in sig.parameters, (
+        "adapt_phase1_to_buyer_spec missing game_state_jsonl kwarg"
+    )
 
 
 def test_pipeline_shell_discovers_jsonl():
