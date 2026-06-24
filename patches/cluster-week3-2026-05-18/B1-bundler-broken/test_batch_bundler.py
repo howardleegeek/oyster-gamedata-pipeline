@@ -3,20 +3,20 @@
 Tests for batch_bundler.py
 """
 
+import hashlib
+import json
 import os
 import sys
-import json
-import hashlib
 import tarfile
 import tempfile
-import shutil
 from pathlib import Path
+
 import pytest
 
 # Add bin to path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'bin'))
 
-from batch_bundler import sha256_file, sha256_bytes, build_merkle_tree, process_session
+from batch_bundler import build_merkle_tree, process_session, sha256_bytes, sha256_file
 
 
 def test_sha256_file():
@@ -119,7 +119,7 @@ def test_process_session():
         
         # Check session SHA256
         concat_hashes = ''.join(sorted(
-            hashlib.sha256(content).hexdigest() 
+            hashlib.sha256(content).hexdigest()
             for content in files.values()
         ))
         expected_session_hash = hashlib.sha256(concat_hashes.encode('utf-8')).hexdigest()
