@@ -41,6 +41,12 @@ class IMUReading:
     gyro: Tuple[float, float, float]
 
     def to_dict(self) -> Dict[str, Any]:
+        """Convert IMU reading to dictionary representation.
+
+        Returns:
+            Dictionary with keys: timestamp (float), accel (list of 3 floats),
+            gyro (list of 3 floats).
+        """
         return {"timestamp": self.timestamp, "accel": list(self.accel), "gyro": list(self.gyro)}
 
 
