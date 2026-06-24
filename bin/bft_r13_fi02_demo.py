@@ -15,6 +15,7 @@ This file does NOT depend on V2/V2'/V3 R13 implementations (they are
 independent dispatches in flight). When V2 R13 lands, this demo will be
 extended to show 2/2 detect.
 """
+
 from __future__ import annotations
 
 import json
@@ -29,13 +30,18 @@ from bin.v3_physics_oracle.residuals import r09_keycode_vk_known as v3_r09
 
 
 def _build_inputs_jsonl(events: list[dict], fps: float = 30.0) -> Path:
-    f = tempfile.NamedTemporaryFile(
-        mode="w", suffix=".jsonl", delete=False, encoding="utf-8"
+    f = tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False, encoding="utf-8")
+    f.write(
+        json.dumps(
+            {
+                "event_type": "session_start",
+                "timestamp_ms": 0,
+                "fps": fps,
+                "frame_count": 9000,
+            }
+        )
+        + "\n"
     )
-    f.write(json.dumps({
-        "event_type": "session_start", "timestamp_ms": 0,
-        "fps": fps, "frame_count": 9000,
-    }) + "\n")
     for ev in events:
         f.write(json.dumps(ev) + "\n")
     f.close()
@@ -50,10 +56,12 @@ def main() -> int:
     # FI-02 attack scenario:
     #   raw input recording: W (87) was held the whole time
     #   producer's action_camera.json (mutated/attacked): keyCode = [88]
-    inputs_path = _build_inputs_jsonl([
-        {"event_type": "key_down", "key_code": 87, "timestamp_ms": 0},
-        {"event_type": "key_up",   "key_code": 87, "timestamp_ms": 5000},
-    ])
+    inputs_path = _build_inputs_jsonl(
+        [
+            {"event_type": "key_down", "key_code": 87, "timestamp_ms": 0},
+            {"event_type": "key_up", "key_code": 87, "timestamp_ms": 5000},
+        ]
+    )
 
     rec_attacked = {
         "frame": 30,
@@ -68,11 +76,13 @@ def main() -> int:
     print(f"  V1 R09: passed={r1.passed} note={r1.note!r}")
     print(f"  V2 R09: passed={r2['passed']} note={r2.get('note', '')}")
     print(f"  V3 R09: verdict={r3.verdict.value} note={r3.note}")
-    n_caught = sum([
-        not r1.passed,
-        not r2["passed"],
-        r3.verdict == Verdict.FAIL,
-    ])
+    n_caught = sum(
+        [
+            not r1.passed,
+            not r2["passed"],
+            r3.verdict == Verdict.FAIL,
+        ]
+    )
     print(f"  → R09 detected by {n_caught}/3 verifiers (BLIND SPOT)")
 
     print()
@@ -94,4 +104,5 @@ def main() -> int:
 
 if __name__ == "__main__":
     import sys
+
     sys.exit(main())
