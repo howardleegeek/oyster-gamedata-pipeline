@@ -65,6 +65,11 @@ class FPSMetrics:
 
     @property
     def avg_fps(self) -> float:
+        """Return the average FPS across all samples.
+
+        Returns:
+            Average FPS as float, or 0.0 if no samples collected.
+        """
         return mean(self.samples) if self.samples else 0.0
 
     @property
