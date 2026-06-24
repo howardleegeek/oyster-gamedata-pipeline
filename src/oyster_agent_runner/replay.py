@@ -293,8 +293,7 @@ class Replayer:
                     continue
                 if last_ts is not None and ts < last_ts - _TIMESTAMP_EPSILON_SEC:
                     report.add(
-                        f"{stream_name}: timestamp regressed at line {i + 1} "
-                        f"({last_ts} -> {ts})"
+                        f"{stream_name}: timestamp regressed at line {i + 1} ({last_ts} -> {ts})"
                     )
                 last_ts = ts
 
@@ -341,7 +340,7 @@ class Replayer:
         )
         if len(cot_action_ts) != len(input_action_ts):
             report.add(
-                f"ACTION count mismatch: cot={len(cot_action_ts)} " f"inputs={len(input_action_ts)}"
+                f"ACTION count mismatch: cot={len(cot_action_ts)} inputs={len(input_action_ts)}"
             )
         else:
             for c_ts, i_ts in zip(cot_action_ts, input_action_ts, strict=False):
