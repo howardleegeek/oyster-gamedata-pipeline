@@ -561,6 +561,17 @@ def process_payouts(
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Daily payout cron entry point.
+
+    Reads unpaid tester balances from Supabase, creates Stripe transfers
+    for eligible testers, and records payouts.
+
+    Args:
+        argv: Command-line arguments (default: sys.argv).
+
+    Returns:
+        Exit code: 0 for success, 1 for failure.
+    """
     parser = argparse.ArgumentParser(description="Daily Stripe Connect payout cron.")
     parser.add_argument(
         "--dry-run",
