@@ -71,9 +71,9 @@ def test_compliance_doc_references_buyer_spec_adapter() -> None:
     code that runs on their bundle.
     """
     text = DOC_PATH.read_text(encoding="utf-8")
-    assert (
-        "buyer_spec_adapter.py" in text or "buyer_spec_adapter" in text
-    ), "compliance doc does not reference the buyer_spec_adapter module"
+    assert "buyer_spec_adapter.py" in text or "buyer_spec_adapter" in text, (
+        "compliance doc does not reference the buyer_spec_adapter module"
+    )
 
 
 @pytest.mark.unit
@@ -90,6 +90,6 @@ def test_compliance_doc_cites_mineflayer_ground_truth() -> None:
     assert "mineflayer" in text, "compliance doc does not mention Mineflayer"
     # And it must explicitly say ground-truth (or a close synonym) so the
     # claim is not buried.
-    assert (
-        "ground-truth" in text or "ground truth" in text
-    ), "compliance doc does not call out Mineflayer values as ground-truth"
+    assert "ground-truth" in text or "ground truth" in text, (
+        "compliance doc does not call out Mineflayer values as ground-truth"
+    )
