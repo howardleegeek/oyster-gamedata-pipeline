@@ -81,6 +81,12 @@
 ## Round @ 2026-06-21T13:35:00Z
 - File: bin/inventory_voxel_capture.py::main
 - Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: 8ec2a7b3a
+
+## Round @ 2026-01-19T10:00:00Z
+- File: bin/imu_provider.py::IMUReading.to_dict
+- Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: a0f11e297dd719ac8fe63f64a546b8fcc05f450dlready had type hints)
 - Commit: 6c0e3a7c1
 
 ## Round @ 2026-06-23T05:25:00Z
