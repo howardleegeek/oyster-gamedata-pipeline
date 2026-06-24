@@ -35,7 +35,9 @@ def run_lint_v2(config_path: Path) -> tuple[int, str, str]:
     """Execute lint v2 on the given systeminfo.json file."""
     result = subprocess.run(
         ["python3", "-m", "lint", "--version", "2", "--config", str(config_path)],
-        capture_output=True, text=True, timeout=60
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
     return result.returncode, result.stdout, result.stderr
 
