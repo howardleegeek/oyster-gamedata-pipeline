@@ -81,6 +81,12 @@
 ## Round @ 2026-06-21T13:35:00Z
 - File: bin/inventory_voxel_capture.py::main
 - Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: f6cf5e2a1
+
+## Round @ 2026-06-21T14:00:00Z
+- File: bin/per_frame_object_bbox.py::BBox2D.is_visible
+- Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: abd4a2bfalready had type hints)
 - Commit: 7e7a3f2d1
 
 ## Round @ 2026-06-24T04:58:00Z
