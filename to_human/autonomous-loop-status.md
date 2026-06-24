@@ -18,7 +18,12 @@
 ## Round 262 @ 2026-06-24T17:27:19Z
 
 - Picked: ruff format sdk/python/oyster_buyer_sdk/__init__.py (308-line SDK entrypoint, smallest remaining unformatted file: 43 ins / 14 del, black-compatible dict-literal wrapping + class docstring blank lines). Justification: measurable code smell, single-file scope, no behavior change, module import smoke OK, no risk of test masking, follows established pattern of previous rounds.
-- Result: committed 2ec1f3a0 (ruff format applied black-compatible line wrapping to sdk/python/oyster_buyer_sdk/__init__.py; 1 file changed, 43 insertions(+), 14 deletions(-); ruff check + ruff format --check clean; module import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: pure cosmetic line wrap — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+- Result: committed 2ec1f3a0 (ruff format applied black-compatible line wrapping to sdk/python/oyster_buyer_sdk/__init__.py; 1 file changed, 43 insertions(+), 14 deletions(-); ruff check + ruff format --check clean; module import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff)
+
+## Round 263 @ 2026-06-24T18:00:00Z
+
+- Picked: ruff format src/oyster_agent_runner/lint/lint_buyer_spec.py (1593-line lint module, only remaining src file needing format; 4 changes: f-string line wrapping at lines 358, 369, 421, 509). Justification: measurable code smell, single-file scope, no behavior change, targeted test passes (test_spec_lint.py 8/8), no risk of test masking, continues established pattern of formatting the codebase.
+- Result: committed 6875fa64 (ruff format applied black-compatible line wrapping to lint_buyer_spec.py; 4 f-string concatenation changes; tests/test_spec_lint.py 8/8 pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: pure cosmetic f-string concatenation changes — no silent error swallow, no race condition, no off-by-one, no security issue, no test masking, no brand cross-reference, no module-level side effect.). Self-review: pure cosmetic line wrap — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
 
 ## Round 264 @ 2026-06-24T18:00:00Z
 
