@@ -1,3 +1,4 @@
+
 ## Round 256 @ 2026-06-24T16:00:00Z
 
 - Picked: ruff format src/oyster_agent_runner/buyer_spec_v2_camera_intrinsics.py (small src file with formatting violations; 226 lines, 4 spacing changes in f-strings). Justification: measurable code smell, single-file scope, no behavior change, targeted test passes (test_buyer_spec_adapter 35/35), no risk of test masking.
@@ -150,3 +151,11 @@
 
 - Picked: ruff format tests/test_tos_privacy_links.py (small 207-line test file, 8 assert statement line-wrap changes). Justification: measurable code smell (file not black-compatible; ruff format --check flagged it), single-file scope, no behavior change, targeted test passes (test_tos_privacy_links 18/18), no risk of test masking.
 - Result: committed 5f6d4b41 (ruff format applied black-compatible line wrapping to test_tos_privacy_links.py; 8 assert statements reformatted; 18/18 tests pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: pure cosmetic line wrap — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 260 @ 2026-06-24T16:57:18Z
+- Picked: ruff format src/oyster_agent_runner/replay.py (merge split f-strings). Justification: measurable code smell (file not black-compatible; ruff format --check flagged it), single-file scope, no behavior change, targeted test passes (test_replay 21/21), no risk of test masking.
+- Result: committed dd560cfe (ruff format merged two f-string concatenations onto single lines in src/oyster_agent_runner/replay.py; 21/21 tests pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: pure cosmetic line wrap — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 261 @ 2026-06-24T17:14:00Z
+- Picked: ruff format src/oyster_agent_runner/phase2/depth_inference_pipeline.py (268-line src file, 2 split-string literals merged in f-string error messages). Justification: measurable code smell (file not black-compatible; ruff format --check flagged it; only 3 remaining unformatted files in src/, this is the smallest), single-file scope, no behavior change, the deselected phase2 test_depth_inference_pipeline.py is pre-existing broken and not my concern; module imports cleanly and the deselected phase2 test suite (test_cs2_test_fixture 7/7) still passes.
+- Result: committed <sha> (ruff format merged two implicit string concatenations in RuntimeError messages; identical string values; lint clean; 7/7 phase2 collection tests pass; no behavior change). Self-review: pure cosmetic string-literal merge — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect. The deselected phase2 test_depth_inference_pipeline.py is pre-existing broken (mock missing `check` kwarg) per conftest.py note "phase2/ has its own missing-deps + sys.path quirks ... Phase 2 is internal R&D, not buyer-facing" — not introduced by this change.
