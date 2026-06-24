@@ -105,14 +105,13 @@ def test_dry_run_succeeds_without_launching_paper() -> None:
     # because we're in dry-run), npm-install branch is logged-only, and
     # the launch + run-mc steps are skipped entirely. Result: rc=0.
     assert result.returncode == 0, (
-        f"dry-run failed rc={result.returncode}\n"
-        f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        f"dry-run failed rc={result.returncode}\nstdout: {result.stdout}\nstderr: {result.stderr}"
     )
     assert "PHASE 1 SMOKE DRY-RUN OK" in result.stdout
     # Sanity: dry-run must NOT have produced a Paper runtime dir with a
     # real eula.txt, because the launch step is the *only* place that
     # writes those files.
     runtime_eula = REPO_ROOT / "bin" / ".cache" / "paper-runtime" / "eula.txt"
-    assert (
-        not runtime_eula.exists()
-    ), "dry-run leaked a paper-runtime/eula.txt — launch path ran when it shouldn't have"
+    assert not runtime_eula.exists(), (
+        "dry-run leaked a paper-runtime/eula.txt — launch path ran when it shouldn't have"
+    )
