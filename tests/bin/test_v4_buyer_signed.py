@@ -51,7 +51,6 @@ def _make_reference(snapshots: list[dict], dataset_id: str = DATASET_ID) -> Path
 
 
 class TestV4BuyerSigned(unittest.TestCase):
-
     def setUp(self) -> None:
         self.env = mock.patch.dict(os.environ, {"BUYER_SHARED_SECRET": SECRET})
         self.env.start()
