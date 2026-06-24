@@ -35,6 +35,7 @@ def _shellcheck_available() -> bool:
         # shellcheck exists but can't be executed (e.g., stub file)
         return False
 
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------

@@ -20,6 +20,7 @@ import numpy as np
 # Check onnxruntime availability for tests that require it
 try:
     import onnxruntime  # noqa: F401 - needed for test patches
+
     _onnxruntime_available = True
 except ImportError:
     _onnxruntime_available = False
@@ -32,6 +33,7 @@ if str(BIN_DIR) not in sys.path:
 # Check torch availability for tests that require it
 try:
     import torch  # noqa: F401
+
     _torch_available = True
 except ImportError:
     _torch_available = False
