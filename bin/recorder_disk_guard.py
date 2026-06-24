@@ -20,6 +20,7 @@ Standalone — stdlib only. Imported by ``recorder_consumer_lite.py``::
         show_banner(str(exc))
         sys.exit(1)
 """
+
 from __future__ import annotations
 
 import shutil
@@ -64,9 +65,7 @@ def ensure_disk_space(
     if free < min_free_bytes:
         free_mb = free // (1024 * 1024)
         floor_mb = min_free_bytes // (1024 * 1024)
-        raise DiskGuardError(
-            f"磁盘剩余 {free_mb} MB 太少 — 至少需要 {floor_mb}MB"
-        )
+        raise DiskGuardError(f"磁盘剩余 {free_mb} MB 太少 — 至少需要 {floor_mb}MB")
     return free
 
 
