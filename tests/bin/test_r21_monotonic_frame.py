@@ -15,7 +15,6 @@ from bin.v1_claude_residuals.r21_monotonic_frame import r21_monotonic_frame
 
 
 class TestR21MonotonicFrame(unittest.TestCase):
-
     def test_in_order_pass(self) -> None:
         """frame 0 followed by frame 1 → strict increase, residual 0."""
         r = r21_monotonic_frame({"frame": 0}, {"frame": 1})
