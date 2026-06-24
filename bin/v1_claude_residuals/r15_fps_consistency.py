@@ -9,6 +9,7 @@ ABSTAIN — never silent-PASS. ABSTAIN is encoded as
 Threshold: |action_camera.fps − probe.avg_frame_rate| < 0.5 fps.
 NTSC tolerance: declared 30 vs probed 30000/1001 (≈29.97) → diff 0.03 → PASS.
 """
+
 from __future__ import annotations
 
 import json
@@ -20,9 +21,15 @@ import subprocess
 from .residuals import ResidualResult
 
 _FFPROBE_CMD = (
-    "ffprobe", "-v", "error", "-select_streams", "v:0",
-    "-show_entries", "stream=avg_frame_rate",
-    "-of", "json",
+    "ffprobe",
+    "-v",
+    "error",
+    "-select_streams",
+    "v:0",
+    "-show_entries",
+    "stream=avg_frame_rate",
+    "-of",
+    "json",
 )
 
 
@@ -68,7 +75,10 @@ def r15_fps_consistency(rec: dict, video_path: str | None = None) -> ResidualRes
     try:
         proc = subprocess.run(
             [*_FFPROBE_CMD, video_path],
-            capture_output=True, text=True, timeout=10, check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
         )
     except (subprocess.TimeoutExpired, OSError) as e:
         return _abstain(f"ffprobe_failed:{type(e).__name__}")
@@ -87,5 +97,7 @@ def r15_fps_consistency(rec: dict, video_path: str | None = None) -> ResidualRes
 
     diff = abs(declared_f - probed)
     threshold = 0.5
-    note = "" if diff < threshold else f"declared={declared_f:.3f} probed={probed:.3f} diff={diff:.3f}"
+    note = (
+        "" if diff < threshold else f"declared={declared_f:.3f} probed={probed:.3f} diff={diff:.3f}"
+    )
     return ResidualResult("R15", diff < threshold, diff, threshold, note)
