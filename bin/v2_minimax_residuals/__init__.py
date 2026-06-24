@@ -4,6 +4,7 @@
 2026-05-05, anchored only on docs/raw_lark_paste_2026-05-05.md.
 IRON LAW IL3 enforced (no V₁/producer imports).
 """
+
 from .residuals import (
     r01_quat_norm,
     r02_euler_quat_consistency,
