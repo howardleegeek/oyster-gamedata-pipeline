@@ -338,7 +338,7 @@ def print_verification_result(result: VerificationResult, verbose: bool = False)
             print(f"  Consent: {manifest.consent_doc_url}")
             print(f"  Signed: {manifest.consent_signed_at_utc}")
             print(f"  Frame count: {manifest.frame_count}")
-            print(f"  Biometric flags:")
+            print("  Biometric flags:")
             for k, v in manifest.biometric_flags.items():
                 print(f"    {k}: {v}")
         except Exception:
@@ -352,7 +352,7 @@ def print_verification_result(result: VerificationResult, verbose: bool = False)
     else:
         print(f"{RED}{BOLD}LEGAL STATUS: VERIFICATION FAILED{RESET}")
         if result.errors:
-            print(f"\nErrors:")
+            print("\nErrors:")
             for error in result.errors:
                 print(f"  - {error}")
         return 1
