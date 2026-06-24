@@ -17,18 +17,17 @@ Produces provenance.json for each session with all required fields:
 - anchor_tx_hash
 """
 
+import hashlib
 import json
 import os
-import uuid
-import hashlib
 import time
+import uuid
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Optional, Dict, Union
-from dataclasses import dataclass, asdict
+from typing import Dict, Optional, Union
 
-from .merkle import MerkleTree, compute_file_hashes, build_merkle_root_from_files
+from .merkle import MerkleTree, build_merkle_root_from_files, compute_file_hashes
 from .sign import SigningKey, load_or_create_keypair, verify_json_signature
-
 
 # Default paths
 DEFAULT_CONSENT_URL = "https://oyster.io/consent/v3.pdf"
