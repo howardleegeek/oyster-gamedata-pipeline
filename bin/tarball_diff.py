@@ -25,7 +25,11 @@ def count_action_camera_records(directory):
                     with open(os.path.join(root, f)) as fp:
                         data = json.load(fp)
                         items = data if isinstance(data, list) else [data]
-                        count += sum(1 for i in items if isinstance(i, dict) and i.get("source") == "action_camera")
+                        count += sum(
+                            1
+                            for i in items
+                            if isinstance(i, dict) and i.get("source") == "action_camera"
+                        )
                 except (json.JSONDecodeError, IOError):
                     pass
     return count
@@ -47,8 +51,12 @@ def get_video_duration(directory):
 
 
 def count_depth_files(directory):
-    return sum(1 for root, _, files in os.walk(directory) for f in files
-               if ".depth" in f.lower() or f.endswith(".depth") or "_depth" in f.lower())
+    return sum(
+        1
+        for root, _, files in os.walk(directory)
+        for f in files
+        if ".depth" in f.lower() or f.endswith(".depth") or "_depth" in f.lower()
+    )
 
 
 def format_duration(seconds):
@@ -56,7 +64,9 @@ def format_duration(seconds):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Compare two buyer-spec tarballs and print a markdown diff table.")
+    parser = argparse.ArgumentParser(
+        description="Compare two buyer-spec tarballs and print a markdown diff table."
+    )
     parser.add_argument("--left", required=True, help="Path to the left (A) tarball")
     parser.add_argument("--right", required=True, help="Path to the right (B) tarball")
     args = parser.parse_args()
@@ -73,10 +83,14 @@ def main():
         lf, rf = count_depth_files(left_dir), count_depth_files(right_dir)
 
         print("\n## Tarball Comparison\n")
-        print(f"**Left:** `{os.path.basename(args.left)}`\n**Right:** `{os.path.basename(args.right)}`\n")
+        print(
+            f"**Left:** `{os.path.basename(args.left)}`\n**Right:** `{os.path.basename(args.right)}`\n"
+        )
         print("| Metric | Left | Right | Diff |\n|--------|------|-------|------|")
         print(f"| Action Camera Records | {lr} | {rr} | {rr - lr:+d} |")
-        print(f"| Video Duration | {format_duration(ld)} | {format_duration(rd)} | {rd - ld:+.2f}s |")
+        print(
+            f"| Video Duration | {format_duration(ld)} | {format_duration(rd)} | {rd - ld:+.2f}s |"
+        )
         print(f"| Depth Files | {lf} | {rf} | {rf - lf:+d} |\n")
     finally:
         shutil.rmtree(left_dir, ignore_errors=True)
