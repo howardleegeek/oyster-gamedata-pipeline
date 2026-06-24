@@ -108,6 +108,11 @@ class ErrorPayload:
         }
 
     def to_json(self) -> str:
+        """Convert the error payload to a JSON string.
+
+        Returns:
+            JSON string representation of the error payload.
+        """
         return json.dumps(self.to_dict(), ensure_ascii=False)
 
 
