@@ -97,3 +97,8 @@
 ## Round 247 @ 2026-06-24T05:33:00Z
 - Picked: no good candidate found this round — exiting
 - Result: skipped (lint clean: src/ bin/ server/ sdk/ dashboard/ all pass ruff. Sampled tests pass: iron_law_no_fake_data 25/25, iron_law_check 13/13, canonical_pipeline 14/14+2skip, buyer_spec_adapter passes. PRD gaps in PRODUCTION_GAPS.md require credentials (Vercel tokens, Supabase migrations, code signing), not code changes. Active code fully resolved.)
+
+## Round 252 @ 2026-06-24T14:15:00Z
+
+- Picked: ruff cleanup I001+F401+W291+W292 in patches/cluster-week3-2026-05-18/B1-bundler-broken/test_batch_bundler.py
+- Result: committed 1a46b9c6 (sorted isort-style imports, removed unused shutil import, stripped trailing whitespace, added EOF newline). Ruff clean on file. Targeted tests pass: tests/test_batch_bundler.py 7/7, tests/test_zbuffer_metric.py 2/2 (9/9 total). Pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: pure cosmetic — no behavior change, no silent error swallow, no race condition, no off-by-one, no security change, no test masked as passing, no brand cross-reference. patches/ dir is historical snapshot not referenced by any test runner — change is safe and matches pattern of rounds 250/251.
