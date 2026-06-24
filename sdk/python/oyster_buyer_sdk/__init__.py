@@ -23,32 +23,38 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 
 class OysterError(Exception):
     """Base exception for Oyster SDK errors."""
+
     pass
 
 
 class AuthenticationError(OysterError):
     """Raised when authentication fails."""
+
     pass
 
 
 class ClipNotFoundError(OysterError):
     """Raised when a requested clip is not found."""
+
     pass
 
 
 class APIError(OysterError):
     """Raised for API-level errors."""
+
     pass
 
 
 class ChecksumError(OysterError):
     """Raised when checksum verification fails."""
+
     pass
 
 
 @dataclass
 class Clip:
     """Represents a data clip in the Oyster marketplace."""
+
     clip_id: str
     name: str
     size_bytes: int
@@ -60,19 +66,28 @@ class Clip:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "clip_id": self.clip_id, "name": self.name, "size_bytes": self.size_bytes,
+            "clip_id": self.clip_id,
+            "name": self.name,
+            "size_bytes": self.size_bytes,
             "created_at": self.created_at.isoformat(),
             "expires_at": self.expires_at.isoformat() if self.expires_at else None,
-            "metadata": self.metadata, "checksum": self.checksum, "format": self.format,
+            "metadata": self.metadata,
+            "checksum": self.checksum,
+            "format": self.format,
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Clip":
         return cls(
-            clip_id=data["clip_id"], name=data["name"], size_bytes=data["size_bytes"],
+            clip_id=data["clip_id"],
+            name=data["name"],
+            size_bytes=data["size_bytes"],
             created_at=datetime.fromisoformat(data["created_at"]),
-            expires_at=datetime.fromisoformat(data["expires_at"]) if data.get("expires_at") else None,
-            metadata=data.get("metadata", {}), checksum=data.get("checksum"),
+            expires_at=datetime.fromisoformat(data["expires_at"])
+            if data.get("expires_at")
+            else None,
+            metadata=data.get("metadata", {}),
+            checksum=data.get("checksum"),
             format=data.get("format", "parquet"),
         )
 
@@ -93,7 +108,9 @@ class ProgressBar:
         bar = "█" * filled + "░" * (self.width - filled)
         elapsed = time.time() - self.start_time
         speed = self.current / elapsed if elapsed > 0 else 0
-        sys.stdout.write(f"\r{self.desc}: |{bar}| {pct*100:.1f}% ({speed/1024/1024:.1f} MB/s)")
+        sys.stdout.write(
+            f"\r{self.desc}: |{bar}| {pct * 100:.1f}% ({speed / 1024 / 1024:.1f} MB/s)"
+        )
         sys.stdout.flush()
 
     def close(self) -> None:
@@ -125,8 +142,12 @@ class OysterClient:
     """Main client for interacting with the Oyster data marketplace."""
 
     def __init__(
-        self, api_key: Optional[str] = None, base_url: str = "https://api.oyster.ai",
-        timeout: int = 30, max_retries: int = 3, show_progress: bool = True,
+        self,
+        api_key: Optional[str] = None,
+        base_url: str = "https://api.oyster.ai",
+        timeout: int = 30,
+        max_retries: int = 3,
+        show_progress: bool = True,
     ):
         self.api_key = api_key or os.environ.get("OYSTER_API_KEY")
         self.base_url = base_url.rstrip("/")
@@ -154,14 +175,16 @@ class OysterClient:
                     raise ClipNotFoundError(f"Resource not found: {endpoint}") from e
                 if attempt == self.max_retries - 1:
                     raise APIError(f"HTTP {e.code}: {e.reason}") from e
-                time.sleep(2 ** attempt)
+                time.sleep(2**attempt)
             except urllib.error.URLError as e:
                 if attempt == self.max_retries - 1:
                     raise APIError(f"Connection error: {e.reason}") from e
-                time.sleep(2 ** attempt)
+                time.sleep(2**attempt)
         raise APIError("Max retries exceeded")
 
-    def list_clips(self, limit: int = 100, offset: int = 0, filters: Optional[Dict] = None) -> List[Clip]:
+    def list_clips(
+        self, limit: int = 100, offset: int = 0, filters: Optional[Dict] = None
+    ) -> List[Clip]:
         """List available clips in the marketplace."""
         params = {"limit": limit, "offset": offset, **(filters or {})}
         resp = self._make_request("GET", "/v1/clips", params if filters else None)
@@ -176,8 +199,12 @@ class OysterClient:
         return resp["url"], datetime.fromisoformat(resp["expires_at"])
 
     def download_clip(
-        self, clip_id: str, output_dir: Union[str, Path], filename: Optional[str] = None,
-        chunk_size: int = 8192, verify_checksum: bool = True,
+        self,
+        clip_id: str,
+        output_dir: Union[str, Path],
+        filename: Optional[str] = None,
+        chunk_size: int = 8192,
+        verify_checksum: bool = True,
     ) -> Path:
         """Download a clip to the specified directory."""
         output_dir = Path(output_dir)
@@ -242,7 +269,9 @@ def list_clips(limit: int = 100, offset: int = 0) -> List[Clip]:
     return get_client().list_clips(limit=limit, offset=offset)
 
 
-def download_clip(clip_id: str, output_dir: Union[str, Path], filename: Optional[str] = None) -> Path:
+def download_clip(
+    clip_id: str, output_dir: Union[str, Path], filename: Optional[str] = None
+) -> Path:
     """Download a clip using the default client."""
     return get_client().download_clip(clip_id, output_dir, filename=filename)
 
