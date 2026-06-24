@@ -136,7 +136,7 @@ def verify_manifest_exists(session_dir: str) -> Tuple[bool, Optional[SessionMani
     try:
         manifest = load_manifest(session_dir)
         return True, manifest
-    except Exception as e:
+    except Exception:
         return False, None
 
 
