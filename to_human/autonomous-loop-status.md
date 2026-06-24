@@ -18,7 +18,12 @@
 ## Round 262 @ 2026-06-24T17:27:19Z
 
 - Picked: ruff format sdk/python/oyster_buyer_sdk/__init__.py (308-line SDK entrypoint, smallest remaining unformatted file: 43 ins / 14 del, black-compatible dict-literal wrapping + class docstring blank lines). Justification: measurable code smell, single-file scope, no behavior change, module import smoke OK, no risk of test masking, follows established pattern of previous rounds.
-- Result: committed 2ec1f3a0 (ruff format applied black-compatible line wrapping to sdk/python/oyster_buyer_sdk/__init__.py; 1 file changed, 43 insertions(+), 14 deletions(-); ruff check + ruff format --check clean; module import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: pure cosmetic line wrap of dict literals, class docstrings, and progress-bar f-string — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+- Result: committed 2ec1f3a0 (ruff format applied black-compatible line wrapping to sdk/python/oyster_buyer_sdk/__init__.py; 1 file changed, 43 insertions(+), 14 deletions(-); ruff check + ruff format --check clean; module import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: pure cosmetic line wrap — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 264 @ 2026-06-24T18:00:00Z
+
+- Picked: ruff format tests/bin/test_r21_monotonic_frame.py (52-line test file, smallest unformatted test file; black-compatible blank line removal after class). Justification: measurable code smell, single-file scope, no behavior change, 5 targeted tests pass, no risk of test masking.
+- Result: committed 2525e77d (ruff format removed one blank line after class definition in test_r21_monotonic_frame.py; 5/5 tests pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: pure cosmetic — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.). Self-review: pure cosmetic line wrap of dict literals, class docstrings, and progress-bar f-string — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
 
 ## Round 257 @ 2026-06-24T16:10:00Z
 
@@ -164,4 +169,9 @@
 ## Round 261 @ 2026-06-24T17:14:00Z
 - Picked: ruff format src/oyster_agent_runner/phase2/depth_inference_pipeline.py (268-line src file, 2 split-string literals merged in f-string error messages). Justification: measurable code smell (file not black-compatible; ruff format --check flagged it; only 3 remaining unformatted files in src/, this is the smallest), single-file scope, no behavior change, the deselected phase2 test_depth_inference_pipeline.py is pre-existing broken and not my concern; module imports cleanly and the deselected phase2 test suite (test_cs2_test_fixture 7/7) still passes.
 - Result: committed 6e17da28 (ruff format merged two implicit string concatenations in RuntimeError messages; identical string values; lint clean; 7/7 phase2 collection tests pass; no behavior change). Self-review: pure cosmetic string-literal merge — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect. The deselected phase2 test_depth_inference_pipeline.py is pre-existing broken (mock missing `check` kwarg) per conftest.py note "phase2/ has its own missing-deps + sys.path quirks ... Phase 2 is internal R&D, not buyer-facing" — not introduced by this change.
+
+## Round 264 @ 2026-06-24T18:00:00Z
+
+- Picked: ruff format tests/bin/test_r21_monotonic_frame.py (52-line test file, smallest unformatted test file; black-compatible blank line removal after class). Justification: measurable code smell, single-file scope, no behavior change, 5 targeted tests pass, no risk of test masking.
+- Result: committed 2525e77d (ruff format removed one blank line after class definition in test_r21_monotonic_frame.py; 5/5 tests pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: pure cosmetic — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
 
