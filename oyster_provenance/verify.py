@@ -14,22 +14,21 @@ Usage:
 """
 
 import argparse
+import hashlib
 import os
 import sys
-import hashlib
-from pathlib import Path
-from typing import Optional, Tuple, List
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
+from typing import List, Optional, Tuple
 
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from oyster_provenance.anchor import format_week_id, get_week_range, load_weekly_anchor
 from oyster_provenance.manifest import SessionManifest, load_manifest
 from oyster_provenance.merkle import compute_file_hashes
 from oyster_provenance.sign import verify_json_signature
-from oyster_provenance.anchor import load_weekly_anchor, get_week_range, format_week_id
-
 
 # ANSI colors
 GREEN = "\033[92m"
