@@ -11,6 +11,7 @@ indicates either PRD ambiguity or rare LLM quirk, not shared blind spot.
 GLM wrote the correct ZYX intrinsic Euler→quat formula on first try
 (unlike V₂ MiniMax which had axis-swap bug on first dispatch).
 """
+
 __all__ = [
     "r01_quat_norm",
     "r02_euler_quat_consistency",
