@@ -97,7 +97,7 @@ def infer_depth_batch(
         from transformers import pipeline
     except ImportError as e:
         raise RuntimeError(
-            f"Missing dependency: {e}. " "Please install with: pip install torch transformers numpy"
+            f"Missing dependency: {e}. Please install with: pip install torch transformers numpy"
         ) from e
 
     try:
@@ -105,7 +105,7 @@ def infer_depth_batch(
         import OpenEXR
     except ImportError as e:
         raise RuntimeError(
-            f"Missing dependency: {e}. " "Please install with: pip install openexr"
+            f"Missing dependency: {e}. Please install with: pip install openexr"
         ) from e
 
     # Validate near and far values
