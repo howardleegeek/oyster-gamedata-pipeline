@@ -139,3 +139,14 @@
 
 - Picked: ruff format tests/test_d5_real_game_state.py (small 135-line test file, 1 cosmetic line-wrap change in f-string). Justification: measurable code smell (file not black-compatible; ruff format --check flagged it), single-file scope, no behavior change, targeted test passes (test_d5_real_game_state 6/6), no risk of test masking.
 - Result: committed c4d025a9 (ruff format applied black-compatible line wrapping to test_d5_real_game_state.py; 2-line f-string concatenated to 1 line; assert message preserved exactly; test_d5_real_game_state 6/6 pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: pure cosmetic line wrap — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 258 @ 2026-06-24T16:39:23Z
+
+- Picked: ruff format src/oyster_agent_runner/phase2/semantic_validator.py (238 lines, 2 spacing changes in f-string arithmetic). Justification: measurable code smell (ruff format violations), single-file scope, no behavior change, targeted test passes (semantic_validator 10/10), no risk of test masking.
+- Result: committed 7d1094d0 (ruff format applied spacing fix to semantic_validator.py; cosmetic arithmetic spacing in f-strings only; 10/10 tests pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: pure cosmetic — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+
+## Round 259 @ 2026-06-24T16:49:00Z
+
+- Picked: ruff format tests/test_tos_privacy_links.py (small 207-line test file, 8 assert statement line-wrap changes). Justification: measurable code smell (file not black-compatible; ruff format --check flagged it), single-file scope, no behavior change, targeted test passes (test_tos_privacy_links 18/18), no risk of test masking.
+- Result: committed 5f6d4b41 (ruff format applied black-compatible line wrapping to test_tos_privacy_links.py; 8 assert statements reformatted; 18/18 tests pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: pure cosmetic line wrap — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
