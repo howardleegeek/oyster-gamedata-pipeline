@@ -103,6 +103,12 @@ class FPSMonitor:
         self._depth_track_enabled: bool = True
 
     def set_fps_source(self, source: Callable[[], float]) -> None:
+        """Set the FPS data source callback.
+
+        Args:
+            source: A callable that returns the current FPS value as a float.
+                If not set, the monitor will simulate FPS values internally.
+        """
         self._fps_source = source
 
     def _get_current_fps(self) -> float:
