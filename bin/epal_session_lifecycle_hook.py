@@ -56,10 +56,23 @@ class SessionContext:
     temp_dir: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
+        """Convert the session context to a dictionary.
+
+        Returns:
+            A dictionary representation of this session context.
+        """
         return asdict(self)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SessionContext":
+        """Create a SessionContext from a dictionary.
+
+        Args:
+            data: Dictionary with session context fields.
+
+        Returns:
+            A new SessionContext instance.
+        """
         return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
 
 
