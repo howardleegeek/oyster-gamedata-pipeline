@@ -39,7 +39,7 @@ def check_bounds(position: List[float], radius: float) -> Dict[str, Any]:
         "world_cube_radius_meters": radius,
         "distance_from_origin": round(distance, 6),
         "within_bounds": within_bounds,
-        "status": "VALID" if within_bounds else "OUT_OF_BOUNDS"
+        "status": "VALID" if within_bounds else "OUT_OF_BOUNDS",
     }
 
 
@@ -68,8 +68,11 @@ def main(argv: List[str]) -> int:
         if args.verbose:
             output = result
         else:
-            output = {"valid": result["within_bounds"], "status": result["status"],
-                      "distance_meters": result["distance_from_origin"]}
+            output = {
+                "valid": result["within_bounds"],
+                "status": result["status"],
+                "distance_meters": result["distance_from_origin"],
+            }
         print(json.dumps(output, indent=2))
         return 0 if result["status"] == "VALID" else 1
     except json.JSONDecodeError as e:
