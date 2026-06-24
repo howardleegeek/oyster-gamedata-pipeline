@@ -6,15 +6,15 @@ Uses ed25519 (NOT RSA — smaller, modern) for signing session manifests.
 
 import json
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Tuple, Union
-from dataclasses import dataclass
+
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
 
 # Use cryptography library for ed25519
 from cryptography.hazmat.primitives.asymmetric import ed25519
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.backends import default_backend
-
 
 # Default paths
 DEFAULT_KEY_DIR = Path.home() / ".oyster" / "keys"
