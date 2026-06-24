@@ -21,9 +21,6 @@ def test_packet_construct():
     packet_type = PacketType.COMMAND
     packet_length = len(body_bytes) + 10  # id(4) + type(4) + body + nulls
 
-    # Manually construct expected packet
-    expected = struct.pack("<iii", packet_length, packet_id, packet_type) + body_bytes
-
     # Create RconClient and mock the _send_packet to capture what it builds
     client = RconClient("localhost", 25575, "password")
 
