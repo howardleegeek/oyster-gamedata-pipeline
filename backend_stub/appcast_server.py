@@ -53,7 +53,7 @@ def appcast() -> Response:
         "  <channel>\n"
         "    <title>Oyster Recorder Updates</title>\n"
         "    <item>\n"
-        f'      <title>v{latest["version"]}</title>\n'
+        f"      <title>v{latest['version']}</title>\n"
         f"      <pubDate>{now}</pubDate>\n"
         f'      <enclosure url="{latest["url"]}" '
         f'sparkle:version="{latest["version"]}" sparkle:sha256="{latest["sha256"]}" '
