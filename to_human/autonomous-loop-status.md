@@ -2424,3 +2424,7 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 - Picked: Fix ruff F841 (unused variable file_mb) in bin/red_team_oversized_json.py. The variable was assigned but never used - it was calculating file size in MB but not used. Single-file bounded change, no behavior change. Module imports cleanly, F841 check clean. Self-review: F841 fix — no runtime behavior change, no silent error swallow, no security/threading/auth change.
 - Result: committed 1486ae19 (pushed to fix/prd-test-action-per-second-ruff)
 
+
+## Round 207 @ 2026-06-24T00:08:04Z
+- Picked: Fix ruff F541 (f-string without placeholders) in oyster_provenance/verify.py. Two lines had extraneous f-prefix on string literals with no {expr} placeholders: `f"  Biometric flags:"` (line 341) and `f"\nErrors:"` (line 355). Single-file bounded change, no behavior change (output bytes identical, `\n` is a backslash escape that works in both f-strings and regular strings). Module imports cleanly, F541 check clean for these lines. tests/test_provenance.py 25/25 passes. Self-review: F541 fix — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing (no test asserts on these print strings), no brand cross-reference.
+- Result: committed 07960d6c (pushed to fix/prd-test-action-per-second-ruff)
