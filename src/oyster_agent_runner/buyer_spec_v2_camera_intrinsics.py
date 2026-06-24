@@ -79,13 +79,13 @@ class CameraIntrinsicsSpec:
             if not np.allclose(k[2, 2], 1.0, atol=1e-6):  # type: ignore
                 errors.append(f"K[2,2] should be 1.0, got {k[2, 2]}")
             if k[0, 0] <= 0 or k[1, 1] <= 0:  # type: ignore
-                errors.append(f"Focal lengths must be positive: fx={k[0,0]}, fy={k[1,1]}")
+                errors.append(f"Focal lengths must be positive: fx={k[0, 0]}, fy={k[1, 1]}")
             if self.image_size:
                 w, h = self.image_size
                 if not (0 < k[0, 2] < w):  # type: ignore
-                    errors.append(f"Principal point cx={k[0,2]} outside image width {w}")
+                    errors.append(f"Principal point cx={k[0, 2]} outside image width {w}")
                 if not (0 < k[1, 2] < h):  # type: ignore
-                    errors.append(f"Principal point cy={k[1,2]} outside image height {h}")
+                    errors.append(f"Principal point cy={k[1, 2]} outside image height {h}")
         except (ValueError, TypeError) as e:
             errors.append(f"Invalid K matrix: {e}")
         return len(errors) == 0, errors
@@ -113,7 +113,7 @@ class CameraIntrinsicsSpec:
                 errors.append(f"T_world_cam must be 4x4, got shape {t.shape}")
                 return False, errors
             if not np.allclose(t[3, :], [0, 0, 0, 1], atol=1e-6):  # type: ignore
-                errors.append(f"T_world_cam bottom row should be [0,0,0,1], got {t[3,:]}")
+                errors.append(f"T_world_cam bottom row should be [0,0,0,1], got {t[3, :]}")
             r = t[:3, :3]  # type: ignore
             det = np.linalg.det(r)  # type: ignore
             if not np.allclose(abs(det), 1.0, atol=1e-3):  # type: ignore
