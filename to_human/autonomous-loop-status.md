@@ -3,6 +3,11 @@
 - Picked: no good candidate found this round — exiting
 - Result: skipped (lint clean: ruff passes src/ tests/ bin/ patches/. Sampled tests pass: iron_law_check 13/13. PRD gaps in PRODUCTION_GAPS.md require credentials (Vercel tokens, Supabase migrations, code signing), not code changes. Active code fully resolved.)
 
+## Round 253 @ 2026-06-24T14:10:00Z
+
+- Picked: no good candidate found this round — exiting
+- Result: skipped (lint clean: src/ tests/ bin/ all pass ruff. Sampled tests pass: iron_law_check 13/13, iron_law_no_fake_data 25/25, buyer_spec_adapter 39/39. PRD gaps in PRODUCTION_GAPS.md require credentials (Vercel tokens, Supabase migrations, code signing), not code changes. Active code fully resolved.)
+
 ## Round 251 @ 2026-06-24T13:30:00Z
 
 - Picked: ruff cleanup I001/W291/W292 in patches/cluster-week1-2026-05-18/D2-zbuffer-exr/zbuffer_to_exr.py
