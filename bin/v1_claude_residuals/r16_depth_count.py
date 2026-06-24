@@ -17,6 +17,7 @@ Design notes
   return ``passed=False`` with note prefix ``"ABSTAIN:"`` when we cannot
   attribute fault — missing depth_dir, missing/non-positive duration.
 """
+
 from __future__ import annotations
 
 import math
@@ -60,9 +61,7 @@ def r16_depth_count(
     if not dir_path.is_dir():
         return ResidualResult("R16", False, math.inf, threshold, "ABSTAIN:no_depth_dir")
     if video_duration_sec is None or video_duration_sec <= 0:
-        return ResidualResult(
-            "R16", False, math.inf, threshold, "ABSTAIN:no_video_duration"
-        )
+        return ResidualResult("R16", False, math.inf, threshold, "ABSTAIN:no_video_duration")
 
     # Count and arithmetic -------------------------------------------------
     actual = sum(1 for _ in dir_path.glob("*.exr"))
