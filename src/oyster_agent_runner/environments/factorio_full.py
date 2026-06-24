@@ -286,7 +286,7 @@ class FactorioObserver:
             return []
 
         waves = []
-        for w in (data if isinstance(data, list) else []):
+        for w in data if isinstance(data, list) else []:
             pos = w.get("position", {})
             waves.append(
                 BiterWaveEvent(
