@@ -1,3 +1,12 @@
+## Round 263 @ 2026-06-24T18:00:00Z
+
+- Picked: ruff format bin/v2_minimax_residuals/__init__.py (smallest unformatted file: 33 lines, single blank line needed after module docstring). Justification: measurable code smell, single-file scope, no behavior change, module import smoke OK, no risk of test masking, follows established pattern of previous rounds.
+- Result: committed 4579507c (ruff format added blank line after module docstring in bin/v2_minimax_residuals/__init__.py; 1 file changed, 1 insertion(+); ruff check + ruff format --check clean; module import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic blank line — no silent error swallow, no race, no off-by-one, n
+
+## Round 264 @ 2026-06-24T19:37:26Z
+
+- Picked: ruff format bin/v4_buyer_signed/__init__.py (smallest unformatted file: 37 lines, single blank line needed after module docstring; same pattern as Rounds 254–263). Justification: measurable code smell, single-file scope, no behavior change, targeted test exists (tests/bin/test_v4_buyer_signed.py 8/8 pass), no risk of test masking, follows established cadence.
+- Result: committed f4c669b6 (ruff format added blank line after module docstring in bin/v4_buyer_signed/__init__.py; 1 file changed, 1 insertion(+); ruff check + ruff format --check clean; import smoke OK (v4_buyer_signed.__all__ loads cleanly); 8/8 tests pass in tests/bin/test_v4_buyer_signed.py; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic blank line — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.
 
 ## Round 256 @ 2026-06-24T16:00:00Z
 
@@ -14,6 +23,11 @@
 
 - Picked: ruff format src/oyster_agent_runner/tools.py (smallest src file with formatting violations; 136 lines, single string concatenation change). Justification: measurable code smell, single-file scope, no behavior change, targeted test passes (test_tools.py 10/10), no risk of test masking.
 - Result: committed 6edb6e79 (ruff format applied black-compatible line wrapping to tools.py; cosmetic string formatting only; test_tools.py 10/10 pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: pure cosmetic line wrap — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 263 @ 2026-06-24T18:00:00Z
+
+- Picked: ruff format bin/v2_minimax_residuals/__init__.py (smallest unformatted file: 33 lines, single blank line needed after module docstring). Justification: measurable code smell, single-file scope, no behavior change, module import smoke OK, no risk of test masking, follows established pattern of previous rounds.
+- Result: committed 4579507c (ruff format added blank line after module docstring in bin/v2_minimax_residuals/__init__.py; 1 file changed, 1 insertion(+); ruff check + ruff format --check clean; module import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic blank line — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
 
 ## Round 262 @ 2026-06-24T17:27:19Z
 
