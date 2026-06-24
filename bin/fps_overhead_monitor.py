@@ -74,6 +74,11 @@ class FPSMetrics:
 
     @property
     def min_fps(self) -> float:
+        """Return the minimum FPS across all samples.
+
+        Returns:
+            Minimum FPS as float, or 0.0 if no samples collected.
+        """
         return min(self.samples) if self.samples else 0.0
 
     @property
