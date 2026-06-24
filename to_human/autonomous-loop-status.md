@@ -16,7 +16,17 @@
 ## Round 266 @ 2026-06-24T21:00:00Z
 
 - Picked: ruff format bin/v2prime_glm_residuals/__init__.py (smallest unformatted file: 54 lines, single blank line needed after module docstring; same pattern as previous rounds). Justification: measurable code smell, single-file scope, no behavior change, targeted test passes (v2prime 13/13), no risk of test masking, follows established cadence.
-- Result: committed 4ca6bdfe (ruff format added blank line after module docstring in bin/v2prime_glm_residuals/__init__.py; 1 file changed, 1 insertion(+); ruff check clean; import smoke OK; 13/13 tests pass (v2prime); pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic blank line — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+- Result: committed 4ca6bdfe (ruff format added blank line after module docstring in bin/v2prime_glm_residuals/__init__.py; 1 file changed, 1 insertion(+); ruff check + ruff format --check clean; targeted test passes (v2prime_glm_residuals 13/13); pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic blank line — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 267 @ 2026-06-24T21:30:00Z
+
+- Picked: ruff format bin/v1_claude_residuals/r21_monotonic_frame.py (smallest unformatted bin file: 68 lines, single blank line needed after module docstring; follows established pattern). Justification: measurable code smell, single-file scope, no behavior change, targeted test exists, no risk of test masking, follows established cadence.
+- Result: committed ad223877 (ruff format added blank line after module docstring in bin/v1_claude_residuals/r21_monotonic_frame.py; 1 file changed, 1 insertion(+); ruff check + ruff format --check clean; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic blank line — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 268 @ 2026-06-24T22:00:00Z
+
+- Picked: ruff format bin/recorder_close_confirm.py (smallest unformatted file: 66 lines, 2 blank lines needed between functions). Justification: measurable code smell, single-file scope, no behavior change, module import smoke OK, no risk of test masking, follows established cadence of formatting small bin files.
+- Result: committed 10c765c1 (ruff format added blank lines between functions in bin/recorder_close_confirm.py; 1 file changed, 2 insertions(+); ruff check + ruff format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)nit__.py; 1 file changed, 1 insertion(+); ruff check clean; import smoke OK; 13/13 tests pass (v2prime); pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic blank line — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
 
 ## Round 256 @ 2026-06-24T16:00:00Z
 
