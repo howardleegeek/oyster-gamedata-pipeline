@@ -299,34 +299,120 @@ def _detect_count(
     mutation diffs against the ground truth and FAILs.
     """
     from bin.v1_claude_residuals.residuals import (
-        r01_quat_norm as v1_r01, r02_euler_quat_consistency as v1_r02,
-        r03_kinematics as v1_r03, r04_mouse_dx_diff as v1_r04,
-        r05_dt_uniform as v1_r05, r06_angle_range as v1_r06,
-        r07_mouse_range as v1_r07, r08_fx_eq_fy as v1_r08,
-        r09_keycode_vk as v1_r09, r10_speed_max as v1_r10,
+        r01_quat_norm as v1_r01,
+    )
+    from bin.v1_claude_residuals.residuals import (
+        r02_euler_quat_consistency as v1_r02,
+    )
+    from bin.v1_claude_residuals.residuals import (
+        r03_kinematics as v1_r03,
+    )
+    from bin.v1_claude_residuals.residuals import (
+        r04_mouse_dx_diff as v1_r04,
+    )
+    from bin.v1_claude_residuals.residuals import (
+        r05_dt_uniform as v1_r05,
+    )
+    from bin.v1_claude_residuals.residuals import (
+        r06_angle_range as v1_r06,
+    )
+    from bin.v1_claude_residuals.residuals import (
+        r07_mouse_range as v1_r07,
+    )
+    from bin.v1_claude_residuals.residuals import (
+        r08_fx_eq_fy as v1_r08,
+    )
+    from bin.v1_claude_residuals.residuals import (
+        r09_keycode_vk as v1_r09,
+    )
+    from bin.v1_claude_residuals.residuals import (
+        r10_speed_max as v1_r10,
+    )
+    from bin.v1_claude_residuals.residuals import (
         r12_fps_range as v1_r12,
     )
     from bin.v2_minimax_residuals.residuals import (
-        r01_quat_norm as v2_r01, r02_euler_quat_consistency as v2_r02,
-        r03_kinematics as v2_r03, r04_mouse_dx_diff as v2_r04,
-        r05_dt as v2_r05, r06_angle_range as v2_r06,
-        r07_mouse_range as v2_r07, r08_fx_eq_fy as v2_r08,
-        r09_keycode_vk as v2_r09, r10_speed_max as v2_r10,
+        r01_quat_norm as v2_r01,
+    )
+    from bin.v2_minimax_residuals.residuals import (
+        r02_euler_quat_consistency as v2_r02,
+    )
+    from bin.v2_minimax_residuals.residuals import (
+        r03_kinematics as v2_r03,
+    )
+    from bin.v2_minimax_residuals.residuals import (
+        r04_mouse_dx_diff as v2_r04,
+    )
+    from bin.v2_minimax_residuals.residuals import (
+        r05_dt as v2_r05,
+    )
+    from bin.v2_minimax_residuals.residuals import (
+        r06_angle_range as v2_r06,
+    )
+    from bin.v2_minimax_residuals.residuals import (
+        r07_mouse_range as v2_r07,
+    )
+    from bin.v2_minimax_residuals.residuals import (
+        r08_fx_eq_fy as v2_r08,
+    )
+    from bin.v2_minimax_residuals.residuals import (
+        r09_keycode_vk as v2_r09,
+    )
+    from bin.v2_minimax_residuals.residuals import (
+        r10_speed_max as v2_r10,
+    )
+    from bin.v2_minimax_residuals.residuals import (
         r12_fps_range as v2_r12,
     )
     from bin.v2prime_glm_residuals.residuals import (
-        r01_quat_norm as v2p_r01, r02_euler_quat_consistency as v2p_r02,
-        r03_kinematics as v2p_r03, r04_mouse_dx_diff as v2p_r04,
-        r05_dt as v2p_r05, r06_angle_range as v2p_r06,
-        r07_mouse_range as v2p_r07, r08_fx_eq_fy as v2p_r08,
-        r09_keycode_vk as v2p_r09, r10_speed_max as v2p_r10,
+        r01_quat_norm as v2p_r01,
+    )
+    from bin.v2prime_glm_residuals.residuals import (
+        r02_euler_quat_consistency as v2p_r02,
+    )
+    from bin.v2prime_glm_residuals.residuals import (
+        r03_kinematics as v2p_r03,
+    )
+    from bin.v2prime_glm_residuals.residuals import (
+        r04_mouse_dx_diff as v2p_r04,
+    )
+    from bin.v2prime_glm_residuals.residuals import (
+        r05_dt as v2p_r05,
+    )
+    from bin.v2prime_glm_residuals.residuals import (
+        r06_angle_range as v2p_r06,
+    )
+    from bin.v2prime_glm_residuals.residuals import (
+        r07_mouse_range as v2p_r07,
+    )
+    from bin.v2prime_glm_residuals.residuals import (
+        r08_fx_eq_fy as v2p_r08,
+    )
+    from bin.v2prime_glm_residuals.residuals import (
+        r09_keycode_vk as v2p_r09,
+    )
+    from bin.v2prime_glm_residuals.residuals import (
+        r10_speed_max as v2p_r10,
+    )
+    from bin.v2prime_glm_residuals.residuals import (
         r12_fps_range as v2p_r12,
     )
     from bin.v3_physics_oracle.residuals import (
-        r01_quat_unit_norm as v3_r01, r02_oula_quat_table as v3_r02,
+        r01_quat_unit_norm as v3_r01,
+    )
+    from bin.v3_physics_oracle.residuals import (
+        r02_oula_quat_table as v3_r02,
+    )
+    from bin.v3_physics_oracle.residuals import (
         r07_mouse_range_strict as v3_r07,
+    )
+    from bin.v3_physics_oracle.residuals import (
         r08_intrinsics_symmetric as v3_r08,
+    )
+    from bin.v3_physics_oracle.residuals import (
         r09_keycode_vk_known as v3_r09,
+    )
+    from bin.v3_physics_oracle.residuals import (
         r12_fps_fixed_30 as v3_r12,
     )
     rec = attack.mutated_rec
@@ -432,8 +518,11 @@ def _detect_count(
     # consistently across the entire 9k-frame stream.
     if attack.bucket == "C":
         from bin.v1_claude_residuals.r20_drift import (
-            r20a_quat_norm_distribution, r20b_mouse_dx_cumulative,
-            r20c_fps_jitter, r20d_speed_profile, r20e_yaw_turn_rate,
+            r20a_quat_norm_distribution,
+            r20b_mouse_dx_cumulative,
+            r20c_fps_jitter,
+            r20d_speed_profile,
+            r20e_yaw_turn_rate,
         )
         dataset = _synthesize_dataset(rec, nbr, attack.fi_id)
         # Each sub-residual gets its own slot so the V1-only acceptance
