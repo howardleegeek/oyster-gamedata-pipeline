@@ -60,7 +60,7 @@ def assert_finite(vec: Vector3, label: str = "Vector3") -> None:
     for idx, v in enumerate(values):
         if not math.isfinite(v):
             raise ValueError(
-                f"{label}[{idx}] = {v!r} is not finite " f"(NaN/Inf detected before write)"
+                f"{label}[{idx}] = {v!r} is not finite (NaN/Inf detected before write)"
             )
 
 
