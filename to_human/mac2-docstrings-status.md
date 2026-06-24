@@ -81,6 +81,12 @@
 ## Round @ 2026-06-21T13:35:00Z
 - File: bin/inventory_voxel_capture.py::main
 - Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: 3c0d5d7e3
+
+## Round @ 2026-06-21T15:45:00Z
+- File: src/oyster_agent_runner/error_client_python.py::ErrorPayload.to_json
+- Added: docstring=Y, type-hints=N (already had return type)
+- Commit: 3814c4e28lready had type hints)
 - Commit: 8ec2a7b3a
 
 ## Round @ 2026-01-19T10:00:00Z
@@ -312,3 +318,13 @@
 - File: bin/inventory_voxel_capture.py::FrameCapture.to_json
 - Added: docstring=Y, type-hints=N (already had type hints)
 - Commit: a03ddd827
+
+## Round @ 2026-06-23T19:50:00Z
+- File: bin/redteam_lint.py::attack_systeminfo_wrong_resolution
+- Added: docstring=Y, type-hints=Y
+- Commit: 7f604f14ef5e4c30c87f2c05e4817bcd6f60bb49
+
+## Round @ 2026-06-24T10:32Z
+- File: bin/verify_round_trip.py::check4_frame_time
+- Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: 56748e817
