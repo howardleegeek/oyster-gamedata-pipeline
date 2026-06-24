@@ -121,7 +121,15 @@ def attack_drop_action_camera(b: Path) -> None:
     (b / "action_camera.json").unlink()
 
 
-def attack_systeminfo_wrong_resolution(b: Path):
+def attack_systeminfo_wrong_resolution(b: Path) -> None:
+    """Set wrong resolution (1080x720) in systeminfo.json for adversarial testing.
+
+    This attack intentionally sets the width/height to non-matching values
+    to test whether lint_buyer_spec catches resolution mismatches.
+
+    Args:
+        b: Path to the directory containing systeminfo.json.
+    """
     p = b / "systeminfo.json"
     d = json.loads(p.read_text())
     d["width"] = 1080
