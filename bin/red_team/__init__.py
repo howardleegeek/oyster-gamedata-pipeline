@@ -10,6 +10,7 @@ Buckets:
   C — sub-threshold perturbation (this module: C-01..C-05)
   D — replay/temporal attacks (this module: D-01..D-05)
 """
+
 from .attackers import (
     ATTACK_CATALOG,
     AttackCase,
