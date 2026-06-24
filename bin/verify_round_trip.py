@@ -450,6 +450,22 @@ def check4_frame_time(records: list[dict[str, Any]]) -> dict[str, Any]:
 # ---- Loader & CLI -----------------------------------------------------------
 
 def load_records(clip_dir: Path) -> list[dict[str, Any]]:
+    """Load action_camera.json records from a clip directory.
+
+    Accepts two JSON formats:
+      - List of frame records directly
+      - Dict with "records" key containing the list
+
+    Args:
+        clip_dir: Path to the extracted clip directory containing action_camera.json.
+
+    Returns:
+        List of frame record dicts.
+
+    Raises:
+        FileNotFoundError: If action_camera.json does not exist.
+        ValueError: If the JSON structure is unrecognized.
+    """
     ac_path = clip_dir / "action_camera.json"
     if not ac_path.is_file():
         raise FileNotFoundError(f"{ac_path} not found")
