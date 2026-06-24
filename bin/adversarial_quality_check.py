@@ -21,6 +21,7 @@ Cross-checks:
 
 For each, prints: claim (what audit says) | independent measurement | delta | verdict.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -42,9 +43,19 @@ def sha256_of(path: pathlib.Path) -> str:
 def ffprobe_field(mp4: pathlib.Path, *fields: str) -> dict:
     """Run ffprobe, return dict of requested format/stream fields."""
     r = subprocess.run(
-        ["ffprobe", "-v", "error", "-print_format", "json",
-         "-show_format", "-show_streams", str(mp4)],
-        capture_output=True, text=True, check=False,
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-print_format",
+            "json",
+            "-show_format",
+            "-show_streams",
+            str(mp4),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
     )
     if not r.stdout:
         return {}
@@ -65,7 +76,8 @@ def check_mp4(sess: pathlib.Path) -> dict:
     tmp_png = pathlib.Path("/tmp/_adv_first_frame.png")
     subprocess.run(
         ["ffmpeg", "-y", "-i", str(mp4), "-vframes", "1", str(tmp_png)],
-        capture_output=True, check=False,
+        capture_output=True,
+        check=False,
     )
     if tmp_png.exists():
         frame1_bytes = tmp_png.stat().st_size
@@ -124,12 +136,14 @@ def check_game_state(sess: pathlib.Path) -> dict:
         xs = [p[0] for p in positions]
         ys = [p[1] for p in positions]
         zs = [p[2] for p in positions]
-        bbox_diag = ((max(xs)-min(xs))**2 + (max(ys)-min(ys))**2 + (max(zs)-min(zs))**2) ** 0.5
+        bbox_diag = (
+            (max(xs) - min(xs)) ** 2 + (max(ys) - min(ys)) ** 2 + (max(zs) - min(zs)) ** 2
+        ) ** 0.5
     else:
         bbox_diag = 0.0
 
     if velocities:
-        v_magnitudes = [(vx*vx + vy*vy + vz*vz) ** 0.5 for vx, vy, vz in velocities]
+        v_magnitudes = [(vx * vx + vy * vy + vz * vz) ** 0.5 for vx, vy, vz in velocities]
         v_mean = sum(v_magnitudes) / len(v_magnitudes)
         v_max = max(v_magnitudes)
     else:
@@ -221,6 +235,7 @@ def check_depth(sess: pathlib.Path) -> dict:
     if exrs:
         try:
             import OpenEXR  # type: ignore
+
             f = OpenEXR.InputFile(str(exrs[0]))
             dw = f.header()["dataWindow"]
             first_shape = (
@@ -294,7 +309,9 @@ def check_cross_source_duration(sess: pathlib.Path, mp4_dur: float, ac_span: flo
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("session_dir")
     args = ap.parse_args()
     sess = pathlib.Path(args.session_dir).resolve()
@@ -332,15 +349,22 @@ def main() -> int:
     if c2.get("ok") and not c2.get("monotonic_timestamps"):
         issues.append("game_state.jsonl: NON-MONOTONIC timestamps (suspicious)")
     if c2.get("ok") and c2.get("bbox_diagonal_m", 0) < 5:
-        issues.append(f"game_state.jsonl: bbox {c2['bbox_diagonal_m']}m < 5m (player barely moved — fake?)")
+        issues.append(
+            f"game_state.jsonl: bbox {c2['bbox_diagonal_m']}m < 5m (player barely moved — fake?)"
+        )
     if c3.get("ok") and c3.get("mouse_x_in_unit") is False:
         issues.append("action_camera.json: mouse_x out of [0,1] (PRD violation)")
     if c4.get("ok") and not c4.get("monotonic_timestamps"):
         issues.append("inputs.jsonl: NON-MONOTONIC timestamps (suspicious)")
     if c4.get("ok") and c4.get("wasd_press_events", 0) < 5:
-        issues.append(f"inputs.jsonl: only {c4['wasd_press_events']} WASD presses (player not actively moving)")
+        issues.append(
+            f"inputs.jsonl: only {c4['wasd_press_events']} WASD presses "
+            f"(player not actively moving)"
+        )
     if c4.get("ok") and c4.get("distinct_event_types", 0) < 5:
-        issues.append(f"inputs.jsonl: only {c4['distinct_event_types']} distinct event types (low diversity)")
+        issues.append(
+            f"inputs.jsonl: only {c4['distinct_event_types']} distinct event types (low diversity)"
+        )
     if c5.get("ok") and c5.get("mismatches", 0) > 0:
         issues.append(f"MANIFEST: {c5['mismatches']} sha256 mismatches (TAMPER OR STALE)")
     if c6.get("ok"):
