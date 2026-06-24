@@ -62,7 +62,7 @@ class FrameDeduplicationDefense:
         is_duplicate = frame_id in self.seen_frame_ids
 
         if is_duplicate:
-            logger.warning(f"Duplicate frame_id detected: {frame_id} " f"(scene: {self.scene_id})")
+            logger.warning(f"Duplicate frame_id detected: {frame_id} (scene: {self.scene_id})")
         else:
             logger.debug(f"New frame_id: {frame_id}")
 
@@ -109,7 +109,7 @@ class FrameDeduplicationDefense:
         """
         count = len(self.seen_frame_ids)
         self.seen_frame_ids.clear()
-        logger.info(f"Cleared {count} tracked frame_ids " f"(scene: {self.scene_id})")
+        logger.info(f"Cleared {count} tracked frame_ids (scene: {self.scene_id})")
 
     def get_stats(self) -> dict[str, Any]:
         """
