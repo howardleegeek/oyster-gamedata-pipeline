@@ -4,24 +4,26 @@ Tests for zbuffer_to_exr.py
 """
 
 import json
-import numpy as np
 import struct
+
+# Add local directory to path for the zbuffer_to_exr module
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-# Add local directory to path for the zbuffer_to_exr module
-import sys
+import numpy as np
+
 sys.path.insert(0, str(Path(__file__).parent))
 
 from zbuffer_to_exr import (
+    find_nearest_tick,
+    load_camera_frames,
+    load_tick_timestamps,
     parse_bin_header,
     read_bin_data,
-    load_tick_timestamps,
-    load_camera_frames,
-    find_nearest_tick,
-    zbuffer_to_exr
+    zbuffer_to_exr,
 )
 
 
@@ -42,7 +44,7 @@ class TestZBufferToEXR(unittest.TestCase):
         import shutil
         shutil.rmtree(self.temp_dir)
     
-    def create_test_bin_file(self, tick_id: int, width: int = 8, height: int = 8, 
+    def create_test_bin_file(self, tick_id: int, width: int = 8, height: int = 8,
                             fill_value: float = 1.0) -> Path:
         """Create a test zbuffer .bin file."""
         bin_path = self.session_dir / 'zbuffer' / f'tick_{tick_id:06d}.bin'
