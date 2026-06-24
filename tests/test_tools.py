@@ -140,7 +140,7 @@ def test_runner_records_unknown_tool_error(tmp_path: Path) -> None:
 
     class _GhostToolProvider:
         def chat(self, system, messages, temperature):
-            return "reason\n<action>" '{"op": "call_tool", "tool": "nope", "args": {}}' "</action>"
+            return 'reason\n<action>{"op": "call_tool", "tool": "nope", "args": {}}</action>'
 
     tp = SimpleToolProvider(
         [
@@ -219,9 +219,7 @@ def test_runner_without_tools_ignores_call_tool_action(tmp_path: Path) -> None:
 
     class _CallToolProvider:
         def chat(self, system, messages, temperature):
-            return (
-                "reason\n<action>" '{"op": "call_tool", "tool": "anything", "args": {}}' "</action>"
-            )
+            return 'reason\n<action>{"op": "call_tool", "tool": "anything", "args": {}}</action>'
 
     task = AgentTask(
         task_id="no-tools",
