@@ -28,8 +28,8 @@ def _np() -> Any:
         try:
             import numpy
             _numpy = numpy
-        except ImportError:
-            raise ImportError("numpy is required")
+        except ImportError as e:
+            raise ImportError("numpy is required") from e
     return _numpy
 
 
