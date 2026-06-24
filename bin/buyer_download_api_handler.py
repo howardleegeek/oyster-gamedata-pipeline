@@ -98,13 +98,13 @@ def generate_presigned_url(storage_path: str, base_url: str, secret: str,
 
 class RateLimiter:
     """Simple in-memory rate limiter using sliding window."""
-    
+
     def __init__(self, per_minute: int = DEFAULT_RATE_LIMIT_PER_MINUTE,
                  per_hour: int = 1000):
         self.per_minute = per_minute
         self.per_hour = per_hour
         self._requests: Dict[str, List[float]] = defaultdict(list)
-    
+
     def is_allowed(self, client_id: str) -> Tuple[bool, Optional[str]]:
         """Check if client is within rate limits."""
         now = time.time()
@@ -122,14 +122,14 @@ class RateLimiter:
 
 class AuditLogger:
     """Audit logger for tracking API access."""
-    
+
     def __init__(self, db_path: Optional[str] = None):
         if db_path is None:
             self._temp_dir = tempfile.mkdtemp(prefix="audit_")
             db_path = f"{self._temp_dir}/audit.db"
         self.db_path = db_path
         self._init_db()
-    
+
     def _init_db(self) -> None:
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("""
@@ -141,7 +141,7 @@ class AuditLogger:
                 )
             """)
             conn.commit()
-    
+
     def log(self, buyer_id: str, action: str, resource: Optional[str] = None,
             ip_address: Optional[str] = None, user_agent: Optional[str] = None,
             status_code: int = 200, details: Optional[Dict] = None) -> None:
@@ -160,16 +160,16 @@ class AuditLogger:
 
 class ClipStore:
     """In-memory store for clips (demo implementation)."""
-    
+
     def __init__(self) -> None:
         self._clips: Dict[str, Clip] = {}
         self._buyer_clips: Dict[str, List[str]] = defaultdict(list)
-    
+
     def add_clip(self, buyer_id: str, clip: Clip) -> None:
         self._clips[clip.clip_id] = clip
         if clip.clip_id not in self._buyer_clips[buyer_id]:
             self._buyer_clips[buyer_id].append(clip.clip_id)
-    
+
     def get_clips_for_buyer(self, buyer_id: str, page: int = 1,
                             page_size: int = DEFAULT_PAGE_SIZE) -> Tuple[List[Clip], int]:
         """Get paginated clips for a buyer."""
@@ -192,16 +192,16 @@ def create_app(jwt_secret: str, download_base_url: str) -> "FastAPI":
     """Create and configure the FastAPI application."""
     if not HAS_FASTAPI:
         raise RuntimeError("FastAPI is required. Install with: pip install fastapi uvicorn")
-    
+
     app = FastAPI(title="Buyer Download API", version="1.0.0")
-    
+
     def get_current_buyer(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
         """Extract and validate buyer from JWT token."""
         try:
             return decode_jwt(credentials.credentials, jwt_secret)
         except JWTAuthError as e:
             raise HTTPException(status_code=401, detail=str(e))
-    
+
     @app.get("/v1/buyer/clips")
     async def list_clips(
         request: Request,
@@ -213,13 +213,13 @@ def create_app(jwt_secret: str, download_base_url: str) -> "FastAPI":
         buyer_id = buyer.get("buyer_id", "unknown")
         client_ip = request.client.host if request.client else None
         user_agent = request.headers.get("user-agent")
-        
+
         allowed, error_msg = rate_limiter.is_allowed(buyer_id)
         if not allowed:
             audit_logger.log(buyer_id, "list_clips", ip_address=client_ip,
                            user_agent=user_agent, status_code=429, details={"error": error_msg})
             raise HTTPException(status_code=429, detail=error_msg)
-        
+
         clips, total = clip_store.get_clips_for_buyer(buyer_id, page, page_size)
         clip_responses = []
         for clip in clips:
@@ -230,17 +230,17 @@ def create_app(jwt_secret: str, download_base_url: str) -> "FastAPI":
                 "created_at": clip.created_at, "download_url": download_url,
                 "content_type": clip.content_type, "metadata": clip.metadata
             })
-        
+
         total_pages = (total + page_size - 1) // page_size
         audit_logger.log(buyer_id, "list_clips", ip_address=client_ip,
                         user_agent=user_agent, status_code=200, details={"page": page, "count": len(clips)})
         return {"clips": clip_responses, "page": page, "page_size": page_size,
                 "total_count": total, "total_pages": total_pages}
-    
+
     @app.get("/health")
     async def health_check() -> Dict[str, str]:
         return {"status": "healthy"}
-    
+
     return app
 
 
@@ -265,20 +265,20 @@ def main(argv: Optional[List[str]] = None) -> int:
                        help="Base URL for presigned download URLs")
     parser.add_argument("--rate-limit-per-minute", type=int, default=DEFAULT_RATE_LIMIT_PER_MINUTE)
     parser.add_argument("--demo", action="store_true", help="Populate with demo data")
-    
+
     args = parser.parse_args(argv)
-    
+
     if not HAS_FASTAPI:
         print("Error: FastAPI is required. Install with: pip install fastapi uvicorn", file=sys.stderr)
         return 1
-    
+
     global rate_limiter
     rate_limiter = RateLimiter(per_minute=args.rate_limit_per_minute, per_hour=args.rate_limit_per_minute * 20)
-    
+
     if args.demo:
         populate_demo_data(clip_store)
         logger.info("Populated demo data for testing")
-    
+
     app = create_app(args.jwt_secret, args.download_base_url)
     logger.info(f"Starting Buyer Download API on {args.host}:{args.port}")
     uvicorn.run(app, host=args.host, port=args.port)
