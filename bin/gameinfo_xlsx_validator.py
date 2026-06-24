@@ -17,6 +17,7 @@ def _load_openpyxl():
     """Lazy-import openpyxl to avoid startup cost when not needed."""
     try:
         import openpyxl
+
         return openpyxl
     except ImportError:
         print("ERROR: openpyxl is required. Install with: pip install openpyxl", file=sys.stderr)
