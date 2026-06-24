@@ -355,8 +355,7 @@ def _check_video(bundle: Path, result: LintResult) -> None:
             code="VIDEO_TOO_SHORT",
             file=here,
             message=(
-                f"duration={duration:.2f}s is below buyer minimum "
-                f"{_VIDEO_MIN_SEC:.0f}s (5 minutes)"
+                f"duration={duration:.2f}s is below buyer minimum {_VIDEO_MIN_SEC:.0f}s (5 minutes)"
             ),
             location="format.duration",
         )
@@ -366,8 +365,7 @@ def _check_video(bundle: Path, result: LintResult) -> None:
             code="VIDEO_TOO_LONG",
             file=here,
             message=(
-                f"duration={duration:.2f}s exceeds buyer maximum "
-                f"{_VIDEO_MAX_SEC:.0f}s (6 minutes)"
+                f"duration={duration:.2f}s exceeds buyer maximum {_VIDEO_MAX_SEC:.0f}s (6 minutes)"
             ),
             location="format.duration",
         )
@@ -418,7 +416,7 @@ def _check_video(bundle: Path, result: LintResult) -> None:
             code="VIDEO_CODEC",
             file=here,
             message=(
-                f"codec_name={codec_name!r} is not in accepted set " f"{sorted(_ACCEPTED_CODECS)}"
+                f"codec_name={codec_name!r} is not in accepted set {sorted(_ACCEPTED_CODECS)}"
             ),
             location="streams[0].codec_name",
         )
@@ -506,7 +504,7 @@ def _check_systeminfo(bundle: Path, result: LintResult) -> None:
                 result.issues,
                 code="SYSTEMINFO_BAD_TYPE",
                 file=here,
-                message=(f"{field!r} must be {expected_type}, " f"got {type(v).__name__}={v!r}"),
+                message=(f"{field!r} must be {expected_type}, got {type(v).__name__}={v!r}"),
                 location=f"{here}.{field}",
             )
 
