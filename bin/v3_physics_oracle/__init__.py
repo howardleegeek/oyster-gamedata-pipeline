@@ -17,6 +17,7 @@ in its table, V₃'s vote breaks the tie. Outside V₃'s table → ABSTAIN.
 
 IRON LAW IL3 enforced: this module imports nothing from V₁/V₂/V₄/producer.
 """
+
 from .residuals import (
     OracleResult,
     Verdict,
