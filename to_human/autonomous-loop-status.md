@@ -18,7 +18,11 @@
 - Result: committed 6f5d50f1 (pushed to fix/prd-test-action-per-second-ruff)
 
 ## Round 208 @ 2026-06-28T06:00:00Z
-- Picked: Fix ruff F841 (unused variables) in oyster_provenance/merkle.py. Two unused variables in `get_proof` method: `current_hash` at line 113 (computed from hash_leaf but never used - the call validates inputs) and `current_hash` at line 150 (assigned but never used after building next_level). Single-file bounded change, no behavior change. Tests pass (25 tests in test_provenance.py). Self-review: F841 fix — no runtime behavior change, functions still called for side effects, no silent error swallow, no security/threading/auth change.
+- Picked: Fix ruff F841 (unused variables) in oyster_provenance/merkle.py. Two unused variables in `get_proof` method: `current_hash` at line 113 (computed from hash_leaf but never used - the call validates inputs) and `current_hash` at line 150 (assigned but never used after building next_level). Single-file bounded change, no behavior change. Tests pass (25 tests in test_provenance.py). Self-review: F841 fix — no runtime behavior change, functions still call
+
+## Round 209 @ 2026-06-29T06:00:00Z
+- Picked: Fix ruff F841 (unused variable `e`) in dashboard/server.py. The variable was assigned in an exception handler (`except Exception as e:`) but never used - the exception is intentionally swallowed to fall back to mock verification. Single-file bounded change, no behavior change. Tests pass (29 tests in test_dashboard_api.py). Self-review: F841 fix — no runtime behavior change, exception is still caught and handled (fallback to mock), no silent error introduced, no security/auth change.
+- Result: committed c020128f (pushed to fix/prd-test-action-per-second-ruff)ed for side effects, no silent error swallow, no security/threading/auth change.
 - Result: committed fa29153c (pushed to fix/prd-test-action-per-second-ruff)
 
 ## Round 203 @ 2026-06-25T05:00:00Z
@@ -2453,3 +2457,7 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 - Picked: Fix ruff I001 (unsorted import block) in oyster_provenance/manifest.py. Continuation of the ongoing ruff cleanup sweep from Rounds 101-210. Single-file bounded change, 5 insertions / 6 deletions, no behavior change. `ruff check oyster_provenance/manifest.py` clean (0 errors, down from 1). 55/55 tests pass across tests/test_provenance.py, tests/test_provenance_sign_verify.py, and tests/test_provenance_offline_bundle.py. Module imports cleanly.
 - Self-review: I001 fix — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference, no module-level side effect.
 - Result: committed 3d9e1153 (pushed to fix/prd-test-action-per-second-ruff)
+
+## Round 212 @ 2026-06-29T06:00:00Z
+- Picked: Fix ruff F841 (unused variable `e`) in dashboard/server.py. The variable was assigned in an exception handler (`except Exception as e:`) but never used - the exception is intentionally swallowed to fall back to mock verification. Single-file bounded change, no behavior change. Tests pass (29 tests in test_dashboard_api.py). Self-review: F841 fix — no runtime behavior change, exception is still caught and handled (fallback to mock), no silent error introduced, no security/auth change.
+- Result: committed c020128f (pushed to fix/prd-test-action-per-second-ruff)
