@@ -19,6 +19,7 @@ def encode_varint(value):
             break
     return bytes(result)
 
+
 def decode_varint(sock):
     """Decode Minecraft VarInt from socket."""
     result, shift = 0, 0
@@ -30,6 +31,7 @@ def decode_varint(sock):
         shift += 7
     return result
 
+
 def check_server(host, port):
     """Check if Paper server is up and running version 1.20.4."""
     try:
@@ -37,7 +39,14 @@ def check_server(host, port):
         sock.settimeout(5.0)
         sock.connect((host, port))
         # Send handshake
-        data = encode_varint(0) + encode_varint(765) + encode_varint(len(host)) + host.encode() + struct.pack(">H", port) + encode_varint(1)
+        data = (
+            encode_varint(0)
+            + encode_varint(765)
+            + encode_varint(len(host))
+            + host.encode()
+            + struct.pack(">H", port)
+            + encode_varint(1)
+        )
         sock.sendall(encode_varint(len(data)) + data)
         # Send status request
         sock.sendall(encode_varint(1) + encode_varint(0))
@@ -62,12 +71,14 @@ def check_server(host, port):
         print(f"Error: {e}")
         return 1
 
+
 def main():
     parser = argparse.ArgumentParser(description="Paper server health probe")
     parser.add_argument("--host", default="localhost", help="Server host")
     parser.add_argument("--port", type=int, default=25565, help="Server port")
     args = parser.parse_args()
     sys.exit(check_server(args.host, args.port))
+
 
 if __name__ == "__main__":
     main()
