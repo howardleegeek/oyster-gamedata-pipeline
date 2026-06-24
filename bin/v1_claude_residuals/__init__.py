@@ -5,6 +5,7 @@ so callers can write::
 
     from bin.v1_claude_residuals import r16_depth_count, ResidualResult
 """
+
 from __future__ import annotations
 
 from .r13_keycode_replay import r13_keycode_replay
