@@ -382,6 +382,19 @@ def check3_quat_euler(records: list[dict[str, Any]]) -> dict[str, Any]:
 # ---- Check 4 — Frame-time consistency ---------------------------------------
 
 def check4_frame_time(records: list[dict[str, Any]]) -> dict[str, Any]:
+    """Check frame-time consistency: recorded index matches time-derived index.
+
+    Verifies that each frame's recorded index (frame_index or frame field)
+    matches the expected index derived from its timestamp and the clip's FPS.
+    This catches dropped frames, timestamp drift, or corrupt frame sequencing.
+
+    Args:
+        records: List of frame record dicts containing time/frame data.
+
+    Returns:
+        Dict with check results including pass/fail status, mismatch count,
+        fps, max drift in frames, and sample mismatches for debugging.
+    """
     if not records:
         return {
             "check": 4,
