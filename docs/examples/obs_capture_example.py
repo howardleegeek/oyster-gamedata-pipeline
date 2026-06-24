@@ -6,6 +6,7 @@ This demonstrates how to use the OBS WebSocket v5 client.
 
 import asyncio
 import logging
+
 from obs_capture import OBSSpectatorCapture
 
 # Configure logging
