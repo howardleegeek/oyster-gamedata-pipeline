@@ -46,6 +46,15 @@ class BBox2D:
     occlusion: float = 0.0; truncation: float = 0.0
 
     def is_visible(self, oc: float = 0.5, tr: float = 0.5) -> bool:
+        """Check if the bounding box is visible based on occlusion and truncation.
+
+        Args:
+            oc: Maximum allowed occlusion ratio (0.0 = fully occluded, 1.0 = fully visible).
+            tr: Maximum allowed truncation ratio (0.0 = fully truncated, 1.0 = not truncated).
+
+        Returns:
+            True if both occlusion and truncation are within thresholds.
+        """
         return self.occlusion <= oc and self.truncation <= tr
 
     def to_dict(self) -> Dict[str, Any]:
