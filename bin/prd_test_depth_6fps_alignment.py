@@ -16,7 +16,7 @@ FRAME_RATIO = VIDEO_FPS // DEPTH_FPS  # 5
 
 def natural_sort_key(path: Path) -> Tuple[int, ...]:
     """Sort key handling numeric sequences in filenames."""
-    return tuple(int(m) if m.isdigit() else m for m in re.split(r'(\d+)', path.stem))
+    return tuple(int(m) if m.isdigit() else m for m in re.split(r"(\d+)", path.stem))
 
 
 def find_frames(directory: Path, exts: List[str]) -> List[Path]:
@@ -31,7 +31,7 @@ def find_frames(directory: Path, exts: List[str]) -> List[Path]:
 
 def extract_index(filename: Path) -> int:
     """Extract trailing frame index from filename."""
-    match = re.search(r'(\d+)$', filename.stem)
+    match = re.search(r"(\d+)$", filename.stem)
     if not match:
         raise ValueError(f"Cannot extract index from {filename}")
     return int(match.group(1))
@@ -39,8 +39,8 @@ def extract_index(filename: Path) -> int:
 
 def validate_alignment(video_dir: Path, depth_dir: Path, verbose: bool = False) -> Tuple[bool, str]:
     """Validate depth EXR 6fps aligns with 30fps video (5:1 ratio)."""
-    video_frames = find_frames(video_dir, ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif'])
-    depth_frames = find_frames(depth_dir, ['.exr'])
+    video_frames = find_frames(video_dir, [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"])
+    depth_frames = find_frames(depth_dir, [".exr"])
 
     if not video_frames:
         return False, f"No video frames in {video_dir}"
@@ -68,10 +68,16 @@ def validate_alignment(video_dir: Path, depth_dir: Path, verbose: bool = False) 
 
 def main(argv: List[str] = None) -> int:
     """CLI entry point."""
-    parser = argparse.ArgumentParser(description="Validate 6fps depth EXR alignment with 30fps video.")
-    parser.add_argument('-v', '--video-dir', type=Path, required=True, help="Video frames directory (30fps)")
-    parser.add_argument('-d', '--depth-dir', type=Path, required=True, help="Depth EXR directory (6fps)")
-    parser.add_argument('--verbose', '-V', action='store_true', help="Verbose output")
+    parser = argparse.ArgumentParser(
+        description="Validate 6fps depth EXR alignment with 30fps video."
+    )
+    parser.add_argument(
+        "-v", "--video-dir", type=Path, required=True, help="Video frames directory (30fps)"
+    )
+    parser.add_argument(
+        "-d", "--depth-dir", type=Path, required=True, help="Depth EXR directory (6fps)"
+    )
+    parser.add_argument("--verbose", "-V", action="store_true", help="Verbose output")
     args = parser.parse_args(argv)
 
     try:
@@ -83,5 +89,5 @@ def main(argv: List[str] = None) -> int:
         return 2
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())
