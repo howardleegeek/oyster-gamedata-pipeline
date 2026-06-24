@@ -7,6 +7,7 @@ timestamp ``23:59:60`` (UTC) without crashing or silently dropping data.
 Usage:  python3 bin/edge_test_leap_second.py [--verbose] [--strict]
 Exit:   0 = all passed, 1 = one or more failed
 """
+
 from __future__ import annotations
 
 import argparse
@@ -17,14 +18,38 @@ import tempfile
 from typing import Any, Dict, List, Tuple
 
 LEAP_SECOND_SCENARIOS: List[Dict[str, Any]] = [
-    {"name": "standard_235959", "desc": "Normal second before leap",
-     "h": 23, "m": 59, "s": 59, "expect": True},
-    {"name": "leap_235960", "desc": "Leap second 23:59:60 (boundary)",
-     "h": 23, "m": 59, "s": 60, "expect": True},
-    {"name": "rollover_000000", "desc": "Midnight rollover after leap",
-     "h": 0, "m": 0, "s": 0, "expect": True},
-    {"name": "invalid_235961", "desc": "Invalid second 23:59:61",
-     "h": 23, "m": 59, "s": 61, "expect": False},
+    {
+        "name": "standard_235959",
+        "desc": "Normal second before leap",
+        "h": 23,
+        "m": 59,
+        "s": 59,
+        "expect": True,
+    },
+    {
+        "name": "leap_235960",
+        "desc": "Leap second 23:59:60 (boundary)",
+        "h": 23,
+        "m": 59,
+        "s": 60,
+        "expect": True,
+    },
+    {
+        "name": "rollover_000000",
+        "desc": "Midnight rollover after leap",
+        "h": 0,
+        "m": 0,
+        "s": 0,
+        "expect": True,
+    },
+    {
+        "name": "invalid_235961",
+        "desc": "Invalid second 23:59:61",
+        "h": 23,
+        "m": 59,
+        "s": 61,
+        "expect": False,
+    },
 ]
 
 
@@ -62,7 +87,9 @@ def main(argv: List[str] | None = None) -> int:
     """Entry point — parse args, run scenarios, report results."""
     parser = argparse.ArgumentParser(description="Leap-second boundary test at 23:59:60")
     parser.add_argument("--verbose", "-v", action="store_true", help="Per-scenario details")
-    parser.add_argument("--strict", action="store_true", help="Require adapter to accept leap seconds")
+    parser.add_argument(
+        "--strict", action="store_true", help="Require adapter to accept leap seconds"
+    )
     args = parser.parse_args(argv)
 
     all_passed = True
@@ -82,7 +109,9 @@ def main(argv: List[str] | None = None) -> int:
         print(f"  Report → {tmpdir}/report.json")
 
     n = sum(1 for e in entries if e["passed"])
-    print(f"Leap-second boundary test: {'PASS' if all_passed else 'FAIL'} ({n}/{len(entries)} passed)")
+    print(
+        f"Leap-second boundary test: {'PASS' if all_passed else 'FAIL'} ({n}/{len(entries)} passed)"
+    )
     return 0 if all_passed else 1
 
 
