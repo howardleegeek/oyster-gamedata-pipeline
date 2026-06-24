@@ -326,7 +326,7 @@ async def verify_session_provenance(
                 hash_matches=result.get("hash_matches", False),
                 details=result
             )
-        except Exception as e:
+        except Exception:
             pass
     
     # Mock verification - hash should match the session_id
