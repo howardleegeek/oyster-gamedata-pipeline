@@ -312,7 +312,18 @@ def uninstall_handlers() -> None:
 
 
 def main(argv: List[str]) -> int:
-    """Main entry point for CLI usage."""
+    """Main entry point for CLI usage.
+
+    Handles command-line argument parsing for the error client. Supports
+    installing global error handlers, testing error reporting, and viewing
+    version information.
+
+    Args:
+        argv: Command-line arguments (excluding script name).
+
+    Returns:
+        Exit code: 0 for success, non-zero for errors.
+    """
     parser = argparse.ArgumentParser(
         description="Python Error Client - Global error capture and reporting"
     )
