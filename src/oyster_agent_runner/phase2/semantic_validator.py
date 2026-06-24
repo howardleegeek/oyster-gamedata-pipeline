@@ -110,11 +110,11 @@ def validate_action_camera_semantics(records: list[dict]) -> dict:
             if abs(norm_sq - 1.0) >= 1e-3:
                 quaternion_unit_norm = False
                 if (
-                    f"Quaternion norm squared={norm_sq:.6f} not unit (diff={abs(norm_sq-1.0):.6f})"
+                    f"Quaternion norm squared={norm_sq:.6f} not unit (diff={abs(norm_sq - 1.0):.6f})"
                     not in issues
                 ):
                     issues.append(
-                        f"Quaternion norm squared={norm_sq:.6f} not unit (diff={abs(norm_sq-1.0):.6f})"
+                        f"Quaternion norm squared={norm_sq:.6f} not unit (diff={abs(norm_sq - 1.0):.6f})"
                     )
 
         # Check camera intrinsics fx == fy
