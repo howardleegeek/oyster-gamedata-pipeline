@@ -180,7 +180,7 @@ def _import_demoparser2() -> Any:
 
         return DemoParser
     except ImportError:
-        sys.stderr.write("demoparser2 is required; install with: " "pip install demoparser2\n")
+        sys.stderr.write("demoparser2 is required; install with: pip install demoparser2\n")
         sys.exit(2)
 
 
