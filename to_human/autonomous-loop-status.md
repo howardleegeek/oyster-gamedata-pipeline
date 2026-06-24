@@ -180,3 +180,7 @@
 - Picked: ruff format tests/bin/test_r21_monotonic_frame.py (52-line test file, smallest unformatted test file; black-compatible blank line removal after class). Justification: measurable code smell, single-file scope, no behavior change, 5 targeted tests pass, no risk of test masking.
 - Result: committed 2525e77d (ruff format removed one blank line after class definition in test_r21_monotonic_frame.py; 5/5 tests pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: pure cosmetic — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
 
+
+## Round 265 @ 2026-06-24T18:50:56Z
+- Picked: ruff format bin/red_team/__init__.py (29-line __init__ file, single blank line after module docstring). Justification: measurable code smell (file not black-compatible; ruff format --check flagged it), smallest unformatted file in repo, single-file scope, no behavior change, module imports cleanly (python3 -c "import bin.red_team"), no risk of test masking.
+- Result: committed 1eef3788 (ruff format added blank line after module docstring in bin/red_team/__init__.py; lint clean; module import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: pure cosmetic — no behavior change, no silent error swallow, no race condition, no off-by-one, no security change, no test masked as passing, no brand cross-reference.)
