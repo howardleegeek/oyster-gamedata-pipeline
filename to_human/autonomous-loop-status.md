@@ -998,6 +998,7 @@ E702 Multiple statements on one line (semicolon)
     |
 
 E701 Multiple statements on one line (colon)
+
    --> bin/inventory_voxel_capture.py:207:37
     |
 205 |     if args.demo: return run_demo()
@@ -2492,3 +2493,7 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 ## Round 217 @ 2026-06-24T02:37:51Z
 - Picked: Fix ruff F841 (unused variable `current_time`) in server/s3_presigned_url.py. The variable was assigned but never used - the function uses upload.is_expired() which internally calls time.time(). Single-file bounded change, no behavior change. Module parses cleanly, F841 check clean. Self-review: F841 fix — no runtime behavior change, function uses upload.is_expired() for expiry check, no silent error swallow, no security/threading/auth change.
 - Result: committed 9ba3d2ce (pushed to fix/prd-test-action-per-second-ruff)
+
+## Round 218 @ 2026-06-24T03:00:50Z
+- Picked: Fix ruff I001 (import block un-sorted) and W292 (no newline at end of file) in docs/examples/obs_capture_example.py. Picked over bin/red_team/blue_team_score.py because docs/examples is a smaller surface (2 issues, no test coverage) and the file is a pure documentation example. Continuation of the ongoing ruff cleanup sweep from Rounds 101-217. Single-file bounded change, 2 insertions / 1 deletion, no behavior change. ast.parse OK, ruff check clean (0 errors, down from 2), no tests reference this file (grep `obs_capture_example` in tests/ returns zero hits), 3294-test collection unaffected. Self-review: pure PEP-8 conformance — I001 (blank line between stdlib and third-party imports) + W292 (trailing newline byte) — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing (no skip/xfail added), no brand cross-reference, no module-level side effect. `git add` was scoped to exactly one file (the other 3 modified files — dashboard/merge_failures.log, dashboard/replay_attacks.json, tests/_payout_cron_test.log — are noise from prior runs and were left unstaged per iron rules).
+- Result: committed e18384e2 (pushed to fix/prd-test-action-per-second-ruff)
