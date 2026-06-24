@@ -36,9 +36,9 @@ class TestBatchSyntax:
     def test_batch_has_shebang(self):
         with open(BATCH_PATH, "r") as f:
             first_line = f.readline().strip()
-        assert first_line.startswith(
-            "@echo off"
-        ), f"Batch should start with @echo off, got: {first_line!r}"
+        assert first_line.startswith("@echo off"), (
+            f"Batch should start with @echo off, got: {first_line!r}"
+        )
 
     def test_batch_has_exit_codes(self):
         with open(BATCH_PATH, "r") as f:
@@ -104,12 +104,12 @@ class TestIssValidity:
     def test_iss_has_initialize_setup(self):
         with open(ISS_PATH, "r") as f:
             content = f.read()
-        assert (
-            "InitializeSetup" in content
-        ), ".iss must have InitializeSetup function for pre-install check"
-        assert (
-            "function InitializeSetup(): Boolean" in content
-        ), "InitializeSetup must return Boolean"
+        assert "InitializeSetup" in content, (
+            ".iss must have InitializeSetup function for pre-install check"
+        )
+        assert "function InitializeSetup(): Boolean" in content, (
+            "InitializeSetup must return Boolean"
+        )
 
     def test_iss_calls_check_runtime_in_run_section(self):
         with open(ISS_PATH, "r") as f:
@@ -139,9 +139,9 @@ class TestIssValidity:
         run_match = re.search(r"\[Run\](.*?)(?=\n\[|\Z)", content, re.DOTALL)
         assert run_match
         run_content = run_match.group(1)
-        assert (
-            "waituntilterminated" in run_content.lower()
-        ), "Runtime check in [Run] must use waituntilterminated flag"
+        assert "waituntilterminated" in run_content.lower(), (
+            "Runtime check in [Run] must use waituntilterminated flag"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -244,9 +244,9 @@ class TestBatchLogicSimulation:
         assert "ERRORLEVEL" in content, "Must check ERRORLEVEL"
         # Verify the pattern: reg query → if ERRORLEVEL EQU 0 → exit /b 0
         pattern = r"reg query.*ERRORLEVEL.*EQU 0.*exit /b 0"
-        assert re.search(
-            pattern, content, re.DOTALL
-        ), "Batch must have: reg query → check ERRORLEVEL → exit 0"
+        assert re.search(pattern, content, re.DOTALL), (
+            "Batch must have: reg query → check ERRORLEVEL → exit 0"
+        )
 
     def test_failure_path_exits_one(self):
         """Verify the batch has a clear failure path with exit 1."""
@@ -259,9 +259,9 @@ class TestBatchLogicSimulation:
         """Verify that empty input defaults to Yes (download)."""
         content = self._parse_batch_logic()
         # Should have: if "%CHOICE%"=="" set "CHOICE=Y"
-        assert (
-            '""' in content or '==""' in content or '==""' in content
-        ), "Batch should handle empty input"
+        assert '""' in content or '==""' in content or '==""' in content, (
+            "Batch should handle empty input"
+        )
         # Check for default Y assignment
         assert "CHOICE=Y" in content or 'CHOICE="Y"' in content, "Batch should default CHOICE to Y"
 
@@ -315,9 +315,9 @@ class TestIntegration:
         )
         assert func_match, "InitializeSetup function not found"
         func_body = func_match.group(1)
-        assert (
-            "Result := False" in func_body
-        ), "InitializeSetup must set Result := False when runtime missing"
+        assert "Result := False" in func_body, (
+            "InitializeSetup must set Result := False when runtime missing"
+        )
 
     def test_initialize_setup_returns_true_on_found_runtime(self):
         """Verify InitializeSetup returns True when runtime is found."""
