@@ -161,7 +161,7 @@ class FactorioAction:
         if op == "mine":
             return cls(op=op, payload=_validate_mine(action))
         raise InvalidFactorioAction(
-            "Unsupported Factorio action op " f"{op!r}; expected one of move/craft/place/mine/noop."
+            f"Unsupported Factorio action op {op!r}; expected one of move/craft/place/mine/noop."
         )
 
     def to_mod_payload(self) -> dict[str, Any]:
