@@ -6,6 +6,7 @@ from caught to uncaught.
 
 Pure stdlib. Exit 0 on pass, 1 on fail.
 """
+
 import os
 import re
 import subprocess
@@ -26,9 +27,7 @@ def main() -> int:
 
     m = re.search(r"OVERALL DETECTION RATE:\s*(\d+)/(\d+)\s*\((\d+)%\)", output)
     if not m:
-        sys.stderr.write(
-            "BFT GATE FAIL: could not parse 'OVERALL DETECTION RATE' from scorer.\n"
-        )
+        sys.stderr.write("BFT GATE FAIL: could not parse 'OVERALL DETECTION RATE' from scorer.\n")
         return 1
     caught, total, pct = int(m.group(1)), int(m.group(2)), int(m.group(3))
 
@@ -57,9 +56,7 @@ def main() -> int:
         )
         return 1
 
-    sys.stdout.write(
-        f"\nBFT GATE PASS: {pct}% ({caught}/{total}) >= {threshold}% threshold.\n"
-    )
+    sys.stdout.write(f"\nBFT GATE PASS: {pct}% ({caught}/{total}) >= {threshold}% threshold.\n")
     return 0
 
 
