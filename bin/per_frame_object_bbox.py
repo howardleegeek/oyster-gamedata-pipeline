@@ -186,6 +186,21 @@ def export_json(frames: List[FrameData], oc: float, tr: float) -> str:
 
 
 def export_csv(frames: List[FrameData], oc: float, tr: float) -> str:
+    """Export frame bounding box data to CSV format.
+
+    Filters visible 2D and 3D bounding boxes based on occlusion and truncation
+    thresholds, then writes all data to CSV format.
+
+    Args:
+        frames: List of FrameData objects containing bounding box data.
+        oc: Occlusion threshold (0.0-1.0). Objects with occlusion > oc are excluded.
+        tr: Truncation threshold (0.0-1.0). Objects with truncation > tr are excluded.
+
+    Returns:
+        CSV-formatted string with columns for frame_id, timestamp, camera_name,
+        scene_id, bbox_type, class_id, track_id, confidence, 2D/3D coordinates,
+        and visibility metrics.
+    """
     buf = io.StringIO()
     cols = ["frame_id","timestamp","camera_name","scene_id","bbox_type",
             "class_id","track_id","confidence","x","y","width","height",
