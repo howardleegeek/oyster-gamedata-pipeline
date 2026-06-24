@@ -244,3 +244,18 @@
 
 - Picked: ruff format bin/v1_claude_residuals/r21_monotonic_frame.py (smallest unformatted file: 60 lines, blank line after module docstring + line wrapping for long function calls). Justification: measurable code smell, single-file scope, no behavior change, targeted test passes (5/5), no risk of test masking, follows established cadence.
 - Result: committed 63757e94 (ruff format added blank line after module docstring and split long function calls across multiple lines in bin/v1_claude_residuals/r21_monotonic_frame.py; 1 file changed, 10 insertions(+), 2 deletions(-); ruff check + ruff format --check clean; 5/5 tests pass in tests/bin/test_r21_monotonic_frame.py; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+
+## Round 267 @ 2026-06-24T20:59:11Z
+
+- Picked: ruff format bin/gameinfo_xlsx_validator.py (smallest formatting diff: 1 blank line after lazy import in try block). Justification: measurable code smell, single-file scope, no behavior change, 22/22 related tests pass, no risk of test masking, follows established cadence of formatting small bin files.
+- Result: committed ea583da4 (ruff format added blank line after lazy import in bin/gameinfo_xlsx_validator.py; 1 file changed, 1 insertion(+); ruff check + ruff format --check clean; 22/22 tests pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic blank line — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 268 @ 2026-06-24T21:07:43Z
+
+- Picked: ruff format bin/video_metadata_extractor.py (small unformatted bin file: 73 lines, line-wrapping ffprobe args). Justification: measurable code smell, single-file scope, no behavior change, module import smoke OK, no risk of test masking, follows established cadence of formatting small bin files.
+- Result: committed 6df3ecdf (ruff format line-wrapped ffprobe args in bin/video_metadata_extractor.py; 1 file changed, 4 insertions(+), 2 deletions(-); ruff check + ruff format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 269 @ 2026-06-24T21:30:00Z
+- Picked: ruff format bin/ci/bft_detection_gate.py (smallest unformatted file: 67 lines; missing blank line after module docstring; 2 multi-line sys.stderr.write / sys.stdout.write calls collapsible to single line). Justification: measurable code smell, single-file scope, no behavior change, module imports cleanly, ruff check clean, tests/bin/test_bft_orchestrator.py 13/13 pass (closest adjacent test), no risk of test masking, follows established cadence of rounds 252–268.
+- Result: committed 11a035ec (ruff format bin/ci/bft_detection_gate.py; 1 file changed, 3 insertions(+), 6 deletions(-); ruff check + ruff format --check clean; module imports cleanly; tests/bin/test_bft_orchestrator.py 13/13 pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: pure cosmetic — added blank line after module docstring; collapsed two sys.stderr.write and one sys.stdout.write multi-line calls to single-line (each fits under 88 chars); no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
