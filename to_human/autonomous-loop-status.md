@@ -292,3 +292,10 @@
 
 - Picked: ruff format bin/v1_claude_residuals/r23_video_codec.py (smallest unformatted v1_claude_residuals file: 93 lines; blank line after module docstring, line-wrap subprocess.run kwargs, line-wrap next() call). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, targeted test exists (tests/bin/test_r23_video_codec.py 5/5 pass), no risk of test masking, follows established cadence of formatting small bin files (Rounds 254–273).
 - Result: committed 29d46af8 (ruff format added blank line after module docstring, line-wrapped the subprocess.run kwargs, and line-wrapped the next() call in bin/v1_claude_residuals/r23_video_codec.py; 1 file changed, 7 insertions(+), 2 deletions(-); ruff check + ruff format --check clean; 5/5 tests pass in tests/bin/test_r23_video_codec.py; import smoke OK (r23_video_codec + _FFPROBE_CMD load); pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow (subprocess.run still raises the same exception on timeout/OSError), no race condition (timeout unchanged), no off-by-one, no security impact (subprocess still uses static tuple, no shell), no test masking, no brand cross-reference, no module-level side effect.
+
+
+## Round 267 @ 2026-06-24T21:30:00Z
+
+- Picked: ruff format bin/tarball_diff.py (smallest unformatted file: 88 lines, blank lines between functions and long line wrapping needed). Justification: measurable code smell, single-file scope, no behavior change, module import smoke OK, no risk of test masking, follows established cadence.
+- Result: committed 395ffa20 (ruff format added blank lines between functions and wrapped long lines in bin/tarball_diff.py; 1 file changed, 20 insertions(+), 6 deletions(-); ruff check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
