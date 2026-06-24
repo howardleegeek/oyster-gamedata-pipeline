@@ -229,3 +229,8 @@
 - Picked: ruff format backend_stub/appcast_server.py (smallest unformatted file: 65 lines, single quote style fix in f-string). Justification: measurable code smell (file not black-compatible; ruff format --check flagged it), single-file scope, no behavior change, targeted test passes (test_appcast_server.py 5/5), no risk of test masking, follows established cadence.
 - Result: committed bdc957f5 (ruff format fixed single-quote f-string to double-quote inner string in backend_stub/appcast_server.py; 1 file changed, 1 insertion(+), 1 deletion(-); ruff check clean; 5/5 tests pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic quote fix — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
 
+
+## Round 267 @ 2026-06-24T20:37:23Z
+
+- Picked: ruff format bin/v1_claude_residuals/r21_monotonic_frame.py (smallest unformatted file: 60 lines, blank line after module docstring + line wrapping for long function calls). Justification: measurable code smell, single-file scope, no behavior change, targeted test passes (5/5), no risk of test masking, follows established cadence.
+- Result: committed 63757e94 (ruff format added blank line after module docstring and split long function calls across multiple lines in bin/v1_claude_residuals/r21_monotonic_frame.py; 1 file changed, 10 insertions(+), 2 deletions(-); ruff check + ruff format --check clean; 5/5 tests pass in tests/bin/test_r21_monotonic_frame.py; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
