@@ -1,3 +1,8 @@
+## Round 250 @ 2026-06-24T12:30:00Z
+
+- Picked: fix black formatting violations in 3 test files
+- Result: committed 3ea19a29 (formatted test_auto_tag_bot.py, test_onnx_inference.py, test_provenance_sign_verify.py; tests pass 36/36)
+
 ## Round 249 @ 2026-06-24T06:10:00Z
 
 - Picked: no good candidate found this round — exiting
