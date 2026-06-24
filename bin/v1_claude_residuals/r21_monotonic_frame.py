@@ -15,6 +15,7 @@ Threshold: 0 (strict). residual = max(0, rec.frame − neighbor.frame + 1)
 counts how many positions out of order; 0 means in-order, 1 means duplicate,
 ≥2 means a true reorder.
 """
+
 from __future__ import annotations
 
 import math
@@ -48,13 +49,20 @@ def r21_monotonic_frame(
     nbr_f = neighbor.get("frame")
     if not isinstance(rec_f, int) or not isinstance(nbr_f, int):
         return ResidualResult(
-            "R21", False, math.nan, threshold, "ABSTAIN:frame_index_missing",
+            "R21",
+            False,
+            math.nan,
+            threshold,
+            "ABSTAIN:frame_index_missing",
         )
 
     residual = float(max(0, rec_f - nbr_f + 1))
     if residual == 0.0:
         return ResidualResult("R21", True, 0.0, threshold, f"{rec_f} < {nbr_f}")
     return ResidualResult(
-        "R21", False, residual, threshold,
+        "R21",
+        False,
+        residual,
+        threshold,
         f"out_of_order: rec.frame={rec_f} >= neighbor.frame={nbr_f}",
     )
