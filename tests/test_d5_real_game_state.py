@@ -111,8 +111,7 @@ def test_string_real_game_state_does_NOT_classify_REAL(tmp_path):
     # Falls through tier 0 (because is True check fails on string), no
     # is_padded flag, identical fingerprints → PLACEHOLDER.
     assert state == tac.PLACEHOLDER, (
-        f"string '_real_game_state' should NOT pass tier 0 — got {state} "
-        f"with evidence: {evidence}"
+        f"string '_real_game_state' should NOT pass tier 0 — got {state} with evidence: {evidence}"
     )
 
 
