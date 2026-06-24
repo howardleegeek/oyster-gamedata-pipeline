@@ -14,6 +14,11 @@
 - Picked: ruff format src/oyster_agent_runner/tools.py (smallest src file with formatting violations; 136 lines, single string concatenation change). Justification: measurable code smell, single-file scope, no behavior change, targeted test passes (test_tools.py 10/10), no risk of test masking.
 - Result: committed 6edb6e79 (ruff format applied black-compatible line wrapping to tools.py; cosmetic string formatting only; test_tools.py 10/10 pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: pure cosmetic line wrap — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
 
+## Round 257 @ 2026-06-24T16:10:00Z
+
+- Picked: ruff format src/oyster_agent_runner/defense_finite_check.py (small src file with formatting violations; 117 lines, 1 f-string concatenation fix). Justification: measurable code smell, single-file scope, no behavior change, tests pass (iron_law_check 13/13), no risk of test masking.
+- Result: committed babbb600 (ruff format applied black-compatible line wrapping to defense_finite_check.py; cosmetic f-string only; iron_law_check 13/13 pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: pure cosmetic line wrap — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
 ## Round 252 @ 2026-06-24T14:00:00Z
 
 - Picked: no good candidate found this round — exiting
@@ -128,3 +133,8 @@
 
 - Picked: ruff cleanup I001+F401+W291+W292 in patches/cluster-week3-2026-05-18/B1-bundler-broken/test_batch_bundler.py
 - Result: committed 1a46b9c6 (sorted isort-style imports, removed unused shutil import, stripped trailing whitespace, added EOF newline). Ruff clean on file. Targeted tests pass: tests/test_batch_bundler.py 7/7, tests/test_zbuffer_metric.py 2/2 (9/9 total). Pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: pure cosmetic — no behavior change, no silent error swallow, no race condition, no off-by-one, no security change, no test masked as passing, no brand cross-reference. patches/ dir is historical snapshot not referenced by any test runner — change is safe and matches pattern of rounds 250/251.
+
+## Round 258 @ 2026-06-24T16:11:24Z
+
+- Picked: ruff format tests/test_d5_real_game_state.py (small 135-line test file, 1 cosmetic line-wrap change in f-string). Justification: measurable code smell (file not black-compatible; ruff format --check flagged it), single-file scope, no behavior change, targeted test passes (test_d5_real_game_state 6/6), no risk of test masking.
+- Result: committed c4d025a9 (ruff format applied black-compatible line wrapping to test_d5_real_game_state.py; 2-line f-string concatenated to 1 line; assert message preserved exactly; test_d5_real_game_state 6/6 pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: pure cosmetic line wrap — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
