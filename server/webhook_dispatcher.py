@@ -325,12 +325,6 @@ def emit_event(event_type: str, payload: Dict[str, Any]) -> None:
         event_type: Event type string
         payload: Event data
     """
-    event = {
-        "type": event_type,
-        "payload": payload,
-        "timestamp": datetime.utcnow().isoformat(),
-    }
-    
     # In production, publish to message queue
     # For now, schedule async dispatch
     asyncio.create_task(dispatch_event(event_type, payload))
