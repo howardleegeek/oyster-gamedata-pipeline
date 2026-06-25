@@ -35,7 +35,8 @@ class GracefulShutdown:
         """Internal SIGTERM handler — flushes, closes, then re-raises."""
         logger.info(
             "SIGTERM: flushing %d file(s), closing %d tarball(s)",
-            len(self._files), len(self._tarballs),
+            len(self._files),
+            len(self._tarballs),
         )
         self._shutting_down = True
         for fh in self._files:
@@ -113,7 +114,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     parser.add_argument("--test", action="store_true", help="Run self-SIGTERM smoke test.")
     parser.add_argument(
-        "--log-level", default="INFO",
+        "--log-level",
+        default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         help="Logging verbosity (default: INFO).",
     )
