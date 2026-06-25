@@ -25,15 +25,27 @@ log = logging.getLogger(__name__)
 
 
 def _build_cmd(
-    entry: Path, name: str, icon: Path | None, onefile: bool,
-    hidden_imports: list[str], extra_args: list[str],
-    dist_tmp: Path, work_tmp: Path,
+    entry: Path,
+    name: str,
+    icon: Path | None,
+    onefile: bool,
+    hidden_imports: list[str],
+    extra_args: list[str],
+    dist_tmp: Path,
+    work_tmp: Path,
 ) -> list[str]:
     """Return the PyInstaller command as a list (never shell=True)."""
     cmd: list[str] = [
-        sys.executable, "-m", "PyInstaller",
-        "--name", name, "--distpath", str(dist_tmp),
-        "--workpath", str(work_tmp), "--noconfirm",
+        sys.executable,
+        "-m",
+        "PyInstaller",
+        "--name",
+        name,
+        "--distpath",
+        str(dist_tmp),
+        "--workpath",
+        str(work_tmp),
+        "--noconfirm",
     ]
     cmd.append("--onefile" if onefile else "--onedir")
     if icon:
@@ -64,26 +76,45 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Package a Python script into a standalone executable via PyInstaller.",
     )
-    parser.add_argument("--entry", required=True, type=Path,
-                        help="Path to the Python entry-point script.")
-    parser.add_argument("--name", default=None,
-                        help="Output binary name (defaults to entry script stem).")
-    parser.add_argument("--out", type=Path, default=Path("dist"),
-                        help="Output directory for the final binary (default: ./dist).")
-    parser.add_argument("--icon", type=Path, default=None,
-                        help="Optional icon file (.ico / .icns / .png).")
-    parser.add_argument("--onefile", action="store_true", default=True,
-                        help="Bundle into a single executable (default).")
-    parser.add_argument("--onedir", action="store_true",
-                        help="Bundle into a directory instead of a single file.")
-    parser.add_argument("--hidden-import", action="append", default=[],
-                        dest="hidden_imports",
-                        help="Additional hidden-import modules (repeatable).")
-    parser.add_argument("--pyinstaller-arg", action="append", default=[],
-                        dest="extra_args",
-                        help="Extra args forwarded to PyInstaller (repeatable).")
-    parser.add_argument("-v", "--verbose", action="store_true",
-                        help="Enable verbose logging.")
+    parser.add_argument(
+        "--entry", required=True, type=Path, help="Path to the Python entry-point script."
+    )
+    parser.add_argument(
+        "--name", default=None, help="Output binary name (defaults to entry script stem)."
+    )
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=Path("dist"),
+        help="Output directory for the final binary (default: ./dist).",
+    )
+    parser.add_argument(
+        "--icon", type=Path, default=None, help="Optional icon file (.ico / .icns / .png)."
+    )
+    parser.add_argument(
+        "--onefile",
+        action="store_true",
+        default=True,
+        help="Bundle into a single executable (default).",
+    )
+    parser.add_argument(
+        "--onedir", action="store_true", help="Bundle into a directory instead of a single file."
+    )
+    parser.add_argument(
+        "--hidden-import",
+        action="append",
+        default=[],
+        dest="hidden_imports",
+        help="Additional hidden-import modules (repeatable).",
+    )
+    parser.add_argument(
+        "--pyinstaller-arg",
+        action="append",
+        default=[],
+        dest="extra_args",
+        help="Extra args forwarded to PyInstaller (repeatable).",
+    )
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging.")
 
     args = parser.parse_args(argv)
     logging.basicConfig(
@@ -105,9 +136,14 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         cmd = _build_cmd(
-            entry=entry, name=name, icon=args.icon, onefile=onefile,
-            hidden_imports=args.hidden_imports, extra_args=args.extra_args,
-            dist_tmp=dist_tmp, work_tmp=work_tmp,
+            entry=entry,
+            name=name,
+            icon=args.icon,
+            onefile=onefile,
+            hidden_imports=args.hidden_imports,
+            extra_args=args.extra_args,
+            dist_tmp=dist_tmp,
+            work_tmp=work_tmp,
         )
         log.info("Running: %s", " ".join(cmd))
         result = subprocess.run(cmd, check=False)
