@@ -23,8 +23,13 @@ DEFAULT_REFILL_RATE = DEFAULT_DAILY_BUDGET / 86400
 class TokenBucket:
     """Thread-safe token bucket for rate limiting."""
 
-    def __init__(self, capacity: int = DEFAULT_DAILY_BUDGET, tokens: float | None = None,
-                 last_refill: float | None = None, refill_rate: float = DEFAULT_REFILL_RATE) -> None:
+    def __init__(
+        self,
+        capacity: int = DEFAULT_DAILY_BUDGET,
+        tokens: float | None = None,
+        last_refill: float | None = None,
+        refill_rate: float = DEFAULT_REFILL_RATE,
+    ) -> None:
         self.capacity = capacity
         self.tokens = tokens if tokens is not None else float(capacity)
         self.last_refill = last_refill or time.time()
@@ -56,8 +61,12 @@ class TokenBucket:
 
     def to_dict(self) -> dict[str, Any]:
         with self._lock:
-            return {"capacity": self.capacity, "tokens": self.tokens,
-                    "last_refill": self.last_refill, "refill_rate": self.refill_rate}
+            return {
+                "capacity": self.capacity,
+                "tokens": self.tokens,
+                "last_refill": self.last_refill,
+                "refill_rate": self.refill_rate,
+            }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> TokenBucket:
@@ -67,7 +76,9 @@ class TokenBucket:
 class VendorRateLimiter:
     """Manages token buckets for multiple vendors with JSON persistence."""
 
-    def __init__(self, state_file: Path | str | None = None, default_budget: int = DEFAULT_DAILY_BUDGET) -> None:
+    def __init__(
+        self, state_file: Path | str | None = None, default_budget: int = DEFAULT_DAILY_BUDGET
+    ) -> None:
         self.state_file = Path(state_file or DEFAULT_STATE_FILE)
         self.default_budget = default_budget
         self._buckets: dict[str, TokenBucket] = {}
@@ -87,8 +98,10 @@ class VendorRateLimiter:
 
     def save_state(self) -> None:
         with self._lock:
-            data = {"buckets": {vid: b.to_dict() for vid, b in self._buckets.items()},
-                    "saved_at": datetime.now().isoformat()}
+            data = {
+                "buckets": {vid: b.to_dict() for vid, b in self._buckets.items()},
+                "saved_at": datetime.now().isoformat(),
+            }
             tmp = self.state_file.with_suffix(".tmp")
             with open(tmp, "w") as f:
                 json.dump(data, f, indent=2)
@@ -114,9 +127,15 @@ class VendorRateLimiter:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Token-bucket rate limiter for vendor clip budgets.")
-    parser.add_argument("--state-file", type=Path, default=DEFAULT_STATE_FILE, help="State JSON file")
-    parser.add_argument("--budget", type=int, default=DEFAULT_DAILY_BUDGET, help="Daily token budget")
+    parser = argparse.ArgumentParser(
+        description="Token-bucket rate limiter for vendor clip budgets."
+    )
+    parser.add_argument(
+        "--state-file", type=Path, default=DEFAULT_STATE_FILE, help="State JSON file"
+    )
+    parser.add_argument(
+        "--budget", type=int, default=DEFAULT_DAILY_BUDGET, help="Daily token budget"
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("check", help="Check if tokens available")
@@ -135,14 +154,18 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "check":
         ok = limiter.get_remaining(args.vendor_id) >= args.tokens
-        print(f"{'OK' if ok else 'LIMIT'}: {limiter.get_remaining(args.vendor_id):.1f}/{args.budget}")
+        print(
+            f"{'OK' if ok else 'LIMIT'}: {limiter.get_remaining(args.vendor_id):.1f}/{args.budget}"
+        )
         return 0 if ok else 1
     elif args.command == "consume":
         ok = limiter.consume(args.vendor_id, args.tokens)
         print(f"{'OK' if ok else 'LIMIT'}: {limiter.get_remaining(args.vendor_id):.1f} left")
         return 0 if ok else 1
     elif args.command == "status":
-        print(f"Vendor: {args.vendor_id}, Remaining: {limiter.get_remaining(args.vendor_id):.1f}/{args.budget}")
+        print(
+            f"Vendor: {args.vendor_id}, Remaining: {limiter.get_remaining(args.vendor_id):.1f}/{args.budget}"
+        )
         return 0
     elif args.command == "reset":
         limiter.reset_vendor(args.vendor_id)
