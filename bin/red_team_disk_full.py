@@ -25,12 +25,16 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description="Simulate disk-full (ENOSPC) during write to verify clean abort.",
     )
-    parser.add_argument("--size", type=int, default=1,
-                        help="Simulated disk size in MiB (default: 1).")
-    parser.add_argument("--payload", type=int, default=256,
-                        help="Payload to write after disk is full, in KiB (default: 256).")
-    parser.add_argument("--verbose", action="store_true",
-                        help="Print detailed progress messages.")
+    parser.add_argument(
+        "--size", type=int, default=1, help="Simulated disk size in MiB (default: 1)."
+    )
+    parser.add_argument(
+        "--payload",
+        type=int,
+        default=256,
+        help="Payload to write after disk is full, in KiB (default: 256).",
+    )
+    parser.add_argument("--verbose", action="store_true", help="Print detailed progress messages.")
     args = parser.parse_args(argv)
     return _run(args.size, args.payload, args.verbose)
 
@@ -51,25 +55,39 @@ def _run(size_mb: int, payload_kb: int, verbose: bool) -> int:
         _cleanup(work_dir, mount_point, verbose)
 
 
-def _setup_tiny_fs(work_dir: str, mount_point: str, size_mb: int,
-                   verbose: bool) -> None:
+def _setup_tiny_fs(work_dir: str, mount_point: str, size_mb: int, verbose: bool) -> None:
     """Create and mount a tiny filesystem appropriate for the current OS."""
     sys_name: str = platform.system()
     if sys_name == "Darwin":
         dmg_path = os.path.join(work_dir, "tiny.dmg")
         subprocess.run(
-            ["hdiutil", "create", "-size", f"{size_mb}m", "-fs", "HFS+",
-             "-volname", "redteam", "-type", "SPARSE", dmg_path],
-            check=True, capture_output=True,
+            [
+                "hdiutil",
+                "create",
+                "-size",
+                f"{size_mb}m",
+                "-fs",
+                "HFS+",
+                "-volname",
+                "redteam",
+                "-type",
+                "SPARSE",
+                dmg_path,
+            ],
+            check=True,
+            capture_output=True,
         )
         subprocess.run(
             ["hdiutil", "attach", "-nobrowse", "-mountpoint", mount_point, dmg_path],
-            check=True, capture_output=True, text=True,
+            check=True,
+            capture_output=True,
+            text=True,
         )
     elif sys_name == "Linux":
         subprocess.run(
             ["mount", "-t", "tmpfs", "-o", f"size={size_mb}m", "tmpfs", mount_point],
-            check=True, capture_output=True,
+            check=True,
+            capture_output=True,
         )
     else:
         raise RuntimeError(f"Unsupported platform: {sys_name}")
@@ -133,12 +151,14 @@ def _cleanup(work_dir: str, mount_point: str, verbose: bool) -> None:
         if sys_name == "Darwin":
             subprocess.run(
                 ["hdiutil", "detach", mount_point],
-                check=False, capture_output=True,
+                check=False,
+                capture_output=True,
             )
         elif sys_name == "Linux":
             subprocess.run(
                 ["umount", mount_point],
-                check=False, capture_output=True,
+                check=False,
+                capture_output=True,
             )
     except Exception as exc:
         if verbose:
