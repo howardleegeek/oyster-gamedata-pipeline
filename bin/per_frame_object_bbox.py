@@ -249,6 +249,16 @@ def export_csv(frames: List[FrameData], oc: float, tr: float) -> str:
 
 
 def export_yaml(frames: List[FrameData], oc: float, tr: float) -> str:
+    """Export frames to YAML format with visibility filtering.
+
+    Args:
+        frames: List of FrameData objects to export.
+        oc: Occlusion threshold (0.0-1.0) for filtering visible 2D bboxes.
+        tr: Truncation threshold (0.0-1.0) for filtering visible 2D bboxes.
+
+    Returns:
+        YAML string representation of frames filtered by visibility thresholds.
+    """
     yaml = _lazy_yaml()
     return yaml.dump({"metadata": {"total_frames": len(frames),
                                     "occlusion_threshold": oc,
