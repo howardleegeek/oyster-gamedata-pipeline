@@ -37,12 +37,12 @@ logger = logging.getLogger(__name__)
 # as an MP4 container (even though the rest is zeros).
 _MP4_FTYPE_HEADER: bytes = (
     b"\x00\x00\x00\x1c"  # box size: 28 bytes
-    b"ftyp"              # box type
-    b"isom"              # major brand
+    b"ftyp"  # box type
+    b"isom"  # major brand
     b"\x00\x00\x02\x00"  # minor version
-    b"isom"              # compatible brand 1
-    b"iso2"              # compatible brand 2
-    b"mp41"              # compatible brand 3
+    b"isom"  # compatible brand 1
+    b"iso2"  # compatible brand 2
+    b"mp41"  # compatible brand 3
 )
 
 _ZERO_PAYLOAD_SIZE: int = 1024  # 1 KB of zeros after the header
@@ -62,9 +62,7 @@ def _build_metadata(
     Mirrors the schema from ``recorder_metadata_emitter.py`` but adds
     game-detection fields so the smoke test can verify the full chain.
     """
-    ts = timestamp or dt.datetime.now(dt.timezone.utc).strftime(
-        "%Y-%m-%dT%H:%M:%S+00:00"
-    )
+    ts = timestamp or dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
     name = hostname if hostname is not None else socket.gethostname()
     dev_id = hashlib.sha256(name.encode("utf-8")).hexdigest()[:16]
     sid = session_id or str(uuid.uuid4())
