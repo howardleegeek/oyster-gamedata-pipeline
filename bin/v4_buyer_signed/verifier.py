@@ -10,6 +10,7 @@ Per ``docs/SPEC_V4_BUYER_SIGNED_PROTOCOL.md``:
 Signing primitive: HMAC-SHA256 keyed off env ``BUYER_SHARED_SECRET``
 (spec § 3.3 fallback; ed25519 deferred to v2 per open Q1).
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -77,7 +78,11 @@ def verify_signature(payload: dict[str, Any], shared_secret: str) -> bool:
 def _abstain(reason: str) -> ResidualResult:
     """Build an ABSTAIN result. ``passed=False`` enforces IL12 strictly."""
     return ResidualResult(
-        name=_NAME, passed=False, residual=-1.0, threshold=0.0, note=f"ABSTAIN:{reason}",
+        name=_NAME,
+        passed=False,
+        residual=-1.0,
+        threshold=0.0,
+        note=f"ABSTAIN:{reason}",
     )
 
 
@@ -125,7 +130,10 @@ def v4_buyer_reference_diff(
     rec_session = rec.get("session_id")
     if rec_session is not None and rec_session != payload["dataset_id"]:
         return ResidualResult(
-            name=_NAME, passed=False, residual=1.0, threshold=0.0,
+            name=_NAME,
+            passed=False,
+            residual=1.0,
+            threshold=0.0,
             note=f"FAIL:dataset_id_mismatch ref={payload['dataset_id']!r} rec={rec_session!r}",
         )
 
@@ -134,7 +142,10 @@ def v4_buyer_reference_diff(
     indices: list[int] = list(payload.get("frame_indices") or [])
     if frame_idx not in indices:
         return ResidualResult(
-            name=_NAME, passed=True, residual=0.0, threshold=0.0,
+            name=_NAME,
+            passed=True,
+            residual=0.0,
+            threshold=0.0,
             note="not_a_reference_frame",
         )
 
@@ -148,8 +159,11 @@ def v4_buyer_reference_diff(
 
     if expected_canon == actual_canon:
         return ResidualResult(
-            name=_NAME, passed=True, residual=0.0, threshold=0.0,
-            note=f"slot=F{slot+1} frame_idx={frame_idx} byte_match",
+            name=_NAME,
+            passed=True,
+            residual=0.0,
+            threshold=0.0,
+            note=f"slot=F{slot + 1} frame_idx={frame_idx} byte_match",
         )
 
     # Find first byte that differs for actionable debug detail.
@@ -158,6 +172,9 @@ def v4_buyer_reference_diff(
         min(len(expected_canon), len(actual_canon)),
     )
     return ResidualResult(
-        name=_NAME, passed=False, residual=1.0, threshold=0.0,
-        note=f"FAIL:byte_diff slot=F{slot+1} frame_idx={frame_idx} offset={diff_offset}",
+        name=_NAME,
+        passed=False,
+        residual=1.0,
+        threshold=0.0,
+        note=f"FAIL:byte_diff slot=F{slot + 1} frame_idx={frame_idx} offset={diff_offset}",
     )
