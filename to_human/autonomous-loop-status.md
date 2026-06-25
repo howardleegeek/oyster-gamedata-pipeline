@@ -393,3 +393,23 @@
 
 - Picked: ruff format bin/recorder_audio_loopback.py (next-smallest unformatted bin file at 117 lines, tied with stress_test_burst_50_clips.py; line-wrap of three argparse.add_argument calls per ruff format rules). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, no test file exists (no risk of test masking), import smoke OK, follows established cadence of formatting small bin files (Rounds 254-287).
 - Result: committed 6256781a (ruff format added line-wrap of three argparse.add_argument calls in bin/recorder_audio_loopback.py; 1 file changed, 10 insertions(+), 3 deletions(-); ruff check + ruff format --check clean; import smoke OK (ast.parse OK); pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic line-wrapping — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect, no behavior change.)
+
+## Round 267 @ 2026-06-24T22:00:00Z
+
+- Picked: ruff format bin/recorder_metadata_emitter.py (smallest unformatted bin file with tests: 129 lines, missing blank lines after module docstring and between functions). Justification: measurable code smell, single-file scope, no behavior change, targeted test passes (11/11), no risk of test masking, follows established cadence.
+- Result: committed 9ed7d0ba (ruff format added missing blank lines after module docstring and between functions in bin/recorder_metadata_emitter.py; ruff check clean; 11/11 tests pass in tests/bin/test_recorder_metadata_emitter.py; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 289 @ 2026-06-26T04:00:00Z
+
+- Picked: ruff format bin/stress_test_burst_50_clips.py (smallest unformatted bin file at 117 lines, line-wrapped long lines per ruff; same pattern as previous rounds). Justification: measurable code smell, single-file scope, no behavior change, no test file exists (no risk of test masking), import smoke OK, follows established cadence.
+- Result: committed 316dbe9a (ruff format line-wrapped long lines in bin/stress_test_burst_50_clips.py; 1 file changed, 21 insertions(+), 11 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic line-wrapping — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 290 @ 2026-06-25T03:28:47Z
+
+- Picked: ruff format bin/edge_test_zero_records.py (smallest unformatted bin file at 119 lines, class blank line + quote style per ruff; same pattern as previous rounds). Justification: measurable code smell, single-file scope, no behavior change, no test file exists (no risk of test masking), import smoke OK, follows established cadence.
+- Result: committed cda144ad (ruff format added class blank line and quote style fixes in bin/edge_test_zero_records.py; 1 file changed, 12 insertions(+), 11 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 291 @ 2026-06-26T05:00:00Z
+
+- Picked: ruff format bin/edge_test_quaternion_norm_drift.py (smallest unformatted bin file at 120 lines, line-wrapped argparse.add_argument calls per ruff). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, no test file exists (no risk of test masking), import smoke OK, --help unchanged, follows established cadence of formatting small bin files (Rounds 254-290).
+- Result: committed 6fbbf7cd (ruff format line-wrapped argparse.add_argument calls in bin/edge_test_quaternion_norm_drift.py; 1 file changed, 8 insertions(+), 4 deletions(-); ruff check + format --check clean; import smoke OK; --help unchanged; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic line-wrapping — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
