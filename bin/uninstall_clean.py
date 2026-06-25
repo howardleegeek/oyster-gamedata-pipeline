@@ -37,9 +37,12 @@ def find_app_paths() -> List[Path]:
 def find_launchd_plists() -> List[Path]:
     """Find launchd plists related to the application."""
     plists: List[Path] = []
-    for loc in [Path("/Library/LaunchDaemons"), Path("/Library/LaunchAgents"),
-                Path.home() / "Library" / "LaunchDaemons",
-                Path.home() / "Library" / "LaunchAgents"]:
+    for loc in [
+        Path("/Library/LaunchDaemons"),
+        Path("/Library/LaunchAgents"),
+        Path.home() / "Library" / "LaunchDaemons",
+        Path.home() / "Library" / "LaunchAgents",
+    ]:
         if loc.exists():
             try:
                 for p in loc.iterdir():
