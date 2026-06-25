@@ -19,6 +19,7 @@ from typing import Optional
 
 class MovementType(Enum):
     """Classification of movement speed types."""
+
     WALK = "walk"
     RUN = "run"
     SPRINT = "sprint"
@@ -28,6 +29,7 @@ class MovementType(Enum):
 @dataclass
 class SpeedBounds:
     """Speed bounds in m/s for a movement type."""
+
     min_mps: float
     max_mps: float
     typical_mps: float
@@ -66,10 +68,14 @@ def validate_velocity(velocity_mps: float) -> tuple[bool, str]:
 def run_all_tests() -> int:
     """Run all built-in speed unit validation tests. Returns exit code."""
     test_cases = [
-        (1.4, MovementType.WALK, True), (4.0, MovementType.RUN, True),
-        (9.0, MovementType.SPRINT, True), (0.0, MovementType.WALK, True),
-        (-1.0, MovementType.INVALID, False), (15.0, MovementType.INVALID, False),
-        (1.0, MovementType.WALK, True), (3.0, MovementType.RUN, True),
+        (1.4, MovementType.WALK, True),
+        (4.0, MovementType.RUN, True),
+        (9.0, MovementType.SPRINT, True),
+        (0.0, MovementType.WALK, True),
+        (-1.0, MovementType.INVALID, False),
+        (15.0, MovementType.INVALID, False),
+        (1.0, MovementType.WALK, True),
+        (3.0, MovementType.RUN, True),
         (8.0, MovementType.SPRINT, True),
     ]
     failures = 0
