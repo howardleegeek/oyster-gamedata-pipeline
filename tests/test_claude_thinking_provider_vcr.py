@@ -126,10 +126,9 @@ def test_claude_thinking_provider_smoke(monkeypatch: pytest.MonkeyPatch) -> None
 
     # Thinking block was captured. The cassette includes one ThinkingBlock,
     # so `last_thinking` must be a non-empty string (not None, not "").
-    assert (
-        provider.last_thinking is not None
-    ), "last_thinking should be set after a thinking-mode call"
+    assert provider.last_thinking is not None, (
+        "last_thinking should be set after a thinking-mode call"
+    )
     assert provider.last_thinking.strip(), (
-        f"last_thinking is empty; expected non-empty thinking text, got "
-        f"{provider.last_thinking!r}"
+        f"last_thinking is empty; expected non-empty thinking text, got {provider.last_thinking!r}"
     )
