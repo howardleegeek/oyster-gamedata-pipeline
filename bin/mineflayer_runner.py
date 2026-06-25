@@ -21,7 +21,9 @@ def find_node_executable() -> str:
     try:
         result = subprocess.run(
             [node, "--version"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
     except subprocess.TimeoutExpired:
         raise RuntimeError("node --version timed out")
@@ -44,9 +46,7 @@ def find_bot_script() -> str:
     for p in candidates:
         if p.is_file():
             return str(p)
-    raise FileNotFoundError(
-        f"bot.js not found. Tried: {[str(p) for p in candidates]}"
-    )
+    raise FileNotFoundError(f"bot.js not found. Tried: {[str(p) for p in candidates]}")
 
 
 def build_node_args(
@@ -64,14 +64,22 @@ def build_node_args(
         raise ValueError(f"Invalid mode {mode!r}. Must be one of {sorted(VALID_MODES)}")
     node = find_node_executable()
     return [
-        node, bot_script,
-        "--host", server_host,
-        "--port", str(server_port),
-        "--username", username,
-        "--mode", mode,
-        "--duration", str(duration_sec),
-        "--output", output_dir,
-        "--seed", str(seed),
+        node,
+        bot_script,
+        "--host",
+        server_host,
+        "--port",
+        str(server_port),
+        "--username",
+        username,
+        "--mode",
+        mode,
+        "--duration",
+        str(duration_sec),
+        "--output",
+        output_dir,
+        "--seed",
+        str(seed),
     ]
 
 
@@ -98,8 +106,14 @@ def run_mineflayer(
     log_path = out / "mineflayer.log"
     bot_script = find_bot_script()
     args = build_node_args(
-        bot_script, server_host, server_port, username,
-        mode, duration_sec, output_dir, seed,
+        bot_script,
+        server_host,
+        server_port,
+        username,
+        mode,
+        duration_sec,
+        output_dir,
+        seed,
     )
 
     timeout = duration_sec + 30
@@ -136,7 +150,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--port", type=int, default=25565, help="Minecraft server port")
     parser.add_argument("--username", default="DataPilot", help="Bot username")
     parser.add_argument(
-        "--mode", default="wasd_balanced",
+        "--mode",
+        default="wasd_balanced",
         choices=sorted(VALID_MODES),
         help="Bot behaviour mode",
     )
