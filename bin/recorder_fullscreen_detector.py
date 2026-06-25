@@ -29,6 +29,7 @@ Usage
     >>> if detect_exclusive_fullscreen().is_exclusive_fullscreen:
     ...     show_banner("请使用窗口化模式 — 全屏会让录制黑屏")
 """
+
 from __future__ import annotations
 
 import ctypes
@@ -44,6 +45,7 @@ SM_CYSCREEN = 1
 @dataclass
 class DetectionResult:
     """Structured result; ``False``/``None`` fields mean "not detected"."""
+
     is_exclusive_fullscreen: bool
     foreground_title: Optional[str]
     window_size: Optional[tuple]
@@ -68,9 +70,15 @@ def _windows_detect() -> DetectionResult:
     title = buf.value
     rect = ctypes.wintypes.RECT() if hasattr(ctypes, "wintypes") else None
     if rect is None:
+
         class _RECT(ctypes.Structure):
-            _fields_ = [("left", ctypes.c_long), ("top", ctypes.c_long),
-                        ("right", ctypes.c_long), ("bottom", ctypes.c_long)]
+            _fields_ = [
+                ("left", ctypes.c_long),
+                ("top", ctypes.c_long),
+                ("right", ctypes.c_long),
+                ("bottom", ctypes.c_long),
+            ]
+
         rect = _RECT()
     if not user32.GetWindowRect(hwnd, ctypes.byref(rect)):
         return DetectionResult(False, title, None, None, "win32", "GetWindowRect failed")
