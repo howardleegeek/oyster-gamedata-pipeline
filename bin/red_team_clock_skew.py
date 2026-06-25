@@ -120,6 +120,12 @@ def main(argv: Optional[list] = None) -> int:
         adapter = ClockAdapter(threshold_seconds=args.threshold)
 
         def on_skew(source: ClockSource, skew: float) -> None:
+            """Callback invoked when clock skew is detected.
+
+            Args:
+                source: The clock source that is now active (e.g., MONOTONIC).
+                skew: The amount of backward time shift detected in seconds.
+            """
             print(f"[ALERT] Clock skew detected: {skew:.2f} seconds")
             print(f"[ALERT] Switched to {source.value} clock")
 
