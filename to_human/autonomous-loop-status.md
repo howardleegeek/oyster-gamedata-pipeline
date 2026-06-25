@@ -679,6 +679,11 @@
 - Picked: ruff format bin/diag_bundle_collector.py (smallest unformatted file: 152 lines, whitespace in '=*50' string literal, list-literal line-wrapping, argparse multi-line split, long f-string wrap). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, module import smoke OK, no test file references this module (no risk of test masking), follows established cadence of formatting small bin files in Rounds 254–323.
 - Result: committed 45452399 (ruff format applied to bin/diag_bundle_collector.py; 1 file changed, 23 insertions(+), 7 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — whitespace inside '=*50' string literal, list-literal line-wrapping, argparse add_argument multi-line split, long f-string wrap. No silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
 
+## Round 325 @ 2026-06-25T16:45:00Z
+
+- Picked: ruff format bin/red_team_corrupt_exr.py (smallest unformatted bin file: 153 lines; multi-line function signatures, dict returns, imports need blank lines per ruff). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, import smoke OK, no dedicated test file (no regressions possible), follows established cadence of previous rounds.
+- Result: committed 981badee (ruff format applied to bin/red_team_corrupt_exr.py; 1 file changed, 37 insertions(+), 17 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — line-wrapped function signatures and dict returns, added blank lines after imports per ruff. No silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
 ## Round 325 @ 2026-06-26T00:00:00Z
 
 - Picked: ruff format bin/prd_test_left_hand_coordinates.py (smallest unformatted bin file: 152 lines, line-wrapped long strings, reformatted multi-line args; same pattern as previous rounds). Justification: measurable code smell, single-file scope, no behavior change, module import smoke OK, no risk of test masking, follows established cadence of formatting small bin files.
@@ -689,3 +694,9 @@
 
 - Picked: ruff format bin/network_throttle_test.py (smallest unformatted file: 153 lines, line-wrapping for long function calls and argument lists). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, ruff check + format --check clean, import smoke OK, no test file references this module (no risk of test masking), follows established cadence of formatting small bin files.
 - Result: committed c9d2840d (ruff format applied line-wrapping to bin/network_throttle_test.py; 1 file changed, 68 insertions(+), 22 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 314 @ 2026-06-25T17:18:17Z
+
+- Picked: ruff format bin/rate_limiter.py (smallest unformatted bin/ file at 155 lines; trailing commas, line-wrapping per trailing-comma convention). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, targeted test passes (tests/test_rate_limiter.py 17/17 pass), follows established cadence of Rounds 254–313.
+- Result: committed 0abe217b (ruff format applied to bin/rate_limiter.py; 1 file changed, 35 insertions(+), 12 deletions(-); ruff check + ruff format --check clean; 17/17 tests pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — trailing commas added to dict literals and function args per trailing-comma convention (easier to add new entries), long function signatures line-wrapped per E501. No silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect, no logic change.)
+
