@@ -7,6 +7,7 @@ agent_geometry, and locomotion_mode attributes.
 
 Reference: arxiv 2505.05753 scaling-laws axis for embodiment characterization.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -21,6 +22,7 @@ from typing import Optional
 @dataclass
 class AgentGeometry:
     """Physical geometry specification for an embodied agent."""
+
     height: float
     width: float
     depth: float
@@ -31,6 +33,7 @@ class AgentGeometry:
 @dataclass
 class LocomotionParams:
     """Locomotion mode parameters per arxiv 2505.05753 scaling-laws axis."""
+
     mode: str  # wheeled, legged, aerial, static
     max_speed: float
     turn_radius: float
@@ -40,6 +43,7 @@ class LocomotionParams:
 @dataclass
 class EmbodimentMetadata:
     """Complete embodiment metadata for a scene."""
+
     embodiment_id: str
     scene_id: str
     agent_geometry: dict
@@ -65,7 +69,7 @@ def create_default_locomotion() -> LocomotionParams:
 def generate_scene_metadata(
     scene_id: str,
     geometry: Optional[AgentGeometry] = None,
-    locomotion: Optional[LocomotionParams] = None
+    locomotion: Optional[LocomotionParams] = None,
 ) -> EmbodimentMetadata:
     """Generate embodiment metadata for a single scene."""
     geometry = geometry or create_default_geometry()
@@ -74,13 +78,12 @@ def generate_scene_metadata(
         embodiment_id=generate_embodiment_id(scene_id),
         scene_id=scene_id,
         agent_geometry=asdict(geometry),
-        locomotion_mode=asdict(locomotion)
+        locomotion_mode=asdict(locomotion),
     )
 
 
 def process_scene_directory(
-    scene_dir: Path,
-    output_dir: Optional[Path] = None
+    scene_dir: Path, output_dir: Optional[Path] = None
 ) -> list[EmbodimentMetadata]:
     """Process all scenes in a directory and generate metadata."""
     results = []
@@ -108,21 +111,17 @@ def main(argv: Optional[list[str]] = None) -> int:
         description="Generate per-scene embodiment.json metadata files."
     )
     parser.add_argument(
-        "--scene-dir", type=Path, required=True,
-        help="Directory containing scene subdirectories"
+        "--scene-dir", type=Path, required=True, help="Directory containing scene subdirectories"
     )
     parser.add_argument(
-        "--output", type=Path, default=None,
-        help="Output directory for embodiment.json files"
+        "--output", type=Path, default=None, help="Output directory for embodiment.json files"
     )
     parser.add_argument(
-        "--dry-run", action="store_true",
-        help="Print metadata without writing files"
+        "--dry-run", action="store_true", help="Print metadata without writing files"
     )
     args = parser.parse_args(argv)
     metadata_list = process_scene_directory(
-        args.scene_dir,
-        output_dir=None if args.dry_run else args.output
+        args.scene_dir, output_dir=None if args.dry_run else args.output
     )
     if args.dry_run:
         for meta in metadata_list:
