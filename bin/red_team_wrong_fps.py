@@ -7,6 +7,7 @@ Usage:
 
 Exit codes: 0 = all compliant, 1 = violations found, 2 = usage error.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -35,8 +36,18 @@ def _probe_fps(path: str) -> Optional[float]:
     if ffprobe is None:
         logger.warning("ffprobe not found; skipping %s", path)
         return None
-    cmd = [ffprobe, "-v", "error", "-select_streams", "v:0",
-           "-show_entries", "stream=r_frame_rate", "-of", "json", path]
+    cmd = [
+        ffprobe,
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=r_frame_rate",
+        "-of",
+        "json",
+        path,
+    ]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, check=True)
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
@@ -74,17 +85,21 @@ def _check_videos(paths: Iterable[str]) -> Sequence[Tuple[str, str, Optional[flo
 def main(argv: Optional[Sequence[str]] = None) -> int:
     """Parse CLI args, probe videos, report violations."""
     parser = argparse.ArgumentParser(
-        description="Red-team lint: flag videos whose FPS != 30 (PRD requirement).")
+        description="Red-team lint: flag videos whose FPS != 30 (PRD requirement)."
+    )
     parser.add_argument("videos", nargs="*", metavar="VIDEO", help="Video files to check.")
-    parser.add_argument("--manifest", type=str, default=None,
-                        help="JSON manifest listing video paths.")
-    parser.add_argument("--json-out", type=str, default=None,
-                        help="Write structured results to this JSON file.")
+    parser.add_argument(
+        "--manifest", type=str, default=None, help="JSON manifest listing video paths."
+    )
+    parser.add_argument(
+        "--json-out", type=str, default=None, help="Write structured results to this JSON file."
+    )
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable debug logging.")
     args = parser.parse_args(argv)
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s %(name)s: %(message)s")
+        format="%(levelname)s %(name)s: %(message)s",
+    )
 
     video_list: list[str] = list(args.videos)
     if args.manifest:
