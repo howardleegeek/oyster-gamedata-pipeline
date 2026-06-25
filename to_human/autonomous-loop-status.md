@@ -629,3 +629,8 @@
 
 - Picked: ruff format bin/secure_subprocess_lib.py (smallest unformatted file: 141 lines, reformatting long lines and frozenset). Justification: measurable code smell, single-file scope, no behavior change, import smoke OK, no risk of test masking, follows established cadence.
 - Result: committed 4b173a33 (ruff format bin/secure_subprocess_lib.py; 1 file changed, 93 insertions(+), 16 deletions(-); ruff check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 317 @ 2026-06-25T14:47:51Z
+
+- Picked: ruff format bin/recovery_orchestrator.py (smallest unformatted file: 145 lines; trailing-comma style for function signatures and calls). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, import smoke OK, no test file references this module, follows established cadence of Rounds 254–316.
+- Result: committed 8d4f2a45 (ruff format applied trailing-comma convention to function signatures and calls in bin/recovery_orchestrator.py; 1 file changed, 5 insertions(+), 8 deletions(-); ruff check clean; import smoke OK; no test file references; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
