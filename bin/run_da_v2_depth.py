@@ -75,7 +75,7 @@ def main():
             rate = (i + 1) / elapsed if elapsed else 0
             eta = (len(frame_files) - i - 1) / rate if rate else 0
             print(
-                f"  [{i+1}/{len(frame_files)}] elapsed={elapsed:.1f}s rate={rate:.2f}/s eta={eta:.0f}s",
+                f"  [{i + 1}/{len(frame_files)}] elapsed={elapsed:.1f}s rate={rate:.2f}/s eta={eta:.0f}s",
                 flush=True,
             )
 
@@ -90,7 +90,7 @@ def main():
         "view_space_z: false (monocular estimate, not optical-axis Z-buffer)\n"
         "pipeline: server_side_postprocess\n"
     )
-    print(f"[da-v2] DONE: {len(frame_files)} EXR files in {time.time()-t0:.1f}s")
+    print(f"[da-v2] DONE: {len(frame_files)} EXR files in {time.time() - t0:.1f}s")
     print("[da-v2] wrote depth/.source marker: kind=monocular_da_v2")
 
 
