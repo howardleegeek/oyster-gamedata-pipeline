@@ -63,6 +63,7 @@
 
 ## Round 263 @ 2026-06-24T18:00:00Z
 
+
 - Picked: ruff format tests/test_d16_server_mod_contract.py (smallest unformatted test file; 117 lines, 12 spacing changes in assert statements). Justification: measurable code smell, single-file scope, no behavior change, targeted test passes (7/7), no risk of test masking, follows established pattern of previous rounds.
 - Result: committed ec4afe20 (ruff format applied black-compatible line wrapping to tests/test_d16_server_mod_contract.py; 1 file changed, 12 insertions(+), 12 deletions(-); tests pass 7/7; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: pure cosmetic line wrap — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.))
 
@@ -382,3 +383,13 @@
 
 - Picked: ruff format bin/recorder_log_rotator.py (smallest unformatted file: 116 lines, single long-line wrap of --force argparse add_argument; same pattern as previous rounds). Justification: measurable code smell, single-file scope, no behavior change, 5/5 functional smoke tests pass (rotate-missing, small-no-rotate, cascade, KEEP_ROTATIONS default, CLI --help), no risk of test masking, follows established cadence.
 - Result: committed 2599eff9 (ruff format wrapped --force argparse line in bin/recorder_log_rotator.py; 1 file changed, 1 insertion(+), 2 deletions(-); ruff check + ruff format --check clean; import smoke OK; 5/5 functional smoke tests pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic single-line wrap — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 287 @ 2026-06-26T00:00:00Z
+
+- Picked: ruff format bin/red_team_year_9999_timestamp.py (smallest unformatted bin file at 116 lines; same pattern as previous rounds). Justification: measurable code smell, single-file scope, no behavior change, import smoke OK, no risk of test masking, follows established cadence.
+- Result: committed 6bc246d4 (ruff format bin/red_team_year_9999_timestamp.py; 1 file changed, 20 insertions(+), 4 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 288 @ 2026-06-25T03:02:38Z
+
+- Picked: ruff format bin/recorder_audio_loopback.py (next-smallest unformatted bin file at 117 lines, tied with stress_test_burst_50_clips.py; line-wrap of three argparse.add_argument calls per ruff format rules). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, no test file exists (no risk of test masking), import smoke OK, follows established cadence of formatting small bin files (Rounds 254-287).
+- Result: committed 6256781a (ruff format added line-wrap of three argparse.add_argument calls in bin/recorder_audio_loopback.py; 1 file changed, 10 insertions(+), 3 deletions(-); ruff check + ruff format --check clean; import smoke OK (ast.parse OK); pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic line-wrapping — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect, no behavior change.)
