@@ -103,11 +103,23 @@ class AuditLog:
         cursor = self.conn.cursor()
         uploaded_at = datetime.now(timezone.utc).isoformat()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO submissions
             (vendor_id, batch_id, clip_id, sha256, size_bytes, uploaded_at, lint_status, lint_details)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (vendor_id, batch_id, clip_id, sha256, size_bytes, uploaded_at, lint_status, lint_details))
+        """,
+            (
+                vendor_id,
+                batch_id,
+                clip_id,
+                sha256,
+                size_bytes,
+                uploaded_at,
+                lint_status,
+                lint_details,
+            ),
+        )
 
         self.conn.commit()
         return cursor.lastrowid
@@ -125,10 +137,13 @@ class AuditLog:
         cursor = self.conn.cursor()
         occurred_at = datetime.now(timezone.utc).isoformat()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO events (submission_id, event_type, message, occurred_at)
             VALUES (?, ?, ?, ?)
-        """, (submission_id, event_type, message, occurred_at))
+        """,
+            (submission_id, event_type, message, occurred_at),
+        )
 
         self.conn.commit()
 
@@ -140,32 +155,41 @@ class AuditLog:
         cursor = self.conn.cursor()
 
         # Get total submissions and last submission time
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT COUNT(*), MAX(uploaded_at)
             FROM submissions
             WHERE vendor_id = ?
-        """, (vendor_id,))
+        """,
+            (vendor_id,),
+        )
         row = cursor.fetchone()
         total_submissions = row[0] if row else 0
         last_submission = row[1] if row and row[1] else None
 
         # Get lint pass rate
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT
                 SUM(CASE WHEN lint_status = 'PASS' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)
             FROM submissions
             WHERE vendor_id = ?
-        """, (vendor_id,))
+        """,
+            (vendor_id,),
+        )
         row = cursor.fetchone()
         lint_pass_rate = round(row[0], 2) if row and row[0] is not None else 0.0
 
         # Get by_status breakdown
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT lint_status, COUNT(*)
             FROM submissions
             WHERE vendor_id = ?
             GROUP BY lint_status
-        """, (vendor_id,))
+        """,
+            (vendor_id,),
+        )
         by_status = {row[0]: row[1] for row in cursor.fetchall()}
 
         return {
@@ -183,13 +207,16 @@ class AuditLog:
         cursor = self.conn.cursor()
 
         # Get all submissions for the batch
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT id, vendor_id, batch_id, clip_id, sha256, size_bytes,
                    uploaded_at, lint_status, lint_details
             FROM submissions
             WHERE batch_id = ?
             ORDER BY id
-        """, (batch_id,))
+        """,
+            (batch_id,),
+        )
 
         submissions = []
         for row in cursor.fetchall():
@@ -208,20 +235,25 @@ class AuditLog:
             }
 
             # Get events for this submission
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT id, event_type, message, occurred_at
                 FROM events
                 WHERE submission_id = ?
                 ORDER BY id
-            """, (submission_id,))
+            """,
+                (submission_id,),
+            )
 
             for event_row in cursor.fetchall():
-                submission["events"].append({
-                    "id": event_row[0],
-                    "event_type": event_row[1],
-                    "message": event_row[2],
-                    "occurred_at": event_row[3],
-                })
+                submission["events"].append(
+                    {
+                        "id": event_row[0],
+                        "event_type": event_row[1],
+                        "message": event_row[2],
+                        "occurred_at": event_row[3],
+                    }
+                )
 
             submissions.append(submission)
 
@@ -235,13 +267,16 @@ class AuditLog:
         cursor = self.conn.cursor()
 
         if vendor_id:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT id, vendor_id, batch_id, clip_id, sha256, size_bytes,
                        uploaded_at, lint_status, lint_details
                 FROM submissions
                 WHERE vendor_id = ?
                 ORDER BY id
-            """, (vendor_id,))
+            """,
+                (vendor_id,),
+            )
         else:
             cursor.execute("""
                 SELECT id, vendor_id, batch_id, clip_id, sha256, size_bytes,
@@ -257,10 +292,19 @@ class AuditLog:
 
         with open(out_path, "w", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow([
-                "id", "vendor_id", "batch_id", "clip_id", "sha256",
-                "size_bytes", "uploaded_at", "lint_status", "lint_details"
-            ])
+            writer.writerow(
+                [
+                    "id",
+                    "vendor_id",
+                    "batch_id",
+                    "clip_id",
+                    "sha256",
+                    "size_bytes",
+                    "uploaded_at",
+                    "lint_status",
+                    "lint_details",
+                ]
+            )
             for row in rows:
                 writer.writerow(row)
 
@@ -272,8 +316,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Vendor submission audit log")
     parser.add_argument("--db", default="audit.db", help="Database path")
     parser.add_argument("--init", action="store_true", help="Create tables")
-    parser.add_argument("--record-submission", action="store_true",
-                        help="Record a submission")
+    parser.add_argument("--record-submission", action="store_true", help="Record a submission")
     parser.add_argument("--vendor-id", help="Vendor ID")
     parser.add_argument("--batch-id", help="Batch ID")
     parser.add_argument("--clip-id", help="Clip ID")
@@ -281,12 +324,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--size", type=int, help="Size in bytes")
     parser.add_argument("--lint-status", help="Lint status (PASS/FAIL)")
     parser.add_argument("--lint-details", default="", help="Lint details")
-    parser.add_argument("--vendor-summary", metavar="ID",
-                        help="Print vendor summary JSON")
-    parser.add_argument("--batch-status", metavar="ID",
-                        help="Print batch all submissions")
-    parser.add_argument("--export-csv", metavar="PATH",
-                        help="Export submissions to CSV")
+    parser.add_argument("--vendor-summary", metavar="ID", help="Print vendor summary JSON")
+    parser.add_argument("--batch-status", metavar="ID", help="Print batch all submissions")
+    parser.add_argument("--export-csv", metavar="PATH", help="Export submissions to CSV")
 
     args = parser.parse_args(argv)
 
@@ -297,8 +337,16 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.record_submission:
-            if not all([args.vendor_id, args.batch_id, args.clip_id,
-                        args.sha256, args.size is not None, args.lint_status]):
+            if not all(
+                [
+                    args.vendor_id,
+                    args.batch_id,
+                    args.clip_id,
+                    args.sha256,
+                    args.size is not None,
+                    args.lint_status,
+                ]
+            ):
                 print("Error: Missing required fields for record-submission")
                 return 1
 
