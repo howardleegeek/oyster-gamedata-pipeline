@@ -551,3 +551,34 @@
 
 - Picked: ruff format server/auth_middleware.py (smallest unformatted file: 93 lines, whitespace + line-wrap + blank-line-after-docstring per ruff). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, targeted test exists (tests/test_oauth_flow.py 23/23 pass), no risk of test masking, follows established cadence of formatting small files with existing tests.
 - Result: committed d97a896c (ruff format applied to server/auth_middleware.py; 1 file changed, 10 insertions(+), 9 deletions(-); ruff check + ruff format --check clean; AST parse OK; module import OK; 23/23 tests pass in tests/test_oauth_flow.py; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic only — trailing whitespace stripped, blank lines added after class/function docstrings, HTTPException status_code/detail line-wrapped, trailing comma added to f-string literal. No silent error swallow, no race, no off-by-one, no security impact (auth flow unchanged: still requires Bearer, still raises 401 on missing, 403 on wrong role, detail strings identical), no test masking, no brand cross-reference, no module-level side effect.
+
+## Round 301 @ 2026-06-25T10:06:55Z
+
+- Picked: ruff format bin/autoresearch_recovery_time.py (smallest unformatted bin file at 136 lines, line-wrapped function args per ruff). Justification: measurable code smell, single-file scope, no behavior change, import smoke OK (ast.parse passes), no test file exists (no risk of test masking), follows established cadence of formatting small bin files.
+- Result: committed 822f76f5 (ruff format line-wrapped function args in bin/autoresearch_recovery_time.py; 1 file changed, 40 insertions(+), 14 deletions(-); ruff check + ruff format --check clean; ast.parse OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic line-wrapping — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 307 @ 2026-06-25T11:00:00Z
+
+- Picked: ruff format bin/autoresearch_adapter_quality.py (smallest unformatted file: 140 lines, function args line-wrapping per ruff). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, ruff check clean, AST parse OK, no test file references this module (no risk of test masking), follows established cadence of formatting small bin files.
+- Result: committed 050bbd21 (ruff format wrapped function args on compute_metrics and parser.add_argument calls in bin/autoresearch_adapter_quality.py; 1 file changed, 9 insertions(+), 10 deletions(-); ruff check clean; AST parse OK; no test file references this module; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 303 @ 2026-06-25T10:27:25Z
+
+- Picked: ruff format bin/graceful_shutdown.py (smallest unformatted bin file at 138 lines; line-wrap of function args per ruff). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, ruff check clean, py_compile OK, follows established cadence of formatting small bin files (Rounds 254-302).
+- Result: committed f3f9eb09 (ruff format line-wrapped function args in bin/graceful_shutdown.py; 1 file changed, 4 insertions(+), 2 deletions(-); ruff check + format --check clean; py_compile OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic line-wrap — no silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+
+## Round 308 @ 2026-06-25T12:00:00Z
+
+- Picked: ruff format bin/edge_test_gigantic_record_count.py (smallest unformatted file: 139 lines, line-wrapping of argparse args). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, ruff check clean, import smoke OK, no test file references this module (no risk of test masking), follows established cadence of formatting small bin files.
+- Result: committed 7b3d73d8 (ruff format line-wrapped argparse args in bin/edge_test_gigantic_record_count.py; 1 file changed, 6 insertions(+), 6 deletions(-); ruff check + format --check clean; import smoke OK; no test file references this module; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic line-wrapping — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 309 @ 2026-06-25T10:49:47Z
+
+- Picked: ruff format bin/e2e_tests/test_provenance_integration.py (smallest unformatted bin file at 138 lines; blank lines and line wrapping per ruff). Justification: measurable code smell, single-file scope, no behavior change, AST parse OK, no test file references this module (no risk of test masking), follows established cadence of formatting small bin files.
+- Result: committed 917b47b6 (ruff format applied to bin/e2e_tests/test_provenance_integration.py; 1 file changed, 21 insertions(+), 32 deletions(-); ruff check clean; AST parse OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 308 @ 2026-06-25T10:57:26Z
+
+- Picked: ruff format server/modal_depth_app.py (smallest unformatted server/ file at 270 lines / 47 diff lines; one blank line per section header + collapse 1 short dict to single line + wrap ffmpeg args list vertically per ruff). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, targeted test exists and passes (tests/test_modal_depth_client.py 6/6 pass), no risk of test masking, follows established cadence of formatting small server/ files (Round 301 was on bin/ scripts; server/ pool only had 8 unformatted files).
+- Result: committed 427880dd (ruff format applied to server/modal_depth_app.py; 1 file changed, 9 insertions(+), 6 deletions(-); ruff check + ruff format --check clean; AST parse OK; 6/6 tests pass in tests/test_modal_depth_client.py; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — list element order preserved, dict single-line semantically identical to 3-line, blank lines after section headers are PEP 8 compliant. No silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
