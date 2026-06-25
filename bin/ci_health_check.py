@@ -49,8 +49,12 @@ def analyze_ci_logs(log_dir: Path, days: int) -> Dict[str, Any]:
     redteam_coverage, total_runs, successful_runs, failed_runs.
     """
     m: Dict[str, Any] = {
-        "lint_pass_rate": 0.0, "total_test_count": 0, "redteam_coverage": 0.0,
-        "total_runs": 0, "successful_runs": 0, "failed_runs": 0,
+        "lint_pass_rate": 0.0,
+        "total_test_count": 0,
+        "redteam_coverage": 0.0,
+        "total_runs": 0,
+        "successful_runs": 0,
+        "failed_runs": 0,
     }
     if not log_dir.is_dir():
         logger.warning("CI logs directory %s does not exist", log_dir)
@@ -68,11 +72,15 @@ def analyze_ci_logs(log_dir: Path, days: int) -> Dict[str, Any]:
         data = _safe_json(fp) if fp.suffix == ".json" else None
 
         if "lint" in name:
-            m["lint_pass_rate"] = max(m["lint_pass_rate"], data.get("pass_rate", 0.95) if data else 0.95)
+            m["lint_pass_rate"] = max(
+                m["lint_pass_rate"], data.get("pass_rate", 0.95) if data else 0.95
+            )
         if "test" in name:
             m["total_test_count"] += data.get("test_count", 150) if data else 150
         if "redteam" in name or "coverage" in name:
-            m["redteam_coverage"] = max(m["redteam_coverage"], data.get("coverage", 0.85) if data else 0.85)
+            m["redteam_coverage"] = max(
+                m["redteam_coverage"], data.get("coverage", 0.85) if data else 0.85
+            )
         if "fail" in name or "error" in name:
             m["failed_runs"] += 1
         else:
@@ -80,7 +88,9 @@ def analyze_ci_logs(log_dir: Path, days: int) -> Dict[str, Any]:
     return m
 
 
-def evaluate(metrics: Dict[str, Any], min_lint: float, min_tests: int, min_rt: float) -> Tuple[bool, List[str]]:
+def evaluate(
+    metrics: Dict[str, Any], min_lint: float, min_tests: int, min_rt: float
+) -> Tuple[bool, List[str]]:
     """Return (all_passed, list_of_failure_messages)."""
     failures: List[str] = []
     if metrics["lint_pass_rate"] < min_lint:
@@ -100,11 +110,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         format="%(asctime)s  %(levelname)-8s  %(message)s",
     )
     metrics = analyze_ci_logs(args.ci_logs_dir, args.days)
-    passed, failures = evaluate(metrics, args.min_lint_pass_rate, args.min_test_count, args.min_redteam_coverage)
+    passed, failures = evaluate(
+        metrics, args.min_lint_pass_rate, args.min_test_count, args.min_redteam_coverage
+    )
 
     report: Dict[str, Any] = {
         "timestamp": datetime.utcnow().isoformat() + "Z",
-        "metrics": metrics, "passed": passed, "failures": failures,
+        "metrics": metrics,
+        "passed": passed,
+        "failures": failures,
     }
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
