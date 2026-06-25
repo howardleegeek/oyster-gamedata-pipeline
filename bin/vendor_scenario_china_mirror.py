@@ -135,21 +135,31 @@ def main(argv: Sequence[str] | None = None) -> int:
         description="G060 — Vendor-in-CN walkthrough: pip mirror + S3 region.",
     )
     parser.add_argument(
-        "--mirror", choices=list(PIP_MIRRORS), default="aliyun",
+        "--mirror",
+        choices=list(PIP_MIRRORS),
+        default="aliyun",
         help="CN pip mirror to use (default: aliyun).",
     )
     parser.add_argument(
-        "--s3-region", choices=list(S3_CN_REGIONS), default="cn-north-1",
+        "--s3-region",
+        choices=list(S3_CN_REGIONS),
+        default="cn-north-1",
         help="AWS S3 China region (default: cn-north-1).",
     )
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Print configuration without network calls.")
-    parser.add_argument("--validate-only", action="store_true",
-                        help="Only validate mirror name and region, then exit.")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Print configuration without network calls."
+    )
+    parser.add_argument(
+        "--validate-only",
+        action="store_true",
+        help="Only validate mirror name and region, then exit.",
+    )
     args = parser.parse_args(argv)
     return run_scenario(
-        args.mirror, args.s3_region,
-        dry_run=args.dry_run, validate_only=args.validate_only,
+        args.mirror,
+        args.s3_region,
+        dry_run=args.dry_run,
+        validate_only=args.validate_only,
     )
 
 
