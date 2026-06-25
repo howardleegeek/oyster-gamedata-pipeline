@@ -88,12 +88,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--data-dir", type=Path, help="Directory with clip JSON files")
     parser.add_argument("--clips-file", type=Path, help="Single JSON file with clips")
     parser.add_argument(
-        "--min-distinct", type=int, default=5,
-        help="Minimum distinct route_type values (default: 5)"
+        "--min-distinct",
+        type=int,
+        default=5,
+        help="Minimum distinct route_type values (default: 5)",
     )
     parser.add_argument(
-        "--expected-total", type=int, default=240,
-        help="Expected total clips (default: 240)"
+        "--expected-total", type=int, default=240, help="Expected total clips (default: 240)"
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
 
@@ -109,9 +110,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     route_types = extract_route_types(clips)
-    success, details = validate_distribution(
-        route_types, args.min_distinct, args.expected_total
-    )
+    success, details = validate_distribution(route_types, args.min_distinct, args.expected_total)
 
     report(details, args.verbose)
 
