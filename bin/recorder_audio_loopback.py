@@ -84,15 +84,22 @@ def main(argv: Optional[List[str]] = None) -> int:
         description="Record system audio using WASAPI loopback with dshow fallback."
     )
     parser.add_argument(
-        "--output", "-o", type=Path, default=Path("recording.mp3"),
+        "--output",
+        "-o",
+        type=Path,
+        default=Path("recording.mp3"),
         help="Output audio file path (default: recording.mp3)",
     )
     parser.add_argument(
-        "--duration", "-d", type=int, default=None,
+        "--duration",
+        "-d",
+        type=int,
+        default=None,
         help="Recording duration in seconds (default: unlimited)",
     )
     parser.add_argument(
-        "--no-wasapi", action="store_true",
+        "--no-wasapi",
+        action="store_true",
         help="Disable WASAPI loopback, use dshow microphone directly",
     )
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose logging")
