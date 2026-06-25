@@ -81,6 +81,17 @@
 ## Round @ 2026-06-21T13:35:00Z
 - File: bin/inventory_voxel_capture.py::main
 - Added: docstring=Y, type-hints=N (already had type hints)
+
+## Round @ 2026-06-21T14:00:00Z
+- File: bin/rate_limiter.py::TokenBucket.to_dict
+- Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: 521e8b57flready had type hints)
+- Commit: c1ae3f9b1
+
+## Round @ 2026-06-24T10:45:00Z
+- File: bin/redteam_lint.py::attack_action_camera_pitch_out_of_range
+- Added: docstring=Y, type-hints=Y
+- Commit: 78b485819lready had type hints)
 - Commit: d28b33735
 
 ## Round @ 2026-06-25T01:12:36Z
