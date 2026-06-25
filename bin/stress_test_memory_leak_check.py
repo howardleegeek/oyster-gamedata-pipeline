@@ -33,7 +33,9 @@ def get_rss_mb() -> float:
     try:
         result = subprocess.run(
             ["ps", "-o", "rss=", "-p", str(pid)],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             return int(result.stdout.strip()) / 1024.0
@@ -105,12 +107,15 @@ def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Stress test adapter for memory leaks using tracemalloc."
     )
-    parser.add_argument("--iterations", type=int, default=1000,
-                        help="Number of iterations (default: 1000)")
-    parser.add_argument("--max-rss-mb", type=float, default=50.0,
-                        help="Max allowed RSS growth in MB (default: 50)")
-    parser.add_argument("-v", "--verbose", action="store_true",
-                        help="Print progress every 100 iterations")
+    parser.add_argument(
+        "--iterations", type=int, default=1000, help="Number of iterations (default: 1000)"
+    )
+    parser.add_argument(
+        "--max-rss-mb", type=float, default=50.0, help="Max allowed RSS growth in MB (default: 50)"
+    )
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Print progress every 100 iterations"
+    )
     args = parser.parse_args(argv)
 
     if args.iterations < 1:
