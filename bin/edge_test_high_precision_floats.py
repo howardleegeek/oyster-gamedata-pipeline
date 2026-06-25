@@ -88,10 +88,10 @@ def main(argv: List[str] | None = None) -> int:
 
     # --- build test positions covering edge cases ---
     test_positions: List[Tuple[float, float, float]] = [
-        (1e-300, 1e-300, 1e-300),          # all tiny
-        (1e-300, 0.0, 0.0),                 # mixed tiny / zero
-        (-1e-300, 1e-300, -1e-300),         # signed tiny
-        (1e-308, 1e-200, 1e-100),           # subnormal to normal range
+        (1e-300, 1e-300, 1e-300),  # all tiny
+        (1e-300, 0.0, 0.0),  # mixed tiny / zero
+        (-1e-300, 1e-300, -1e-300),  # signed tiny
+        (1e-308, 1e-200, 1e-100),  # subnormal to normal range
         (3.141592653589793e-300, 2.71828e-300, 1.41421e-300),  # irrational-scaled
     ]
 
@@ -107,8 +107,10 @@ def main(argv: List[str] | None = None) -> int:
             print(f"  {msg}", file=sys.stderr)
         return 1
 
-    print(f"PASS — all {len(test_positions)} camera positions survived JSON round-trip "
-          f"within relative tolerance {args.tolerance:.2e}.")
+    print(
+        f"PASS — all {len(test_positions)} camera positions survived JSON round-trip "
+        f"within relative tolerance {args.tolerance:.2e}."
+    )
     return 0
 
 
