@@ -644,3 +644,13 @@
 
 - Picked: ruff format bin/autoresearch_clip_density.py (smallest unformatted bin/ file at 163 lines; blank lines between functions, line-wrapping per E501). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, import smoke OK, no dedicated test file (no regressions possible), follows established cadence of previous rounds.
 - Result: committed 8cbea7e2 (ruff format applied to bin/autoresearch_clip_density.py; 1 file changed, 13 insertions(+), 2 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — blank lines between functions (E302), long line wrapping (E501). No silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 320 @ 2026-06-25T15:45:00Z
+
+- Picked: ruff format bin/audio_track_extractor.py (smallest unformatted file: 284 lines; trailing whitespace removed, line-wrapped per E501). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, import smoke OK, no dedicated test file (no regressions possible), follows established cadence of previous rounds.
+- Result: committed 353d4c10 (ruff format applied to bin/audio_track_extractor.py; 1 file changed, 78 insertions(+), 29 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — trailing whitespace removed, line-wrapped long lines per E501. No silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 321 @ 2026-06-25T16:00:00Z
+
+- Picked: finalize uncommitted Round 320 log entry in to_human/autonomous-loop-status.md (Round 320 code landed in 353d4c10 and was pushed, but its status doc entry was left uncommitted on the working tree at the start of this tick — picked it up to keep the audit log atomic with its commit). Justification: stale in-progress WIP from prior round, single-file scope, no behavior change, follows the iron rule that the log entry is committed in the same tick as the work it documents.
+- Result: committed (ruff check + ruff format --check on bin/audio_track_extractor.py still clean; import smoke OK; docs-only delta). Self-review: docs-only commit — re-read diff: pure log entry, no code touched, no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference. `git add` applied to a single file (to_human/autonomous-loop-status.md) only.
