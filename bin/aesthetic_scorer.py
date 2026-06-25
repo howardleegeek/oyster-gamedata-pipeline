@@ -49,6 +49,7 @@ def _lazy_imports() -> Tuple[Any, Any]:
 # Frame extraction
 # ---------------------------------------------------------------------------
 
+
 def _extract_frames_from_video(video_path: str, num_frames: int = 32) -> List[Any]:
     """Extract *num_frames* evenly-spaced frames from a video file.
 
@@ -59,9 +60,17 @@ def _extract_frames_from_video(video_path: str, num_frames: int = 32) -> List[An
     try:
         out_pattern = os.path.join(tmpdir, "frame_%04d.png")
         cmd = [
-            "ffmpeg", "-y", "-i", video_path,
-            "-vf", "fps=1/1,scale=320:240",
-            "-frames:v", str(num_frames), "-q:v", "2", out_pattern,
+            "ffmpeg",
+            "-y",
+            "-i",
+            video_path,
+            "-vf",
+            "fps=1/1,scale=320:240",
+            "-frames:v",
+            str(num_frames),
+            "-q:v",
+            "2",
+            out_pattern,
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
         if result.returncode != 0:
@@ -88,6 +97,7 @@ def _extract_frames_from_images(image_paths: Sequence[str], max_frames: int = 32
 # ---------------------------------------------------------------------------
 # Scoring functions
 # ---------------------------------------------------------------------------
+
 
 def _to_gray(frame: Any) -> Any:
     """Convert frame to 2-D float grayscale array."""
@@ -167,6 +177,7 @@ def compute_camera_jitter(frames: List[Any]) -> float:
 # Aggregate scoring
 # ---------------------------------------------------------------------------
 
+
 def score_clip(frames: List[Any], ocr_threshold: float = 0.3) -> Dict[str, Any]:
     """Run all four scorers and return combined result with composite score."""
     aesthetic = compute_aesthetic_score(frames)
@@ -200,7 +211,9 @@ _VIDEO_EXTS = {".mp4", ".avi", ".mov", ".mkv", ".webm", ".flv"}
 _IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".webp"}
 
 
-def process_single(input_path: str, sample_frames: int = 32, ocr_threshold: float = 0.3) -> Dict[str, Any]:
+def process_single(
+    input_path: str, sample_frames: int = 32, ocr_threshold: float = 0.3
+) -> Dict[str, Any]:
     """Score a single video file or image directory."""
     p = Path(input_path)
     if p.is_file() and p.suffix.lower() in _VIDEO_EXTS:
@@ -216,7 +229,9 @@ def process_single(input_path: str, sample_frames: int = 32, ocr_threshold: floa
     return result
 
 
-def process_batch(input_dir: str, sample_frames: int = 32, ocr_threshold: float = 0.3) -> List[Dict[str, Any]]:
+def process_batch(
+    input_dir: str, sample_frames: int = 32, ocr_threshold: float = 0.3
+) -> List[Dict[str, Any]]:
     """Score every video / image-set under *input_dir*."""
     root = Path(input_dir)
     results: List[Dict[str, Any]] = []
@@ -232,7 +247,8 @@ def process_batch(input_dir: str, sample_frames: int = 32, ocr_threshold: float 
             if images:
                 try:
                     frames = _extract_frames_from_images(
-                        [str(f) for f in images], max_frames=sample_frames,
+                        [str(f) for f in images],
+                        max_frames=sample_frames,
                     )
                     r = score_clip(frames, ocr_threshold=ocr_threshold)
                     r["source"] = str(sub)
@@ -247,6 +263,7 @@ def process_batch(input_dir: str, sample_frames: int = 32, ocr_threshold: float 
 # Output helpers
 # ---------------------------------------------------------------------------
 
+
 def _write_json(results: Any, output_path: str) -> None:
     """Write results as pretty-printed JSON."""
     with open(output_path, "w", encoding="utf-8") as fh:
@@ -259,28 +276,39 @@ def _write_csv(results: List[Dict[str, Any]], output_path: str) -> None:
     if not results:
         logging.warning("No results to write.")
         return
-    fieldnames = ["source", "num_frames", "aesthetic", "motion",
-                  "ocr_has_ocr", "ocr_confidence", "jitter", "composite"]
+    fieldnames = [
+        "source",
+        "num_frames",
+        "aesthetic",
+        "motion",
+        "ocr_has_ocr",
+        "ocr_confidence",
+        "jitter",
+        "composite",
+    ]
     with open(output_path, "w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=fieldnames)
         writer.writeheader()
         for r in results:
-            writer.writerow({
-                "source": r.get("source", ""),
-                "num_frames": r.get("num_frames", 0),
-                "aesthetic": r.get("aesthetic", 0.0),
-                "motion": r.get("motion", 0.0),
-                "ocr_has_ocr": r.get("ocr", {}).get("has_ocr", False),
-                "ocr_confidence": r.get("ocr", {}).get("confidence", 0.0),
-                "jitter": r.get("jitter", 0.0),
-                "composite": r.get("composite", 0.0),
-            })
+            writer.writerow(
+                {
+                    "source": r.get("source", ""),
+                    "num_frames": r.get("num_frames", 0),
+                    "aesthetic": r.get("aesthetic", 0.0),
+                    "motion": r.get("motion", 0.0),
+                    "ocr_has_ocr": r.get("ocr", {}).get("has_ocr", False),
+                    "ocr_confidence": r.get("ocr", {}).get("confidence", 0.0),
+                    "jitter": r.get("jitter", 0.0),
+                    "composite": r.get("composite", 0.0),
+                }
+            )
     logging.info("Wrote CSV → %s", output_path)
 
 
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def build_parser() -> argparse.ArgumentParser:
     """Construct the argument parser."""
@@ -291,9 +319,15 @@ def build_parser() -> argparse.ArgumentParser:
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--input", "-i", type=str, help="Single video file or image directory")
     group.add_argument("--batch", "-b", type=str, help="Directory for batch scoring")
-    parser.add_argument("--output", "-o", type=str, required=True, help="Output file (.json or .csv)")
-    parser.add_argument("--sample-frames", type=int, default=32, help="Frames per clip (default: 32)")
-    parser.add_argument("--ocr-threshold", type=float, default=0.3, help="OCR edge-density threshold")
+    parser.add_argument(
+        "--output", "-o", type=str, required=True, help="Output file (.json or .csv)"
+    )
+    parser.add_argument(
+        "--sample-frames", type=int, default=32, help="Frames per clip (default: 32)"
+    )
+    parser.add_argument(
+        "--ocr-threshold", type=float, default=0.3, help="OCR edge-density threshold"
+    )
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable debug logging")
     return parser
 
