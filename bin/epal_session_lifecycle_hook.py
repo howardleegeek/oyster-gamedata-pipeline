@@ -89,6 +89,11 @@ class SessionEndPayload:
     provenance: Dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
+        """Convert the session end payload to a dictionary.
+
+        Returns:
+            A dictionary representation of this session end payload.
+        """
         return asdict(self)
 
 
