@@ -13,6 +13,7 @@ Per IL10: ABSTAIN, never silent PASS, when artifact (inputs.jsonl) absent.
 
 Module isolation: V₁'s implementation; V₂ MiniMax has independent dispatch.
 """
+
 from __future__ import annotations
 
 import json
@@ -88,25 +89,22 @@ def r13_keycode_replay(
     """
     threshold = 0.0
     if inputs_path is None:
-        return ResidualResult("R13", False, math.nan, threshold,
-                              "ABSTAIN:no_inputs_path")
+        return ResidualResult("R13", False, math.nan, threshold, "ABSTAIN:no_inputs_path")
     p = Path(inputs_path)
     if not p.exists():
-        return ResidualResult("R13", False, math.nan, threshold,
-                              "ABSTAIN:inputs_jsonl_absent")
+        return ResidualResult("R13", False, math.nan, threshold, "ABSTAIN:inputs_jsonl_absent")
 
     fps, events = _parse_inputs_jsonl(p)
     if fps is None:
-        return ResidualResult("R13", False, math.nan, threshold,
-                              "ABSTAIN:no_session_start_sentinel")
+        return ResidualResult(
+            "R13", False, math.nan, threshold, "ABSTAIN:no_session_start_sentinel"
+        )
     if not (29.5 <= fps <= 30.5):
-        return ResidualResult("R13", False, math.nan, threshold,
-                              f"ABSTAIN:fps_out_of_band ({fps})")
+        return ResidualResult("R13", False, math.nan, threshold, f"ABSTAIN:fps_out_of_band ({fps})")
 
     frame_idx = rec.get("frame")
     if not isinstance(frame_idx, int):
-        return ResidualResult("R13", False, math.nan, threshold,
-                              "ABSTAIN:frame_index_missing")
+        return ResidualResult("R13", False, math.nan, threshold, "ABSTAIN:frame_index_missing")
 
     # Frame N spans [N · 1000/fps, (N+1) · 1000/fps] ms. Snapshot at end.
     t_end_ms = (frame_idx + 1) * (1000.0 / fps)
@@ -119,9 +117,11 @@ def r13_keycode_replay(
         last_ts = float(events[-1].get("timestamp_ms", 0))
         if last_ts < t_end_ms - 5000:
             return ResidualResult(
-                "R13", False, math.nan, threshold,
-                f"ABSTAIN:inputs_truncated (last event @ {last_ts}ms, "
-                f"frame needs {t_end_ms}ms)",
+                "R13",
+                False,
+                math.nan,
+                threshold,
+                f"ABSTAIN:inputs_truncated (last event @ {last_ts}ms, frame needs {t_end_ms}ms)",
             )
 
     snapshot = _held_keys_at(events, t_end_ms)
@@ -132,9 +132,11 @@ def r13_keycode_replay(
     sym_diff = snapshot ^ actual
     residual = float(len(sym_diff))
     if residual == 0.0:
-        return ResidualResult("R13", True, 0.0, threshold,
-                              f"replay matched ({len(snapshot)} keys)")
+        return ResidualResult("R13", True, 0.0, threshold, f"replay matched ({len(snapshot)} keys)")
     return ResidualResult(
-        "R13", False, residual, threshold,
+        "R13",
+        False,
+        residual,
+        threshold,
         f"keyCode mismatch: replay={sorted(snapshot)} vs frame={sorted(actual)}",
     )
