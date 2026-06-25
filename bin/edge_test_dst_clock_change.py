@@ -40,7 +40,9 @@ def _dst_transitions(tz_name: str, year: int) -> list[datetime]:
 
 
 def test_utc_monotonicity_across_dst(
-    tz_name: str, year: int, step_minutes: int = 1,
+    tz_name: str,
+    year: int,
+    step_minutes: int = 1,
 ) -> list[str]:
     """Walk each DST transition in UTC and verify round-trip monotonicity.
 
@@ -72,7 +74,9 @@ def test_utc_monotonicity_across_dst(
 
 
 def test_local_time_behavior(
-    tz_name: str, year: int, step_minutes: int = 1,
+    tz_name: str,
+    year: int,
+    step_minutes: int = 1,
 ) -> list[str]:
     """Verify offset changes at each DST transition boundary."""
     errors: list[str] = []
@@ -82,9 +86,7 @@ def test_local_time_behavior(
         pre = (t_utc - timedelta(minutes=step_minutes)).astimezone(tz)
         post = (t_utc + timedelta(minutes=step_minutes)).astimezone(tz)
         if pre.utcoffset() == post.utcoffset():
-            errors.append(
-                f"Pre/post offsets equal at {t_utc.isoformat()} (expected DST change)"
-            )
+            errors.append(f"Pre/post offsets equal at {t_utc.isoformat()} (expected DST change)")
     return errors
 
 
@@ -93,16 +95,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Verify UTC monotonicity across DST transitions.",
     )
-    parser.add_argument("--tz", default="America/New_York",
-                        help="IANA timezone name (default: America/New_York)")
-    parser.add_argument("--year", type=int, default=2024,
-                        help="Calendar year to scan (default: 2024)")
-    parser.add_argument("--step-minutes", type=int, default=1,
-                        help="Scan granularity in minutes")
+    parser.add_argument(
+        "--tz", default="America/New_York", help="IANA timezone name (default: America/New_York)"
+    )
+    parser.add_argument(
+        "--year", type=int, default=2024, help="Calendar year to scan (default: 2024)"
+    )
+    parser.add_argument("--step-minutes", type=int, default=1, help="Scan granularity in minutes")
     args = parser.parse_args(list(argv) if argv is not None else None)
 
-    print(f"Testing DST transitions for {args.tz} in {args.year} "
-          f"(step={args.step_minutes} min)")
+    print(f"Testing DST transitions for {args.tz} in {args.year} (step={args.step_minutes} min)")
     all_errors: list[str] = []
 
     print("\n[Test 1] UTC monotonicity across DST transitions...")
