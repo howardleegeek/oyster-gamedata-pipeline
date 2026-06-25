@@ -28,6 +28,7 @@ Public API
 * :func:`plan_audio_capture` — probe ffmpeg, decide, return a plan.
 * :func:`build_ffmpeg_args` — convert a plan into list-of-string ffmpeg args.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -41,7 +42,8 @@ from typing import List, Optional, Sequence
 
 class AudioCaptureMode:
     """String constants for the audio capture strategies."""
-    WASAPI_LOOPBACK = "wasapi_loopback"   # preferred: system audio only
+
+    WASAPI_LOOPBACK = "wasapi_loopback"  # preferred: system audio only
     DSHOW_LOOPBACK_FILTER = "dshow_loopback_filter"  # screen-capture-recorder
     DSHOW_MICROPHONE = "dshow_microphone"  # last resort, privacy WARNING
     NONE = "none"  # ffmpeg unavailable / no device — recorder skips audio
@@ -63,6 +65,7 @@ _DSHOW_LOOPBACK_HINTS = (
 @dataclass(frozen=True)
 class AudioCapturePlan:
     """Resolved audio-capture plan for the recorder."""
+
     mode: str
     device_name: Optional[str] = None
     fallback_used: bool = False
@@ -106,9 +109,7 @@ def _list_dshow_audio_devices() -> List[str]:
     device list to stderr and exits non-zero, which is fine — we just parse
     whatever came back.
     """
-    out = _run_ffmpeg(
-        ["-hide_banner", "-f", "dshow", "-list_devices", "true", "-i", "dummy"]
-    )
+    out = _run_ffmpeg(["-hide_banner", "-f", "dshow", "-list_devices", "true", "-i", "dummy"])
     if not out:
         return []
     devices: List[str] = []
@@ -129,7 +130,7 @@ def _list_dshow_audio_devices() -> List[str]:
             start = line.find('"')
             end = line.find('"', start + 1)
             if end > start:
-                devices.append(line[start + 1:end])
+                devices.append(line[start + 1 : end])
     return devices
 
 
@@ -193,9 +194,7 @@ def plan_audio_capture(prefer_wasapi: bool = True) -> AudioCapturePlan:
 
     # Last resort: dshow mic. Caller MUST gate on user consent.
     mic = devices[0]
-    notes.append(
-        "FALLBACK: capturing dshow microphone — privacy WARNING, requires consent"
-    )
+    notes.append("FALLBACK: capturing dshow microphone — privacy WARNING, requires consent")
     return AudioCapturePlan(
         mode=AudioCaptureMode.DSHOW_MICROPHONE,
         device_name=mic,
@@ -235,8 +234,11 @@ def build_ffmpeg_args(plan: AudioCapturePlan) -> List[str]:
 
 def _cli(argv: Optional[Sequence[str]] = None) -> int:
     p = argparse.ArgumentParser(description="Plan ffmpeg audio capture (loopback first).")
-    p.add_argument("--no-wasapi", action="store_true",
-                   help="Skip wasapi probe (force dshow path; testing only).")
+    p.add_argument(
+        "--no-wasapi",
+        action="store_true",
+        help="Skip wasapi probe (force dshow path; testing only).",
+    )
     p.add_argument("--json", action="store_true", help="Emit JSON instead of human text.")
     args = p.parse_args(argv)
 
