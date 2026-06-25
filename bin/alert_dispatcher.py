@@ -39,14 +39,17 @@ import yaml
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "monitor_thresholds.yaml")
 
+
 def load_config() -> dict:
     """Load thresholds config from YAML."""
     with open(CONFIG_PATH, "r") as f:
         return yaml.safe_load(f)
 
+
 def expand_oyster_path(path: str) -> str:
     """Expand ~ in oyster paths."""
     return os.path.expanduser(path)
+
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -62,6 +65,7 @@ log = logging.getLogger("alert_dispatcher")
 # ---------------------------------------------------------------------------
 # Alert Types
 # ---------------------------------------------------------------------------
+
 
 class AlertSeverity:
     CRITICAL = "critical"
@@ -111,7 +115,13 @@ class Alert:
 
     def format_slack(self) -> dict:
         """Format for Slack webhook."""
-        emoji = "🔴" if self.severity == AlertSeverity.CRITICAL else "🟡" if self.severity == AlertSeverity.WARNING else "🔵"
+        emoji = (
+            "🔴"
+            if self.severity == AlertSeverity.CRITICAL
+            else "🟡"
+            if self.severity == AlertSeverity.WARNING
+            else "🔵"
+        )
         return {
             "text": f"{emoji} [oyster-prod] {self.title}",
             "blocks": [
@@ -119,22 +129,28 @@ class Alert:
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": f"*{emoji} [oyster-prod] {self.title}*\n{self.message}"
-                    }
+                        "text": f"*{emoji} [oyster-prod] {self.title}*\n{self.message}",
+                    },
                 },
                 {
                     "type": "section",
                     "fields": [
                         {"type": "mrkdwn", "text": f"*Component:*\n{self.component}"},
                         {"type": "mrkdwn", "text": f"*Severity:*\n{self.severity}"},
-                    ]
+                    ],
                 },
             ],
         }
 
     def format_discord(self) -> dict:
         """Format for Discord webhook."""
-        color = 0xFF0000 if self.severity == AlertSeverity.CRITICAL else 0xFFA500 if self.severity == AlertSeverity.WARNING else 0x0000FF
+        color = (
+            0xFF0000
+            if self.severity == AlertSeverity.CRITICAL
+            else 0xFFA500
+            if self.severity == AlertSeverity.WARNING
+            else 0x0000FF
+        )
         fields = []
         if self.last_success:
             fields.append({"name": "Last success", "value": self.last_success, "inline": True})
@@ -146,14 +162,16 @@ class Alert:
 
         return {
             "content": None,
-            "embeds": [{
-                "title": f"[oyster-prod] {self.title}",
-                "description": self.message,
-                "color": color,
-                "fields": fields,
-                "timestamp": self.created_at,
-                "footer": {"text": "Oyster Monitor"},
-            }]
+            "embeds": [
+                {
+                    "title": f"[oyster-prod] {self.title}",
+                    "description": self.message,
+                    "color": color,
+                    "fields": fields,
+                    "timestamp": self.created_at,
+                    "footer": {"text": "Oyster Monitor"},
+                }
+            ],
         }
 
     def format_pagerduty(self) -> dict:
@@ -180,6 +198,7 @@ class Alert:
 # Alert State Manager (dedup + escalation)
 # ---------------------------------------------------------------------------
 
+
 class AlertStateManager:
     """Manages alert state for deduplication and escalation."""
 
@@ -191,7 +210,9 @@ class AlertStateManager:
     ):
         self.dedup_window = dedup_window_seconds
         self.escalation_seconds = escalation_seconds
-        self.alerts_file = expand_oyster_path(alerts_file) if alerts_file else "~/.oyster/monitor_alerts.jsonl"
+        self.alerts_file = (
+            expand_oyster_path(alerts_file) if alerts_file else "~/.oyster/monitor_alerts.jsonl"
+        )
 
         # In-memory state: alert_id -> {last_fired, fire_count, last_escalated, cleared}
         self.state: dict[str, dict] = {}
@@ -270,7 +291,9 @@ class AlertStateManager:
             "alert_id": alert_id,
             "last_fired": now,
             "fire_count": self.state.get(alert_id, {}).get("fire_count", 0) + 1,
-            "last_escalated": now if fire_type == "escalation" else self.state.get(alert_id, {}).get("last_escalated", now),
+            "last_escalated": now
+            if fire_type == "escalation"
+            else self.state.get(alert_id, {}).get("last_escalated", now),
             "cleared": fire_type == "cleared",
             "fire_type": fire_type,
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -282,6 +305,7 @@ class AlertStateManager:
 # ---------------------------------------------------------------------------
 # Webhook Senders
 # ---------------------------------------------------------------------------
+
 
 class WebhookSender:
     """Sends alerts to Slack, Discord, and PagerDuty."""
@@ -328,7 +352,9 @@ class WebhookSender:
                 return False
         except requests.exceptions.RequestException as e:
             log.error(f"Failed to send Slack alert: {e}")
-            self.offline_queue.append({"channel": "slack", "payload": payload, "timestamp": time.time()})
+            self.offline_queue.append(
+                {"channel": "slack", "payload": payload, "timestamp": time.time()}
+            )
             self._save_queue()
             return False
 
@@ -349,7 +375,9 @@ class WebhookSender:
                 return False
         except requests.exceptions.RequestException as e:
             log.error(f"Failed to send Discord alert: {e}")
-            self.offline_queue.append({"channel": "discord", "payload": payload, "timestamp": time.time()})
+            self.offline_queue.append(
+                {"channel": "discord", "payload": payload, "timestamp": time.time()}
+            )
             self._save_queue()
             return False
 
@@ -413,6 +441,7 @@ class WebhookSender:
 # ---------------------------------------------------------------------------
 # Alert Dispatcher
 # ---------------------------------------------------------------------------
+
 
 class AlertDispatcher:
     """Main alert dispatcher — evaluates metrics and fires alerts."""
@@ -496,7 +525,9 @@ class AlertDispatcher:
                 threshold = self.thresholds["health_check_consecutive_failures"]
 
                 if failures >= threshold:
-                    should_fire, fire_type = self.state_manager.should_fire(alert_id, is_active=True)
+                    should_fire, fire_type = self.state_manager.should_fire(
+                        alert_id, is_active=True
+                    )
                     if should_fire:
                         self.state_manager.record_fire(alert_id, fire_type)
 
@@ -505,11 +536,19 @@ class AlertDispatcher:
                         )
                         if self.last_success_time.get(name):
                             last_success = self._time_ago(
-                                datetime.fromtimestamp(self.last_success_time[name], tz=timezone.utc).isoformat()
+                                datetime.fromtimestamp(
+                                    self.last_success_time[name], tz=timezone.utc
+                                ).isoformat()
                             )
 
-                        severity = AlertSeverity.CRITICAL if fire_type == "escalation" else AlertSeverity.WARNING
-                        title_suffix = "still failing" if fire_type == "escalation" else "health check failed"
+                        severity = (
+                            AlertSeverity.CRITICAL
+                            if fire_type == "escalation"
+                            else AlertSeverity.WARNING
+                        )
+                        title_suffix = (
+                            "still failing" if fire_type == "escalation" else "health check failed"
+                        )
 
                         alert = Alert(
                             alert_id=alert_id,
@@ -549,8 +588,14 @@ class AlertDispatcher:
                     action="No action needed — auto-cleared.",
                 )
             else:
-                severity = AlertSeverity.CRITICAL if fire_type == "escalation" else AlertSeverity.WARNING
-                title_suffix = "still exceeding threshold" if fire_type == "escalation" else "exceeds threshold"
+                severity = (
+                    AlertSeverity.CRITICAL if fire_type == "escalation" else AlertSeverity.WARNING
+                )
+                title_suffix = (
+                    "still exceeding threshold"
+                    if fire_type == "escalation"
+                    else "exceeds threshold"
+                )
                 alert = Alert(
                     alert_id=alert_id,
                     component="upload_backlog",
@@ -587,7 +632,9 @@ class AlertDispatcher:
                     action="No action needed — auto-cleared.",
                 )
             else:
-                severity = AlertSeverity.CRITICAL if fire_type == "escalation" else AlertSeverity.WARNING
+                severity = (
+                    AlertSeverity.CRITICAL if fire_type == "escalation" else AlertSeverity.WARNING
+                )
                 title_suffix = "still high" if fire_type == "escalation" else "exceeds threshold"
                 sample_errors = error_rate.get("sample_errors", [])
                 alert = Alert(
@@ -631,7 +678,9 @@ class AlertDispatcher:
                     action="No action needed — auto-cleared.",
                 )
             else:
-                severity = AlertSeverity.CRITICAL if fire_type == "escalation" else AlertSeverity.WARNING
+                severity = (
+                    AlertSeverity.CRITICAL if fire_type == "escalation" else AlertSeverity.WARNING
+                )
                 title_suffix = "critically low" if fire_type == "escalation" else "low"
                 alert = Alert(
                     alert_id=alert_id,
@@ -668,7 +717,9 @@ class AlertDispatcher:
                     action="No action needed — auto-cleared.",
                 )
             else:
-                severity = AlertSeverity.CRITICAL if fire_type == "escalation" else AlertSeverity.WARNING
+                severity = (
+                    AlertSeverity.CRITICAL if fire_type == "escalation" else AlertSeverity.WARNING
+                )
                 title_suffix = "still stuck" if fire_type == "escalation" else "stuck"
                 alert = Alert(
                     alert_id=alert_id,
@@ -705,7 +756,9 @@ class AlertDispatcher:
 
         # Send all alerts
         for alert in all_alerts:
-            log.info(f"Firing alert [{alert.fire_type if hasattr(alert, 'fire_type') else 'unknown'}]: {alert.title}")
+            log.info(
+                f"Firing alert [{alert.fire_type if hasattr(alert, 'fire_type') else 'unknown'}]: {alert.title}"
+            )
             self.webhook_sender.send_all(alert)
 
         # Try to flush offline queue
