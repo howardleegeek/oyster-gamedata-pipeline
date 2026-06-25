@@ -45,6 +45,11 @@ class Vector3:
     z: float = 0.0
 
     def to_list(self) -> List[float]:
+        """Convert the vector to a list of [x, y, z] floats.
+
+        Returns:
+            A list containing the x, y, z components in order.
+        """
         return [self.x, self.y, self.z]
 
     def length(self) -> float:
