@@ -619,3 +619,13 @@
 
 - Picked: ruff format bin/anti_replay_check.py (smallest unformatted file in working tree at 407 lines; trailing commas, line-wrapping per E501). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, tests/test_anti_replay_check.py 31/31 pass, follows established cadence.
 - Result: committed 521503df (ruff format applied to bin/anti_replay_check.py; 1 file changed, 4 insertions(+), 12 deletions(-); ruff check + format --check clean; import smoke OK; tests/test_anti_replay_check.py 31/31 pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — trailing commas added to dict literals per trailing-comma convention, long lines wrapped per E501, argparse calls consolidated to single line where appropriate. No silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 314 @ 2026-06-25T14:19:56Z
+
+- Picked: ruff format bin/audio_loopback.py (small unformatted bin file: 269 lines, trailing whitespace removed, line wrapping per E501). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, module import smoke OK, no test file references this module, follows established cadence.
+- Result: committed a3081ffd (ruff format applied to bin/audio_loopback.py; 1 file changed, 12 insertions(+), 10 deletions(-); ruff check + ruff format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — trailing whitespace removed, line-wrapped long lines per E501. No silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 316 @ 2026-06-25T14:37:04Z
+
+- Picked: ruff format bin/secure_subprocess_lib.py (smallest unformatted file: 141 lines, reformatting long lines and frozenset). Justification: measurable code smell, single-file scope, no behavior change, import smoke OK, no risk of test masking, follows established cadence.
+- Result: committed 4b173a33 (ruff format bin/secure_subprocess_lib.py; 1 file changed, 93 insertions(+), 16 deletions(-); ruff check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
