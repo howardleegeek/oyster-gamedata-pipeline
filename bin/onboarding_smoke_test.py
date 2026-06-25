@@ -27,12 +27,14 @@ log = logging.getLogger(__name__)
 def _import_pil():
     """Return PIL.Image or raise ImportError."""
     from PIL import Image  # noqa: PLC0415
+
     return Image
 
 
 def _import_numpy():
     """Return numpy or raise ImportError."""
     import numpy as np  # noqa: PLC0415
+
     return np
 
 
@@ -55,16 +57,22 @@ def check_python_version() -> CheckResult:
 
 def check_stdlib_modules() -> CheckResult:
     """Verify essential stdlib modules import cleanly."""
-    missing = [m for m in ["argparse", "json", "logging", "tempfile", "pathlib", "ast"]
-               if __import__(m) is None]
-    return CheckResult("stdlib_modules", not missing, ", ".join(missing) if missing else "all present")
+    missing = [
+        m
+        for m in ["argparse", "json", "logging", "tempfile", "pathlib", "ast"]
+        if __import__(m) is None
+    ]
+    return CheckResult(
+        "stdlib_modules", not missing, ", ".join(missing) if missing else "all present"
+    )
 
 
 def check_optional_deps() -> CheckResult:
     """Verify optional vendor deps (numpy, PIL) are available."""
-    missing = [n for n, g in [("numpy", _import_numpy), ("PIL", _import_pil)]
-               if not _try_import(g)]
-    return CheckResult("optional_deps", not missing, "missing: " + ", ".join(missing) if missing else "all present")
+    missing = [n for n, g in [("numpy", _import_numpy), ("PIL", _import_pil)] if not _try_import(g)]
+    return CheckResult(
+        "optional_deps", not missing, "missing: " + ", ".join(missing) if missing else "all present"
+    )
 
 
 def _try_import(getter) -> bool:
@@ -96,14 +104,25 @@ def capture_clip(output_dir: Path, duration: int) -> CheckResult:
         frame = np.random.randint(0, 255, (48, 64, 3), dtype=np.uint8)
         img_path = output_dir / "smoke_clip_frame.png"
         Image.fromarray(frame, "RGB").save(str(img_path), "PNG")
-        manifest = {"type": "smoke_clip", "duration_s": duration,
-                     "frame_shape": list(frame.shape), "frame_path": str(img_path),
-                     "timestamp": time.time()}
+        manifest = {
+            "type": "smoke_clip",
+            "duration_s": duration,
+            "frame_shape": list(frame.shape),
+            "frame_path": str(img_path),
+            "timestamp": time.time(),
+        }
     except ImportError:
-        manifest = {"type": "smoke_clip", "duration_s": duration,
-                     "frame_shape": None, "frame_path": None, "timestamp": time.time()}
+        manifest = {
+            "type": "smoke_clip",
+            "duration_s": duration,
+            "frame_shape": None,
+            "frame_path": None,
+            "timestamp": time.time(),
+        }
     clip_path.write_text(json.dumps(manifest, indent=2))
-    return CheckResult("capture_clip", clip_path.exists() and clip_path.stat().st_size > 0, str(clip_path))
+    return CheckResult(
+        "capture_clip", clip_path.exists() and clip_path.stat().st_size > 0, str(clip_path)
+    )
 
 
 def lint_clip(output_dir: Path) -> CheckResult:
@@ -138,9 +157,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     Returns 0 on full pass (go), 1 on any failure (no-go).
     """
     parser = argparse.ArgumentParser(
-        description="G136 post-install smoke test — captures a clip, lints, reports go/no-go.")
-    parser.add_argument("--duration", type=int, default=10, help="Clip duration in seconds (default: 10).")
-    parser.add_argument("--output-dir", type=Path, default=None, help="Output directory (default: auto tempdir).")
+        description="G136 post-install smoke test — captures a clip, lints, reports go/no-go."
+    )
+    parser.add_argument(
+        "--duration", type=int, default=10, help="Clip duration in seconds (default: 10)."
+    )
+    parser.add_argument(
+        "--output-dir", type=Path, default=None, help="Output directory (default: auto tempdir)."
+    )
     args = parser.parse_args(argv)
 
     output_dir = args.output_dir or Path(tempfile.mkdtemp(prefix="g136_smoke_"))
@@ -148,8 +172,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     log.info("duration=%ds  output_dir=%s", args.duration, output_dir)
 
     checks: List[CheckResult] = []
-    for fn in [check_python_version, check_stdlib_modules, check_optional_deps,
-               lambda: check_output_dir(output_dir), self_ast_check]:
+    for fn in [
+        check_python_version,
+        check_stdlib_modules,
+        check_optional_deps,
+        lambda: check_output_dir(output_dir),
+        self_ast_check,
+    ]:
         r = fn()
         checks.append(r)
         log.info("  %s", r)
