@@ -10,6 +10,7 @@ various points and inspects the output directory for partial artefacts.
 Usage:
     python3 bin/red_team_sigkill_mid_write.py [--iterations N] [--delay-ms D]
 """
+
 from __future__ import annotations
 
 import argparse
@@ -44,12 +45,16 @@ except OSError: pass
 def _build_child_script(payload_size: int, chunk_size: int, sleep_per_chunk: float) -> str:
     """Return the child writer script with parameters interpolated."""
     return _CHILD_SCRIPT.format(
-        payload_size=payload_size, chunk_size=chunk_size, sleep_per_chunk=sleep_per_chunk)
+        payload_size=payload_size, chunk_size=chunk_size, sleep_per_chunk=sleep_per_chunk
+    )
 
 
 def _run_sigkill_trial(
-    work_dir: Path, payload_size: int, chunk_size: int,
-    sleep_per_chunk: float, kill_after_chunks: int,
+    work_dir: Path,
+    payload_size: int,
+    chunk_size: int,
+    sleep_per_chunk: float,
+    kill_after_chunks: int,
 ) -> dict:
     """Spawn a writer, SIGKILL it after *kill_after_chunks* chunks, inspect results."""
     script_path = work_dir / "_writer.py"
@@ -57,7 +62,10 @@ def _run_sigkill_trial(
     r_fd, w_fd = os.pipe()
     proc = subprocess.Popen(
         [sys.executable, str(script_path), str(work_dir), str(w_fd)],
-        pass_fds=(w_fd,), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        pass_fds=(w_fd,),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
     os.close(w_fd)
     chunks_seen = 0
     try:
@@ -85,7 +93,9 @@ def _run_sigkill_trial(
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Entry-point with argparse CLI."""
-    parser = argparse.ArgumentParser(description="Red-team: SIGKILL adapter mid action_camera write")
+    parser = argparse.ArgumentParser(
+        description="Red-team: SIGKILL adapter mid action_camera write"
+    )
     parser.add_argument("--iterations", type=int, default=5, help="Number of SIGKILL trials")
     parser.add_argument("--delay-ms", type=float, default=10.0, help="Sleep per chunk (ms)")
     parser.add_argument("--payload-kb", type=int, default=64, help="Total payload size (KB)")
@@ -98,20 +108,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         work_dir = Path(tmpdir)
         total_chunks = payload_size // chunk_size
         print("[red-team] SIGKILL mid-write test")
-        print(f"  payload={args.payload_kb}KB  chunk={args.chunk_kb}KB  "
-              f"sleep={args.delay_ms}ms/chunk  iterations={args.iterations}\n")
+        print(
+            f"  payload={args.payload_kb}KB  chunk={args.chunk_kb}KB  "
+            f"sleep={args.delay_ms}ms/chunk  iterations={args.iterations}\n"
+        )
         partial_count = final_count = 0
         for i in range(1, args.iterations + 1):
             kill_at = (i * 3) % max(total_chunks - 1, 1) + 1
             result = _run_sigkill_trial(
-                work_dir, payload_size, chunk_size, sleep_per_chunk, kill_at)
+                work_dir, payload_size, chunk_size, sleep_per_chunk, kill_at
+            )
             status = "PARTIAL-FILE" if result["partial_found"] else "CLEAN"
             if result["partial_found"]:
                 partial_count += 1
             if result["final_found"]:
                 final_count += 1
-            print(f"  trial {i:2d}: kill_after={kill_at} chunks  "
-                  f"written={result['chunks_written']}  status={status}")
+            print(
+                f"  trial {i:2d}: kill_after={kill_at} chunks  "
+                f"written={result['chunks_written']}  status={status}"
+            )
         print()
         if partial_count > 0:
             print(f"[FAIL] {partial_count}/{args.iterations} trials left partial .tmp files")
