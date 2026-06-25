@@ -171,8 +171,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         import uvicorn
     except ImportError:
         print(
-            "ERROR: uvicorn is not installed. "
-            "Install with: pip install 'uvicorn[standard]>=0.27'",
+            "ERROR: uvicorn is not installed. Install with: pip install 'uvicorn[standard]>=0.27'",
             file=sys.stderr,
         )
         return 1
