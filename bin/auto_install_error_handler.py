@@ -43,15 +43,17 @@ def _get_temp_dir() -> Path:
     return Path(tempfile.mkdtemp(prefix="g234_errors_"))
 
 
-def _format_exception(exc_type: Type[BaseException], exc_value: BaseException,
-                      exc_tb: Optional[Any]) -> str:
+def _format_exception(
+    exc_type: Type[BaseException], exc_value: BaseException, exc_tb: Optional[Any]
+) -> str:
     """Format an exception with full traceback and context."""
     lines = traceback.format_exception(exc_type, exc_value, exc_tb)
     return "".join(lines)
 
 
-def _g234_excepthook(exc_type: Type[BaseException], exc_value: BaseException,
-                     exc_tb: Optional[Any]) -> None:
+def _g234_excepthook(
+    exc_type: Type[BaseException], exc_value: BaseException, exc_tb: Optional[Any]
+) -> None:
     """
     Global exception hook for G234 error handling.
 
@@ -156,38 +158,24 @@ def main(argv: Optional[list[str]] = None) -> int:
         Exit code (0 for success, non-zero for errors).
     """
     parser = argparse.ArgumentParser(
-        prog=_MODULE_NAME,
-        description="Install or manage G234 global Python error handling hooks."
+        prog=_MODULE_NAME, description="Install or manage G234 global Python error handling hooks."
     )
     parser.add_argument(
-        "--install", "-i",
-        action="store_true",
-        help="Install G234 error handling hooks"
+        "--install", "-i", action="store_true", help="Install G234 error handling hooks"
     )
     parser.add_argument(
-        "--uninstall", "-u",
-        action="store_true",
-        help="Uninstall G234 error handling hooks"
+        "--uninstall", "-u", action="store_true", help="Uninstall G234 error handling hooks"
     )
     parser.add_argument(
-        "--check", "-c",
-        action="store_true",
-        help="Check if G234 hooks are installed"
+        "--check", "-c", action="store_true", help="Check if G234 hooks are installed"
     )
-    parser.add_argument(
-        "--verbose", "-v",
-        action="store_true",
-        help="Enable verbose output"
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
 
     args = parser.parse_args(argv)
 
     # Configure logging
     log_level = logging.DEBUG if args.verbose else logging.INFO
-    logging.basicConfig(
-        level=log_level,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-    )
+    logging.basicConfig(level=log_level, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
     if args.check:
         installed = is_installed()
