@@ -13,6 +13,7 @@ the exact false-confidence failure mode IL10 was written to prevent
 
 Stdlib only (``ast``, ``pathlib``).
 """
+
 from __future__ import annotations
 
 import ast
@@ -29,12 +30,14 @@ SCAN_DIRS = (
 )
 
 # Suspicious parameter names that bind to a producer-written artifact.
-ARTIFACT_PARAM_NAMES = frozenset({
-    "manifest_path",
-    "video_path",
-    "inputs_path",
-    "depth_dir",
-})
+ARTIFACT_PARAM_NAMES = frozenset(
+    {
+        "manifest_path",
+        "video_path",
+        "inputs_path",
+        "depth_dir",
+    }
+)
 ARTIFACT_PARAM_SUFFIXES = ("_path", "_dir")
 
 
