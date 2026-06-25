@@ -514,3 +514,4 @@
 
 - Picked: ruff format bin/uninstall_clean.py (smallest unformatted bin file at 130 lines; list-literal reformat per ruff). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, AST parse + import smoke OK, no test file references this module (no risk of test masking), follows established cadence of formatting small bin files.
 - Result: committed c52aaca2 (ruff format wrapped list literal in bin/uninstall_clean.py; 1 file changed, 6 insertions(+), 3 deletions(-); ruff check + ruff format --check clean; AST parse OK; import smoke OK (APP_NAME=g137 loads cleanly); pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic list-literal reformat only — same 4 Path entries in same order, no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
