@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Generate a self-contained STATUS.html dashboard from sprint data."""
+
 import argparse
 import os
 import re
@@ -25,14 +26,16 @@ def get_git_log():
     try:
         out = subprocess.check_output(
             ["git", "log", "--pretty=format:%h|%an|%ad|%s", "--date=short", "-20"],
-            stderr=subprocess.DEVNULL, text=True,
+            stderr=subprocess.DEVNULL,
+            text=True,
         )
         commits = []
         for line in out.strip().splitlines():
             parts = line.split("|", 3)
             if len(parts) == 4:
-                commits.append({"hash": parts[0], "author": parts[1],
-                                "date": parts[2], "subject": parts[3]})
+                commits.append(
+                    {"hash": parts[0], "author": parts[1], "date": parts[2], "subject": parts[3]}
+                )
         return commits
     except (subprocess.CalledProcessError, FileNotFoundError):
         return []
@@ -54,14 +57,15 @@ def count_test_files(root="src/tests"):
 def build_html(metrics, commits, file_counts, total_files):
     """Return a complete HTML string with inlined CSS."""
     sprint = metrics.get("Sprint", "N/A")
-    rows = "".join(
-        f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in metrics.items()
+    rows = "".join(f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in metrics.items())
+    commit_rows = (
+        "".join(
+            f"<tr><td><code>{c['hash']}</code></td><td>{c['author']}</td>"
+            f"<td>{c['date']}</td><td>{c['subject']}</td></tr>"
+            for c in commits
+        )
+        or "<tr><td colspan='4'>No commits found</td></tr>"
     )
-    commit_rows = "".join(
-        f"<tr><td><code>{c['hash']}</code></td><td>{c['author']}</td>"
-        f"<td>{c['date']}</td><td>{c['subject']}</td></tr>"
-        for c in commits
-    ) or "<tr><td colspan='4'>No commits found</td></tr>"
     file_rows = "".join(
         f"<tr><td>{ext}</td><td>{cnt}</td></tr>" for ext, cnt in sorted(file_counts.items())
     )
