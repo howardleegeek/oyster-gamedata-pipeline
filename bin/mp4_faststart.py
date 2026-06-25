@@ -18,6 +18,7 @@ Usage (programmatic)::
     cmd = extend_ffmpeg_cmd(cmd)
     # -> ["ffmpeg", "-y", "-i", "in.mkv", "-movflags", "+faststart", "out.mp4"]
 """
+
 from __future__ import annotations
 
 import sys
@@ -29,15 +30,65 @@ _FASTSTART_EXTS = (".mp4", ".m4v", ".m4a", ".mov", ".3gp", ".3g2")
 # Flags that take an argument we should skip when locating the output path.
 # (ffmpeg has many; this list covers the recorder's common surface.)
 _FLAGS_WITH_ARG = {
-    "-i", "-c", "-c:v", "-c:a", "-c:s", "-codec", "-codec:v", "-codec:a",
-    "-b", "-b:v", "-b:a", "-r", "-s", "-pix_fmt", "-vf", "-af", "-filter:v",
-    "-filter:a", "-filter_complex", "-map", "-metadata", "-f", "-t", "-ss",
-    "-to", "-preset", "-crf", "-tune", "-profile:v", "-level", "-g", "-keyint_min",
-    "-bf", "-threads", "-thread_type", "-movflags", "-fflags", "-loglevel",
-    "-hide_banner", "-stats", "-progress", "-aspect", "-ar", "-ac", "-acodec",
-    "-vcodec", "-vsync", "-async", "-bsf:v", "-bsf:a", "-x264-params",
-    "-x264opts", "-hwaccel", "-hwaccel_device", "-init_hw_device",
-    "-filter_hw_device", "-rtbufsize", "-probesize", "-analyzeduration",
+    "-i",
+    "-c",
+    "-c:v",
+    "-c:a",
+    "-c:s",
+    "-codec",
+    "-codec:v",
+    "-codec:a",
+    "-b",
+    "-b:v",
+    "-b:a",
+    "-r",
+    "-s",
+    "-pix_fmt",
+    "-vf",
+    "-af",
+    "-filter:v",
+    "-filter:a",
+    "-filter_complex",
+    "-map",
+    "-metadata",
+    "-f",
+    "-t",
+    "-ss",
+    "-to",
+    "-preset",
+    "-crf",
+    "-tune",
+    "-profile:v",
+    "-level",
+    "-g",
+    "-keyint_min",
+    "-bf",
+    "-threads",
+    "-thread_type",
+    "-movflags",
+    "-fflags",
+    "-loglevel",
+    "-hide_banner",
+    "-stats",
+    "-progress",
+    "-aspect",
+    "-ar",
+    "-ac",
+    "-acodec",
+    "-vcodec",
+    "-vsync",
+    "-async",
+    "-bsf:v",
+    "-bsf:a",
+    "-x264-params",
+    "-x264opts",
+    "-hwaccel",
+    "-hwaccel_device",
+    "-init_hw_device",
+    "-filter_hw_device",
+    "-rtbufsize",
+    "-probesize",
+    "-analyzeduration",
 }
 
 
@@ -135,8 +186,7 @@ def _selftest() -> int:
         ),
         (
             ["ffmpeg", "-i", "in.mkv", "-c:v", "libx264", "out.mov"],
-            ["ffmpeg", "-i", "in.mkv", "-c:v", "libx264",
-             "-movflags", "+faststart", "out.mov"],
+            ["ffmpeg", "-i", "in.mkv", "-c:v", "libx264", "-movflags", "+faststart", "out.mov"],
         ),
         (
             # Idempotent.
