@@ -4,6 +4,7 @@
 Usage:
     python3 bin/error_message_translator.py [--input FILE] [--format text|json] [--verbose]
 """
+
 from __future__ import annotations
 
 import argparse
@@ -18,6 +19,7 @@ from typing import List, Optional
 @dataclass
 class RemediationRule:
     """Mapping from an internal exception pattern to a vendor message."""
+
     pattern: str
     friendly_title: str
     remediation: str
@@ -25,45 +27,90 @@ class RemediationRule:
 
 
 _RULES: List[RemediationRule] = [
-    RemediationRule("ConnectionRefusedError", "Service Unreachable",
+    RemediationRule(
+        "ConnectionRefusedError",
+        "Service Unreachable",
         "Verify the target service is running and the network endpoint is correct. "
-        "Check firewall rules and DNS resolution.", "critical"),
-    RemediationRule(r"TimeoutError|socket\.timeout", "Operation Timed Out",
+        "Check firewall rules and DNS resolution.",
+        "critical",
+    ),
+    RemediationRule(
+        r"TimeoutError|socket\.timeout",
+        "Operation Timed Out",
         "The request exceeded the allowed time window. Retry with a larger timeout "
-        "or investigate network latency and service load.", "warning"),
-    RemediationRule(r"PermissionError|AccessDenied", "Access Denied",
+        "or investigate network latency and service load.",
+        "warning",
+    ),
+    RemediationRule(
+        r"PermissionError|AccessDenied",
+        "Access Denied",
         "Insufficient permissions for the requested operation. Confirm that the "
-        "service account or user has the required IAM / filesystem roles.", "critical"),
-    RemediationRule(r"FileNotFoundError|No such file or directory", "Resource Not Found",
+        "service account or user has the required IAM / filesystem roles.",
+        "critical",
+    ),
+    RemediationRule(
+        r"FileNotFoundError|No such file or directory",
+        "Resource Not Found",
         "The specified file or directory does not exist. Verify the path and ensure "
-        "all prerequisites (uploads, mounts) are in place.", "warning"),
-    RemediationRule(r"MemoryError|out of memory", "Insufficient Memory",
+        "all prerequisites (uploads, mounts) are in place.",
+        "warning",
+    ),
+    RemediationRule(
+        r"MemoryError|out of memory",
+        "Insufficient Memory",
         "The process ran out of available memory. Reduce input size, increase the "
-        "instance memory allocation, or enable swap / paging.", "critical"),
-    RemediationRule("ValueError", "Invalid Input Value",
+        "instance memory allocation, or enable swap / paging.",
+        "critical",
+    ),
+    RemediationRule(
+        "ValueError",
+        "Invalid Input Value",
         "One or more input parameters failed validation. Review the request payload "
-        "against the API schema and correct any malformed fields.", "info"),
-    RemediationRule("KeyError", "Missing Configuration Key",
+        "against the API schema and correct any malformed fields.",
+        "info",
+    ),
+    RemediationRule(
+        "KeyError",
+        "Missing Configuration Key",
         "A required configuration key is absent. Check environment variables, "
-        "config files, and secret manager entries for completeness.", "warning"),
-    RemediationRule(r"ImportError|ModuleNotFoundError", "Missing Dependency",
+        "config files, and secret manager entries for completeness.",
+        "warning",
+    ),
+    RemediationRule(
+        r"ImportError|ModuleNotFoundError",
+        "Missing Dependency",
         "A required Python package is not installed. Run the dependency installer "
-        "(e.g. pip install -r requirements.txt) and verify the virtual environment.", "critical"),
-    RemediationRule(r"JSONDecodeError|json\.decoder", "Malformed JSON Payload",
+        "(e.g. pip install -r requirements.txt) and verify the virtual environment.",
+        "critical",
+    ),
+    RemediationRule(
+        r"JSONDecodeError|json\.decoder",
+        "Malformed JSON Payload",
         "The supplied JSON could not be parsed. Validate the payload with a JSON "
-        "linter and ensure proper escaping of special characters.", "warning"),
-    RemediationRule(r"OSError|IOError", "I/O Operation Failed",
+        "linter and ensure proper escaping of special characters.",
+        "warning",
+    ),
+    RemediationRule(
+        r"OSError|IOError",
+        "I/O Operation Failed",
         "A low-level input/output error occurred. Check disk space, file permissions, "
-        "and storage device health.", "warning"),
+        "and storage device health.",
+        "warning",
+    ),
 ]
-_FALLBACK = RemediationRule(".*", "Unexpected Error",
+_FALLBACK = RemediationRule(
+    ".*",
+    "Unexpected Error",
     "An unrecognised error occurred. Please collect the full traceback and contact "
-    "support with the request ID for further investigation.", "info")
+    "support with the request ID for further investigation.",
+    "info",
+)
 
 
 @dataclass
 class ParsedTrace:
     """Structured information extracted from a Python traceback string."""
+
     exception_type: str
     exception_message: str
     frames: List[str] = field(default_factory=list)
@@ -73,7 +120,8 @@ class ParsedTrace:
 _TRACE_RE = re.compile(r"Traceback \(most recent call last\):", re.MULTILINE)
 _FRAME_RE = re.compile(r'^\s+File "([^"]+)", line (\d+), in (.+)$', re.MULTILINE)
 _EXCEPTION_RE = re.compile(
-    r"^([A-Za-z_][A-Za-z0-9_.]*(?:Error|Exception|Warning)?):(.*)$", re.MULTILINE)
+    r"^([A-Za-z_][A-Za-z0-9_.]*(?:Error|Exception|Warning)?):(.*)$", re.MULTILINE
+)
 
 
 def parse_traceback(raw: str) -> Optional[ParsedTrace]:
@@ -106,7 +154,8 @@ def format_text(rule: RemediationRule, trace: ParsedTrace, verbose: bool = False
     lines = [
         "=" * 60,
         f"  [{rule.severity.upper()}] {rule.friendly_title}",
-        "=" * 60, "",
+        "=" * 60,
+        "",
         f"Internal exception : {trace.exception_type}",
     ]
     if trace.exception_message:
@@ -123,8 +172,10 @@ def format_text(rule: RemediationRule, trace: ParsedTrace, verbose: bool = False
 def format_json(rule: RemediationRule, trace: ParsedTrace, verbose: bool = False) -> str:
     """Render a JSON report suitable for programmatic consumption."""
     payload = {
-        "severity": rule.severity, "friendly_title": rule.friendly_title,
-        "remediation": rule.remediation, "internal_exception": trace.exception_type,
+        "severity": rule.severity,
+        "friendly_title": rule.friendly_title,
+        "remediation": rule.remediation,
+        "internal_exception": trace.exception_type,
         "message": trace.exception_message or None,
     }
     if verbose and trace.frames:
@@ -135,13 +186,25 @@ def format_json(rule: RemediationRule, trace: ParsedTrace, verbose: bool = False
 def main(argv: Optional[List[str]] = None) -> int:
     """Entry point — parse CLI args, read input, translate, and print output."""
     parser = argparse.ArgumentParser(
-        description="Translate internal Python exception traces into vendor-friendly messages.")
-    parser.add_argument("--input", "-i", type=argparse.FileType("r", encoding="utf-8"),
-        default=sys.stdin, help="Path to a file containing a traceback (default: stdin).")
-    parser.add_argument("--format", "-f", choices=["text", "json"], default="text",
-        help="Output format (default: text).")
-    parser.add_argument("--verbose", "-v", action="store_true",
-        help="Include abbreviated call stack in the output.")
+        description="Translate internal Python exception traces into vendor-friendly messages."
+    )
+    parser.add_argument(
+        "--input",
+        "-i",
+        type=argparse.FileType("r", encoding="utf-8"),
+        default=sys.stdin,
+        help="Path to a file containing a traceback (default: stdin).",
+    )
+    parser.add_argument(
+        "--format",
+        "-f",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text).",
+    )
+    parser.add_argument(
+        "--verbose", "-v", action="store_true", help="Include abbreviated call stack in the output."
+    )
     args = parser.parse_args(argv)
     raw = args.input.read()
     args.input.close()
