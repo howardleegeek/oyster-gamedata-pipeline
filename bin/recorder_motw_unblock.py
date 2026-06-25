@@ -80,18 +80,21 @@ def unblock_via_powershell(exe_path: Path) -> bool:
         "powershell.exe",
         "-NoProfile",
         "-NonInteractive",
-        "-ExecutionPolicy", "Bypass",
-        "-Command", f"Unblock-File -LiteralPath '{exe_path}'",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        f"Unblock-File -LiteralPath '{exe_path}'",
     ]
     try:
         subprocess.run(
             cmd,
-            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
-            check=True, timeout=15,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            check=True,
+            timeout=15,
         )
         return True
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired,
-            FileNotFoundError) as exc:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError) as exc:
         logger.warning("PowerShell Unblock-File failed: %s", exc)
         return False
 
@@ -126,8 +129,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("exe_path", type=Path, help="Path to .exe to unblock")
-    parser.add_argument("--quiet", action="store_true",
-                        help="Suppress informational output")
+    parser.add_argument("--quiet", action="store_true", help="Suppress informational output")
     return parser.parse_args(argv)
 
 
