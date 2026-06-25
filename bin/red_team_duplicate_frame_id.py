@@ -19,14 +19,14 @@ from typing import Any, Dict, List, Set, Tuple
 
 def parse_args(argv: List[str]) -> argparse.Namespace:
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Detect duplicate frame_id values in JSON records"
-    )
+    parser = argparse.ArgumentParser(description="Detect duplicate frame_id values in JSON records")
     parser.add_argument("input", help="Input JSON file path")
-    parser.add_argument("--field", "-f", default="frame_id",
-                       help="Field name to check (default: frame_id)")
-    parser.add_argument("--verbose", "-v", action="store_true",
-                       help="Show detailed output with record indices")
+    parser.add_argument(
+        "--field", "-f", default="frame_id", help="Field name to check (default: frame_id)"
+    )
+    parser.add_argument(
+        "--verbose", "-v", action="store_true", help="Show detailed output with record indices"
+    )
     return parser.parse_args(argv)
 
 
@@ -65,8 +65,9 @@ def load_json(filepath: str) -> List[Dict[str, Any]]:
     return records
 
 
-def find_duplicates(records: List[Dict[str, Any]], field: str
-                   ) -> Tuple[Dict[Any, List[int]], Set[Any]]:
+def find_duplicates(
+    records: List[Dict[str, Any]], field: str
+) -> Tuple[Dict[Any, List[int]], Set[Any]]:
     """Find duplicate values for a given field.
 
     Args:
