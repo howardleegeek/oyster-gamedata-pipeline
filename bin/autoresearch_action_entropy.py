@@ -46,11 +46,13 @@ def analyze_actions(actions: List[str], threshold: Optional[float] = None) -> Di
     }
 
     if threshold is not None:
-        result.update({
-            "threshold": threshold,
-            "is_low_entropy": entropy < threshold,
-            "classification": "LIKELY_SCRIPTED" if entropy < threshold else "LIKELY_HUMAN",
-        })
+        result.update(
+            {
+                "threshold": threshold,
+                "is_low_entropy": entropy < threshold,
+                "classification": "LIKELY_SCRIPTED" if entropy < threshold else "LIKELY_HUMAN",
+            }
+        )
 
     return result
 
@@ -67,16 +69,23 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description="Calculate Shannon entropy of action stream to detect AFK/scripted behavior."
     )
-    parser.add_argument("input_file", nargs="?", default="-",
-                        help="Input file path (use '-' for stdin)")
-    parser.add_argument("-t", "--threshold", type=float, default=None,
-                        help="Entropy threshold for low-entropy detection")
-    parser.add_argument("-j", "--json", action="store_true",
-                        help="Output results as JSON")
-    parser.add_argument("-v", "--verbose", action="store_true",
-                        help="Show detailed frequency breakdown")
-    parser.add_argument("-q", "--quiet", action="store_true",
-                        help="Suppress all output (exit code only)")
+    parser.add_argument(
+        "input_file", nargs="?", default="-", help="Input file path (use '-' for stdin)"
+    )
+    parser.add_argument(
+        "-t",
+        "--threshold",
+        type=float,
+        default=None,
+        help="Entropy threshold for low-entropy detection",
+    )
+    parser.add_argument("-j", "--json", action="store_true", help="Output results as JSON")
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Show detailed frequency breakdown"
+    )
+    parser.add_argument(
+        "-q", "--quiet", action="store_true", help="Suppress all output (exit code only)"
+    )
 
     args = parser.parse_args(argv)
 
