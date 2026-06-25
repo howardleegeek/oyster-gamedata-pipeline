@@ -41,7 +41,6 @@ def _write_inputs_jsonl(events: list[dict], fps: float = 30.0) -> Path:
 
 
 class TestR13KeyCodeReplay(unittest.TestCase):
-
     def test_w_held_for_2_seconds(self) -> None:
         """W down at t=0, up at t=2000ms. Frame 30 (t_end=1033ms) → {87}."""
         path = _write_inputs_jsonl(
