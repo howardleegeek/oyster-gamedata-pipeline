@@ -759,3 +759,13 @@ b4c97dbd638c75a1d826e641df598879876660ed
 
 - Picked: ruff format bin/red_team_out_of_order_frames.py (smallest unformatted bin file: 176 lines, 3 cosmetic changes — collapsed 2-line print, 3-line with_name call, and split -o/--output argparse arg). Justification: measurable code smell, single-file scope, no behavior change, follows established pattern of Rounds 254–330, no test directly references this file, module import smoke OK, full tests/bin/ suite 530/530 pass, no risk of test masking.
 - Result: committed a3dba25f (ruff format bin/red_team_out_of_order_frames.py; 1 file changed, 4 insertions(+), 6 deletions(-); ruff check + ruff format --check clean; import smoke OK; 530/530 tests/bin/* pass; pushed to origin/fix/prd-test-action-per-second-ruff). Self-review: cosmetic formatting only — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.
+
+## Round 329 @ 2026-06-25T23:07:08Z
+
+- Picked: ruff format bin/backend_stub.py (smallest unformatted file: 188 lines, single print statement line merge). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, 23/23 tests pass, follows established cadence of previous rounds.
+- Result: committed 12f0fb24 (ruff format merged print statement line in bin/backend_stub.py; 1 file changed, 1 insertion(+), 2 deletions(-); ruff check + format --check clean; import smoke OK; 23/23 tests pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic line merge — no silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 332 @ 2026-06-25T23:17:41Z
+
+- Picked: ruff format bin/prd_test_audio_continuity.py (smallest unformatted bin file: 177 lines, split -v/--show_entries/--select_streams/--of argparse list args). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change (subprocess argv vector identical), no test file references this module, AST parse OK, module import smoke OK, ruff check + format --check clean, follows established cadence of Rounds 254–331.
+- Result: committed d451b7dd (ruff format bin/prd_test_audio_continuity.py; 1 file changed, 22 insertions(+), 20 deletions(-); ruff check + format --check clean; AST parse OK; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff). Self-review: cosmetic reformat only — list literal items split to one per line; subprocess argv identical; no silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.
