@@ -81,6 +81,12 @@
 ## Round @ 2026-06-21T13:35:00Z
 - File: bin/inventory_voxel_capture.py::main
 - Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: 8a2f7e9d1
+
+## Round @ 2026-06-25T03:45:00Z
+- File: bin/spec_generator.py::build_entries
+- Added: docstring=Y, type-hints=Y (already had type hints)
+- Commit: c2eb9f8d123dc2a7c0289359a3a806fa8dfb8a6elready had type hints)
 
 ## Round @ 2026-06-21T14:00:00Z
 - File: bin/rate_limiter.py::TokenBucket.to_dict
