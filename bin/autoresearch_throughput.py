@@ -27,6 +27,7 @@ from typing import Sequence
 @dataclass(frozen=True)
 class ThroughputResult:
     """Single-scale throughput snapshot."""
+
     vendors: int
     clips_per_vendor: int
     total_clips: int
@@ -40,6 +41,7 @@ class ThroughputResult:
 @dataclass
 class CapacityPlan:
     """Full capacity plan across all vendor scales."""
+
     clips_per_vendor: int
     processing_hours: float
     results: list[ThroughputResult] = field(default_factory=list)
@@ -63,21 +65,27 @@ class CapacityPlan:
     def to_json(self) -> str:
         """Serialise the plan to a JSON string."""
         return json.dumps(
-            {"clips_per_vendor": self.clips_per_vendor,
-             "processing_hours": self.processing_hours,
-             "results": [asdict(r) for r in self.results]},
+            {
+                "clips_per_vendor": self.clips_per_vendor,
+                "processing_hours": self.processing_hours,
+                "results": [asdict(r) for r in self.results],
+            },
             indent=2,
         )
 
     def write_csv(self, path: Path) -> None:
         """Write results as CSV to *path*."""
         with path.open("w") as fh:
-            fh.write("vendors,clips_per_vendor,total_clips,clips_per_hour,"
-                     "clips_per_second,est_processing_sec_per_clip,bottleneck\n")
+            fh.write(
+                "vendors,clips_per_vendor,total_clips,clips_per_hour,"
+                "clips_per_second,est_processing_sec_per_clip,bottleneck\n"
+            )
             for r in self.results:
-                fh.write(f"{r.vendors},{r.clips_per_vendor},{r.total_clips},"
-                         f"{r.clips_per_hour:.1f},{r.clips_per_second:.2f},"
-                         f"{r.est_processing_sec_per_clip:.1f},{r.bottleneck}\n")
+                fh.write(
+                    f"{r.vendors},{r.clips_per_vendor},{r.total_clips},"
+                    f"{r.clips_per_hour:.1f},{r.clips_per_second:.2f},"
+                    f"{r.est_processing_sec_per_clip:.1f},{r.bottleneck}\n"
+                )
 
 
 def _identify_bottleneck(cps: float) -> str:
@@ -106,36 +114,60 @@ def compute_plan(
     Returns:
         A :class:`CapacityPlan` with per-scale results.
     """
-    plan = CapacityPlan(clips_per_vendor=clips_per_vendor,
-                        processing_hours=processing_hours)
+    plan = CapacityPlan(clips_per_vendor=clips_per_vendor, processing_hours=processing_hours)
     seconds_available = processing_hours * 3600.0
     for n_vendors in vendor_scales:
         total_clips = n_vendors * clips_per_vendor
         cph = total_clips / processing_hours if processing_hours else 0.0
         cps = total_clips / seconds_available if seconds_available else 0.0
         spc = seconds_available / total_clips if total_clips else 0.0
-        plan.results.append(ThroughputResult(
-            vendors=n_vendors, clips_per_vendor=clips_per_vendor,
-            total_clips=total_clips, processing_hours=processing_hours,
-            clips_per_hour=cph, clips_per_second=cps,
-            est_processing_sec_per_clip=spc, bottleneck=_identify_bottleneck(cps),
-        ))
+        plan.results.append(
+            ThroughputResult(
+                vendors=n_vendors,
+                clips_per_vendor=clips_per_vendor,
+                total_clips=total_clips,
+                processing_hours=processing_hours,
+                clips_per_hour=cph,
+                clips_per_second=cps,
+                est_processing_sec_per_clip=spc,
+                bottleneck=_identify_bottleneck(cps),
+            )
+        )
     return plan
 
 
 def _build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser."""
     p = argparse.ArgumentParser(description="Autoresearch throughput capacity planner.")
-    p.add_argument("--clips-per-vendor", type=int, default=120,
-                   help="Clips each vendor submits per day (default: 120).")
-    p.add_argument("--hours", type=float, default=16.0,
-                   help="Available processing hours per day (default: 16).")
-    p.add_argument("--vendor-scales", type=int, nargs="+", default=[50, 200, 1000],
-                   help="Vendor-count scenarios (default: 50 200 1000).")
-    p.add_argument("--format", dest="output_format", choices=["table", "json", "csv"],
-                   default="table", help="Output format (default: table).")
-    p.add_argument("--output", type=str, default=None,
-                   help="Output file path.  If omitted, prints to stdout.")
+    p.add_argument(
+        "--clips-per-vendor",
+        type=int,
+        default=120,
+        help="Clips each vendor submits per day (default: 120).",
+    )
+    p.add_argument(
+        "--hours",
+        type=float,
+        default=16.0,
+        help="Available processing hours per day (default: 16).",
+    )
+    p.add_argument(
+        "--vendor-scales",
+        type=int,
+        nargs="+",
+        default=[50, 200, 1000],
+        help="Vendor-count scenarios (default: 50 200 1000).",
+    )
+    p.add_argument(
+        "--format",
+        dest="output_format",
+        choices=["table", "json", "csv"],
+        default="table",
+        help="Output format (default: table).",
+    )
+    p.add_argument(
+        "--output", type=str, default=None, help="Output file path.  If omitted, prints to stdout."
+    )
     return p
 
 
