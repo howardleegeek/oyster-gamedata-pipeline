@@ -14,10 +14,16 @@ import tempfile
 from typing import List, Tuple
 
 UNICODE_NAMES: List[str] = [
-    "中文文件.txt", "日本語テスト.pdf", "한국어_데이터.csv",
-    "🎉🚀emoji_file.dat", "📁📊🔥report.xlsx",
-    "ملف_عربي.txt", "קובץ_עברי.log",
-    "αβγδ_ελληνικά.md", "файл_данных.json", "café_résumé.txt",
+    "中文文件.txt",
+    "日本語テスト.pdf",
+    "한국어_데이터.csv",
+    "🎉🚀emoji_file.dat",
+    "📁📊🔥report.xlsx",
+    "ملف_عربي.txt",
+    "קובץ_עברי.log",
+    "αβγδ_ελληνικά.md",
+    "файл_данных.json",
+    "café_résumé.txt",
 ]
 
 
@@ -74,10 +80,10 @@ def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Boundary test: unicode filenames in tarball entries."
     )
-    parser.add_argument("--tarball", default=None,
-                        help="Path to existing tarball to verify (skips creation).")
-    parser.add_argument("--verbose", "-v", action="store_true",
-                        help="Print detailed results.")
+    parser.add_argument(
+        "--tarball", default=None, help="Path to existing tarball to verify (skips creation)."
+    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Print detailed results.")
     args = parser.parse_args(argv)
     all_pass = True
 
