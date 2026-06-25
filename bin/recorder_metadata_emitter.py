@@ -45,8 +45,7 @@ DEVICE_ID_LENGTH: int = 16
 
 def utc_now_iso() -> str:
     """Return the current time in UTC ISO 8601 format with offset."""
-    return dt.datetime.now(dt.timezone.utc).strftime(
-        "%Y-%m-%dT%H:%M:%S+00:00")
+    return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
 
 
 def device_id(hostname: Optional[str] = None) -> str:
@@ -69,9 +68,12 @@ def session_id() -> str:
     return str(uuid.uuid4())
 
 
-def build_metadata(*, hostname: Optional[str] = None,
-                   timestamp: Optional[str] = None,
-                   session: Optional[str] = None) -> Dict[str, Any]:
+def build_metadata(
+    *,
+    hostname: Optional[str] = None,
+    timestamp: Optional[str] = None,
+    session: Optional[str] = None,
+) -> Dict[str, Any]:
     """Return the ``metadata.json`` payload for a recorder clip.
 
     Args:
@@ -88,8 +90,7 @@ def build_metadata(*, hostname: Optional[str] = None,
     }
 
 
-def write_metadata(clip_dir: Path,
-                   metadata: Optional[Dict[str, Any]] = None) -> Path:
+def write_metadata(clip_dir: Path, metadata: Optional[Dict[str, Any]] = None) -> Path:
     """Write metadata.json into ``clip_dir`` and return its path."""
     payload = metadata if metadata is not None else build_metadata()
     out = clip_dir / "metadata.json"
@@ -100,18 +101,19 @@ def write_metadata(clip_dir: Path,
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--clip-dir", type=Path, required=True,
-                        help="Recorder clip directory to emit metadata into")
-    parser.add_argument("--print", action="store_true",
-                        help="Print the metadata JSON to stdout after write")
+    parser.add_argument(
+        "--clip-dir", type=Path, required=True, help="Recorder clip directory to emit metadata into"
+    )
+    parser.add_argument(
+        "--print", action="store_true", help="Print the metadata JSON to stdout after write"
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     """CLI entry point."""
     args = parse_args(argv)
-    logging.basicConfig(level=logging.INFO,
-                        format="%(levelname)s: %(message)s")
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     clip_dir: Path = args.clip_dir.resolve()
     if not clip_dir.exists() or not clip_dir.is_dir():
         logger.error("Clip dir not found: %s", clip_dir)
