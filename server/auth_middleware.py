@@ -13,25 +13,24 @@ security = HTTPBearer()
 
 class AuthMiddleware(BaseHTTPMiddleware):
     """Middleware to verify JWT tokens on protected routes."""
-    
+
     def __init__(self, app, protected_prefixes: Optional[list[str]] = None):
         super().__init__(app)
         self.protected_prefixes = protected_prefixes or ["/api/protected", "/api/user"]
-    
+
     async def dispatch(self, request: Request, call_next):
         # Check if path requires authentication
         requires_auth = any(
             request.url.path.startswith(prefix) for prefix in self.protected_prefixes
         )
-        
+
         if requires_auth:
             auth_header = request.headers.get("Authorization")
             if not auth_header or not auth_header.startswith("Bearer "):
                 raise HTTPException(
-                    status_code=401,
-                    detail="Missing or invalid Authorization header"
+                    status_code=401, detail="Missing or invalid Authorization header"
                 )
-            
+
             token = auth_header.split(" ")[1]
             try:
                 payload = verify_jwt_token(token)
@@ -40,7 +39,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 raise
             except Exception as e:
                 raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
-        
+
         return await call_next(request)
 
 
@@ -55,7 +54,7 @@ async def get_current_user_optional(request: Request) -> Optional[dict]:
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         return None
-    
+
     token = auth_header.split(" ")[1]
     try:
         return verify_jwt_token(token)
@@ -65,14 +64,16 @@ async def get_current_user_optional(request: Request) -> Optional[dict]:
 
 def require_role(*allowed_roles: str):
     """Dependency factory to require specific roles."""
+
     async def role_checker(user: dict = Depends(get_current_user)) -> dict:
         user_role = user.get("role", "")
         if user_role not in allowed_roles:
             raise HTTPException(
                 status_code=403,
-                detail=f"Role '{user_role}' not authorized. Required: {allowed_roles}"
+                detail=f"Role '{user_role}' not authorized. Required: {allowed_roles}",
             )
         return user
+
     return role_checker
 
 
