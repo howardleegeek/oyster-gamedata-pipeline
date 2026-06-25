@@ -13,22 +13,31 @@ import shlex
 import subprocess
 
 ALLOWED_BINARIES: set[str] = {
-    "/usr/bin/git", "/usr/bin/java", "/usr/bin/python3",
+    "/usr/bin/git",
+    "/usr/bin/java",
+    "/usr/bin/python3",
     "/usr/local/bin/python3",
-    "/usr/local/bin/node", "/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg",
-    "/usr/bin/ls", "/bin/ls",
-    "/usr/bin/cat", "/bin/cat",
+    "/usr/local/bin/node",
+    "/usr/bin/ffmpeg",
+    "/usr/local/bin/ffmpeg",
+    "/usr/bin/ls",
+    "/bin/ls",
+    "/usr/bin/cat",
+    "/bin/cat",
     "/usr/bin/grep",
     "/usr/bin/find",
     "/usr/bin/curl",
     "/usr/bin/wget",
     "/usr/bin/tar",
     "/usr/bin/make",
-    "/usr/bin/docker", "/usr/local/bin/docker",
+    "/usr/bin/docker",
+    "/usr/local/bin/docker",
     "/usr/local/bin/npm",
     "/usr/local/bin/pip3",
-    "/usr/bin/echo", "/bin/echo",
-    "/usr/bin/date", "/bin/date",
+    "/usr/bin/echo",
+    "/bin/echo",
+    "/usr/bin/date",
+    "/bin/date",
     "/usr/bin/whoami",
     "/usr/bin/id",
 }
@@ -49,8 +58,7 @@ def _validate_cmd(cmd: list[str]) -> None:
         raise ValueError("All cmd elements must be strings")
     if cmd[0] not in ALLOWED_BINARIES:
         raise ValueError(
-            f"Binary '{cmd[0]}' is not in the allowlist. "
-            f"Allowed: {sorted(ALLOWED_BINARIES)}"
+            f"Binary '{cmd[0]}' is not in the allowlist. Allowed: {sorted(ALLOWED_BINARIES)}"
         )
 
 
@@ -68,8 +76,13 @@ def safe_run(
     """
     _validate_cmd(cmd)
     return subprocess.run(
-        cmd, shell=False, timeout=timeout, cwd=cwd, env=env,
-        capture_output=capture_output, text=True,
+        cmd,
+        shell=False,
+        timeout=timeout,
+        cwd=cwd,
+        env=env,
+        capture_output=capture_output,
+        text=True,
     )
 
 
@@ -83,8 +96,14 @@ def safe_run_with_input(
     """Run a subprocess safely, piping *input_data* to stdin."""
     _validate_cmd(cmd)
     return subprocess.run(
-        cmd, shell=False, timeout=timeout, cwd=cwd, env=env,
-        input=input_data, capture_output=True, text=True,
+        cmd,
+        shell=False,
+        timeout=timeout,
+        cwd=cwd,
+        env=env,
+        input=input_data,
+        capture_output=True,
+        text=True,
     )
 
 
@@ -97,7 +116,7 @@ def main() -> None:
     print(f"    rc={r.returncode}, stdout={r.stdout.strip()!r}\n")
 
     print("[2] quote_for_shell with dangerous input")
-    dangerous = 'hello; rm -rf /'
+    dangerous = "hello; rm -rf /"
     print(f"    raw:     {dangerous}")
     print(f"    quoted:  {quote_for_shell(dangerous)}\n")
 
