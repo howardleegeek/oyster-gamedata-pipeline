@@ -678,3 +678,14 @@
 
 - Picked: ruff format bin/diag_bundle_collector.py (smallest unformatted file: 152 lines, whitespace in '=*50' string literal, list-literal line-wrapping, argparse multi-line split, long f-string wrap). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, module import smoke OK, no test file references this module (no risk of test masking), follows established cadence of formatting small bin files in Rounds 254–323.
 - Result: committed 45452399 (ruff format applied to bin/diag_bundle_collector.py; 1 file changed, 23 insertions(+), 7 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — whitespace inside '=*50' string literal, list-literal line-wrapping, argparse add_argument multi-line split, long f-string wrap. No silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 325 @ 2026-06-26T00:00:00Z
+
+- Picked: ruff format bin/prd_test_left_hand_coordinates.py (smallest unformatted bin file: 152 lines, line-wrapped long strings, reformatted multi-line args; same pattern as previous rounds). Justification: measurable code smell, single-file scope, no behavior change, module import smoke OK, no risk of test masking, follows established cadence of formatting small bin files.
+- Result: committed 17bc3584 (ruff format line-wrapped long strings and reformatted multi-line args in bin/prd_test_left_hand_coordinates.py; 1 file changed, 2 insertions(+), 7 deletions(-); ruff check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+
+## Round 325 @ 2026-06-25T17:08:52Z
+
+- Picked: ruff format bin/network_throttle_test.py (smallest unformatted file: 153 lines, line-wrapping for long function calls and argument lists). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, ruff check + format --check clean, import smoke OK, no test file references this module (no risk of test masking), follows established cadence of formatting small bin files.
+- Result: committed c9d2840d (ruff format applied line-wrapping to bin/network_throttle_test.py; 1 file changed, 68 insertions(+), 22 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
