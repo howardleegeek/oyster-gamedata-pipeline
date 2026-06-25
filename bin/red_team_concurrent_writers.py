@@ -98,7 +98,10 @@ def _verify(tar_path: pathlib.Path, originals: List[pathlib.Path]) -> Tuple[bool
                 ex = tf.extractfile(src.name)
                 if ex is None:
                     return False, f"cannot extract {src.name}"
-                if hashlib.sha256(ex.read()).hexdigest() != hashlib.sha256(src.read_bytes()).hexdigest():
+                if (
+                    hashlib.sha256(ex.read()).hexdigest()
+                    != hashlib.sha256(src.read_bytes()).hexdigest()
+                ):
                     return False, f"hash mismatch: {src.name}"
         return True, None
     except Exception as exc:
@@ -148,7 +151,9 @@ def run_concurrent_test(workers: int = 2, files: int = 5, seed: int = 42) -> Tup
 
 def main(argv: Optional[List[str]] = None) -> int:
     """CLI entry-point."""
-    ap = argparse.ArgumentParser(description="Red-team: concurrent tarball writers with file locking.")
+    ap = argparse.ArgumentParser(
+        description="Red-team: concurrent tarball writers with file locking."
+    )
     ap.add_argument("--workers", type=int, default=2, help="Concurrent writer count (default: 2)")
     ap.add_argument("--files", type=int, default=5, help="Payload files per tarball (default: 5)")
     ap.add_argument("--seed", type=int, default=42, help="RNG seed (default: 42)")
