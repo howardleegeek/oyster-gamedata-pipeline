@@ -47,10 +47,26 @@ def build_test_cases(max_year: int) -> List[Dict[str, Any]]:
     now = datetime.datetime.now()
     return [
         {"label": "year 9999 max", "input": YEAR_9999_DT, "expected_year": max_year},
-        {"label": "year 9999-01-01", "input": datetime.datetime(9999, 1, 1), "expected_year": max_year},
-        {"label": "year 2099 (in range)", "input": datetime.datetime(2099, 6, 15), "expected_year": 2099},
-        {"label": "year 2101 (just over)", "input": datetime.datetime(2101, 3, 1), "expected_year": max_year},
-        {"label": "year 1969 (under min)", "input": datetime.datetime(1969, 12, 31), "expected_year": DEFAULT_MIN_YEAR},
+        {
+            "label": "year 9999-01-01",
+            "input": datetime.datetime(9999, 1, 1),
+            "expected_year": max_year,
+        },
+        {
+            "label": "year 2099 (in range)",
+            "input": datetime.datetime(2099, 6, 15),
+            "expected_year": 2099,
+        },
+        {
+            "label": "year 2101 (just over)",
+            "input": datetime.datetime(2101, 3, 1),
+            "expected_year": max_year,
+        },
+        {
+            "label": "year 1969 (under min)",
+            "input": datetime.datetime(1969, 12, 31),
+            "expected_year": DEFAULT_MIN_YEAR,
+        },
         {"label": "current year", "input": now, "expected_year": now.year},
     ]
 
