@@ -16,6 +16,7 @@ Usage:
 
 The file is rewritten in place via ffmpeg `-c copy -metadata`. No re-encode.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -60,10 +61,14 @@ def stamp_video(video_path: Path, *, recorder_version: str = "lite-v0.24.0") -> 
         cmd = [
             "ffmpeg",
             "-y",
-            "-i", str(video_path),
-            "-c", "copy",
-            "-metadata", f"comment={REAL_COMMENT_TAG}",
-            "-metadata", f"composer=oyster-recorder-{recorder_version}",
+            "-i",
+            str(video_path),
+            "-c",
+            "copy",
+            "-metadata",
+            f"comment={REAL_COMMENT_TAG}",
+            "-metadata",
+            f"composer=oyster-recorder-{recorder_version}",
             str(tmp_out),
         ]
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
@@ -101,6 +106,7 @@ def main(argv: list[str] | None = None) -> int:
         return 3
 
     import json as _json
+
     print(_json.dumps(info, indent=2))
     return 0
 
