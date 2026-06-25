@@ -78,7 +78,8 @@ def patch_metadata(session: Path, dry_run: bool = False) -> dict:
             date_part, time_part = m.group(1), m.group(2)
             try:
                 started_dt = dt.datetime.strptime(
-                    date_part + time_part, "%Y%m%d%H%M%S",
+                    date_part + time_part,
+                    "%Y%m%d%H%M%S",
                 ).replace(tzinfo=dt.timezone.utc)
             except ValueError:
                 pass
@@ -87,7 +88,8 @@ def patch_metadata(session: Path, dry_run: bool = False) -> dict:
         mp4 = session / "recording.mp4"
         if mp4.exists():
             started_dt = dt.datetime.fromtimestamp(
-                mp4.stat().st_mtime, dt.timezone.utc,
+                mp4.stat().st_mtime,
+                dt.timezone.utc,
             )
 
     if started_dt is not None:
@@ -131,13 +133,23 @@ def patch_audio_check(session: Path, dry_run: bool = False) -> dict:
 
     # ffmpeg -i audio.flac -af astats -f null -
     cmd = [
-        "ffmpeg", "-hide_banner", "-i", str(audio_path),
-        "-af", "astats=metadata=1:reset=1,ametadata=print:file=-",
-        "-f", "null", "-",
+        "ffmpeg",
+        "-hide_banner",
+        "-i",
+        str(audio_path),
+        "-af",
+        "astats=metadata=1:reset=1,ametadata=print:file=-",
+        "-f",
+        "null",
+        "-",
     ]
     try:
         proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=120, check=False,
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
         return {"error": f"ffmpeg failed: {exc}"}
@@ -170,9 +182,20 @@ def patch_audio_check(session: Path, dry_run: bool = False) -> dict:
     dur_sec = 0.0
     try:
         r = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-             "-of", "default=noprint_wrappers=1:nokey=1", str(audio_path)],
-            capture_output=True, text=True, timeout=30, check=False,
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                str(audio_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
         )
         dur_sec = float(r.stdout.strip()) if r.stdout.strip() else 0.0
     except (subprocess.TimeoutExpired, FileNotFoundError, ValueError):
@@ -182,9 +205,21 @@ def patch_audio_check(session: Path, dry_run: bool = False) -> dict:
     max_silence_gap_s = 0.0
     try:
         sd_proc = subprocess.run(
-            ["ffmpeg", "-hide_banner", "-i", str(audio_path),
-             "-af", "silencedetect=noise=-50dB:duration=0.5", "-f", "null", "-"],
-            capture_output=True, text=True, timeout=60, check=False,
+            [
+                "ffmpeg",
+                "-hide_banner",
+                "-i",
+                str(audio_path),
+                "-af",
+                "silencedetect=noise=-50dB:duration=0.5",
+                "-f",
+                "null",
+                "-",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
         )
         # Parse silence_duration values
         durs = []
