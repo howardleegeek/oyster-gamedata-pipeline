@@ -25,6 +25,7 @@ Usage::
     # at audit time in CI
     python3 bin/utc_timestamps.py audit src/recorder/clip_writer.py
 """
+
 from __future__ import annotations
 
 import argparse
@@ -58,6 +59,7 @@ def now_utc_iso() -> str:
 @dataclass(frozen=True)
 class NaiveDatetimeFinding:
     """One offending call site in the audited file."""
+
     path: Path
     lineno: int
     col_offset: int
