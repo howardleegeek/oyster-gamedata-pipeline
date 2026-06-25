@@ -137,7 +137,15 @@ def attack_systeminfo_wrong_resolution(b: Path) -> None:
     p.write_text(json.dumps(d))
 
 
-def attack_action_camera_pitch_out_of_range(b: Path):
+def attack_action_camera_pitch_out_of_range(b: Path) -> None:
+    """Attack: set pitch value out of valid range.
+
+    Modifies action_camera.json to set the pitch (index 0 of camera_rotation_oula)
+    to 250.0, which is outside the valid pitch range.
+
+    Args:
+        b: Path to the directory containing action_camera.json.
+    """
     p = b / "action_camera.json"
     arr = json.loads(p.read_text())
     for r in arr[:5]:
