@@ -76,6 +76,14 @@ class TokenBucket:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> TokenBucket:
+        """Create a TokenBucket instance from a dictionary.
+
+        Args:
+            data: Dictionary containing capacity, tokens, last_refill, and refill_rate.
+
+        Returns:
+            A new TokenBucket instance initialized with the provided values.
+        """
         return cls(data["capacity"], data["tokens"], data["last_refill"], data["refill_rate"])
 
 
