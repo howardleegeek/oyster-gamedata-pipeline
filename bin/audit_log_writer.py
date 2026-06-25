@@ -100,11 +100,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     parser.add_argument("--log-path", required=True, help="Path to the audit log file.")
     parser.add_argument(
-        "--action", required=True, choices=["capture", "lint", "upload"],
+        "--action",
+        required=True,
+        choices=["capture", "lint", "upload"],
         help="Event verb.",
     )
     parser.add_argument(
-        "--status", required=True, choices=["ok", "error"],
+        "--status",
+        required=True,
+        choices=["ok", "error"],
         help="Event outcome.",
     )
     parser.add_argument("--detail", default=None, help="Optional detail string.")
