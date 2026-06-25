@@ -47,34 +47,28 @@ class Vector4Adapter:
 def _build_test_cases() -> List[Tuple[str, Dict[str, Any], bool]]:
     """Return (name, input_data, should_succeed) test tuples."""
     return [
-        ("complete_data",
-         {"x": 1.0, "y": 2.0, "z": 3.0, "w": 0.5,
-          "quat": {"x": 1.0, "y": 2.0, "z": 3.0, "w": 0.5}},
-         True),
-        ("missing_w",
-         {"x": 1.0, "y": 2.0, "z": 3.0,
-          "quat": {"x": 1.0, "y": 2.0, "z": 3.0, "w": 0.5}},
-         True),
-        ("missing_quat",
-         {"x": 1.0, "y": 2.0, "z": 3.0, "w": 0.5},
-         True),
-        ("missing_w_and_quat",
-         {"x": 1.0, "y": 2.0, "z": 3.0},
-         True),
-        ("quat_none",
-         {"x": 1.0, "y": 2.0, "z": 3.0, "w": 0.5, "quat": None},
-         True),
-        ("quat_partial",
-         {"x": 1.0, "y": 2.0, "z": 3.0, "w": 0.5,
-          "quat": {"x": 1.0}},
-         True),
-        ("quat_partial_no_w",
-         {"x": 1.0, "y": 2.0, "z": 3.0,
-          "quat": {"y": 2.0, "z": 3.0}},
-         True),
-        ("empty_dict",
-         {},
-         True),
+        (
+            "complete_data",
+            {
+                "x": 1.0,
+                "y": 2.0,
+                "z": 3.0,
+                "w": 0.5,
+                "quat": {"x": 1.0, "y": 2.0, "z": 3.0, "w": 0.5},
+            },
+            True,
+        ),
+        (
+            "missing_w",
+            {"x": 1.0, "y": 2.0, "z": 3.0, "quat": {"x": 1.0, "y": 2.0, "z": 3.0, "w": 0.5}},
+            True,
+        ),
+        ("missing_quat", {"x": 1.0, "y": 2.0, "z": 3.0, "w": 0.5}, True),
+        ("missing_w_and_quat", {"x": 1.0, "y": 2.0, "z": 3.0}, True),
+        ("quat_none", {"x": 1.0, "y": 2.0, "z": 3.0, "w": 0.5, "quat": None}, True),
+        ("quat_partial", {"x": 1.0, "y": 2.0, "z": 3.0, "w": 0.5, "quat": {"x": 1.0}}, True),
+        ("quat_partial_no_w", {"x": 1.0, "y": 2.0, "z": 3.0, "quat": {"y": 2.0, "z": 3.0}}, True),
+        ("empty_dict", {}, True),
     ]
 
 
@@ -91,8 +85,9 @@ def run_tests(verbose: bool = False) -> Tuple[int, int]:
             assert isinstance(result["quat"], dict), f"quat not dict: {name}"
             for key in ("x", "y", "z", "w"):
                 assert key in result["quat"], f"quat.{key} missing: {name}"
-                assert isinstance(result["quat"][key], (int, float)), \
+                assert isinstance(result["quat"][key], (int, float)), (
                     f"quat.{key} not numeric: {name}"
+                )
             if should_succeed:
                 passed += 1
                 if verbose:
@@ -117,13 +112,10 @@ def run_tests(verbose: bool = False) -> Tuple[int, int]:
 def main(argv: Optional[List[str]] = None) -> int:
     """CLI entry point. Returns 0 on success, 1 on any test failure."""
     parser = argparse.ArgumentParser(
-        description="Boundary test: missing optional Vector4 quat field")
-    parser.add_argument(
-        "--verbose", "-v", action="store_true",
-        help="Print per-test results")
-    parser.add_argument(
-        "--json", action="store_true",
-        help="Output results as JSON to stdout")
+        description="Boundary test: missing optional Vector4 quat field"
+    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Print per-test results")
+    parser.add_argument("--json", action="store_true", help="Output results as JSON to stdout")
     args = parser.parse_args(argv)
 
     passed, failed = run_tests(verbose=args.verbose)
