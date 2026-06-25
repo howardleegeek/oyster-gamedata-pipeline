@@ -1,3 +1,5 @@
+
+
 ## Round 263 @ 2026-06-24T18:00:00Z
 
 - Picked: ruff format bin/v2_minimax_residuals/__init__.py (smallest unformatted file: 33 lines, single blank line needed after module docstring). Justification: measurable code smell, single-file scope, no behavior change, module import smoke OK, no risk of test masking, follows established pattern of previous rounds.
@@ -304,3 +306,23 @@
 
 - Picked: ruff format bin/send_tester_invite.py (smallest diff among queued unformatted files: 3 print() call line-wraps, +3/-8). Justification: measurable code smell (file not black-compatible; ruff format --check flagged it), single-file scope, no behavior change, module imports cleanly, no test file exists (no risk of test masking), 538/538 tests/bin tests still pass, follows established cadence of formatting small bin files.
 - Result: committed 89c2802c (ruff format line-wrapped 3 print() calls into single f-strings in bin/send_tester_invite.py; 1 file changed, 3 insertions(+), 8 deletions(-); ruff check + ruff format --check clean; module import smoke OK; 538/538 tests/bin tests pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic line-wrap — no silent error swallow (except httpx.ConnectError unchanged, sys.exit(1) unchanged), no race condition, no off-by-one, no security impact (no shell, no user input paths), no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 271 @ 2026-06-24T23:37:24Z
+- Picked: ruff format bin/edge_test_leap_second.py (smallest unformatted file at 90 lines; reformatting LEAP_SECOND_SCENARIOS dict literal and argparse --strict line). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, module imports cleanly, edge test passes 4/4, no risk of test masking, follows established cadence.
+- Result: committed 1558d525 (ruff format bin/edge_test_leap_second.py; 1 file changed, 39 insertions(+), 10 deletions(-); ruff check clean; import smoke OK; edge test passes 4/4; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 276 @ 2026-06-24T23:45:00Z
+
+- Picked: ruff format bin/adversarial_quality_check.py (long f-strings needed line-wrapping to stay under 100-char limit; file is 13KB and had 3 lines over limit after initial format). Justification: measurable code smell (ruff check --select=E flagged 4 E501 errors), single-file scope, no behavior change, module imports cleanly (adversarial_quality_check loads), no existing test file (no risk of test masking), follows established cadence of formatting small bin files.
+- Result: committed 7257b524 (ruff format + manual line-wrapping of 3 f-strings in bin/adversarial_quality_check.py; 1 file changed, 34 insertions(+), 10 deletions(-); ruff check + ruff format --check clean; module import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: line length only — no silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 277 @ 2026-06-25T00:00:00Z
+
+- Picked: ruff format bin/integration_smoke_runner.py (smallest unformatted bin file at 90 lines; single subprocess.run() call needed line-wrap). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, module imports cleanly, no test exists (no risk of test masking), follows established cadence of formatting small bin files.
+- Result: committed 86bd2f21 (ruff format line-wrapped single subprocess.run call in bin/integration_smoke_runner.py; 1 file changed, 3 insertions(+), 2 deletions(-); ruff check + ruff format --check clean; py_compile + importlib smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: line-wrap only — no silent error swallow (subprocess.TimeoutExpired/Exception handlers unchanged, ok=returncode==0 unchanged), no race condition (no shared state, no threading), no off-by-one, no security impact (shell=True unchanged, timeout=300 unchanged, no new shell injection surface), no test masking (no test exists), no brand cross-reference, no module-level side effect.)
+
+## Round 277 @ 2026-06-25T00:30:00Z
+
+- Picked: ruff format bin/run_da_v2_depth.py (smallest unformatted bin file: 98 lines, 2 whitespace fixes in f-strings — `i+1` -> `i + 1` and `time.time()-t0` -> `time.time() - t0`). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, ast.parse OK, no test file exists for this script (no risk of test masking), follows established cadence of formatting small bin files (Rounds 254–276).
+- Result: committed 67e33bb0 (ruff format applied 2 whitespace fixes in f-strings of bin/run_da_v2_depth.py; 1 file changed, 2 insertions(+), 2 deletions(-); ruff check + ruff format --check clean; ast.parse OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic whitespace — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect added.
+
