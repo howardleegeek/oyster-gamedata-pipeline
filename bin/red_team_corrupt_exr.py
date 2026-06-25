@@ -21,12 +21,14 @@ def _get_numpy():
     global _np
     if _np is None:
         import numpy as np
+
         _np = np
     return _np
 
 
-def corrupt_exr_file(input_path: Path, output_path: Path, offset: int = 0,
-                     corrupt_size: int = 1024) -> dict:
+def corrupt_exr_file(
+    input_path: Path, output_path: Path, offset: int = 0, corrupt_size: int = 1024
+) -> dict:
     """Corrupt an EXR file by zero-filling a region.
 
     Parameters
@@ -64,8 +66,13 @@ def corrupt_exr_file(input_path: Path, output_path: Path, offset: int = 0,
     with open(output_path, "wb") as f:
         f.write(data)
 
-    return {"input": str(input_path), "output": str(output_path),
-            "file_size": file_size, "offset": offset, "corrupt_size": actual_size}
+    return {
+        "input": str(input_path),
+        "output": str(output_path),
+        "file_size": file_size,
+        "offset": offset,
+        "corrupt_size": actual_size,
+    }
 
 
 def validate_corruption_detection(file_path: Path) -> dict:
@@ -82,11 +89,17 @@ def validate_corruption_detection(file_path: Path) -> dict:
         Detection results including whether NaN/Inf values were found.
     """
     np = _get_numpy()
-    result = {"file": str(file_path), "has_nan": False, "has_inf": False,
-              "detection_possible": False, "error": None}
+    result = {
+        "file": str(file_path),
+        "has_nan": False,
+        "has_inf": False,
+        "detection_possible": False,
+        "error": None,
+    }
 
     try:
         from PIL import Image
+
         with Image.open(file_path) as img:
             arr = np.array(img, dtype=np.float32)
             result["has_nan"] = bool(np.isnan(arr).any())
@@ -113,16 +126,21 @@ def main(argv: Optional[list] = None) -> int:
         Exit code (0 for success, non-zero for errors).
     """
     parser = argparse.ArgumentParser(
-        description="Red team: corrupt an EXR file by zero-filling 1 KB.")
+        description="Red team: corrupt an EXR file by zero-filling 1 KB."
+    )
     parser.add_argument("input", type=Path, help="Input EXR file path")
-    parser.add_argument("output", type=Path, nargs="?",
-                        help="Output corrupted EXR file path")
-    parser.add_argument("--offset", type=int, default=0,
-                        help="Byte offset for corruption start (default: 0)")
-    parser.add_argument("--size", type=int, default=1024,
-                        help="Bytes to zero-fill (default: 1024 = 1 KB)")
-    parser.add_argument("--validate-only", action="store_true",
-                        help="Only validate corruption detection, don't corrupt")
+    parser.add_argument("output", type=Path, nargs="?", help="Output corrupted EXR file path")
+    parser.add_argument(
+        "--offset", type=int, default=0, help="Byte offset for corruption start (default: 0)"
+    )
+    parser.add_argument(
+        "--size", type=int, default=1024, help="Bytes to zero-fill (default: 1024 = 1 KB)"
+    )
+    parser.add_argument(
+        "--validate-only",
+        action="store_true",
+        help="Only validate corruption detection, don't corrupt",
+    )
 
     args = parser.parse_args(argv)
 
@@ -132,8 +150,10 @@ def main(argv: Optional[list] = None) -> int:
 
     if args.validate_only:
         result = validate_corruption_detection(args.input)
-        print(f"Validation: has_nan={result['has_nan']}, has_inf={result['has_inf']}, "
-              f"detection_possible={result['detection_possible']}")
+        print(
+            f"Validation: has_nan={result['has_nan']}, has_inf={result['has_inf']}, "
+            f"detection_possible={result['detection_possible']}"
+        )
         return 0
 
     if args.output is None:
