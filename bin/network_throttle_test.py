@@ -50,10 +50,36 @@ def apply_throttle(interface: str, bandwidth: str, latency: str = "50ms") -> Non
     log.info("Applying throttle: %s up=%s latency=%s", interface, bandwidth, latency)
     _tc("qdisc", "del", "dev", interface, "root", check=False)
     _tc("qdisc", "add", "dev", interface, "root", "handle", "1:", "htb", "default", "10")
-    _tc("class", "add", "dev", interface, "parent", "1:", "classid", "1:1",
-        "htb", "rate", bandwidth, "ceil", bandwidth)
-    _tc("qdisc", "add", "dev", interface, "parent", "1:1", "handle", "10:",
-        "netem", "delay", latency, "loss", "0.1%")
+    _tc(
+        "class",
+        "add",
+        "dev",
+        interface,
+        "parent",
+        "1:",
+        "classid",
+        "1:1",
+        "htb",
+        "rate",
+        bandwidth,
+        "ceil",
+        bandwidth,
+    )
+    _tc(
+        "qdisc",
+        "add",
+        "dev",
+        interface,
+        "parent",
+        "1:1",
+        "handle",
+        "10:",
+        "netem",
+        "delay",
+        latency,
+        "loss",
+        "0.1%",
+    )
     log.info("Throttle applied successfully.")
 
 
@@ -81,22 +107,38 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description="Simulate weak vendor network and validate upload scripts.",
     )
-    parser.add_argument("--interface", "-i", default="eth0",
-                        help="Network interface to throttle (default: eth0).")
-    parser.add_argument("--bandwidth", "-b", default="200kbps",
-                        help="Upload bandwidth limit, e.g. 200kbps (default: 200kbps).")
-    parser.add_argument("--latency", "-l", default="50ms",
-                        help="Simulated one-way latency (default: 50ms).")
-    parser.add_argument("--duration", "-d", type=int, default=0,
-                        help="Max duration in seconds before auto-cleanup (0 = no limit).")
-    parser.add_argument("--target", "-t", default=None,
-                        help="Path to the script to validate under throttle.")
-    parser.add_argument("--target-args", nargs=argparse.REMAINDER, default=[],
-                        help="Arguments forwarded to --target.")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Print tc commands without executing them.")
-    parser.add_argument("--verbose", "-v", action="store_true",
-                        help="Enable debug logging.")
+    parser.add_argument(
+        "--interface", "-i", default="eth0", help="Network interface to throttle (default: eth0)."
+    )
+    parser.add_argument(
+        "--bandwidth",
+        "-b",
+        default="200kbps",
+        help="Upload bandwidth limit, e.g. 200kbps (default: 200kbps).",
+    )
+    parser.add_argument(
+        "--latency", "-l", default="50ms", help="Simulated one-way latency (default: 50ms)."
+    )
+    parser.add_argument(
+        "--duration",
+        "-d",
+        type=int,
+        default=0,
+        help="Max duration in seconds before auto-cleanup (0 = no limit).",
+    )
+    parser.add_argument(
+        "--target", "-t", default=None, help="Path to the script to validate under throttle."
+    )
+    parser.add_argument(
+        "--target-args",
+        nargs=argparse.REMAINDER,
+        default=[],
+        help="Arguments forwarded to --target.",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Print tc commands without executing them."
+    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable debug logging.")
     args = parser.parse_args(argv)
 
     logging.basicConfig(
@@ -113,8 +155,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     atexit.register(remove_throttle, args.interface)
 
     if args.dry_run:
-        log.info("[DRY RUN] Would apply throttle on %s: %s / %s",
-                 args.interface, args.bandwidth, args.latency)
+        log.info(
+            "[DRY RUN] Would apply throttle on %s: %s / %s",
+            args.interface,
+            args.bandwidth,
+            args.latency,
+        )
         if args.target:
             log.info("[DRY RUN] Would run: %s %s", args.target, " ".join(args.target_args))
         return 0
