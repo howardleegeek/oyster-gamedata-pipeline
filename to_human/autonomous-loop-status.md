@@ -660,3 +660,21 @@
 
 - Picked: ruff format bin/edge_test_nan_inf_floats.py (smallest unformatted bin file: 151 lines, 6 single→double quote conversions in 3 lines; no behavior change). Justification: measurable code smell, single-file scope, no behavior change, module import smoke OK + --verbose run produces identical output, follows established cadence of rounds 254–321.
 - Result: committed 10768090 (ruff format normalized single→double quotes in 3 sites in bin/edge_test_nan_inf_floats.py; 1 file changed, 6 insertions(+), 6 deletions(-); ruff check + ruff format --check clean; import smoke OK; --verbose run output identical pre/post; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic quote normalization only — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+
+## Round 323 @ 2026-06-25T16:19:56Z
+
+- Picked: ruff format bin/prd_test_depth_invalid_marker.py (smallest unformatted bin file: 151 lines, formatting per ruff). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, ruff check + format --check clean, import smoke OK, no test file references this module (no risk of test masking), follows established cadence of formatting small bin files.
+- Result: committed 4becbc2d (ruff format applied to bin/prd_test_depth_invalid_marker.py; 1 file changed, 19 insertions(+), 8 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+
+## Round 318 @ 2026-06-25T16:29:55Z
+
+- Picked: ruff format bin/vendor_scenario_alpha_week.py (smallest unformatted file: 151 lines). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, import smoke OK, no test file references this module, follows established cadence.
+- Result: committed c9f26269 (ruff format applied to bin/vendor_scenario_alpha_week.py; 1 file changed, 4 insertions(+), 1 deletion(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+
+## Round 324 @ 2026-06-25T16:40:00Z
+
+- Picked: ruff format bin/diag_bundle_collector.py (smallest unformatted file: 152 lines, whitespace in '=*50' string literal, list-literal line-wrapping, argparse multi-line split, long f-string wrap). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, module import smoke OK, no test file references this module (no risk of test masking), follows established cadence of formatting small bin files in Rounds 254–323.
+- Result: committed 45452399 (ruff format applied to bin/diag_bundle_collector.py; 1 file changed, 23 insertions(+), 7 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — whitespace inside '=*50' string literal, list-literal line-wrapping, argparse add_argument multi-line split, long f-string wrap. No silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
