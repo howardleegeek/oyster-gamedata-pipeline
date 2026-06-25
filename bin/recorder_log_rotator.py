@@ -99,8 +99,7 @@ def main(argv: Optional[list] = None) -> int:
     parser.add_argument("--path", type=Path, default=DEFAULT_LOG_PATH)
     parser.add_argument("--max-mb", type=float, default=10.0)
     parser.add_argument("--keep", type=int, default=KEEP_ROTATIONS)
-    parser.add_argument("--force", action="store_true",
-                        help="Rotate regardless of current size")
+    parser.add_argument("--force", action="store_true", help="Rotate regardless of current size")
     args = parser.parse_args(argv)
 
     max_bytes = int(args.max_mb * 1024 * 1024)
