@@ -99,7 +99,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         print(f"\n[1/2] Generating {args.size_mb} MB JSON file...")
         records, size = generate_oversized_json(json_path, args.size_mb * BYTES_PER_MB)
-        print(f"      Created {json_path}, Records: {records:,}, Size: {size/BYTES_PER_MB:.2f} MB")
+        print(
+            f"      Created {json_path}, Records: {records:,}, Size: {size / BYTES_PER_MB:.2f} MB"
+        )
 
         print(f"\n[2/2] Testing memory usage (max: {args.max_memory_mb} MB)...")
         success, msg, _ = test_memory_usage(json_path, args.max_memory_mb)
