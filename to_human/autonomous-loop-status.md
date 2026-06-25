@@ -504,3 +504,13 @@
 
 - Picked: ruff format bin/data_quality_report.py (smallest unformatted file: 133 lines, whitespace/spacing per ruff; follows established pattern from previous rounds). Justification: measurable code smell, single-file scope, no behavior change, AST parse OK, no test file references this module (no risk of test masking), follows established cadence.
 - Result: committed 7aa010d5 (ruff format applied whitespace/spacing changes in bin/data_quality_report.py; 1 file changed, 27 insertions(+), 31 deletions(-); ruff check + ruff format --check clean; AST parse OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 302 @ 2026-06-25T08:00:33Z
+
+- Picked: ruff format bin/e2e_tests/test_preflight_integration.py (smallest unformatted bin file at 131 lines; trailing whitespace removal + line-wrapping per ruff). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, AST parse OK, import test module OK, follows established cadence of formatting small bin files.
+- Result: committed b6c1e81e (ruff format removed trailing whitespace + line-wrapped function args in bin/e2e_tests/test_preflight_integration.py; 1 file changed, 24 insertions(+), 24 deletions(-); ruff check + ruff format --check clean; import smoke OK (AST parse + import module OK); pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 303 @ 2026-06-25T09:00:00Z
+
+- Picked: ruff format bin/uninstall_clean.py (smallest unformatted bin file at 130 lines; list-literal reformat per ruff). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, AST parse + import smoke OK, no test file references this module (no risk of test masking), follows established cadence of formatting small bin files.
+- Result: committed c52aaca2 (ruff format wrapped list literal in bin/uninstall_clean.py; 1 file changed, 6 insertions(+), 3 deletions(-); ruff check + ruff format --check clean; AST parse OK; import smoke OK (APP_NAME=g137 loads cleanly); pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic list-literal reformat only — same 4 Path entries in same order, no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
