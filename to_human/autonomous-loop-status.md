@@ -716,3 +716,4 @@
 
 - Picked: ruff format bin/e2e_tests/test_watchdog_integration.py (smallest unformatted file: 154 lines, trailing commas added, whitespace cleanup). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, follows established cadence of Rounds 254–316.
 - Result: committed 7cda7d74 (ruff format applied to bin/e2e_tests/test_watchdog_integration.py; 1 file changed, 24 insertions(+), 27 deletions(-); ruff check + format --check clean; AST parse OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — trailing commas added to dict literals per trailing-comma convention, trailing whitespace removed, consistent spacing. No silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
