@@ -34,8 +34,9 @@ def measure_latency(host: str, port: int = 443, timeout: float = 5.0) -> Tuple[b
         sock.close()
 
 
-def measure_upload(host: str, port: int = 443, size_kb: int = 100,
-                   timeout: float = 10.0) -> Tuple[bool, float, float]:
+def measure_upload(
+    host: str, port: int = 443, size_kb: int = 100, timeout: float = 10.0
+) -> Tuple[bool, float, float]:
     """Measure upload throughput via raw TCP. Returns (success, speed_mbps, elapsed_s)."""
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -62,9 +63,15 @@ def measure_upload(host: str, port: int = 443, size_kb: int = 100,
         return False, 0.0, 0.0
 
 
-def run_tests(dns_hosts: List[str], latency_host: str, latency_port: int,
-              upload_host: str, upload_port: int, upload_size_kb: int,
-              timeout: float) -> int:
+def run_tests(
+    dns_hosts: List[str],
+    latency_host: str,
+    latency_port: int,
+    upload_host: str,
+    upload_port: int,
+    upload_size_kb: int,
+    timeout: float,
+) -> int:
     """Run all network tests. Returns 0 if all pass, 1 otherwise."""
     print("=" * 60 + "\nNetwork Connectivity Test\n" + "=" * 60)
     all_passed = True
@@ -74,19 +81,21 @@ def run_tests(dns_hosts: List[str], latency_host: str, latency_port: int,
         ok, elapsed, result = measure_dns(host, timeout)
         if not ok:
             all_passed = False
-        print(f"  {host}: {'PASS' if ok else 'FAIL'} ({elapsed*1000:.1f}ms) -> {result}")
+        print(f"  {host}: {'PASS' if ok else 'FAIL'} ({elapsed * 1000:.1f}ms) -> {result}")
 
     print(f"\n[Latency Test] -> {latency_host}:{latency_port}")
     ok, elapsed = measure_latency(latency_host, latency_port, timeout)
     if not ok:
         all_passed = False
-    print(f"  {latency_host}:{latency_port}: {'PASS' if ok else 'FAIL'} ({elapsed*1000:.1f}ms)")
+    print(f"  {latency_host}:{latency_port}: {'PASS' if ok else 'FAIL'} ({elapsed * 1000:.1f}ms)")
 
     print(f"\n[Upload Test] -> {upload_host}:{upload_port} ({upload_size_kb}KB)")
     ok, speed, elapsed = measure_upload(upload_host, upload_port, upload_size_kb, timeout)
     if not ok:
         all_passed = False
-    print(f"  {upload_host}:{upload_port}: {'PASS' if ok else 'FAIL'} ({speed:.2f} Mbps, {elapsed:.3f}s)")
+    print(
+        f"  {upload_host}:{upload_port}: {'PASS' if ok else 'FAIL'} ({speed:.2f} Mbps, {elapsed:.3f}s)"
+    )
 
     print("\n" + "=" * 60)
     print(f"Overall: {'ALL PASSED' if all_passed else 'SOME FAILED'}")
@@ -99,8 +108,9 @@ def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Vendor network upload speed + latency + DNS resolution check."
     )
-    parser.add_argument("--dns-hosts", nargs="+",
-                        default=["google.com", "cloudflare.com", "baidu.com"])
+    parser.add_argument(
+        "--dns-hosts", nargs="+", default=["google.com", "cloudflare.com", "baidu.com"]
+    )
     parser.add_argument("--latency-host", default="google.com")
     parser.add_argument("--latency-port", type=int, default=443)
     parser.add_argument("--upload-host", default="google.com")
@@ -109,9 +119,12 @@ def main(argv: List[str] | None = None) -> int:
     parser.add_argument("--timeout", type=float, default=5.0)
     args = parser.parse_args(argv)
     return run_tests(
-        dns_hosts=args.dns_hosts, latency_host=args.latency_host,
-        latency_port=args.latency_port, upload_host=args.upload_host,
-        upload_port=args.upload_port, upload_size_kb=args.upload_size,
+        dns_hosts=args.dns_hosts,
+        latency_host=args.latency_host,
+        latency_port=args.latency_port,
+        upload_host=args.upload_host,
+        upload_port=args.upload_port,
+        upload_size_kb=args.upload_size,
         timeout=args.timeout,
     )
 
