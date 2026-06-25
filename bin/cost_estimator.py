@@ -33,10 +33,14 @@ STORAGE_PRICING: Dict[StorageClass, float] = {
 }
 
 # Egress pricing tiers (USD per GB): (limit_gb, price)
-EGRESS_PRICING = [(1, 0.00), (10, 0.09), (50, 0.085), (150, 0.07), (float('inf'), 0.05)]
+EGRESS_PRICING = [(1, 0.00), (10, 0.09), (50, 0.085), (150, 0.07), (float("inf"), 0.05)]
 
 # Lifecycle thresholds (days -> storage class)
-LIFECYCLE_THRESHOLDS = {30: StorageClass.STANDARD_IA, 90: StorageClass.GLACIER, 180: StorageClass.DEEP_ARCHIVE}
+LIFECYCLE_THRESHOLDS = {
+    30: StorageClass.STANDARD_IA,
+    90: StorageClass.GLACIER,
+    180: StorageClass.DEEP_ARCHIVE,
+}
 
 
 @dataclass
@@ -114,28 +118,28 @@ def print_report(report: Dict[str, Any], output_format: str = "text") -> None:
     if output_format == "json":
         print(json.dumps(report, indent=2))
     else:
-        print(f"\n{'='*50}")
+        print(f"\n{'=' * 50}")
         print(f"S3 Cost Report - {report['bucket']}")
-        print(f"{'='*50}")
+        print(f"{'=' * 50}")
         print(f"Report Date: {report['report_date']}")
-        m = report['metrics']
+        m = report["metrics"]
         print("\n--- Storage Metrics ---")
         print(f"  Size:           {m['size_gb']:.2f} GB")
         print(f"  Objects:        {m['object_count']:,}")
         print(f"  Storage Class:  {m['storage_class']}")
         print(f"  Egress:         {m['egress_gb']:.2f} GB")
         print(f"  Avg Age:        {m['avg_object_age_days']} days")
-        c = report['cost_breakdown']
+        c = report["cost_breakdown"]
         print("\n--- Cost Breakdown (Monthly) ---")
         print(f"  Storage:        ${c['storage_monthly_usd']:.4f}")
         print(f"  Egress:         ${c['egress_monthly_usd']:.4f}")
         print(f"  TOTAL:          ${c['total_monthly_usd']:.4f}")
-        lp = report['lifecycle_projection']
+        lp = report["lifecycle_projection"]
         print("\n--- Lifecycle Projection ---")
         print(f"  Current Class:      {lp['current_class']}")
         print(f"  Recommended Class:  {lp['recommended_class']}")
         print(f"  Potential Savings:  ${lp['monthly_savings_usd']:.4f}/month")
-        print(f"{'='*50}\n")
+        print(f"{'=' * 50}\n")
 
 
 def parse_args(argv: List[str]) -> argparse.Namespace:
@@ -143,10 +147,22 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
     parser.add_argument("--bucket", "-b", required=True, help="S3 bucket name")
     parser.add_argument("--size-gb", "-s", type=float, required=True, help="Storage size in GB")
     parser.add_argument("--objects", "-o", type=int, required=True, help="Number of objects")
-    parser.add_argument("--storage-class", "-c", default="STANDARD", choices=[sc.value for sc in StorageClass], help="S3 storage class")
-    parser.add_argument("--egress-gb", "-e", type=float, default=0.0, help="Egress data transfer in GB")
-    parser.add_argument("--avg-age-days", "-a", type=int, default=0, help="Average object age in days")
-    parser.add_argument("--format", "-f", choices=["text", "json"], default="text", help="Output format")
+    parser.add_argument(
+        "--storage-class",
+        "-c",
+        default="STANDARD",
+        choices=[sc.value for sc in StorageClass],
+        help="S3 storage class",
+    )
+    parser.add_argument(
+        "--egress-gb", "-e", type=float, default=0.0, help="Egress data transfer in GB"
+    )
+    parser.add_argument(
+        "--avg-age-days", "-a", type=int, default=0, help="Average object age in days"
+    )
+    parser.add_argument(
+        "--format", "-f", choices=["text", "json"], default="text", help="Output format"
+    )
     return parser.parse_args(argv)
 
 
