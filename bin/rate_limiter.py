@@ -96,6 +96,17 @@ class VendorRateLimiter:
                 pass
 
     def save_state(self) -> None:
+        """Persist current rate limiter state to JSON file.
+
+        Writes bucket state for all vendors to a temporary file then atomically
+        replaces the state file to prevent corruption on interruption.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+        """
         with self._lock:
             data = {"buckets": {vid: b.to_dict() for vid, b in self._buckets.items()},
                     "saved_at": datetime.now().isoformat()}
