@@ -117,18 +117,21 @@ def main(argv: list[str] | None = None) -> int:
         description="Test median actions-per-second against PRD quality thresholds."
     )
     parser.add_argument(
-        "-i", "--input",
+        "-i",
+        "--input",
         type=Path,
         help="Input file containing action rates (JSON or text, one per line)",
     )
     parser.add_argument(
-        "-a", "--actions",
+        "-a",
+        "--actions",
         type=float,
         nargs="+",
         help="Action rates directly on command line",
     )
     parser.add_argument(
-        "-j", "--json-output",
+        "-j",
+        "--json-output",
         action="store_true",
         help="Output results as JSON",
     )
@@ -153,7 +156,9 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(result, indent=2))
         else:
             print(f"Median APS: {result['median_actions_per_second']}")
-            print(f"Range: [{result['min_actions_per_second']}, {result['max_actions_per_second']}]")
+            print(
+                f"Range: [{result['min_actions_per_second']}, {result['max_actions_per_second']}]"
+            )
             print(f"Samples: {result['sample_count']}")
             print(f"Quality: {result['quality_status']}")
 
