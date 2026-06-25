@@ -102,8 +102,7 @@ def assert_left_handed_coordinates() -> None:
     """
     if not test_left_handed_cross_products():
         raise AssertionError(
-            "Coordinate system is NOT left-handed. "
-            "Expected X × Y = -Z, Y × Z = -X, Z × X = -Y"
+            "Coordinate system is NOT left-handed. Expected X × Y = -Z, Y × Z = -X, Z × X = -Y"
         )
 
 
@@ -120,11 +119,7 @@ def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Test left-hand coordinate system handedness via cross-product sign."
     )
-    parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        help="Print detailed test results"
-    )
+    parser.add_argument("-v", "--verbose", action="store_true", help="Print detailed test results")
     args = parser.parse_args(argv)
 
     try:
