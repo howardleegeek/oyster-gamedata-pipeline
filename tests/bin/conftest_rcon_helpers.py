@@ -70,7 +70,7 @@ def parse_rcon_packet(packet: bytes) -> Tuple[int, int, int, str]:
     length, request_id, packet_type = struct.unpack("<III", packet[:12])
 
     if length != len(packet) - 4:
-        raise ValueError(f"Length mismatch: header says {length}, actual {len(packet)-4}")
+        raise ValueError(f"Length mismatch: header says {length}, actual {len(packet) - 4}")
 
     body_data = packet[12:-2]  # Remove header and two null terminators
     body = body_data.decode("utf-8", errors="replace")
