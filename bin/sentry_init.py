@@ -14,6 +14,7 @@ Usage
     # CLI
     python -m bin.sentry_init --dsn "$SENTRY_DSN" --env prod --release v1.2.3
 """
+
 from __future__ import annotations
 
 import argparse
