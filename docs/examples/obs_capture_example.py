@@ -22,28 +22,28 @@ async def record_with_obs():
     obs = OBSSpectatorCapture(
         host="localhost",
         port=4455,
-        password=""  # Set your OBS WebSocket password here
+        password="",  # Set your OBS WebSocket password here
     )
-    
+
     try:
         # Connect to OBS
         logger.info("Connecting to OBS WebSocket...")
         if await obs.connect():
             logger.info("Connected to OBS WebSocket")
-            
+
             # Start recording
             logger.info("Starting recording...")
             if await obs.start_recording():
                 logger.info("Recording started successfully")
-                
+
                 # Record for 10 seconds
                 logger.info("Recording for 10 seconds...")
                 await asyncio.sleep(10)
-                
+
                 # Stop recording
                 logger.info("Stopping recording...")
                 output_path = await obs.stop_recording()
-                
+
                 if output_path:
                     logger.info(f"Recording saved to: {output_path}")
                 else:
@@ -52,10 +52,10 @@ async def record_with_obs():
                 logger.error("Failed to start recording")
         else:
             logger.error("Failed to connect to OBS WebSocket")
-            
+
     except Exception as e:
         logger.error(f"Error during OBS recording: {e}")
-        
+
     finally:
         # Always disconnect
         logger.info("Disconnecting from OBS...")
@@ -68,20 +68,20 @@ async def test_connection_only():
     Example: Test connection to OBS without recording.
     """
     obs = OBSSpectatorCapture(password="")
-    
+
     try:
         logger.info("Testing connection to OBS...")
         if await obs.connect():
             logger.info("Successfully connected to OBS WebSocket")
-            
+
             # You could check OBS status here
             logger.info("Connection test successful")
         else:
             logger.error("Failed to connect to OBS WebSocket")
-            
+
     except Exception as e:
         logger.error(f"Connection test failed: {e}")
-        
+
     finally:
         await obs.disconnect()
 
@@ -90,10 +90,12 @@ async def main():
     """Main function to run examples."""
     print("OBS WebSocket v5 Client Examples")
     print("=" * 40)
-    
+
     # Choose which example to run
-    choice = input("Choose example:\n1. Full recording test\n2. Connection test only\nChoice (1-2): ").strip()
-    
+    choice = input(
+        "Choose example:\n1. Full recording test\n2. Connection test only\nChoice (1-2): "
+    ).strip()
+
     if choice == "1":
         await record_with_obs()
     elif choice == "2":
