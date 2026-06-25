@@ -24,17 +24,25 @@ CODEC_SETTINGS = {
 def check_ffmpeg() -> bool:
     """Check if ffmpeg is available in PATH."""
     try:
-        return subprocess.run(
-            ["ffmpeg", "-version"], capture_output=True, timeout=10
-        ).returncode == 0
+        return (
+            subprocess.run(["ffmpeg", "-version"], capture_output=True, timeout=10).returncode == 0
+        )
     except (subprocess.SubprocessError, FileNotFoundError, OSError):
         return False
 
 
 def get_video_info(video_path: Path) -> Optional[Dict]:
     """Get video metadata using ffprobe."""
-    cmd = ["ffprobe", "-v", "quiet", "-print_format", "json",
-           "-show_format", "-show_streams", str(video_path)]
+    cmd = [
+        "ffprobe",
+        "-v",
+        "quiet",
+        "-print_format",
+        "json",
+        "-show_format",
+        "-show_streams",
+        str(video_path),
+    ]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         if result.returncode == 0:
@@ -44,16 +52,33 @@ def get_video_info(video_path: Path) -> Optional[Dict]:
     return None
 
 
-def encode_video(input_path: Path, output_path: Path, codec: str,
-                  timeout: int = 300) -> Tuple[bool, int, float, Optional[str]]:
+def encode_video(
+    input_path: Path, output_path: Path, codec: str, timeout: int = 300
+) -> Tuple[bool, int, float, Optional[str]]:
     """Encode video with specified codec. Returns (success, size, time, error)."""
     if codec not in CODEC_SETTINGS:
         return False, 0, 0.0, f"Unknown codec: {codec}"
 
     encoder, preset, crf = CODEC_SETTINGS[codec]
-    cmd = ["ffmpeg", "-y", "-i", str(input_path), "-c:v", encoder,
-           "-preset", preset, "-crf", crf, "-pix_fmt", "yuv420p",
-           "-c:a", "aac", "-b:a", "128k", str(output_path)]
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(input_path),
+        "-c:v",
+        encoder,
+        "-preset",
+        preset,
+        "-crf",
+        crf,
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        str(output_path),
+    ]
 
     try:
         start = time.time()
@@ -68,8 +93,9 @@ def encode_video(input_path: Path, output_path: Path, codec: str,
         return False, 0, 0.0, str(e)
 
 
-def analyze_results(input_size: int,
-                    results: Dict[str, Tuple[bool, int, float, Optional[str]]]) -> List[str]:
+def analyze_results(
+    input_size: int, results: Dict[str, Tuple[bool, int, float, Optional[str]]]
+) -> List[str]:
     """Analyze compression results and generate recommendations."""
     recs = []
     successful = {k: (s, t) for k, (ok, s, t, e) in results.items() if ok and s > 0}
@@ -86,29 +112,38 @@ def analyze_results(input_size: int,
     for name in sorted(successful.keys()):
         size, enc_time = successful[name]
         diff = ((size - best_size) / best_size * 100) if name != best[0] else 0
-        recs.append(f"  {name.upper():6s}: {size/1024/1024:7.2f} MB "
-                    f"({ratios[name]:.2f}x) {diff:+.1f}% vs best, {enc_time:.1f}s")
+        recs.append(
+            f"  {name.upper():6s}: {size / 1024 / 1024:7.2f} MB "
+            f"({ratios[name]:.2f}x) {diff:+.1f}% vs best, {enc_time:.1f}s"
+        )
 
-    recs.extend([
-        "\nCodec characteristics:",
-        "  - H.264: Widest compatibility, fast encoding",
-        "  - H.265: ~50% smaller than H.264, moderate speed",
-        "  - AV1: Best compression, royalty-free, slow encoding"
-    ])
+    recs.extend(
+        [
+            "\nCodec characteristics:",
+            "  - H.264: Widest compatibility, fast encoding",
+            "  - H.265: ~50% smaller than H.264, moderate speed",
+            "  - AV1: Best compression, royalty-free, slow encoding",
+        ]
+    )
     return recs
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     """Main entry point with CLI argument parsing."""
-    parser = argparse.ArgumentParser(
-        description="Compare H.264 vs H.265 vs AV1 compression ratios"
-    )
+    parser = argparse.ArgumentParser(description="Compare H.264 vs H.265 vs AV1 compression ratios")
     parser.add_argument("input", type=Path, help="Input video file")
     parser.add_argument("--output", "-o", type=Path, help="Output JSON report path")
-    parser.add_argument("--timeout", "-t", type=int, default=300,
-                        help="Encoding timeout per codec (default: 300s)")
-    parser.add_argument("--codecs", "-c", nargs="+", choices=["h264", "h265", "av1"],
-                        default=["h264", "h265", "av1"], help="Codecs to test")
+    parser.add_argument(
+        "--timeout", "-t", type=int, default=300, help="Encoding timeout per codec (default: 300s)"
+    )
+    parser.add_argument(
+        "--codecs",
+        "-c",
+        nargs="+",
+        choices=["h264", "h265", "av1"],
+        default=["h264", "h265", "av1"],
+        help="Codecs to test",
+    )
 
     args = parser.parse_args(argv)
 
@@ -148,9 +183,12 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.output:
         report = {
-            "input": str(args.input), "input_size_bytes": input_size,
-            "results": {k: {"success": s, "size_bytes": sz, "time_seconds": t, "error": e}
-                         for k, (s, sz, t, e) in results.items()}
+            "input": str(args.input),
+            "input_size_bytes": input_size,
+            "results": {
+                k: {"success": s, "size_bytes": sz, "time_seconds": t, "error": e}
+                for k, (s, sz, t, e) in results.items()
+            },
         }
         args.output.write_text(json.dumps(report, indent=2))
         print(f"\nReport saved to: {args.output}")
