@@ -37,10 +37,14 @@ def get_audio_packets(video_path: Path, stream_index: int) -> List[float]:
     """
     cmd = [
         "ffprobe",
-        "-v", "quiet",
-        "-select_streams", str(stream_index),
-        "-show_entries", "packet=pts_time",
-        "-of", "json",
+        "-v",
+        "quiet",
+        "-select_streams",
+        str(stream_index),
+        "-show_entries",
+        "packet=pts_time",
+        "-of",
+        "json",
         str(video_path),
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -68,9 +72,12 @@ def get_audio_streams(video_path: Path) -> List[int]:
     """
     cmd = [
         "ffprobe",
-        "-v", "quiet",
-        "-show_entries", "stream=index,codec_type",
-        "-of", "json",
+        "-v",
+        "quiet",
+        "-show_entries",
+        "stream=index,codec_type",
+        "-of",
+        "json",
         str(video_path),
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -78,10 +85,7 @@ def get_audio_streams(video_path: Path) -> List[int]:
         raise RuntimeError(f"ffprobe failed: {result.stderr}")
 
     data = json.loads(result.stdout)
-    return [
-        s["index"] for s in data.get("streams", [])
-        if s.get("codec_type") == "audio"
-    ]
+    return [s["index"] for s in data.get("streams", []) if s.get("codec_type") == "audio"]
 
 
 def check_continuity(
@@ -125,12 +129,13 @@ def main(argv: List[str] = None) -> int:
     parser = argparse.ArgumentParser(
         description="Check video audio track continuity (no gaps > 50ms)."
     )
+    parser.add_argument("video", type=Path, help="Path to video file to analyze.")
     parser.add_argument(
-        "video", type=Path, help="Path to video file to analyze."
-    )
-    parser.add_argument(
-        "-t", "--threshold", type=float, default=50.0,
-        help="Maximum allowed gap in milliseconds (default: 50)."
+        "-t",
+        "--threshold",
+        type=float,
+        default=50.0,
+        help="Maximum allowed gap in milliseconds (default: 50).",
     )
     args = parser.parse_args(argv)
 
@@ -163,10 +168,7 @@ def main(argv: List[str] = None) -> int:
     if all_gaps:
         print(f"FAIL: {len(all_gaps)} gap(s) detected > {args.threshold}ms:")
         for stream_idx, start, end, duration in all_gaps:
-            print(
-                f"  Stream {stream_idx}: {duration:.1f}ms gap "
-                f"from {start:.3f}s to {end:.3f}s"
-            )
+            print(f"  Stream {stream_idx}: {duration:.1f}ms gap from {start:.3f}s to {end:.3f}s")
         return 1
 
     print(f"PASS: All {len(audio_streams)} audio stream(s) continuous.")
