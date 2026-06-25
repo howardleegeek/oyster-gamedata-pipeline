@@ -165,8 +165,7 @@ def main() -> int:
 
     # Summary
     print(
-        f"Generated wxs with {mod_count} mod jars + {exe_count} exe, "
-        f"ProductVersion={args.version}"
+        f"Generated wxs with {mod_count} mod jars + {exe_count} exe, ProductVersion={args.version}"
     )
     return 0
 
