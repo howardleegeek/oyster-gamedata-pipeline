@@ -65,6 +65,11 @@ class TokenBucket:
             self.last_refill = time.time()
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize the token bucket state to a dictionary.
+
+        Returns:
+            A dictionary containing capacity, tokens, last_refill, and refill_rate.
+        """
         with self._lock:
             return {"capacity": self.capacity, "tokens": self.tokens,
                     "last_refill": self.last_refill, "refill_rate": self.refill_rate}
