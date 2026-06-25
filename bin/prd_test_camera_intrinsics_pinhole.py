@@ -61,8 +61,15 @@ def validate_pinhole_intrinsics(camera: Dict[str, Any], name: str) -> List[str]:
         errors.append(f"[{name}] Invalid 'aspect' value: {aspect} (must be positive number)")
 
     # Check for fisheye distortion parameters (must NOT be present)
-    fisheye_keys = ["fisheye", "fisheye_coefficients", "distortion_fisheye",
-                    "ftheta", "fisheye_params", "k1_fisheye", "fisheye_model"]
+    fisheye_keys = [
+        "fisheye",
+        "fisheye_coefficients",
+        "distortion_fisheye",
+        "ftheta",
+        "fisheye_params",
+        "k1_fisheye",
+        "fisheye_model",
+    ]
     for key in fisheye_keys:
         if key in intrinsics or key in projection:
             errors.append(f"[{name}] Forbidden fisheye parameter '{key}' found")
@@ -145,9 +152,7 @@ def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Validate camera intrinsics for pinhole projection model"
     )
-    parser.add_argument(
-        "file", type=Path, help="Path to camera configuration file (JSON/YAML)"
-    )
+    parser.add_argument("file", type=Path, help="Path to camera configuration file (JSON/YAML)")
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="Print detailed validation results"
     )
