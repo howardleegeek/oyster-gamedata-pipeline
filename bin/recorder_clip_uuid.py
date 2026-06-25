@@ -8,6 +8,7 @@ Usage:
 
 Closes C6.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -39,13 +40,15 @@ def suffix_filename(fp: Path, clip_uuid: str) -> Path:
 
 
 def build_metadata(
-    clip_id: str, clip_uuid: str,
+    clip_id: str,
+    clip_uuid: str,
     filepath: Optional[Path] = None,
     extra: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Build a metadata dict for a single clip."""
     meta: Dict[str, Any] = {
-        "clip_id": clip_id, "clip_uuid": clip_uuid,
+        "clip_id": clip_id,
+        "clip_uuid": clip_uuid,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "hostname": os.uname().nodename,
     }
@@ -67,8 +70,12 @@ def init_db(db_path: Path) -> sqlite3.Connection:
 
 
 def insert_clip_record(
-    conn: sqlite3.Connection, clip_id: str, clip_uuid: str,
-    hostname: str, created_at: str, filename: Optional[str] = None,
+    conn: sqlite3.Connection,
+    clip_id: str,
+    clip_uuid: str,
+    hostname: str,
+    created_at: str,
+    filename: Optional[str] = None,
 ) -> None:
     """Upsert a clip-uuid row into the clip_uuids table."""
     conn.execute(
@@ -83,11 +90,16 @@ def insert_clip_record(
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="Generate per-clip UUID4, persist to systeminfo, suffix filenames.")
+        description="Generate per-clip UUID4, persist to systeminfo, suffix filenames."
+    )
     p.add_argument("--clip-dir", type=Path, help="Directory of clip files to process.")
     p.add_argument("--clip-id", type=str, help="Single clip identifier.")
-    p.add_argument("--db-path", type=Path, default=Path("systeminfo.db"),
-                   help="Path to systeminfo SQLite DB (default: systeminfo.db).")
+    p.add_argument(
+        "--db-path",
+        type=Path,
+        default=Path("systeminfo.db"),
+        help="Path to systeminfo SQLite DB (default: systeminfo.db).",
+    )
     p.add_argument("--output-json", type=Path, help="Write metadata JSON here.")
     p.add_argument("--dry-run", action="store_true", help="No disk/DB writes.")
     p.add_argument("-v", "--verbose", action="store_true", help="DEBUG logging.")
@@ -111,8 +123,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         logger.info("clip_id=%s  uuid=%s", args.clip_id, clip_uuid)
         if not args.dry_run:
             conn = init_db(args.db_path)
-            insert_clip_record(conn, args.clip_id, clip_uuid,
-                               meta["hostname"], meta["created_at"])
+            insert_clip_record(conn, args.clip_id, clip_uuid, meta["hostname"], meta["created_at"])
             conn.close()
 
     elif args.clip_dir:
@@ -131,8 +142,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             results.append(meta)
             logger.info("%s → %s  (uuid=%s)", entry.name, new_path.name, clip_uuid)
             if not args.dry_run:
-                insert_clip_record(conn, clip_id, clip_uuid,
-                                   meta["hostname"], meta["created_at"], entry.name)
+                insert_clip_record(
+                    conn, clip_id, clip_uuid, meta["hostname"], meta["created_at"], entry.name
+                )
                 entry.rename(new_path)
         conn.close()
 
