@@ -96,12 +96,12 @@ def format_results(timings: List[float], p50: float, p95: float, p99: float, tot
             "=" * 40,
             f"Total files: {total}",
             f"Total elapsed: {sum(timings):.3f}s",
-            f"Average: {sum(timings)/len(timings):.3f}s",
+            f"Average: {sum(timings) / len(timings):.3f}s",
             "",
             "Latency Percentiles:",
-            f"  p50: {p50*1000:.2f}ms",
-            f"  p95: {p95*1000:.2f}ms",
-            f"  p99: {p99*1000:.2f}ms",
+            f"  p50: {p50 * 1000:.2f}ms",
+            f"  p95: {p95 * 1000:.2f}ms",
+            f"  p99: {p99 * 1000:.2f}ms",
         ]
     )
 
@@ -146,7 +146,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         timings = benchmark_file(fp, runs=args.runs)
         all_timings.extend(timings)
         if args.verbose:
-            print(f"  {fp.name}: {timings[-1]*1000:.2f}ms")
+            print(f"  {fp.name}: {timings[-1] * 1000:.2f}ms")
 
     # Calculate percentiles
     p50, p95, p99 = calculate_percentiles(all_timings, [50, 95, 99])
