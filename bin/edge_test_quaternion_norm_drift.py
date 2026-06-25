@@ -100,11 +100,15 @@ def main(argv: List[str] | None = None) -> int:
         description="Boundary test: quaternion norm drift tolerance.",
     )
     parser.add_argument(
-        "--epsilon", type=float, default=DEFAULT_EPSILON,
+        "--epsilon",
+        type=float,
+        default=DEFAULT_EPSILON,
         help=f"Epsilon tolerance (default: {DEFAULT_EPSILON})",
     )
     parser.add_argument(
-        "--verbose", "-v", action="store_true",
+        "--verbose",
+        "-v",
+        action="store_true",
         help="Print results for every test case.",
     )
     args = parser.parse_args(argv)
