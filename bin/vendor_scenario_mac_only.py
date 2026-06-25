@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 def _import_numpy():
     """Lazy-import numpy only when needed."""
     import numpy as np  # noqa: F401
+
     return np
 
 
@@ -34,6 +35,7 @@ def _import_torch():
     """Attempt torch import; return None when unavailable."""
     try:
         import torch  # noqa: F401
+
         return torch
     except ImportError:
         return None
@@ -120,8 +122,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     int
         Exit code (0 on success, 1 on failure).
     """
-    parser = argparse.ArgumentParser(description="Vendor scenario: M1 Mac depth-provider CPU fallback")
-    parser.add_argument("--dry-run", action="store_true", help="Skip actual numpy/torch computation")
+    parser = argparse.ArgumentParser(
+        description="Vendor scenario: M1 Mac depth-provider CPU fallback"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Skip actual numpy/torch computation"
+    )
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable DEBUG-level logging")
     args = parser.parse_args(argv)
 
