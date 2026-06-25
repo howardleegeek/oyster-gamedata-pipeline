@@ -45,8 +45,7 @@ def load_corpus(path: Path, key: str) -> dict[str, set[str]]:
 
 
 def compute_metrics(
-    golden: dict[str, set[str]],
-    predicted: dict[str, set[str]]
+    golden: dict[str, set[str]], predicted: dict[str, set[str]]
 ) -> dict[str, float]:
     """Compute coverage, recall, precision, and F1 score."""
     g_ids = set(golden.keys())
@@ -85,14 +84,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Compute coverage and recall metrics for autoresearch adapter."
     )
-    parser.add_argument("--golden", type=Path, required=True,
-                        help="Path to golden corpus (dir or JSON)")
-    parser.add_argument("--predicted", type=Path, required=True,
-                        help="Path to predicted scenes (dir or JSON)")
-    parser.add_argument("--output", type=Path, default=None,
-                        help="Output JSON file (optional)")
-    parser.add_argument("--verbose", action="store_true",
-                        help="Print report to stdout")
+    parser.add_argument(
+        "--golden", type=Path, required=True, help="Path to golden corpus (dir or JSON)"
+    )
+    parser.add_argument(
+        "--predicted", type=Path, required=True, help="Path to predicted scenes (dir or JSON)"
+    )
+    parser.add_argument("--output", type=Path, default=None, help="Output JSON file (optional)")
+    parser.add_argument("--verbose", action="store_true", help="Print report to stdout")
 
     args = parser.parse_args(argv)
 
