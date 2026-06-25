@@ -25,6 +25,7 @@ Usage::
     clip_uuid = inject_uuid(sysinfo, clip_dir)
     # sysinfo["clip_uuid"] is now set; clip_dir has a `.clip_uuid_<uuid>` file
 """
+
 from __future__ import annotations
 
 import argparse
@@ -111,8 +112,12 @@ def _cli(argv: list[str] | None = None) -> int:
 
     inj = sub.add_parser("inject", help="Inject UUID into systeminfo.json + marker.")
     inj.add_argument("--clip-dir", required=True, type=Path)
-    inj.add_argument("--systeminfo", required=True, type=Path,
-                     help="Path to systeminfo.json (read+rewritten in place).")
+    inj.add_argument(
+        "--systeminfo",
+        required=True,
+        type=Path,
+        help="Path to systeminfo.json (read+rewritten in place).",
+    )
     inj.add_argument("--uuid", default=None, help="Use this UUID instead of generating.")
 
     args = p.parse_args(argv)
