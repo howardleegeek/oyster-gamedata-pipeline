@@ -727,3 +727,8 @@
 
 - Picked: ruff format bin/e2e_tests/test_batch_integration.py (smallest unformatted file: 155 lines, line-wrapped dict literals, trailing commas, whitespace cleanup). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, module import smoke OK, no test file references this module, follows established cadence of Rounds 254–327.
 - Result: committed e4ea9247 (ruff format applied to bin/e2e_tests/test_batch_integration.py; 1 file changed, 30 insertions(+), 46 deletions(-); ruff check + ruff format --check clean; AST parse OK; module import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — line-wrapped dict literals to single lines, added trailing commas, normalized whitespace. No silent error swallow (existing try/except preserved), no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 267 @ 2026-06-24T22:00:00Z
+
+- Picked: ruff format bin/prd_test_action_per_second.py (168-line bin file, line-wrapped argparse arguments and long print statement). Justification: measurable code smell, single-file scope, no behavior change, module import smoke OK, no targeted tests, no risk of test masking, follows established cadence.
+- Result: committed f263e199 (ruff format line-wrapped argparse and long print line in bin/prd_test_action_per_second.py; 1 file changed, 9 insertions(+), 4 deletions(-); ruff check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
