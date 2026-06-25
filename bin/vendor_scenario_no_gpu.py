@@ -23,11 +23,14 @@ from typing import Any, Dict, List
 def _check_gpu() -> Dict[str, Any]:
     """Check GPU availability with lazy torch import."""
     info: Dict[str, Any] = {
-        "cuda": False, "metal": False,
-        "fallback": True, "reason": "No GPU detected",
+        "cuda": False,
+        "metal": False,
+        "fallback": True,
+        "reason": "No GPU detected",
     }
     try:
         import torch  # noqa: F401
+
         info["cuda"] = torch.cuda.is_available()
         if info["cuda"]:
             info["fallback"] = False
@@ -39,7 +42,9 @@ def _check_gpu() -> Dict[str, Any]:
         try:
             r = subprocess.run(
                 ["system_profiler", "SPDisplaysDataType"],
-                capture_output=True, text=True, check=False,
+                capture_output=True,
+                text=True,
+                check=False,
             )
             if "Metal" in r.stdout:
                 info["metal"] = True
@@ -51,7 +56,8 @@ def _check_gpu() -> Dict[str, Any]:
 
 
 def _simulate_inference(
-    prefer_gpu: bool, sla_timeout: float,
+    prefer_gpu: bool,
+    sla_timeout: float,
     image_shape: tuple = (480, 640),
 ) -> Dict[str, Any]:
     """Simulate a single DepthAnything inference pass with fallback."""
@@ -69,16 +75,20 @@ def _simulate_inference(
     time.sleep(min(elapsed_s, 0.05))
 
     return {
-        "mode": mode, "device": device,
+        "mode": mode,
+        "device": device,
         "elapsed_s": round(elapsed_s, 3),
         "within_sla": elapsed_s <= sla_timeout,
-        "image_shape": list(image_shape), "gpu_info": gpu,
+        "image_shape": list(image_shape),
+        "gpu_info": gpu,
     }
 
 
 def run_scenario(
-    iterations: int, sla_timeout: float,
-    prefer_gpu: bool, verbose: bool,
+    iterations: int,
+    sla_timeout: float,
+    prefer_gpu: bool,
+    verbose: bool,
 ) -> Dict[str, Any]:
     """Execute the no-GPU fallback scenario across *iterations* runs."""
     results: List[Dict[str, Any]] = []
@@ -94,17 +104,21 @@ def run_scenario(
             results.append(r)
             if verbose:
                 mark = "✓" if r["within_sla"] else "✗"
-                print(f"  {i+1:3d}: {mark}  {r['mode']:10s}  "
-                      f"{r['device']:14s}  {r['elapsed_s']:6.3f}s")
+                print(
+                    f"  {i + 1:3d}: {mark}  {r['mode']:10s}  "
+                    f"{r['device']:14s}  {r['elapsed_s']:6.3f}s"
+                )
 
     total_s = sum(r["elapsed_s"] for r in results)
     avg_s = total_s / len(results)
     sla_pass = sum(1 for r in results if r["within_sla"])
     return {
         "scenario": "G066_no_gpu_fallback",
-        "iterations": iterations, "sla_timeout_s": sla_timeout,
+        "iterations": iterations,
+        "sla_timeout_s": sla_timeout,
         "prefer_gpu": prefer_gpu,
-        "total_s": round(total_s, 3), "avg_s": round(avg_s, 3),
+        "total_s": round(total_s, 3),
+        "avg_s": round(avg_s, 3),
         "sla_pass_count": sla_pass,
         "sla_pass_pct": round((sla_pass / len(results)) * 100.0, 1),
         "all_within_sla": sla_pass == iterations,
@@ -117,20 +131,24 @@ def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="G066 — DepthAnything no-GPU fallback walkthrough",
     )
-    parser.add_argument("--iterations", type=int, default=5,
-                        help="Number of inference passes (default: 5)")
-    parser.add_argument("--sla-timeout", type=float, default=5.0,
-                        help="SLA timeout in seconds (default: 5.0)")
-    parser.add_argument("--prefer-gpu", action="store_true",
-                        help="Attempt GPU first; fall back to onnx-cpu")
-    parser.add_argument("--json", action="store_true",
-                        help="Output summary as JSON")
-    parser.add_argument("-v", "--verbose", action="store_true",
-                        help="Print per-iteration details")
+    parser.add_argument(
+        "--iterations", type=int, default=5, help="Number of inference passes (default: 5)"
+    )
+    parser.add_argument(
+        "--sla-timeout", type=float, default=5.0, help="SLA timeout in seconds (default: 5.0)"
+    )
+    parser.add_argument(
+        "--prefer-gpu", action="store_true", help="Attempt GPU first; fall back to onnx-cpu"
+    )
+    parser.add_argument("--json", action="store_true", help="Output summary as JSON")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Print per-iteration details")
     args = parser.parse_args(argv)
 
     summary = run_scenario(
-        args.iterations, args.sla_timeout, args.prefer_gpu, args.verbose,
+        args.iterations,
+        args.sla_timeout,
+        args.prefer_gpu,
+        args.verbose,
     )
     if args.json:
         print(json.dumps(summary, indent=2))
@@ -138,8 +156,10 @@ def main(argv: List[str] | None = None) -> int:
         print("\n[G066] Summary")
         print(f"  Total time   : {summary['total_s']:.3f}s")
         print(f"  Avg / iter   : {summary['avg_s']:.3f}s")
-        print(f"  SLA pass     : {summary['sla_pass_count']}/{summary['iterations']} "
-              f"({summary['sla_pass_pct']}%)")
+        print(
+            f"  SLA pass     : {summary['sla_pass_count']}/{summary['iterations']} "
+            f"({summary['sla_pass_pct']}%)"
+        )
         print(f"  All within SLA: {'YES ✓' if summary['all_within_sla'] else 'NO ✗'}")
         print(f"  Device used  : {summary['gpu_info']['reason']}")
     return 0 if summary["all_within_sla"] else 1
