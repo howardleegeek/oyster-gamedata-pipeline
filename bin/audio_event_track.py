@@ -11,6 +11,7 @@ Usage:
 
 Dependencies: stdlib + numpy (optional, falls back to stdlib-only mode).
 """
+
 from __future__ import annotations
 
 import argparse
@@ -33,6 +34,7 @@ def _get_numpy() -> Any:
     if _numpy is None:
         try:
             import numpy as np  # noqa: E402
+
             _numpy = np
         except ImportError:
             _numpy = None
@@ -40,18 +42,33 @@ def _get_numpy() -> Any:
 
 
 EVENT_CLASSES: List[str] = [
-    "silence", "ambient", "footstep", "speech", "music", "impact", "noise", "unknown",
+    "silence",
+    "ambient",
+    "footstep",
+    "speech",
+    "music",
+    "impact",
+    "noise",
+    "unknown",
 ]
 
 _DEFAULT_THRESHOLDS: Dict[str, Tuple[float, float]] = {
-    "silence": (0.0, 0.02), "ambient": (0.02, 0.10), "footstep": (0.10, 0.35),
-    "speech": (0.08, 0.45), "music": (0.15, 0.70), "impact": (0.50, 1.00),
+    "silence": (0.0, 0.02),
+    "ambient": (0.02, 0.10),
+    "footstep": (0.10, 0.35),
+    "speech": (0.08, 0.45),
+    "music": (0.15, 0.70),
+    "impact": (0.50, 1.00),
     "noise": (0.05, 0.60),
 }
 
 _ZCR_RANGES: Dict[str, Tuple[float, float]] = {
-    "silence": (0.0, 0.01), "ambient": (0.01, 0.15), "footstep": (0.05, 0.25),
-    "speech": (0.10, 0.40), "music": (0.05, 0.35), "impact": (0.01, 0.20),
+    "silence": (0.0, 0.01),
+    "ambient": (0.01, 0.15),
+    "footstep": (0.05, 0.25),
+    "speech": (0.10, 0.40),
+    "music": (0.05, 0.35),
+    "impact": (0.01, 0.20),
     "noise": (0.20, 0.60),
 }
 
@@ -64,14 +81,16 @@ def load_wav(path: str) -> Tuple[List[float], int]:
         sr = wf.getframerate()
         raw = wf.readframes(wf.getnframes())
     if sw == 3:
-        samples = [struct.unpack("<i", raw[i:i+3] + b"\x00")[0] / 8388608.0
-                   for i in range(0, len(raw), 3)]
+        samples = [
+            struct.unpack("<i", raw[i : i + 3] + b"\x00")[0] / 8388608.0
+            for i in range(0, len(raw), 3)
+        ]
     else:
         fmt = {1: "B", 2: "h", 4: "i"}[sw]
-        scale = {1: 1/127.5, 2: 1/32768.0, 4: 1/2147483648.0}[sw]
+        scale = {1: 1 / 127.5, 2: 1 / 32768.0, 4: 1 / 2147483648.0}[sw]
         samples = [v * scale for v in array.array(fmt, raw)]
     if n_ch == 2:
-        samples = [(samples[i] + samples[i+1]) * 0.5 for i in range(0, len(samples)-1, 2)]
+        samples = [(samples[i] + samples[i + 1]) * 0.5 for i in range(0, len(samples) - 1, 2)]
     return samples, sr
 
 
@@ -81,6 +100,7 @@ def load_with_numpy(path: str) -> Tuple[List[float], int]:
     if np is not None:
         try:
             from scipy.io import wavfile  # type: ignore[import-not-found]
+
             sr, data = wavfile.read(path)
             s = data.astype(np.float64)
             if s.ndim == 2:
@@ -108,7 +128,7 @@ def compute_zcr(samples: Sequence[float]) -> float:
     """Return zero-crossing rate (fraction of adjacent pairs crossing zero)."""
     if len(samples) < 2:
         return 0.0
-    crossings = sum(1 for i in range(len(samples) - 1) if samples[i] * samples[i+1] < 0)
+    crossings = sum(1 for i in range(len(samples) - 1) if samples[i] * samples[i + 1] < 0)
     return crossings / (len(samples) - 1)
 
 
@@ -130,8 +150,10 @@ def compute_spectral_centroid(samples: Sequence[float]) -> float:
 
 
 def segment_frames(
-    samples: Sequence[float], sample_rate: int,
-    frame_ms: int = 50, hop_ms: Optional[int] = None,
+    samples: Sequence[float],
+    sample_rate: int,
+    frame_ms: int = 50,
+    hop_ms: Optional[int] = None,
 ) -> List[List[float]]:
     """Split samples into overlapping frames."""
     frame_len = max(1, int(sample_rate * frame_ms / 1000))
@@ -139,7 +161,7 @@ def segment_frames(
     frames: List[List[float]] = []
     start = 0
     while start + frame_len <= len(samples):
-        frames.append(list(samples[start:start + frame_len]))
+        frames.append(list(samples[start : start + frame_len]))
         start += hop
     if not frames and samples:
         frames.append(list(samples))
@@ -147,7 +169,9 @@ def segment_frames(
 
 
 def classify_frame(
-    peak: float, zcr: float, rms: float,
+    peak: float,
+    zcr: float,
+    rms: float,
     thresholds: Optional[Dict[str, Tuple[float, float]]] = None,
     zcr_ranges: Optional[Dict[str, Tuple[float, float]]] = None,
 ) -> str:
@@ -182,8 +206,10 @@ def classify_frame(
 
 
 def process_audio(
-    path: str, frame_ms: int = 50,
-    hop_ms: Optional[int] = None, out_path: Optional[str] = None,
+    path: str,
+    frame_ms: int = 50,
+    hop_ms: Optional[int] = None,
+    out_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Process an audio file and return per-frame event tracking data."""
     samples, sr = load_with_numpy(path)
@@ -196,21 +222,29 @@ def process_audio(
         centroid = compute_spectral_centroid(frame)
         event = classify_frame(peak, zcr, rms)
         t_start = idx * (hop_ms or frame_ms // 2) / 1000.0
-        results.append({
-            "frame": idx, "time_s": round(t_start, 4),
-            "peak": round(peak, 6), "rms": round(rms, 6),
-            "zcr": round(zcr, 6), "spectral_centroid": round(centroid, 4),
-            "event": event,
-        })
+        results.append(
+            {
+                "frame": idx,
+                "time_s": round(t_start, 4),
+                "peak": round(peak, 6),
+                "rms": round(rms, 6),
+                "zcr": round(zcr, 6),
+                "spectral_centroid": round(centroid, 4),
+                "event": event,
+            }
+        )
     event_counts: Dict[str, int] = {}
     for r in results:
         event_counts[r["event"]] = event_counts.get(r["event"], 0) + 1
     output: Dict[str, Any] = {
-        "source": str(path), "sample_rate": sr,
+        "source": str(path),
+        "sample_rate": sr,
         "total_samples": len(samples),
         "duration_s": round(len(samples) / sr, 4) if sr else 0.0,
-        "frame_ms": frame_ms, "hop_ms": hop_ms or frame_ms // 2,
-        "num_frames": len(results), "event_summary": event_counts,
+        "frame_ms": frame_ms,
+        "hop_ms": hop_ms or frame_ms // 2,
+        "num_frames": len(results),
+        "event_summary": event_counts,
         "frames": results,
     }
     if out_path:
@@ -228,9 +262,15 @@ def build_parser() -> argparse.ArgumentParser:
         epilog="Event classes: silence, ambient, footstep, speech, music, impact, noise, unknown.",
     )
     parser.add_argument("audio", type=str, help="Path to audio file (WAV supported natively).")
-    parser.add_argument("--frame-ms", type=int, default=50, help="Frame length in ms (default: 50).")
-    parser.add_argument("--hop-ms", type=int, default=None, help="Hop size in ms (default: frame_ms//2).")
-    parser.add_argument("--out", type=str, default=None, help="Output JSON file path (default: stdout).")
+    parser.add_argument(
+        "--frame-ms", type=int, default=50, help="Frame length in ms (default: 50)."
+    )
+    parser.add_argument(
+        "--hop-ms", type=int, default=None, help="Hop size in ms (default: frame_ms//2)."
+    )
+    parser.add_argument(
+        "--out", type=str, default=None, help="Output JSON file path (default: stdout)."
+    )
     parser.add_argument("--quiet", action="store_true", help="Suppress summary output.")
     return parser
 
@@ -244,8 +284,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 1
     try:
         result = process_audio(
-            path=args.audio, frame_ms=args.frame_ms,
-            hop_ms=args.hop_ms, out_path=args.out,
+            path=args.audio,
+            frame_ms=args.frame_ms,
+            hop_ms=args.hop_ms,
+            out_path=args.out,
         )
     except wave.Error as exc:
         print(f"Error: invalid WAV file: {exc}", file=sys.stderr)
