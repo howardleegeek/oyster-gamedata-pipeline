@@ -89,6 +89,14 @@ class TesterBalance:
     paid_cents: int
 
     def unpaid_cents(self, rate_per_hour_cents: int) -> int:
+        """Calculate unpaid balance in cents.
+
+        Args:
+            rate_per_hour_cents: Hourly rate in cents.
+
+        Returns:
+            Unpaid balance in cents (non-negative).
+        """
         earned = round(self.accepted_seconds * rate_per_hour_cents / 3600)
         return max(0, earned - self.paid_cents)
 
