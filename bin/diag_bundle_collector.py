@@ -112,8 +112,12 @@ def collect_bundle(log_dirs: List[str], manifest_dir: str, output: str) -> Path:
                 pass
         # Diagnostic commands output
         with open(col_dir / "diagnostics.txt", "w") as f:
-            f.write(f"Collected: {datetime.datetime.now().isoformat()}\n{'='*50}\n")
-            for name, cmd in [("Uname", ["uname", "-a"]), ("Date", ["date"]), ("Uptime", ["uptime"])]:
+            f.write(f"Collected: {datetime.datetime.now().isoformat()}\n{'=' * 50}\n")
+            for name, cmd in [
+                ("Uname", ["uname", "-a"]),
+                ("Date", ["date"]),
+                ("Uptime", ["uptime"]),
+            ]:
                 f.write(f"\n--- {name} ---\n{run_cmd_safe(cmd) or 'N/A'}\n")
         # Create tarball
         out = Path(output)
@@ -128,14 +132,26 @@ def main(argv: Optional[List[str]] = None) -> int:
         description="Collect logs, system info, and manifests into a diagnostic tarball."
     )
     parser.add_argument("-o", "--output", help="Output tarball path (default: auto-generated)")
-    parser.add_argument("-l", "--log-dir", action="append", dest="log_dirs", default=[],
-                        help="Additional log directory (can repeat)")
-    parser.add_argument("-m", "--manifest-dir", default="./manifests",
-                        help="Manifest directory (default: ./manifests)")
+    parser.add_argument(
+        "-l",
+        "--log-dir",
+        action="append",
+        dest="log_dirs",
+        default=[],
+        help="Additional log directory (can repeat)",
+    )
+    parser.add_argument(
+        "-m",
+        "--manifest-dir",
+        default="./manifests",
+        help="Manifest directory (default: ./manifests)",
+    )
     parser.add_argument("-v", "--version", action="version", version=f"%(prog)s {MODULE_VERSION}")
     args = parser.parse_args(argv)
 
-    output = args.output or f"diag_bundle_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.tar.gz"
+    output = (
+        args.output or f"diag_bundle_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.tar.gz"
+    )
     log_dirs = DEFAULT_LOG_DIRS + args.log_dirs
 
     print(f"Collecting diagnostics to: {output}")
