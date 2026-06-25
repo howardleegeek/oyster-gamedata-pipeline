@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 class ClipStatus(str, Enum):
     """Lifecycle states for a locally queued clip."""
+
     PENDING = "pending"
     UPLOADING = "uploading"
     UPLOADED = "uploaded"
@@ -45,6 +46,7 @@ class ClipStatus(str, Enum):
 @dataclass
 class ClipMetadata:
     """Metadata for a single recorded clip."""
+
     clip_id: str
     title: str
     duration_seconds: float
@@ -69,6 +71,7 @@ class ClipMetadata:
 @dataclass
 class AnonymousConfig:
     """Persistent configuration for an anonymous session."""
+
     anonymous_id: str
     created_at: str
     storage_path: str
@@ -169,6 +172,7 @@ class AnonymousStorage:
 # ---------------------------------------------------------------------------
 # CLI Commands
 # ---------------------------------------------------------------------------
+
 
 def cmd_init(args: argparse.Namespace, storage: AnonymousStorage) -> int:
     """Initialise anonymous mode."""
@@ -288,16 +292,20 @@ def cmd_cleanup(args: argparse.Namespace, storage: AnonymousStorage) -> int:
 # CLI Parser & Entry Point
 # ---------------------------------------------------------------------------
 
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the argument parser for all sub-commands."""
     parser = argparse.ArgumentParser(
         prog="anonymous_first_run",
         description="Anonymous clip recording and deferred upload.",
     )
-    parser.add_argument("--storage-dir", type=Path, default=None,
-                        help="Override base storage directory (default: $HOME).")
-    parser.add_argument("-v", "--verbose", action="store_true",
-                        help="Enable debug logging.")
+    parser.add_argument(
+        "--storage-dir",
+        type=Path,
+        default=None,
+        help="Override base storage directory (default: $HOME).",
+    )
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable debug logging.")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("init", help="Initialise anonymous session")
