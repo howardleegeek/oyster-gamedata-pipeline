@@ -578,6 +578,11 @@
 - Picked: ruff format bin/e2e_tests/test_provenance_integration.py (smallest unformatted bin file at 138 lines; blank lines and line wrapping per ruff). Justification: measurable code smell, single-file scope, no behavior change, AST parse OK, no test file references this module (no risk of test masking), follows established cadence of formatting small bin files.
 - Result: committed 917b47b6 (ruff format applied to bin/e2e_tests/test_provenance_integration.py; 1 file changed, 21 insertions(+), 32 deletions(-); ruff check clean; AST parse OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
 
+## Round 310 @ 2026-06-25T13:00:00Z
+
+- Picked: ruff format bin/audit_log_writer.py (smallest unformatted file: 141 lines, blank lines between sections per ruff). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, import smoke OK, no test file references this module (no risk of test masking), follows established cadence of formatting small bin files.
+- Result: committed d35c5f3e (ruff format added blank lines between sections in bin/audit_log_writer.py; 1 file changed, 6 insertions(+), 2 deletions(-); ruff check + ruff format --check clean; import smoke OK; no test file references; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
 ## Round 308 @ 2026-06-25T10:57:26Z
 
 - Picked: ruff format server/modal_depth_app.py (smallest unformatted server/ file at 270 lines / 47 diff lines; one blank line per section header + collapse 1 short dict to single line + wrap ffmpeg args list vertically per ruff). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, targeted test exists and passes (tests/test_modal_depth_client.py 6/6 pass), no risk of test masking, follows established cadence of formatting small server/ files (Round 301 was on bin/ scripts; server/ pool only had 8 unformatted files).
