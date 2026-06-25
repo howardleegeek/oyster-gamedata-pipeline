@@ -71,15 +71,21 @@ def main(argv: list[str] | None = None) -> int:
         description="Edge test: 1M records — verify streaming adapter."
     )
     parser.add_argument(
-        "--records", type=int, default=1_000_000,
+        "--records",
+        type=int,
+        default=1_000_000,
         help="Number of records to generate (default: 1,000,000)",
     )
     parser.add_argument(
-        "--output", type=Path, default=None,
+        "--output",
+        type=Path,
+        default=None,
         help="Output JSON file path (default: temporary directory)",
     )
     parser.add_argument(
-        "--chunk-size", type=int, default=10_000,
+        "--chunk-size",
+        type=int,
+        default=10_000,
         help="Stream read chunk size (default: 10,000)",
     )
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
