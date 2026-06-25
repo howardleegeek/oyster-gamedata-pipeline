@@ -32,21 +32,20 @@ logger = logging.getLogger(__name__)
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _find_staged_python_files() -> list[str]:
     """Return list of staged ``*.py`` paths from ``git diff --cached``."""
     try:
         result = subprocess.run(
             ["git", "diff", "--cached", "--name-only", "--diff-filter=ACMR"],
-            capture_output=True, text=True, check=True,
+            capture_output=True,
+            text=True,
+            check=True,
         )
     except (subprocess.CalledProcessError, FileNotFoundError):
         logger.warning("git not available or no staged files; falling back to cwd")
         return [str(p) for p in Path(".").rglob("*.py")]
-    return [
-        line.strip()
-        for line in result.stdout.splitlines()
-        if line.strip().endswith(".py")
-    ]
+    return [line.strip() for line in result.stdout.splitlines() if line.strip().endswith(".py")]
 
 
 def _validate_syntax(path: str) -> bool:
@@ -67,7 +66,9 @@ def _run_formatter(cmd: list[str], paths: list[str]) -> int:
     try:
         result = subprocess.run(
             cmd + paths,
-            capture_output=True, text=True, check=False,
+            capture_output=True,
+            text=True,
+            check=False,
         )
         if result.returncode != 0:
             logger.warning("%s exited %d: %s", cmd[0], result.returncode, result.stderr.strip())
@@ -80,6 +81,7 @@ def _run_formatter(cmd: list[str], paths: list[str]) -> int:
 # ---------------------------------------------------------------------------
 # Core logic
 # ---------------------------------------------------------------------------
+
 
 def format_files(paths: list[str], *, dry_run: bool = False) -> int:
     """Run black + ruff --fix on *paths*.
@@ -126,6 +128,7 @@ def format_files(paths: list[str], *, dry_run: bool = False) -> int:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Entry-point with argparse CLI.
 
@@ -143,19 +146,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         description="Pre-commit auto-formatter: runs black + ruff --fix on staged files.",
     )
     parser.add_argument(
-        "files", nargs="*", default=None,
+        "files",
+        nargs="*",
+        default=None,
         help="Python files to format (default: staged *.py files).",
     )
     parser.add_argument(
-        "--dry-run", action="store_true",
+        "--dry-run",
+        action="store_true",
         help="Check formatting only; do not modify files.",
     )
     parser.add_argument(
-        "--staged", action="store_true", default=True,
+        "--staged",
+        action="store_true",
+        default=True,
         help="Auto-detect staged Python files via git (default: True).",
     )
     parser.add_argument(
-        "-v", "--verbose", action="store_true",
+        "-v",
+        "--verbose",
+        action="store_true",
         help="Enable debug logging.",
     )
     args = parser.parse_args(list(argv) if argv is not None else sys.argv[1:])
