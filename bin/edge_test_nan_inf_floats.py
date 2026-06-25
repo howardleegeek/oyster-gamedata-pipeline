@@ -58,9 +58,9 @@ def create_test_vectors() -> List[Vector3]:
     return [
         Vector3(1.0, 2.0, 3.0),
         Vector3(-1.5, 0.0, 4.2),
-        Vector3(float('nan'), 1.0, 2.0),
-        Vector3(1.0, float('inf'), 2.0),
-        Vector3(1.0, 2.0, float('-inf')),
+        Vector3(float("nan"), 1.0, 2.0),
+        Vector3(1.0, float("inf"), 2.0),
+        Vector3(1.0, 2.0, float("-inf")),
     ]
 
 
@@ -109,7 +109,7 @@ def run_tests(verbose: bool = False) -> int:
 
     # Test 3: Lint temp source file
     print("\n[Test 3] Linting source code...")
-    test_code = '''
+    test_code = """
 class Vector3:
     def __init__(self, x: float, y: float, z: float) -> None:
         self.x, self.y, self.z = x, y, z
@@ -117,8 +117,8 @@ class Vector3:
 v1 = Vector3(1.0, 2.0, 3.0)
 v_bad = Vector3(float("nan"), 1.0, 2.0)
 v_inf = Vector3(1.0, float("inf"), 2.0)
-'''
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(test_code)
         temp_path = Path(f.name)
 
