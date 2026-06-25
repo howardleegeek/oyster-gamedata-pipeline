@@ -18,6 +18,7 @@ from typing import Callable, Optional
 
 class CircuitState(Enum):
     """Circuit breaker states."""
+
     CLOSED = "CLOSED"
     OPEN = "OPEN"
     HALF_OPEN = "HALF_OPEN"
@@ -50,11 +51,15 @@ class CircuitBreaker:
     def _save_state(self) -> None:
         """Persist circuit breaker state to file."""
         if self.state_file:
-            self.state_file.write_text(json.dumps({
-                "state": self._state.value,
-                "failure_count": self._failure_count,
-                "trip_time": self._trip_time,
-            }))
+            self.state_file.write_text(
+                json.dumps(
+                    {
+                        "state": self._state.value,
+                        "failure_count": self._failure_count,
+                        "trip_time": self._trip_time,
+                    }
+                )
+            )
 
     def is_allowed(self) -> bool:
         """Check if operations are allowed based on current state."""
@@ -118,10 +123,12 @@ class CircuitBreaker:
 def main(argv: Optional[list] = None) -> int:
     """Main entry point for circuit breaker CLI."""
     parser = argparse.ArgumentParser(description="Circuit breaker for S3 operations")
-    parser.add_argument("--threshold", type=int, default=5,
-                        help="Failures before tripping (default: 5)")
-    parser.add_argument("--timeout", type=float, default=60.0,
-                        help="Recovery timeout in seconds (default: 60)")
+    parser.add_argument(
+        "--threshold", type=int, default=5, help="Failures before tripping (default: 5)"
+    )
+    parser.add_argument(
+        "--timeout", type=float, default=60.0, help="Recovery timeout in seconds (default: 60)"
+    )
     parser.add_argument("--state-file", type=Path, help="Path to persist state")
     parser.add_argument("--status", action="store_true", help="Print status and exit")
     parser.add_argument("--reset", action="store_true", help="Reset to CLOSED state")
@@ -129,8 +136,10 @@ def main(argv: Optional[list] = None) -> int:
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logging")
 
     args = parser.parse_args(argv)
-    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
-                        format="%(asctime)s - %(levelname)s - %(message)s")
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+    )
 
     cb = CircuitBreaker(
         failure_threshold=args.threshold,
