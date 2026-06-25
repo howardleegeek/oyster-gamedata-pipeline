@@ -40,6 +40,7 @@ def _get_numpy():
     """Return numpy module or None if unavailable."""
     try:
         import numpy as np  # noqa: F811
+
         return np
     except ImportError:
         return None
@@ -51,7 +52,9 @@ def _ensure_ffmpeg() -> bool:
         try:
             subprocess.run(
                 [exe, "-version"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=True,
             )
         except (subprocess.CalledProcessError, FileNotFoundError):
             logger.error("%s not found on PATH", exe)
@@ -62,18 +65,27 @@ def _ensure_ffmpeg() -> bool:
 def _run_ffprobe(args: List[str]) -> str:
     """Run ffprobe with the given args and return stdout."""
     result = subprocess.run(
-        ["ffprobe", "-v", "error"] + args, capture_output=True, text=True, check=True,
+        ["ffprobe", "-v", "error"] + args,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     return result.stdout
 
 
 def _get_audio_info(audio_path: Path) -> Dict[str, Any]:
     """Return dict with duration, sample_rate, channels, codec_name."""
-    raw = _run_ffprobe([
-        "-select_streams", "a:0",
-        "-show_entries", "stream=duration,sample_rate,channels,codec_name",
-        "-of", "json", str(audio_path),
-    ])
+    raw = _run_ffprobe(
+        [
+            "-select_streams",
+            "a:0",
+            "-show_entries",
+            "stream=duration,sample_rate,channels,codec_name",
+            "-of",
+            "json",
+            str(audio_path),
+        ]
+    )
     stream = json.loads(raw)["streams"][0]
     return {
         "duration_seconds": float(stream.get("duration", 0)),
@@ -86,8 +98,17 @@ def _get_audio_info(audio_path: Path) -> Dict[str, Any]:
 def _decode_to_wav(audio_path: Path, wav_path: Path) -> bool:
     """Decode audio file to raw PCM WAV for analysis."""
     cmd = [
-        "ffmpeg", "-y", "-i", str(audio_path),
-        "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "2", str(wav_path),
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(audio_path),
+        "-acodec",
+        "pcm_s16le",
+        "-ar",
+        "44100",
+        "-ac",
+        "2",
+        str(wav_path),
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
@@ -133,19 +154,23 @@ def _detect_gaps(
             in_gap = False
             dur = i - gap_start
             if dur >= min_gap_samples:
-                gaps.append({
-                    "start_sec": round(gap_start / sample_rate, 4),
-                    "end_sec": round(i / sample_rate, 4),
-                    "duration_ms": round(dur / sample_rate * 1000, 2),
-                })
+                gaps.append(
+                    {
+                        "start_sec": round(gap_start / sample_rate, 4),
+                        "end_sec": round(i / sample_rate, 4),
+                        "duration_ms": round(dur / sample_rate * 1000, 2),
+                    }
+                )
     if in_gap:
         dur = len(is_silent) - gap_start
         if dur >= min_gap_samples:
-            gaps.append({
-                "start_sec": round(gap_start / sample_rate, 4),
-                "end_sec": round(len(is_silent) / sample_rate, 4),
-                "duration_ms": round(dur / sample_rate * 1000, 2),
-            })
+            gaps.append(
+                {
+                    "start_sec": round(gap_start / sample_rate, 4),
+                    "end_sec": round(len(is_silent) / sample_rate, 4),
+                    "duration_ms": round(dur / sample_rate * 1000, 2),
+                }
+            )
     return gaps
 
 
@@ -156,7 +181,7 @@ def _analyze_volume_and_distortion(
     np = _get_numpy()
     if np is None:
         return {"rms_dbfs": None, "peak_dbfs": None, "clip_ratio": None, "distortion_flag": False}
-    rms = float(np.sqrt(np.mean(samples ** 2)))
+    rms = float(np.sqrt(np.mean(samples**2)))
     peak = float(np.max(np.abs(samples)))
     clip_count = int(np.sum(np.abs(samples) >= 0.999))
     clip_ratio = clip_count / len(samples) if len(samples) > 0 else 0.0
@@ -171,13 +196,19 @@ def _analyze_volume_and_distortion(
 
 
 def extract_and_validate(
-    video_path: Path, output_dir: Path, verbose: bool = False,
+    video_path: Path,
+    output_dir: Path,
+    verbose: bool = False,
 ) -> Tuple[int, Dict[str, Any]]:
     """Full pipeline: extract audio → validate continuity → check quality.
     Returns (exit_code, qc_report)."""
     qc: Dict[str, Any] = {
-        "source_video": str(video_path), "status": "unknown",
-        "audio_info": {}, "continuity": {}, "quality": {}, "gates_passed": True,
+        "source_video": str(video_path),
+        "status": "unknown",
+        "audio_info": {},
+        "continuity": {},
+        "quality": {},
+        "gates_passed": True,
     }
     if not video_path.is_file():
         logger.error("Video file not found: %s", video_path)
@@ -190,8 +221,18 @@ def extract_and_validate(
     # Extract audio to FLAC
     flac_path = output_dir / "audio.flac"
     extract_cmd = [
-        "ffmpeg", "-y", "-i", str(video_path), "-vn", "-acodec", "flac",
-        "-ar", str(DEFAULT_SAMPLE_RATE), "-ac", str(DEFAULT_CHANNELS), str(flac_path),
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(video_path),
+        "-vn",
+        "-acodec",
+        "flac",
+        "-ar",
+        str(DEFAULT_SAMPLE_RATE),
+        "-ac",
+        str(DEFAULT_CHANNELS),
+        str(flac_path),
     ]
     logger.info("Extracting audio: %s", " ".join(extract_cmd))
     result = subprocess.run(extract_cmd, capture_output=True, text=True)
@@ -232,8 +273,11 @@ def extract_and_validate(
         max_gap_ms = max((g["duration_ms"] for g in gaps), default=0.0)
         continuity_ok = max_gap_ms <= MAX_GAP_MS
         qc["continuity"] = {
-            "max_gap_ms": max_gap_ms, "gap_count": len(gaps),
-            "gaps": gaps[:20], "threshold_ms": MAX_GAP_MS, "passed": continuity_ok,
+            "max_gap_ms": max_gap_ms,
+            "gap_count": len(gaps),
+            "gaps": gaps[:20],
+            "threshold_ms": MAX_GAP_MS,
+            "passed": continuity_ok,
         }
 
         # Volume / distortion check
@@ -254,7 +298,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     parser.add_argument("video", type=Path, help="Path to input video file")
     parser.add_argument(
-        "--output-dir", "-o", type=Path, default=Path("."),
+        "--output-dir",
+        "-o",
+        type=Path,
+        default=Path("."),
         help="Directory for audio.flac and audio_qc.json (default: cwd)",
     )
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable debug logging")
@@ -265,7 +312,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     args.output_dir.mkdir(parents=True, exist_ok=True)
     exit_code, qc_report = extract_and_validate(
-        video_path=args.video, output_dir=args.output_dir, verbose=args.verbose,
+        video_path=args.video,
+        output_dir=args.output_dir,
+        verbose=args.verbose,
     )
     qc_path = args.output_dir / "audio_qc.json"
     with open(qc_path, "w", encoding="utf-8") as fh:
