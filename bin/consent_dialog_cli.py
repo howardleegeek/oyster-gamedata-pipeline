@@ -121,9 +121,7 @@ def run_dialog() -> Dict[str, bool]:
     for idx, (title, description, default_yes) in enumerate(_PROMPTS):
         print(f"--- {idx + 1}. {title} ---")
         print(description)
-        results[consent_keys[idx]] = _ask(
-            f"Do you consent to {title.lower()}?", default_yes
-        )
+        results[consent_keys[idx]] = _ask(f"Do you consent to {title.lower()}?", default_yes)
         print()
 
     return results
