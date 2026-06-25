@@ -25,6 +25,7 @@ Design notes
        (legacy data predating this residual — escalate via spec, not
        by voting FAIL on every old clip).
 """
+
 from __future__ import annotations
 
 import json
@@ -85,7 +86,9 @@ def r18_session_manifest(
 
     # IL10 ABSTAIN gate 3: empty / falsy session_id (uninitialized).
     if not isinstance(manifest_sid, str) or manifest_sid == "":
-        return ResidualResult("R18", False, math.nan, threshold, "ABSTAIN:manifest_session_id_empty")
+        return ResidualResult(
+            "R18", False, math.nan, threshold, "ABSTAIN:manifest_session_id_empty"
+        )
 
     # IL10 ABSTAIN gate 4: legacy frame with no session_id at all.
     if "session_id" not in rec:
