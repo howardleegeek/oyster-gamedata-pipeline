@@ -16,6 +16,7 @@ Schema reference (mod side: GameStateSample.toJsonLine):
      look_x, look_y, look_z, velocity_x, velocity_y, velocity_z,
      on_ground, sneaking, sprinting, dimension, game_mode}
 """
+
 from __future__ import annotations
 
 import json
