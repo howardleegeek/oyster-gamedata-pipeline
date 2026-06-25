@@ -26,6 +26,7 @@ from typing import Any, Dict, Optional, TextIO
 
 class LogLevel(IntEnum):
     """Numeric log levels compatible with stdlib logging."""
+
     DEBUG = 10
     INFO = 20
     WARNING = 30
