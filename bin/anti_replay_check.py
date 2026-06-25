@@ -56,15 +56,11 @@ class SessionStore:
     def __init__(self, max_size: int = MAX_MEMORY_SESSIONS):
         self.max_size = max_size
         self.session_ids: deque[str] = deque(maxlen=max_size)
-        self.video_hashes: deque[tuple[str, str]] = deque(
-            maxlen=max_size
-        )  # (hash, session_id)
+        self.video_hashes: deque[tuple[str, str]] = deque(maxlen=max_size)  # (hash, session_id)
         self.perceptual_hashes: deque[tuple[str, str]] = deque(
             maxlen=max_size
         )  # (hex_hash, session_id)
-        self.input_hashes: deque[tuple[str, str]] = deque(
-            maxlen=max_size
-        )  # (hash, session_id)
+        self.input_hashes: deque[tuple[str, str]] = deque(maxlen=max_size)  # (hash, session_id)
 
     def add_session_id(self, session_id: str) -> bool:
         """Return True if session_id is a duplicate."""
@@ -80,9 +76,7 @@ class SessionStore:
         self.video_hashes.append((vhash, session_id))
         return False
 
-    def add_perceptual_hash(
-        self, phash: str, session_id: str
-    ) -> tuple[bool, str | None]:
+    def add_perceptual_hash(self, phash: str, session_id: str) -> tuple[bool, str | None]:
         """
         Return (is_near_match, matched_session_id).
         Near-match means similarity > SIMILARITY_THRESHOLD.
@@ -337,9 +331,7 @@ def check_session(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Anti-replay check for uploaded sessions"
-    )
+    parser = argparse.ArgumentParser(description="Anti-replay check for uploaded sessions")
     parser.add_argument(
         "session_id",
         help="Unique session identifier",
