@@ -54,8 +54,12 @@ def _find_bare_now_calls(source: str) -> List[Tuple[int, str]]:
         if not isinstance(node, ast.Call) or node.args or node.keywords:
             continue
         func = node.func
-        if (isinstance(func, ast.Attribute) and func.attr == "now"
-                and isinstance(func.value, ast.Name) and func.value.id == "datetime"):
+        if (
+            isinstance(func, ast.Attribute)
+            and func.attr == "now"
+            and isinstance(func.value, ast.Name)
+            and func.value.id == "datetime"
+        ):
             ln = node.lineno
             hits.append((ln, lines[ln - 1].rstrip() if ln <= len(lines) else ""))
     return hits
@@ -65,14 +69,15 @@ def _fix_source(source: str) -> str:
     """Replace bare datetime.now() with datetime.now(timezone.utc)."""
     fixed = re.sub(
         r"(?<!\w)datetime\.now\s*\(\s*\)(?!\s*timezone)",
-        "datetime.now(timezone.utc)", source,
+        "datetime.now(timezone.utc)",
+        source,
     )
     if fixed != source and not re.search(r"from\s+datetime\s+import\b.*\btimezone\b", source):
         m = re.search(r"(from\s+datetime\s+import\s+)([^\n]+)", fixed)
         if m:
             existing = m.group(2).strip()
             if "timezone" not in existing:
-                fixed = fixed[:m.start()] + f"{m.group(1)}{existing}, timezone" + fixed[m.end():]
+                fixed = fixed[: m.start()] + f"{m.group(1)}{existing}, timezone" + fixed[m.end() :]
         else:
             lines = fixed.splitlines(True)
             idx = 0
@@ -110,10 +115,14 @@ def _discover_python_files(paths: Sequence[str]) -> List[Path]:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     """Entry-point: audit (and optionally fix) recorder source files."""
-    parser = argparse.ArgumentParser(description="Audit recorder code for bare datetime.now() calls.")
+    parser = argparse.ArgumentParser(
+        description="Audit recorder code for bare datetime.now() calls."
+    )
     parser.add_argument("paths", nargs="*", default=["."], help="Files or directories to scan.")
     parser.add_argument("--fix", action="store_true", help="Apply fixes in-place.")
-    parser.add_argument("--dry-run", action="store_true", default=True, help="Report only (default).")
+    parser.add_argument(
+        "--dry-run", action="store_true", default=True, help="Report only (default)."
+    )
     args = parser.parse_args(argv)
 
     files = _discover_python_files(args.paths)
@@ -138,15 +147,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 fpath.write_text(fixed, encoding="utf-8")
                 print("  -> fixed and written")
 
-    print(textwrap.dedent(f"""
+    print(
+        textwrap.dedent(f"""
         -----------------------------------------
         Summary
           Files scanned : {len(files)}
           Files with hits: {files_with_hits}
           Total hits    : {total_hits}
-          Mode          : {'FIX' if args.fix else 'DRY-RUN'}
+          Mode          : {"FIX" if args.fix else "DRY-RUN"}
         -----------------------------------------
-    """).strip())
+    """).strip()
+    )
 
     # Self-test: verify own AST is valid
     ast.parse(Path(__file__).read_text(encoding="utf-8"))
