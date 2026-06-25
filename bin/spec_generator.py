@@ -756,6 +756,15 @@ SPECS: list[dict] = [
 
 
 def build_entries() -> list[dict]:
+    """Build gap entries from SPECS with default values.
+
+    Converts each spec in SPECS into a gap entry dict with
+    default 'status' set to 'pending'.
+
+    Returns:
+        List of gap entry dicts with keys: id, title, purpose,
+        status, priority, lines_estimate.
+    """
     out = []
     for s in SPECS:
         entry = {
