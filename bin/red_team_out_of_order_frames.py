@@ -104,8 +104,7 @@ def shuffle_frames(
         return False
 
     if len(frames) < 2:
-        print(f"Only {len(frames)} frame in {input_file}; nothing to shuffle",
-              file=sys.stderr)
+        print(f"Only {len(frames)} frame in {input_file}; nothing to shuffle", file=sys.stderr)
         return False
 
     if seed is not None:
@@ -118,9 +117,7 @@ def shuffle_frames(
         print(f"Failed to replace frames in {input_file}", file=sys.stderr)
         return False
 
-    out_path = output_file or input_file.with_name(
-        f"{input_file.stem}_shuffled{input_file.suffix}"
-    )
+    out_path = output_file or input_file.with_name(f"{input_file.stem}_shuffled{input_file.suffix}")
 
     with open(out_path, "w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=2, ensure_ascii=False)
@@ -151,7 +148,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Path to the input JSON file containing frames.",
     )
     parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         type=Path,
         default=None,
         help="Output file path (default: <input_stem>_shuffled.json).",
