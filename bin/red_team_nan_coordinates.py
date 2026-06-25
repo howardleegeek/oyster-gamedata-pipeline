@@ -16,8 +16,9 @@ from typing import List, Optional
 import yaml
 
 
-def inject_nan(data: dict, field_path: str = "camera_position",
-               coords: Optional[List[str]] = None) -> dict:
+def inject_nan(
+    data: dict, field_path: str = "camera_position", coords: Optional[List[str]] = None
+) -> dict:
     """Inject NaN into coordinate fields at the given path."""
     if coords is None:
         coords = ["x", "y", "z"]
@@ -56,16 +57,17 @@ def load_yaml(path: Path) -> dict:
 def main(argv: Optional[List[str]] = None) -> int:
     """CLI entry point for NaN injection tool."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input", "-i", type=Path, required=True,
-                        help="Input YAML with camera_position")
-    parser.add_argument("--output", "-o", type=Path, required=True,
-                        help="Output file for corrupted data")
-    parser.add_argument("--field", "-f", default="camera_position",
-                        help="Field path to corrupt")
-    parser.add_argument("--coordinates", "-c", nargs="+",
-                        default=["x", "y", "z"], help="Coords to corrupt")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Validate only, don't write output")
+    parser.add_argument(
+        "--input", "-i", type=Path, required=True, help="Input YAML with camera_position"
+    )
+    parser.add_argument(
+        "--output", "-o", type=Path, required=True, help="Output file for corrupted data"
+    )
+    parser.add_argument("--field", "-f", default="camera_position", help="Field path to corrupt")
+    parser.add_argument(
+        "--coordinates", "-c", nargs="+", default=["x", "y", "z"], help="Coords to corrupt"
+    )
+    parser.add_argument("--dry-run", action="store_true", help="Validate only, don't write output")
 
     args = parser.parse_args(argv)
 
@@ -91,8 +93,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     # Atomic write via temp file
     try:
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml",
-                                          delete=False, encoding="utf-8") as tmp:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False, encoding="utf-8"
+        ) as tmp:
             tmp_path = Path(tmp.name)
             yaml.safe_dump(corrupted, tmp, default_flow_style=False)
         tmp_path.replace(args.output)
