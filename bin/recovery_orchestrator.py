@@ -77,10 +77,7 @@ def attempt_resume(filepath: Path) -> bool:
 
 
 def process_incomplete(
-    staging_dir: Path,
-    quarantine_dir: Path,
-    resume: bool = True,
-    dry_run: bool = False
+    staging_dir: Path, quarantine_dir: Path, resume: bool = True, dry_run: bool = False
 ) -> tuple[int, int]:
     """Process incomplete tarballs: resume or quarantine."""
     processed = 0
@@ -109,7 +106,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--quarantine", type=Path, required=True, help="Quarantine directory")
     parser.add_argument("--no-resume", action="store_true", help="Skip resume, quarantine all")
     parser.add_argument("--dry-run", action="store_true", help="Log actions without executing")
-    parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="INFO")
+    parser.add_argument(
+        "--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="INFO"
+    )
     return parser.parse_args(argv)
 
 
@@ -130,9 +129,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         processed, quarantined = process_incomplete(
-            args.staging, args.quarantine,
-            resume=not args.no_resume,
-            dry_run=args.dry_run
+            args.staging, args.quarantine, resume=not args.no_resume, dry_run=args.dry_run
         )
         logger.info(f"Complete: processed={processed}, quarantined={quarantined}")
         return 0
