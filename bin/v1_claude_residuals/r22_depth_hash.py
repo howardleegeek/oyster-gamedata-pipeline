@@ -26,6 +26,7 @@ Design notes
     3. manifest JSON is unreadable / malformed
     4. manifest is not a flat ``{filename: sha256_hex}`` mapping
 """
+
 from __future__ import annotations
 
 import hashlib
