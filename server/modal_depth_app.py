@@ -18,6 +18,7 @@ import numpy as np
 # ---------------------------------------------------------------------------
 stub = modal.Stub("oyster-depth")
 
+
 # ---------------------------------------------------------------------------
 # Image definition
 # ---------------------------------------------------------------------------
@@ -52,6 +53,7 @@ image = (
     .apt_install("ffmpeg")
     .run_function(download_model)
 )
+
 
 # ---------------------------------------------------------------------------
 # Core depth computation
@@ -95,9 +97,12 @@ def compute_depth(video_bytes: bytes, fps: int = 6) -> bytes:
             [
                 "ffmpeg",
                 "-y",
-                "-i", video_path,
-                "-vf", f"fps={fps}",
-                "-q:v", "2",
+                "-i",
+                video_path,
+                "-vf",
+                f"fps={fps}",
+                "-q:v",
+                "2",
                 os.path.join(frames_dir, "frame_%06d.jpg"),
             ],
             check=True,
@@ -163,9 +168,7 @@ def write_exr(path: str, depth_array: np.ndarray):
 
     height, width = depth_array.shape
     header = OpenEXR.Header(width, height)
-    header["channels"] = {
-        "Z": Imath.Channel(Imath.PixelType(Imath.PixelType.FLOAT))
-    }
+    header["channels"] = {"Z": Imath.Channel(Imath.PixelType(Imath.PixelType.FLOAT))}
     exr = OpenEXR.OutputFile(path, header)
     exr.writePixels({"Z": depth_array.tobytes()})
     exr.close()
