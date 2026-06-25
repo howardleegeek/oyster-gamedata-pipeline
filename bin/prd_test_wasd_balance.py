@@ -23,6 +23,7 @@ from typing import NamedTuple
 
 class KeyStats(NamedTuple):
     """Statistics for a single key."""
+
     key: str
     count: int
     percentage: float
@@ -30,6 +31,7 @@ class KeyStats(NamedTuple):
 
 class BalanceResult(NamedTuple):
     """Result of balance analysis."""
+
     total: int
     stats: list[KeyStats]
     violations: list[KeyStats]
@@ -56,10 +58,7 @@ def parse_keypress_file(path: Path) -> dict[str, int]:
                             counts[key] += 1
                 return counts
             elif isinstance(data, dict):
-                return {
-                    k.upper(): v for k, v in data.items()
-                    if k.upper() in counts
-                }
+                return {k.upper(): v for k, v in data.items() if k.upper() in counts}
         except (json.JSONDecodeError, ValueError):
             pass
 
@@ -118,21 +117,16 @@ def main(argv: list[str] | None = None) -> int:
     Returns:
         Exit code: 0=pass, 1=violation, 2=error
     """
-    parser = argparse.ArgumentParser(
-        description="Test WASD key balance in capture files"
-    )
+    parser = argparse.ArgumentParser(description="Test WASD key balance in capture files")
+    parser.add_argument("input", type=Path, help="Input file (CSV or JSON format)")
     parser.add_argument(
-        "input", type=Path,
-        help="Input file (CSV or JSON format)"
+        "-t",
+        "--threshold",
+        type=float,
+        default=60.0,
+        help="Maximum allowed percentage for any key (default: 60.0)",
     )
-    parser.add_argument(
-        "-t", "--threshold", type=float, default=60.0,
-        help="Maximum allowed percentage for any key (default: 60.0)"
-    )
-    parser.add_argument(
-        "-v", "--verbose", action="store_true",
-        help="Print detailed statistics"
-    )
+    parser.add_argument("-v", "--verbose", action="store_true", help="Print detailed statistics")
 
     args = parser.parse_args(argv)
 
