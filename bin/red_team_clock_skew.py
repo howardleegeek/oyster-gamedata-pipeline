@@ -16,6 +16,7 @@ from typing import Callable, Optional
 
 class ClockSource(Enum):
     """Available clock sources."""
+
     SYSTEM = "system"
     MONOTONIC = "monotonic"
 
@@ -23,6 +24,7 @@ class ClockSource(Enum):
 @dataclass
 class ClockState:
     """Current state of the clock adapter."""
+
     source: ClockSource
     last_system_time: float
     last_monotonic_time: float
@@ -39,7 +41,8 @@ class ClockAdapter:
             source=ClockSource.SYSTEM,
             last_system_time=time.time(),
             last_monotonic_time=time.monotonic(),
-            skew_detected=False, skew_amount=0.0
+            skew_detected=False,
+            skew_amount=0.0,
         )
 
     @property
@@ -62,8 +65,9 @@ class ClockAdapter:
         """Check if system clock jumped backward beyond threshold. Returns True if switched."""
         current_system = time.time()
         current_monotonic = time.monotonic()
-        skew = (current_system - self._state.last_system_time) - \
-               (current_monotonic - self._state.last_monotonic_time)
+        skew = (current_system - self._state.last_system_time) - (
+            current_monotonic - self._state.last_monotonic_time
+        )
 
         if skew < -self._threshold:
             self._state.skew_detected = True
@@ -81,13 +85,17 @@ class ClockAdapter:
             source=ClockSource.SYSTEM,
             last_system_time=time.time(),
             last_monotonic_time=time.monotonic(),
-            skew_detected=False, skew_amount=0.0
+            skew_detected=False,
+            skew_amount=0.0,
         )
 
 
-def monitor_clock(adapter: ClockAdapter, duration_seconds: float,
-                  callback: Optional[Callable[[ClockSource, float], None]] = None,
-                  poll_interval: float = 0.1) -> bool:
+def monitor_clock(
+    adapter: ClockAdapter,
+    duration_seconds: float,
+    callback: Optional[Callable[[ClockSource, float], None]] = None,
+    poll_interval: float = 0.1,
+) -> bool:
     """Monitor clock for specified duration. Returns True if skew detected."""
     end_time = time.monotonic() + duration_seconds
     while time.monotonic() < end_time:
@@ -102,13 +110,26 @@ def monitor_clock(adapter: ClockAdapter, duration_seconds: float,
 def main(argv: Optional[list] = None) -> int:
     """Main entry point. Returns 0 if no skew, 1 if skew detected, 2 on error."""
     parser = argparse.ArgumentParser(
-        description="Detect machine clock jumps backward and switch to monotonic clock.")
-    parser.add_argument("--threshold", type=float, default=3600.0,
-                        help="Backward jump threshold in seconds (default: 3600)")
-    parser.add_argument("--monitor-duration", type=float, default=60.0,
-                        help="Duration to monitor in seconds (default: 60)")
-    parser.add_argument("--simulate-skew", type=float, default=None,
-                        help="Simulate a clock skew of given seconds (for testing)")
+        description="Detect machine clock jumps backward and switch to monotonic clock."
+    )
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=3600.0,
+        help="Backward jump threshold in seconds (default: 3600)",
+    )
+    parser.add_argument(
+        "--monitor-duration",
+        type=float,
+        default=60.0,
+        help="Duration to monitor in seconds (default: 60)",
+    )
+    parser.add_argument(
+        "--simulate-skew",
+        type=float,
+        default=None,
+        help="Simulate a clock skew of given seconds (for testing)",
+    )
     args = parser.parse_args(argv)
 
     try:
