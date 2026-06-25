@@ -38,7 +38,7 @@ logger = logging.getLogger("vendor_low_disk")
 def get_free_disk_gb(path: str) -> float:
     """Return free disk space in gigabytes for the filesystem containing *path*."""
     usage = shutil.disk_usage(path)
-    return usage.free / (1024 ** 3)
+    return usage.free / (1024**3)
 
 
 def check_disk_space(
