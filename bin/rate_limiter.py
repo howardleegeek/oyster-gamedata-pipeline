@@ -129,6 +129,14 @@ class VendorRateLimiter:
             tmp.replace(self.state_file)
 
     def get_bucket(self, vendor_id: str) -> TokenBucket:
+        """Get or create a token bucket for a vendor.
+
+        Args:
+            vendor_id: Unique vendor identifier.
+
+        Returns:
+            The TokenBucket instance for the specified vendor.
+        """
         with self._lock:
             if vendor_id not in self._buckets:
                 self._buckets[vendor_id] = TokenBucket(capacity=self.default_budget)
@@ -151,6 +159,14 @@ class VendorRateLimiter:
         return self.get_bucket(vendor_id).get_available()
 
     def reset_vendor(self, vendor_id: str) -> None:
+        """Reset a vendor's token bucket to full capacity.
+
+        Args:
+            vendor_id: Unique vendor identifier.
+
+        Returns:
+            None.
+        """
         self.get_bucket(vendor_id).reset()
         self.save_state()
 
