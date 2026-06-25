@@ -27,14 +27,14 @@ def process_clip(clip_id: int, fail_rate: float = 0.05) -> Dict:
     return {"id": clip_id, "ok": True, "time": elapsed, "err": None}
 
 
-def process_burst(burst_id: int, size: int = 50, workers: int = 10,
-                  fail_rate: float = 0.05, timeout: float = 10.0) -> Tuple[List[Dict], float]:
+def process_burst(
+    burst_id: int, size: int = 50, workers: int = 10, fail_rate: float = 0.05, timeout: float = 10.0
+) -> Tuple[List[Dict], float]:
     """Process a burst of clips concurrently."""
     results, start = [], time.time()
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
         future_to_idx = {
-            executor.submit(process_clip, burst_id * size + i, fail_rate): i
-            for i in range(size)
+            executor.submit(process_clip, burst_id * size + i, fail_rate): i for i in range(size)
         }
         for future in concurrent.futures.as_completed(future_to_idx):
             idx = future_to_idx[future]
@@ -50,9 +50,13 @@ def process_burst(burst_id: int, size: int = 50, workers: int = 10,
     return results, elapsed
 
 
-def run_stress_test(duration_min: float = 5.0, burst_size: int = 50,
-                    workers: int = 10, fail_rate: float = 0.05,
-                    interval: float = 60.0) -> Tuple[bool, Dict]:
+def run_stress_test(
+    duration_min: float = 5.0,
+    burst_size: int = 50,
+    workers: int = 10,
+    fail_rate: float = 0.05,
+    interval: float = 60.0,
+) -> Tuple[bool, Dict]:
     """Run stress test for specified duration."""
     logger.info(f"Starting: {burst_size} clips/burst, {duration_min} min, {workers} workers")
     start_time = time.time()
@@ -79,14 +83,20 @@ def run_stress_test(duration_min: float = 5.0, burst_size: int = 50,
     total_elapsed = time.time() - start_time
     total, ok = len(all_results), sum(1 for r in all_results if r["ok"])
     stats = {
-        "bursts": burst_count, "total_clips": total, "ok_clips": ok,
-        "success_rate": ok / total if total else 0, "total_time_sec": total_elapsed,
+        "bursts": burst_count,
+        "total_clips": total,
+        "ok_clips": ok,
+        "success_rate": ok / total if total else 0,
+        "total_time_sec": total_elapsed,
         "clips_per_minute": (total / total_elapsed * 60) if total_elapsed else 0,
-        "slow_bursts": slow_bursts, "deadlock_detected": deadlock,
+        "slow_bursts": slow_bursts,
+        "deadlock_detected": deadlock,
     }
     logger.info("=" * 50)
     logger.info(f"Complete: {burst_count} bursts, {total} clips, {stats['success_rate']:.1%} OK")
-    logger.info(f"Throughput: {stats['clips_per_minute']:.1f} clips/min, Time: {total_elapsed:.1f}s")
+    logger.info(
+        f"Throughput: {stats['clips_per_minute']:.1f} clips/min, Time: {total_elapsed:.1f}s"
+    )
     return not deadlock and stats["success_rate"] >= 0.9, stats
 
 
