@@ -69,6 +69,7 @@ _DEFAULT_CONFIG: Dict[str, Any] = {
 # Exceptions
 # ---------------------------------------------------------------------------
 
+
 class ConfigError(Exception):
     """Raised when the config is invalid or cannot be loaded."""
 
@@ -76,6 +77,7 @@ class ConfigError(Exception):
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def load(config_path: Optional[Path] = None) -> Dict[str, Any]:
     """Load the OysterRecorder configuration.
@@ -119,6 +121,7 @@ def load(config_path: Optional[Path] = None) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
 
 def _load_from_path(path: Path) -> Dict[str, Any]:
     """Try to load config from *path*, falling back through defaults."""
