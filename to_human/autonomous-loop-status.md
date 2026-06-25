@@ -639,3 +639,8 @@
 
 - Picked: ruff format bin/zbuffer_to_exr.py (smallest unformatted file: 145 lines, added blank lines between functions, fixed quotes and spacing). Justification: measurable code smell, single-file scope, no behavior change, module import smoke OK, no targeted tests to break, follows established cadence.
 - Result: committed 50f5e0ba (ruff format applied to bin/zbuffer_to_exr.py; 1 file changed, 55 insertions(+), 49 deletions(-); ruff check clean; import smoke OK (module loads without error); pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 319 @ 2026-06-25T15:20:00Z
+
+- Picked: ruff format bin/autoresearch_clip_density.py (smallest unformatted bin/ file at 163 lines; blank lines between functions, line-wrapping per E501). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, import smoke OK, no dedicated test file (no regressions possible), follows established cadence of previous rounds.
+- Result: committed 8cbea7e2 (ruff format applied to bin/autoresearch_clip_density.py; 1 file changed, 13 insertions(+), 2 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — blank lines between functions (E302), long line wrapping (E501). No silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
