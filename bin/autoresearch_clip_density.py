@@ -26,6 +26,7 @@ DEFAULT_SCENE_TYPES: Tuple[str, ...] = ("combat", "build", "explore")
 def _get_numpy():
     """Lazy-import numpy."""
     import numpy as np  # noqa: F811
+
     return np
 
 
@@ -49,12 +50,22 @@ def compute_clip_density(
         subset = vecs[mask]
         count = int(mask.sum())
         if count == 0:
-            results[stype] = {"count": 0, "mean_density": 0.0, "variance": 0.0, "diversity_score": 0.0}
+            results[stype] = {
+                "count": 0,
+                "mean_density": 0.0,
+                "variance": 0.0,
+                "diversity_score": 0.0,
+            }
             continue
         centroid = subset.mean(axis=0)
         cn = np.linalg.norm(centroid)
         if cn < 1e-8:
-            results[stype] = {"count": count, "mean_density": 0.0, "variance": 0.0, "diversity_score": 0.0}
+            results[stype] = {
+                "count": count,
+                "mean_density": 0.0,
+                "variance": 0.0,
+                "diversity_score": 0.0,
+            }
             continue
         centroid /= cn
         sims = subset @ centroid
