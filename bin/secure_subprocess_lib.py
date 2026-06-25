@@ -7,6 +7,7 @@ Usage:
     python3 bin/secure_subprocess_lib.py -- ls -la /
     python3 bin/secure_subprocess_lib.py --allowlist ls,cat -- cat /etc/hostname
 """
+
 from __future__ import annotations
 
 import argparse
@@ -30,17 +31,82 @@ class BinaryNotAllowedError(SecureSubprocessError):
     """Raised when a binary is not in the allowlist."""
 
 
-DEFAULT_ALLOWLIST: Set[str] = frozenset({
-    "ls", "cat", "head", "tail", "wc", "grep", "find", "sort", "uniq",
-    "awk", "sed", "cut", "tr", "diff", "echo", "date", "whoami", "pwd",
-    "mkdir", "cp", "mv", "rm", "chmod", "chown", "stat", "file",
-    "md5sum", "sha256sum", "tar", "gzip", "gunzip", "zip", "unzip",
-    "python3", "python", "node", "bash", "sh", "env", "printenv",
-    "id", "uname", "df", "du", "ps", "sleep", "touch", "ln", "readlink",
-    "basename", "dirname", "realpath", "which", "xargs", "tee", "jq",
-    "curl", "wget", "git", "make", "gcc", "g++", "clang", "pip", "pip3",
-    "npm", "rsync", "ssh", "scp", "base64", "xxd", "hexdump",
-})
+DEFAULT_ALLOWLIST: Set[str] = frozenset(
+    {
+        "ls",
+        "cat",
+        "head",
+        "tail",
+        "wc",
+        "grep",
+        "find",
+        "sort",
+        "uniq",
+        "awk",
+        "sed",
+        "cut",
+        "tr",
+        "diff",
+        "echo",
+        "date",
+        "whoami",
+        "pwd",
+        "mkdir",
+        "cp",
+        "mv",
+        "rm",
+        "chmod",
+        "chown",
+        "stat",
+        "file",
+        "md5sum",
+        "sha256sum",
+        "tar",
+        "gzip",
+        "gunzip",
+        "zip",
+        "unzip",
+        "python3",
+        "python",
+        "node",
+        "bash",
+        "sh",
+        "env",
+        "printenv",
+        "id",
+        "uname",
+        "df",
+        "du",
+        "ps",
+        "sleep",
+        "touch",
+        "ln",
+        "readlink",
+        "basename",
+        "dirname",
+        "realpath",
+        "which",
+        "xargs",
+        "tee",
+        "jq",
+        "curl",
+        "wget",
+        "git",
+        "make",
+        "gcc",
+        "g++",
+        "clang",
+        "pip",
+        "pip3",
+        "npm",
+        "rsync",
+        "ssh",
+        "scp",
+        "base64",
+        "xxd",
+        "hexdump",
+    }
+)
 
 
 def validate_binary(binary: str, allowlist: Set[str]) -> str:
@@ -76,8 +142,14 @@ def run(
     run_env: Optional[Dict[str, str]] = {**os.environ, **env} if env else None
 
     return subprocess.run(
-        list(cmd), shell=False, timeout=timeout, cwd=cwd, env=run_env,
-        capture_output=capture_output, check=check, **kwargs,
+        list(cmd),
+        shell=False,
+        timeout=timeout,
+        cwd=cwd,
+        env=run_env,
+        capture_output=capture_output,
+        check=check,
+        **kwargs,
     )
 
 
@@ -92,15 +164,20 @@ def main(argv: Optional[List[str]] = None) -> int:
         description="Secure subprocess runner with binary allowlist.",
     )
     parser.add_argument(
-        "--allowlist", type=str, default=None,
+        "--allowlist",
+        type=str,
+        default=None,
         help="Comma-separated list of allowed binaries.",
     )
     parser.add_argument(
-        "--timeout", type=float, default=None,
+        "--timeout",
+        type=float,
+        default=None,
         help="Maximum seconds to wait for the subprocess.",
     )
     parser.add_argument(
-        "command", nargs=argparse.REMAINDER,
+        "command",
+        nargs=argparse.REMAINDER,
         help="Command and arguments to execute.",
     )
 
