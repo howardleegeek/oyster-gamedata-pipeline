@@ -28,6 +28,7 @@ REQUIRED_KEYS: List[str] = ["gpu", "cpu", "ram_gb", "os", "build"]
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _load_json(path: Path) -> Dict[str, Any]:
     """Load and return a JSON document from *path*."""
     with path.open("r", encoding="utf-8") as fh:
@@ -71,6 +72,7 @@ def validate_required_keys(data: Dict[str, Any]) -> List[str]:
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def main(argv: List[str] | None = None) -> int:
     """Entry-point: parse args, load file, validate, report.
