@@ -62,17 +62,27 @@ def check_fps_consistency(session) -> Dict[str, Any]:
     """QM1: FPS consistency - stddev/mean < 5% over 60-sec window"""
     try:
         # Try to get video file path
-        video_path = getattr(session, 'video_path', None)
+        video_path = getattr(session, "video_path", None)
         if not video_path or not os.path.exists(video_path):
-            return {"id": "QM1", "status": "SKIP", "evidence": "Video file not found", "value": None}
+            return {
+                "id": "QM1",
+                "status": "SKIP",
+                "evidence": "Video file not found",
+                "value": None,
+            }
 
         # Use ffprobe to get packet timestamps
         cmd = [
-            'ffprobe', '-v', 'quiet',
-            '-select_streams', 'v:0',
-            '-show_entries', 'packet=pts_time',
-            '-of', 'csv=p=0',
-            str(video_path)
+            "ffprobe",
+            "-v",
+            "quiet",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "packet=pts_time",
+            "-of",
+            "csv=p=0",
+            str(video_path),
         ]
 
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
@@ -81,7 +91,7 @@ def check_fps_consistency(session) -> Dict[str, Any]:
 
         # Parse timestamps
         timestamps = []
-        for line in result.stdout.strip().split('\n'):
+        for line in result.stdout.strip().split("\n"):
             if line:
                 try:
                     timestamps.append(float(line))
@@ -89,12 +99,17 @@ def check_fps_consistency(session) -> Dict[str, Any]:
                     continue
 
         if len(timestamps) < 2:
-            return {"id": "QM1", "status": "SKIP", "evidence": "Insufficient timestamps", "value": None}
+            return {
+                "id": "QM1",
+                "status": "SKIP",
+                "evidence": "Insufficient timestamps",
+                "value": None,
+            }
 
         # Calculate deltas (time between frames)
         deltas = []
         for i in range(1, len(timestamps)):
-            delta = timestamps[i] - timestamps[i-1]
+            delta = timestamps[i] - timestamps[i - 1]
             if delta > 0:  # Skip negative or zero deltas
                 deltas.append(delta)
 
@@ -104,7 +119,12 @@ def check_fps_consistency(session) -> Dict[str, Any]:
         # Calculate mean and stddev
         mean_delta = statistics.mean(deltas)
         if mean_delta == 0:
-            return {"id": "QM1", "status": "FAIL", "evidence": "Zero mean delta", "value": float('inf')}
+            return {
+                "id": "QM1",
+                "status": "FAIL",
+                "evidence": "Zero mean delta",
+                "value": float("inf"),
+            }
 
         stddev_delta = statistics.stdev(deltas) if len(deltas) > 1 else 0
 
@@ -119,7 +139,7 @@ def check_fps_consistency(session) -> Dict[str, Any]:
             "id": "QM1",
             "status": status,
             "evidence": f"CV={cv:.4f}, mean={mean_delta:.6f}s, stddev={stddev_delta:.6f}s",
-            "value": cv
+            "value": cv,
         }
 
     except Exception as e:
@@ -129,12 +149,17 @@ def check_fps_consistency(session) -> Dict[str, Any]:
 def check_frame_drops(session) -> Dict[str, Any]:
     """QM2: Frame drops - 0 missing frames in monotone index 0..N"""
     try:
-        frames_path = getattr(session, 'frames_jsonl_path', None)
+        frames_path = getattr(session, "frames_jsonl_path", None)
         if not frames_path or not os.path.exists(frames_path):
-            return {"id": "QM2", "status": "SKIP", "evidence": "frames.jsonl not found", "value": None}
+            return {
+                "id": "QM2",
+                "status": "SKIP",
+                "evidence": "frames.jsonl not found",
+                "value": None,
+            }
 
         frame_indices = []
-        with open(frames_path, 'r') as f:
+        with open(frames_path, "r") as f:
             for line in f:
                 try:
                     data = json.loads(line.strip())
@@ -143,7 +168,7 @@ def check_frame_drops(session) -> Dict[str, Any]:
                     # frames.jsonl uses "idx" and "frame" per the recorder/transform
                     # convention. SKIP-ing valid sessions just because of a field
                     # name mismatch is theatrical, not honest.
-                    for key in ('frame_index', 'idx', 'frame'):
+                    for key in ("frame_index", "idx", "frame"):
                         if key in data:
                             frame_indices.append(data[key])
                             break
@@ -151,7 +176,12 @@ def check_frame_drops(session) -> Dict[str, Any]:
                     continue
 
         if not frame_indices:
-            return {"id": "QM2", "status": "SKIP", "evidence": "No frame indices found", "value": None}
+            return {
+                "id": "QM2",
+                "status": "SKIP",
+                "evidence": "No frame indices found",
+                "value": None,
+            }
 
         # Check for monotonic sequence without gaps
         frame_indices.sort()
@@ -180,18 +210,23 @@ def check_frame_drops(session) -> Dict[str, Any]:
 def check_audio_snr(session) -> Dict[str, Any]:
     """QM3: Audio SNR > 30 dB"""
     try:
-        audio_path = getattr(session, 'audio_flac_path', None)
+        audio_path = getattr(session, "audio_flac_path", None)
         if not audio_path or not os.path.exists(audio_path):
-            return {"id": "QM3", "status": "SKIP", "evidence": "audio.flac not found", "value": None}
+            return {
+                "id": "QM3",
+                "status": "SKIP",
+                "evidence": "audio.flac not found",
+                "value": None,
+            }
 
         # Check if sox is available
         try:
-            subprocess.run(['sox', '--version'], capture_output=True, check=True)
+            subprocess.run(["sox", "--version"], capture_output=True, check=True)
         except (subprocess.CalledProcessError, FileNotFoundError):
             return {"id": "QM3", "status": "SKIP", "evidence": "sox not installed", "value": None}
 
         # Run sox stats
-        cmd = ['sox', str(audio_path), '-n', 'stats']
+        cmd = ["sox", str(audio_path), "-n", "stats"]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
 
         if result.returncode != 0:
@@ -199,11 +234,11 @@ def check_audio_snr(session) -> Dict[str, Any]:
 
         # Parse SNR from sox output
         snr = None
-        for line in result.stderr.split('\n'):
-            if 'SNR' in line:
+        for line in result.stderr.split("\n"):
+            if "SNR" in line:
                 try:
                     # Extract SNR value (format: "SNR       :   xx.x dB")
-                    parts = line.split(':')
+                    parts = line.split(":")
                     if len(parts) > 1:
                         snr_str = parts[1].strip().split()[0]
                         snr = float(snr_str)
@@ -212,15 +247,15 @@ def check_audio_snr(session) -> Dict[str, Any]:
                     continue
 
         if snr is None:
-            return {"id": "QM3", "status": "SKIP", "evidence": "SNR not found in sox output", "value": None}
+            return {
+                "id": "QM3",
+                "status": "SKIP",
+                "evidence": "SNR not found in sox output",
+                "value": None,
+            }
 
         status = "PASS" if snr > 30 else "FAIL"
-        return {
-            "id": "QM3",
-            "status": status,
-            "evidence": f"SNR={snr:.1f} dB",
-            "value": snr
-        }
+        return {"id": "QM3", "status": status, "evidence": f"SNR={snr:.1f} dB", "value": snr}
 
     except Exception as e:
         return {"id": "QM3", "status": "SKIP", "evidence": f"Error: {str(e)}", "value": None}
@@ -229,18 +264,23 @@ def check_audio_snr(session) -> Dict[str, Any]:
 def check_audio_dynamic_range(session) -> Dict[str, Any]:
     """QM4: Audio dynamic range - RMS lev dB > -30"""
     try:
-        audio_path = getattr(session, 'audio_flac_path', None)
+        audio_path = getattr(session, "audio_flac_path", None)
         if not audio_path or not os.path.exists(audio_path):
-            return {"id": "QM4", "status": "SKIP", "evidence": "audio.flac not found", "value": None}
+            return {
+                "id": "QM4",
+                "status": "SKIP",
+                "evidence": "audio.flac not found",
+                "value": None,
+            }
 
         # Check if sox is available
         try:
-            subprocess.run(['sox', '--version'], capture_output=True, check=True)
+            subprocess.run(["sox", "--version"], capture_output=True, check=True)
         except (subprocess.CalledProcessError, FileNotFoundError):
             return {"id": "QM4", "status": "SKIP", "evidence": "sox not installed", "value": None}
 
         # Run sox stats
-        cmd = ['sox', str(audio_path), '-n', 'stats']
+        cmd = ["sox", str(audio_path), "-n", "stats"]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
 
         if result.returncode != 0:
@@ -248,11 +288,11 @@ def check_audio_dynamic_range(session) -> Dict[str, Any]:
 
         # Parse RMS level from sox output
         rms_db = None
-        for line in result.stderr.split('\n'):
-            if 'RMS lev dB' in line:
+        for line in result.stderr.split("\n"):
+            if "RMS lev dB" in line:
                 try:
                     # Extract RMS value (format: "RMS lev dB    :   -xx.xx")
-                    parts = line.split(':')
+                    parts = line.split(":")
                     if len(parts) > 1:
                         rms_str = parts[1].strip().split()[0]
                         rms_db = float(rms_str)
@@ -261,14 +301,19 @@ def check_audio_dynamic_range(session) -> Dict[str, Any]:
                     continue
 
         if rms_db is None:
-            return {"id": "QM4", "status": "SKIP", "evidence": "RMS level not found in sox output", "value": None}
+            return {
+                "id": "QM4",
+                "status": "SKIP",
+                "evidence": "RMS level not found in sox output",
+                "value": None,
+            }
 
         status = "PASS" if rms_db > -30 else "FAIL"
         return {
             "id": "QM4",
             "status": status,
             "evidence": f"RMS level={rms_db:.2f} dB",
-            "value": rms_db
+            "value": rms_db,
         }
 
     except Exception as e:
@@ -278,30 +323,40 @@ def check_audio_dynamic_range(session) -> Dict[str, Any]:
 def check_input_latency_p99(session) -> Dict[str, Any]:
     """QM5: Input latency p99 < 100 ms"""
     try:
-        latency_path = getattr(session, 'input_latency_json_path', None)
+        latency_path = getattr(session, "input_latency_json_path", None)
         if not latency_path or not os.path.exists(latency_path):
-            return {"id": "QM5", "status": "SKIP", "evidence": "input_latency.json not found", "value": None}
+            return {
+                "id": "QM5",
+                "status": "SKIP",
+                "evidence": "input_latency.json not found",
+                "value": None,
+            }
 
-        with open(latency_path, 'r') as f:
+        with open(latency_path, "r") as f:
             data = json.load(f)
 
         # Extract latency values
         latencies = []
         if isinstance(data, list):
             for item in data:
-                if isinstance(item, dict) and 'latency_ms' in item:
-                    latencies.append(item['latency_ms'])
+                if isinstance(item, dict) and "latency_ms" in item:
+                    latencies.append(item["latency_ms"])
                 elif isinstance(item, (int, float)):
                     latencies.append(item)
         elif isinstance(data, dict):
             # Try common keys
-            for key in ['latencies', 'latency_ms', 'values']:
+            for key in ["latencies", "latency_ms", "values"]:
                 if key in data and isinstance(data[key], list):
                     latencies.extend([x for x in data[key] if isinstance(x, (int, float))])
                     break
 
         if not latencies:
-            return {"id": "QM5", "status": "SKIP", "evidence": "No latency values found", "value": None}
+            return {
+                "id": "QM5",
+                "status": "SKIP",
+                "evidence": "No latency values found",
+                "value": None,
+            }
 
         # Calculate p99
         latencies.sort()
@@ -316,7 +371,7 @@ def check_input_latency_p99(session) -> Dict[str, Any]:
             "id": "QM5",
             "status": status,
             "evidence": f"p99 latency={p99:.1f} ms (n={n})",
-            "value": p99
+            "value": p99,
         }
 
     except Exception as e:
@@ -326,14 +381,24 @@ def check_input_latency_p99(session) -> Dict[str, Any]:
 def check_depth_entropy(session) -> Dict[str, Any]:
     """QM6: Depth entropy > 4.0 (not all-zero)"""
     try:
-        depth_dir = getattr(session, 'depth_dir', None)
+        depth_dir = getattr(session, "depth_dir", None)
         if not depth_dir or not os.path.exists(depth_dir):
-            return {"id": "QM6", "status": "SKIP", "evidence": "depth directory not found", "value": None}
+            return {
+                "id": "QM6",
+                "status": "SKIP",
+                "evidence": "depth directory not found",
+                "value": None,
+            }
 
         # Find first .exr file
-        exr_files = list(Path(depth_dir).glob('*.exr'))
+        exr_files = list(Path(depth_dir).glob("*.exr"))
         if not exr_files:
-            return {"id": "QM6", "status": "SKIP", "evidence": "No .exr files found in depth directory", "value": None}
+            return {
+                "id": "QM6",
+                "status": "SKIP",
+                "evidence": "No .exr files found in depth directory",
+                "value": None,
+            }
 
         first_exr = str(exr_files[0])
 
@@ -343,12 +408,17 @@ def check_depth_entropy(session) -> Dict[str, Any]:
             import numpy as np
             import OpenEXR
         except ImportError:
-            return {"id": "QM6", "status": "SKIP", "evidence": "OpenEXR not installed", "value": None}
+            return {
+                "id": "QM6",
+                "status": "SKIP",
+                "evidence": "OpenEXR not installed",
+                "value": None,
+            }
 
         # Read EXR file
         try:
             exr_file = OpenEXR.InputFile(first_exr)
-            dw = exr_file.header()['dataWindow']
+            dw = exr_file.header()["dataWindow"]
             size = (dw.max.x - dw.min.x + 1, dw.max.y - dw.min.y + 1)
 
             # Read depth channel
@@ -357,8 +427,8 @@ def check_depth_entropy(session) -> Dict[str, Any]:
             # tried "R" and SKIP-ed with confusing message — a direct contradiction
             # with H5. Now try "Z" first (canonical), fall back to "R" (legacy).
             pt = Imath.PixelType(Imath.PixelType.FLOAT)
-            channels = list(exr_file.header()['channels'].keys())
-            depth_channel = 'Z' if 'Z' in channels else ('R' if 'R' in channels else channels[0])
+            channels = list(exr_file.header()["channels"].keys())
+            depth_channel = "Z" if "Z" in channels else ("R" if "R" in channels else channels[0])
             depth_str = exr_file.channel(depth_channel, pt)
             depth_array = np.frombuffer(depth_str, dtype=np.float32).reshape(size[1], size[0])
 
@@ -369,7 +439,12 @@ def check_depth_entropy(session) -> Dict[str, Any]:
             depth_flat = depth_flat[np.isfinite(depth_flat)]
 
             if len(depth_flat) == 0:
-                return {"id": "QM6", "status": "FAIL", "evidence": "All depth values are NaN/inf", "value": 0.0}
+                return {
+                    "id": "QM6",
+                    "status": "FAIL",
+                    "evidence": "All depth values are NaN/inf",
+                    "value": 0.0,
+                }
 
             # Normalize to 0-255 for histogram
             depth_min = np.min(depth_flat)
@@ -379,7 +454,9 @@ def check_depth_entropy(session) -> Dict[str, Any]:
                 # All values are the same
                 entropy_val = 0.0
             else:
-                depth_norm = ((depth_flat - depth_min) / (depth_max - depth_min) * 255).astype(np.int32)
+                depth_norm = ((depth_flat - depth_min) / (depth_max - depth_min) * 255).astype(
+                    np.int32
+                )
                 depth_norm = np.clip(depth_norm, 0, 255)
 
                 # Compute histogram
@@ -400,11 +477,16 @@ def check_depth_entropy(session) -> Dict[str, Any]:
                 "id": "QM6",
                 "status": status,
                 "evidence": f"Depth entropy={entropy_val:.2f} (min={depth_min:.2f}, max={depth_max:.2f})",
-                "value": entropy_val
+                "value": entropy_val,
             }
 
         except Exception as e:
-            return {"id": "QM6", "status": "SKIP", "evidence": f"Error reading EXR: {str(e)}", "value": None}
+            return {
+                "id": "QM6",
+                "status": "SKIP",
+                "evidence": f"Error reading EXR: {str(e)}",
+                "value": None,
+            }
 
     except Exception as e:
         return {"id": "QM6", "status": "SKIP", "evidence": f"Error: {str(e)}", "value": None}
@@ -413,24 +495,29 @@ def check_depth_entropy(session) -> Dict[str, Any]:
 def check_action_diversity(session) -> Dict[str, Any]:
     """QM7: Action diversity - >= 6 distinct event types"""
     try:
-        inputs_path = getattr(session, 'inputs_jsonl_path', None)
+        inputs_path = getattr(session, "inputs_jsonl_path", None)
         if not inputs_path or not os.path.exists(inputs_path):
-            return {"id": "QM7", "status": "SKIP", "evidence": "inputs.jsonl not found", "value": None}
+            return {
+                "id": "QM7",
+                "status": "SKIP",
+                "evidence": "inputs.jsonl not found",
+                "value": None,
+            }
 
         event_types = set()
-        with open(inputs_path, 'r') as f:
+        with open(inputs_path, "r") as f:
             for line in f:
                 try:
                     data = json.loads(line.strip())
                     # Look for event type in common formats
-                    if 'event_type' in data:
-                        event_types.add(data['event_type'])
-                    elif 'type' in data:
-                        event_types.add(data['type'])
-                    elif 'action' in data:
-                        event_types.add(data['action'])
-                    elif 'key' in data:
-                        event_types.add(data['key'])
+                    if "event_type" in data:
+                        event_types.add(data["event_type"])
+                    elif "type" in data:
+                        event_types.add(data["type"])
+                    elif "action" in data:
+                        event_types.add(data["action"])
+                    elif "key" in data:
+                        event_types.add(data["key"])
                 except json.JSONDecodeError:
                     continue
 
@@ -440,12 +527,7 @@ def check_action_diversity(session) -> Dict[str, Any]:
         status = "PASS" if distinct_count >= 6 else "FAIL"
         evidence = f"Found {distinct_count} distinct event types: {sorted(list(event_types))[:10]}{'...' if len(event_types) > 10 else ''}"
 
-        return {
-            "id": "QM7",
-            "status": status,
-            "evidence": evidence,
-            "value": distinct_count
-        }
+        return {"id": "QM7", "status": status, "evidence": evidence, "value": distinct_count}
 
     except Exception as e:
         return {"id": "QM7", "status": "SKIP", "evidence": f"Error: {str(e)}", "value": None}
@@ -454,12 +536,17 @@ def check_action_diversity(session) -> Dict[str, Any]:
 def check_world_coverage(session) -> Dict[str, Any]:
     """QM8: World coverage - >= 10 unique 16x16 chunks visited"""
     try:
-        game_state_path = getattr(session, 'game_state_jsonl_path', None)
+        game_state_path = getattr(session, "game_state_jsonl_path", None)
         if not game_state_path or not os.path.exists(game_state_path):
-            return {"id": "QM8", "status": "SKIP", "evidence": "game_state.jsonl not found", "value": None}
+            return {
+                "id": "QM8",
+                "status": "SKIP",
+                "evidence": "game_state.jsonl not found",
+                "value": None,
+            }
 
         chunks = set()
-        with open(game_state_path, 'r') as f:
+        with open(game_state_path, "r") as f:
             for line in f:
                 try:
                     data = json.loads(line.strip())
@@ -469,18 +556,18 @@ def check_world_coverage(session) -> Dict[str, Any]:
                     chunk_z = None
 
                     # Common formats
-                    if 'chunk_x' in data and 'chunk_z' in data:
-                        chunk_x = data['chunk_x']
-                        chunk_z = data['chunk_z']
-                    elif 'position' in data and isinstance(data['position'], dict):
-                        pos = data['position']
-                        if 'x' in pos and 'z' in pos:
+                    if "chunk_x" in data and "chunk_z" in data:
+                        chunk_x = data["chunk_x"]
+                        chunk_z = data["chunk_z"]
+                    elif "position" in data and isinstance(data["position"], dict):
+                        pos = data["position"]
+                        if "x" in pos and "z" in pos:
                             # Convert world coordinates to chunk coordinates (16x16 blocks)
-                            chunk_x = int(pos['x'] // 16)
-                            chunk_z = int(pos['z'] // 16)
-                    elif 'x' in data and 'z' in data:
-                        chunk_x = int(data['x'] // 16)
-                        chunk_z = int(data['z'] // 16)
+                            chunk_x = int(pos["x"] // 16)
+                            chunk_z = int(pos["z"] // 16)
+                    elif "x" in data and "z" in data:
+                        chunk_x = int(data["x"] // 16)
+                        chunk_z = int(data["z"] // 16)
 
                     if chunk_x is not None and chunk_z is not None:
                         chunks.add((chunk_x, chunk_z))
@@ -493,12 +580,7 @@ def check_world_coverage(session) -> Dict[str, Any]:
         status = "PASS" if unique_chunks >= 10 else "FAIL"
         evidence = f"Visited {unique_chunks} unique 16x16 chunks"
 
-        return {
-            "id": "QM8",
-            "status": status,
-            "evidence": evidence,
-            "value": unique_chunks
-        }
+        return {"id": "QM8", "status": status, "evidence": evidence, "value": unique_chunks}
 
     except Exception as e:
         return {"id": "QM8", "status": "SKIP", "evidence": f"Error: {str(e)}", "value": None}
@@ -512,9 +594,9 @@ def check_camera_position_range(session) -> Dict[str, Any]:
 
         # Check multiple possible sources
         sources = [
-            ('action_camera_jsonl_path', 'action_camera'),
-            ('camera_jsonl_path', 'camera'),
-            ('frames_jsonl_path', 'frames')  # frames might have camera info
+            ("action_camera_jsonl_path", "action_camera"),
+            ("camera_jsonl_path", "camera"),
+            ("frames_jsonl_path", "frames"),  # frames might have camera info
         ]
 
         for attr_name, source_type in sources:
@@ -525,8 +607,8 @@ def check_camera_position_range(session) -> Dict[str, Any]:
                 # ``for line in f`` which fails to parse the giant JSON document.
                 # Detect array-vs-stream by extension + fallback.
                 rows: list = []
-                with open(path, 'r') as f:
-                    if path.endswith('.json'):
+                with open(path, "r") as f:
+                    if path.endswith(".json"):
                         try:
                             doc = json.load(f)
                             if isinstance(doc, list):
@@ -549,35 +631,40 @@ def check_camera_position_range(session) -> Dict[str, Any]:
                                 continue
 
                 for data in rows:
-                        try:
-                            pos = None
+                    try:
+                        pos = None
 
-                            # Bug-fix 2026-05-16: accept BOTH dict {x,y,z} and list [x,y,z]
-                            # forms. The PRD-spec transform writes camera_position as a
-                            # 3-element list (standard convention); previously this
-                            # SKIP-ed because we only matched the dict shape.
-                            for pos_key in ['position', 'camera_position', 'pos', 'camera_pos']:
-                                if pos_key in data:
-                                    val = data[pos_key]
-                                    if isinstance(val, dict) and all(k in val for k in ['x', 'y', 'z']):
-                                        pos = (float(val['x']), float(val['y']), float(val['z']))
-                                        break
-                                    elif isinstance(val, (list, tuple)) and len(val) >= 3:
-                                        pos = (float(val[0]), float(val[1]), float(val[2]))
-                                        break
+                        # Bug-fix 2026-05-16: accept BOTH dict {x,y,z} and list [x,y,z]
+                        # forms. The PRD-spec transform writes camera_position as a
+                        # 3-element list (standard convention); previously this
+                        # SKIP-ed because we only matched the dict shape.
+                        for pos_key in ["position", "camera_position", "pos", "camera_pos"]:
+                            if pos_key in data:
+                                val = data[pos_key]
+                                if isinstance(val, dict) and all(k in val for k in ["x", "y", "z"]):
+                                    pos = (float(val["x"]), float(val["y"]), float(val["z"]))
+                                    break
+                                elif isinstance(val, (list, tuple)) and len(val) >= 3:
+                                    pos = (float(val[0]), float(val[1]), float(val[2]))
+                                    break
 
-                            # Also check for direct x,y,z fields
-                            if not pos and all(k in data for k in ['x', 'y', 'z']):
-                                pos = (float(data['x']), float(data['y']), float(data['z']))
+                        # Also check for direct x,y,z fields
+                        if not pos and all(k in data for k in ["x", "y", "z"]):
+                            pos = (float(data["x"]), float(data["y"]), float(data["z"]))
 
-                            if pos:
-                                camera_data.append(pos)
+                        if pos:
+                            camera_data.append(pos)
 
-                        except (json.JSONDecodeError, KeyError, TypeError, ValueError):
-                            continue
+                    except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+                        continue
 
         if not camera_data:
-            return {"id": "QM9", "status": "SKIP", "evidence": "No camera position data found", "value": None}
+            return {
+                "id": "QM9",
+                "status": "SKIP",
+                "evidence": "No camera position data found",
+                "value": None,
+            }
 
         # Calculate bounding box
         xs = [p[0] for p in camera_data]
@@ -592,17 +679,12 @@ def check_camera_position_range(session) -> Dict[str, Any]:
         dx = max_x - min_x
         dy = max_y - min_y
         dz = max_z - min_z
-        diagonal = math.sqrt(dx*dx + dy*dy + dz*dz)
+        diagonal = math.sqrt(dx * dx + dy * dy + dz * dz)
 
         status = "PASS" if diagonal > 20 else "FAIL"
         evidence = f"Camera position bbox diagonal={diagonal:.2f}m (range: x[{min_x:.1f},{max_x:.1f}], y[{min_y:.1f},{max_y:.1f}], z[{min_z:.1f},{max_z:.1f}])"
 
-        return {
-            "id": "QM9",
-            "status": status,
-            "evidence": evidence,
-            "value": diagonal
-        }
+        return {"id": "QM9", "status": status, "evidence": evidence, "value": diagonal}
 
     except Exception as e:
         return {"id": "QM9", "status": "SKIP", "evidence": f"Error: {str(e)}", "value": None}
@@ -613,28 +695,32 @@ def check_recording_continuity(session) -> Dict[str, Any]:
     try:
         # Get metadata duration
         metadata_duration = None
-        metadata_path = getattr(session, 'metadata_path', None)
+        metadata_path = getattr(session, "metadata_path", None)
         if metadata_path and os.path.exists(metadata_path):
             try:
-                with open(metadata_path, 'r') as f:
+                with open(metadata_path, "r") as f:
                     metadata = json.load(f)
-                if 'duration' in metadata:
-                    metadata_duration = float(metadata['duration'])
-                elif 'recording_duration' in metadata:
-                    metadata_duration = float(metadata['recording_duration'])
+                if "duration" in metadata:
+                    metadata_duration = float(metadata["duration"])
+                elif "recording_duration" in metadata:
+                    metadata_duration = float(metadata["recording_duration"])
             except (json.JSONDecodeError, KeyError, ValueError):
                 pass
 
         # Get video duration via ffprobe
         video_duration = None
-        video_path = getattr(session, 'video_path', None)
+        video_path = getattr(session, "video_path", None)
         if video_path and os.path.exists(video_path):
             try:
                 cmd = [
-                    'ffprobe', '-v', 'quiet',
-                    '-show_entries', 'format=duration',
-                    '-of', 'default=noprint_wrappers=1:nokey=1',
-                    str(video_path)
+                    "ffprobe",
+                    "-v",
+                    "quiet",
+                    "-show_entries",
+                    "format=duration",
+                    "-of",
+                    "default=noprint_wrappers=1:nokey=1",
+                    str(video_path),
                 ]
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
                 if result.returncode == 0:
@@ -644,11 +730,11 @@ def check_recording_continuity(session) -> Dict[str, Any]:
 
         # Get frames count duration
         frames_duration = None
-        frames_path = getattr(session, 'frames_jsonl_path', None)
+        frames_path = getattr(session, "frames_jsonl_path", None)
         if frames_path and os.path.exists(frames_path):
             try:
                 frame_count = 0
-                with open(frames_path, 'r') as f:
+                with open(frames_path, "r") as f:
                     for line in f:
                         if line.strip():
                             frame_count += 1
@@ -676,7 +762,12 @@ def check_recording_continuity(session) -> Dict[str, Any]:
             sources.append("frames")
 
         if len(durations) < 2:
-            return {"id": "QM10", "status": "SKIP", "evidence": f"Insufficient duration sources: {sources}", "value": None}
+            return {
+                "id": "QM10",
+                "status": "SKIP",
+                "evidence": f"Insufficient duration sources: {sources}",
+                "value": None,
+            }
 
         # Check if all durations are within 2% of each other
         max_diff_ratio = 0
@@ -693,14 +784,9 @@ def check_recording_continuity(session) -> Dict[str, Any]:
         avg_duration = sum(durations) / len(durations)
 
         status = "PASS" if max_diff_ratio <= 0.02 else "FAIL"
-        evidence = f"Max duration difference={max_diff_ratio*100:.1f}% (metadata={metadata_duration or 'N/A'}s, video={video_duration or 'N/A'}s, frames≈{frames_duration or 'N/A'}s)"
+        evidence = f"Max duration difference={max_diff_ratio * 100:.1f}% (metadata={metadata_duration or 'N/A'}s, video={video_duration or 'N/A'}s, frames≈{frames_duration or 'N/A'}s)"
 
-        return {
-            "id": "QM10",
-            "status": status,
-            "evidence": evidence,
-            "value": avg_duration
-        }
+        return {"id": "QM10", "status": status, "evidence": evidence, "value": avg_duration}
 
     except Exception as e:
         return {"id": "QM10", "status": "SKIP", "evidence": f"Error: {str(e)}", "value": None}
