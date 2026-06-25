@@ -8,6 +8,7 @@ Usage:
     python3 bin/download_da_v2_onnx.py
     python3 bin/download_da_v2_onnx.py --force  # re-download even if cached
 """
+
 import argparse
 import hashlib
 import json
@@ -147,9 +148,7 @@ def download_model(force: bool = False) -> pathlib.Path:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Download Depth Anything V2 ONNX model"
-    )
+    parser = argparse.ArgumentParser(description="Download Depth Anything V2 ONNX model")
     parser.add_argument(
         "--force",
         action="store_true",
