@@ -18,7 +18,11 @@ Vector3 = Union[Vector3Dict, Vector3List]
 
 def parse_vector3_dict(data: dict[str, Any]) -> Vector3Dict:
     """Parse Vector3 from dict format: {'x': float, 'y': float, 'z': float}."""
-    return {'x': float(data.get('x', 0.0)), 'y': float(data.get('y', 0.0)), 'z': float(data.get('z', 0.0))}
+    return {
+        "x": float(data.get("x", 0.0)),
+        "y": float(data.get("y", 0.0)),
+        "z": float(data.get("z", 0.0)),
+    }
 
 
 def parse_vector3_list(data: list[Any]) -> Vector3List:
@@ -31,52 +35,54 @@ def parse_vector3_list(data: list[Any]) -> Vector3List:
 def vector3_to_dict(v: Vector3) -> Vector3Dict:
     """Convert any Vector3 format to dict."""
     if isinstance(v, dict):
-        return {'x': v['x'], 'y': v['y'], 'z': v['z']}
-    return {'x': v[0], 'y': v[1], 'z': v[2]}
+        return {"x": v["x"], "y": v["y"], "z": v["z"]}
+    return {"x": v[0], "y": v[1], "z": v[2]}
 
 
 def vector3_to_list(v: Vector3) -> Vector3List:
     """Convert any Vector3 format to list."""
     if isinstance(v, list):
         return [v[0], v[1], v[2]]
-    return [v['x'], v['y'], v['z']]
+    return [v["x"], v["y"], v["z"]]
 
 
 # Red team test case: mixed dict and list formats in same file
 SAMPLE_POSITIONS: list[dict[str, Vector3]] = [
-    {'position': {'x': 1.0, 'y': 2.0, 'z': 3.0}},  # dict format
-    {'position': [4.0, 5.0, 6.0]},                  # list format - MIXED!
-    {'position': {'x': 7.0, 'y': 8.0, 'z': 9.0}},  # dict format
-    {'position': [10.0, 11.0, 12.0]},               # list format - MIXED!
+    {"position": {"x": 1.0, "y": 2.0, "z": 3.0}},  # dict format
+    {"position": [4.0, 5.0, 6.0]},  # list format - MIXED!
+    {"position": {"x": 7.0, "y": 8.0, "z": 9.0}},  # dict format
+    {"position": [10.0, 11.0, 12.0]},  # list format - MIXED!
 ]
 
 
 def validate_format_consistency(positions: list[dict[str, Vector3]]) -> tuple[bool, list[str]]:
     """Validate all Vector3 entries use consistent format."""
     errors: list[str] = []
-    format_counts: dict[str, int] = {'dict': 0, 'list': 0}
-    
+    format_counts: dict[str, int] = {"dict": 0, "list": 0}
+
     for idx, entry in enumerate(positions):
-        pos = entry.get('position')
+        pos = entry.get("position")
         if pos is None:
             errors.append(f"Entry {idx}: missing 'position' key")
             continue
-            
+
         if isinstance(pos, dict):
-            format_counts['dict'] += 1
-            if not {'x', 'y', 'z'}.issubset(pos.keys()):
+            format_counts["dict"] += 1
+            if not {"x", "y", "z"}.issubset(pos.keys()):
                 errors.append(f"Entry {idx}: dict missing required keys")
         elif isinstance(pos, (list, tuple)):
-            format_counts['list'] += 1
+            format_counts["list"] += 1
             if len(pos) != 3:
                 errors.append(f"Entry {idx}: list must have 3 elements")
         else:
             errors.append(f"Entry {idx}: unsupported type {type(pos).__name__}")
-    
-    if format_counts['dict'] > 0 and format_counts['list'] > 0:
-        errors.append(f"Format inconsistency: {format_counts['dict']} dict, {format_counts['list']} list")
+
+    if format_counts["dict"] > 0 and format_counts["list"] > 0:
+        errors.append(
+            f"Format inconsistency: {format_counts['dict']} dict, {format_counts['list']} list"
+        )
         return False, errors
-    
+
     return len(errors) == 0, errors
 
 
@@ -88,10 +94,10 @@ def analyze_file(filepath: Path) -> int:
     except (SyntaxError, OSError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
-    
+
     print(f"Analyzing {filepath}...")
     is_valid, errors = validate_format_consistency(SAMPLE_POSITIONS)
-    
+
     if is_valid:
         print("✓ Format is consistent")
         return 0
@@ -104,16 +110,16 @@ def analyze_file(filepath: Path) -> int:
 def main(argv: list[str] | None = None) -> int:
     """Main entry point for Vector3 format validation CLI."""
     parser = argparse.ArgumentParser(description="Red team: Detect mixed Vector3 format")
-    parser.add_argument('file', nargs='?', type=Path, help="Python file to analyze")
-    parser.add_argument('-v', '--verbose', action='store_true', help="Verbose output")
+    parser.add_argument("file", nargs="?", type=Path, help="Python file to analyze")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
     args = parser.parse_args(argv)
-    
+
     if args.file:
         return analyze_file(args.file)
-    
+
     print("Analyzing sample Vector3 data...")
     is_valid, errors = validate_format_consistency(SAMPLE_POSITIONS)
-    
+
     if is_valid:
         print("✓ Format is consistent")
         return 0
@@ -123,5 +129,5 @@ def main(argv: list[str] | None = None) -> int:
     return 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())
