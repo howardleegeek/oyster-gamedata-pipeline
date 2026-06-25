@@ -100,6 +100,7 @@
 
 
 
+
 ## Round 250 @ 2026-06-24T12:30:00Z
 
 
@@ -747,3 +748,8 @@ b4c97dbd638c75a1d826e641df598879876660ed
 
 - Picked: ruff format bin/mp4_faststart.py (smallest unformatted bin file at 171 lines; set _FLAGS_WITH_ARG itemized to one entry per line, added blank line after module docstring). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, AST parse OK, import smoke OK (module imports; extend_ffmpeg_cmd present), no dedicated test file (no regressions possible), follows established cadence of previous rounds (Rounds 267–329 have all done ruff format on bin/ files).
 - Result: committed 61b28be4 (ruff format applied to bin/mp4_faststart.py; 1 file changed, 61 insertions(+), 11 deletions(-); ruff check + ruff format --check clean; AST parse OK; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff). Self-review: cosmetic reformat only — set one-entry-per-line, blank line after docstring, long-line wrapping. No silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect. `git add` applied to a single file (bin/mp4_faststart.py) only.
+
+## Round 329 @ 2026-06-25T21:57:22Z
+
+- Picked: ruff format bin/autoresearch_throughput.py (smallest unformatted bin file: 174 lines, blank lines after dataclass docstrings, line-wrapped dict/string literals, trailing commas; same pattern as Rounds 254–328). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, ruff check clean, format --check clean, import smoke OK, follows established cadence.
+- Result: committed a793e5d1 (ruff format applied to bin/autoresearch_throughput.py; 1 file changed, 58 insertions(+), 26 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting only — blank lines after dataclass docstrings, line-wrapped dict/string literals, added trailing commas. No silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
