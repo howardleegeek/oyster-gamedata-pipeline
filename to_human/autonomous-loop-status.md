@@ -711,3 +711,8 @@
 - Picked: ruff format bin/red_team_disk_full.py (smallest unformatted bin file: 154 lines, line-wrapped argparse args, list multi-line splits). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, import smoke OK, no dedicated test file (no regressions possible), follows established cadence of previous rounds.
 - Result: committed ce37e12b (ruff format line-wrapped argparse args and list multi-line splits in bin/red_team_disk_full.py; 1 file changed, 35 insertions(+), 15 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
 
+
+## Round 317 @ 2026-06-25T18:17:30Z
+
+- Picked: ruff format bin/e2e_tests/test_watchdog_integration.py (smallest unformatted file: 154 lines, trailing commas added, whitespace cleanup). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, follows established cadence of Rounds 254–316.
+- Result: committed 7cda7d74 (ruff format applied to bin/e2e_tests/test_watchdog_integration.py; 1 file changed, 24 insertions(+), 27 deletions(-); ruff check + format --check clean; AST parse OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — trailing commas added to dict literals per trailing-comma convention, trailing whitespace removed, consistent spacing. No silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
