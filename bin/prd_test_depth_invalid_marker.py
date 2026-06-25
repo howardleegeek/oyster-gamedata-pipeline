@@ -34,6 +34,7 @@ def write_exr(filepath: Path, depth: np.ndarray) -> bool:
     """Write depth to EXR file. Returns True on success."""
     try:
         import OpenImageIO as oiio
+
         spec = oiio.ImageSpec(depth.shape[1], depth.shape[0], 1, oiio.FLOAT)
         spec.channelnames = ["Z"]
         out = oiio.ImageOutput.create(str(filepath))
@@ -48,6 +49,7 @@ def write_exr(filepath: Path, depth: np.ndarray) -> bool:
     try:
         import Imath
         import OpenEXR
+
         header = OpenEXR.Header(depth.shape[1], depth.shape[0])
         header["channels"] = {"Z": Imath.Channel(Imath.PixelType(Imath.PixelType.FLOAT))}
         exr = OpenEXR.OutputFile(str(filepath), header)
@@ -66,6 +68,7 @@ def read_exr(filepath: Path) -> np.ndarray | None:
     """Read depth from EXR file. Returns None on failure."""
     try:
         import OpenImageIO as oiio
+
         inp = oiio.ImageInput.open(str(filepath))
         if inp:
             img = inp.read_image()
@@ -77,6 +80,7 @@ def read_exr(filepath: Path) -> np.ndarray | None:
     try:
         import Imath
         import OpenEXR
+
         exr = OpenEXR.InputFile(str(filepath))
         dw = exr.header()["dataWindow"]
         w, h = dw.max.x - dw.min.x + 1, dw.max.y - dw.min.y + 1
@@ -100,9 +104,13 @@ def verify_preservation(orig: np.ndarray, rest: np.ndarray, sentinel: str) -> di
     mismatch = np.sum(orig_mask != rest_mask)
     valid = ~orig_mask & ~rest_mask
     valid_ok = not np.any(valid) or np.max(np.abs(orig[valid] - rest[valid])) < 1e-6
-    return {"sentinel": sentinel, "passed": mismatch == 0 and valid_ok,
-            "orig_invalid": int(np.sum(orig_mask)), "rest_invalid": int(np.sum(rest_mask)),
-            "mismatch": int(mismatch)}
+    return {
+        "sentinel": sentinel,
+        "passed": mismatch == 0 and valid_ok,
+        "orig_invalid": int(np.sum(orig_mask)),
+        "rest_invalid": int(np.sum(rest_mask)),
+        "mismatch": int(mismatch),
+    }
 
 
 def run_test(sentinel: str, temp_dir: Path) -> int:
@@ -130,14 +138,17 @@ def run_test(sentinel: str, temp_dir: Path) -> int:
 def main(argv: list[str] | None = None) -> int:
     """Main entry point. Returns 0 on all tests pass."""
     parser = argparse.ArgumentParser(
-        description="Test depth invalid pixel sentinel preservation in OpenEXR roundtrip")
-    parser.add_argument("--sentinel", choices=["zero", "nan", "both"], default="both",
-                        help="Sentinel type to test")
+        description="Test depth invalid pixel sentinel preservation in OpenEXR roundtrip"
+    )
+    parser.add_argument(
+        "--sentinel", choices=["zero", "nan", "both"], default="both", help="Sentinel type to test"
+    )
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
     args = parser.parse_args(argv)
 
-    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
-                        format="%(levelname)s: %(message)s")
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO, format="%(levelname)s: %(message)s"
+    )
 
     sentinels = ["zero", "nan"] if args.sentinel == "both" else [args.sentinel]
     temp_dir = Path(tempfile.mkdtemp(prefix="depth_test_"))
