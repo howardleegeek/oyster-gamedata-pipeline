@@ -21,7 +21,7 @@ DEFAULT_THRESHOLDS = {
     "archive_days": 14,
     "delete_after_days": 30,
     "auto_delete_after_archive": False,
-    "compress_with_zstd": False
+    "compress_with_zstd": False,
 }
 
 
@@ -31,7 +31,7 @@ def load_config() -> dict:
         return DEFAULT_THRESHOLDS.copy()
 
     try:
-        with open(CONFIG_FILE, 'r') as f:
+        with open(CONFIG_FILE, "r") as f:
             config = json.load(f)
         # Ensure all default keys exist
         for key, value in DEFAULT_THRESHOLDS.items():
@@ -75,11 +75,7 @@ def compress_with_zstd(file_path: Path) -> Optional[Path]:
 
     try:
         # Check if zstd is available
-        result = subprocess.run(
-            ["zstd", "--version"],
-            capture_output=True,
-            text=True
-        )
+        result = subprocess.run(["zstd", "--version"], capture_output=True, text=True)
         if result.returncode != 0:
             return None
 
@@ -87,7 +83,7 @@ def compress_with_zstd(file_path: Path) -> Optional[Path]:
         result = subprocess.run(
             ["zstd", "-f", "-q", str(file_path), "-o", str(compressed_path)],
             capture_output=True,
-            text=True
+            text=True,
         )
 
         if result.returncode == 0 and compressed_path.exists():
@@ -118,7 +114,7 @@ def archive_old_files() -> dict:
         "archived": 0,
         "compressed": 0,
         "failed": 0,
-        "deleted": 0
+        "deleted": 0,
     }
 
     for file_path in old_files:
@@ -189,7 +185,9 @@ def cleanup_old_session_dirs() -> dict:
                             # Calculate size before deletion
                             dir_size = 0
                             try:
-                                dir_size = sum(f.stat().st_size for f in item.rglob('*') if f.is_file())
+                                dir_size = sum(
+                                    f.stat().st_size for f in item.rglob("*") if f.is_file()
+                                )
                             except (OSError, AttributeError):
                                 pass
 
@@ -220,15 +218,15 @@ if __name__ == "__main__":
         print("Archive operation completed:")
         print(f"  Found {stats['total_found']} old uploaded files")
         print(f"  Archived {stats['archived']} files")
-        if stats['compressed'] > 0:
+        if stats["compressed"] > 0:
             print(f"  Compressed {stats['compressed']} files with zstd")
-        if stats['failed'] > 0:
+        if stats["failed"] > 0:
             print(f"  Failed to archive {stats['failed']} files")
-        if stats['deleted'] > 0:
+        if stats["deleted"] > 0:
             print(f"  Deleted {stats['deleted']} old archived files")
 
         # Also clean up old session directories
         dir_stats = cleanup_old_session_dirs()
-        if dir_stats['directories_removed'] > 0:
+        if dir_stats["directories_removed"] > 0:
             print(f"\nCleaned up {dir_stats['directories_removed']} old session directories")
             print(f"Freed {dir_stats['total_space_freed_gb']:.2f} GB")
