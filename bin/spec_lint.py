@@ -20,6 +20,7 @@ Exit codes:
 
 Stdlib only. Run: ``python bin/spec_lint.py specs/``
 """
+
 from __future__ import annotations
 
 import argparse
@@ -129,8 +130,9 @@ def _parse_front_matter(text: str) -> tuple[dict, int] | None:
                 fm[cur_key] = cur_list
             elif value.startswith("[") and value.endswith("]"):
                 inner = value[1:-1]
-                fm[cur_key] = [v.strip().strip('"').strip("'")
-                               for v in inner.split(",") if v.strip()]
+                fm[cur_key] = [
+                    v.strip().strip('"').strip("'") for v in inner.split(",") if v.strip()
+                ]
                 cur_list = None
             else:
                 fm[cur_key] = value.strip('"').strip("'")
@@ -165,20 +167,16 @@ def lint_file(path: Path) -> LintResult:
     if fm:
         missing = REQUIRED_FM_KEYS - set(fm.keys())
         if missing:
-            res.failures.append(
-                f"front-matter missing required keys: {sorted(missing)}"
-            )
+            res.failures.append(f"front-matter missing required keys: {sorted(missing)}")
 
         # Recommended keys (warn).
         rec_missing = RECOMMENDED_FM_KEYS - set(fm.keys())
         if rec_missing:
-            res.warnings.append(
-                f"front-matter missing recommended keys: {sorted(rec_missing)}"
-            )
+            res.warnings.append(f"front-matter missing recommended keys: {sorted(rec_missing)}")
 
     # Acceptance criteria count. Skip for legacy specs (no front-matter) —
     # they predate this convention and we don't churn historical artefacts.
-    body = text[text.find("\n---\n") + 5:] if fm else text
+    body = text[text.find("\n---\n") + 5 :] if fm else text
     body_lines = body.split("\n")
     ac_count = sum(1 for line in body_lines if ACCEPTANCE_RE.match(line))
     if fm and ac_count < MIN_ACCEPTANCE_CRITERIA:
@@ -239,8 +237,7 @@ def lint_dir(spec_dir: Path) -> int:
     ``README.md``). Returns shell exit code."""
     failures = 0
     warnings_only = 0
-    files = sorted(p for p in spec_dir.glob("*.md")
-                   if p.name not in ("INDEX.md", "README.md"))
+    files = sorted(p for p in spec_dir.glob("*.md") if p.name not in ("INDEX.md", "README.md"))
     if not files:
         print(f"::warning:: no spec files found in {spec_dir}")
         return 0
@@ -249,8 +246,7 @@ def lint_dir(spec_dir: Path) -> int:
         try:
             res = lint_file(path)
         except Exception as e:  # pragma: no cover — true bug, exit 2
-            print(f"::error file={path}::lint script bug: {e}",
-                  file=sys.stderr)
+            print(f"::error file={path}::lint script bug: {e}", file=sys.stderr)
             return 2
 
         if res.ok:
@@ -265,10 +261,12 @@ def lint_dir(spec_dir: Path) -> int:
             print(f"  FAIL  {path}", file=sys.stderr)
 
     print()
-    print(f"summary: {len(files)} specs total, "
-          f"{len(files) - failures} pass, "
-          f"{failures} fail, "
-          f"{warnings_only} pass-with-warning")
+    print(
+        f"summary: {len(files)} specs total, "
+        f"{len(files) - failures} pass, "
+        f"{failures} fail, "
+        f"{warnings_only} pass-with-warning"
+    )
     return 0 if failures == 0 else 1
 
 
