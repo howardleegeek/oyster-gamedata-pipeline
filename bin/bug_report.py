@@ -136,8 +136,8 @@ def read_crash_dump(path: str = DEFAULT_CRASH_DUMP_PATH) -> Optional[str]:
         return None
     if p.stat().st_size > MAX_ATTACH_BYTES:
         print(
-            f"  Crash dump exceeds {MAX_ATTACH_BYTES / (1024*1024):.0f} MB limit "
-            f"({p.stat().st_size / (1024*1024):.1f} MB), skipping."
+            f"  Crash dump exceeds {MAX_ATTACH_BYTES / (1024 * 1024):.0f} MB limit "
+            f"({p.stat().st_size / (1024 * 1024):.1f} MB), skipping."
         )
         return None
     with open(p, "rb") as fh:
@@ -155,7 +155,7 @@ def tail_log(path: str = DEFAULT_LOG_PATH, lines: int = LOG_TAIL_LINES) -> Optio
         return None
     if p.stat().st_size > MAX_ATTACH_BYTES:
         print(
-            f"  Log file exceeds {MAX_ATTACH_BYTES / (1024*1024):.0f} MB limit, "
+            f"  Log file exceeds {MAX_ATTACH_BYTES / (1024 * 1024):.0f} MB limit, "
             "reading last lines only."
         )
     try:
