@@ -48,7 +48,7 @@ def detect_screen_dpi() -> float:
                                 pass
     except (subprocess.SubprocessError, FileNotFoundError, ValueError):
         pass
-    
+
     return 1.0
 
 
@@ -96,8 +96,13 @@ def detect_window_geometry(window_title: str = "Minecraft") -> dict:
                     if "=" in line:
                         key, value = line.split("=", 1)
                         geometry[key] = value
-                
-                if "X" in geometry and "Y" in geometry and "WIDTH" in geometry and "HEIGHT" in geometry:
+
+                if (
+                    "X" in geometry
+                    and "Y" in geometry
+                    and "WIDTH" in geometry
+                    and "HEIGHT" in geometry
+                ):
                     return {
                         "x": int(geometry["X"]),
                         "y": int(geometry["Y"]),
@@ -106,7 +111,7 @@ def detect_window_geometry(window_title: str = "Minecraft") -> dict:
                     }
     except (subprocess.SubprocessError, FileNotFoundError, ValueError, KeyError):
         pass
-    
+
     # Fallback to defaults
     return {
         "x": 0,
@@ -180,7 +185,7 @@ def build_systeminfo(
 def write_systeminfo_json(data: dict, out_path: str) -> None:
     """
     Write systeminfo.json to file.
-    
+
     Args:
         data: Systeminfo dictionary
         out_path: Output file path
@@ -191,10 +196,8 @@ def write_systeminfo_json(data: dict, out_path: str) -> None:
 
 def main(argv=None) -> int:
     """CLI: --output PATH + all fields as flags."""
-    parser = argparse.ArgumentParser(
-        description="Generate systeminfo.json file for Minecraft"
-    )
-    
+    parser = argparse.ArgumentParser(description="Generate systeminfo.json file for Minecraft")
+
     # Output file argument
     parser.add_argument(
         "--output",
@@ -202,14 +205,14 @@ def main(argv=None) -> int:
         required=True,
         help="Output JSON file path",
     )
-    
+
     # Game process name
     parser.add_argument(
         "--game-process-name",
         default="minecraft.exe",
         help="Game process name (default: minecraft.exe)",
     )
-    
+
     # Window geometry
     parser.add_argument(
         "--x",
@@ -235,7 +238,7 @@ def main(argv=None) -> int:
         default=1080,
         help="Window height (default: 1080)",
     )
-    
+
     # DPI and scale
     parser.add_argument(
         "--record-dpi",
@@ -249,7 +252,7 @@ def main(argv=None) -> int:
         default=1.0,
         help="Map scale factor (default: 1.0)",
     )
-    
+
     # Map bounds
     parser.add_argument(
         "--map-bounds-min-x",
@@ -275,7 +278,7 @@ def main(argv=None) -> int:
         default=10000,
         help="Map bounds max Z (default: 10000)",
     )
-    
+
     # Auto-detect flags
     parser.add_argument(
         "--auto-detect-dpi",
@@ -296,20 +299,20 @@ def main(argv=None) -> int:
         action="store_true",
         help="(legacy) Emit map_scale + map_bounds (NOT in PDF spec — opt-in)",
     )
-    
+
     args = parser.parse_args(argv)
-    
+
     # Auto-detect DPI if requested or if record_dpi not specified
     record_dpi = args.record_dpi
     if record_dpi is None or args.auto_detect_dpi:
         record_dpi = detect_screen_dpi()
-    
+
     # Auto-detect window geometry if requested
     x, y, width, height = args.x, args.y, args.width, args.height
     if args.auto_detect_window:
         geometry = detect_window_geometry()
         x, y, width, height = geometry["x"], geometry["y"], geometry["width"], geometry["height"]
-    
+
     # Build map bounds dictionary
     map_bounds = {
         "min_x": args.map_bounds_min_x,
@@ -317,7 +320,7 @@ def main(argv=None) -> int:
         "max_x": args.map_bounds_max_x,
         "max_z": args.map_bounds_max_z,
     }
-    
+
     # Build systeminfo data
     try:
         data = build_systeminfo(
@@ -334,7 +337,7 @@ def main(argv=None) -> int:
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
-    
+
     # Write to file
     try:
         write_systeminfo_json(data, args.output)
