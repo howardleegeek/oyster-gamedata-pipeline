@@ -11,6 +11,7 @@ try:
 except ImportError:
     raise ImportError("mss library required for screen capture")
 
+
 def record_screen_region(
     output_path: Path,
     *,
@@ -166,6 +167,7 @@ def record_screen_region(
     # stamp fails, the video itself is still real, just D5 will mark UNKNOWN.
     try:
         from bin.stamp_real_metadata import stamp_video  # noqa: PLC0415
+
         stamp_video(output_path, recorder_version="screen-capture-recorder-v1")
     except Exception:
         pass  # non-fatal
