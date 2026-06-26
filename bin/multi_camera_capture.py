@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 class CameraType(Enum):
     """Camera viewpoint types for multi-view capture."""
+
     FIRST_PERSON = "first_person"
     THIRD_PERSON = "third_person"
     TOP_DOWN = "top_down"
@@ -39,6 +40,7 @@ class CameraType(Enum):
 @dataclass
 class CameraConfig:
     """Configuration for a single camera in the capture rig."""
+
     name: str
     camera_type: CameraType
     width: int = 640
@@ -76,6 +78,7 @@ class CameraConfig:
 @dataclass
 class CaptureSettings:
     """Global settings for a multi-camera capture session."""
+
     output_dir: Path
     fps: int = 30
     image_format: str = "png"
@@ -102,16 +105,31 @@ def build_default_rig() -> List[CameraConfig]:
     """Build a default 3-camera rig: 1st-person, 3rd-person, top-down."""
     return [
         CameraConfig(
-            "fpv", CameraType.FIRST_PERSON, 640, 480, 90.0,
-            (0.0, 1.5, 0.0), (0.0, 0.0, 0.0),
+            "fpv",
+            CameraType.FIRST_PERSON,
+            640,
+            480,
+            90.0,
+            (0.0, 1.5, 0.0),
+            (0.0, 0.0, 0.0),
         ),
         CameraConfig(
-            "tpv", CameraType.THIRD_PERSON, 640, 480, 75.0,
-            (0.0, 3.0, -5.0), (-15.0, 0.0, 0.0),
+            "tpv",
+            CameraType.THIRD_PERSON,
+            640,
+            480,
+            75.0,
+            (0.0, 3.0, -5.0),
+            (-15.0, 0.0, 0.0),
         ),
         CameraConfig(
-            "top", CameraType.TOP_DOWN, 512, 512, 60.0,
-            (0.0, 10.0, 0.0), (-90.0, 0.0, 0.0),
+            "top",
+            CameraType.TOP_DOWN,
+            512,
+            512,
+            60.0,
+            (0.0, 10.0, 0.0),
+            (-90.0, 0.0, 0.0),
         ),
     ]
 
@@ -207,7 +225,9 @@ def run_capture(
 
     logger.info(
         "Starting capture: %d cameras, %d frames @ %d fps",
-        len(rig), total_frames, settings.fps,
+        len(rig),
+        total_frames,
+        settings.fps,
     )
 
     with concurrent.futures.ThreadPoolExecutor(
@@ -218,19 +238,25 @@ def run_capture(
             if dry_run:
                 logger.info(
                     "[dry-run] frame %d/%d  t=%.3fs",
-                    frame_idx + 1, total_frames, timestamp,
+                    frame_idx + 1,
+                    total_frames,
+                    timestamp,
                 )
-                meta["frames"].append({
-                    "frame": frame_idx,
-                    "timestamp": round(timestamp, 4),
-                    "cameras": [c.name for c in rig],
-                })
+                meta["frames"].append(
+                    {
+                        "frame": frame_idx,
+                        "timestamp": round(timestamp, 4),
+                        "cameras": [c.name for c in rig],
+                    }
+                )
                 continue
 
             futures = {
                 executor.submit(
                     capture_single_frame,
-                    cam, frame_idx, timestamp,
+                    cam,
+                    frame_idx,
+                    timestamp,
                     settings.output_dir,
                     settings.image_format,
                     settings.simulate_delay,
@@ -244,11 +270,13 @@ def run_capture(
                 except Exception as exc:
                     logger.error("Camera %s failed: %s", futures[fut], exc)
             results.extend(frame_results)
-            meta["frames"].append({
-                "frame": frame_idx,
-                "timestamp": round(timestamp, 4),
-                "cameras": [r["camera"] for r in frame_results],
-            })
+            meta["frames"].append(
+                {
+                    "frame": frame_idx,
+                    "timestamp": round(timestamp, 4),
+                    "cameras": [r["camera"] for r in frame_results],
+                }
+            )
 
     if settings.save_metadata and not dry_run:
         meta_path = settings.output_dir / "capture_meta.json"
@@ -265,44 +293,62 @@ def build_parser() -> argparse.ArgumentParser:
         description="Multi-camera concurrent capture for Habitat-Sim parity.",
     )
     parser.add_argument(
-        "--output-dir", type=Path, default=None,
+        "--output-dir",
+        type=Path,
+        default=None,
         help="Directory to save captured frames (default: temp dir).",
     )
     parser.add_argument(
-        "--config", type=Path, default=None,
+        "--config",
+        type=Path,
+        default=None,
         help="Path to JSON rig config file (default: built-in 3-camera rig).",
     )
     parser.add_argument(
-        "--fps", type=int, default=30,
+        "--fps",
+        type=int,
+        default=30,
         help="Frames per second (default: 30).",
     )
     parser.add_argument(
-        "--frames", type=int, default=100,
+        "--frames",
+        type=int,
+        default=100,
         help="Total number of frames to capture (default: 100).",
     )
     parser.add_argument(
-        "--format", dest="image_format", type=str, default="png",
+        "--format",
+        dest="image_format",
+        type=str,
+        default="png",
         choices=["png", "jpeg"],
         help="Image output format (default: png).",
     )
     parser.add_argument(
-        "--workers", type=int, default=3,
+        "--workers",
+        type=int,
+        default=3,
         help="Number of concurrent capture workers (default: 3).",
     )
     parser.add_argument(
-        "--no-delay", action="store_true",
+        "--no-delay",
+        action="store_true",
         help="Disable simulated per-frame delay.",
     )
     parser.add_argument(
-        "--no-metadata", action="store_true",
+        "--no-metadata",
+        action="store_true",
         help="Skip writing capture_meta.json.",
     )
     parser.add_argument(
-        "--dry-run", action="store_true",
+        "--dry-run",
+        action="store_true",
         help="Simulate capture without writing image files.",
     )
     parser.add_argument(
-        "--verbose", "-v", action="store_true",
+        "--verbose",
+        "-v",
+        action="store_true",
         help="Enable debug logging.",
     )
     return parser
@@ -352,7 +398,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     else:
         logger.info(
             "Capture complete: %d frames across %d cameras → %s",
-            args.frames, len(rig), output_dir,
+            args.frames,
+            len(rig),
+            output_dir,
         )
 
     return 0
