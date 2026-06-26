@@ -20,9 +20,7 @@ from pathlib import Path
 from statistics import mean, stdev
 from typing import Any, Callable, Optional
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 DEFAULT_OVERHEAD_THRESHOLD = 5.0
@@ -36,6 +34,7 @@ MIN_BITRATE_KBPS = 1000
 @dataclass
 class FPSConfig:
     """Configuration for FPS monitoring."""
+
     overhead_threshold: float = DEFAULT_OVERHEAD_THRESHOLD
     sample_interval: float = DEFAULT_SAMPLE_INTERVAL
     baseline_duration: float = DEFAULT_BASELINE_DURATION
@@ -58,6 +57,7 @@ class FPSConfig:
 @dataclass
 class FPSMetrics:
     """Container for FPS measurement metrics."""
+
     samples: list[float] = field(default_factory=list)
     start_time: float = 0.0
     end_time: float = 0.0
@@ -115,9 +115,7 @@ class FPSMonitor:
             metrics.samples.append(self._get_current_fps())
             time.sleep(self.config.sample_interval)
         metrics.end_time = time.time()
-        logger.info(
-            f"Collected {len(metrics.samples)} samples, avg: {metrics.avg_fps:.1f} fps"
-        )
+        logger.info(f"Collected {len(metrics.samples)} samples, avg: {metrics.avg_fps:.1f} fps")
 
     def calculate_overhead(self) -> float:
         """Calculate FPS overhead percentage."""
@@ -129,8 +127,9 @@ class FPSMonitor:
 
     def _adjust_encoder_bitrate(self) -> bool:
         """Reduce encoder bitrate to lower overhead."""
-        new_bitrate = max(MIN_BITRATE_KBPS,
-                         int(self._current_bitrate_kbps * BITRATE_REDUCTION_FACTOR))
+        new_bitrate = max(
+            MIN_BITRATE_KBPS, int(self._current_bitrate_kbps * BITRATE_REDUCTION_FACTOR)
+        )
         if new_bitrate < self._current_bitrate_kbps:
             logger.warning(f"Reducing bitrate: {self._current_bitrate_kbps} -> {new_bitrate} kbps")
             self._current_bitrate_kbps = new_bitrate
@@ -232,17 +231,31 @@ def main(argv: Optional[list[str]] = None) -> int:
         description="Real-time FPS overhead monitor for game recording"
     )
     parser.add_argument("--config", type=Path, help="Path to configuration JSON file")
-    parser.add_argument("--threshold", type=float, default=DEFAULT_OVERHEAD_THRESHOLD,
-                       help="Overhead threshold percentage")
-    parser.add_argument("--baseline", type=float, default=DEFAULT_BASELINE_DURATION,
-                       help="Baseline measurement duration (seconds)")
-    parser.add_argument("--monitor", type=float, default=DEFAULT_MONITOR_DURATION,
-                       help="Recording monitor duration (seconds)")
-    parser.add_argument("--interval", type=float, default=DEFAULT_SAMPLE_INTERVAL,
-                       help="Sample interval (seconds)")
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=DEFAULT_OVERHEAD_THRESHOLD,
+        help="Overhead threshold percentage",
+    )
+    parser.add_argument(
+        "--baseline",
+        type=float,
+        default=DEFAULT_BASELINE_DURATION,
+        help="Baseline measurement duration (seconds)",
+    )
+    parser.add_argument(
+        "--monitor",
+        type=float,
+        default=DEFAULT_MONITOR_DURATION,
+        help="Recording monitor duration (seconds)",
+    )
+    parser.add_argument(
+        "--interval", type=float, default=DEFAULT_SAMPLE_INTERVAL, help="Sample interval (seconds)"
+    )
     parser.add_argument("--state-file", type=Path, help="Path to state persistence file")
-    parser.add_argument("--init-config", type=Path,
-                       help="Create default configuration file and exit")
+    parser.add_argument(
+        "--init-config", type=Path, help="Create default configuration file and exit"
+    )
     parser.add_argument("--json-output", action="store_true", help="Output results as JSON")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
 
