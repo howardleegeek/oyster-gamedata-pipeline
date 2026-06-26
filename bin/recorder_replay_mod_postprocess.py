@@ -39,6 +39,7 @@ parser interface for the follow-up spec (G27x / W32+).
 
 Standalone — stdlib only (``zipfile``, ``json``, ``struct``).
 """
+
 from __future__ import annotations
 
 import json
@@ -89,6 +90,7 @@ RECORDING_NAME = "recording.tmcpr"
 @dataclass
 class CameraSample:
     """One frame of 6DoF camera state."""
+
     t_seconds: float
     pos_x: float = 0.0
     pos_y: float = 0.0
@@ -102,7 +104,8 @@ class CameraSample:
 @dataclass
 class PostprocessResult:
     """Returned by :func:`run` to describe what (if anything) happened."""
-    status: str           # 'ok' | 'stub' | 'no_mcpr' | 'error'
+
+    status: str  # 'ok' | 'stub' | 'no_mcpr' | 'error'
     samples: List[CameraSample] = field(default_factory=list)
     duration_seconds: float = 0.0
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -112,6 +115,7 @@ class PostprocessResult:
 def _quat_from_yaw_pitch(yaw_deg: float, pitch_deg: float) -> tuple:
     """Convert MC yaw/pitch (degrees) → unit quaternion (w,x,y,z)."""
     import math
+
     yaw = math.radians(yaw_deg)
     pitch = math.radians(pitch_deg)
     cy, sy = math.cos(yaw * 0.5), math.sin(yaw * 0.5)
@@ -146,7 +150,7 @@ def _scan_recording(zf: zipfile.ZipFile) -> Dict[str, Any]:
     count = 0
     while cursor + 8 <= len(data):
         try:
-            ts, length = struct.unpack(">II", data[cursor:cursor + 8])
+            ts, length = struct.unpack(">II", data[cursor : cursor + 8])
         except struct.error:
             break
         cursor += 8
@@ -220,14 +224,17 @@ def find_latest_mcpr(replay_dir: Optional[Path] = None) -> Optional[Path]:
     if replay_dir is None:
         candidates: List[Path] = []
         import os
+
         appdata = os.environ.get("APPDATA")
         if appdata:
             candidates.append(Path(appdata) / ".minecraft" / "replay_recordings")
         home = Path.home()
-        candidates.extend([
-            home / ".minecraft" / "replay_recordings",
-            home / "Library" / "Application Support" / "minecraft" / "replay_recordings",
-        ])
+        candidates.extend(
+            [
+                home / ".minecraft" / "replay_recordings",
+                home / "Library" / "Application Support" / "minecraft" / "replay_recordings",
+            ]
+        )
         for c in candidates:
             if c.is_dir():
                 replay_dir = c
@@ -255,15 +262,17 @@ def merge_into_action_camera(
     n = min(len(frames), len(result.samples))
     for i in range(n):
         s = result.samples[i]
-        frames[i].update({
-            "cameraX": s.pos_x,
-            "cameraY": s.pos_y,
-            "cameraZ": s.pos_z,
-            "qW": s.quat_w,
-            "qX": s.quat_x,
-            "qY": s.quat_y,
-            "qZ": s.quat_z,
-        })
+        frames[i].update(
+            {
+                "cameraX": s.pos_x,
+                "cameraY": s.pos_y,
+                "cameraZ": s.pos_z,
+                "qW": s.quat_w,
+                "qX": s.quat_x,
+                "qY": s.quat_y,
+                "qZ": s.quat_z,
+            }
+        )
     data["camera_track_status"] = result.status
     data["camera_track_notes"] = result.notes
     action_camera_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
