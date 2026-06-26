@@ -8,6 +8,7 @@ Usage:
     python3 bin/scene_lighting_metadata.py --input scene.yaml --output lighting.json
     python3 bin/scene_lighting_metadata.py --frames-dir ./frames/ --output lighting.json
 """
+
 from __future__ import annotations
 
 import argparse
@@ -27,6 +28,7 @@ def _get_yaml():
     global _yaml
     if _yaml is None:
         import yaml
+
         _yaml = yaml
     return _yaml
 
@@ -34,20 +36,24 @@ def _get_yaml():
 @dataclass
 class SunDirection:
     """Sun direction as azimuth/elevation in degrees."""
-    azimuth: float   # 0-360°, 0=North, 90=East
+
+    azimuth: float  # 0-360°, 0=North, 90=East
     elevation: float  # -90..+90°
 
     def to_vector(self) -> Tuple[float, float, float]:
         """Convert to unit (x,y,z) vector pointing toward the sun."""
         az_rad, el_rad = math.radians(self.azimuth), math.radians(self.elevation)
-        return (math.cos(el_rad) * math.sin(az_rad),
-                math.cos(el_rad) * math.cos(az_rad),
-                math.sin(el_rad))
+        return (
+            math.cos(el_rad) * math.sin(az_rad),
+            math.cos(el_rad) * math.cos(az_rad),
+            math.sin(el_rad),
+        )
 
 
 @dataclass
 class AmbientIntensity:
     """Normalized ambient lighting parameters."""
+
     intensity: float = 0.5
     color_temperature: float = 5500.0
     sky_model: str = "hosek_wilkie"
@@ -56,6 +62,7 @@ class AmbientIntensity:
 @dataclass
 class WeatherState:
     """Discrete weather condition with continuous modifiers."""
+
     condition: str = "clear"
     cloud_cover: float = 0.0
     visibility_km: float = 10.0
@@ -65,6 +72,7 @@ class WeatherState:
 @dataclass
 class FrameLighting:
     """Complete lighting metadata for a single frame."""
+
     frame_id: str
     timestamp: Optional[float] = None
     sun: Optional[SunDirection] = None
@@ -91,7 +99,7 @@ class FrameLighting:
 
 def compute_sun_position(lat: float, lon: float, utc_ts: float) -> SunDirection:
     """Compute sun azimuth/elevation from geo coords and UTC timestamp.
-    
+
     Uses simplified solar position algorithm (~±1° accuracy).
     """
     dt = datetime.datetime.utcfromtimestamp(utc_ts)
@@ -102,10 +110,18 @@ def compute_sun_position(lat: float, lon: float, utc_ts: float) -> SunDirection:
     eqt = 9.87 * math.sin(2 * b) - 7.53 * math.cos(b) - 1.5 * math.sin(b)
     solar_time = hour + lon / 15.0 + eqt / 60.0
     hour_angle = 15.0 * (solar_time - 12.0)
-    lat_rad, dec_rad, ha_rad = math.radians(lat), math.radians(declination), math.radians(hour_angle)
-    sin_elev = math.sin(lat_rad) * math.sin(dec_rad) + math.cos(lat_rad) * math.cos(dec_rad) * math.cos(ha_rad)
+    lat_rad, dec_rad, ha_rad = (
+        math.radians(lat),
+        math.radians(declination),
+        math.radians(hour_angle),
+    )
+    sin_elev = math.sin(lat_rad) * math.sin(dec_rad) + math.cos(lat_rad) * math.cos(
+        dec_rad
+    ) * math.cos(ha_rad)
     elevation = math.degrees(math.asin(max(-1.0, min(1.0, sin_elev))))
-    cos_az = (math.sin(dec_rad) - math.sin(lat_rad) * sin_elev) / (math.cos(lat_rad) * math.cos(math.radians(elevation)) + 1e-9)
+    cos_az = (math.sin(dec_rad) - math.sin(lat_rad) * sin_elev) / (
+        math.cos(lat_rad) * math.cos(math.radians(elevation)) + 1e-9
+    )
     azimuth = math.degrees(math.acos(max(-1.0, min(1.0, cos_az))))
     if hour_angle > 0:
         azimuth = 360.0 - azimuth
@@ -114,17 +130,35 @@ def compute_sun_position(lat: float, lon: float, utc_ts: float) -> SunDirection:
 
 def estimate_ambient_from_weather(weather: WeatherState) -> AmbientIntensity:
     """Estimate ambient intensity from weather conditions."""
-    intensity_map = {"clear": 0.8, "partly_cloudy": 0.6, "overcast": 0.4, "rain": 0.3, "snow": 0.5, "fog": 0.35}
-    temp_map = {"clear": 5500.0, "partly_cloudy": 6000.0, "overcast": 7000.0, "rain": 6500.0, "snow": 7500.0, "fog": 7000.0}
+    intensity_map = {
+        "clear": 0.8,
+        "partly_cloudy": 0.6,
+        "overcast": 0.4,
+        "rain": 0.3,
+        "snow": 0.5,
+        "fog": 0.35,
+    }
+    temp_map = {
+        "clear": 5500.0,
+        "partly_cloudy": 6000.0,
+        "overcast": 7000.0,
+        "rain": 6500.0,
+        "snow": 7500.0,
+        "fog": 7000.0,
+    }
     base = intensity_map.get(weather.condition, 0.5)
     adjusted = base * (1.0 - weather.cloud_cover * 0.3)
-    return AmbientIntensity(intensity=min(1.0, max(0.0, adjusted)), color_temperature=temp_map.get(weather.condition, 5500.0))
+    return AmbientIntensity(
+        intensity=min(1.0, max(0.0, adjusted)),
+        color_temperature=temp_map.get(weather.condition, 5500.0),
+    )
 
 
 def infer_weather_from_image(image_path: Path) -> WeatherState:
     """Infer weather state from image brightness analysis."""
     try:
         from PIL import Image
+
         with Image.open(image_path) as img:
             img = img.convert("L")
             pixels = list(img.get_flattened_data())
@@ -155,22 +189,41 @@ def process_frame(frame_data: Dict[str, Any], frame_id: str) -> FrameLighting:
     sun = compute_sun_position(lat, lon, ts) if lat and lon and ts else None
     weather_data = frame_data.get("weather", {})
     weather = WeatherState(
-        condition=weather_data.get("condition", "clear") if isinstance(weather_data, dict) else "clear",
+        condition=weather_data.get("condition", "clear")
+        if isinstance(weather_data, dict)
+        else "clear",
         cloud_cover=weather_data.get("cloud_cover", 0.0) if isinstance(weather_data, dict) else 0.0,
-        visibility_km=weather_data.get("visibility_km", 10.0) if isinstance(weather_data, dict) else 10.0,
-        precipitation=weather_data.get("precipitation", 0.0) if isinstance(weather_data, dict) else 0.0,
+        visibility_km=weather_data.get("visibility_km", 10.0)
+        if isinstance(weather_data, dict)
+        else 10.0,
+        precipitation=weather_data.get("precipitation", 0.0)
+        if isinstance(weather_data, dict)
+        else 0.0,
     )
     ambient_data = frame_data.get("ambient", {})
-    ambient = AmbientIntensity(
-        intensity=ambient_data.get("intensity", 0.5),
-        color_temperature=ambient_data.get("color_temperature", 5500.0),
-        sky_model=ambient_data.get("sky_model", "hosek_wilkie"),
-    ) if ambient_data else estimate_ambient_from_weather(weather)
-    return FrameLighting(frame_id=frame_id, timestamp=ts, sun=sun, ambient=ambient, weather=weather,
-                         source=frame_data.get("source", "computed"), notes=frame_data.get("notes", ""))
+    ambient = (
+        AmbientIntensity(
+            intensity=ambient_data.get("intensity", 0.5),
+            color_temperature=ambient_data.get("color_temperature", 5500.0),
+            sky_model=ambient_data.get("sky_model", "hosek_wilkie"),
+        )
+        if ambient_data
+        else estimate_ambient_from_weather(weather)
+    )
+    return FrameLighting(
+        frame_id=frame_id,
+        timestamp=ts,
+        sun=sun,
+        ambient=ambient,
+        weather=weather,
+        source=frame_data.get("source", "computed"),
+        notes=frame_data.get("notes", ""),
+    )
 
 
-def process_frames_dir(frames_dir: Path, lat: float, lon: float, ts: Optional[float]) -> List[FrameLighting]:
+def process_frames_dir(
+    frames_dir: Path, lat: float, lon: float, ts: Optional[float]
+) -> List[FrameLighting]:
     """Process all frames in a directory."""
     results, image_exts = [], {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp"}
     sun = compute_sun_position(lat, lon, ts) if lat and lon and ts else None
@@ -178,9 +231,16 @@ def process_frames_dir(frames_dir: Path, lat: float, lon: float, ts: Optional[fl
         if img_path.suffix.lower() not in image_exts:
             continue
         weather = infer_weather_from_image(img_path)
-        results.append(FrameLighting(frame_id=img_path.stem, timestamp=ts, sun=sun,
-                                     ambient=estimate_ambient_from_weather(weather),
-                                     weather=weather, source="image_analysis"))
+        results.append(
+            FrameLighting(
+                frame_id=img_path.stem,
+                timestamp=ts,
+                sun=sun,
+                ambient=estimate_ambient_from_weather(weather),
+                weather=weather,
+                source="image_analysis",
+            )
+        )
     return results
 
 
@@ -208,12 +268,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if not args.frames_dir.exists():
             print(f"Error: Frames directory not found: {args.frames_dir}", file=sys.stderr)
             return 1
-        for fl in process_frames_dir(args.frames_dir, args.latitude, args.longitude, args.timestamp):
+        for fl in process_frames_dir(
+            args.frames_dir, args.latitude, args.longitude, args.timestamp
+        ):
             results.append(fl.to_dict())
     if not results:
         print("Error: No input provided (--input or --frames-dir required)", file=sys.stderr)
         return 1
-    output_data = {"version": "1.0", "generated": datetime.datetime.utcnow().isoformat() + "Z", "frames": results}
+    output_data = {
+        "version": "1.0",
+        "generated": datetime.datetime.utcnow().isoformat() + "Z",
+        "frames": results,
+    }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(output_data, indent=2))
     print(f"Wrote lighting metadata for {len(results)} frames to {args.output}")
