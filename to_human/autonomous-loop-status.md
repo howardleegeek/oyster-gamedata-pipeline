@@ -1132,3 +1132,4 @@ b4c97dbd638c75a1d826e641df598879876660ed
 
 - Picked: ruff format bin/build_bundled_installer/build_oysterplay_exe.py (smallest unformatted bin file at 298 lines; cosmetic line-wrapping, trailing whitespace, dict/list literals). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change, AST parse OK, ruff check clean, follows established cadence of formatting bin files.
 - Result: committed 9b8bc0b0 (ruff format applied to bin/build_bundled_installer/build_oysterplay_exe.py; 1 file changed, 57 insertions(+), 41 deletions(-); ruff check + format --check clean; AST parse OK; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race condition, no off-by-one, no security impact, no test masking (no tests reference this file), no brand cross-reference, no module-level side effect.)
+
