@@ -68,9 +68,7 @@ RUNTIME_MANIFEST_PATH = MC_INSTANCE_DIR / "manifest-fabric.json"
 DOWNLOAD_TIMEOUT_SEC = 120
 DOWNLOAD_RETRIES = 3
 DOWNLOAD_CHUNK = 1 << 16  # 64 KiB
-USER_AGENT = (
-    "oyster-agent-runner-bundled-installer/1.0 (+https://meta.fabricmc.net)"
-)
+USER_AGENT = "oyster-agent-runner-bundled-installer/1.0 (+https://meta.fabricmc.net)"
 
 # Fabric Maven base — used to derive download URLs when the profile JSON
 # only lists `name` + `url` for a library entry. Fabric's convention is
@@ -188,19 +186,13 @@ def _download_with_retries(url: str, dest: Path) -> int:
             if attempt < DOWNLOAD_RETRIES:
                 backoff = 2 ** (attempt - 1)
                 _log(
-                    f"  attempt {attempt}/{DOWNLOAD_RETRIES} failed: {exc}; "
-                    f"retrying in {backoff}s"
+                    f"  attempt {attempt}/{DOWNLOAD_RETRIES} failed: {exc}; retrying in {backoff}s"
                 )
                 time.sleep(backoff)
             else:
-                _err(
-                    f"  attempt {attempt}/{DOWNLOAD_RETRIES} failed: {exc}; "
-                    f"giving up"
-                )
+                _err(f"  attempt {attempt}/{DOWNLOAD_RETRIES} failed: {exc}; giving up")
 
-    raise RuntimeError(
-        f"download failed after {DOWNLOAD_RETRIES} attempts: {last_exc}"
-    )
+    raise RuntimeError(f"download failed after {DOWNLOAD_RETRIES} attempts: {last_exc}")
 
 
 def _download_text(url: str) -> str:
@@ -218,9 +210,7 @@ def _download_text(url: str) -> str:
             if attempt < DOWNLOAD_RETRIES:
                 backoff = 2 ** (attempt - 1)
                 time.sleep(backoff)
-    raise RuntimeError(
-        f"text fetch failed after {DOWNLOAD_RETRIES} attempts: {last_exc}"
-    )
+    raise RuntimeError(f"text fetch failed after {DOWNLOAD_RETRIES} attempts: {last_exc}")
 
 
 def _download_json(url: str) -> dict[str, Any]:
@@ -252,18 +242,14 @@ def _download_json_array(url: str) -> list[dict[str, Any]]:
             ) as resp:
                 payload = json.loads(resp.read().decode("utf-8"))
                 if not isinstance(payload, list):
-                    raise ValueError(
-                        f"expected JSON array, got {type(payload).__name__}"
-                    )
+                    raise ValueError(f"expected JSON array, got {type(payload).__name__}")
                 return payload
         except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
             last_exc = exc
             if attempt < DOWNLOAD_RETRIES:
                 backoff = 2 ** (attempt - 1)
                 time.sleep(backoff)
-    raise RuntimeError(
-        f"JSON-array fetch failed after {DOWNLOAD_RETRIES} attempts: {last_exc}"
-    )
+    raise RuntimeError(f"JSON-array fetch failed after {DOWNLOAD_RETRIES} attempts: {last_exc}")
 
 
 def _fetch_with_sha1_pin(
@@ -293,10 +279,7 @@ def _fetch_with_sha1_pin(
 
     got = _sha1_file(dest)
     if got.lower() != expected_sha1.lower():
-        _err(
-            f"{label}: SHA-1 mismatch — refusing to keep file. "
-            f"expected={expected_sha1} got={got}"
-        )
+        _err(f"{label}: SHA-1 mismatch — refusing to keep file. expected={expected_sha1} got={got}")
         try:
             dest.unlink()
         except OSError:
@@ -338,9 +321,7 @@ def _maven_url(base_url: str, name: str) -> str:
     return base + str(relpath).replace(os.sep, "/")
 
 
-def _resolve_lib_url_and_sha1(
-    lib: dict[str, Any], default_maven: str
-) -> tuple[str, str]:
+def _resolve_lib_url_and_sha1(lib: dict[str, Any], default_maven: str) -> tuple[str, str]:
     """Pull a (url, sha1) pair out of a Fabric library entry.
 
     Fabric's profile JSON describes each library as either:
@@ -373,9 +354,7 @@ def _resolve_lib_url_and_sha1(
         # The sidecar sometimes contains "<hash>  <filename>"; take the first token.
         sha1 = sha1_text.split()[0].strip().lower()
     if len(sha1) != 40:
-        raise RuntimeError(
-            f"library {name!r}: sha1 has unexpected length {len(sha1)}: {sha1!r}"
-        )
+        raise RuntimeError(f"library {name!r}: sha1 has unexpected length {len(sha1)}: {sha1!r}")
     return jar_url, sha1
 
 
@@ -399,10 +378,7 @@ def _fetch_profile(profile_url: str, loader_version: str, mc_version: str) -> di
 
     profile_name = f"fabric-loader-{loader_version}-{mc_version}"
     if profile.get("id") != profile_name:
-        _err(
-            f"profile id mismatch — expected {profile_name!r}, "
-            f"got {profile.get('id')!r}"
-        )
+        _err(f"profile id mismatch — expected {profile_name!r}, got {profile.get('id')!r}")
         sys.exit(7)
 
     if profile.get("inheritsFrom") != mc_version:
@@ -425,9 +401,7 @@ def _fetch_profile(profile_url: str, loader_version: str, mc_version: str) -> di
     versions_dir = MC_INSTANCE_DIR / "versions" / profile_name
     versions_dir.mkdir(parents=True, exist_ok=True)
     json_path = versions_dir / f"{profile_name}.json"
-    json_path.write_text(
-        json.dumps(profile, indent=2) + "\n", encoding="utf-8"
-    )
+    json_path.write_text(json.dumps(profile, indent=2) + "\n", encoding="utf-8")
     return profile
 
 
@@ -469,9 +443,7 @@ def _fetch_libraries(profile: dict[str, Any]) -> tuple[int, int, list[dict[str, 
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_bytes(cache.read_bytes())
         kept += 1
-        records.append(
-            {"name": name, "path": str(rel).replace(os.sep, "/"), "sha1": sha1}
-        )
+        records.append({"name": name, "path": str(rel).replace(os.sep, "/"), "sha1": sha1})
 
     return bytes_dl, kept, records
 
@@ -506,9 +478,7 @@ def _pick_primary_file(version: dict[str, Any]) -> dict[str, Any]:
     for f in files:
         if f.get("primary"):
             return f
-    raise RuntimeError(
-        f"Modrinth version {version.get('version_number')!r} has no primary file"
-    )
+    raise RuntimeError(f"Modrinth version {version.get('version_number')!r} has no primary file")
 
 
 def _fetch_fabric_api(mc_version: str) -> tuple[dict[str, Any], int]:
@@ -651,9 +621,7 @@ def _write_runtime_manifest(
             "instance_size_bytes_total": _dir_size_bytes(MC_INSTANCE_DIR),
         },
     }
-    RUNTIME_MANIFEST_PATH.write_text(
-        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
-    )
+    RUNTIME_MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     _log(f"wrote {RUNTIME_MANIFEST_PATH.relative_to(REPO_ROOT)}")
 
 
@@ -711,9 +679,7 @@ def main() -> int:
 
     # Verify + write runtime manifest.
     _verify_post_fetch(profile, expected_main, required_files)
-    _write_runtime_manifest(
-        pin, profile, library_records, bytes_dl, fabric_api=fabric_api_record
-    )
+    _write_runtime_manifest(pin, profile, library_records, bytes_dl, fabric_api=fabric_api_record)
 
     instance_size = _dir_size_bytes(MC_INSTANCE_DIR)
     _log(
