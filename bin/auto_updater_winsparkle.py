@@ -35,17 +35,21 @@ from xml.etree import ElementTree
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
+
 class UpdateStatus(Enum):
     """Enumeration of possible update states."""
+
     UP_TO_DATE = auto()
     UPDATE_AVAILABLE = auto()
     DOWNLOADING = auto()
     DOWNLOADED = auto()
     ERROR = auto()
 
+
 @dataclass
 class UpdateInfo:
     """Information about an available update."""
+
     version: str
     download_url: str
     file_size: int = 0
@@ -58,9 +62,11 @@ class UpdateInfo:
         """Serialize update info to a dictionary."""
         return {k: v for k, v in self.__dict__.items()}
 
+
 @dataclass
 class AppConfig:
     """Application configuration for the updater."""
+
     app_name: str
     current_version: str
     update_url: str
@@ -73,15 +79,18 @@ class AppConfig:
         if self.download_dir is None:
             self.download_dir = Path(tempfile.mkdtemp(prefix="updater_"))
 
+
 @dataclass
 class UpdateState:
     """Current state of the update process."""
+
     status: UpdateStatus = UpdateStatus.UP_TO_DATE
     last_check: Optional[datetime] = None
     available_update: Optional[UpdateInfo] = None
     downloaded_file: Optional[Path] = None
     error_message: str = ""
     download_progress: float = 0.0
+
 
 class AutoUpdater:
     """Main auto-updater implementing WinSparkle/Squirrel.Mac style updates."""
@@ -92,8 +101,10 @@ class AutoUpdater:
         self._stop_event = threading.Event()
         self._daemon_thread: Optional[threading.Thread] = None
         self._callbacks: Dict[str, List[Callable[..., None]]] = {
-            "update_available": [], "download_complete": [],
-            "install_ready": [], "error": [],
+            "update_available": [],
+            "download_complete": [],
+            "install_ready": [],
+            "error": [],
         }
 
     def on(self, event: str, callback: Callable[..., None]) -> None:
@@ -185,7 +196,9 @@ class AutoUpdater:
             self._emit("error", exc)
             return None
 
-    def _download_file(self, url: str, dest: Path, progress_cb: Optional[Callable[[float], None]] = None) -> bool:
+    def _download_file(
+        self, url: str, dest: Path, progress_cb: Optional[Callable[[float], None]] = None
+    ) -> bool:
         """Download a file with optional progress reporting."""
         self.state.status = UpdateStatus.DOWNLOADING
         try:
@@ -257,8 +270,10 @@ class AutoUpdater:
             return None
         dest = self.config.download_dir / Path(urllib.parse.urlparse(info.download_url).path).name
         dest.parent.mkdir(parents=True, exist_ok=True)
+
         def _progress(pct: float) -> None:
             self.state.download_progress = pct
+
         ok = self._download_file(info.download_url, dest, _progress)
         if not ok:
             return None
@@ -277,9 +292,11 @@ class AutoUpdater:
         info = self.state.available_update
         if info is None:
             return
-        msg = (f"Update {info.version} is ready.\n"
-               f"Release notes: {info.release_notes}\n"
-               "Please restart the application to apply the update.")
+        msg = (
+            f"Update {info.version} is ready.\n"
+            f"Release notes: {info.release_notes}\n"
+            "Please restart the application to apply the update."
+        )
         logger.info("PROMPT: %s", msg)
         self._emit("install_ready", info)
 
@@ -319,7 +336,9 @@ class AutoUpdater:
             logger.warning("Daemon already running")
             return
         self._stop_event.clear()
-        self._daemon_thread = threading.Thread(target=self._daemon_loop, name="updater-daemon", daemon=True)
+        self._daemon_thread = threading.Thread(
+            target=self._daemon_loop, name="updater-daemon", daemon=True
+        )
         self._daemon_thread.start()
         logger.info("Updater daemon started (interval=%dh)", self.config.poll_interval_hours)
 
@@ -330,28 +349,43 @@ class AutoUpdater:
             self._daemon_thread.join(timeout=10)
             logger.info("Updater daemon stopped")
 
+
 def _build_parser() -> argparse.ArgumentParser:
     """Construct the argument parser for the CLI."""
-    parser = argparse.ArgumentParser(description="Auto-update mechanism (WinSparkle / Squirrel.Mac style)")
+    parser = argparse.ArgumentParser(
+        description="Auto-update mechanism (WinSparkle / Squirrel.Mac style)"
+    )
     parser.add_argument("--url", required=True, help="Update server URL (XML appcast or JSON feed)")
     parser.add_argument("--version", required=True, help="Current application version (e.g. 1.2.3)")
-    parser.add_argument("--app-name", default="MyApp", help="Application name for User-Agent header")
-    parser.add_argument("--poll-hours", type=int, default=24, help="Polling interval in hours (default: 24)")
-    parser.add_argument("--auto-install-critical", action="store_true", help="Auto-install critical updates")
-    parser.add_argument("--download-dir", type=Path, default=None, help="Directory for downloaded installers")
+    parser.add_argument(
+        "--app-name", default="MyApp", help="Application name for User-Agent header"
+    )
+    parser.add_argument(
+        "--poll-hours", type=int, default=24, help="Polling interval in hours (default: 24)"
+    )
+    parser.add_argument(
+        "--auto-install-critical", action="store_true", help="Auto-install critical updates"
+    )
+    parser.add_argument(
+        "--download-dir", type=Path, default=None, help="Directory for downloaded installers"
+    )
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("check", help="Check for available updates")
     sub.add_parser("download", help="Download the latest update")
     sub.add_parser("daemon", help="Run the background update daemon")
     return parser
 
+
 def main(argv: Optional[List[str]] = None) -> int:
     """Entry point for the auto-updater CLI. Returns exit code."""
     parser = _build_parser()
     args = parser.parse_args(argv)
     config = AppConfig(
-        app_name=args.app_name, current_version=args.version, update_url=args.url,
-        poll_interval_hours=args.poll_hours, auto_install_critical=args.auto_install_critical,
+        app_name=args.app_name,
+        current_version=args.version,
+        update_url=args.url,
+        poll_interval_hours=args.poll_hours,
+        auto_install_critical=args.auto_install_critical,
         download_dir=args.download_dir,
     )
     updater = AutoUpdater(config)
@@ -383,6 +417,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             updater.stop_daemon()
             return 0
     return 1  # pragma: no cover
+
 
 if __name__ == "__main__":
     sys.exit(main())
