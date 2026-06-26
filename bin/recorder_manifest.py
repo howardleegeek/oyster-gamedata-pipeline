@@ -26,6 +26,7 @@ Standalone CLI:
 
 Spec: G262 (W31 wave). PP1 priority. ~100 lines.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -145,8 +146,7 @@ def build_manifest(clip_dir: Path) -> Dict[str, Any]:
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "files": files,
         "depth": depth_meta,
-        "complete": all(v is not None for v in files.values())
-        and depth_meta is not None,
+        "complete": all(v is not None for v in files.values()) and depth_meta is not None,
     }
 
 
