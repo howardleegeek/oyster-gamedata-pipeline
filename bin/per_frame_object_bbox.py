@@ -41,6 +41,7 @@ def _lazy_pil():
 @dataclass
 class BBox2D:
     """2D bounding box in image pixel coordinates."""
+
     x: float
     y: float
     width: float
@@ -85,6 +86,7 @@ class BBox2D:
 @dataclass
 class BBox3D:
     """3D bounding box in world / ego coordinates."""
+
     x: float
     y: float
     z: float
@@ -133,6 +135,7 @@ class BBox3D:
 @dataclass
 class FrameDetections:
     """Container for per-frame detections."""
+
     frame_index: int
     timestamp: float
     bboxes_2d: List[BBox2D] = field(default_factory=list)
@@ -165,7 +168,9 @@ class FrameDetections:
         self, occlusion_thresh: float = 0.5, truncation_thresh: float = 0.5
     ) -> "FrameDetections":
         """Return a new FrameDetections with only visible objects."""
-        filtered_2d = [b for b in self.bboxes_2d if b.is_visible(occlusion_thresh, truncation_thresh)]
+        filtered_2d = [
+            b for b in self.bboxes_2d if b.is_visible(occlusion_thresh, truncation_thresh)
+        ]
         return FrameDetections(
             frame_index=self.frame_index,
             timestamp=self.timestamp,
@@ -180,9 +185,7 @@ class FrameDetections:
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description="G168: Per-frame 2D/3D bounding box extraction"
-    )
+    parser = argparse.ArgumentParser(description="G168: Per-frame 2D/3D bounding box extraction")
     parser.add_argument("input", type=Path, help="Input video or directory")
     parser.add_argument(
         "--output",
@@ -338,9 +341,7 @@ def main():
     input_path = args.input
 
     if input_path.is_dir():
-        frame_files = sorted(input_path.glob("*.png")) + sorted(
-            input_path.glob("*.jpg")
-        )
+        frame_files = sorted(input_path.glob("*.png")) + sorted(input_path.glob("*.jpg"))
         frames = [(i, None) for i, _ in enumerate(frame_files)]
     else:
         frames = extract_frames(input_path)
