@@ -108,8 +108,7 @@ def load_config(config_path: Optional[Path] = None) -> UploadConfig:
     )
 
 
-def build_multipart_body(tarball_path: Path,
-                         vendor_id: str) -> Tuple[bytes, str]:
+def build_multipart_body(tarball_path: Path, vendor_id: str) -> Tuple[bytes, str]:
     """Return ``(body, content_type)`` for a multipart/form-data POST.
 
     The recorder is the only producer that talks to /v1/ingest, so we hand
@@ -129,17 +128,20 @@ def build_multipart_body(tarball_path: Path,
     ).encode("utf-8")
     file_bytes = tarball_path.read_bytes()
     if len(file_bytes) > MAX_PAYLOAD_BYTES:
-        raise ValueError(
-            f"Tarball too large: {len(file_bytes)} > {MAX_PAYLOAD_BYTES}")
+        raise ValueError(f"Tarball too large: {len(file_bytes)} > {MAX_PAYLOAD_BYTES}")
     post = f"\r\n--{boundary}--\r\n".encode("utf-8")
     body = pre + file_bytes + post
     content_type = f"multipart/form-data; boundary={boundary}"
     return body, content_type
 
 
-def post_tarball(endpoint: str, body: bytes, content_type: str,
-                 auth_token: Optional[str] = None,
-                 timeout: float = DEFAULT_TIMEOUT_SECONDS) -> Dict[str, Any]:
+def post_tarball(
+    endpoint: str,
+    body: bytes,
+    content_type: str,
+    auth_token: Optional[str] = None,
+    timeout: float = DEFAULT_TIMEOUT_SECONDS,
+) -> Dict[str, Any]:
     """POST a multipart body to ``endpoint`` and return parsed JSON.
 
     Raises:
@@ -152,8 +154,7 @@ def post_tarball(endpoint: str, body: bytes, content_type: str,
     }
     if auth_token:
         headers["Authorization"] = auth_token
-    req = urllib.request.Request(endpoint, data=body, headers=headers,
-                                  method="POST")
+    req = urllib.request.Request(endpoint, data=body, headers=headers, method="POST")
     started = time.monotonic()
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         raw = resp.read()
@@ -172,10 +173,12 @@ def post_tarball(endpoint: str, body: bytes, content_type: str,
             }
 
 
-def upload_clip(tarball_path: Path,
-                config: Optional[UploadConfig] = None,
-                vendor_id_override: Optional[str] = None,
-                dry_run: bool = False) -> Dict[str, Any]:
+def upload_clip(
+    tarball_path: Path,
+    config: Optional[UploadConfig] = None,
+    vendor_id_override: Optional[str] = None,
+    dry_run: bool = False,
+) -> Dict[str, Any]:
     """Upload ``tarball_path`` if config has an endpoint; else skip.
 
     Returns a dict with at least ``{"status": str}``; status is one of
@@ -190,51 +193,58 @@ def upload_clip(tarball_path: Path,
     body, content_type = build_multipart_body(tarball_path, vendor_id)
     if dry_run:
         return {
-            "status": "skipped", "reason": "dry-run",
-            "endpoint": endpoint, "vendor_id": vendor_id,
+            "status": "skipped",
+            "reason": "dry-run",
+            "endpoint": endpoint,
+            "vendor_id": vendor_id,
             "body_bytes": len(body),
         }
     try:
-        result = post_tarball(endpoint, body, content_type,
-                              auth_token=cfg.auth_token)
+        result = post_tarball(endpoint, body, content_type, auth_token=cfg.auth_token)
         result["status"] = "uploaded"
         result["vendor_id"] = vendor_id
         return result
     except urllib.error.HTTPError as exc:
-        return {"status": "failed", "reason": "http_error",
-                "status_code": exc.code, "detail": str(exc)}
+        return {
+            "status": "failed",
+            "reason": "http_error",
+            "status_code": exc.code,
+            "detail": str(exc),
+        }
     except urllib.error.URLError as exc:
-        return {"status": "failed", "reason": "network",
-                "detail": str(exc.reason)}
+        return {"status": "failed", "reason": "network", "detail": str(exc.reason)}
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--tarball", type=Path, required=True,
-                        help="Path to the .tar.gz produced by the recorder")
-    parser.add_argument("--vendor-id", type=str, default=None,
-                        help="Override vendor_id from config.json")
-    parser.add_argument("--config", type=Path, default=None,
-                        help="Override config.json path (test usage)")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Resolve config + payload size, do not POST")
+    parser.add_argument(
+        "--tarball", type=Path, required=True, help="Path to the .tar.gz produced by the recorder"
+    )
+    parser.add_argument(
+        "--vendor-id", type=str, default=None, help="Override vendor_id from config.json"
+    )
+    parser.add_argument(
+        "--config", type=Path, default=None, help="Override config.json path (test usage)"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Resolve config + payload size, do not POST"
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     """CLI entry point.  Status maps to documented exit codes."""
     args = parse_args(argv)
-    logging.basicConfig(level=logging.INFO,
-                        format="%(levelname)s: %(message)s")
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     tarball: Path = args.tarball.resolve()
     if not tarball.exists() or not tarball.is_file():
         logger.error("Tarball not found: %s", tarball)
         return 1
     config = load_config(args.config) if args.config else load_config()
-    result = upload_clip(tarball, config=config,
-                         vendor_id_override=args.vendor_id,
-                         dry_run=args.dry_run)
+    result = upload_clip(
+        tarball, config=config, vendor_id_override=args.vendor_id, dry_run=args.dry_run
+    )
     logger.info("Upload result: %s", result)
     status = result.get("status")
     if status == "uploaded" or status == "skipped":
