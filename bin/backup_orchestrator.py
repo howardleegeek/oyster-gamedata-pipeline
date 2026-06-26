@@ -77,15 +77,29 @@ def report_last_success() -> int:
 
 
 def run_pg_dump(
-    db_host: str, db_port: int, db_name: str, db_user: str,
-    dump_path: Path, extra_args: Optional[List[str]] = None,
+    db_host: str,
+    db_port: int,
+    db_name: str,
+    db_user: str,
+    dump_path: Path,
+    extra_args: Optional[List[str]] = None,
 ) -> Path:
     """Execute pg_dump writing compressed custom-format dump to *dump_path*."""
     env = os.environ.copy()
     cmd: List[str] = [
-        "pg_dump", "--host", db_host, "--port", str(db_port),
-        "--username", db_user, "--format", "custom",
-        "--verbose", "--file", str(dump_path), db_name,
+        "pg_dump",
+        "--host",
+        db_host,
+        "--port",
+        str(db_port),
+        "--username",
+        db_user,
+        "--format",
+        "custom",
+        "--verbose",
+        "--file",
+        str(dump_path),
+        db_name,
     ]
     if extra_args:
         cmd.extend(extra_args)
@@ -114,20 +128,25 @@ def upload_to_s3(bucket: str, key: str, local_path: Path, region: str) -> str:
 
 
 def ensure_glacier_lifecycle(
-    bucket: str, region: str, prefix: str = "backups/",
-    transition_days: int = 90, expiration_days: int = 365,
+    bucket: str,
+    region: str,
+    prefix: str = "backups/",
+    transition_days: int = 90,
+    expiration_days: int = 365,
 ) -> None:
     """Apply idempotent S3 lifecycle rule: GLACIER after *transition_days*, expire after *expiration_days*."""
     env = os.environ.copy()
     env["AWS_DEFAULT_REGION"] = region
     policy = {
-        "Rules": [{
-            "ID": "g205-backup-glacier-retention",
-            "Status": "Enabled",
-            "Filter": {"Prefix": prefix},
-            "Transitions": [{"Days": transition_days, "StorageClass": "GLACIER"}],
-            "Expiration": {"Days": expiration_days},
-        }]
+        "Rules": [
+            {
+                "ID": "g205-backup-glacier-retention",
+                "Status": "Enabled",
+                "Filter": {"Prefix": prefix},
+                "Transitions": [{"Days": transition_days, "StorageClass": "GLACIER"}],
+                "Expiration": {"Days": expiration_days},
+            }
+        ]
     }
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
         json.dump(policy, tmp)
@@ -135,22 +154,34 @@ def ensure_glacier_lifecycle(
         policy_path = tmp.name
     try:
         cmd: List[str] = [
-            "aws", "s3api", "put-bucket-lifecycle-configuration",
-            "--bucket", bucket, "--lifecycle-configuration", f"file://{policy_path}",
+            "aws",
+            "s3api",
+            "put-bucket-lifecycle-configuration",
+            "--bucket",
+            bucket,
+            "--lifecycle-configuration",
+            f"file://{policy_path}",
         ]
         logger.info("Applying lifecycle policy to bucket %s", bucket)
         result = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=120)
         if result.returncode != 0:
             logger.warning("Lifecycle policy rc=%d: %s", result.returncode, result.stderr)
         else:
-            logger.info("Lifecycle rule set: transition=%dd, expire=%dd", transition_days, expiration_days)
+            logger.info(
+                "Lifecycle rule set: transition=%dd, expire=%dd", transition_days, expiration_days
+            )
     finally:
         os.unlink(policy_path)
 
 
 def run_backup(
-    db_host: str, db_port: int, db_name: str, db_user: str,
-    s3_bucket: str, s3_region: str, s3_prefix: str = "backups",
+    db_host: str,
+    db_port: int,
+    db_name: str,
+    db_user: str,
+    s3_bucket: str,
+    s3_region: str,
+    s3_prefix: str = "backups",
     extra_pg_args: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Execute the full backup pipeline. Returns metadata dict."""
@@ -159,8 +190,11 @@ def run_backup(
     ts = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     key = f"{s3_prefix}/{db_name}-{date_stamp}-{int(now.timestamp())}.dump"
     details: Dict[str, Any] = {
-        "db_host": db_host, "db_name": db_name,
-        "s3_bucket": s3_bucket, "s3_key": key, "started_at": ts,
+        "db_host": db_host,
+        "db_name": db_name,
+        "s3_bucket": s3_bucket,
+        "s3_key": key,
+        "started_at": ts,
     }
     with tempfile.TemporaryDirectory(prefix="g205_backup_") as tmpdir:
         dump_path = Path(tmpdir) / f"{db_name}.dump"
@@ -183,7 +217,9 @@ def run_backup(
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser."""
-    p = argparse.ArgumentParser(prog="backup_orchestrator", description="Daily backup: pg_dump → S3 → Glacier.")
+    p = argparse.ArgumentParser(
+        prog="backup_orchestrator", description="Daily backup: pg_dump → S3 → Glacier."
+    )
     p.add_argument("--db-host", required=True, help="PostgreSQL host.")
     p.add_argument("--db-port", type=int, default=5432, help="PostgreSQL port (default: 5432).")
     p.add_argument("--db-name", required=True, help="Database name.")
@@ -205,9 +241,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         return report_last_success()
     try:
         details = run_backup(
-            db_host=args.db_host, db_port=args.db_port, db_name=args.db_name,
-            db_user=args.db_user, s3_bucket=args.s3_bucket, s3_region=args.s3_region,
-            s3_prefix=args.s3_prefix, extra_pg_args=args.extra_pg_args,
+            db_host=args.db_host,
+            db_port=args.db_port,
+            db_name=args.db_name,
+            db_user=args.db_user,
+            s3_bucket=args.s3_bucket,
+            s3_region=args.s3_region,
+            s3_prefix=args.s3_prefix,
+            extra_pg_args=args.extra_pg_args,
         )
         print(f"Backup completed at {details['completed_at']}")
         print(f"  S3 URI: {details['s3_uri']}")
