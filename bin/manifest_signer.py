@@ -61,7 +61,8 @@ def sign_manifest(manifest_path: Path, output_path: Path, keyid: Optional[str] =
         "--yes",
         "--armor",
         "--detach-sign",
-        "--output", str(output_path),
+        "--output",
+        str(output_path),
     ]
 
     if keyid:
@@ -109,7 +110,10 @@ def verify_manifest(manifest_path: Path, signature_path: Path) -> int:
     returncode, stdout, stderr = run_gpg(gpg_args)
 
     if returncode != 0:
-        print(f"Signature verification failed: {stderr.decode('utf-8', errors='replace')}", file=sys.stderr)
+        print(
+            f"Signature verification failed: {stderr.decode('utf-8', errors='replace')}",
+            file=sys.stderr,
+        )
         return 1
 
     print(f"Signature verified successfully for: {manifest_path}")
@@ -134,37 +138,26 @@ def main(argv: list[str]) -> int:
     # Sign subcommand
     sign_parser = subparsers.add_parser("sign", help="Sign a manifest file")
     sign_parser.add_argument(
-        "--input", "-i",
-        type=Path,
-        required=True,
-        help="Path to manifest.yaml file to sign"
+        "--input", "-i", type=Path, required=True, help="Path to manifest.yaml file to sign"
     )
     sign_parser.add_argument(
-        "--output", "-o",
-        type=Path,
-        required=True,
-        help="Path for output signature file"
+        "--output", "-o", type=Path, required=True, help="Path for output signature file"
     )
     sign_parser.add_argument(
-        "--keyid", "-k",
+        "--keyid",
+        "-k",
         type=str,
         default=None,
-        help="GPG key ID to use for signing (default: uses default key)"
+        help="GPG key ID to use for signing (default: uses default key)",
     )
 
     # Verify subcommand
     verify_parser = subparsers.add_parser("verify", help="Verify a manifest signature")
     verify_parser.add_argument(
-        "--input", "-i",
-        type=Path,
-        required=True,
-        help="Path to manifest.yaml file"
+        "--input", "-i", type=Path, required=True, help="Path to manifest.yaml file"
     )
     verify_parser.add_argument(
-        "--signature", "-s",
-        type=Path,
-        required=True,
-        help="Path to signature file"
+        "--signature", "-s", type=Path, required=True, help="Path to signature file"
     )
 
     args = parser.parse_args(argv)
