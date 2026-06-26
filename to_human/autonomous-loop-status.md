@@ -199,6 +199,7 @@
 - Picked: no good candidate found this round — exiting
 - Result: skipped (lint clean: src/ bin/ tests/ sdk/ server/ dashboard/ all pass ruff. Sampled tests pass: iron_law_check 13/13, iron_law_no_fake_data 25/25, storage 57/57, spec_lint 8/8, deploy 57/57. PRD gaps require credentials (Vercel, Supabase), not code changes. Active code fully resolved.)
 
+
 ## Round 232 @ 2026-07-04T16:30:00Z
 - Picked: no good candidate found this round — exiting
 - Result: skipped (lint clean: src/, tests/, sdk/, server/, dashboard/ all pass ruff. Sampled tests pass: bin/ 538/538, iron_law_check 13/13, iron_law_no_fake_data 32/32, storage 15/
@@ -997,3 +998,8 @@ b4c97dbd638c75a1d826e641df598879876660ed
 
 - Picked: ruff format bin/check_fabric_yarn_versions.py (smallest unformatted bin file: 245 lines, missing blank line after module docstring + long-expression wrapping; same pattern as Rounds 254–361). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change, no test references this file (no test-masking risk), module import smoke OK + AST parse OK + py_compile OK, follows established cadence of formatting small bin files.
 - Result: committed 80ba8ff6 (ruff format applied blank line after module docstring, line-wrap long expressions, multi-line dict formatting to bin/check_fabric_yarn_versions.py; 1 file changed, 33 insertions(+), 22 deletions(-); ruff check + format --check clean; AST parse + py_compile OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 363 @ 2026-06-26T09:37:12Z
+
+- Picked: ruff format bin/redteam_lint.py (smallest unformatted bin file: 245 lines, missing blank line after module docstring, missing blank line in function body, single-line list/dict needing expansion, long print f-string needing wrap; same pattern as Rounds 254–362). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change, no test file references this script (no test-masking risk), module import smoke OK + AST parse OK + py_compile OK, follows established cadence of formatting small bin files.
+- Result: committed cfe42bf3 (ruff format applied blank line after module docstring, blank line in function body, multi-line list/dict formatting, line-wrap long print f-string to bin/redteam_lint.py; 1 file changed, 23 insertions(+), 11 deletions(-); ruff check + format --check clean; AST parse + py_compile OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
