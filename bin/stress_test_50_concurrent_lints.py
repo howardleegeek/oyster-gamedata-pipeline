@@ -32,6 +32,7 @@ NUM_WORKERS_DEFAULT = 50
 @dataclass
 class LintResult:
     """Result from a single lint worker."""
+
     worker_id: int
     success: bool
     file_count: int = 0
@@ -60,13 +61,18 @@ def _extract_and_lint(tarball_path: str, worker_id: int) -> LintResult:
                         for chunk in iter(lambda: fh.read(8192), b""):
                             hasher.update(chunk)
         return LintResult(
-            worker_id=worker_id, success=True, file_count=file_count,
-            total_size=total_size, checksum=hasher.hexdigest(),
+            worker_id=worker_id,
+            success=True,
+            file_count=file_count,
+            total_size=total_size,
+            checksum=hasher.hexdigest(),
             duration_sec=time.monotonic() - start,
         )
     except Exception as exc:
         return LintResult(
-            worker_id=worker_id, success=False, error=str(exc),
+            worker_id=worker_id,
+            success=False,
+            error=str(exc),
             duration_sec=time.monotonic() - start,
         )
     finally:
@@ -75,7 +81,9 @@ def _extract_and_lint(tarball_path: str, worker_id: int) -> LintResult:
 
 
 def _run_subprocess_lint(
-    tarball_path: str, worker_id: int, lint_cmd: List[str],
+    tarball_path: str,
+    worker_id: int,
+    lint_cmd: List[str],
 ) -> LintResult:
     """Run an external lint command (list form, no shell=True)."""
     start = time.monotonic()
@@ -85,21 +93,29 @@ def _run_subprocess_lint(
         with tarfile.open(tarball_path, "r:*") as tf:
             tf.extractall(path=work_dir)
         proc = subprocess.run(
-            lint_cmd + [work_dir], capture_output=True, text=True, timeout=120,
+            lint_cmd + [work_dir],
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
         return LintResult(
-            worker_id=worker_id, success=proc.returncode == 0,
+            worker_id=worker_id,
+            success=proc.returncode == 0,
             error=proc.stderr.strip() if proc.returncode else None,
             duration_sec=time.monotonic() - start,
         )
     except subprocess.TimeoutExpired:
         return LintResult(
-            worker_id=worker_id, success=False, error="timeout 120s",
+            worker_id=worker_id,
+            success=False,
+            error="timeout 120s",
             duration_sec=time.monotonic() - start,
         )
     except Exception as exc:
         return LintResult(
-            worker_id=worker_id, success=False, error=str(exc),
+            worker_id=worker_id,
+            success=False,
+            error=str(exc),
             duration_sec=time.monotonic() - start,
         )
     finally:
@@ -121,15 +137,22 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     parser.add_argument("tarball", help="Path to tarball to stress-test")
     parser.add_argument(
-        "--workers", type=int, default=NUM_WORKERS_DEFAULT,
+        "--workers",
+        type=int,
+        default=NUM_WORKERS_DEFAULT,
         help=f"Number of concurrent workers (default: {NUM_WORKERS_DEFAULT})",
     )
     parser.add_argument(
-        "--lint-cmd", nargs="+", default=None,
+        "--lint-cmd",
+        nargs="+",
+        default=None,
         help="Optional external lint command (list form)",
     )
     parser.add_argument(
-        "--verbose", "-v", action="store_true", help="Enable debug logging",
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Enable debug logging",
     )
     args = parser.parse_args(argv)
     logging.basicConfig(
@@ -145,10 +168,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     results: List[LintResult] = []
     executor_fn = _run_subprocess_lint if args.lint_cmd else _extract_and_lint
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
-        futures = {
-            pool.submit(executor_fn, tarball_path, wid): wid
-            for wid in range(args.workers)
-        }
+        futures = {pool.submit(executor_fn, tarball_path, wid): wid for wid in range(args.workers)}
         for future in as_completed(futures):
             wid = futures[future]
             try:
@@ -157,8 +177,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                 result = LintResult(worker_id=wid, success=False, error=str(exc))
             results.append(result)
             logger.debug(
-                "Worker %d: %s (%.2fs)", wid,
-                "OK" if result.success else "FAIL", result.duration_sec,
+                "Worker %d: %s (%.2fs)",
+                wid,
+                "OK" if result.success else "FAIL",
+                result.duration_sec,
             )
     elapsed = time.monotonic() - t0
     results.sort(key=lambda r: r.worker_id)
@@ -178,17 +200,23 @@ def main(argv: Optional[List[str]] = None) -> int:
             if r.file_count != ref.file_count:
                 logger.error(
                     "File count mismatch: worker %d=%d vs expected %d",
-                    r.worker_id, r.file_count, ref.file_count,
+                    r.worker_id,
+                    r.file_count,
+                    ref.file_count,
                 )
                 passed = False
             if r.checksum != ref.checksum:
                 logger.error(
                     "Checksum mismatch: worker %d vs worker %d",
-                    r.worker_id, ref.worker_id,
+                    r.worker_id,
+                    ref.worker_id,
                 )
                 passed = False
     logger.info(
-        "Complete: %d/%d passed in %.2fs", success_count, args.workers, elapsed,
+        "Complete: %d/%d passed in %.2fs",
+        success_count,
+        args.workers,
+        elapsed,
     )
     if passed:
         logger.info("RESULT: PASS — no shared-state corruption detected")
