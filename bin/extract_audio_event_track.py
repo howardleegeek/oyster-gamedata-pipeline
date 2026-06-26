@@ -114,9 +114,18 @@ def run_sox_silence(audio_path):
         # Use sox to detect silence: periods below -50dB lasting > 0.1s
         result = subprocess.run(
             [
-                "sox", audio_path, "-n", "noisered",
-                "silence", "-l", "1", "0.1", "-50dB",
-                "-1", "0.1", "-50dB",
+                "sox",
+                audio_path,
+                "-n",
+                "noisered",
+                "silence",
+                "-l",
+                "1",
+                "0.1",
+                "-50dB",
+                "-1",
+                "0.1",
+                "-50dB",
                 "stat",
             ],
             capture_output=True,
@@ -161,12 +170,8 @@ def compute_snr_from_events(events_path):
     if not signal_volumes:
         return 0.0
 
-    signal_power = sum(v ** 2 for v in signal_volumes) / len(signal_volumes)
-    noise_power = (
-        sum(v ** 2 for v in noise_volumes) / len(noise_volumes)
-        if noise_volumes
-        else 1e-10
-    )
+    signal_power = sum(v**2 for v in signal_volumes) / len(signal_volumes)
+    noise_power = sum(v**2 for v in noise_volumes) / len(noise_volumes) if noise_volumes else 1e-10
 
     if noise_power < 1e-10:
         # No noise events — very high SNR
@@ -317,7 +322,10 @@ def main():
         json.dump(result, f, indent=2)
 
     print(f"[audio] Wrote {args.output}", file=sys.stderr)
-    print(f"[audio] SNR={snr_db}dB RMS={rms_db}dB events={event_count} voice={voice_present}", file=sys.stderr)
+    print(
+        f"[audio] SNR={snr_db}dB RMS={rms_db}dB events={event_count} voice={voice_present}",
+        file=sys.stderr,
+    )
 
     return result
 
