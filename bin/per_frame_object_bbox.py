@@ -127,6 +127,15 @@ class FrameData:
     camera_name: Optional[str] = None; scene_id: Optional[str] = None
 
     def get_visible_2d(self, oc: float = 0.5, tr: float = 0.5) -> List[BBox2D]:
+        """Get 2D bounding boxes that meet visibility thresholds.
+
+        Args:
+            oc: Maximum occlusion ratio (0.0 = fully occluded, 1.0 = fully visible).
+            tr: Maximum truncation ratio (0.0 = fully truncated, 1.0 = not truncated).
+
+        Returns:
+            List of BBox2D objects that pass the visibility filter.
+        """
         return [b for b in self.bboxes_2d if b.is_visible(oc, tr)]
 
     def get_visible_3d(self, oc: float = 0.5, tr: float = 0.5) -> List[BBox3D]:
