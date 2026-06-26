@@ -98,9 +98,7 @@ def is_telemetry_opted_in(path: Optional[Path] = None) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def compute_anon_id(
-    machine_id: Optional[str] = None, os_user: Optional[str] = None
-) -> str:
+def compute_anon_id(machine_id: Optional[str] = None, os_user: Optional[str] = None) -> str:
     """Compute a deterministic anonymous identifier.
 
     ``anon_id = sha256(machine_id + os_user)``
