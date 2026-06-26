@@ -237,7 +237,7 @@ def infer_batch(
                 frames_done = batch_end
                 if frames_done > 0:
                     eta = elapsed / frames_done * (total_frames - frames_done)
-                    print(f"Progress: {frames_done}/{total_frames} frames, " f"ETA: {eta:.1f}s")
+                    print(f"Progress: {frames_done}/{total_frames} frames, ETA: {eta:.1f}s")
 
             i = batch_end
 
