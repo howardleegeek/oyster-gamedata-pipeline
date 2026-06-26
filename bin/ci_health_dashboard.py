@@ -26,6 +26,7 @@ from typing import List, Optional, Tuple
 @dataclass
 class RunInfo:
     """Represents a single CI run from `gh run list`."""
+
     id: int
     name: str
     status: str
@@ -49,8 +50,15 @@ def fetch_runs(repo: Optional[str], limit: int) -> List[RunInfo]:
     Raises:
         RuntimeError: If `gh` command fails.
     """
-    cmd = ["gh", "run", "list", "--limit", str(limit), "--json",
-           "id,name,status,conclusion,createdAt,headBranch,event"]
+    cmd = [
+        "gh",
+        "run",
+        "list",
+        "--limit",
+        str(limit),
+        "--json",
+        "id,name,status,conclusion,createdAt,headBranch,event",
+    ]
     if repo:
         cmd.extend(["--repo", repo])
 
@@ -61,15 +69,17 @@ def fetch_runs(repo: Optional[str], limit: int) -> List[RunInfo]:
     runs_data = json.loads(result.stdout)
     runs = []
     for item in runs_data:
-        runs.append(RunInfo(
-            id=item.get("id", 0),
-            name=item.get("name", "unknown"),
-            status=item.get("status", "unknown"),
-            conclusion=item.get("conclusion"),
-            created_at=item.get("createdAt", ""),
-            head_branch=item.get("headBranch", ""),
-            event=item.get("event", "")
-        ))
+        runs.append(
+            RunInfo(
+                id=item.get("id", 0),
+                name=item.get("name", "unknown"),
+                status=item.get("status", "unknown"),
+                conclusion=item.get("conclusion"),
+                created_at=item.get("createdAt", ""),
+                head_branch=item.get("headBranch", ""),
+                event=item.get("event", ""),
+            )
+        )
     return runs
 
 
@@ -127,7 +137,7 @@ def format_output(
     failed: int,
     pass_rate: float,
     patterns: List[Tuple[str, int]],
-    output_json: bool
+    output_json: bool,
 ) -> str:
     """
     Format the dashboard output as either JSON or human-readable text.
@@ -149,9 +159,7 @@ def format_output(
             "passed": passed,
             "failed": failed,
             "pass_rate": round(pass_rate, 2),
-            "top_failure_patterns": [
-                {"pattern": p, "count": c} for p, c in patterns
-            ]
+            "top_failure_patterns": [{"pattern": p, "count": c} for p, c in patterns],
         }
         return json.dumps(data, indent=2)
 
@@ -191,22 +199,16 @@ def main(argv: List[str]) -> int:
         description="CI Health Dashboard - Analyze GitHub Actions run history."
     )
     parser.add_argument(
-        "--runs", "-n",
-        type=int,
-        default=20,
-        help="Number of recent runs to analyze (default: 20)"
+        "--runs", "-n", type=int, default=20, help="Number of recent runs to analyze (default: 20)"
     )
     parser.add_argument(
-        "--repo", "-r",
+        "--repo",
+        "-r",
         type=str,
         default=None,
-        help="Repository in 'owner/repo' format (default: current repo)"
+        help="Repository in 'owner/repo' format (default: current repo)",
     )
-    parser.add_argument(
-        "--json", "-j",
-        action="store_true",
-        help="Output results in JSON format"
-    )
+    parser.add_argument("--json", "-j", action="store_true", help="Output results in JSON format")
 
     args = parser.parse_args(argv)
 
@@ -225,8 +227,7 @@ def main(argv: List[str]) -> int:
         patterns = extract_failure_patterns(runs)
 
         # Output results
-        output = format_output(runs, passed, failed, pass_rate,
-                               patterns, args.json)
+        output = format_output(runs, passed, failed, pass_rate, patterns, args.json)
         print(output)
 
         return 0
