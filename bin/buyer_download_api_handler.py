@@ -29,6 +29,7 @@ try:
     import uvicorn
     from fastapi import Depends, FastAPI, HTTPException, Query, Request
     from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
     HAS_FASTAPI = True
 except ImportError:
     HAS_FASTAPI = False
@@ -48,6 +49,7 @@ PRESIGNED_URL_EXPIRY_SECONDS = 3600
 @dataclass
 class Clip:
     """Represents a video clip in the system."""
+
     clip_id: str
     title: str
     duration_seconds: float
@@ -60,6 +62,7 @@ class Clip:
 
 class JWTAuthError(Exception):
     """Raised when JWT authentication fails."""
+
     pass
 
 
@@ -76,22 +79,29 @@ def decode_jwt(token: str, secret: str) -> Dict[str, Any]:
     if "exp" in payload and datetime.now(timezone.utc).timestamp() > payload["exp"]:
         raise JWTAuthError("Token expired")
     signing_input = f"{parts[0]}.{parts[1]}".encode()
-    expected_sig = base64.urlsafe_b64encode(
-        hmac.new(secret.encode(), signing_input, hashlib.sha256).digest()
-    ).decode().rstrip("=")
+    expected_sig = (
+        base64.urlsafe_b64encode(hmac.new(secret.encode(), signing_input, hashlib.sha256).digest())
+        .decode()
+        .rstrip("=")
+    )
     if not hmac.compare_digest(parts[2], expected_sig):
         raise JWTAuthError("Invalid signature")
     return payload
 
 
-def generate_presigned_url(storage_path: str, base_url: str, secret: str,
-                          expires_in: int = PRESIGNED_URL_EXPIRY_SECONDS) -> str:
+def generate_presigned_url(
+    storage_path: str, base_url: str, secret: str, expires_in: int = PRESIGNED_URL_EXPIRY_SECONDS
+) -> str:
     """Generate a presigned download URL for a clip."""
     expires = int(time.time()) + expires_in
     to_sign = f"{storage_path}\n{expires}"
-    signature = base64.urlsafe_b64encode(
-        hmac.new(secret.encode(), to_sign.encode(), hashlib.sha256).digest()
-    ).decode().rstrip("=")
+    signature = (
+        base64.urlsafe_b64encode(
+            hmac.new(secret.encode(), to_sign.encode(), hashlib.sha256).digest()
+        )
+        .decode()
+        .rstrip("=")
+    )
     params = {"path": storage_path, "expires": expires, "signature": signature}
     return f"{base_url}?{urlencode(params)}"
 
@@ -99,8 +109,7 @@ def generate_presigned_url(storage_path: str, base_url: str, secret: str,
 class RateLimiter:
     """Simple in-memory rate limiter using sliding window."""
 
-    def __init__(self, per_minute: int = DEFAULT_RATE_LIMIT_PER_MINUTE,
-                 per_hour: int = 1000):
+    def __init__(self, per_minute: int = DEFAULT_RATE_LIMIT_PER_MINUTE, per_hour: int = 1000):
         self.per_minute = per_minute
         self.per_hour = per_hour
         self._requests: Dict[str, List[float]] = defaultdict(list)
@@ -142,9 +151,16 @@ class AuditLogger:
             """)
             conn.commit()
 
-    def log(self, buyer_id: str, action: str, resource: Optional[str] = None,
-            ip_address: Optional[str] = None, user_agent: Optional[str] = None,
-            status_code: int = 200, details: Optional[Dict] = None) -> None:
+    def log(
+        self,
+        buyer_id: str,
+        action: str,
+        resource: Optional[str] = None,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
+        status_code: int = 200,
+        details: Optional[Dict] = None,
+    ) -> None:
         """Log an audit event."""
         timestamp = datetime.now(timezone.utc).isoformat()
         details_json = json.dumps(details) if details else None
@@ -152,10 +168,21 @@ class AuditLogger:
             conn.execute(
                 "INSERT INTO audit_log (timestamp, buyer_id, action, resource, "
                 "ip_address, user_agent, status_code, details) VALUES (?,?,?,?,?,?,?,?)",
-                (timestamp, buyer_id, action, resource, ip_address, user_agent, status_code, details_json)
+                (
+                    timestamp,
+                    buyer_id,
+                    action,
+                    resource,
+                    ip_address,
+                    user_agent,
+                    status_code,
+                    details_json,
+                ),
             )
             conn.commit()
-        logger.info(f"AUDIT: buyer={buyer_id} action={action} resource={resource} status={status_code}")
+        logger.info(
+            f"AUDIT: buyer={buyer_id} action={action} resource={resource} status={status_code}"
+        )
 
 
 class ClipStore:
@@ -170,8 +197,9 @@ class ClipStore:
         if clip.clip_id not in self._buyer_clips[buyer_id]:
             self._buyer_clips[buyer_id].append(clip.clip_id)
 
-    def get_clips_for_buyer(self, buyer_id: str, page: int = 1,
-                            page_size: int = DEFAULT_PAGE_SIZE) -> Tuple[List[Clip], int]:
+    def get_clips_for_buyer(
+        self, buyer_id: str, page: int = 1, page_size: int = DEFAULT_PAGE_SIZE
+    ) -> Tuple[List[Clip], int]:
         """Get paginated clips for a buyer."""
         clip_ids = self._buyer_clips.get(buyer_id, [])
         total = len(clip_ids)
@@ -195,7 +223,9 @@ def create_app(jwt_secret: str, download_base_url: str) -> "FastAPI":
 
     app = FastAPI(title="Buyer Download API", version="1.0.0")
 
-    def get_current_buyer(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
+    def get_current_buyer(
+        credentials: HTTPAuthorizationCredentials = Depends(security),
+    ) -> Dict[str, Any]:
         """Extract and validate buyer from JWT token."""
         try:
             return decode_jwt(credentials.credentials, jwt_secret)
@@ -207,7 +237,7 @@ def create_app(jwt_secret: str, download_base_url: str) -> "FastAPI":
         request: Request,
         page: int = Query(1, ge=1),
         page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
-        buyer: Dict[str, Any] = Depends(get_current_buyer)
+        buyer: Dict[str, Any] = Depends(get_current_buyer),
     ) -> Dict[str, Any]:
         """List clips available to the authenticated buyer with presigned download URLs."""
         buyer_id = buyer.get("buyer_id", "unknown")
@@ -216,26 +246,49 @@ def create_app(jwt_secret: str, download_base_url: str) -> "FastAPI":
 
         allowed, error_msg = rate_limiter.is_allowed(buyer_id)
         if not allowed:
-            audit_logger.log(buyer_id, "list_clips", ip_address=client_ip,
-                           user_agent=user_agent, status_code=429, details={"error": error_msg})
+            audit_logger.log(
+                buyer_id,
+                "list_clips",
+                ip_address=client_ip,
+                user_agent=user_agent,
+                status_code=429,
+                details={"error": error_msg},
+            )
             raise HTTPException(status_code=429, detail=error_msg)
 
         clips, total = clip_store.get_clips_for_buyer(buyer_id, page, page_size)
         clip_responses = []
         for clip in clips:
             download_url = generate_presigned_url(clip.storage_path, download_base_url, jwt_secret)
-            clip_responses.append({
-                "clip_id": clip.clip_id, "title": clip.title,
-                "duration_seconds": clip.duration_seconds, "file_size_bytes": clip.file_size_bytes,
-                "created_at": clip.created_at, "download_url": download_url,
-                "content_type": clip.content_type, "metadata": clip.metadata
-            })
+            clip_responses.append(
+                {
+                    "clip_id": clip.clip_id,
+                    "title": clip.title,
+                    "duration_seconds": clip.duration_seconds,
+                    "file_size_bytes": clip.file_size_bytes,
+                    "created_at": clip.created_at,
+                    "download_url": download_url,
+                    "content_type": clip.content_type,
+                    "metadata": clip.metadata,
+                }
+            )
 
         total_pages = (total + page_size - 1) // page_size
-        audit_logger.log(buyer_id, "list_clips", ip_address=client_ip,
-                        user_agent=user_agent, status_code=200, details={"page": page, "count": len(clips)})
-        return {"clips": clip_responses, "page": page, "page_size": page_size,
-                "total_count": total, "total_pages": total_pages}
+        audit_logger.log(
+            buyer_id,
+            "list_clips",
+            ip_address=client_ip,
+            user_agent=user_agent,
+            status_code=200,
+            details={"page": page, "count": len(clips)},
+        )
+        return {
+            "clips": clip_responses,
+            "page": page,
+            "page_size": page_size,
+            "total_count": total,
+            "total_pages": total_pages,
+        }
 
     @app.get("/health")
     async def health_check() -> Dict[str, str]:
@@ -247,9 +300,30 @@ def create_app(jwt_secret: str, download_base_url: str) -> "FastAPI":
 def populate_demo_data(store: ClipStore) -> None:
     """Populate store with demo clips for testing."""
     demo_clips = [
-        Clip("clip001", "Demo Video 1", 120.5, 52428800, "2024-01-15T10:30:00Z", "/storage/clips/clip001.mp4"),
-        Clip("clip002", "Demo Video 2", 45.0, 20971520, "2024-01-16T14:20:00Z", "/storage/clips/clip002.mp4"),
-        Clip("clip003", "Demo Video 3", 300.0, 131072000, "2024-01-17T09:00:00Z", "/storage/clips/clip003.mp4"),
+        Clip(
+            "clip001",
+            "Demo Video 1",
+            120.5,
+            52428800,
+            "2024-01-15T10:30:00Z",
+            "/storage/clips/clip001.mp4",
+        ),
+        Clip(
+            "clip002",
+            "Demo Video 2",
+            45.0,
+            20971520,
+            "2024-01-16T14:20:00Z",
+            "/storage/clips/clip002.mp4",
+        ),
+        Clip(
+            "clip003",
+            "Demo Video 3",
+            300.0,
+            131072000,
+            "2024-01-17T09:00:00Z",
+            "/storage/clips/clip003.mp4",
+        ),
     ]
     for clip in demo_clips:
         store.add_clip("demo_buyer", clip)
@@ -261,19 +335,26 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind to")
     parser.add_argument("--port", type=int, default=8000, help="Port to bind to")
     parser.add_argument("--jwt-secret", required=True, help="Secret key for JWT validation")
-    parser.add_argument("--download-base-url", default="https://cdn.example.com/download",
-                       help="Base URL for presigned download URLs")
+    parser.add_argument(
+        "--download-base-url",
+        default="https://cdn.example.com/download",
+        help="Base URL for presigned download URLs",
+    )
     parser.add_argument("--rate-limit-per-minute", type=int, default=DEFAULT_RATE_LIMIT_PER_MINUTE)
     parser.add_argument("--demo", action="store_true", help="Populate with demo data")
 
     args = parser.parse_args(argv)
 
     if not HAS_FASTAPI:
-        print("Error: FastAPI is required. Install with: pip install fastapi uvicorn", file=sys.stderr)
+        print(
+            "Error: FastAPI is required. Install with: pip install fastapi uvicorn", file=sys.stderr
+        )
         return 1
 
     global rate_limiter
-    rate_limiter = RateLimiter(per_minute=args.rate_limit_per_minute, per_hour=args.rate_limit_per_minute * 20)
+    rate_limiter = RateLimiter(
+        per_minute=args.rate_limit_per_minute, per_hour=args.rate_limit_per_minute * 20
+    )
 
     if args.demo:
         populate_demo_data(clip_store)
