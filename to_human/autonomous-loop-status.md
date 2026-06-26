@@ -775,3 +775,18 @@ b4c97dbd638c75a1d826e641df598879876660ed
 
 - Picked: ruff format bin/vendor_scenario_low_bandwidth.py (smallest unformatted bin file: 180 lines, blank lines after class docstrings, trailing whitespace removal, list literal reformatting). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, import smoke OK, no test file references this module (no risk of test masking), follows established cadence of Rounds 254–332.
 - Result: committed 54ebf37d (ruff format applied to bin/vendor_scenario_low_bandwidth.py; 1 file changed; ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — blank lines after class docstrings, trailing whitespace removal, list literal reformatting. No silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 267 @ 2026-06-26T00:20:20Z
+
+- Picked: ruff format bin/autoresearch_depth_quality.py (186-line file, blank lines between functions; smallest unformatted file in bin/). Justification: measurable code smell, single-file scope, no behavior change, module import smoke OK, no risk of test masking, follows established cadence.
+- Result: committed 606424ca (ruff format added blank lines between functions in bin/autoresearch_depth_quality.py; 1 file changed, 32 insertions(+), 6 deletions(-); ruff check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.)
+
+## Round 326 @ 2026-06-26T01:00:00Z
+
+- Picked: ruff format bin/red_team_path_traversal.py (smallest unformatted bin file: 181 lines; line-wrapped long strings and function args). Justification: measurable code smell, single-file scope, no behavior change, import smoke OK, no dedicated test file (no regressions possible), follows established cadence of formatting small bin files.
+- Result: committed a9e19b47 (ruff format applied line-wrapping to bin/red_team_path_traversal.py; 1 file changed, 5 insertions(+), 16 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 334 @ 2026-06-26T00:36:43Z
+
+- Picked: ruff format bin/manifest_signer.py (182 lines; trailing comma, long-line wrap, list-arg reformat). Justification: measurable code smell, single-file scope, no behavior change, no tests reference this module (no risk of test masking), follows established cadence of formatting small bin files.
+- Result: committed e2d1690c (ruff format applied trailing comma, line-wrapping, list-arg reformat to bin/manifest_signer.py; 1 file changed, 13 insertions(+), 20 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
