@@ -26,6 +26,7 @@ def _import_websockets() -> Any:
     """Lazily import websockets library."""
     try:
         import websockets
+
         return websockets
     except ImportError:
         print("ERROR: websockets not installed. Run: pip install websockets")
@@ -138,17 +139,29 @@ class OBSSmokeTest:
             if self.password:
                 auth = {"password": self.password}
 
-            await ws.send(json.dumps({
-                "op": 1,
-                "d": {"rpcVersion": 1, "eventSubscriptions": 33, "authentication": auth}
-            }))
+            await ws.send(
+                json.dumps(
+                    {
+                        "op": 1,
+                        "d": {"rpcVersion": 1, "eventSubscriptions": 33, "authentication": auth},
+                    }
+                )
+            )
 
             resp = json.loads(await ws.recv())
             if resp.get("op") == 0 and resp.get("d", {}).get("authentication"):
-                await ws.send(json.dumps({
-                    "op": 1,
-                    "d": {"rpcVersion": 1, "eventSubscriptions": 33, "authentication": auth}
-                }))
+                await ws.send(
+                    json.dumps(
+                        {
+                            "op": 1,
+                            "d": {
+                                "rpcVersion": 1,
+                                "eventSubscriptions": 33,
+                                "authentication": auth,
+                            },
+                        }
+                    )
+                )
                 resp = json.loads(await ws.recv())
 
             if resp.get("op") == 2:
@@ -162,17 +175,19 @@ class OBSSmokeTest:
 
         print("[WS] Testing recording...")
         async with websockets.connect(self.ws_uri, timeout=10) as ws:
-            await ws.send(json.dumps({
-                "op": 6, "d": {"requestType": "StartRecord", "requestId": "r1"}
-            }))
+            await ws.send(
+                json.dumps({"op": 6, "d": {"requestType": "StartRecord", "requestId": "r1"}})
+            )
             start_resp = json.loads(await ws.recv())
-            print(f"[WS] StartRecord: {start_resp.get('d', {}).get('requestStatus', {}).get('code')}")
+            print(
+                f"[WS] StartRecord: {start_resp.get('d', {}).get('requestStatus', {}).get('code')}"
+            )
 
             await asyncio.sleep(2)
 
-            await ws.send(json.dumps({
-                "op": 6, "d": {"requestType": "StopRecord", "requestId": "r2"}
-            }))
+            await ws.send(
+                json.dumps({"op": 6, "d": {"requestType": "StopRecord", "requestId": "r2"}})
+            )
             stop_resp = json.loads(await ws.recv())
             print(f"[WS] StopRecord: {stop_resp.get('d', {}).get('requestStatus', {}).get('code')}")
 
