@@ -26,7 +26,9 @@ def load_weights(config_path: Optional[str] = None) -> Dict[str, Any]:
     if config_path is None:
         config_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
-            "..", "config", "quality_weights.yaml",
+            "..",
+            "config",
+            "quality_weights.yaml",
         )
     config_path = os.path.normpath(config_path)
     if not os.path.exists(config_path):
@@ -104,11 +106,14 @@ def aggregate_batch(
     if config is None:
         config = load_weights()
 
-    tiers = config.get("tiers", {
-        "top_tier": 0.90,
-        "premium": 0.75,
-        "standard": 0.50,
-    })
+    tiers = config.get(
+        "tiers",
+        {
+            "top_tier": 0.90,
+            "premium": 0.75,
+            "standard": 0.50,
+        },
+    )
 
     n = len(session_scores)
     if n == 0:
@@ -152,7 +157,11 @@ def aggregate_batch(
     # Summary statistics
     mean_score = sum(scores) / n
     sorted_scores = sorted(scores)
-    median_score = sorted_scores[n // 2] if n % 2 == 1 else (sorted_scores[n // 2 - 1] + sorted_scores[n // 2]) / 2
+    median_score = (
+        sorted_scores[n // 2]
+        if n % 2 == 1
+        else (sorted_scores[n // 2 - 1] + sorted_scores[n // 2]) / 2
+    )
     variance = sum((s - mean_score) ** 2 for s in scores) / n
     std_dev = math.sqrt(variance)
 
@@ -171,28 +180,34 @@ def aggregate_batch(
     recommendations = []
     top_tier_sessions = [s for s in enriched_sessions if s["tier"] == "top_tier"]
     if top_tier_sessions:
-        recommendations.append({
-            "action": "flag_for_top_tier",
-            "sessions": [s["session_id"] for s in top_tier_sessions],
-            "count": len(top_tier_sessions),
-            "rationale": f"{len(top_tier_sessions)} sessions in top {int((1 - tiers['top_tier']) * 100)}% by quality score",
-        })
+        recommendations.append(
+            {
+                "action": "flag_for_top_tier",
+                "sessions": [s["session_id"] for s in top_tier_sessions],
+                "count": len(top_tier_sessions),
+                "rationale": f"{len(top_tier_sessions)} sessions in top {int((1 - tiers['top_tier']) * 100)}% by quality score",
+            }
+        )
 
     if low_outliers:
-        recommendations.append({
-            "action": "review_low_outliers",
-            "sessions": [enriched_sessions[i]["session_id"] for i in low_outliers],
-            "count": len(low_outliers),
-            "rationale": "Sessions with unusually low quality scores - may need re-recording",
-        })
+        recommendations.append(
+            {
+                "action": "review_low_outliers",
+                "sessions": [enriched_sessions[i]["session_id"] for i in low_outliers],
+                "count": len(low_outliers),
+                "rationale": "Sessions with unusually low quality scores - may need re-recording",
+            }
+        )
 
     if high_outliers:
-        recommendations.append({
-            "action": "flag_high_outliers",
-            "sessions": [enriched_sessions[i]["session_id"] for i in high_outliers],
-            "count": len(high_outliers),
-            "rationale": "Exceptionally high quality sessions - premium pricing candidates",
-        })
+        recommendations.append(
+            {
+                "action": "flag_high_outliers",
+                "sessions": [enriched_sessions[i]["session_id"] for i in high_outliers],
+                "count": len(high_outliers),
+                "rationale": "Exceptionally high quality sessions - premium pricing candidates",
+            }
+        )
 
     return {
         "batch_size": n,
