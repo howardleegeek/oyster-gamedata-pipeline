@@ -26,6 +26,7 @@ Howard 2026-05-06 Iron Law: NO PLACEHOLDER. Every file in the output
 tarball is captured or inferred from real data. If any step fails, abort.
 NEVER silently fall back to the placeholder.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -99,8 +100,8 @@ This bundle contains 100% real captured/inferred data. No placeholders.
 
 | File | Status | Source |
 |------|--------|--------|
-| `video.mp4`           | ✅ REAL | mss screen capture, {capture_info.get('width')}×{capture_info.get('height')} @ {capture_info.get('actual_fps', 30)} fps, {capture_info.get('frames_captured', 0)} frames |
-| `depth/*.exr`         | ✅ REAL | DepthAnything V2 ViT-S, {depth_info['frames_inferred']} frames |
+| `video.mp4`           | ✅ REAL | mss screen capture, {capture_info.get("width")}×{capture_info.get("height")} @ {capture_info.get("actual_fps", 30)} fps, {capture_info.get("frames_captured", 0)} frames |
+| `depth/*.exr`         | ✅ REAL | DepthAnything V2 ViT-S, {depth_info["frames_inferred"]} frames |
 | `action_camera.json`  | ✅ REAL | per-frame bot telemetry from Mineflayer + buyer_spec_adapter |
 | `gameinfo.xlsx`       | ✅ REAL | bin/generate_gameinfo_xlsx.py |
 | `systeminfo.json`     | ✅ REAL | recorder host metadata |
@@ -172,10 +173,18 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("--in-tarball", type=Path, required=True)
     p.add_argument("--out-tarball", type=Path, required=True)
-    p.add_argument("--capture-region", type=str, default="0,0,1920,1080",
-                   help="x,y,w,h pixel region (default primary monitor 1920×1080)")
-    p.add_argument("--capture-duration", type=float, default=300.0,
-                   help="seconds to capture (default 300 = 5 min for buyer spec)")
+    p.add_argument(
+        "--capture-region",
+        type=str,
+        default="0,0,1920,1080",
+        help="x,y,w,h pixel region (default primary monitor 1920×1080)",
+    )
+    p.add_argument(
+        "--capture-duration",
+        type=float,
+        default=300.0,
+        help="seconds to capture (default 300 = 5 min for buyer spec)",
+    )
     args = p.parse_args(argv)
 
     region = tuple(int(x) for x in args.capture_region.split(","))
@@ -184,8 +193,10 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     info = make_real_tarball(
-        args.in_tarball, args.out_tarball,
-        region=region, duration=args.capture_duration,
+        args.in_tarball,
+        args.out_tarball,
+        region=region,
+        duration=args.capture_duration,
     )
     print(json.dumps(info, indent=2))
     return 0
