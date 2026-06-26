@@ -11,6 +11,7 @@ Usage:
     python3 bin/redteam_lint.py --attack drop_systeminfo
     python3 bin/redteam_lint.py --json
 """
+
 from __future__ import annotations
 
 import argparse
@@ -36,6 +37,7 @@ except Exception as e:
 def lint_buyer_bundle(tarball_path: str):
     """Adapter: lint expects an unpacked dir, redteam works in tarballs."""
     import tarfile as _t
+
     with tempfile.TemporaryDirectory() as td:
         td = Path(td)
         with _t.open(tarball_path) as t:
@@ -48,9 +50,16 @@ def build_clean_bundle(tmpdir: Path) -> Path:
     """Run sample_tarball_builder to get a known-good 5-file bundle, then unpack."""
     tarball = tmpdir / "clean.tar.gz"
     subprocess.run(
-        [sys.executable, str(REPO / "bin" / "sample_tarball_builder.py"),
-         "--output", str(tarball), "--skip-video", "--skip-depth"],
-        check=True, capture_output=True
+        [
+            sys.executable,
+            str(REPO / "bin" / "sample_tarball_builder.py"),
+            "--output",
+            str(tarball),
+            "--skip-video",
+            "--skip-depth",
+        ],
+        check=True,
+        capture_output=True,
     )
     bundle = tmpdir / "bundle"
     bundle.mkdir()
@@ -204,8 +213,11 @@ def run_attack(name: str, mutator) -> dict:
                 "issue_count": len(issues) if issues else 0,
             }
         except Exception as e:
-            return {"attack": name, "blue_team_caught": True,
-                    "error": f"lint-raised-exception: {e}"}
+            return {
+                "attack": name,
+                "blue_team_caught": True,
+                "error": f"lint-raised-exception: {e}",
+            }
 
 
 def main(argv=None):
@@ -224,9 +236,11 @@ def main(argv=None):
         results.append(r)
         if not args.json:
             sym = "✅" if r.get("blue_team_caught") else "❌"
-            print(f"{sym} {name:<32}  caught={r.get('blue_team_caught')}  "
-                  f"issues={r.get('issue_count', '?')}  "
-                  f"{r.get('error', '')}")
+            print(
+                f"{sym} {name:<32}  caught={r.get('blue_team_caught')}  "
+                f"issues={r.get('issue_count', '?')}  "
+                f"{r.get('error', '')}"
+            )
 
     if args.json:
         print(json.dumps(results, indent=2))
@@ -235,9 +249,7 @@ def main(argv=None):
     miss = sum(1 for r in results if r.get("blue_team_caught") is False)
     if not args.json:
         print()
-        print(f"Red-team total: {len(results)}  "
-              f"Blue caught: {caught}  "
-              f"Missed (LINT BUG): {miss}")
+        print(f"Red-team total: {len(results)}  Blue caught: {caught}  Missed (LINT BUG): {miss}")
     return 0 if miss == 0 else 1
 
 
