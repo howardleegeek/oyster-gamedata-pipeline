@@ -16,7 +16,12 @@
 ## Round 372 @ 2026-06-26T03:45:00Z
 
 - Picked: ruff format bin/buyer_dashboard_html.py (278 lines, 2nd smallest unformatted bin file after bug_report.py at 365). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic line-wrap + dict literals + trailing commas), AST parse + import smoke OK, no test for this file, follows established cadence.
-- Result: committed b756eb31 (ruff format applied: dict literals, f-strings, trailing commas; 1 file changed, 23 insertions(+), 24 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff.)
+- Result: committed b756eb31 (ruff format applied: dict literals, f-strings, trailing commas; 1 file changed, 23 insertions(+), 24 deletions(-); ruff check + format --check clean; AST parse + import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
+
+## Round 373 @ 2026-06-26T04:00:00Z
+
+- Picked: ruff format bin/clip_validator_strict.py (375 lines, smallest unformatted bin file). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic line-wrap + dict literals + trailing commas), AST parse OK, no test for this file, follows established cadence.
+- Result: committed 6e5f3158 (ruff format applied: line-wrap, dict literals, trailing commas; 1 file changed, 85 insertions(+), 35 deletions(-); ruff check + format --check clean; AST parse OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.) --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff.)
 
 ## Round 373 @ 2026-06-26T04:00:00Z
 
@@ -1139,3 +1144,8 @@ b4c97dbd638c75a1d826e641df598879876660ed
 
 - Picked: ruff format bin/server_ingest_worker.py (smallest unformatted bin file: 296 lines, ties with rlds_export.py at 297). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change (purely cosmetic line-wrap of 8-element list literal + 5-arg call + blank lines after 3 import statements), no test references (verified grep in tests/), ruff check clean before+after, AST parse + import smoke OK, follows established cadence of small-bin-file formats (Rounds 254-382).
 - Result: committed c03e0486 (ruff format applied: expanded 8-element required-env list to one-per-line, expanded 5-arg write_result_to_db call, added blank lines after 3 import boto3 / import shutil statements; 1 file changed, 20 insertions(+), 5 deletions(-); ruff check + ruff format --check clean; AST parse + import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect, list contents identical, call argument order identical, import statements unchanged.)
+
+## Round 384 @ 2026-06-26T17:37:53Z
+
+- Picked: ruff format bin/rlds_export.py (smallest unformatted bin file at 297 lines; line-wrap list comprehension in TarballParser.extract, blank lines after class docstrings, trailing whitespace trim). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change (purely cosmetic reformat), AST parse OK, ruff check + format --check clean before/after, no test file exists for this module so no risk of test masking, follows established cadence of formatting small bin files one at a time.
+- Result: committed 867f60dc (ruff format applied: 1 file changed, 61 insertions(+), 38 deletions(-); ruff check + ruff format --check clean; AST parse OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race condition, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect, no tarball path-traversal guard change (the `[m for m in tar.getmembers() if not m.name.startswith("/") and ".." not in m.name]` filter is preserved byte-for-byte in semantic content, only re-wrapped onto 3 lines).)
