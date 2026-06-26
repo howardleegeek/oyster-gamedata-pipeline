@@ -92,8 +92,7 @@ def _apply_tester(
     )
     if resp.status_code != 200:
         print(
-            f"ERROR: Failed to apply for {email} "
-            f"(status={resp.status_code}): {resp.text}",
+            f"ERROR: Failed to apply for {email} (status={resp.status_code}): {resp.text}",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -121,8 +120,7 @@ def _approve_tester(
         sys.exit(1)
     if resp.status_code != 200:
         print(
-            f"ERROR: Failed to approve tester {tester_id} "
-            f"(status={resp.status_code}): {resp.text}",
+            f"ERROR: Failed to approve tester {tester_id} (status={resp.status_code}): {resp.text}",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -167,8 +165,7 @@ def main() -> None:
         sys.exit(1)
     if len(emails) > MAX_BATCH_SIZE:
         print(
-            f"ERROR: Too many emails ({len(emails)}). "
-            f"Maximum is {MAX_BATCH_SIZE} per batch.",
+            f"ERROR: Too many emails ({len(emails)}). Maximum is {MAX_BATCH_SIZE} per batch.",
             file=sys.stderr,
         )
         sys.exit(1)
