@@ -28,28 +28,31 @@ class GracefulShutdownHandler:
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.queue_file = self.state_dir / "queue.json"
         self.flush_timeout = flush_timeout
-        
+
         self._shutdown = threading.Event()
         self._writes: Dict[str, Dict] = {}
         self._tarballs: Dict[str, tarfile.TarFile] = {}
         self._queue: Dict[str, Any] = {"version": 1, "items": [], "cursor": 0}
         self._lock = threading.RLock()
-        
+
         self._load_queue()
         atexit.register(self._atexit)
         self._register_signals()
-    
+
     def _register_signals(self):
         if sys.platform == "win32":
             try:
                 import ctypes
                 from ctypes import wintypes
+
                 PHANDLER_ROUTINE = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.DWORD)
+
                 def handler(ctrl_type: int) -> bool:
                     if ctrl_type in (0, 1, 2, 5, 6):
                         self._handle_signal(signal.SIGTERM, None)
                         return True
                     return False
+
                 kernel32 = ctypes.WinDLL("kernel32")
                 kernel32.SetConsoleCtrlHandler(PHANDLER_ROUTINE(handler), True)
             except ImportError:
@@ -58,11 +61,11 @@ class GracefulShutdownHandler:
             signal.signal(signal.SIGTERM, self._handle_signal)
             signal.signal(signal.SIGINT, self._handle_signal)
         logger.info("Signal handlers registered")
-    
+
     def _handle_signal(self, signum, frame):
         logger.info("Signal %s received", signum)
         self.shutdown()
-    
+
     def shutdown(self):
         if self._shutdown.is_set():
             return
@@ -77,7 +80,7 @@ class GracefulShutdownHandler:
         except Exception as e:
             logger.error("Shutdown error: %s", e)
         sys.exit(0)
-    
+
     def _flush_writes(self):
         with self._lock:
             if not self._writes:
@@ -93,7 +96,7 @@ class GracefulShutdownHandler:
                         write["completed"] = True
                     except Exception as e:
                         logger.warning("Write failed %s: %s", clip_id, e)
-    
+
     def _close_tarballs(self):
         with self._lock:
             if not self._tarballs:
@@ -104,18 +107,18 @@ class GracefulShutdownHandler:
                     tar.close()
                 except Exception as e:
                     logger.error("Close error %s: %s", path, e)
-    
+
     def _save_queue(self):
         with self._lock:
             try:
-                temp = self.queue_file.with_suffix('.tmp')
-                with open(temp, 'w') as f:
+                temp = self.queue_file.with_suffix(".tmp")
+                with open(temp, "w") as f:
                     json.dump(self._queue, f, indent=2)
                 temp.replace(self.queue_file)
                 logger.info("Queue saved")
             except Exception as e:
                 logger.error("Save error: %s", e)
-    
+
     def _create_checkpoint(self):
         try:
             ts = int(time.time())
@@ -128,19 +131,20 @@ class GracefulShutdownHandler:
                         {"id": k, "path": v["path"], "completed": v.get("completed", False)}
                         for k, v in self._writes.items()
                     ],
-                    "tarballs": list(self._tarballs.keys())
+                    "tarballs": list(self._tarballs.keys()),
                 }
-            with open(checkpoint, 'w') as f:
+            with open(checkpoint, "w") as f:
                 json.dump(data, f, indent=2)
             logger.info("Checkpoint created")
             self._cleanup_checkpoints()
         except Exception as e:
             logger.error("Checkpoint error: %s", e)
-    
+
     def _cleanup_checkpoints(self):
         try:
-            checkpoints = sorted(self.state_dir.glob("checkpoint_*.json"),
-                               key=lambda p: p.stat().st_mtime)
+            checkpoints = sorted(
+                self.state_dir.glob("checkpoint_*.json"), key=lambda p: p.stat().st_mtime
+            )
             for old in checkpoints[:-5]:
                 try:
                     old.unlink()
@@ -148,40 +152,40 @@ class GracefulShutdownHandler:
                     pass
         except Exception:
             pass
-    
+
     def _load_queue(self):
         try:
             if self.queue_file.exists():
-                with open(self.queue_file, 'r') as f:
+                with open(self.queue_file, "r") as f:
                     self._queue = json.load(f)
         except Exception:
             pass
-    
+
     def _atexit(self):
         if not self._shutdown.is_set():
             self.shutdown()
-    
+
     def is_shutting_down(self) -> bool:
         return self._shutdown.is_set()
-    
+
     def wait_for_shutdown(self, timeout: Optional[float] = None) -> bool:
         return self._shutdown.wait(timeout)
-    
+
     def register_clip_write(self, clip_id: str, file_path: Path, data: bytes):
         with self._lock:
             self._writes[clip_id] = {"path": str(file_path), "data": data, "completed": False}
-    
+
     def mark_write_completed(self, clip_id: str):
         with self._lock:
             if clip_id in self._writes:
                 self._writes[clip_id]["completed"] = True
-    
+
     def open_tarball(self, path: Path, mode: str = "w:gz") -> tarfile.TarFile:
         with self._lock:
             tar = tarfile.open(path, mode)
             self._tarballs[str(path)] = tar
             return tar
-    
+
     def update_queue(self, items: List[Dict[str, Any]], cursor: int = 0):
         with self._lock:
             self._queue["items"] = items
@@ -190,30 +194,30 @@ class GracefulShutdownHandler:
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Graceful shutdown handler")
-    parser.add_argument("--state-dir", type=Path, required=True,
-                       help="Directory for state and checkpoints")
-    parser.add_argument("--flush-timeout", type=float, default=30.0,
-                       help="Timeout for flushing writes (seconds)")
-    parser.add_argument("--daemon", action="store_true",
-                       help="Run as daemon, wait for shutdown")
-    parser.add_argument("--log-level", default="INFO",
-                       choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-                       help="Logging level")
-    
+    parser.add_argument(
+        "--state-dir", type=Path, required=True, help="Directory for state and checkpoints"
+    )
+    parser.add_argument(
+        "--flush-timeout", type=float, default=30.0, help="Timeout for flushing writes (seconds)"
+    )
+    parser.add_argument("--daemon", action="store_true", help="Run as daemon, wait for shutdown")
+    parser.add_argument(
+        "--log-level",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Logging level",
+    )
+
     args = parser.parse_args(argv)
-    
+
     logging.basicConfig(
-        level=getattr(logging, args.log_level),
-        format="%(asctime)s - %(levelname)s - %(message)s"
+        level=getattr(logging, args.log_level), format="%(asctime)s - %(levelname)s - %(message)s"
     )
-    
-    handler = GracefulShutdownHandler(
-        state_dir=args.state_dir,
-        flush_timeout=args.flush_timeout
-    )
-    
+
+    handler = GracefulShutdownHandler(state_dir=args.state_dir, flush_timeout=args.flush_timeout)
+
     logger.info("Graceful shutdown handler initialized")
-    
+
     if args.daemon:
         logger.info("Running in daemon mode")
         try:
@@ -224,7 +228,7 @@ def main(argv=None) -> int:
     else:
         logger.info("Running in one-shot mode")
         handler._create_checkpoint()
-    
+
     return 0
 
 
