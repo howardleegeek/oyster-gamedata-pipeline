@@ -184,9 +184,9 @@ def run_smoke(backend_url: str) -> int:
             try:
                 logger.info("=== Step 4: Verify ===")
                 verify_result = step_verify(backend_url, session_id)
-                assert (
-                    verify_result.get("session_id") == session_id
-                ), "Verify returned wrong session_id"
+                assert verify_result.get("session_id") == session_id, (
+                    "Verify returned wrong session_id"
+                )
                 assert verify_result.get("status") == "received", "Verify status not 'received'"
                 logger.info("Step 4 PASSED")
             except Exception as exc:
