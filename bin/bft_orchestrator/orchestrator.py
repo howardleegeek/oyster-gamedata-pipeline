@@ -10,6 +10,7 @@ ABSTAINs to decide. IL3 (independence) is enforced upstream by the verifier
 modules - this orchestrator only counts votes, never sees source residual
 math, so a malicious verifier cannot rewrite consensus from inside.
 """
+
 from __future__ import annotations
 
 import importlib
@@ -76,9 +77,9 @@ _V3_RES = [
 _V2P_RES = [
     ("R01", "r01_quat_norm", False, False),
     ("R02", "r02_euler_quat_consistency", False, False),
-    ("R03", "r03_kinematics", True, False),     # GLM: 2-arg signature
+    ("R03", "r03_kinematics", True, False),  # GLM: 2-arg signature
     ("R04", "r04_mouse_dx_diff", True, False),
-    ("R05", "r05_dt", True, False),              # GLM: 2-arg signature
+    ("R05", "r05_dt", True, False),  # GLM: 2-arg signature
     ("R06", "r06_angle_range", False, False),
     ("R07", "r07_mouse_range", False, False),
     ("R08", "r08_fx_eq_fy", False, False),
@@ -96,24 +97,45 @@ def _load(path: str) -> Any:
 
 
 def _to_vote_v1(name: str, vid: str, r: Any) -> Vote:
-    return Vote(vid, name, "PASS" if r.passed else "FAIL", float(r.residual),
-                float(r.threshold), getattr(r, "note", ""))
+    return Vote(
+        vid,
+        name,
+        "PASS" if r.passed else "FAIL",
+        float(r.residual),
+        float(r.threshold),
+        getattr(r, "note", ""),
+    )
 
 
 def _to_vote_v2(name: str, vid: str, r: dict) -> Vote:
-    return Vote(vid, name, "PASS" if r.get("passed") else "FAIL",
-                float(r.get("residual", 0.0)), float(r.get("threshold", 0.0)),
-                str(r.get("name", "")))
+    return Vote(
+        vid,
+        name,
+        "PASS" if r.get("passed") else "FAIL",
+        float(r.get("residual", 0.0)),
+        float(r.get("threshold", 0.0)),
+        str(r.get("name", "")),
+    )
 
 
 def _to_vote_v3(name: str, vid: str, r: Any) -> Vote:
     verdict = r.verdict.value if hasattr(r.verdict, "value") else str(r.verdict)
-    val = math.nan if (isinstance(r.residual, float) and math.isnan(r.residual)) else float(r.residual)
+    val = (
+        math.nan
+        if (isinstance(r.residual, float) and math.isnan(r.residual))
+        else float(r.residual)
+    )
     return Vote(vid, name, verdict, val, 0.0, getattr(r, "note", "") or "")
 
 
-def _invoke(fn: Callable[..., Any], rec: dict, neighbor: dict | None,
-            fps: float, needs_n: bool, needs_f: bool) -> Any:
+def _invoke(
+    fn: Callable[..., Any],
+    rec: dict,
+    neighbor: dict | None,
+    fps: float,
+    needs_n: bool,
+    needs_f: bool,
+) -> Any:
     if needs_n and needs_f:
         return fn(rec, neighbor, fps)
     if needs_n:
@@ -123,8 +145,15 @@ def _invoke(fn: Callable[..., Any], rec: dict, neighbor: dict | None,
     return fn(rec)
 
 
-def _run(module: Any, vid: str, registry: list, normalize: Callable[[str, str, Any], Vote],
-         frame: dict, neighbor: dict | None, fps: float) -> list[Vote]:
+def _run(
+    module: Any,
+    vid: str,
+    registry: list,
+    normalize: Callable[[str, str, Any], Vote],
+    frame: dict,
+    neighbor: dict | None,
+    fps: float,
+) -> list[Vote]:
     out: list[Vote] = []
     if module is None:
         return out
@@ -138,8 +167,7 @@ def _run(module: Any, vid: str, registry: list, normalize: Callable[[str, str, A
             result = _invoke(fn, frame, neighbor, fps, needs_n, needs_f)
             out.append(normalize(name, vid, result))
         except Exception as exc:  # exception still counts as detection (FAIL)
-            out.append(Vote(vid, name, "FAIL", math.nan, 0.0,
-                            f"{type(exc).__name__}: {exc}"))
+            out.append(Vote(vid, name, "FAIL", math.nan, 0.0, f"{type(exc).__name__}: {exc}"))
     return out
 
 
@@ -153,8 +181,7 @@ def _abstain_vote(verifier: str, residual_name: str, note: str) -> bool:
     return isinstance(note, str) and note.startswith("ABSTAIN:")
 
 
-def _r13_vote_v1(frame: dict, neighbor: dict | None,
-                 inputs_path: str | Path | None) -> Vote | None:
+def _r13_vote_v1(frame: dict, neighbor: dict | None, inputs_path: str | Path | None) -> Vote | None:
     """Invoke V₁ R13 keycode-replay if module is loadable. Returns None on
     ABSTAIN so we don't pollute the tally."""
     mod = _load("bin.v1_claude_residuals.r13_keycode_replay")
@@ -166,16 +193,16 @@ def _r13_vote_v1(frame: dict, neighbor: dict | None,
     try:
         r = fn(frame, neighbor, inputs_path)
     except Exception as exc:
-        return Vote("V1", "R13", "FAIL", math.nan, 0.0,
-                    f"{type(exc).__name__}: {exc}")
+        return Vote("V1", "R13", "FAIL", math.nan, 0.0, f"{type(exc).__name__}: {exc}")
     note = getattr(r, "note", "") or ""
     if _abstain_vote("V1", "R13", note):
         return None
     return _to_vote_v1("R13", "V1", r)
 
 
-def _r13_vote_v2prime(frame: dict, neighbor: dict | None,
-                      inputs_path: str | Path | None) -> Vote | None:
+def _r13_vote_v2prime(
+    frame: dict, neighbor: dict | None, inputs_path: str | Path | None
+) -> Vote | None:
     """Invoke V₂' GLM R13 keycode-replay (dict return shape)."""
     mod = _load("bin.v2prime_glm_residuals.residuals")
     if mod is None or inputs_path is None:
@@ -186,17 +213,19 @@ def _r13_vote_v2prime(frame: dict, neighbor: dict | None,
     try:
         r = fn(frame, neighbor, str(inputs_path))
     except Exception as exc:
-        return Vote("V2prime", "R13", "FAIL", math.nan, 0.0,
-                    f"{type(exc).__name__}: {exc}")
+        return Vote("V2prime", "R13", "FAIL", math.nan, 0.0, f"{type(exc).__name__}: {exc}")
     note = str(r.get("note", "")) if isinstance(r, dict) else ""
     if _abstain_vote("V2prime", "R13", note):
         return None
     return _to_vote_v2("R13", "V2prime", r)
 
 
-def collect_votes(frame: dict, neighbor: dict | None = None,
-                  fps: float = 30.0,
-                  inputs_path: str | Path | None = None) -> list[Vote]:
+def collect_votes(
+    frame: dict,
+    neighbor: dict | None = None,
+    fps: float = 30.0,
+    inputs_path: str | Path | None = None,
+) -> list[Vote]:
     """Run all V1/V2/V3 (and V2' if present) residuals on the frame pair.
 
     Residuals needing neighbor (R03, R04, R05) are skipped if neighbor is
@@ -208,14 +237,30 @@ def collect_votes(frame: dict, neighbor: dict | None = None,
     R15/R16 are dataset-level and are invoked from ``aggregate_dataset``.
     """
     votes: list[Vote] = []
-    votes += _run(_load("bin.v1_claude_residuals.residuals"), "V1", _V1_RES,
-                  _to_vote_v1, frame, neighbor, fps)
-    votes += _run(_load("bin.v2_minimax_residuals.residuals"), "V2", _V2_RES,
-                  _to_vote_v2, frame, neighbor, fps)
-    votes += _run(_load("bin.v2prime_glm_residuals.residuals"), "V2prime",
-                  _V2P_RES, _to_vote_v2, frame, neighbor, fps)
-    votes += _run(_load("bin.v3_physics_oracle.residuals"), "V3", _V3_RES,
-                  _to_vote_v3, frame, neighbor, fps)
+    votes += _run(
+        _load("bin.v1_claude_residuals.residuals"), "V1", _V1_RES, _to_vote_v1, frame, neighbor, fps
+    )
+    votes += _run(
+        _load("bin.v2_minimax_residuals.residuals"),
+        "V2",
+        _V2_RES,
+        _to_vote_v2,
+        frame,
+        neighbor,
+        fps,
+    )
+    votes += _run(
+        _load("bin.v2prime_glm_residuals.residuals"),
+        "V2prime",
+        _V2P_RES,
+        _to_vote_v2,
+        frame,
+        neighbor,
+        fps,
+    )
+    votes += _run(
+        _load("bin.v3_physics_oracle.residuals"), "V3", _V3_RES, _to_vote_v3, frame, neighbor, fps
+    )
 
     # R13 is per-frame multimodal: needs inputs.jsonl, applied here.
     if inputs_path is not None:
@@ -228,8 +273,7 @@ def collect_votes(frame: dict, neighbor: dict | None = None,
     return votes
 
 
-def _r15_dataset_vote(video_path: str | Path | None,
-                      sample_rec: dict) -> Vote | None:
+def _r15_dataset_vote(video_path: str | Path | None, sample_rec: dict) -> Vote | None:
     """Invoke V₁ R15 fps-consistency once per dataset. Returns None on
     ABSTAIN. The residual reads ``rec['fps']`` so we pass any record."""
     if video_path is None:
@@ -243,17 +287,16 @@ def _r15_dataset_vote(video_path: str | Path | None,
     try:
         r = fn(sample_rec, str(video_path))
     except Exception as exc:
-        return Vote("V1", "R15", "FAIL", math.nan, 0.0,
-                    f"{type(exc).__name__}: {exc}")
+        return Vote("V1", "R15", "FAIL", math.nan, 0.0, f"{type(exc).__name__}: {exc}")
     note = getattr(r, "note", "") or ""
     if _abstain_vote("V1", "R15", note):
         return None
     return _to_vote_v1("R15", "V1", r)
 
 
-def _r16_dataset_vote(depth_dir: str | Path | None,
-                      video_duration_sec: float | None,
-                      sample_rec: dict) -> Vote | None:
+def _r16_dataset_vote(
+    depth_dir: str | Path | None, video_duration_sec: float | None, sample_rec: dict
+) -> Vote | None:
     """Invoke V₁ R16 depth-count once per dataset."""
     if depth_dir is None:
         return None
@@ -266,8 +309,7 @@ def _r16_dataset_vote(depth_dir: str | Path | None,
     try:
         r = fn(sample_rec, str(depth_dir), video_duration_sec)
     except Exception as exc:
-        return Vote("V1", "R16", "FAIL", math.nan, 0.0,
-                    f"{type(exc).__name__}: {exc}")
+        return Vote("V1", "R16", "FAIL", math.nan, 0.0, f"{type(exc).__name__}: {exc}")
     note = getattr(r, "note", "") or ""
     if _abstain_vote("V1", "R16", note):
         return None
@@ -305,8 +347,9 @@ def _r20_dataset_votes(records: list[dict]) -> list[Vote]:
         try:
             r = fn(records)
         except Exception as exc:
-            out.append(Vote("V1", residual_name, "FAIL", math.nan, 0.0,
-                            f"{type(exc).__name__}: {exc}"))
+            out.append(
+                Vote("V1", residual_name, "FAIL", math.nan, 0.0, f"{type(exc).__name__}: {exc}")
+            )
             continue
         detail = getattr(r, "detail", "") or ""
         if isinstance(detail, str) and detail.startswith("ABSTAIN:"):
@@ -318,14 +361,13 @@ def _r20_dataset_votes(records: list[dict]) -> list[Vote]:
             sval = float(sample_stat)
         except (TypeError, ValueError):
             sval = math.nan
-        out.append(Vote("V1", residual_name, verdict, sval,
-                        float(threshold), str(detail)))
+        out.append(Vote("V1", residual_name, verdict, sval, float(threshold), str(detail)))
     return out
 
 
-def _r22_dataset_vote(depth_dir: str | Path | None,
-                      depth_manifest_path: str | Path | None,
-                      sample_rec: dict) -> Vote | None:
+def _r22_dataset_vote(
+    depth_dir: str | Path | None, depth_manifest_path: str | Path | None, sample_rec: dict
+) -> Vote | None:
     """Invoke V₁ R22 depth-content SHA-256 verifier once per dataset.
 
     R22 needs both ``depth_dir`` and a manifest path — either being None
@@ -343,16 +385,14 @@ def _r22_dataset_vote(depth_dir: str | Path | None,
     try:
         r = fn(sample_rec, None, str(depth_dir), str(depth_manifest_path))
     except Exception as exc:
-        return Vote("V1", "R22", "FAIL", math.nan, 0.0,
-                    f"{type(exc).__name__}: {exc}")
+        return Vote("V1", "R22", "FAIL", math.nan, 0.0, f"{type(exc).__name__}: {exc}")
     note = getattr(r, "note", "") or ""
     if _abstain_vote("V1", "R22", note):
         return None
     return _to_vote_v1("R22", "V1", r)
 
 
-def _r23_dataset_vote(video_path: str | Path | None,
-                      sample_rec: dict) -> Vote | None:
+def _r23_dataset_vote(video_path: str | Path | None, sample_rec: dict) -> Vote | None:
     """Invoke V₁ R23 video-codec verifier once per dataset."""
     if video_path is None:
         return None
@@ -365,8 +405,7 @@ def _r23_dataset_vote(video_path: str | Path | None,
     try:
         r = fn(sample_rec, None, str(video_path))
     except Exception as exc:
-        return Vote("V1", "R23", "FAIL", math.nan, 0.0,
-                    f"{type(exc).__name__}: {exc}")
+        return Vote("V1", "R23", "FAIL", math.nan, 0.0, f"{type(exc).__name__}: {exc}")
     note = getattr(r, "note", "") or ""
     if _abstain_vote("V1", "R23", note):
         return None
@@ -393,8 +432,7 @@ def tally(votes: list[Vote]) -> dict[str, dict[str, Any]]:
 
     by_res: dict[str, dict[str, int]] = {}
     for v in votes:
-        bucket = by_res.setdefault(v.residual,
-                                   {"passed": 0, "failed": 0, "abstain": 0})
+        bucket = by_res.setdefault(v.residual, {"passed": 0, "failed": 0, "abstain": 0})
         if v.verdict == "PASS":
             bucket["passed"] += 1
         elif v.verdict == "FAIL":
@@ -417,17 +455,19 @@ def tally(votes: list[Vote]) -> dict[str, dict[str, Any]]:
             decision = "COMMIT"
         else:
             decision = "INSUFFICIENT"
-        out[r_name] = {"passed": p, "failed": fl, "abstain": ab,
-                       "decision": decision}
+        out[r_name] = {"passed": p, "failed": fl, "abstain": ab, "decision": decision}
     return out
 
 
-def aggregate_dataset(records: list[dict], fps: float = 30.0,
-                      inputs_path: str | Path | None = None,
-                      video_path: str | Path | None = None,
-                      depth_dir: str | Path | None = None,
-                      video_duration_sec: float | None = None,
-                      depth_manifest_path: str | Path | None = None) -> dict[str, Any]:
+def aggregate_dataset(
+    records: list[dict],
+    fps: float = 30.0,
+    inputs_path: str | Path | None = None,
+    video_path: str | Path | None = None,
+    depth_dir: str | Path | None = None,
+    video_duration_sec: float | None = None,
+    depth_manifest_path: str | Path | None = None,
+) -> dict[str, Any]:
     """Run collect_votes + tally on each frame pair (n, n+1).
 
     Multimodal extras (all backward-compatible — None = unchanged behavior):
@@ -449,10 +489,11 @@ def aggregate_dataset(records: list[dict], fps: float = 30.0,
     n_pairs = max(len(records) - 1, 0)
     by_res: dict[str, dict[str, int]] = {}
     for i in range(n_pairs):
-        votes = collect_votes(records[i], records[i + 1], fps=fps,
-                              inputs_path=inputs_path)
+        votes = collect_votes(records[i], records[i + 1], fps=fps, inputs_path=inputs_path)
         for r_name, info in tally(votes).items():
-            bucket = by_res.setdefault(r_name, {"COMMIT": 0, "REJECT": 0, "VIEW_CHANGE": 0, "INSUFFICIENT": 0})
+            bucket = by_res.setdefault(
+                r_name, {"COMMIT": 0, "REJECT": 0, "VIEW_CHANGE": 0, "INSUFFICIENT": 0}
+            )
             bucket[info["decision"]] += 1
 
     # Dataset-level residuals (R15, R16, R20a..e, R22, R23) — fire once each.
@@ -481,7 +522,9 @@ def aggregate_dataset(records: list[dict], fps: float = 30.0,
         dataset_votes.append(v)
     if dataset_votes:
         for r_name, info in tally(dataset_votes).items():
-            bucket = by_res.setdefault(r_name, {"COMMIT": 0, "REJECT": 0, "VIEW_CHANGE": 0, "INSUFFICIENT": 0})
+            bucket = by_res.setdefault(
+                r_name, {"COMMIT": 0, "REJECT": 0, "VIEW_CHANGE": 0, "INSUFFICIENT": 0}
+            )
             bucket[info["decision"]] += 1
 
     all_commit = True
@@ -493,14 +536,18 @@ def aggregate_dataset(records: list[dict], fps: float = 30.0,
         if counts["COMMIT"] / total < 0.95:
             all_commit = False
 
-    verdict = "PASS" if (all_commit and not any_reject) else ("FAIL" if any_reject else "NEEDS_HUMAN")
+    verdict = (
+        "PASS" if (all_commit and not any_reject) else ("FAIL" if any_reject else "NEEDS_HUMAN")
+    )
     return {"frames": n_pairs, "residuals": by_res, "dataset_decision": verdict}
 
 
 def _cli(argv: list[str]) -> int:
     if len(argv) < 2:
-        print("usage: python -m bin.bft_orchestrator.orchestrator "
-              "<action_camera.json>", file=sys.stderr)
+        print(
+            "usage: python -m bin.bft_orchestrator.orchestrator <action_camera.json>",
+            file=sys.stderr,
+        )
         return 2
     path = Path(argv[1])
     with path.open() as fh:
@@ -518,8 +565,10 @@ def _cli(argv: list[str]) -> int:
     print("-" * 44)
     for r_name in sorted(s["residuals"].keys()):
         c = s["residuals"][r_name]
-        print(f"{r_name:<8} {c['COMMIT']:>7} {c['REJECT']:>7} "
-              f"{c['VIEW_CHANGE']:>9} {c['INSUFFICIENT']:>7}")
+        print(
+            f"{r_name:<8} {c['COMMIT']:>7} {c['REJECT']:>7} "
+            f"{c['VIEW_CHANGE']:>9} {c['INSUFFICIENT']:>7}"
+        )
     return 0
 
 
