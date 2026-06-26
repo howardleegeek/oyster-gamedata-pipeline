@@ -31,6 +31,7 @@ from typing import Any, Dict, List, Optional
 YAML_AVAILABLE = False
 try:
     import yaml
+
     YAML_AVAILABLE = True
 except ImportError:
     pass
@@ -38,6 +39,7 @@ except ImportError:
 
 class EPALPayoutError(Exception):
     """Base exception for EPAL payout errors."""
+
     pass
 
 
@@ -49,7 +51,7 @@ class EPALPayoutClient:
         base_url: str,
         api_key: Optional[str] = None,
         timeout: int = 30,
-        verify_ssl: bool = True
+        verify_ssl: bool = True,
     ) -> None:
         """
         Initialize EPAL payout client.
@@ -60,35 +62,29 @@ class EPALPayoutClient:
             timeout: Request timeout in seconds
             verify_ssl: Whether to verify SSL certificates
         """
-        self.base_url = base_url.rstrip('/')
+        self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.timeout = timeout
         self.verify_ssl = verify_ssl
         self.logger = logging.getLogger(__name__)
 
     def _make_request(
-        self,
-        method: str,
-        endpoint: str,
-        data: Optional[Dict[str, Any]] = None
+        self, method: str, endpoint: str, data: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Make HTTP request to EPAL API."""
         parsed = urllib.parse.urlparse(f"{self.base_url}/{endpoint.lstrip('/')}")
-        headers = {
-            'Content-Type': 'application/json',
-            'User-Agent': 'EPAL-Payout-Passthrough/1.0'
-        }
+        headers = {"Content-Type": "application/json", "User-Agent": "EPAL-Payout-Passthrough/1.0"}
         if self.api_key:
-            headers['Authorization'] = f'Bearer {self.api_key}'
+            headers["Authorization"] = f"Bearer {self.api_key}"
 
-        conn_class = HTTPSConnection if parsed.scheme == 'https' else HTTPConnection
+        conn_class = HTTPSConnection if parsed.scheme == "https" else HTTPConnection
         conn = conn_class(parsed.netloc, timeout=self.timeout)
 
         try:
             body = json.dumps(data) if data else None
             conn.request(method, parsed.path, body=body, headers=headers)
             response = conn.getresponse()
-            response_body = response.read().decode('utf-8')
+            response_body = response.read().decode("utf-8")
 
             if response.status >= 400:
                 raise EPALPayoutError(f"API error {response.status}: {response_body}")
@@ -105,7 +101,7 @@ class EPALPayoutClient:
         session_id: Optional[str] = None,
         recording_id: Optional[str] = None,
         description: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Process a bonus payout for a companion.
@@ -126,7 +122,7 @@ class EPALPayoutClient:
             "companion_id": companion_id,
             "amount": amount,
             "currency": currency,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
 
         if session_id:
@@ -147,8 +143,8 @@ def setup_logging(verbose: bool = False) -> None:
     level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
         level=level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
 
@@ -158,10 +154,10 @@ def load_config(config_path: str) -> Dict[str, Any]:
     if not path.exists():
         return {}
 
-    with open(path, 'r', encoding='utf-8') as f:
-        if path.suffix in ('.yaml', '.yml') and YAML_AVAILABLE:
+    with open(path, "r", encoding="utf-8") as f:
+        if path.suffix in (".yaml", ".yml") and YAML_AVAILABLE:
             return yaml.safe_load(f) or {}
-        elif path.suffix == '.json':
+        elif path.suffix == ".json":
             return json.load(f)
     return {}
 
@@ -191,80 +187,43 @@ def main(argv: Optional[List[str]] = None) -> int:
         Exit code (0 for success, non-zero for failure)
     """
     parser = argparse.ArgumentParser(
-        description='EPAL Payout Passthrough - Process bonus payouts via EPAL payment rails',
+        description="EPAL Payout Passthrough - Process bonus payouts via EPAL payment rails",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   %(prog)s --companion-id cmp_123 --amount 50.00
   %(prog)s --companion-id cmp_123 --amount 100 --session-id ses_456
   %(prog)s --companion-id cmp_123 --amount 75.50 --dry-run
-        """
+        """,
     )
 
+    parser.add_argument("--companion-id", "-c", required=True, help="Companion ID for the payout")
+    parser.add_argument("--amount", "-a", type=float, required=True, help="Bonus amount to payout")
+    parser.add_argument("--currency", "-u", default="USD", help="Currency code (default: USD)")
+    parser.add_argument("--session-id", "-s", help="Optional session ID")
+    parser.add_argument("--recording-id", "-r", help="Optional recording ID")
+    parser.add_argument("--description", "-d", help="Optional payout description")
     parser.add_argument(
-        '--companion-id', '-c',
-        required=True,
-        help='Companion ID for the payout'
+        "--api-url",
+        default=os.environ.get("EPAL_API_URL", "https://api.epal.com"),
+        help="EPAL API base URL",
     )
     parser.add_argument(
-        '--amount', '-a',
-        type=float,
-        required=True,
-        help='Bonus amount to payout'
+        "--api-key",
+        default=os.environ.get("EPAL_API_KEY"),
+        help="EPAL API key (or set EPAL_API_KEY env var)",
+    )
+    parser.add_argument("--config", "-f", help="Path to configuration file (JSON or YAML)")
+    parser.add_argument(
+        "--timeout", "-t", type=int, default=30, help="Request timeout in seconds (default: 30)"
     )
     parser.add_argument(
-        '--currency', '-u',
-        default='USD',
-        help='Currency code (default: USD)'
+        "--output", "-o", choices=["text", "json", "yaml"], default="text", help="Output format"
     )
     parser.add_argument(
-        '--session-id', '-s',
-        help='Optional session ID'
+        "--dry-run", action="store_true", help="Validate without making API request"
     )
-    parser.add_argument(
-        '--recording-id', '-r',
-        help='Optional recording ID'
-    )
-    parser.add_argument(
-        '--description', '-d',
-        help='Optional payout description'
-    )
-    parser.add_argument(
-        '--api-url',
-        default=os.environ.get('EPAL_API_URL', 'https://api.epal.com'),
-        help='EPAL API base URL'
-    )
-    parser.add_argument(
-        '--api-key',
-        default=os.environ.get('EPAL_API_KEY'),
-        help='EPAL API key (or set EPAL_API_KEY env var)'
-    )
-    parser.add_argument(
-        '--config', '-f',
-        help='Path to configuration file (JSON or YAML)'
-    )
-    parser.add_argument(
-        '--timeout', '-t',
-        type=int,
-        default=30,
-        help='Request timeout in seconds (default: 30)'
-    )
-    parser.add_argument(
-        '--output', '-o',
-        choices=['text', 'json', 'yaml'],
-        default='text',
-        help='Output format'
-    )
-    parser.add_argument(
-        '--dry-run',
-        action='store_true',
-        help='Validate without making API request'
-    )
-    parser.add_argument(
-        '--verbose', '-v',
-        action='store_true',
-        help='Enable verbose logging'
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
 
     args = parser.parse_args(argv)
     setup_logging(args.verbose)
@@ -277,14 +236,14 @@ Examples:
 
     # Merge config with args
     api_url = args.api_url
-    if 'api_url' in config:
-        api_url = config['api_url']
+    if "api_url" in config:
+        api_url = config["api_url"]
 
     api_key = args.api_key
-    if not api_key and 'api_key' in config:
-        api_key = config['api_key']
+    if not api_key and "api_key" in config:
+        api_key = config["api_key"]
     if not api_key:
-        api_key = os.environ.get('EPAL_API_KEY')
+        api_key = os.environ.get("EPAL_API_KEY")
 
     # Validate arguments
     if not validate_args(args):
@@ -293,16 +252,12 @@ Examples:
     # Build metadata from args
     metadata: Dict[str, Any] = {}
     if args.session_id:
-        metadata['session_id'] = args.session_id
+        metadata["session_id"] = args.session_id
     if args.recording_id:
-        metadata['recording_id'] = args.recording_id
+        metadata["recording_id"] = args.recording_id
 
     # Create client
-    client = EPALPayoutClient(
-        base_url=api_url,
-        api_key=api_key,
-        timeout=args.timeout
-    )
+    client = EPALPayoutClient(base_url=api_url, api_key=api_key, timeout=args.timeout)
 
     try:
         if args.dry_run:
@@ -318,21 +273,21 @@ Examples:
             session_id=args.session_id,
             recording_id=args.recording_id,
             description=args.description,
-            metadata=metadata
+            metadata=metadata,
         )
 
         # Output result
-        if args.output == 'json':
+        if args.output == "json":
             print(json.dumps(result, indent=2))
-        elif args.output == 'yaml' and YAML_AVAILABLE:
+        elif args.output == "yaml" and YAML_AVAILABLE:
             print(yaml.dump(result, default_flow_style=False))
         else:
             print("Bonus payout successful!")
             print(f"  Companion: {args.companion_id}")
             print(f"  Amount: {args.amount} {args.currency}")
-            if 'payout_id' in result:
+            if "payout_id" in result:
                 print(f"  Payout ID: {result['payout_id']}")
-            if 'transaction_id' in result:
+            if "transaction_id" in result:
                 print(f"  Transaction ID: {result['transaction_id']}")
             print(f"  Timestamp: {result.get('timestamp', 'N/A')}")
 
