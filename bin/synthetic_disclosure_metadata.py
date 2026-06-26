@@ -30,6 +30,7 @@ def _load_yaml(path: Path) -> Dict[str, Any] | None:
     """Load a YAML file; returns None when PyYAML is unavailable."""
     try:
         import yaml  # lazy import
+
         with open(path, "r", encoding="utf-8") as fh:
             return yaml.safe_load(fh) or {}
     except ImportError:
@@ -39,6 +40,7 @@ def _load_yaml(path: Path) -> Dict[str, Any] | None:
 def _save_yaml(path: Path, data: Dict[str, Any]) -> None:
     """Persist data as YAML."""
     import yaml  # lazy import
+
     with open(path, "w", encoding="utf-8") as fh:
         yaml.safe_dump(data, fh, default_flow_style=False, allow_unicode=True)
 
@@ -82,6 +84,7 @@ def _missing_keys(data: Dict[str, Any]) -> List[str]:
 # ---------------------------------------------------------------------------
 # CLI sub-commands
 # ---------------------------------------------------------------------------
+
 
 def cmd_scan(args: argparse.Namespace) -> int:
     """Audit a directory and report files missing disclosure metadata."""
@@ -174,6 +177,7 @@ def cmd_patch(args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def main(argv: List[str] | None = None) -> int:
     """CLI entry-point returning an exit code."""
