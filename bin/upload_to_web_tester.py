@@ -153,7 +153,7 @@ def upload(
     if token:
         headers[UPLOAD_TOKEN_HEADER] = token
     else:
-        LOG.warning("no upload token resolved — server may 401 if " "UPLOAD_REQUIRE_TOKEN=true")
+        LOG.warning("no upload token resolved — server may 401 if UPLOAD_REQUIRE_TOKEN=true")
 
     sha = sha256 or compute_sha256(tarball)
     LOG.info("uploading %s (sha256=%s) → %s", tarball, sha, url)
