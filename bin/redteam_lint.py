@@ -97,7 +97,7 @@ def attack_drop_systeminfo(b: Path) -> None:
     (b / "systeminfo.json").unlink()
 
 
-def attack_drop_video(b: Path):
+def attack_drop_video(b: Path) -> None:
     """Remove video.mp4 from the batch directory.
 
     Args:
