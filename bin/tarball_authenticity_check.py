@@ -13,6 +13,7 @@ Exits:
   1  any file PLACEHOLDER or UNKNOWN
   2  usage / tarball missing / unreadable
 """
+
 from __future__ import annotations
 
 import argparse
@@ -37,9 +38,11 @@ def _classify_video(p: Path) -> tuple[str, str]:
         return UNKNOWN, "missing"
     try:
         res = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_format", "-show_streams",
-             "-of", "json", str(p)],
-            capture_output=True, text=True, check=True, timeout=15,
+            ["ffprobe", "-v", "error", "-show_format", "-show_streams", "-of", "json", str(p)],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=15,
         )
         meta = json.loads(res.stdout or "{}")
     except Exception as e:
@@ -69,14 +72,30 @@ def _classify_video(p: Path) -> tuple[str, str]:
         with tempfile.TemporaryDirectory() as td:
             for idx, t in enumerate([0.0, 0.5, 1.0, 1.5, 2.0]):
                 subprocess.run(
-                    ["ffmpeg", "-ss", str(t), "-i", str(p),
-                     "-vframes", "1", "-f", "image2pipe", "-vcodec", "rawvideo",
-                     "-pix_fmt", "gray",
-                     str(Path(td) / f"f{idx}.gray")],
-                    capture_output=True, check=False, timeout=10,
+                    [
+                        "ffmpeg",
+                        "-ss",
+                        str(t),
+                        "-i",
+                        str(p),
+                        "-vframes",
+                        "1",
+                        "-f",
+                        "image2pipe",
+                        "-vcodec",
+                        "rawvideo",
+                        "-pix_fmt",
+                        "gray",
+                        str(Path(td) / f"f{idx}.gray"),
+                    ],
+                    capture_output=True,
+                    check=False,
+                    timeout=10,
                 )
             sizes = [
-                (Path(td) / f"f{i}.gray").stat().st_size if (Path(td) / f"f{i}.gray").exists() else 0
+                (Path(td) / f"f{i}.gray").stat().st_size
+                if (Path(td) / f"f{i}.gray").exists()
+                else 0
                 for i in range(5)
             ]
             if len(set(sizes)) == 1 and sizes[0] > 0:
@@ -118,7 +137,10 @@ def _classify_depth_dir(d: Path) -> tuple[str, str]:
     unique = len(hashes)
     ratio = unique / n
     if ratio < 0.05:
-        return PLACEHOLDER, f"{unique} unique / {n} files ({ratio:.1%}) — likely hardlinked or copies of one file"
+        return (
+            PLACEHOLDER,
+            f"{unique} unique / {n} files ({ratio:.1%}) — likely hardlinked or copies of one file",
+        )
     return REAL, f"{unique} unique / {n} files ({ratio:.1%}) — real per-frame variation"
 
 
@@ -169,26 +191,42 @@ def _classify_action_camera(p: Path) -> tuple[str, str]:
         real_count = sum(1 for r in d if not r.get("is_padded"))
         ratio = real_count / n if n else 0
         if ratio < 0.02:  # less than 2% real records → effectively all padded
-            return PLACEHOLDER, f"{real_count}/{n} records non-padded ({ratio:.1%}) — almost entirely synthetic"
-        return REAL, f"{real_count}/{n} records non-padded ({ratio:.1%}, is_padded flag present) — real bot data + transparent padding"
+            return (
+                PLACEHOLDER,
+                f"{real_count}/{n} records non-padded ({ratio:.1%}) — almost entirely synthetic",
+            )
+        return (
+            REAL,
+            f"{real_count}/{n} records non-padded ({ratio:.1%}, is_padded flag present) — real bot data + transparent padding",
+        )
 
     # Tier 2: multi-field fingerprint (position, rotation, speed, intrinsics)
     fingerprint_keys = (
-        "camera_position", "camera_rotation_oula", "camera_quat",
-        "camera_speed", "player_position", "yaw", "pitch",
+        "camera_position",
+        "camera_rotation_oula",
+        "camera_quat",
+        "camera_speed",
+        "player_position",
+        "yaw",
+        "pitch",
     )
     fingerprints = set()
     for r in d:
         fp = tuple(
-            tuple(r[k]) if isinstance(r.get(k), list) else r.get(k)
-            for k in fingerprint_keys
+            tuple(r[k]) if isinstance(r.get(k), list) else r.get(k) for k in fingerprint_keys
         )
         fingerprints.add(fp)
     unique = len(fingerprints)
     ratio = unique / n if n else 0
     if ratio < 0.05:
-        return PLACEHOLDER, f"{unique} distinct multi-field fingerprints / {n} records ({ratio:.1%}) — mostly identical"
-    return REAL, f"{unique} distinct multi-field fingerprints / {n} records ({ratio:.1%}) — real frame variation"
+        return (
+            PLACEHOLDER,
+            f"{unique} distinct multi-field fingerprints / {n} records ({ratio:.1%}) — mostly identical",
+        )
+    return (
+        REAL,
+        f"{unique} distinct multi-field fingerprints / {n} records ({ratio:.1%}) — real frame variation",
+    )
 
 
 def _classify_gameinfo_xlsx(p: Path) -> tuple[str, str]:
@@ -337,7 +375,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  [{f['status']:11}] {f['name']:25} — {f['evidence']}")
         print()
         s = report["summary"]
-        print(f"  REAL={s['real_count']}  PLACEHOLDER={s['placeholder_count']}  UNKNOWN={s['unknown_count']}")
+        print(
+            f"  REAL={s['real_count']}  PLACEHOLDER={s['placeholder_count']}  UNKNOWN={s['unknown_count']}"
+        )
 
     return 0 if report["verdict"] == REAL else 1
 
