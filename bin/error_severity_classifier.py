@@ -20,6 +20,7 @@ from typing import Optional
 # Lazy imports for optional dependencies
 try:
     import yaml
+
     YAML_AVAILABLE = True
 except ImportError:
     YAML_AVAILABLE = False
@@ -29,8 +30,10 @@ except ImportError:
 # Severity Levels
 # -----------------------------------------------------------------------------
 
+
 class Severity:
     """Severity level constants and definitions."""
+
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
@@ -68,22 +71,34 @@ class Severity:
 # Default classification rules: (error_class_pattern, module_pattern, keywords) -> severity
 DEFAULT_RULES = [
     # Critical: Data loss / payment / auth
-    (r".*", r".*auth.*|.*login.*|.*oauth.*|.*session.*", r"unauthorized|forbidden|auth.*fail", Severity.CRITICAL),
-    (r".*", r".*payment.*|.*billing.*|.*invoice.*|.*transaction.*", r"declined|failed|error", Severity.CRITICAL),
-    (r".*", r".*database.*|.*db.*|.*storage.*", r"data.*loss|corrupt|delete.*fail", Severity.CRITICAL),
+    (
+        r".*",
+        r".*auth.*|.*login.*|.*oauth.*|.*session.*",
+        r"unauthorized|forbidden|auth.*fail",
+        Severity.CRITICAL,
+    ),
+    (
+        r".*",
+        r".*payment.*|.*billing.*|.*invoice.*|.*transaction.*",
+        r"declined|failed|error",
+        Severity.CRITICAL,
+    ),
+    (
+        r".*",
+        r".*database.*|.*db.*|.*storage.*",
+        r"data.*loss|corrupt|delete.*fail",
+        Severity.CRITICAL,
+    ),
     (r".*", r".*", r"OutOfMemoryError|StackOverflowError", Severity.CRITICAL),
-
     # High: Crash scenarios
     (r".*", r".*", r"NullPointerException|NullReferenceException|NoneType.*", Severity.HIGH),
     (r".*", r".*", r"ConnectionRefused|ConnectionReset|TimeoutError", Severity.HIGH),
     (r".*", r".*", r"ImportError|ModuleNotFoundError|AttributeError", Severity.HIGH),
     (r"RuntimeError|SystemExit|KeyboardInterrupt", r".*", r".*", Severity.HIGH),
-
     # Medium: Degraded performance
     (r".*", r".*", r"timeout|slow|latency|degraded", Severity.MEDIUM),
     (r".*", r".*", r"retry|fallback|circuit.*breaker", Severity.MEDIUM),
     (r".*", r".*", r"cache.*miss|rate.*limit", Severity.MEDIUM),
-
     # Low: Warnings
     (r".*", r".*", r"warning|deprecated|debug", Severity.LOW),
     (r".*", r".*", r"info|log|audit", Severity.LOW),
@@ -173,6 +188,7 @@ class RuleEngine:
 # CLI Interface
 # -----------------------------------------------------------------------------
 
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
@@ -187,39 +203,45 @@ Examples:
     )
 
     parser.add_argument(
-        "--error-class", "-e",
+        "--error-class",
+        "-e",
         required=True,
         help="Error class name (e.g., ValueError, RuntimeError)",
     )
 
     parser.add_argument(
-        "--module", "-m",
+        "--module",
+        "-m",
         required=True,
         help="Module where error occurred (e.g., payment.service)",
     )
 
     parser.add_argument(
-        "--traceback", "-t",
+        "--traceback",
+        "-t",
         default="",
         help="Traceback text for keyword matching",
     )
 
     parser.add_argument(
-        "--override", "-o",
+        "--override",
+        "-o",
         type=Path,
         default=None,
         help="Path to override rules file (JSON or YAML)",
     )
 
     parser.add_argument(
-        "--format", "-f",
+        "--format",
+        "-f",
         choices=["text", "json"],
         default="text",
         help="Output format",
     )
 
     parser.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Show severity description",
     )
