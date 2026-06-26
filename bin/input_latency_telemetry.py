@@ -23,10 +23,10 @@ import time
 
 # WASD key codes and their corresponding velocity component
 WASD_MAP = {
-    87: "forward",   # W
-    65: "left",      # A
+    87: "forward",  # W
+    65: "left",  # A
     83: "backward",  # S
-    68: "right",     # D
+    68: "right",  # D
 }
 
 # Velocity component keys in game_state.jsonl
@@ -39,9 +39,7 @@ VELOCITY_KEYS = {
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Input-to-effect latency telemetry collector"
-    )
+    parser = argparse.ArgumentParser(description="Input-to-effect latency telemetry collector")
     parser.add_argument(
         "--inputs",
         default="inputs.jsonl",
@@ -228,12 +226,12 @@ def write_output(latencies, output_path, method="wasd_press_to_velocity_change")
         "method": method,
         "count": len(latencies),
         "p50": round(sorted(latencies)[len(latencies) // 2], 2) if latencies else None,
-        "p95": round(
-            sorted(latencies)[int(len(latencies) * 0.95)] if latencies else None, 2
-        ) if latencies else None,
-        "p99": round(
-            sorted(latencies)[int(len(latencies) * 0.99)] if latencies else None, 2
-        ) if latencies else None,
+        "p95": round(sorted(latencies)[int(len(latencies) * 0.95)] if latencies else None, 2)
+        if latencies
+        else None,
+        "p99": round(sorted(latencies)[int(len(latencies) * 0.99)] if latencies else None, 2)
+        if latencies
+        else None,
         "min": round(min(latencies), 2) if latencies else None,
         "max": round(max(latencies), 2) if latencies else None,
         "mean": round(sum(latencies) / len(latencies), 2) if latencies else None,
@@ -244,7 +242,10 @@ def write_output(latencies, output_path, method="wasd_press_to_velocity_change")
 
     print(f"[latency] Wrote {len(latencies)} latencies to {output_path}", file=sys.stderr)
     if latencies:
-        print(f"[latency] p50={result['p50']}ms p95={result['p95']}ms p99={result['p99']}ms", file=sys.stderr)
+        print(
+            f"[latency] p50={result['p50']}ms p95={result['p95']}ms p99={result['p99']}ms",
+            file=sys.stderr,
+        )
 
     return result
 
@@ -258,7 +259,10 @@ def main():
         sys.exit(1)
 
     if not wait_for_file(args.game_state, timeout_s=args.timeout_s):
-        print(f"[latency] ERROR: {args.game_state} not found within {args.timeout_s}s", file=sys.stderr)
+        print(
+            f"[latency] ERROR: {args.game_state} not found within {args.timeout_s}s",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     # Compute latencies
