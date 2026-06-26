@@ -105,9 +105,7 @@ def get_consent() -> bool | None:
 def prompt_consent() -> bool:
     """Ask the user for crash-upload consent and persist the answer."""
     try:
-        answer = (
-            input("Send anonymized crash report to help fix? [Y/n]: ").strip().lower()
-        )
+        answer = input("Send anonymized crash report to help fix? [Y/n]: ").strip().lower()
     except (EOFError, OSError):
         # Non-interactive: default to no
         answer = "n"
@@ -276,10 +274,7 @@ def _watch_directory(watch_dir: str, backend_url: str) -> None:
             if event.is_directory:
                 return
             path = Path(event.src_path)
-            if (
-                CRASH_FILE_PATTERN.match(path.name)
-                and path.name not in _processed_files
-            ):
+            if CRASH_FILE_PATTERN.match(path.name) and path.name not in _processed_files:
                 time.sleep(0.5)
                 process_crash_file(path, backend_url)
 
