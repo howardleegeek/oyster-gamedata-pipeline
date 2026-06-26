@@ -27,6 +27,7 @@ def _lazy_import_pandas():
     if pandas is None:
         try:
             import pandas as pd
+
             pandas = pd
         except ImportError:
             raise ImportError("pandas is required for parquet operations")
@@ -39,6 +40,7 @@ def _lazy_import_pyarrow():
     if pyarrow is None:
         try:
             import pyarrow as pa
+
             pyarrow = pa
         except ImportError:
             raise ImportError("pyarrow is required for parquet operations")
@@ -46,8 +48,7 @@ def _lazy_import_pyarrow():
 
 
 def discover_parquet_files(
-    input_dir: Path,
-    patterns: Optional[List[str]] = None
+    input_dir: Path, patterns: Optional[List[str]] = None
 ) -> Dict[str, Path]:
     """
     Discover parquet files in the input directory matching given patterns.
@@ -76,8 +77,7 @@ def discover_parquet_files(
 
 
 def read_parquet_keys(
-    parquet_path: Path,
-    key_columns: Tuple[str, ...] = ("clip_id", "frame_idx")
+    parquet_path: Path, key_columns: Tuple[str, ...] = ("clip_id", "frame_idx")
 ) -> List[Dict[str, any]]:
     """
     Read key columns from a parquet file.
@@ -103,7 +103,7 @@ def read_parquet_keys(
 def generate_manifest(
     input_dir: Path,
     output_path: Optional[Path] = None,
-    key_columns: Tuple[str, ...] = ("clip_id", "frame_idx")
+    key_columns: Tuple[str, ...] = ("clip_id", "frame_idx"),
 ) -> Dict[str, any]:
     """
     Generate a manifest mapping (clip_id, frame_idx) to shard metadata.
@@ -124,7 +124,7 @@ def generate_manifest(
         "generated_by": "parquet_manifest_writer.py",
         "key_columns": list(key_columns),
         "shards": {},
-        "entries": []
+        "entries": [],
     }
 
     for name, path in parquet_files.items():
@@ -132,18 +132,20 @@ def generate_manifest(
         manifest["shards"][shard_id] = {
             "name": name,
             "path": str(path),
-            "size_bytes": path.stat().st_size
+            "size_bytes": path.stat().st_size,
         }
 
         records = read_parquet_keys(path, key_columns)
         for rec in records:
             composite_key = "|".join(str(rec.get(col, "")) for col in key_columns)
-            manifest["entries"].append({
-                "key": composite_key,
-                "shard": shard_id,
-                "clip_id": rec.get("clip_id"),
-                "frame_idx": rec.get("frame_idx")
-            })
+            manifest["entries"].append(
+                {
+                    "key": composite_key,
+                    "shard": shard_id,
+                    "clip_id": rec.get("clip_id"),
+                    "frame_idx": rec.get("frame_idx"),
+                }
+            )
 
     # Sort entries by key for deterministic output
     manifest["entries"].sort(key=lambda x: x["key"])
@@ -193,28 +195,23 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description="Generate manifest for parquet shards keyed by (clip_id, frame_idx)."
     )
+    parser.add_argument("input_dir", type=Path, help="Directory containing parquet files")
     parser.add_argument(
-        "input_dir",
-        type=Path,
-        help="Directory containing parquet files"
-    )
-    parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         type=Path,
         default=None,
-        help="Output path for manifest JSON (default: stdout)"
+        help="Output path for manifest JSON (default: stdout)",
     )
     parser.add_argument(
         "--key-columns",
         nargs=2,
         default=["clip_id", "frame_idx"],
         metavar=("COL1", "COL2"),
-        help="Column names to use as composite key (default: clip_id frame_idx)"
+        help="Column names to use as composite key (default: clip_id frame_idx)",
     )
     parser.add_argument(
-        "--validate",
-        action="store_true",
-        help="Validate manifest after generation"
+        "--validate", action="store_true", help="Validate manifest after generation"
     )
 
     args = parser.parse_args(argv)
@@ -231,9 +228,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     try:
         manifest = generate_manifest(
-            input_dir=args.input_dir,
-            output_path=output_path,
-            key_columns=tuple(args.key_columns)
+            input_dir=args.input_dir, output_path=output_path, key_columns=tuple(args.key_columns)
         )
 
         if args.validate:
