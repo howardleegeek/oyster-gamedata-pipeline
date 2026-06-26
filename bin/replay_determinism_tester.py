@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _sha256_file(path: Path) -> str:
     """Return hex SHA-256 digest of *path*."""
     h = hashlib.sha256()
@@ -92,6 +93,7 @@ def _run_replay(
 # Core comparison logic
 # ---------------------------------------------------------------------------
 
+
 def compare_frame_pairs(
     run_a_frames: List[Path],
     run_b_frames: List[Path],
@@ -120,9 +122,7 @@ def compare_frame_pairs(
     for i in range(common):
         fa, fb = run_a_frames[i], run_b_frames[i]
         if fa.name != fb.name:
-            mismatches.append(
-                f"Frame index {i}: filename mismatch '{fa.name}' vs '{fb.name}'"
-            )
+            mismatches.append(f"Frame index {i}: filename mismatch '{fa.name}' vs '{fb.name}'")
             continue
 
         ha, hb = _sha256_file(fa), _sha256_file(fb)
@@ -142,6 +142,7 @@ def compare_frame_pairs(
 # Main entry-point
 # ---------------------------------------------------------------------------
 
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     """
     CLI entry-point.
@@ -158,7 +159,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     """
     parser = argparse.ArgumentParser(
         description="Re-run a replay command twice with the same seed and "
-                    "assert frame-by-frame byte identity.",
+        "assert frame-by-frame byte identity.",
     )
     parser.add_argument(
         "--seed",
@@ -191,7 +192,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         help="Maximum frames to compare; 0 = all (default: 0).",
     )
     parser.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Enable debug logging.",
     )
@@ -243,8 +245,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         logger.info("=== Run A ===")
         result_a = _run_replay(args.replay_cmd, args.seed, run_a_dir, env_overrides)
         if result_a.returncode != 0:
-            logger.error("Run A failed (rc=%d):\n%s", result_a.returncode,
-                         result_a.stderr.decode(errors="replace"))
+            logger.error(
+                "Run A failed (rc=%d):\n%s",
+                result_a.returncode,
+                result_a.stderr.decode(errors="replace"),
+            )
             return 2
         logger.info("Run A completed successfully.")
 
@@ -252,8 +257,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         logger.info("=== Run B ===")
         result_b = _run_replay(args.replay_cmd, args.seed, run_b_dir, env_overrides)
         if result_b.returncode != 0:
-            logger.error("Run B failed (rc=%d):\n%s", result_b.returncode,
-                         result_b.stderr.decode(errors="replace"))
+            logger.error(
+                "Run B failed (rc=%d):\n%s",
+                result_b.returncode,
+                result_b.stderr.decode(errors="replace"),
+            )
             return 2
         logger.info("Run B completed successfully.")
 
@@ -265,8 +273,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             frames_a = frames_a[: args.max_frames]
             frames_b = frames_b[: args.max_frames]
 
-        logger.info("Collected %d frame(s) from run A, %d from run B.",
-                     len(frames_a), len(frames_b))
+        logger.info(
+            "Collected %d frame(s) from run A, %d from run B.", len(frames_a), len(frames_b)
+        )
 
         if not frames_a and not frames_b:
             logger.warning("No frames found matching pattern '%s'.", args.frame_pattern)
