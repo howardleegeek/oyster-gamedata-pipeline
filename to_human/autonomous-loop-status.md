@@ -999,6 +999,8 @@ b4c97dbd638c75a1d826e641df598879876660ed
 
 ## Round 358 @ 2026-06-26T08:27:17Z
 
+
+
 - Picked: ruff format bin/recorder_local_smoke.py (smallest unformatted bin file at 241 lines; one multiline assert collapsed to single-line with parenthesized message). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change, 0 test references in tests/ (no test-masking risk), import smoke OK, follows established cadence of Rounds 254–357 small-bin-file formats.
 - Result: committed bf294c37 (ruff format collapsed one multiline assert in bin/recorder_local_smoke.py; 1 file changed, 3 insertions(+), 3 deletions(-); ruff check + ruff format --check clean; AST parse OK; 26/26 tests/test_recorder_local_smoke.py pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — single-line assert with parenthesized message, no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
 
@@ -1113,3 +1115,7 @@ b4c97dbd638c75a1d826e641df598879876660ed
 ## Round 382 @ 2026-06-26T16:00:00Z
 - Picked: ruff format bin/dr_failover_runbook_check.py (smallest unformatted bin file: 286 lines). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change (purely cosmetic line-wrap + dict/list literals), no test references (zero test-masking risk), ruff check clean, AST parse OK, import smoke OK, follows established cadence of small-bin-file formats (Rounds 254-381).
 - Result: committed ad54ae1c (ruff format applied: line-wrap long function signatures, multi-line dict/list literals, trailing commas; 1 file changed, 90 insertions(+), 66 deletions(-); ruff check + format --check clean; AST parse OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
+
+## Round 378 @ 2026-06-26T15:47:19Z
+- Picked: ruff format bin/right_to_delete.py (smallest unformatted bin file: 285 lines; single quotes → double quotes, trailing whitespace cleanup, blank line normalization). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change (purely cosmetic), no test references (no test-masking risk), ruff check clean, import smoke OK, AST parse OK, follows established cadence of Rounds 254-377 small-bin-file formats.
+- Result: committed bcc75c66 (ruff format applied: single quotes → double quotes, trailing whitespace cleanup, blank line normalization in bin/right_to_delete.py; 1 file changed, 42 insertions(+), 31 deletions(-); ruff check + format --check clean; AST parse OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
