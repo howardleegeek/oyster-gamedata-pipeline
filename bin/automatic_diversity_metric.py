@@ -31,6 +31,7 @@ def _lazy_import_yaml() -> Any:
     if yaml is None:
         try:
             import yaml as _yaml
+
             yaml = _yaml
         except ImportError:
             yaml = None
@@ -43,6 +44,7 @@ def _lazy_import_numpy() -> Any:
     if numpy is None:
         try:
             import numpy as _numpy
+
             numpy = _numpy
         except ImportError:
             numpy = None
@@ -96,9 +98,7 @@ def normalize_entropy(entropy: float, num_categories: int) -> float:
 
 
 def calculate_diversity_score(
-    biome: list[str],
-    time_of_day: list[str],
-    weather: list[str]
+    biome: list[str], time_of_day: list[str], weather: list[str]
 ) -> dict[str, float]:
     """
     Calculate comprehensive diversity score from scene attributes.
@@ -200,9 +200,15 @@ def extract_attributes(scenes: list[dict[str, Any]]) -> tuple[list[str], list[st
 
     for scene in scenes:
         # Handle various field name conventions
-        biome_val = scene.get("biome") or scene.get("environment") or scene.get("biome_type", "unknown")
+        biome_val = (
+            scene.get("biome") or scene.get("environment") or scene.get("biome_type", "unknown")
+        )
         time_val = scene.get("time_of_day") or scene.get("time") or scene.get("tod", "unknown")
-        weather_val = scene.get("weather") or scene.get("weather_condition") or scene.get("conditions", "unknown")
+        weather_val = (
+            scene.get("weather")
+            or scene.get("weather_condition")
+            or scene.get("conditions", "unknown")
+        )
 
         biome.append(str(biome_val))
         time_of_day.append(str(time_val))
@@ -212,9 +218,7 @@ def extract_attributes(scenes: list[dict[str, Any]]) -> tuple[list[str], list[st
 
 
 def format_output(
-    scores: dict[str, float],
-    output_format: str,
-    include_details: bool = True
+    scores: dict[str, float], output_format: str, include_details: bool = True
 ) -> str:
     """
     Format diversity scores for output.
@@ -235,10 +239,16 @@ def format_output(
             return f"aggregate_diversity_score\n{scores['aggregate_diversity_score']}"
 
         headers = [
-            "biome_entropy_raw", "biome_entropy_normalized", "biome_unique_count",
-            "time_entropy_raw", "time_entropy_normalized", "time_unique_count",
-            "weather_entropy_raw", "weather_entropy_normalized", "weather_unique_count",
-            "aggregate_diversity_score"
+            "biome_entropy_raw",
+            "biome_entropy_normalized",
+            "biome_unique_count",
+            "time_entropy_raw",
+            "time_entropy_normalized",
+            "time_unique_count",
+            "weather_entropy_raw",
+            "weather_entropy_normalized",
+            "weather_unique_count",
+            "aggregate_diversity_score",
         ]
         values = [str(scores.get(h, "")) for h in headers]
         return ",".join(headers) + "\n" + ",".join(values)
@@ -301,7 +311,7 @@ def main(argv: list[str] | None = None) -> int:
     """
     parser = argparse.ArgumentParser(
         description="Calculate per-scene diversity scores (biome/time/weather entropy) "
-                    "for cohort sorting.",
+        "for cohort sorting.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -309,34 +319,26 @@ Examples:
   %(prog)s cohort.yaml -f csv
   %(prog)s data.json -o results.txt
   %(prog)s scenes.json --quiet
-        """
+        """,
     )
 
+    parser.add_argument("input", type=Path, help="Input file containing scene data (JSON or YAML)")
+    parser.add_argument("-o", "--output", type=Path, help="Output file path (default: stdout)")
     parser.add_argument(
-        "input",
-        type=Path,
-        help="Input file containing scene data (JSON or YAML)"
-    )
-    parser.add_argument(
-        "-o", "--output",
-        type=Path,
-        help="Output file path (default: stdout)"
-    )
-    parser.add_argument(
-        "-f", "--format",
+        "-f",
+        "--format",
         choices=["json", "text", "csv"],
         default="text",
-        help="Output format (default: text)"
+        help="Output format (default: text)",
     )
     parser.add_argument(
-        "-q", "--quiet",
+        "-q",
+        "--quiet",
         action="store_true",
-        help="Suppress non-result output (errors still printed)"
+        help="Suppress non-result output (errors still printed)",
     )
     parser.add_argument(
-        "--no-details",
-        action="store_true",
-        help="Output only aggregate score (for CSV)"
+        "--no-details", action="store_true", help="Output only aggregate score (for CSV)"
     )
 
     args = parser.parse_args(argv)
