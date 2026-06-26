@@ -36,6 +36,7 @@ def _get_numpy() -> Any:
 @dataclass
 class IMUReading:
     """Single IMU reading with 6-axis data and timestamp."""
+
     timestamp: float
     accel: Tuple[float, float, float]
     gyro: Tuple[float, float, float]
@@ -47,6 +48,7 @@ class IMUReading:
 @dataclass
 class EntityState:
     """Mineflayer entity state at a given tick."""
+
     timestamp: float
     position: Tuple[float, float, float]
     velocity: Tuple[float, float, float]
@@ -100,7 +102,11 @@ class IMUProvider:
         self, state_curr: EntityState, state_prev: EntityState
     ) -> Tuple[float, float, float]:
         """Compute linear acceleration from state transitions."""
-        dt = state_curr.timestamp - state_prev.timestamp if state_curr.timestamp != state_prev.timestamp else 1.0 / self.tick_rate
+        dt = (
+            state_curr.timestamp - state_prev.timestamp
+            if state_curr.timestamp != state_prev.timestamp
+            else 1.0 / self.tick_rate
+        )
         ax = (state_curr.velocity[0] - state_prev.velocity[0]) / dt
         ay = (state_curr.velocity[1] - state_prev.velocity[1]) / dt + self.gravity
         az = (state_curr.velocity[2] - state_prev.velocity[2]) / dt
@@ -112,7 +118,11 @@ class IMUProvider:
         """Compute angular velocity from orientation changes."""
         if state_curr.angular_velocity is not None:
             return state_curr.angular_velocity
-        dt = state_curr.timestamp - state_prev.timestamp if state_curr.timestamp != state_prev.timestamp else 1.0 / self.tick_rate
+        dt = (
+            state_curr.timestamp - state_prev.timestamp
+            if state_curr.timestamp != state_prev.timestamp
+            else 1.0 / self.tick_rate
+        )
         return tuple((state_curr.orientation[i] - state_prev.orientation[i]) / dt for i in range(3))  # type: ignore
 
     def _add_noise(self, value: float, std: float) -> float:
@@ -121,6 +131,7 @@ class IMUProvider:
         if np is not None:
             return value + float(np.random.normal(0, std))
         import random
+
         u1, u2 = max(random.random(), 1e-10), random.random()
         return value + std * math.sqrt(-2.0 * math.log(u1)) * math.cos(2.0 * math.pi * u2)
 
@@ -156,7 +167,9 @@ class IMUProvider:
             with open(filepath, "w", encoding="utf-8") as f:
                 f.write("timestamp,ax,ay,az,gx,gy,gz\n")
                 for r in self._imu_readings:
-                    f.write(f"{r.timestamp},{r.accel[0]},{r.accel[1]},{r.accel[2]},{r.gyro[0]},{r.gyro[1]},{r.gyro[2]}\n")
+                    f.write(
+                        f"{r.timestamp},{r.accel[0]},{r.accel[1]},{r.accel[2]},{r.gyro[0]},{r.gyro[1]},{r.gyro[2]}\n"
+                    )
         else:
             raise ValueError(f"Unknown format: {fmt}")
 
@@ -167,13 +180,51 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
         prog="imu_provider",
         description="Synthetic IMU 6-axis provider at 240Hz physics-tick rate.",
     )
-    parser.add_argument("--input", "-i", type=Path, required=True, help="Input JSON file with Mineflayer state data.")
-    parser.add_argument("--output", "-o", type=Path, required=True, help="Output file for IMU readings.")
-    parser.add_argument("--format", "-f", choices=["json", "npy", "csv"], default="json", help="Output format (default: json).")
-    parser.add_argument("--tick-rate", "-t", type=float, default=240.0, help="Physics tick rate in Hz (default: 240).")
-    parser.add_argument("--gravity", "-g", type=float, default=9.81, help="Gravity constant in m/s² (default: 9.81).")
-    parser.add_argument("--noise-accel", "-a", type=float, default=0.05, help="Accelerometer noise std dev (default: 0.05).")
-    parser.add_argument("--noise-gyro", "-r", type=float, default=0.01, help="Gyroscope noise std dev (default: 0.01).")
+    parser.add_argument(
+        "--input",
+        "-i",
+        type=Path,
+        required=True,
+        help="Input JSON file with Mineflayer state data.",
+    )
+    parser.add_argument(
+        "--output", "-o", type=Path, required=True, help="Output file for IMU readings."
+    )
+    parser.add_argument(
+        "--format",
+        "-f",
+        choices=["json", "npy", "csv"],
+        default="json",
+        help="Output format (default: json).",
+    )
+    parser.add_argument(
+        "--tick-rate",
+        "-t",
+        type=float,
+        default=240.0,
+        help="Physics tick rate in Hz (default: 240).",
+    )
+    parser.add_argument(
+        "--gravity",
+        "-g",
+        type=float,
+        default=9.81,
+        help="Gravity constant in m/s² (default: 9.81).",
+    )
+    parser.add_argument(
+        "--noise-accel",
+        "-a",
+        type=float,
+        default=0.05,
+        help="Accelerometer noise std dev (default: 0.05).",
+    )
+    parser.add_argument(
+        "--noise-gyro",
+        "-r",
+        type=float,
+        default=0.01,
+        help="Gyroscope noise std dev (default: 0.01).",
+    )
     return parser.parse_args(argv)
 
 
