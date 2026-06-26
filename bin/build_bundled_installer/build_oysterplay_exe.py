@@ -25,6 +25,7 @@ Iron-law constraints:
     the build can be cross-prepared from a CI runner — actual ``.exe``
     output is Windows-only.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -53,6 +54,7 @@ EXIT_VERIFY_FAILED = 6
 def _has_pyinstaller() -> bool:
     try:
         import PyInstaller  # type: ignore[import-not-found]  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -74,8 +76,7 @@ def _verify_sources() -> tuple[bool, list[str]]:
     repo_bin = str(BIN_DIR)
     env = os.environ.copy()
     env["PYTHONPATH"] = (
-        repo_bin if not env.get("PYTHONPATH") else
-        f"{repo_bin}{os.pathsep}{env['PYTHONPATH']}"
+        repo_bin if not env.get("PYTHONPATH") else f"{repo_bin}{os.pathsep}{env['PYTHONPATH']}"
     )
     for module_name, source in (
         ("oyster_launch_mc", LAUNCHER_MODULE),
@@ -83,12 +84,12 @@ def _verify_sources() -> tuple[bool, list[str]]:
     ):
         proc = subprocess.run(
             [sys.executable, "-c", f"import {module_name}"],
-            env=env, capture_output=True, text=True,
+            env=env,
+            capture_output=True,
+            text=True,
         )
         if proc.returncode != 0:
-            problems.append(
-                f"{module_name} fails to import: {proc.stderr.strip()[:400]}"
-            )
+            problems.append(f"{module_name} fails to import: {proc.stderr.strip()[:400]}")
     return not problems, problems
 
 
@@ -108,13 +109,19 @@ def _construct_pyinstaller_args(
     (Bug 4 regression check).
     """
     args: list[str] = [
-        sys.executable, "-m", "PyInstaller",
-        "--name", name,
-        "--noconsole",   # GUI app — no flashing console
+        sys.executable,
+        "-m",
+        "PyInstaller",
+        "--name",
+        name,
+        "--noconsole",  # GUI app — no flashing console
         "--clean" if clean else "--noconfirm",
-        "--distpath", str(DIST_DIR.parent),
-        "--workpath", str(BUILD_DIR.parent),
-        "--specpath", str(BUILD_DIR.parent),
+        "--distpath",
+        str(DIST_DIR.parent),
+        "--workpath",
+        str(BUILD_DIR.parent),
+        "--specpath",
+        str(BUILD_DIR.parent),
     ]
     # Bug 4 fix (R05C): always ship --onefile so the resulting OysterPlay.exe
     # is a single ~30 MB binary with no `_internal/` companion directory. An
@@ -165,8 +172,7 @@ def build(
     """
     if not _has_pyinstaller():
         print(
-            "ERROR: PyInstaller not installed. "
-            "Run: pip install pyinstaller>=6.0",
+            "ERROR: PyInstaller not installed. Run: pip install pyinstaller>=6.0",
             file=sys.stderr,
         )
         return EXIT_NO_PYINSTALLER
@@ -204,11 +210,9 @@ def build(
 
     # Verify output
     suffix = ".exe" if os.name == "nt" else ""
-    output = DIST_DIR.parent / f"{name}{suffix}" if onefile else \
-        DIST_DIR / f"{name}{suffix}"
+    output = DIST_DIR.parent / f"{name}{suffix}" if onefile else DIST_DIR / f"{name}{suffix}"
     if not output.exists():
-        print(f"ERROR: expected build output {output} not found",
-              file=sys.stderr)
+        print(f"ERROR: expected build output {output} not found", file=sys.stderr)
         return EXIT_VERIFY_FAILED
 
     print(f"OK: built {output}")
@@ -217,22 +221,34 @@ def build(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--onefile", action="store_true", default=True,
-                        help="Single-file .exe (default).")
-    parser.add_argument("--onedir", dest="onefile", action="store_false",
-                        help="Multi-file dist (faster cold start).")
-    parser.add_argument("--name", default="OysterPlay",
-                        help="Output binary name (default: OysterPlay).")
-    parser.add_argument("--icon", type=Path, default=None,
-                        help="Optional .ico file for the .exe.")
-    parser.add_argument("--clean", action="store_true",
-                        help="Wipe dist/ and build/ before building.")
-    parser.add_argument("--check-only", action="store_true",
-                        help="Verify sources + PyInstaller install but "
-                             "don't actually build.")
-    parser.add_argument("--add-data", action="append", default=[],
-                        metavar="SRC=DEST",
-                        help="Extra files to bundle: SRC=DEST_INSIDE_BUNDLE")
+    parser.add_argument(
+        "--onefile", action="store_true", default=True, help="Single-file .exe (default)."
+    )
+    parser.add_argument(
+        "--onedir",
+        dest="onefile",
+        action="store_false",
+        help="Multi-file dist (faster cold start).",
+    )
+    parser.add_argument(
+        "--name", default="OysterPlay", help="Output binary name (default: OysterPlay)."
+    )
+    parser.add_argument("--icon", type=Path, default=None, help="Optional .ico file for the .exe.")
+    parser.add_argument(
+        "--clean", action="store_true", help="Wipe dist/ and build/ before building."
+    )
+    parser.add_argument(
+        "--check-only",
+        action="store_true",
+        help="Verify sources + PyInstaller install but don't actually build.",
+    )
+    parser.add_argument(
+        "--add-data",
+        action="append",
+        default=[],
+        metavar="SRC=DEST",
+        help="Extra files to bundle: SRC=DEST_INSIDE_BUNDLE",
+    )
 
     args = parser.parse_args(argv)
 
@@ -241,9 +257,11 @@ def main(argv: list[str] | None = None) -> int:
             # Bug 4: still print what the args WOULD be when PyInstaller
             # is absent — so cross-platform validation works without
             # forcing the dev to pip-install the heavy toolchain.
-            print("CHECK WARN: PyInstaller not installed (cannot build, "
-                  "but printing arg construction for cross-platform validation)",
-                  file=sys.stderr)
+            print(
+                "CHECK WARN: PyInstaller not installed (cannot build, "
+                "but printing arg construction for cross-platform validation)",
+                file=sys.stderr,
+            )
         ok, problems = _verify_sources() if _has_pyinstaller() else (True, [])
         if not ok:
             for p in problems:
@@ -272,15 +290,13 @@ def main(argv: list[str] | None = None) -> int:
             return EXIT_BAD_SOURCE
         if not _has_pyinstaller():
             return EXIT_NO_PYINSTALLER
-        print("CHECK OK: PyInstaller installed + sources import cleanly + "
-              "argv includes --onefile")
+        print("CHECK OK: PyInstaller installed + sources import cleanly + argv includes --onefile")
         return EXIT_OK
 
     extra_data: list[tuple[Path, str]] = []
     for spec in args.add_data:
         if "=" not in spec:
-            print(f"ERROR: --add-data must be SRC=DEST, got {spec}",
-                  file=sys.stderr)
+            print(f"ERROR: --add-data must be SRC=DEST, got {spec}", file=sys.stderr)
             return EXIT_BAD_SOURCE
         src_str, dest = spec.split("=", 1)
         extra_data.append((Path(src_str), dest))
