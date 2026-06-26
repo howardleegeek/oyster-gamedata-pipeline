@@ -139,6 +139,18 @@ class FrameData:
         return [b for b in self.bboxes_2d if b.is_visible(oc, tr)]
 
     def get_visible_3d(self, oc: float = 0.5, tr: float = 0.5) -> List[BBox3D]:
+        """Get 3D bounding boxes visible within occlusion and truncation thresholds.
+
+        Returns 3D boxes that correspond to the 2D boxes passing the visibility
+        filter. If no 2D boxes pass the filter, returns all 3D boxes.
+
+        Args:
+            oc: Maximum occlusion ratio to consider visible (0.0 to 1.0).
+            tr: Maximum truncation ratio to consider visible (0.0 to 1.0).
+
+        Returns:
+            List of BBox3D objects that pass the visibility filter.
+        """
         ids = {b.track_id for b in self.get_visible_2d(oc, tr) if b.track_id}
         if not ids:
             return self.bboxes_3d
