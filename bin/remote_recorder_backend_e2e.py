@@ -161,9 +161,9 @@ def step_upload_via_signed_url(
         upload_resp = client.put(upload_url, content=fake_tarball, timeout=REQUEST_TIMEOUT)
     except httpx.HTTPError as exc:
         raise AssertionError(f"upload PUT failed: {exc}") from exc
-    assert (
-        200 <= upload_resp.status_code < 300
-    ), f"upload PUT returned {upload_resp.status_code}: {upload_resp.text}"
+    assert 200 <= upload_resp.status_code < 300, (
+        f"upload PUT returned {upload_resp.status_code}: {upload_resp.text}"
+    )
     logger.info("  ✓ upload PUT succeeded (status=%s)", upload_resp.status_code)
 
     # 5c: Register session with backend
