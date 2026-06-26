@@ -149,7 +149,9 @@ def _cohort_key(rec: Dict) -> str:
     return rec.get("cohort", rec.get("id", "unknown")[:8])
 
 
-def _render_bar(labels: List[str], values: List[int], title: str, color: str, height: int = 20) -> Image.Image:
+def _render_bar(
+    labels: List[str], values: List[int], title: str, color: str, height: int = 20
+) -> Image.Image:
     if not HAS_PIL:
         raise ImportError("PIL required for rendering")
     width = max(800, len(labels) * 60)
@@ -206,14 +208,16 @@ def dashboard(records: List[Dict], output: Path, cohort_field: str = "cohort") -
         biome_lbl, biome_cnt = _histogram(biome_vals)
         tod_lbl, tod_cnt = _histogram(tod_vals)
         ent_lbl, ent_cnt = _histogram(ent_vals)
-        summary.append({
-            "cohort": cohort,
-            "n": len(recs),
-            "routes": route_lbl,
-            "biomes": biome_lbl,
-            "times": tod_lbl,
-            "entropies": ent_lbl,
-        })
+        summary.append(
+            {
+                "cohort": cohort,
+                "n": len(recs),
+                "routes": route_lbl,
+                "biomes": biome_lbl,
+                "times": tod_lbl,
+                "entropies": ent_lbl,
+            }
+        )
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "Summary"
@@ -232,21 +236,25 @@ def dashboard(records: List[Dict], output: Path, cohort_field: str = "cohort") -
     ws_s.title = "Cohorts"
     ws_s.append(["Cohort", "N", "Route Types", "Biomes", "Times of Day", "Entropies"])
     for s in summary:
-        ws_s.append([
-            s["cohort"],
-            s["n"],
-            ", ".join(s["routes"]),
-            ", ".join(s["biomes"]),
-            ", ".join(s["times"]),
-            ", ".join(s["entropies"]),
-        ])
+        ws_s.append(
+            [
+                s["cohort"],
+                s["n"],
+                ", ".join(s["routes"]),
+                ", ".join(s["biomes"]),
+                ", ".join(s["times"]),
+                ", ".join(s["entropies"]),
+            ]
+        )
     wb_summary.save(output / "cohort_summary.xlsx")
 
 
 def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Generate per-cohort diversity dashboards.")
     parser.add_argument("input", type=Path, help="Input file (JSON/YAML/CSV)")
-    parser.add_argument("-o", "--output", type=Path, default=Path("dashboard_out"), help="Output directory")
+    parser.add_argument(
+        "-o", "--output", type=Path, default=Path("dashboard_out"), help="Output directory"
+    )
     parser.add_argument(
         "--cohort-field",
         default="cohort",
