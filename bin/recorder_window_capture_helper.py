@@ -26,6 +26,7 @@ The recorder file itself is **not edited**.
 
 Spec: G263 (W31 wave). PP1 priority. ~120 lines.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -85,9 +86,7 @@ def enumerate_windows() -> List[WindowRect]:
     IsWindowVisible = user32.IsWindowVisible
 
     # WNDENUMPROC: BOOL (HWND, LPARAM)
-    EnumWindowsProc = ctypes.WINFUNCTYPE(
-        wintypes.BOOL, wintypes.HWND, wintypes.LPARAM
-    )
+    EnumWindowsProc = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
 
     results: List[WindowRect] = []
 
@@ -171,17 +170,21 @@ def build_window_args(
     if rect is None:
         raise LookupError(f"no visible window matches title containing {title_substr!r}")
     if rect.width <= 0 or rect.height <= 0:
-        raise ValueError(
-            f"window {rect.title!r} has zero area: {rect.width}x{rect.height}"
-        )
+        raise ValueError(f"window {rect.title!r} has zero area: {rect.width}x{rect.height}")
 
     args: List[str] = [
-        "-f", "gdigrab",
-        "-framerate", str(framerate),
-        "-offset_x", str(rect.left),
-        "-offset_y", str(rect.top),
-        "-video_size", f"{rect.width}x{rect.height}",
-        "-i", "desktop",
+        "-f",
+        "gdigrab",
+        "-framerate",
+        str(framerate),
+        "-offset_x",
+        str(rect.left),
+        "-offset_y",
+        str(rect.top),
+        "-video_size",
+        f"{rect.width}x{rect.height}",
+        "-i",
+        "desktop",
     ]
     return args, rect
 
