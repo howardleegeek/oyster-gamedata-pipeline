@@ -38,13 +38,20 @@ def _setup_logging(verbose: bool) -> None:
     """Configure root logger with appropriate level."""
     level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
-        level=level, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S",
+        level=level,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%H:%M:%S",
     )
 
 
 def _ensure_workspace(workspace: Path) -> None:
     """Create the vendor workspace directory tree."""
-    for d in [workspace / "clips", workspace / "metadata", workspace / "logs", workspace / "config"]:
+    for d in [
+        workspace / "clips",
+        workspace / "metadata",
+        workspace / "logs",
+        workspace / "config",
+    ]:
         d.mkdir(parents=True, exist_ok=True)
     logger.info("Workspace initialised at %s", workspace)
 
@@ -54,7 +61,7 @@ def _write_default_config(workspace: Path) -> Path:
     config_path = workspace / "config" / "vendor.yaml"
     if not config_path.exists():
         config_path.write_text(
-            "vendor_id: \"\"\nupload_endpoint: \"\"\nmax_retries: 3\ntimeout_seconds: 60\n"
+            'vendor_id: ""\nupload_endpoint: ""\nmax_retries: 3\ntimeout_seconds: 60\n'
         )
     logger.info("Default config written to %s", config_path)
     return config_path
@@ -94,6 +101,7 @@ def _validate_clip(clip_path: Path) -> Dict[str, Any]:
     # Optional duration via PIL (lazy import, best-effort)
     try:
         from PIL import Image
+
         with Image.open(clip_path) as img:
             n_frames = getattr(img, "n_frames", 1)
             fps = getattr(img, "fps", 25.0)
@@ -116,8 +124,12 @@ def _simulate_upload(clip_path: Path, workspace: Path, dry_run: bool) -> Dict[st
     else:
         logger.info("Upload simulation: %s (%d bytes)", clip_path.name, clip_path.stat().st_size)
     elapsed = time.monotonic() - start
-    return {"file": clip_path.name, "size_bytes": clip_path.stat().st_size,
-            "upload_time_s": round(elapsed, 4), "dry_run": dry_run}
+    return {
+        "file": clip_path.name,
+        "size_bytes": clip_path.stat().st_size,
+        "upload_time_s": round(elapsed, 4),
+        "dry_run": dry_run,
+    }
 
 
 def _write_metric_report(workspace: Path, report: Dict[str, Any]) -> Path:
@@ -145,12 +157,18 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description="Vendor first-clip walkthrough — measure time-to-first-clip.",
     )
-    parser.add_argument("--workspace", type=str, default=DEFAULT_WORKSPACE,
-                        help="Root workspace directory (default: %(default)s).")
-    parser.add_argument("--clip", type=str, default="first_clip.mp4",
-                        help="Clip file name (default: %(default)s).")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Simulate upload without remote endpoint.")
+    parser.add_argument(
+        "--workspace",
+        type=str,
+        default=DEFAULT_WORKSPACE,
+        help="Root workspace directory (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--clip", type=str, default="first_clip.mp4", help="Clip file name (default: %(default)s)."
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Simulate upload without remote endpoint."
+    )
     parser.add_argument("--verbose", "-v", action="store_true", help="Debug logging.")
     args = parser.parse_args(argv)
     _setup_logging(args.verbose)
@@ -182,9 +200,12 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     total_elapsed = time.monotonic() - overall_start
     report: Dict[str, Any] = {
-        "scenario": "first_clip", "workspace": str(workspace), "clip": args.clip,
+        "scenario": "first_clip",
+        "workspace": str(workspace),
+        "clip": args.clip,
         "validation": {"passed": validation["valid"], "checks": validation["checks"]},
-        "upload": upload_result, "time_to_first_clip_s": round(total_elapsed, 4),
+        "upload": upload_result,
+        "time_to_first_clip_s": round(total_elapsed, 4),
     }
     _write_metric_report(workspace, report)
 
