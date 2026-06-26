@@ -15,6 +15,7 @@ Naming follows PRD literal (PDF page 4-5 + Lark page 文件2):
 We deliberately do NOT accept aliases ("camera_rotation_euler", "Cx", scalar
 mouse_x) — that tolerance is what made V₁/v0.19.0 a false-PASS rubber stamp.
 """
+
 from __future__ import annotations
 
 import math
@@ -38,6 +39,7 @@ class ResidualResult:
 # Helpers — kept private to discourage cross-residual coupling.
 # ---------------------------------------------------------------------------
 
+
 def _take(value: Any) -> float:
     """Take element 0 of a list[float] or return scalar.
 
@@ -49,7 +51,9 @@ def _take(value: Any) -> float:
     return float(value)
 
 
-def _euler_zyx_to_quat(pitch_deg: float, yaw_deg: float, roll_deg: float) -> tuple[float, float, float, float]:
+def _euler_zyx_to_quat(
+    pitch_deg: float, yaw_deg: float, roll_deg: float
+) -> tuple[float, float, float, float]:
     """ZYX intrinsic Euler → quaternion ``[x, y, z, w]``.
 
     Per PRD page 4 嵌入图 axis-angle Hamilton formula:
@@ -73,6 +77,7 @@ def _euler_zyx_to_quat(pitch_deg: float, yaw_deg: float, roll_deg: float) -> tup
 # ---------------------------------------------------------------------------
 # 12 residuals.
 # ---------------------------------------------------------------------------
+
 
 def r01_quat_norm(rec: dict, threshold: float = 0.01) -> ResidualResult:
     """‖q‖ ≈ 1 for both camera and player quaternions."""
@@ -107,7 +112,9 @@ def r02_euler_quat_consistency(rec: dict, threshold: float = 0.01) -> ResidualRe
     return ResidualResult("R02", worst <= threshold, worst, threshold)
 
 
-def r03_kinematics(rec_n: dict, rec_n1: dict, fps: float, threshold: float = 0.05) -> ResidualResult:
+def r03_kinematics(
+    rec_n: dict, rec_n1: dict, fps: float, threshold: float = 0.05
+) -> ResidualResult:
     """speed[n] ≈ (pos[n+1] − pos[n]) · fps for camera + player.
 
     Tests at frame n with neighbor n+1. Threshold in m/s.
@@ -139,10 +146,13 @@ def r04_mouse_dx_diff(rec_n: dict, rec_n1: dict, threshold: float = 1e-6) -> Res
     return ResidualResult("R04", worst <= threshold, worst, threshold)
 
 
-def r05_dt_uniform(rec_n: dict, rec_n1: dict, fps: float = 30.0, tol_ms: float = 5.0) -> ResidualResult:
+def r05_dt_uniform(
+    rec_n: dict, rec_n1: dict, fps: float = 30.0, tol_ms: float = 5.0
+) -> ResidualResult:
     """t[n+1] − t[n] ≈ 1/fps within ±tol_ms ms. Time string format
     'YYYY-MM-DD HH:mm:ss.SSS'."""
     from datetime import datetime
+
     fmt = "%Y-%m-%d %H:%M:%S.%f"
     try:
         t_n = datetime.strptime(rec_n["time"], fmt)
@@ -184,7 +194,9 @@ def r07_mouse_range(rec: dict) -> ResidualResult:
             return ResidualResult("R07", False, math.inf, 1.0, f"mouse_d{axis} not list[float]")
         dx = float(d[0])
         if not (-1.0 <= dx <= 1.0):
-            return ResidualResult("R07", False, max(abs(dx), abs(dx - 1.0), abs(dx + 1.0)), 1.0, f"mouse_d{axis}={dx}")
+            return ResidualResult(
+                "R07", False, max(abs(dx), abs(dx - 1.0), abs(dx + 1.0)), 1.0, f"mouse_d{axis}={dx}"
+            )
     return ResidualResult("R07", True, 0.0, 1.0)
 
 
@@ -202,18 +214,34 @@ def r08_fx_eq_fy(rec: dict, threshold: float = 0.01) -> ResidualResult:
 # Windows VK code subset — derived from PRD Lark page 文件2 VK_TO_KEY table.
 # This list is the V₁ Claude reading; V₂ MiniMax has its own independent
 # read of the same table. Disagreement triggers BFT view-change.
-_VALID_VK_CODES: frozenset[int] = frozenset({
-    # F1-F12
-    *range(112, 124),
-    27,  # ESC
-    192,  # `
-    *range(48, 58),  # 0-9
-    *range(65, 91),  # A-Z
-    9, 20, 16, 160, 161, 17, 162, 163, 18, 164, 165, 32,  # tab/caps/shift/ctrl/alt/space
-    # extended (arrows, numpad, etc.) — PRD didn't list explicitly but allow
-    *range(33, 41),  # PgUp/PgDn/End/Home/arrows
-    8, 13, 46, 45,  # backspace/enter/del/insert
-})
+_VALID_VK_CODES: frozenset[int] = frozenset(
+    {
+        # F1-F12
+        *range(112, 124),
+        27,  # ESC
+        192,  # `
+        *range(48, 58),  # 0-9
+        *range(65, 91),  # A-Z
+        9,
+        20,
+        16,
+        160,
+        161,
+        17,
+        162,
+        163,
+        18,
+        164,
+        165,
+        32,  # tab/caps/shift/ctrl/alt/space
+        # extended (arrows, numpad, etc.) — PRD didn't list explicitly but allow
+        *range(33, 41),  # PgUp/PgDn/End/Home/arrows
+        8,
+        13,
+        46,
+        45,  # backspace/enter/del/insert
+    }
+)
 
 
 def r09_keycode_vk(rec: dict) -> ResidualResult:
