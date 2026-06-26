@@ -43,8 +43,14 @@ def _handle_signal(signum: int, _frame: Any) -> None:
 def load_config() -> dict[str, Any]:
     """Load configuration from environment variables."""
     required = [
-        "SQS_QUEUE_URL", "S3_BUCKET", "DB_HOST", "DB_PORT",
-        "DB_NAME", "DB_USER", "DB_PASSWORD", "LINT_SERVICE_URL",
+        "SQS_QUEUE_URL",
+        "S3_BUCKET",
+        "DB_HOST",
+        "DB_PORT",
+        "DB_NAME",
+        "DB_USER",
+        "DB_PASSWORD",
+        "LINT_SERVICE_URL",
     ]
     missing = [k for k in required if not os.environ.get(k)]
     if missing:
@@ -86,6 +92,7 @@ class SQSClient:
         """Lazily initialise the boto3 SQS client."""
         if self._client is None:
             import boto3
+
             self._client = boto3.client("sqs", region_name=self.region)
         return self._client
 
@@ -128,6 +135,7 @@ class S3Downloader:
         """Lazily initialise the boto3 S3 client."""
         if self._client is None:
             import boto3
+
             self._client = boto3.client("s3", region_name=self.region)
         return self._client
 
@@ -234,7 +242,11 @@ def process_message(
         file_hash = compute_sha256(local_path)
         lint_result = dispatch_lint(config["lint_service_url"], local_path, file_hash)
         write_result_to_db(
-            config, message["message_id"], s3_key, file_hash, lint_result,
+            config,
+            message["message_id"],
+            s3_key,
+            file_hash,
+            lint_result,
         )
         sqs.delete(message["receipt_handle"])
         logger.info("Successfully processed %s", s3_key)
@@ -244,6 +256,7 @@ def process_message(
         return False
     finally:
         import shutil
+
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 
@@ -251,12 +264,14 @@ def main(argv: list[str] | None = None) -> int:
     """Entry point: parse args, configure, and run the SQS consumer loop."""
     parser = argparse.ArgumentParser(description="SQS ingest worker")
     parser.add_argument(
-        "--log-level", default="INFO",
+        "--log-level",
+        default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         help="Logging verbosity",
     )
     parser.add_argument(
-        "--once", action="store_true",
+        "--once",
+        action="store_true",
         help="Process a single message and exit",
     )
     args = parser.parse_args(argv)
