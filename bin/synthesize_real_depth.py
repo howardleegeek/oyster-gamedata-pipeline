@@ -29,6 +29,7 @@ import numpy as np
 # Depth-map generation
 # ---------------------------------------------------------------------------
 
+
 def _generate_scene_depth(
     width: int,
     height: int,
@@ -46,7 +47,7 @@ def _generate_scene_depth(
     X, Y = np.meshgrid(x, y)
 
     # Base ground plane with perspective (farther = larger depth)
-    depth = 1.0 + 0.5 * Y + 0.3 * (X ** 2 + Y ** 2)
+    depth = 1.0 + 0.5 * Y + 0.3 * (X**2 + Y**2)
 
     # Gaussian mounds — simulate objects sitting on the ground
     mounds: list[Tuple[float, float, float, float]] = [
@@ -59,7 +60,7 @@ def _generate_scene_depth(
     ]
     for cx, cy, sigma, amp in mounds:
         dist_sq = (X - cx) ** 2 + (Y - cy) ** 2
-        depth += amp * np.exp(-dist_sq / (2.0 * sigma ** 2))
+        depth += amp * np.exp(-dist_sq / (2.0 * sigma**2))
 
     # Subtle high-frequency noise (sensor-like)
     depth += rng.normal(0.0, 0.005, (height, width))
@@ -121,6 +122,7 @@ def generate_realistic_depth(
 # EXR output (lazy-import backends)
 # ---------------------------------------------------------------------------
 
+
 def _save_exr_openexr(depth: np.ndarray, path: Path) -> bool:
     """Write EXR via OpenEXR / Imath (C++ bindings)."""
     import Imath  # noqa: F811 — lazy
@@ -129,9 +131,7 @@ def _save_exr_openexr(depth: np.ndarray, path: Path) -> bool:
     h, w = depth.shape
     header = OpenEXR.Header(w, h)
     header["compression"] = Imath.Compression(Imath.Compression.ZIP_COMPRESSION)
-    header["channels"] = {
-        "Y": Imath.Channel(Imath.PixelType(Imath.PixelType.FLOAT))
-    }
+    header["channels"] = {"Y": Imath.Channel(Imath.PixelType(Imath.PixelType.FLOAT))}
     out = OpenEXR.OutputFile(str(path), header)
     out.writePixels({"Y": depth.tobytes()})
     out.close()
@@ -141,6 +141,7 @@ def _save_exr_openexr(depth: np.ndarray, path: Path) -> bool:
 def _save_exr_imageio(depth: np.ndarray, path: Path) -> bool:
     """Write EXR via imageio (pure-Python fallback)."""
     import imageio.v3 as iio  # noqa: F811 — lazy
+
     iio.imwrite(str(path), depth, extension=".exr")
     return True
 
@@ -177,31 +178,41 @@ def save_exr(depth: np.ndarray, output_path: Path) -> bool:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def build_parser() -> argparse.ArgumentParser:
     """Construct the argument parser."""
     p = argparse.ArgumentParser(
         description="Synthesize realistic EXR depth maps (Z-buffer).",
     )
     p.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         type=Path,
         required=True,
         help="Output EXR file path.",
     )
     p.add_argument(
-        "--width", type=int, default=1920,
+        "--width",
+        type=int,
+        default=1920,
         help="Image width  (default: 1920).",
     )
     p.add_argument(
-        "--height", type=int, default=1080,
+        "--height",
+        type=int,
+        default=1080,
         help="Image height (default: 1080).",
     )
     p.add_argument(
-        "--invalid-ratio", type=float, default=0.001,
+        "--invalid-ratio",
+        type=float,
+        default=0.001,
         help="Max invalid-pixel ratio (default: 0.001 = 0.1 %%).",
     )
     p.add_argument(
-        "--seed", type=int, default=None,
+        "--seed",
+        type=int,
+        default=None,
         help="Random seed for reproducibility.",
     )
     return p
@@ -230,9 +241,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     invalid_count = int(np.isnan(depth).sum())
     total = depth.size
     actual_ratio = invalid_count / total if total else 0.0
-    assert actual_ratio <= 0.001 + 1e-9, (
-        f"Invalid ratio {actual_ratio:.6f} exceeds 0.001 cap"
-    )
+    assert actual_ratio <= 0.001 + 1e-9, f"Invalid ratio {actual_ratio:.6f} exceeds 0.001 cap"
 
     # Write
     args.output.parent.mkdir(parents=True, exist_ok=True)
