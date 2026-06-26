@@ -39,12 +39,13 @@ CONTACT: dpo@epal.example.com for data protection inquiries.
 
 class ConsentError(Exception):
     """Exception raised when consent handshake fails."""
+
     pass
 
 
 class ConsentRecord:
     """Represents a consent record for a client session per G221."""
-    
+
     def __init__(
         self,
         session_id: str,
@@ -52,7 +53,7 @@ class ConsentRecord:
         ai_training_consent: bool = False,
         recording_consent: bool = False,
         gdpr_acknowledged: bool = False,
-        opt_out_flags: Optional[Dict[str, bool]] = None
+        opt_out_flags: Optional[Dict[str, bool]] = None,
     ) -> None:
         self.session_id = session_id
         self.client_id = client_id
@@ -62,7 +63,7 @@ class ConsentRecord:
         self.gdpr_acknowledged = gdpr_acknowledged
         self.opt_out_flags = opt_out_flags or {}
         self.signature_hash = self._compute_signature()
-    
+
     def _compute_signature(self) -> str:
         """Compute SHA-256 signature hash for verification."""
         data = (
@@ -70,8 +71,8 @@ class ConsentRecord:
             f"{self.ai_training_consent}:{self.recording_consent}:"
             f"{self.gdpr_acknowledged}:{json.dumps(self.opt_out_flags, sort_keys=True)}"
         )
-        return hashlib.sha256(data.encode('utf-8')).hexdigest()[:32]
-    
+        return hashlib.sha256(data.encode("utf-8")).hexdigest()[:32]
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert consent record to dictionary."""
         return {
@@ -83,7 +84,7 @@ class ConsentRecord:
             "gdpr_acknowledged": self.gdpr_acknowledged,
             "opt_out_flags": self.opt_out_flags,
             "signature_hash": self.signature_hash,
-            "version": "1.0"
+            "version": "1.0",
         }
 
 
@@ -92,7 +93,7 @@ def display_gdpr_disclosure() -> bool:
     print(GDPR_DISCLOSURE)
     print("Press ENTER to acknowledge, or 'q' to quit...")
     try:
-        return input().strip().lower() != 'q'
+        return input().strip().lower() != "q"
     except EOFError:
         return False
 
@@ -101,21 +102,21 @@ def prompt_consent() -> tuple[bool, bool, Dict[str, bool]]:
     """Prompt for AI training and recording consent with opt-out options."""
     print("\nSESSION RECORDING & AI TRAINING CONSENT")
     print("-" * 40)
-    
+
     # AI training consent
     print("Consent to session recording for AI training? [y/N]: ", end="")
     try:
-        ai_consent = input().strip().lower() in ('y', 'yes')
+        ai_consent = input().strip().lower() in ("y", "yes")
     except EOFError:
         ai_consent = False
-    
+
     # Recording consent
     print("Consent to session recording for quality purposes? [y/N]: ", end="")
     try:
-        rec_consent = input().strip().lower() in ('y', 'yes')
+        rec_consent = input().strip().lower() in ("y", "yes")
     except EOFError:
         rec_consent = False
-    
+
     # Opt-out options
     opt_out: Dict[str, bool] = {}
     if ai_consent:
@@ -123,11 +124,11 @@ def prompt_consent() -> tuple[bool, bool, Dict[str, bool]]:
         for opt in ["data_sharing", "third_party_access", "long_term_storage"]:
             print(f"  Opt-out of {opt.replace('_', ' ')}? [y/N]: ", end="")
             try:
-                if input().strip().lower() in ('y', 'yes'):
+                if input().strip().lower() in ("y", "yes"):
                     opt_out[opt] = True
             except EOFError:
                 pass
-    
+
     return ai_consent, rec_consent, opt_out
 
 
@@ -135,15 +136,15 @@ def persist_consent_log(record: ConsentRecord, log_dir: Optional[Path] = None) -
     """Persist consent record to signed log file per G221."""
     log_path = log_dir or DEFAULT_CONSENT_LOG_DIR
     log_path.mkdir(parents=True, exist_ok=True)
-    
-    safe_id = "".join(c if c.isalnum() or c in '-_' else '_' for c in record.session_id)
-    ts_safe = record.timestamp.replace(':', '-').replace('.', '-')
+
+    safe_id = "".join(c if c.isalnum() or c in "-_" else "_" for c in record.session_id)
+    ts_safe = record.timestamp.replace(":", "-").replace(".", "-")
     filename = f"consent_{safe_id}_{ts_safe}.json"
     file_path = log_path / filename
-    
-    with open(file_path, 'w', encoding='utf-8') as f:
+
+    with open(file_path, "w", encoding="utf-8") as f:
         json.dump(record.to_dict(), f, indent=2, ensure_ascii=False)
-    
+
     return file_path
 
 
@@ -152,7 +153,7 @@ def run_consent_handshake(
     client_id: str,
     log_dir: Optional[Path] = None,
     non_interactive: bool = False,
-    default_consent: bool = False
+    default_consent: bool = False,
 ) -> ConsentRecord:
     """Execute full consent handshake process."""
     if non_interactive:
@@ -162,12 +163,12 @@ def run_consent_handshake(
             ai_training_consent=default_consent,
             recording_consent=default_consent,
             gdpr_acknowledged=True,
-            opt_out_flags={}
+            opt_out_flags={},
         )
     else:
         if not display_gdpr_disclosure():
             raise ConsentError("Client declined GDPR disclosure acknowledgment")
-        
+
         ai_consent, rec_consent, opt_out = prompt_consent()
         record = ConsentRecord(
             session_id=session_id,
@@ -175,9 +176,9 @@ def run_consent_handshake(
             ai_training_consent=ai_consent,
             recording_consent=rec_consent,
             gdpr_acknowledged=True,
-            opt_out_flags=opt_out
+            opt_out_flags=opt_out,
         )
-    
+
     log_path = persist_consent_log(record, log_dir)
     print(f"\nConsent log saved to: {log_path}")
     return record
@@ -187,45 +188,51 @@ def main(argv: Optional[list[str]] = None) -> int:
     """Main entry point for consent handshake CLI."""
     parser = argparse.ArgumentParser(
         prog="epal_client_consent_handshake",
-        description="Handle client consent handshake for EPal sessions."
+        description="Handle client consent handshake for EPal sessions.",
     )
     parser.add_argument("--session-id", "-s", required=True, help="Unique session ID")
     parser.add_argument("--client-id", "-c", required=True, help="Unique client ID")
     parser.add_argument("--log-dir", "-l", type=Path, help="Consent log directory")
-    parser.add_argument("--non-interactive", "-n", action="store_true",
-                        help="Run non-interactively with defaults")
-    parser.add_argument("--default-consent", "-d", action="store_true",
-                        help="Default to consent given (non-interactive)")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Show what would happen without persisting")
-    
+    parser.add_argument(
+        "--non-interactive", "-n", action="store_true", help="Run non-interactively with defaults"
+    )
+    parser.add_argument(
+        "--default-consent",
+        "-d",
+        action="store_true",
+        help="Default to consent given (non-interactive)",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Show what would happen without persisting"
+    )
+
     args = parser.parse_args(argv)
-    
+
     print("=" * 60)
     print("EPAL CLIENT CONSENT HANDSHAKE")
     print("=" * 60)
     print(f"Session ID: {args.session_id}")
     print(f"Client ID: {args.client_id}\n")
-    
+
     if args.dry_run:
         record = ConsentRecord(
             session_id=args.session_id,
             client_id=args.client_id,
             ai_training_consent=args.default_consent,
             recording_consent=args.default_consent,
-            gdpr_acknowledged=True
+            gdpr_acknowledged=True,
         )
         print("[DRY RUN] Consent record:")
         print(json.dumps(record.to_dict(), indent=2))
         return 0
-    
+
     try:
         record = run_consent_handshake(
             session_id=args.session_id,
             client_id=args.client_id,
             log_dir=args.log_dir,
             non_interactive=args.non_interactive,
-            default_consent=args.default_consent
+            default_consent=args.default_consent,
         )
         print("\n" + "=" * 60)
         print("CONSENT HANDSHAKE COMPLETE")
