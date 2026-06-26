@@ -81,6 +81,12 @@
 ## Round @ 2026-06-21T13:35:00Z
 - File: bin/inventory_voxel_capture.py::main
 - Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: 2d4ce7d52
+
+## Round @ 2026-06-21T13:50:00Z
+- File: bin/spectator_follow.py::RconClient.connect
+- Added: docstring=N (already had docstring), type-hints=Y
+- Commit: 72b65a135lready had type hints)
 - Commit: 4f2e1a2b3
 
 ## Round @ 2026-06-21T14:00:00Z
