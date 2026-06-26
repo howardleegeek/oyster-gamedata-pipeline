@@ -178,13 +178,13 @@ def format_human_readable(
 
     # Add verdict with appropriate message
     if verdict == "PASS_STRICT":
-        message = f"PASS_STRICT ({ratio_strict*100:.1f}% within 10ms)"
+        message = f"PASS_STRICT ({ratio_strict * 100:.1f}% within 10ms)"
     elif verdict == "PASS_OK":
-        message = f"PASS_OK ({ratio_ok*100:.1f}% within 50ms)"
+        message = f"PASS_OK ({ratio_ok * 100:.1f}% within 50ms)"
     elif verdict == "PASS_TOLERABLE":
-        message = f"PASS_TOLERABLE ({ratio_tolerable*100:.1f}% within 100ms)"
+        message = f"PASS_TOLERABLE ({ratio_tolerable * 100:.1f}% within 100ms)"
     else:
-        message = f"FAIL (only {ratio_tolerable*100:.1f}% within 100ms)"
+        message = f"FAIL (only {ratio_tolerable * 100:.1f}% within 100ms)"
 
     output.append(f"  Verdict: {message}")
 
