@@ -968,3 +968,8 @@ b4c97dbd638c75a1d826e641df598879876660ed
 
 
 
+
+## Round 358 @ 2026-06-26T08:27:17Z
+
+- Picked: ruff format bin/recorder_local_smoke.py (smallest unformatted bin file at 241 lines; one multiline assert collapsed to single-line with parenthesized message). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change, 0 test references in tests/ (no test-masking risk), import smoke OK, follows established cadence of Rounds 254–357 small-bin-file formats.
+- Result: committed bf294c37 (ruff format collapsed one multiline assert in bin/recorder_local_smoke.py; 1 file changed, 3 insertions(+), 3 deletions(-); ruff check + ruff format --check clean; AST parse OK; 26/26 tests/test_recorder_local_smoke.py pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — single-line assert with parenthesized message, no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
