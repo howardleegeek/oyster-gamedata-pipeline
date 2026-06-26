@@ -128,10 +128,15 @@ def watch_session(
 
     with log_path.open("a", encoding="utf-8") as logf:
         logf.write(
-            json.dumps({
-                "ts": start_ts, "event": "watchdog_start",
-                "interval_sec": interval_sec, "stall_threshold_sec": stall_threshold_sec,
-            }) + "\n",
+            json.dumps(
+                {
+                    "ts": start_ts,
+                    "event": "watchdog_start",
+                    "interval_sec": interval_sec,
+                    "stall_threshold_sec": stall_threshold_sec,
+                }
+            )
+            + "\n",
         )
         logf.flush()
 
@@ -154,9 +159,16 @@ def watch_session(
                         # Recovered from stall
                         msg = f"recovered: {name} resumed growing after {health.stall_duration_sec():.1f}s"
                         print(f"  ✓ {msg}")
-                        logf.write(json.dumps({
-                            "ts": time.time(), "event": "stall_recovered", "file": name,
-                        }) + "\n")
+                        logf.write(
+                            json.dumps(
+                                {
+                                    "ts": time.time(),
+                                    "event": "stall_recovered",
+                                    "file": name,
+                                }
+                            )
+                            + "\n"
+                        )
                         health.stall_warned = False
 
                 dur = health.stall_duration_sec()
@@ -166,15 +178,24 @@ def watch_session(
                     msg = f"STALLED: {name} no growth for {dur:.1f}s (size={size} lines={lines})"
                     tick_stalls.append(msg)
                     print(f"  ⚠ {msg}")
-                    logf.write(json.dumps({
-                        "ts": time.time(), "event": "stall_detected", "file": name,
-                        "stall_sec": dur, "size": size, "lines": lines,
-                    }) + "\n")
+                    logf.write(
+                        json.dumps(
+                            {
+                                "ts": time.time(),
+                                "event": "stall_detected",
+                                "file": name,
+                                "stall_sec": dur,
+                                "size": size,
+                                "lines": lines,
+                            }
+                        )
+                        + "\n"
+                    )
 
             # Status print every 12 iterations (~1 min @ 5s)
             if iteration % 12 == 0:
                 ages = {n: int(time.time() - h.last_change_ts) for n, h in files.items()}
-                print(f"  [iter {iteration}] elapsed={int(time.time()-start_ts)}s ages={ages}")
+                print(f"  [iter {iteration}] elapsed={int(time.time() - start_ts)}s ages={ages}")
 
             # Write the .stall_warning marker on first stall
             if tick_stalls and not warning_path.exists():
@@ -184,10 +205,17 @@ def watch_session(
             logf.flush()
             time.sleep(interval_sec)
 
-        logf.write(json.dumps({
-            "ts": time.time(), "event": "watchdog_stop",
-            "elapsed_sec": time.time() - start_ts, "saw_stall": saw_any_stall,
-        }) + "\n")
+        logf.write(
+            json.dumps(
+                {
+                    "ts": time.time(),
+                    "event": "watchdog_stop",
+                    "elapsed_sec": time.time() - start_ts,
+                    "saw_stall": saw_any_stall,
+                }
+            )
+            + "\n"
+        )
 
     print()
     print(f"[watchdog] stopped after {time.time() - start_ts:.1f}s")
@@ -202,12 +230,19 @@ def watch_session(
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("session_dir", type=Path,
-                    help="Session directory to monitor")
-    ap.add_argument("--interval", type=float, default=DEFAULT_INTERVAL_SEC,
-                    help=f"Polling interval seconds (default: {DEFAULT_INTERVAL_SEC})")
-    ap.add_argument("--stall", type=float, default=DEFAULT_STALL_THRESHOLD_SEC,
-                    help=f"Stall threshold seconds (default: {DEFAULT_STALL_THRESHOLD_SEC})")
+    ap.add_argument("session_dir", type=Path, help="Session directory to monitor")
+    ap.add_argument(
+        "--interval",
+        type=float,
+        default=DEFAULT_INTERVAL_SEC,
+        help=f"Polling interval seconds (default: {DEFAULT_INTERVAL_SEC})",
+    )
+    ap.add_argument(
+        "--stall",
+        type=float,
+        default=DEFAULT_STALL_THRESHOLD_SEC,
+        help=f"Stall threshold seconds (default: {DEFAULT_STALL_THRESHOLD_SEC})",
+    )
     args = ap.parse_args(argv)
 
     return watch_session(args.session_dir, args.interval, args.stall)
