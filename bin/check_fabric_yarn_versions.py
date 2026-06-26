@@ -16,6 +16,7 @@ Usage:
 Output (stdout): JSON with current matrix, available_to_add, and skip reasons.
 Exit code: always 0 (report-only, never crashes cron).
 """
+
 import json
 import re
 import sys
@@ -24,9 +25,7 @@ import urllib.request
 
 FABRIC_META = "https://meta.fabricmc.net/v2"
 FABRIC_MAVEN = "https://maven.fabricmc.net"
-FABRIC_API_MAVEN_METADATA = (
-    f"{FABRIC_MAVEN}/net/fabricmc/fabric-api/fabric-api/maven-metadata.xml"
-)
+FABRIC_API_MAVEN_METADATA = f"{FABRIC_MAVEN}/net/fabricmc/fabric-api/fabric-api/maven-metadata.xml"
 DEFAULT_WORKFLOW = ".github/workflows/build-mc-mod.yml"
 
 
@@ -177,24 +176,34 @@ def main():
     stable_versions, err = get_stable_game_versions()
     if err:
         errors.append(err)
-        print(json.dumps({
-            "current": current_versions,
-            "available_to_add": [],
-            "skip_reason": {},
-            "errors": errors,
-        }, indent=2))
+        print(
+            json.dumps(
+                {
+                    "current": current_versions,
+                    "available_to_add": [],
+                    "skip_reason": {},
+                    "errors": errors,
+                },
+                indent=2,
+            )
+        )
         return
 
     # 3. Fetch fabric-api Maven versions (one call, reuse for all checks)
     all_fabric_api, err = fetch_all_fabric_api_versions()
     if err:
         errors.append(err)
-        print(json.dumps({
-            "current": current_versions,
-            "available_to_add": [],
-            "skip_reason": {},
-            "errors": errors,
-        }, indent=2))
+        print(
+            json.dumps(
+                {
+                    "current": current_versions,
+                    "available_to_add": [],
+                    "skip_reason": {},
+                    "errors": errors,
+                },
+                indent=2,
+            )
+        )
         return
 
     # 4. Fetch latest stable loader
@@ -223,13 +232,15 @@ def main():
 
         # Both gates passed
         java_rel = determine_java_release(mc_ver)
-        available_to_add.append({
-            "mc_version": mc_ver,
-            "yarn": yarn_ver,
-            "fabric_api": fapi_ver,
-            "loader": latest_loader,
-            "java_release": java_rel,
-        })
+        available_to_add.append(
+            {
+                "mc_version": mc_ver,
+                "yarn": yarn_ver,
+                "fabric_api": fapi_ver,
+                "loader": latest_loader,
+                "java_release": java_rel,
+            }
+        )
 
     result = {
         "current": current_versions,
