@@ -19,13 +19,16 @@ from typing import Any, Dict, Optional, Tuple
 
 try:
     import psutil
+
     HAS_PSUTIL = True
 except ImportError:
     psutil = None  # type: ignore
     HAS_PSUTIL = False
 
 DEFAULT_CONFIG: Dict[str, Any] = {
-    "pause_on_battery": True, "min_battery_percent": 20, "game_overrides": {}
+    "pause_on_battery": True,
+    "min_battery_percent": 20,
+    "game_overrides": {},
 }
 
 
@@ -48,6 +51,7 @@ def detect_power_source() -> Tuple[str, Optional[float], bool]:
 def _detect_macos() -> Tuple[str, Optional[float], bool]:
     """Detect power on macOS using pmset (IOPSCopyPowerSourcesInfo)."""
     import subprocess
+
     try:
         r = subprocess.run(["pmset", "-g", "batt"], capture_output=True, text=True, timeout=5)
         out = r.stdout
@@ -88,8 +92,11 @@ def _detect_linux() -> Tuple[str, Optional[float], bool]:
 
 def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
     """Load configuration from file, merging with defaults."""
-    path = Path(config_path) if config_path else \
-        Path.home() / ".config" / "battery_aware_pause" / "config.json"
+    path = (
+        Path(config_path)
+        if config_path
+        else Path.home() / ".config" / "battery_aware_pause" / "config.json"
+    )
     config = DEFAULT_CONFIG.copy()
     if path.exists():
         try:
@@ -101,8 +108,11 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
 
 def save_config(config: Dict[str, Any], config_path: Optional[str] = None) -> None:
     """Save configuration to file atomically."""
-    path = Path(config_path) if config_path else \
-        Path.home() / ".config" / "battery_aware_pause" / "config.json"
+    path = (
+        Path(config_path)
+        if config_path
+        else Path.home() / ".config" / "battery_aware_pause" / "config.json"
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(suffix=".json", dir=str(path.parent))
     try:
@@ -115,8 +125,9 @@ def save_config(config: Dict[str, Any], config_path: Optional[str] = None) -> No
         raise
 
 
-def should_pause(config: Dict[str, Any], game: Optional[str] = None,
-                 override: bool = False) -> Tuple[bool, str]:
+def should_pause(
+    config: Dict[str, Any], game: Optional[str] = None, override: bool = False
+) -> Tuple[bool, str]:
     """Determine if recording should pause. Returns (should_pause, reason)."""
     if override:
         return False, "Override flag set"
@@ -145,23 +156,31 @@ def print_status(config: Dict[str, Any]) -> None:
     if pct is not None:
         print(f"Battery Level: {pct:.0f}%")
     print(f"Plugged In: {'Yes' if plugged else 'No'}")
-    print(f"\nConfig: pause_on_battery={config.get('pause_on_battery', True)}, "
-          f"min_battery_percent={config.get('min_battery_percent', 20)}")
+    print(
+        f"\nConfig: pause_on_battery={config.get('pause_on_battery', True)}, "
+        f"min_battery_percent={config.get('min_battery_percent', 20)}"
+    )
 
 
 def main(argv: Optional[list] = None) -> int:
     """Main entry point. Returns 0=continue, 1=pause, 2=error."""
     parser = argparse.ArgumentParser(
         description="Battery-aware pause utility for laptop recording.",
-        epilog="Exit: 0=continue, 1=pause, 2=error")
+        epilog="Exit: 0=continue, 1=pause, 2=error",
+    )
     parser.add_argument("--game", metavar="NAME", help="Game identifier for override")
     parser.add_argument("--config", metavar="PATH", help="Config file path")
     parser.add_argument("--override", action="store_true", help="Force continue")
     parser.add_argument("--status", action="store_true", help="Print status and exit")
-    parser.add_argument("--pause-on-battery", choices=["true", "false"],
-                        help="Set default pause_on_battery")
-    parser.add_argument("--set-game-override", nargs=2, metavar=("GAME", "BOOL"),
-                        help="Set per-game override (true/false)")
+    parser.add_argument(
+        "--pause-on-battery", choices=["true", "false"], help="Set default pause_on_battery"
+    )
+    parser.add_argument(
+        "--set-game-override",
+        nargs=2,
+        metavar=("GAME", "BOOL"),
+        help="Set per-game override (true/false)",
+    )
     args = parser.parse_args(argv)
 
     config = load_config(args.config)
