@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class UploadConfig:
     """Configuration for the low-bandwidth upload simulation."""
+
     file_size_mb: float = 50.0
     bandwidth_kbps: int = 200
     chunk_size_kb: int = 64
@@ -42,6 +43,7 @@ class UploadConfig:
 @dataclass
 class ChunkResult:
     """Result of a single chunk upload attempt."""
+
     chunk_index: int
     success: bool
     retries: int
@@ -52,6 +54,7 @@ class ChunkResult:
 @dataclass
 class UploadResult:
     """Aggregate result of the full upload simulation."""
+
     success: bool
     total_time_seconds: float
     chunks_uploaded: int
@@ -76,7 +79,7 @@ def _upload_chunk(idx: int, nbytes: int, bw: int, fail_rate: float, max_r: int) 
         if random.random() > fail_rate:
             return ChunkResult(idx, True, retries, elapsed, nbytes)
         retries += 1
-        elapsed += min(2.0 ** attempt, 10.0)
+        elapsed += min(2.0**attempt, 10.0)
     return ChunkResult(idx, False, retries, elapsed, 0)
 
 
@@ -88,8 +91,13 @@ def run_simulation(cfg: UploadConfig) -> UploadResult:
     total = math.ceil(file_bytes / chunk_bytes)
     timeout = cfg.timeout_minutes * 60
 
-    logger.info("Upload: %.1f MB @ %d Kbps | %d chunks | timeout=%d min",
-                cfg.file_size_mb, cfg.bandwidth_kbps, total, cfg.timeout_minutes)
+    logger.info(
+        "Upload: %.1f MB @ %d Kbps | %d chunks | timeout=%d min",
+        cfg.file_size_mb,
+        cfg.bandwidth_kbps,
+        total,
+        cfg.timeout_minutes,
+    )
 
     uploaded = 0
     retries = 0
@@ -155,9 +163,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
 
     cfg = UploadConfig(
-        file_size_mb=args.file_size_mb, bandwidth_kbps=args.bandwidth_kbps,
-        chunk_size_kb=args.chunk_size_kb, max_retries=args.max_retries,
-        timeout_minutes=args.timeout_minutes, failure_rate=args.failure_rate,
+        file_size_mb=args.file_size_mb,
+        bandwidth_kbps=args.bandwidth_kbps,
+        chunk_size_kb=args.chunk_size_kb,
+        max_retries=args.max_retries,
+        timeout_minutes=args.timeout_minutes,
+        failure_rate=args.failure_rate,
         seed=args.seed,
     )
 
@@ -167,12 +178,20 @@ def main(argv: Optional[List[str]] = None) -> int:
         write_report(res, cfg, report)
 
     if res.success:
-        logger.info("SUCCESS: %d chunks, %d retries, %.1f min (budget %d min)",
-                     res.chunks_uploaded, res.retries_total,
-                     res.total_time_seconds / 60, cfg.timeout_minutes)
+        logger.info(
+            "SUCCESS: %d chunks, %d retries, %.1f min (budget %d min)",
+            res.chunks_uploaded,
+            res.retries_total,
+            res.total_time_seconds / 60,
+            cfg.timeout_minutes,
+        )
         return 0
-    logger.error("FAILED: %d/%d chunks, %.1f min",
-                 res.chunks_uploaded, res.chunks_total, res.total_time_seconds / 60)
+    logger.error(
+        "FAILED: %d/%d chunks, %.1f min",
+        res.chunks_uploaded,
+        res.chunks_total,
+        res.total_time_seconds / 60,
+    )
     return 1
 
 
