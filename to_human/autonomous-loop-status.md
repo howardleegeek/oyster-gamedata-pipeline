@@ -982,3 +982,8 @@ b4c97dbd638c75a1d826e641df598879876660ed
 ## Round 357 @ 2026-06-26T08:00:00Z
 - Picked: ruff format bin/first_run_consent.py (smallest unformatted bin file: 243 lines, blank lines + line wrap). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change, targeted test exists (tests/test_first_run_consent.py 38/38 pass), no risk of test masking, follows established cadence of Rounds 254-356.
 - Result: committed ccc997d7 (ruff format added blank lines and line-wrapped long literals in bin/first_run_consent.py; 1 file changed, 1 insertion(+), 3 deletions(-); ruff check + format --check clean; 38/38 tests pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting only — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 361 @ 2026-06-25T05:35:00Z
+
+- Picked: ruff format bin/auto_fix_ci_failures.py (468 lines, add blank lines between functions, line-wrap long signatures). Justification: measurable code smell, single-file scope, no behavior change, module import smoke OK, no risk of test masking, follows established cadence.
+- Result: committed 85b61190 (ruff format added blank lines between functions and line-wrapped long signatures in bin/auto_fix_ci_failures.py; 1 file changed, 39 insertions(+), 46 deletions(-); ruff check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
