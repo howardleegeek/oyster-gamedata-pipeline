@@ -31,13 +31,7 @@ def run_command(cmd: List[str], cwd: Optional[str] = None) -> Tuple[int, str, st
         Tuple of (returncode, stdout, stderr)
     """
     try:
-        result = subprocess.run(
-            cmd,
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-            check=False
-        )
+        result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=False)
         return result.returncode, result.stdout, result.stderr
     except Exception as e:
         return 1, "", str(e)
@@ -80,15 +74,15 @@ def parse_black_failure(logs: str) -> List[str]:
     # Also check for summary line that might list files
     if "black --check" in logs.lower() and "would reformat" in logs:
         # Try to find files mentioned in context
-        lines = logs.split('\n')
+        lines = logs.split("\n")
         for i, line in enumerate(lines):
             if "would reformat" in line or "reformatted" in line:
                 # Check surrounding lines for file paths
-                for j in range(max(0, i-3), min(len(lines), i+4)):
-                    if '.py:' in lines[j]:
+                for j in range(max(0, i - 3), min(len(lines), i + 4)):
+                    if ".py:" in lines[j]:
                         # Extract file path before colon
-                        file_path = lines[j].split(':')[0]
-                        if os.path.exists(file_path) and file_path.endswith('.py'):
+                        file_path = lines[j].split(":")[0]
+                        if os.path.exists(file_path) and file_path.endswith(".py"):
                             files.append(file_path)
 
     return list(set(files))  # Remove duplicates
@@ -117,11 +111,11 @@ def parse_ruff_failure(logs: str) -> List[str]:
     # Also check for ruff-specific patterns
     if "ruff check" in logs.lower() or "ruff format" in logs.lower():
         # Look for file paths in error messages
-        lines = logs.split('\n')
+        lines = logs.split("\n")
         for line in lines:
-            if '.py:' in line and ('error' in line.lower() or 'warning' in line.lower()):
-                file_path = line.split(':')[0]
-                if os.path.exists(file_path) and file_path.endswith('.py'):
+            if ".py:" in line and ("error" in line.lower() or "warning" in line.lower()):
+                file_path = line.split(":")[0]
+                if os.path.exists(file_path) and file_path.endswith(".py"):
                     files.append(file_path)
 
     return list(set(files))
@@ -146,31 +140,33 @@ def parse_missing_imports(logs: str) -> Dict[str, List[str]]:
     for match in re.finditer(import_error_pattern, logs):
         module_name = match.group(1)
         # Try to find which file caused this error
-        lines = logs.split('\n')
+        lines = logs.split("\n")
         for i, line in enumerate(lines):
             if match.group(0) in line:
                 # Look backward for file path
-                for j in range(max(0, i-5), i):
-                    if '.py:' in lines[j]:
-                        file_path = lines[j].split(':')[0]
+                for j in range(max(0, i - 5), i):
+                    if ".py:" in lines[j]:
+                        file_path = lines[j].split(":")[0]
                         if os.path.exists(file_path):
                             if file_path not in imports_by_file:
                                 imports_by_file[file_path] = []
                             imports_by_file[file_path].append(module_name)
 
     # Look for specific import errors
-    import_name_pattern = r"ImportError: cannot import name ['\"]([^'\"]+)['\"] from ['\"]([^'\"]+)['\"]"
+    import_name_pattern = (
+        r"ImportError: cannot import name ['\"]([^'\"]+)['\"] from ['\"]([^'\"]+)['\"]"
+    )
     for match in re.finditer(import_name_pattern, logs):
         import_name = match.group(1)
         module_name = match.group(2)
         # Try to find which file caused this error
-        lines = logs.split('\n')
+        lines = logs.split("\n")
         for i, line in enumerate(lines):
             if match.group(0) in line:
                 # Look backward for file path
-                for j in range(max(0, i-5), i):
-                    if '.py:' in lines[j]:
-                        file_path = lines[j].split(':')[0]
+                for j in range(max(0, i - 5), i):
+                    if ".py:" in lines[j]:
+                        file_path = lines[j].split(":")[0]
                         if os.path.exists(file_path):
                             if file_path not in imports_by_file:
                                 imports_by_file[file_path] = []
@@ -258,26 +254,26 @@ def add_missing_imports(imports_by_file: Dict[str, List[str]]) -> bool:
 
     for file_path, imports in imports_by_file.items():
         try:
-            with open(file_path, 'r') as f:
+            with open(file_path, "r") as f:
                 content = f.read()
 
             # Find the best place to add imports (after any existing imports)
-            lines = content.split('\n')
+            lines = content.split("\n")
             import_end = 0
 
             for i, line in enumerate(lines):
                 line_stripped = line.strip()
-                if line_stripped.startswith('import ') or line_stripped.startswith('from '):
+                if line_stripped.startswith("import ") or line_stripped.startswith("from "):
                     import_end = i + 1
-                elif line_stripped and not line_stripped.startswith('#') and i > import_end:
+                elif line_stripped and not line_stripped.startswith("#") and i > import_end:
                     break
 
             # Add new imports
             new_imports = []
             for imp in imports:
-                if ' from ' in imp:
+                if " from " in imp:
                     # Format: "name from module"
-                    parts = imp.split(' from ')
+                    parts = imp.split(" from ")
                     if len(parts) == 2:
                         new_imports.append(f"from {parts[1]} import {parts[0]}")
                 else:
@@ -286,22 +282,22 @@ def add_missing_imports(imports_by_file: Dict[str, List[str]]) -> bool:
             # Insert new imports
             if import_end == 0:
                 # No existing imports, add at top (after any shebang or encoding)
-                if lines and lines[0].startswith('#!'):
+                if lines and lines[0].startswith("#!"):
                     # Shebang line present
-                    lines.insert(1, '')
-                    lines.insert(2, '\n'.join(new_imports))
+                    lines.insert(1, "")
+                    lines.insert(2, "\n".join(new_imports))
                     import_end = 2 + len(new_imports)
                 else:
-                    lines.insert(0, '\n'.join(new_imports))
+                    lines.insert(0, "\n".join(new_imports))
                     import_end = len(new_imports)
             else:
                 # Add after existing imports
-                lines.insert(import_end, '')
-                lines.insert(import_end + 1, '\n'.join(new_imports))
+                lines.insert(import_end, "")
+                lines.insert(import_end + 1, "\n".join(new_imports))
 
             # Write back
-            with open(file_path, 'w') as f:
-                f.write('\n'.join(lines))
+            with open(file_path, "w") as f:
+                f.write("\n".join(lines))
 
             print(f"  Added imports to {file_path}: {', '.join(imports)}")
 
@@ -370,17 +366,15 @@ def main(argv: List[str]) -> int:
     """
     parser = argparse.ArgumentParser(
         description="Automatically fix common CI failures by analyzing GitHub Actions run logs.",
-        epilog="Example: python bin/auto_fix_ci_failures.py"
+        epilog="Example: python bin/auto_fix_ci_failures.py",
     )
     parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Show what would be fixed without making changes"
+        "--dry-run", action="store_true", help="Show what would be fixed without making changes"
     )
     parser.add_argument(
         "--log-file",
         type=str,
-        help="Path to log file instead of running 'gh run view --log-failed'"
+        help="Path to log file instead of running 'gh run view --log-failed'",
     )
 
     args = parser.parse_args(argv)
@@ -388,7 +382,7 @@ def main(argv: List[str]) -> int:
     # Get logs
     if args.log_file:
         try:
-            with open(args.log_file, 'r') as f:
+            with open(args.log_file, "r") as f:
                 logs = f.read()
         except Exception as e:
             print(f"Error reading log file {args.log_file}: {e}", file=sys.stderr)
@@ -465,4 +459,3 @@ def main(argv: List[str]) -> int:
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))
-
