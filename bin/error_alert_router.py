@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 class Severity(Enum):
     """Error severity levels."""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -55,6 +56,7 @@ class AlertRouter:
         if config_path and Path(config_path).exists():
             try:
                 import yaml
+
                 with open(config_path, "r", encoding="utf-8") as f:
                     config.update(yaml.safe_load(f) or {})
             except Exception as e:
@@ -80,8 +82,11 @@ class AlertRouter:
             return False
         try:
             import urllib.request
+
             data = json.dumps(payload).encode()
-            req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+            req = urllib.request.Request(
+                url, data=data, headers={"Content-Type": "application/json"}
+            )
             with urllib.request.urlopen(req, timeout=10) as resp:
                 return 200 <= resp.status < 300
         except Exception as e:
@@ -89,20 +94,48 @@ class AlertRouter:
             return False
 
     def _slack_payload(self, error: Dict, severity: Severity) -> Dict:
-        colors = {Severity.LOW: "#36a64f", Severity.MEDIUM: "#ff9900", Severity.HIGH: "#ff6600", Severity.CRITICAL: "#ff0000"}
-        return {"attachments": [{"color": colors.get(severity, "#808080"), "title": f"[{severity.value.upper()}] Error",
-            "fields": [{"title": "Message", "value": error.get("message", "N/A"), "short": False},
-                       {"title": "Type", "value": error.get("type", "N/A"), "short": True},
-                       {"title": "Location", "value": error.get("location", "N/A"), "short": True}],
-            "footer": "G240 Alert Router"}]}
+        colors = {
+            Severity.LOW: "#36a64f",
+            Severity.MEDIUM: "#ff9900",
+            Severity.HIGH: "#ff6600",
+            Severity.CRITICAL: "#ff0000",
+        }
+        return {
+            "attachments": [
+                {
+                    "color": colors.get(severity, "#808080"),
+                    "title": f"[{severity.value.upper()}] Error",
+                    "fields": [
+                        {"title": "Message", "value": error.get("message", "N/A"), "short": False},
+                        {"title": "Type", "value": error.get("type", "N/A"), "short": True},
+                        {"title": "Location", "value": error.get("location", "N/A"), "short": True},
+                    ],
+                    "footer": "G240 Alert Router",
+                }
+            ]
+        }
 
     def _discord_payload(self, error: Dict, severity: Severity) -> Dict:
-        colors = {Severity.LOW: 3447003, Severity.MEDIUM: 15105570, Severity.HIGH: 15158332, Severity.CRITICAL: 15158332}
-        return {"embeds": [{"title": f"[{severity.value.upper()}] Error", "description": error.get("message", "N/A"),
-            "color": colors.get(severity, 808080),
-            "fields": [{"name": "Type", "value": error.get("type", "N/A"), "inline": True},
-                       {"name": "Location", "value": error.get("location", "N/A"), "inline": True}],
-            "timestamp": datetime.utcnow().isoformat()}]}
+        colors = {
+            Severity.LOW: 3447003,
+            Severity.MEDIUM: 15105570,
+            Severity.HIGH: 15158332,
+            Severity.CRITICAL: 15158332,
+        }
+        return {
+            "embeds": [
+                {
+                    "title": f"[{severity.value.upper()}] Error",
+                    "description": error.get("message", "N/A"),
+                    "color": colors.get(severity, 808080),
+                    "fields": [
+                        {"name": "Type", "value": error.get("type", "N/A"), "inline": True},
+                        {"name": "Location", "value": error.get("location", "N/A"), "inline": True},
+                    ],
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            ]
+        }
 
     def route_error(self, error: Dict[str, Any]) -> bool:
         """Route error based on severity. Returns True if alert was processed."""
@@ -127,7 +160,9 @@ class AlertRouter:
                 logger.critical(f"Critical alert: {error.get('message', '')[:50]}")
             return sent
         else:
-            self.daily_summary[severity.value].append({**error, "timestamp": datetime.now().isoformat()})
+            self.daily_summary[severity.value].append(
+                {**error, "timestamp": datetime.now().isoformat()}
+            )
             logger.info(f"Added to digest: {severity.value}")
             return True
 
@@ -158,16 +193,27 @@ class AlertRouter:
         digest = self.generate_digest()
         if digest["total_errors"] == 0:
             return True
-        payload = {"text": f"Daily Error Summary: {digest['total_errors']} errors",
-            "attachments": [{"color": "#ff9900", "title": "Daily Error Digest",
-                "fields": [{"title": k, "value": f"{v['count']} errors", "short": True}
-                          for k, v in digest["summaries"].items()]}]}
+        payload = {
+            "text": f"Daily Error Summary: {digest['total_errors']} errors",
+            "attachments": [
+                {
+                    "color": "#ff9900",
+                    "title": "Daily Error Digest",
+                    "fields": [
+                        {"title": k, "value": f"{v['count']} errors", "short": True}
+                        for k, v in digest["summaries"].items()
+                    ],
+                }
+            ],
+        }
         return self._send_webhook(self.config.get("slack_webhook", ""), payload)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     """Main CLI entry point."""
-    parser = argparse.ArgumentParser(description="Route error alerts with rate limiting and deduplication")
+    parser = argparse.ArgumentParser(
+        description="Route error alerts with rate limiting and deduplication"
+    )
     parser.add_argument("--config", "-c", help="YAML config file path")
     parser.add_argument("--error", "-e", help="JSON-encoded error to route")
     parser.add_argument("--digest", "-d", action="store_true", help="Generate daily digest")
