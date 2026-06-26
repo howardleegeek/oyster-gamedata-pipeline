@@ -40,10 +40,12 @@ def _setup_logging(verbose: bool = False) -> None:
 
 # -- Lazy imports -----------------------------------------------------------
 
+
 def _np() -> Any:
     """Lazy import numpy."""
     try:
         import numpy as np
+
         return np
     except ImportError:
         sys.exit("ERROR: numpy required. pip install numpy")
@@ -53,6 +55,7 @@ def _pil() -> Any:
     """Lazy import PIL.Image."""
     try:
         from PIL import Image
+
         return Image
     except ImportError:
         sys.exit("ERROR: Pillow required. pip install Pillow")
@@ -62,6 +65,7 @@ def _yaml() -> Optional[Any]:
     """Lazy import yaml (optional)."""
     try:
         import yaml
+
         return yaml
     except ImportError:
         return None
@@ -71,6 +75,7 @@ def _torch() -> Optional[Any]:
     """Lazy import torch (optional)."""
     try:
         import torch
+
         return torch
     except ImportError:
         return None
@@ -102,11 +107,13 @@ def _group_into_clips(frames: List[Path], clip_size: int = 8) -> List[List[Path]
     """Group consecutive frames into clips of specified size."""
     clips = []
     for i in range(0, len(frames) - clip_size + 1, clip_size):
-        clips.append(frames[i:i + clip_size])
+        clips.append(frames[i : i + clip_size])
     return clips
 
 
-def _split_clips(clips: List[List[Path]], test_ratio: float, seed: int = 42) -> Tuple[List[List[Path]], List[List[Path]]]:
+def _split_clips(
+    clips: List[List[Path]], test_ratio: float, seed: int = 42
+) -> Tuple[List[List[Path]], List[List[Path]]]:
     """Split clips into train/test sets based on test_ratio."""
     random.seed(seed)
     indices = list(range(len(clips)))
@@ -117,6 +124,7 @@ def _split_clips(clips: List[List[Path]], test_ratio: float, seed: int = 42) -> 
 
 
 # -- Model: Tiny ConvLSTM world model ---------------------------------------
+
 
 class TinyWorldModel:
     """Minimal convolutional world model for quick evaluation."""
@@ -168,7 +176,9 @@ class TinyWorldModel:
         opt.step()
         return loss.item()
 
-    def fit(self, train_clips: List[List[Path]], epochs: int = 3, batch_size: int = 4) -> Dict[str, float]:
+    def fit(
+        self, train_clips: List[List[Path]], epochs: int = 3, batch_size: int = 4
+    ) -> Dict[str, float]:
         """Train the model on provided clips."""
         torch = _torch()
         self._encoders = torch.nn.ModuleDict(self._make_encoder())
@@ -197,7 +207,7 @@ class TinyWorldModel:
             perm = torch.randperm(n)
             epoch_loss = 0.0
             for i in range(0, n, batch_size):
-                idx = perm[i:i + batch_size]
+                idx = perm[i : i + batch_size]
                 batch = data[idx]
                 loss = self.train_step(batch)
                 epoch_loss += loss * len(batch)
@@ -210,6 +220,7 @@ class TinyWorldModel:
 
 # -- Metrics ---------------------------------------------------------------
 
+
 def compute_mse(pred: Any, target: Any) -> float:
     """Compute mean squared error between predicted and target frames."""
     np = _np()
@@ -219,8 +230,8 @@ def compute_mse(pred: Any, target: Any) -> float:
 def compute_ssim(pred: Any, target: Any, window_size: int = 5) -> float:
     """Compute structural similarity index between two frames."""
     np = _np()
-    C1 = 0.01 ** 2
-    C2 = 0.03 ** 2
+    C1 = 0.01**2
+    C2 = 0.03**2
 
     mu_pred = np.mean(pred)
     mu_target = np.mean(target)
@@ -229,7 +240,7 @@ def compute_ssim(pred: Any, target: Any, window_size: int = 5) -> float:
     sigma_pred_target = np.mean((pred - mu_pred) * (target - mu_target))
 
     numerator = (2 * mu_pred * mu_target + C1) * (2 * sigma_pred_target + C2)
-    denominator = (mu_pred ** 2 + mu_target ** 2 + C1) * (sigma_pred + sigma_target + C2)
+    denominator = (mu_pred**2 + mu_target**2 + C1) * (sigma_pred + sigma_target + C2)
     return float(numerator / denominator)
 
 
@@ -241,7 +252,7 @@ def compute_fid(real_features: Any, gen_features: Any) -> float:
 
     diff = mu_real - mu_gen
     covmean = np.sqrt(sigma_real @ sigma_gen + 1e-6 * np.eye(len(mu_real)))
-    fid = float(np.sum(diff ** 2) + np.trace(sigma_real + sigma_gen - 2 * covmean))
+    fid = float(np.sum(diff**2) + np.trace(sigma_real + sigma_gen - 2 * covmean))
     return fid
 
 
@@ -253,6 +264,7 @@ def _extract_features(frames: List[Any]) -> Any:
 
 
 # -- Evaluation ------------------------------------------------------------
+
 
 def evaluate_model(model: TinyWorldModel, test_clips: List[List[Path]]) -> Dict[str, float]:
     """Evaluate trained model on test clips, return metrics."""
@@ -302,15 +314,22 @@ def evaluate_model(model: TinyWorldModel, test_clips: List[List[Path]]) -> Dict[
 
 # -- Main ------------------------------------------------------------------
 
+
 def _parse_args(argv: List[str]) -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description="G210 Buyer Evaluation Harness: train tiny world model and evaluate.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--data-dir", type=str, required=True, help="Directory containing video clips")
-    parser.add_argument("--num-clips", type=int, default=100, help="Number of clips to use for training")
-    parser.add_argument("--test-ratio", type=float, default=0.2, help="Fraction of data for testing")
+    parser.add_argument(
+        "--data-dir", type=str, required=True, help="Directory containing video clips"
+    )
+    parser.add_argument(
+        "--num-clips", type=int, default=100, help="Number of clips to use for training"
+    )
+    parser.add_argument(
+        "--test-ratio", type=float, default=0.2, help="Fraction of data for testing"
+    )
     parser.add_argument("--clip-size", type=int, default=8, help="Frames per clip")
     parser.add_argument("--image-size", type=int, default=64, help="Resize frames to this size")
     parser.add_argument("--epochs", type=int, default=3, help="Training epochs")
@@ -363,7 +382,9 @@ def main(argv: List[str]) -> int:
     # Evaluate
     logger.info("Evaluating on test set...")
     eval_metrics = evaluate_model(model, test_clips)
-    logger.info(f"MSE: {eval_metrics['mse']:.4f}, SSIM: {eval_metrics['ssim']:.4f}, FID: {eval_metrics['fid']:.2f}")
+    logger.info(
+        f"MSE: {eval_metrics['mse']:.4f}, SSIM: {eval_metrics['ssim']:.4f}, FID: {eval_metrics['fid']:.2f}"
+    )
 
     # Write results
     results = {
