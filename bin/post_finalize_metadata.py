@@ -13,6 +13,7 @@ Idempotent: rerunning produces the same MANIFEST given same files.
 Usage:
   python3 bin/post_finalize_metadata.py <session_dir>
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -142,21 +143,33 @@ def write_metadata(session: Path) -> dict:
         existing.get("session_id"),
         os.environ.get("OYSTER_SESSION_ID"),
     ) or str(uuid.uuid4())
-    device_id = _first_nonempty(
-        os.environ.get("OYSTER_DEVICE_ID"),
-        socket.gethostname(),
-    ) or "unknown"
-    location = _first_nonempty(
-        os.environ.get("OYSTER_LOCATION"),
-    ) or "unspecified"
-    recording_started_utc = _first_nonempty(
-        existing.get("recording_started_utc"),
-    ) or now_utc.isoformat()
-    recorder_version = _first_nonempty(
-        os.environ.get("OYSTER_RECORDER_VERSION"),
-        existing.get("recorder_version"),
-        _detect_recorder_version(session),  # MECE M5 — Cargo.toml auto-detect
-    ) or "unknown"
+    device_id = (
+        _first_nonempty(
+            os.environ.get("OYSTER_DEVICE_ID"),
+            socket.gethostname(),
+        )
+        or "unknown"
+    )
+    location = (
+        _first_nonempty(
+            os.environ.get("OYSTER_LOCATION"),
+        )
+        or "unspecified"
+    )
+    recording_started_utc = (
+        _first_nonempty(
+            existing.get("recording_started_utc"),
+        )
+        or now_utc.isoformat()
+    )
+    recorder_version = (
+        _first_nonempty(
+            os.environ.get("OYSTER_RECORDER_VERSION"),
+            existing.get("recorder_version"),
+            _detect_recorder_version(session),  # MECE M5 — Cargo.toml auto-detect
+        )
+        or "unknown"
+    )
 
     # Bug-fix 2026-05-16: MERGE into existing metadata instead of overwriting.
     # Previously this function destroyed recorder-generated fields like
@@ -166,15 +179,17 @@ def write_metadata(session: Path) -> dict:
     # then failed because the recorder's rich data was nuked.
     # Fix: start from `existing` and overlay only the M2/M3/RBGA-C1 required fields.
     meta = dict(existing)  # preserve everything the recorder wrote
-    meta.update({
-        "schema_version": 1,
-        "session_id": session_id,                  # M2: UUID4 unique cross-machine
-        "device_id": device_id,                    # RBGA C1
-        "location": location,                      # RBGA C1
-        "recording_started_utc": recording_started_utc,
-        "metadata_written_utc": now_utc.isoformat(),  # M3: UTC timestamps
-        "recorder_version": recorder_version,
-    })
+    meta.update(
+        {
+            "schema_version": 1,
+            "session_id": session_id,  # M2: UUID4 unique cross-machine
+            "device_id": device_id,  # RBGA C1
+            "location": location,  # RBGA C1
+            "recording_started_utc": recording_started_utc,
+            "metadata_written_utc": now_utc.isoformat(),  # M3: UTC timestamps
+            "recorder_version": recorder_version,
+        }
+    )
     # Platform sub-dict: also merge to preserve any recorder-side platform info
     existing_platform = meta.get("platform") if isinstance(meta.get("platform"), dict) else {}
     meta["platform"] = {
