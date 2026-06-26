@@ -27,6 +27,7 @@ prints planned actions without writing the network or the .minecraft folder.
 
 Spec: G264 (W31 wave). PP1 priority. ~200 lines.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -213,9 +214,7 @@ def download_jar(
 
     if release.sha256 and sha.hexdigest() != release.sha256:
         out.unlink(missing_ok=True)
-        raise ValueError(
-            f"sha256 mismatch: expected {release.sha256}, got {sha.hexdigest()}"
-        )
+        raise ValueError(f"sha256 mismatch: expected {release.sha256}, got {sha.hexdigest()}")
     return out
 
 
@@ -283,9 +282,7 @@ def install(
     """
     detected = mc_version or detect_minecraft_version()
     if detected is None:
-        raise LookupError(
-            "could not detect Minecraft version — pass --mc-version explicitly"
-        )
+        raise LookupError("could not detect Minecraft version — pass --mc-version explicitly")
 
     mods_dir = mods_dir or (detect_minecraft_dir() / "mods")
     if dry_run:
