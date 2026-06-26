@@ -74,8 +74,7 @@ def read_zbuffer_header(raw_bin: Path) -> ZBufferHeader:
         and z_far > z_near
     ):
         raise ValueError(
-            f"{raw_bin} has invalid projection values: "
-            f"zNear={z_near}, zFar={z_far}, fov={fov_deg}"
+            f"{raw_bin} has invalid projection values: zNear={z_near}, zFar={z_far}, fov={fov_deg}"
         )
 
     return ZBufferHeader(
