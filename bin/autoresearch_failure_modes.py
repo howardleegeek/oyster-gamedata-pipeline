@@ -9,6 +9,7 @@ Usage::
     python bin/autoresearch_failure_modes.py --tarballs /path/to/tarballs_dir
     python bin/autoresearch_failure_modes.py --tarballs /path --top 15 -v
 """
+
 from __future__ import annotations
 
 import argparse
@@ -58,6 +59,7 @@ _RE_TRAIL = re.compile(r"[ \t]+$", re.MULTILINE)
 _RE_MIXED = re.compile(r"^( +\t|\t+ )", re.MULTILINE)
 
 # Lint helpers (stdlib-only) ----------------------------------------------
+
 
 def _classify_compile_error(err: Exception) -> str:
     """Map a compile/AST error to a failure-mode key."""
@@ -111,10 +113,14 @@ def _lint_source(source: str, filepath: str) -> List[str]:
     if _RE_MIXED.search(source):
         modes.append("mixed_indentation")
     # Missing module-level docstring
-    if not (tree.body and isinstance(tree.body[0], ast.Expr)
-            and isinstance(tree.body[0].value, (ast.Constant, ast.Str))):
+    if not (
+        tree.body
+        and isinstance(tree.body[0], ast.Expr)
+        and isinstance(tree.body[0].value, (ast.Constant, ast.Str))
+    ):
         modes.append("missing_docstring")
     return modes
+
 
 # Tarball processing ------------------------------------------------------
 
@@ -147,42 +153,52 @@ def _extract_and_lint(tarball_path: str, tmpdir: str) -> List[str]:
 
 def _find_tarballs(directory: str) -> List[str]:
     """Return sorted list of tarball paths inside *directory*."""
-    results = [e.path for e in os.scandir(directory)
-               if e.is_file() and any(e.name.endswith(s) for s in _TARBALL_SUF)]
+    results = [
+        e.path
+        for e in os.scandir(directory)
+        if e.is_file() and any(e.name.endswith(s) for s in _TARBALL_SUF)
+    ]
     results.sort()
     return results
 
+
 # Reporting ---------------------------------------------------------------
 
-def _report_top(counter: collections.Counter, top_n: int,
-                total_files: int, total_tarballs: int) -> None:
+
+def _report_top(
+    counter: collections.Counter, top_n: int, total_files: int, total_tarballs: int
+) -> None:
     """Print human-readable top-N failure-mode table."""
     sep = "=" * 72
-    print(f"\n{sep}\n  Autoresearch Failure-Mode Report"
-          f"\n  Tarballs scanned : {total_tarballs}"
-          f"\n  Python files linted (approx): {total_files}\n{sep}\n")
+    print(
+        f"\n{sep}\n  Autoresearch Failure-Mode Report"
+        f"\n  Tarballs scanned : {total_tarballs}"
+        f"\n  Python files linted (approx): {total_files}\n{sep}\n"
+    )
     print(f"  {'Rank':<6} {'Count':>7}  {'Mode':<25}  Description")
-    print(f"  {'-'*6} {'-'*7}  {'-'*25}  {'-'*40}")
+    print(f"  {'-' * 6} {'-' * 7}  {'-' * 25}  {'-' * 40}")
     for rank, (mode, count) in enumerate(counter.most_common(top_n), 1):
         print(f"  {rank:<6} {count:>7}  {mode:<25}  {FAILURE_MODES.get(mode, 'Unknown')}")
     print(f"\n{sep}\n")
 
+
 # CLI ---------------------------------------------------------------------
+
 
 def main(argv: List[str] | None = None) -> int:
     """Entry-point: parse args, scan tarballs, report top failure modes."""
     parser = argparse.ArgumentParser(
-        description="Enumerate top lint failure modes from vendor tarballs.")
-    parser.add_argument("--tarballs", required=True,
-                        help="Directory containing vendor tarballs.")
-    parser.add_argument("--top", type=int, default=10,
-                        help="Number of top failure modes to display (default: 10).")
-    parser.add_argument("--verbose", "-v", action="store_true",
-                        help="Enable debug logging.")
+        description="Enumerate top lint failure modes from vendor tarballs."
+    )
+    parser.add_argument("--tarballs", required=True, help="Directory containing vendor tarballs.")
+    parser.add_argument(
+        "--top", type=int, default=10, help="Number of top failure modes to display (default: 10)."
+    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable debug logging.")
     args = parser.parse_args(argv)
     logging.basicConfig(
-        level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s %(message)s")
+        level=logging.DEBUG if args.verbose else logging.INFO, format="%(levelname)s %(message)s"
+    )
     if not os.path.isdir(args.tarballs):
         logger.error("Directory not found: %s", args.tarballs)
         return 2
