@@ -172,6 +172,21 @@ class VendorRateLimiter:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Main entry point for the rate limiter CLI.
+
+    Parses command-line arguments and executes rate limiter commands:
+    - check: Verify if tokens are available for a vendor
+    - consume: Consume tokens from a vendor's bucket
+    - status: Display remaining tokens for a vendor
+    - reset: Reset a vendor's bucket to full capacity
+
+    Args:
+        argv: Command-line arguments (excluding program name).
+              If None, uses sys.argv.
+
+    Returns:
+        Exit code: 0 for success, 1 for limit exceeded or errors.
+    """
     parser = argparse.ArgumentParser(description="Token-bucket rate limiter for vendor clip budgets.")
     parser.add_argument("--state-file", type=Path, default=DEFAULT_STATE_FILE, help="State JSON file")
     parser.add_argument("--budget", type=int, default=DEFAULT_DAILY_BUDGET, help="Daily token budget")
