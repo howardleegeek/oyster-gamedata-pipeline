@@ -75,11 +75,15 @@ class Manifest:
 
     def add(self, clip_idx: int, filename: str, sha: str, size: int) -> None:
         """Add a clip entry to the manifest."""
-        self._entries.append({
-            "clip_idx": clip_idx, "filename": filename, "sha256": sha,
-            "size_bytes": size,
-            "uploaded_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        })
+        self._entries.append(
+            {
+                "clip_idx": clip_idx,
+                "filename": filename,
+                "sha256": sha,
+                "size_bytes": size,
+                "uploaded_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            }
+        )
 
     def save(self) -> None:
         """Persist manifest to disk."""
@@ -134,8 +138,11 @@ class CaptureSimulator:
     def resume_capture(self, total_clips: int, crash_at: int) -> Dict[str, Any]:
         """Resume capture after crash, detecting and handling gaps."""
         result: Dict[str, Any] = {
-            "crash_at": crash_at, "partial_detected": False,
-            "gaps": [], "recovered": [], "s3_keys": [],
+            "crash_at": crash_at,
+            "partial_detected": False,
+            "gaps": [],
+            "recovered": [],
+            "s3_keys": [],
         }
         # Check for partial tarball from crash
         partial_path = self.work_dir / _clip_name(crash_at)
@@ -166,7 +173,7 @@ def main(argv: List[str] | None = None) -> int:
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(asctime)s %(levelname)s %(message)s"
+        format="%(asctime)s %(levelname)s %(message)s",
     )
 
     if args.crash_at >= args.clips:
