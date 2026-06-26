@@ -40,6 +40,7 @@
 - Picked: ruff format bin/v4_buyer_signed/__init__.py (smallest unformatted file: 37 lines, single blank line needed after module docstring; same pattern as Rounds 254–263). Justification: measurable code smell, single-file scope, no behavior change, targeted test exists (tests/bin/test_v4_buyer_signed.py 8/8 pass), no risk of test masking, follows established cadence.
 - Result: committed f4c669b6 (ruff format added blank line after module docstring in bin/v4_buyer_signed/__init__.py; 1 file changed, 1 insertion(+); ruff check + ruff format --check clean; import smoke OK (v4_buyer_signed.__all__ loads cleanly); 8/8 tests pass in tests/bin/test_v4_buyer_signed.py; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic blank line — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.
 
+
 ## Round 265 @ 2026-06-24T20:00:00Z
 
 - Picked: ruff format bin/paper_health_check.py (small unformatted bin file: 73 lines, missing blank lines between functions, long line needs wrapping). Justification: measurable code smell, single-file scope, no behavior change, module import smoke OK, no risk of test masking, follows established cadence of formatting small bin files.
@@ -1213,3 +1214,8 @@ b4c97dbd638c75a1d826e641df598879876660ed
 ## Round 391 @ 2026-06-27T13:30:00Z
 - Picked: ruff format dashboard/login_page.py (smallest unformatted dashboard file: 278 lines). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change (cosmetic: quotes, trailing commas, blank lines), ruff check clean before+after, no test references this file, follows established cadence of formatting small unformatted files.
 - Result: committed 7f6f42bd (ruff format applied: quotes to double, trailing commas, blank lines after docstrings; 1 file changed, 71 insertions(+), 52 deletions(-); ruff check + format --check clean; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race condition, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
+
+## Round 392 @ 2026-06-26T04:00:00Z
+
+- Picked: ruff format bin/extract_audio_event_track.py (326 lines, smallest unformatted bin file; has a referenced test test_audio_event_track.py 14/14). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change (purely cosmetic line-wrap + spacing around **), targeted test passes (14/14 unchanged), no risk of test masking, follows established cadence.
+- Result: committed 0a5e0196 (1 file changed, 18 insertions(+), 10 deletions(-); ruff check clean; ruff format --check clean; AST parse OK; tests/test_audio_event_track.py 14/14 pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — line-wrap argparse sox command, de-wrap noise_power conditional, remove spaces around ** per ruff default, wrap long f-string. No silent error swallow, no race, no off-by-one, no security impact, no test masking (14/14 unchanged), no brand cross-reference, no module-level side effect, no logic change in audio processing math.)
