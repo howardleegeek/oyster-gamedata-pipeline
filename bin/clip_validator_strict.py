@@ -35,6 +35,7 @@ def _get_numpy() -> Any:
     global _numpy
     if _numpy is None:
         import numpy as np
+
         _numpy = np
     return _numpy
 
@@ -44,6 +45,7 @@ def _get_pil_image() -> Any:
     global _pil_image
     if _pil_image is None:
         from PIL import Image
+
         _pil_image = Image
     return _pil_image
 
@@ -51,6 +53,7 @@ def _get_pil_image() -> Any:
 @dataclass
 class ValidationResult:
     """Container for all validation metrics of a single clip."""
+
     video_path: str
     audio_mute_ratio: float = 0.0
     audio_silent_ratio: float = 0.0
@@ -81,6 +84,7 @@ class ValidationResult:
 @dataclass
 class ValidationThresholds:
     """Configurable pass/fail thresholds."""
+
     max_audio_mute_ratio: float = 0.95
     max_audio_silent_ratio: float = 0.90
     max_black_frame_ratio: float = 0.80
@@ -94,9 +98,20 @@ def _has_audio_stream(video_path: str) -> bool:
     """Return True if the file contains at least one audio stream."""
     try:
         result = subprocess.run(
-            ["ffprobe", "-v", "quiet", "-print_format", "json",
-             "-show_streams", "-select_streams", "a", video_path],
-            capture_output=True, text=True, timeout=30,
+            [
+                "ffprobe",
+                "-v",
+                "quiet",
+                "-print_format",
+                "json",
+                "-show_streams",
+                "-select_streams",
+                "a",
+                video_path,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         return len(json.loads(result.stdout).get("streams", [])) > 0
     except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError):
@@ -115,7 +130,8 @@ def _parse_db_value(text: str, key: str) -> Optional[float]:
 
 
 def compute_audio_metrics(
-    video_path: str, thresholds: ValidationThresholds,
+    video_path: str,
+    thresholds: ValidationThresholds,
 ) -> Tuple[float, float]:
     """
     Compute audio mute and silent ratios via ffprobe volumedetect.
@@ -127,9 +143,10 @@ def compute_audio_metrics(
 
     try:
         result = subprocess.run(
-            ["ffmpeg", "-i", video_path, "-af", "volumedetect",
-             "-f", "null", "/dev/null"],
-            capture_output=True, text=True, timeout=120,
+            ["ffmpeg", "-i", video_path, "-af", "volumedetect", "-f", "null", "/dev/null"],
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
         stderr = result.stderr.lower()
         mean_vol = _parse_db_value(stderr, "mean_volume")
@@ -159,9 +176,20 @@ def _get_video_info(video_path: str) -> Dict[str, Any]:
     """Probe video for duration, fps, width, height via ffprobe."""
     try:
         result = subprocess.run(
-            ["ffprobe", "-v", "quiet", "-print_format", "json",
-             "-show_streams", "-select_streams", "v:0", video_path],
-            capture_output=True, text=True, timeout=30,
+            [
+                "ffprobe",
+                "-v",
+                "quiet",
+                "-print_format",
+                "json",
+                "-show_streams",
+                "-select_streams",
+                "v:0",
+                video_path,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         streams = json.loads(result.stdout).get("streams", [])
         if streams:
@@ -184,7 +212,8 @@ def _get_video_info(video_path: str) -> Dict[str, Any]:
 
 
 def compute_video_metrics(
-    video_path: str, thresholds: ValidationThresholds,
+    video_path: str,
+    thresholds: ValidationThresholds,
     sample_interval: float = 1.0,
 ) -> Tuple[float, float, float]:
     """
@@ -205,9 +234,10 @@ def compute_video_metrics(
 
     try:
         subprocess.run(
-            ["ffmpeg", "-i", video_path, "-vf", f"fps=1/{sample_interval}",
-             "-q:v", "2", pattern],
-            capture_output=True, text=True, timeout=120,
+            ["ffmpeg", "-i", video_path, "-vf", f"fps=1/{sample_interval}", "-q:v", "2", pattern],
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
         frames = sorted(f for f in os.listdir(tmpdir) if f.endswith(".png"))
         if not frames:
@@ -280,26 +310,32 @@ def validate_clip(
 
     if mute_ratio >= thresholds.max_audio_mute_ratio:
         result.warnings.append(
-            f"Audio mute ratio {mute_ratio:.2%} exceeds threshold {thresholds.max_audio_mute_ratio:.2%}")
+            f"Audio mute ratio {mute_ratio:.2%} exceeds threshold {thresholds.max_audio_mute_ratio:.2%}"
+        )
     if silent_ratio >= thresholds.max_audio_silent_ratio:
         result.warnings.append(
-            f"Audio silent ratio {silent_ratio:.2%} exceeds threshold {thresholds.max_audio_silent_ratio:.2%}")
+            f"Audio silent ratio {silent_ratio:.2%} exceeds threshold {thresholds.max_audio_silent_ratio:.2%}"
+        )
 
     black_ratio, repeated_ratio, motion_ent = compute_video_metrics(
-        video_path, thresholds, sample_interval)
+        video_path, thresholds, sample_interval
+    )
     result.black_frame_ratio = black_ratio
     result.repeated_frame_ratio = repeated_ratio
     result.motion_entropy = motion_ent
 
     if black_ratio >= thresholds.max_black_frame_ratio:
         result.warnings.append(
-            f"Black frame ratio {black_ratio:.2%} exceeds threshold {thresholds.max_black_frame_ratio:.2%}")
+            f"Black frame ratio {black_ratio:.2%} exceeds threshold {thresholds.max_black_frame_ratio:.2%}"
+        )
     if repeated_ratio >= thresholds.max_repeated_frame_ratio:
         result.warnings.append(
-            f"Repeated frame ratio {repeated_ratio:.2%} exceeds threshold {thresholds.max_repeated_frame_ratio:.2%}")
+            f"Repeated frame ratio {repeated_ratio:.2%} exceeds threshold {thresholds.max_repeated_frame_ratio:.2%}"
+        )
     if motion_ent < thresholds.min_motion_entropy:
         result.warnings.append(
-            f"Motion entropy {motion_ent:.4f} below threshold {thresholds.min_motion_entropy}")
+            f"Motion entropy {motion_ent:.4f} below threshold {thresholds.min_motion_entropy}"
+        )
 
     result.is_valid = len(result.warnings) == 0 and len(result.errors) == 0
     return result
@@ -308,20 +344,33 @@ def validate_clip(
 def build_parser() -> argparse.ArgumentParser:
     """Build the argument parser for the CLI."""
     parser = argparse.ArgumentParser(
-        description="Strict clip-level validator for video/audio quality.")
+        description="Strict clip-level validator for video/audio quality."
+    )
     parser.add_argument("video_path", type=str, help="Path to the video file.")
-    parser.add_argument("--sample-interval", type=float, default=1.0,
-                        help="Seconds between sampled frames (default: 1.0).")
-    parser.add_argument("--max-audio-mute", type=float, default=0.95,
-                        help="Maximum allowed audio mute ratio.")
-    parser.add_argument("--max-audio-silent", type=float, default=0.90,
-                        help="Maximum allowed audio silent ratio.")
-    parser.add_argument("--max-black-frame", type=float, default=0.80,
-                        help="Maximum allowed black frame ratio.")
-    parser.add_argument("--max-repeated-frame", type=float, default=0.50,
-                        help="Maximum allowed repeated frame ratio.")
-    parser.add_argument("--min-motion-entropy", type=float, default=0.1,
-                        help="Minimum required motion entropy.")
+    parser.add_argument(
+        "--sample-interval",
+        type=float,
+        default=1.0,
+        help="Seconds between sampled frames (default: 1.0).",
+    )
+    parser.add_argument(
+        "--max-audio-mute", type=float, default=0.95, help="Maximum allowed audio mute ratio."
+    )
+    parser.add_argument(
+        "--max-audio-silent", type=float, default=0.90, help="Maximum allowed audio silent ratio."
+    )
+    parser.add_argument(
+        "--max-black-frame", type=float, default=0.80, help="Maximum allowed black frame ratio."
+    )
+    parser.add_argument(
+        "--max-repeated-frame",
+        type=float,
+        default=0.50,
+        help="Maximum allowed repeated frame ratio.",
+    )
+    parser.add_argument(
+        "--min-motion-entropy", type=float, default=0.1, help="Minimum required motion entropy."
+    )
     parser.add_argument("--json", action="store_true", help="Output as JSON.")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose logging.")
     return parser
@@ -347,8 +396,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
 
     try:
-        result = validate_clip(args.video_path, thresholds=thresholds,
-                               sample_interval=args.sample_interval)
+        result = validate_clip(
+            args.video_path, thresholds=thresholds, sample_interval=args.sample_interval
+        )
     except Exception as exc:
         logger.error("Validation failed: %s", exc)
         return 2
