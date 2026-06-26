@@ -78,8 +78,10 @@ def _extract_list(metadata: Dict[str, Any], key: str, cast: type) -> List[Any]:
 
 
 def _compute_offsets(
-    prev_end_ts: float, prev_end_fid: int,
-    clip_ts: List[float], clip_fids: List[int],
+    prev_end_ts: float,
+    prev_end_fid: int,
+    clip_ts: List[float],
+    clip_fids: List[int],
 ) -> Tuple[float, int]:
     """Compute timestamp and frame_id offsets for monotonic continuity."""
     if not clip_ts:
@@ -111,8 +113,7 @@ def _adjust_annotations(annotations: Dict[str, Any], fid_off: int) -> Dict[str, 
     frames_map = adj.get("frames", {})
     if isinstance(frames_map, dict):
         adj["frames"] = {
-            str(int(k) + fid_off) if k.isdigit() else k: v
-            for k, v in frames_map.items()
+            str(int(k) + fid_off) if k.isdigit() else k: v for k, v in frames_map.items()
         }
     if isinstance(adj.get("annotations"), list):
         for ann in adj["annotations"]:
@@ -198,22 +199,29 @@ def stitch_clips(
             if isinstance(sa, list):
                 merged_ann["annotations"].extend(sa)
 
-        entries.append({
-            "clip_index": idx, "clip_path": str(clip_dir), "num_frames": n,
-            "timestamp_offset": round(ts_off, 6), "frame_id_offset": fid_off,
-            "first_timestamp": a_ts[0] if a_ts else None,
-            "last_timestamp": a_ts[-1] if a_ts else None,
-            "first_frame_id": a_fids[0] if a_fids else None,
-            "last_frame_id": a_fids[-1] if a_fids else None,
-        })
+        entries.append(
+            {
+                "clip_index": idx,
+                "clip_path": str(clip_dir),
+                "num_frames": n,
+                "timestamp_offset": round(ts_off, 6),
+                "frame_id_offset": fid_off,
+                "first_timestamp": a_ts[0] if a_ts else None,
+                "last_timestamp": a_ts[-1] if a_ts else None,
+                "first_frame_id": a_fids[0] if a_fids else None,
+                "last_frame_id": a_fids[-1] if a_fids else None,
+            }
+        )
         if a_ts:
             prev_ts = a_ts[-1]
         if a_fids:
             prev_fid = a_fids[-1]
 
     merged_meta: Dict[str, Any] = {
-        "num_clips": len(clip_dirs), "total_frames": len(all_ts),
-        "timestamps": all_ts, "frame_ids": all_fids,
+        "num_clips": len(clip_dirs),
+        "total_frames": len(all_ts),
+        "timestamps": all_ts,
+        "frame_ids": all_fids,
     }
     if all_frames_meta:
         merged_meta["frames"] = all_frames_meta
@@ -227,9 +235,12 @@ def stitch_clips(
         _save_json(output_dir / ANNOTATIONS_FILENAME, merged_ann)
 
     manifest: Dict[str, Any] = {
-        "tool": "multi_clip_stitcher", "version": "1.0.0",
-        "num_clips": len(clip_dirs), "total_frames": len(all_ts),
-        "output_dir": str(output_dir), "clips": entries,
+        "tool": "multi_clip_stitcher",
+        "version": "1.0.0",
+        "num_clips": len(clip_dirs),
+        "total_frames": len(all_ts),
+        "output_dir": str(output_dir),
+        "clips": entries,
         "timestamp_range": [all_ts[0] if all_ts else None, all_ts[-1] if all_ts else None],
         "frame_id_range": [all_fids[0] if all_fids else None, all_fids[-1] if all_fids else None],
     }
@@ -244,6 +255,7 @@ def _load_manifest(manifest_path: Path) -> List[Path]:
     if manifest_path.suffix.lower() in {".yaml", ".yml"}:
         try:
             import yaml  # lazy import
+
             data = yaml.safe_load(text)
         except ImportError:
             logger.error("PyYAML not installed; cannot parse YAML manifest.")
@@ -277,7 +289,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
-    clip_dirs = _load_manifest(args.manifest) if args.manifest else [p.resolve() for p in args.clips]
+    clip_dirs = (
+        _load_manifest(args.manifest) if args.manifest else [p.resolve() for p in args.clips]
+    )
     for cd in clip_dirs:
         if not cd.is_dir():
             logger.error("Clip directory does not exist: %s", cd)
