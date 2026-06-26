@@ -40,24 +40,42 @@ logger = logging.getLogger("g203.buyer_signup")
 class CompanyInfo:
     """Company information for buyer signup."""
 
-    def __init__(self, name: str, address: str, city: str, state: str,
-                 zip_code: str, country: str, tax_id: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        name: str,
+        address: str,
+        city: str,
+        state: str,
+        zip_code: str,
+        country: str,
+        tax_id: Optional[str] = None,
+    ) -> None:
         self.name, self.address, self.city = name, address, city
         self.state, self.zip_code, self.country = state, zip_code, country
         self.tax_id = tax_id
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"name": self.name, "address": self.address, "city": self.city,
-                "state": self.state, "zip_code": self.zip_code,
-                "country": self.country, "tax_id": self.tax_id}
+        return {
+            "name": self.name,
+            "address": self.address,
+            "city": self.city,
+            "state": self.state,
+            "zip_code": self.zip_code,
+            "country": self.country,
+            "tax_id": self.tax_id,
+        }
 
     def validate(self) -> List[str]:
         errors: List[str] = []
         if not self.name or len(self.name.strip()) < 2:
             errors.append("Company name must be at least 2 characters")
-        for label, value in [("Address", self.address), ("City", self.city),
-                             ("State", self.state), ("ZIP", self.zip_code),
-                             ("Country", self.country)]:
+        for label, value in [
+            ("Address", self.address),
+            ("City", self.city),
+            ("State", self.state),
+            ("ZIP", self.zip_code),
+            ("Country", self.country),
+        ]:
             if not value or not value.strip():
                 errors.append(f"{label} is required")
         return errors
@@ -66,14 +84,25 @@ class CompanyInfo:
 class SalesContact:
     """Sales contact information for a buyer."""
 
-    def __init__(self, first_name: str, last_name: str, email: str,
-                 phone: Optional[str] = None, title: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        first_name: str,
+        last_name: str,
+        email: str,
+        phone: Optional[str] = None,
+        title: Optional[str] = None,
+    ) -> None:
         self.first_name, self.last_name, self.email = first_name, last_name, email
         self.phone, self.title = phone, title
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"first_name": self.first_name, "last_name": self.last_name,
-                "email": self.email, "phone": self.phone, "title": self.title}
+        return {
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "email": self.email,
+            "phone": self.phone,
+            "title": self.title,
+        }
 
     def validate(self) -> List[str]:
         errors: List[str] = []
@@ -91,16 +120,21 @@ def _b64url(data: bytes) -> str:
     return urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
 
 
-def generate_jwt(buyer_id: str, company_name: str, email: str,
-                 secret: str = JWT_SECRET_DEFAULT) -> str:
+def generate_jwt(
+    buyer_id: str, company_name: str, email: str, secret: str = JWT_SECRET_DEFAULT
+) -> str:
     """Generate a minimal HS256 JWT token for the buyer."""
     header = {"alg": "HS256", "typ": "JWT"}
     now = datetime.datetime.utcnow()
     expiry = now + datetime.timedelta(hours=TOKEN_EXPIRY_HOURS)
     payload = {
-        "sub": buyer_id, "company": company_name, "email": email,
-        "iat": int(now.timestamp()), "exp": int(expiry.timestamp()),
-        "jti": str(uuid.uuid4()), "scope": ["buyer", "sample-clip:download"],
+        "sub": buyer_id,
+        "company": company_name,
+        "email": email,
+        "iat": int(now.timestamp()),
+        "exp": int(expiry.timestamp()),
+        "jti": str(uuid.uuid4()),
+        "scope": ["buyer", "sample-clip:download"],
     }
     h = _b64url(json.dumps(header, separators=(",", ":")).encode())
     p = _b64url(json.dumps(payload, separators=(",", ":")).encode())
@@ -127,40 +161,67 @@ def _ensure_db(db_path: str) -> sqlite3.Connection:
     return conn
 
 
-def insert_buyer(conn: sqlite3.Connection, buyer_id: str,
-                 company: CompanyInfo, contact: SalesContact,
-                 jwt_token: str) -> None:
+def insert_buyer(
+    conn: sqlite3.Connection,
+    buyer_id: str,
+    company: CompanyInfo,
+    contact: SalesContact,
+    jwt_token: str,
+) -> None:
     """Insert a new buyer row into the database."""
     now = datetime.datetime.utcnow().isoformat() + "Z"
-    conn.execute("""
+    conn.execute(
+        """
         INSERT INTO buyers (buyer_id, company_name, company_addr, company_city,
             company_state, company_zip, company_country, company_tax_id,
             contact_first, contact_last, contact_email, contact_phone,
             contact_title, jwt_token, sample_clip_granted, created_at, updated_at)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)""",
-        (buyer_id, company.name, company.address, company.city,
-         company.state, company.zip_code, company.country, company.tax_id,
-         contact.first_name, contact.last_name, contact.email,
-         contact.phone, contact.title, jwt_token, now, now))
+        (
+            buyer_id,
+            company.name,
+            company.address,
+            company.city,
+            company.state,
+            company.zip_code,
+            company.country,
+            company.tax_id,
+            contact.first_name,
+            contact.last_name,
+            contact.email,
+            contact.phone,
+            contact.title,
+            jwt_token,
+            now,
+            now,
+        ),
+    )
     conn.commit()
 
 
-def write_audit(audit_path: str, buyer_id: str, action: str,
-                details: Optional[Dict[str, Any]] = None) -> None:
+def write_audit(
+    audit_path: str, buyer_id: str, action: str, details: Optional[Dict[str, Any]] = None
+) -> None:
     """Append a JSON-lines audit record."""
     os.makedirs(os.path.dirname(audit_path) or ".", exist_ok=True)
-    record = {"timestamp": datetime.datetime.utcnow().isoformat() + "Z",
-              "buyer_id": buyer_id, "action": action, "details": details or {}}
+    record = {
+        "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+        "buyer_id": buyer_id,
+        "action": action,
+        "details": details or {},
+    }
     with open(audit_path, "a", encoding="utf-8") as fh:
         fh.write(json.dumps(record, separators=(",", ":")) + "\n")
 
 
-def grant_sample_clip(conn: sqlite3.Connection, buyer_id: str,
-                      clip_id: str = SAMPLE_CLIP_ID) -> None:
+def grant_sample_clip(
+    conn: sqlite3.Connection, buyer_id: str, clip_id: str = SAMPLE_CLIP_ID
+) -> None:
     """Mark the sample-clip download grant for the buyer."""
-    conn.execute("UPDATE buyers SET sample_clip_granted=1, updated_at=? "
-                 "WHERE buyer_id=?",
-                 (datetime.datetime.utcnow().isoformat() + "Z", buyer_id))
+    conn.execute(
+        "UPDATE buyers SET sample_clip_granted=1, updated_at=? WHERE buyer_id=?",
+        (datetime.datetime.utcnow().isoformat() + "Z", buyer_id),
+    )
     conn.commit()
     logger.info("Granted sample-clip '%s' to buyer '%s'", clip_id, buyer_id)
 
@@ -169,7 +230,8 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the argparse CLI parser."""
     p = argparse.ArgumentParser(
         prog="buyer_signup_flow",
-        description="G203 Buyer Signup: register company + contact, issue JWT, grant sample clip.")
+        description="G203 Buyer Signup: register company + contact, issue JWT, grant sample clip.",
+    )
     p.add_argument("--company-name", required=True, help="Company legal name")
     p.add_argument("--company-address", required=True, help="Street address")
     p.add_argument("--company-city", required=True, help="City")
@@ -202,13 +264,22 @@ def main(argv: Optional[List[str]] = None) -> int:
     audit_path = args.audit_path or os.environ.get(AUDIT_PATH_ENV, AUDIT_PATH_DEFAULT)
     jwt_secret = args.jwt_secret or os.environ.get(JWT_SECRET_ENV, JWT_SECRET_DEFAULT)
 
-    company = CompanyInfo(args.company_name, args.company_address,
-                          args.company_city, args.company_state,
-                          args.company_zip, args.company_country,
-                          args.company_tax_id)
-    contact = SalesContact(args.contact_first, args.contact_last,
-                           args.contact_email, args.contact_phone,
-                           args.contact_title)
+    company = CompanyInfo(
+        args.company_name,
+        args.company_address,
+        args.company_city,
+        args.company_state,
+        args.company_zip,
+        args.company_country,
+        args.company_tax_id,
+    )
+    contact = SalesContact(
+        args.contact_first,
+        args.contact_last,
+        args.contact_email,
+        args.contact_phone,
+        args.contact_title,
+    )
 
     errors = company.validate() + contact.validate()
     if errors:
@@ -231,13 +302,23 @@ def main(argv: Optional[List[str]] = None) -> int:
         grant_sample_clip(conn, buyer_id)
         conn.close()
 
-        write_audit(audit_path, buyer_id, "buyer_signup", {
-            "company": company.to_dict(), "contact": contact.to_dict(),
-            "sample_clip_id": SAMPLE_CLIP_ID})
+        write_audit(
+            audit_path,
+            buyer_id,
+            "buyer_signup",
+            {
+                "company": company.to_dict(),
+                "contact": contact.to_dict(),
+                "sample_clip_id": SAMPLE_CLIP_ID,
+            },
+        )
 
         logger.info("Buyer signup complete: id=%s", buyer_id)
-        print(json.dumps({"buyer_id": buyer_id, "jwt_token": jwt_token,
-                          "sample_clip_id": SAMPLE_CLIP_ID}))
+        print(
+            json.dumps(
+                {"buyer_id": buyer_id, "jwt_token": jwt_token, "sample_clip_id": SAMPLE_CLIP_ID}
+            )
+        )
         return 0
     except Exception as exc:
         logger.error("Signup failed: %s", exc, exc_info=True)
