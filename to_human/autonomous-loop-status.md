@@ -800,3 +800,9 @@ b4c97dbd638c75a1d826e641df598879876660ed
 
 - Picked: ruff format bin/prd_test_video_no_ui.py (smallest unformatted bin file: 182 lines, multi-line list formatting, line wrapping). Justification: measurable code smell, single-file scope, no behavior change, module import smoke OK, no risk of test masking, follows established cadence.
 - Result: committed 56d67838 (ruff format added blank lines between function defs, multi-line list/collection formatting, and line wrapping in bin/prd_test_video_no_ui.py; 1 file changed, 59 insertions(+), 19 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.)
+
+
+## Round 336 @ 2026-06-26T00:58:04Z
+
+- Picked: ruff format bin/prd_test_stationary_threshold.py (smallest unformatted bin file at 183 lines; collapsed 5-line parenthesized list literal in _run_tests scenario 5 into a single line). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change, no test references this file (no test-masking risk), module import smoke OK + AST parse OK + py_compile OK, follows established cadence of small-bin-file formats (Rounds 254–335).
+- Result: committed 3ec54eb2 (ruff format collapsed split_burst parenthesized list literal from 5 lines to 1 in bin/prd_test_stationary_threshold.py; 1 file changed, 1 insertion(+), 5 deletions(-); ruff check + format --check clean; import smoke OK; 538/538 tests/bin/ pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — list concatenation is associative so behavior identical, no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
