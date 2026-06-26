@@ -31,6 +31,7 @@ except ImportError:
 # Data loading
 # ---------------------------------------------------------------------------
 
+
 def _load_csv(path: Path) -> List[Dict[str, str]]:
     """Return list of row-dicts from a CSV file."""
     with open(path, newline="", encoding="utf-8") as fh:
@@ -77,6 +78,7 @@ def load_records(path: Path) -> List[Dict[str, Any]]:
 # Analysis
 # ---------------------------------------------------------------------------
 
+
 def _normalize(value: Any) -> str:
     """Coerce a metadata value to a lowercase, stripped string."""
     return str(value).strip().lower()
@@ -110,6 +112,7 @@ def flag_undersampled(
 # Reporting
 # ---------------------------------------------------------------------------
 
+
 def print_report(
     dist: Dict[str, float],
     undersampled: List[str],
@@ -118,9 +121,9 @@ def print_report(
     threshold: float,
 ) -> None:
     """Print a human-readable distribution table to stdout."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  {field.upper()}  (per {per_k} clips, threshold={threshold:.0%})")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     for cat, count in dist.items():
         flag = " ⚠ UNDERSAMPLED" if cat in undersampled else ""
         print(f"  {cat:<20s} {count:>8.1f}{flag}")
@@ -133,6 +136,7 @@ def print_report(
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def build_parser() -> argparse.ArgumentParser:
     """Construct the argument parser."""
     p = argparse.ArgumentParser(
@@ -142,7 +146,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--biome-col", default="biome", help="Column name for biome (default: biome)")
     p.add_argument("--tod-col", default="time_of_day", help="Column name for time-of-day")
     p.add_argument("--weather-col", default="weather", help="Column name for weather")
-    p.add_argument("--per-k", type=int, default=1000, help="Normalise to per-K clips (default: 1000)")
+    p.add_argument(
+        "--per-k", type=int, default=1000, help="Normalise to per-K clips (default: 1000)"
+    )
     p.add_argument(
         "--threshold",
         type=float,
