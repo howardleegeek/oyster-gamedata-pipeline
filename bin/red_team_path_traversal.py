@@ -38,9 +38,7 @@ def is_path_traversal(name: str, base_dir: Path) -> bool:
         return True
 
 
-def extract_tarball_safely(
-    tar_path: Path, dest_dir: Path
-) -> Tuple[bool, List[str]]:
+def extract_tarball_safely(tar_path: Path, dest_dir: Path) -> Tuple[bool, List[str]]:
     """
     Extract a tarball with path traversal protection.
 
@@ -59,9 +57,7 @@ def extract_tarball_safely(
             for member in tar.getmembers():
                 # Check for path traversal attempt
                 if is_path_traversal(member.name, dest_dir):
-                    errors.append(
-                        f"BLOCKED: Path traversal detected in '{member.name}'"
-                    )
+                    errors.append(f"BLOCKED: Path traversal detected in '{member.name}'")
                     continue
 
                 # Safe to extract
@@ -129,12 +125,8 @@ def main(argv: List[str]) -> int:
     Returns:
         Exit code: 0 for success, 1 for failure.
     """
-    parser = argparse.ArgumentParser(
-        description="Red team test: verify path traversal rejection"
-    )
-    parser.add_argument(
-        "--verbose", "-v", action="store_true", help="Enable verbose output"
-    )
+    parser = argparse.ArgumentParser(description="Red team test: verify path traversal rejection")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
     parser.add_argument(
         "--create-only",
         action="store_true",
@@ -167,10 +159,7 @@ def main(argv: List[str]) -> int:
         blocked_count = sum(1 for m in messages if "BLOCKED" in m)
 
         if blocked_count > 0:
-            print(
-                f"SUCCESS: Path traversal attack blocked ({blocked_count} "
-                f"entries rejected)"
-            )
+            print(f"SUCCESS: Path traversal attack blocked ({blocked_count} entries rejected)")
             return 0
         else:
             print("FAILURE: Path traversal attack was NOT blocked!")
