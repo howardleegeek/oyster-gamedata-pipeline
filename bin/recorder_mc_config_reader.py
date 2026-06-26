@@ -54,6 +54,7 @@ CLI:
     python recorder_mc_config_reader.py             # human readable
     python recorder_mc_config_reader.py --json      # machine readable
 """
+
 from __future__ import annotations
 
 import json
@@ -145,7 +146,14 @@ def _parse_options_txt(path: Path, warnings: List[str]) -> Dict[str, Any]:
             warnings.append(f"guiScale not int: {parsed['guiScale']!r}")
     width = parsed.get("overrideWidth")
     height = parsed.get("overrideHeight")
-    if width and height and width.isdigit() and height.isdigit() and int(width) > 0 and int(height) > 0:
+    if (
+        width
+        and height
+        and width.isdigit()
+        and height.isdigit()
+        and int(width) > 0
+        and int(height) > 0
+    ):
         out["screen_resolution"] = f"{int(width)}x{int(height)}"
     elif "fullscreenResolution" in parsed and "x" in parsed["fullscreenResolution"]:
         out["screen_resolution"] = parsed["fullscreenResolution"].split("@", 1)[0]
@@ -198,7 +206,9 @@ def read_mc_config(minecraft_dir: Optional[Path] = None) -> Dict[str, Any]:
     if not options_path.is_file():
         warnings.append(f"options.txt missing at {options_path}")
     profiles_path = mc_dir / "launcher_profiles.json"
-    username = _parse_launcher_profiles(profiles_path, warnings) if profiles_path.is_file() else None
+    username = (
+        _parse_launcher_profiles(profiles_path, warnings) if profiles_path.is_file() else None
+    )
     return {
         "character_name": username or DEFAULT_CHARACTER_NAME,
         "fov_degrees": parsed.get("fov_degrees", DEFAULT_FOV_DEGREES),
