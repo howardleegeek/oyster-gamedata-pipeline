@@ -53,10 +53,20 @@ class ClockAdapter:
 
     @property
     def skew_detected(self) -> bool:
+        """Check if clock skew was detected.
+
+        Returns:
+            True if backward time jump beyond threshold was detected.
+        """
         return self._state.skew_detected
 
     @property
     def skew_amount(self) -> float:
+        """Get the detected clock skew amount in seconds.
+
+        Returns:
+            Negative value indicating seconds system clock jumped backward.
+        """
         return self._state.skew_amount
 
     def get_time(self) -> float:
