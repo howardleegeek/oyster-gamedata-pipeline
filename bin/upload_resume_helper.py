@@ -11,6 +11,7 @@ Usage:
     python3 upload_resume_helper.py abort --bucket B --key K --upload-id U
     python3 upload_resume_helper.py list-parts --bucket B --key K --upload-id U
 """
+
 from __future__ import annotations
 
 import argparse
@@ -26,7 +27,7 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 DEFAULT_PART_SIZE = 50 * 1024 * 1024  # 50 MiB
-MIN_PART_SIZE = 5 * 1024 * 1024       # 5 MiB (S3 minimum)
+MIN_PART_SIZE = 5 * 1024 * 1024  # 5 MiB (S3 minimum)
 MAX_PARTS = 10_000
 CHECKPOINT_SUFFIX = ".upload_checkpoint.json"
 
@@ -41,6 +42,7 @@ def _import_boto3():
     if _boto3 is None:
         import boto3
         import botocore.exceptions
+
         _boto3 = boto3
         _botocore_exceptions = botocore.exceptions
     return _boto3, _botocore_exceptions
@@ -49,6 +51,7 @@ def _import_boto3():
 @dataclass
 class PartInfo:
     """Metadata for a single uploaded part."""
+
     part_number: int
     etag: str
     size: int
@@ -57,6 +60,7 @@ class PartInfo:
 @dataclass
 class CheckpointState:
     """Serializable checkpoint for a multipart upload session."""
+
     upload_id: str
     bucket: str
     key: str
@@ -124,16 +128,15 @@ def get_s3_client():
     return boto3.client("s3")
 
 
-def initiate_upload(bucket: str, key: str, file_path: str,
-                    part_size: int) -> CheckpointState:
+def initiate_upload(bucket: str, key: str, file_path: str, part_size: int) -> CheckpointState:
     """Initiate a new multipart upload and return checkpoint state."""
     s3 = get_s3_client()
     file_size = os.path.getsize(file_path)
     part_size = compute_part_size(file_size, part_size)
-    
+
     resp = s3.create_multipart_upload(Bucket=bucket, Key=key)
     upload_id = resp["UploadId"]
-    
+
     checkpoint = CheckpointState(
         upload_id=upload_id,
         bucket=bucket,
@@ -147,8 +150,7 @@ def initiate_upload(bucket: str, key: str, file_path: str,
     return checkpoint
 
 
-def upload_part(checkpoint: CheckpointState, part_number: int,
-                data: bytes) -> PartInfo:
+def upload_part(checkpoint: CheckpointState, part_number: int, data: bytes) -> PartInfo:
     """Upload a single part and return its info."""
     s3 = get_s3_client()
     resp = s3.upload_part(
@@ -166,8 +168,10 @@ def upload_part(checkpoint: CheckpointState, part_number: int,
 def complete_upload(checkpoint: CheckpointState) -> None:
     """Complete the multipart upload."""
     s3 = get_s3_client()
-    parts = [{"PartNumber": p.part_number, "ETag": p.etag}
-             for p in sorted(checkpoint.parts, key=lambda x: x.part_number)]
+    parts = [
+        {"PartNumber": p.part_number, "ETag": p.etag}
+        for p in sorted(checkpoint.parts, key=lambda x: x.part_number)
+    ]
     s3.complete_multipart_upload(
         Bucket=checkpoint.bucket,
         Key=checkpoint.key,
@@ -194,19 +198,19 @@ def list_parts(bucket: str, key: str, upload_id: str) -> List[Dict[str, Any]]:
     parts = []
     resp = s3.list_parts(Bucket=bucket, Key=key, UploadId=upload_id)
     for p in resp.get("Parts", []):
-        parts.append({
-            "PartNumber": p["PartNumber"],
-            "ETag": p["ETag"],
-            "Size": p["Size"],
-        })
+        parts.append(
+            {
+                "PartNumber": p["PartNumber"],
+                "ETag": p["ETag"],
+                "Size": p["Size"],
+            }
+        )
     return parts
 
 
 def do_upload(args) -> int:
     """Execute upload command."""
-    checkpoint = initiate_upload(
-        args.bucket, args.key, args.file, args.part_size
-    )
+    checkpoint = initiate_upload(args.bucket, args.key, args.file, args.part_size)
     return do_resume_internal(checkpoint)
 
 
@@ -221,27 +225,26 @@ def do_resume_internal(checkpoint: CheckpointState) -> int:
     if not os.path.exists(checkpoint.file_path):
         logger.error("Source file not found: %s", checkpoint.file_path)
         return 1
-    
+
     completed_parts = {p.part_number for p in checkpoint.parts}
-    total_parts = (checkpoint.file_size + checkpoint.part_size - 1)
+    total_parts = checkpoint.file_size + checkpoint.part_size - 1
     total_parts = total_parts // checkpoint.part_size
-    
+
     with open(checkpoint.file_path, "rb") as fh:
         for part_num in range(1, total_parts + 1):
             if part_num in completed_parts:
                 logger.info("Skipping completed part %d/%d", part_num, total_parts)
                 continue
-            
+
             offset = (part_num - 1) * checkpoint.part_size
             fh.seek(offset)
             data = fh.read(checkpoint.part_size)
-            
-            logger.info("Uploading part %d/%d (%d bytes)",
-                       part_num, total_parts, len(data))
+
+            logger.info("Uploading part %d/%d (%d bytes)", part_num, total_parts, len(data))
             part_info = upload_part(checkpoint, part_num, data)
             checkpoint.parts.append(part_info)
             checkpoint.save()
-    
+
     complete_upload(checkpoint)
     return 0
 
@@ -262,48 +265,44 @@ def do_list_parts(args) -> int:
 
 def main(argv: Optional[List[str]] = None) -> int:
     """Main entry point with argparse CLI."""
-    parser = argparse.ArgumentParser(
-        description="Resumable S3 multipart upload helper"
-    )
-    parser.add_argument("-v", "--verbose", action="store_true",
-                       help="Enable verbose logging")
-    
+    parser = argparse.ArgumentParser(description="Resumable S3 multipart upload helper")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
+
     sub = parser.add_subparsers(dest="command", required=True)
-    
+
     # upload command
     up = sub.add_parser("upload", help="Start a new multipart upload")
     up.add_argument("--bucket", required=True, help="S3 bucket name")
     up.add_argument("--key", required=True, help="S3 object key")
     up.add_argument("--file", required=True, help="Local file to upload")
-    up.add_argument("--part-size", type=int, default=DEFAULT_PART_SIZE,
-                   help="Part size in bytes")
+    up.add_argument("--part-size", type=int, default=DEFAULT_PART_SIZE, help="Part size in bytes")
     up.set_defaults(func=do_upload)
-    
+
     # resume command
     res = sub.add_parser("resume", help="Resume from checkpoint")
     res.add_argument("--checkpoint", required=True, help="Checkpoint file path")
     res.set_defaults(func=do_resume)
-    
+
     # abort command
     ab = sub.add_parser("abort", help="Abort an upload")
     ab.add_argument("--bucket", required=True)
     ab.add_argument("--key", required=True)
     ab.add_argument("--upload-id", required=True)
     ab.set_defaults(func=do_abort)
-    
+
     # list-parts command
     lp = sub.add_parser("list-parts", help="List uploaded parts")
     lp.add_argument("--bucket", required=True)
     lp.add_argument("--key", required=True)
     lp.add_argument("--upload-id", required=True)
     lp.set_defaults(func=do_list_parts)
-    
+
     args = parser.parse_args(argv)
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(asctime)s %(levelname)s %(message)s"
+        format="%(asctime)s %(levelname)s %(message)s",
     )
-    
+
     return args.func(args)
 
 
