@@ -61,9 +61,7 @@ RUNTIME_MANIFEST_PATH = JRE_DIR / "manifest.json"
 DOWNLOAD_TIMEOUT_SEC = 120
 DOWNLOAD_RETRIES = 3
 DOWNLOAD_CHUNK = 1 << 16  # 64 KiB
-USER_AGENT = (
-    "oyster-agent-runner-bundled-installer/1.0 (+https://github.com/adoptium)"
-)
+USER_AGENT = "oyster-agent-runner-bundled-installer/1.0 (+https://github.com/adoptium)"
 
 
 # ---------------------------------------------------------------------------
@@ -164,9 +162,7 @@ def _download_with_retries(url: str, dest: Path) -> None:
                 _log(f"retrying in {backoff}s")
                 time.sleep(backoff)
 
-    raise RuntimeError(
-        f"download failed after {DOWNLOAD_RETRIES} attempts: {last_exc}"
-    )
+    raise RuntimeError(f"download failed after {DOWNLOAD_RETRIES} attempts: {last_exc}")
 
 
 def _verify_sha(path: Path, expected: str) -> None:
@@ -214,9 +210,7 @@ def _extract_flat(zip_path: Path, dest_dir: Path) -> Path:
         for member in zf.namelist():
             normalized = os.path.normpath(member).replace("\\", "/")
             if normalized.startswith(("..", "/")) or ":" in normalized:
-                raise RuntimeError(
-                    f"refusing to extract suspicious zip entry: {member!r}"
-                )
+                raise RuntimeError(f"refusing to extract suspicious zip entry: {member!r}")
         zf.extractall(staging)
 
     # Identify the single top-level directory.
@@ -243,9 +237,7 @@ def _verify_post_extract(jre_dir: Path, required_relpaths: list[str]) -> None:
     bin_dir = jre_dir / "bin"
     if not bin_dir.is_dir():
         contents = (
-            sorted(p.name for p in jre_dir.iterdir())
-            if jre_dir.is_dir()
-            else "<jre_dir missing>"
+            sorted(p.name for p in jre_dir.iterdir()) if jre_dir.is_dir() else "<jre_dir missing>"
         )
         _err(f"bundle/jre/bin/ missing after extraction (jre/ contents: {contents})")
         sys.exit(3)
@@ -257,10 +249,7 @@ def _verify_post_extract(jre_dir: Path, required_relpaths: list[str]) -> None:
 
     if missing:
         _err(f"required JRE artifacts missing: {missing}")
-        _err(
-            "  bin/ contents: "
-            f"{sorted(p.name for p in bin_dir.iterdir())[:20]}"
-        )
+        _err(f"  bin/ contents: {sorted(p.name for p in bin_dir.iterdir())[:20]}")
         sys.exit(3)
 
     _log(f"post-extract verification OK ({len(required_relpaths)} required paths)")
@@ -277,9 +266,7 @@ def _dir_size_bytes(root: Path) -> int:
     return total
 
 
-def _write_runtime_manifest(
-    jre_dir: Path, zip_path: Path, pin: dict[str, Any]
-) -> None:
+def _write_runtime_manifest(jre_dir: Path, zip_path: Path, pin: dict[str, Any]) -> None:
     """Emit bundle/jre/manifest.json — runtime provenance record.
 
     Includes both the build-time pin (so consumers can verify what was
@@ -307,9 +294,7 @@ def _write_runtime_manifest(
             "verified_files": pin["post_extract_required_files"],
         },
     }
-    RUNTIME_MANIFEST_PATH.write_text(
-        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
-    )
+    RUNTIME_MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     _log(f"wrote {RUNTIME_MANIFEST_PATH.relative_to(REPO_ROOT)}")
 
 
