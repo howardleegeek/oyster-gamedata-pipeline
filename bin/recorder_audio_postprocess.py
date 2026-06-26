@@ -26,6 +26,7 @@ post-processing on existing clip directories without re-recording.
 
 Spec: G260 (W31 wave). PP1 priority. ~140 lines.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -64,9 +65,7 @@ def find_clip_video(clip_dir: Path) -> Path:
         return canonical.resolve()
     candidates = sorted(p for p in clip_dir.glob("*.mp4") if p.is_file())
     if not candidates:
-        raise FileNotFoundError(
-            f"No video.mp4 (or *.mp4) inside clip directory: {clip_dir}"
-        )
+        raise FileNotFoundError(f"No video.mp4 (or *.mp4) inside clip directory: {clip_dir}")
     return candidates[0].resolve()
 
 
@@ -93,29 +92,27 @@ def extract_audio_track(
         RuntimeError: ffmpeg returned a non-zero exit code.
     """
     if shutil.which(ffmpeg_bin) is None:
-        raise FileNotFoundError(
-            f"ffmpeg binary '{ffmpeg_bin}' not found on PATH"
-        )
+        raise FileNotFoundError(f"ffmpeg binary '{ffmpeg_bin}' not found on PATH")
 
     cmd = [
         ffmpeg_bin,
         "-y",  # overwrite if exists
-        "-i", str(video_path),
+        "-i",
+        str(video_path),
         "-vn",  # drop video
-        "-ac", "1",  # mono
-        "-ar", str(sample_rate),  # downsample
-        "-acodec", "pcm_s16le",
+        "-ac",
+        "1",  # mono
+        "-ar",
+        str(sample_rate),  # downsample
+        "-acodec",
+        "pcm_s16le",
         str(out_wav),
     ]
     proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if proc.returncode != 0:
-        raise RuntimeError(
-            f"ffmpeg failed (rc={proc.returncode}): {proc.stderr[-512:]}"
-        )
+        raise RuntimeError(f"ffmpeg failed (rc={proc.returncode}): {proc.stderr[-512:]}")
     if not out_wav.is_file() or out_wav.stat().st_size == 0:
-        raise RuntimeError(
-            f"ffmpeg produced empty audio file: {out_wav}"
-        )
+        raise RuntimeError(f"ffmpeg produced empty audio file: {out_wav}")
     return out_wav
 
 
