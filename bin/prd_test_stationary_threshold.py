@@ -126,11 +126,7 @@ def _run_tests(fps: int, threshold_sec: float) -> int:
         print(f"PASS scenario 4: cutoff at frame {result} (exact threshold)")
 
     # Scenario 5: two short bursts separated by motion — no cutoff
-    split_burst = (
-        [0.0] * (threshold_frames // 2)
-        + [1.0] * 5
-        + [0.0] * (threshold_frames // 2)
-    )
+    split_burst = [0.0] * (threshold_frames // 2) + [1.0] * 5 + [0.0] * (threshold_frames // 2)
     result = detect_stationary_cutoff(split_burst, fps, threshold_sec)
     if result is not None:
         print(f"FAIL scenario 5: expected None, got cutoff at frame {result}")
