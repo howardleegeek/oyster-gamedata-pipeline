@@ -53,6 +53,7 @@ def _install_signal_handlers() -> None:
 # Metrics collection
 # ---------------------------------------------------------------------------
 
+
 def _read_proc_uptime(pid: Optional[int] = None) -> float:
     """Return process uptime in seconds.
 
@@ -137,6 +138,7 @@ def _collect_recorder_metrics(
 # HTTP posting
 # ---------------------------------------------------------------------------
 
+
 def _post_health(endpoint: str, payload: Dict[str, Any], timeout: float = 10.0) -> bool:
     """POST *payload* as JSON to *endpoint*.
 
@@ -164,6 +166,7 @@ def _post_health(endpoint: str, payload: Dict[str, Any], timeout: float = 10.0) 
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
+
 
 def _run_loop(
     endpoint: str,
@@ -197,6 +200,7 @@ def _run_loop(
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def main(argv: Optional[list[str]] = None) -> int:
     """Entry-point with argparse CLI.
