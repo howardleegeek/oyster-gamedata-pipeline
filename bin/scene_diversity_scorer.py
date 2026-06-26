@@ -37,6 +37,7 @@ def _get_numpy():
     global _np
     if _np is None:
         import numpy as np
+
         _np = np
     return _np
 
@@ -46,12 +47,14 @@ def _get_pil():
     global _pil_image
     if _pil_image is None:
         from PIL import Image
+
         _pil_image = Image
     return _pil_image
 
 
-def extract_frames(video_path: str, max_frames: int = 30,
-                   output_dir: Optional[str] = None) -> List[str]:
+def extract_frames(
+    video_path: str, max_frames: int = 30, output_dir: Optional[str] = None
+) -> List[str]:
     """Extract evenly-spaced frames from video using ffmpeg.
 
     Args:
@@ -66,9 +69,16 @@ def extract_frames(video_path: str, max_frames: int = 30,
         output_dir = tempfile.mkdtemp(prefix="scene_div_")
     os.makedirs(output_dir, exist_ok=True)
     cmd = [
-        "ffmpeg", "-y", "-i", video_path,
-        "-vf", "fps=1/5,scale=256:256",
-        "-frames:v", str(max_frames), "-q:v", "3",
+        "ffmpeg",
+        "-y",
+        "-i",
+        video_path,
+        "-vf",
+        "fps=1/5,scale=256:256",
+        "-frames:v",
+        str(max_frames),
+        "-q:v",
+        "3",
         os.path.join(output_dir, "frame_%04d.jpg"),
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
@@ -90,10 +100,12 @@ def compute_histogram(image_path: str, bins: int = 32) -> "np.ndarray":
     np = _get_numpy()
     img = _get_pil().open(image_path).convert("RGB")
     arr = np.array(img, dtype=np.float32) / 255.0
-    hist = np.concatenate([
-        np.histogram(arr[:, :, c], bins=bins, range=(0.0, 1.0))[0].astype(np.float32)
-        for c in range(3)
-    ])
+    hist = np.concatenate(
+        [
+            np.histogram(arr[:, :, c], bins=bins, range=(0.0, 1.0))[0].astype(np.float32)
+            for c in range(3)
+        ]
+    )
     return hist / (hist.sum() + 1e-10)
 
 
@@ -143,8 +155,9 @@ def compute_diversity_score(histograms: "np.ndarray") -> float:
     distances = []
     for i in range(n):
         for j in range(i + 1, n):
-            d = np.sum((histograms[i] - histograms[j]) ** 2 /
-                       (histograms[i] + histograms[j] + 1e-10))
+            d = np.sum(
+                (histograms[i] - histograms[j]) ** 2 / (histograms[i] + histograms[j] + 1e-10)
+            )
             distances.append(d)
     mean_dist = np.mean(distances) if distances else 0.0
     # Normalize to [0, 1] range (empirical scaling)
@@ -152,8 +165,9 @@ def compute_diversity_score(histograms: "np.ndarray") -> float:
     return float(score)
 
 
-def analyze_video(video_path: str, threshold: float = 0.35,
-                  max_frames: int = 30, bins: int = 32) -> dict:
+def analyze_video(
+    video_path: str, threshold: float = 0.35, max_frames: int = 30, bins: int = 32
+) -> dict:
     """Analyze video for scene diversity.
 
     Args:
@@ -167,18 +181,22 @@ def analyze_video(video_path: str, threshold: float = 0.35,
     """
     output_dir = tempfile.mkdtemp(prefix="scene_div_")
     try:
-        frame_paths = extract_frames(video_path, max_frames=max_frames,
-                                     output_dir=output_dir)
+        frame_paths = extract_frames(video_path, max_frames=max_frames, output_dir=output_dir)
         if not frame_paths:
-            return {"score": 0.0, "flagged": True, "frame_count": 0,
-                    "threshold": threshold, "error": "No frames extracted"}
+            return {
+                "score": 0.0,
+                "flagged": True,
+                "frame_count": 0,
+                "threshold": threshold,
+                "error": "No frames extracted",
+            }
         histograms = compute_frame_histograms(frame_paths, bins=bins)
         score = compute_diversity_score(histograms)
         return {
             "score": round(score, 4),
             "flagged": score < threshold,
             "frame_count": len(frame_paths),
-            "threshold": threshold
+            "threshold": threshold,
         }
     finally:
         # Cleanup extracted frames
@@ -193,8 +211,7 @@ def analyze_video(video_path: str, threshold: float = 0.35,
             pass
 
 
-def analyze_frames_dir(frames_dir: str, threshold: float = 0.35,
-                       bins: int = 32) -> dict:
+def analyze_frames_dir(frames_dir: str, threshold: float = 0.35, bins: int = 32) -> dict:
     """Analyze pre-extracted frames directory for scene diversity.
 
     Args:
@@ -205,20 +222,28 @@ def analyze_frames_dir(frames_dir: str, threshold: float = 0.35,
     Returns:
         Dict with score, flagged, frame_count, threshold.
     """
-    frame_paths = sorted([
-        str(f) for f in Path(frames_dir).iterdir()
-        if f.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp"}
-    ])
+    frame_paths = sorted(
+        [
+            str(f)
+            for f in Path(frames_dir).iterdir()
+            if f.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp"}
+        ]
+    )
     if not frame_paths:
-        return {"score": 0.0, "flagged": True, "frame_count": 0,
-                "threshold": threshold, "error": "No frames found"}
+        return {
+            "score": 0.0,
+            "flagged": True,
+            "frame_count": 0,
+            "threshold": threshold,
+            "error": "No frames found",
+        }
     histograms = compute_frame_histograms(frame_paths, bins=bins)
     score = compute_diversity_score(histograms)
     return {
         "score": round(score, 4),
         "flagged": score < threshold,
         "frame_count": len(frame_paths),
-        "threshold": threshold
+        "threshold": threshold,
     }
 
 
@@ -231,17 +256,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     Returns:
         Exit code (0 for success, non-zero for errors).
     """
-    parser = argparse.ArgumentParser(
-        description="Compute scene diversity score for video clips."
-    )
+    parser = argparse.ArgumentParser(description="Compute scene diversity score for video clips.")
     parser.add_argument("video", nargs="?", help="Path to video file")
     parser.add_argument("--frames-dir", help="Directory with pre-extracted frames")
-    parser.add_argument("--threshold", type=float, default=0.35,
-                        help="Diversity threshold for flagging (default: 0.35)")
-    parser.add_argument("--max-frames", type=int, default=30,
-                        help="Max frames to sample from video (default: 30)")
-    parser.add_argument("--bins", type=int, default=32,
-                        help="Histogram bins per channel (default: 32)")
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=0.35,
+        help="Diversity threshold for flagging (default: 0.35)",
+    )
+    parser.add_argument(
+        "--max-frames", type=int, default=30, help="Max frames to sample from video (default: 30)"
+    )
+    parser.add_argument(
+        "--bins", type=int, default=32, help="Histogram bins per channel (default: 32)"
+    )
     parser.add_argument("--output", "-o", help="Output JSON file (default: stdout)")
     args = parser.parse_args(argv)
 
@@ -250,11 +279,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     try:
         if args.frames_dir:
-            result = analyze_frames_dir(args.frames_dir, threshold=args.threshold,
-                                        bins=args.bins)
+            result = analyze_frames_dir(args.frames_dir, threshold=args.threshold, bins=args.bins)
         else:
-            result = analyze_video(args.video, threshold=args.threshold,
-                                   max_frames=args.max_frames, bins=args.bins)
+            result = analyze_video(
+                args.video, threshold=args.threshold, max_frames=args.max_frames, bins=args.bins
+            )
         output_json = json.dumps(result, indent=2)
         if args.output:
             Path(args.output).write_text(output_json)
