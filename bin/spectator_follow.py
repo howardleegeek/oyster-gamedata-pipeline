@@ -40,7 +40,7 @@ class RconClient:
     def __exit__(self, *exc):
         self.close()
         
-    def connect(self):
+    def connect(self) -> None:
         """Establish connection to RCON server."""
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.settimeout(self.timeout)
