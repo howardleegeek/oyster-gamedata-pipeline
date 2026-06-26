@@ -45,6 +45,7 @@ def _import_pil():
     try:
         from PIL import Image as _Image
         from PIL import ImageGrab as _ImageGrab
+
         return _Image, _ImageGrab
     except ImportError:
         return None, None
@@ -54,6 +55,7 @@ def _import_numpy():
     """Lazy-import numpy; returns np or None."""
     try:
         import numpy as _np
+
         return _np
     except ImportError:
         return None
@@ -178,14 +180,28 @@ def verify_pixels_not_black(screenshot: Path, threshold: int = 5) -> Tuple[bool,
 def build_parser() -> argparse.ArgumentParser:
     """Construct the argument parser."""
     parser = argparse.ArgumentParser(description="Minecraft Java 1.20.4 client smoke test")
-    parser.add_argument("--wait", type=int, default=DEFAULT_WAIT_SEC,
-                        help=f"Seconds to wait before screenshot (default: {DEFAULT_WAIT_SEC})")
-    parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_SEC,
-                        help=f"Overall timeout in seconds (default: {DEFAULT_TIMEOUT_SEC})")
-    parser.add_argument("--threshold", type=int, default=5,
-                        help="Min avg brightness to consider non-black (default: 5)")
+    parser.add_argument(
+        "--wait",
+        type=int,
+        default=DEFAULT_WAIT_SEC,
+        help=f"Seconds to wait before screenshot (default: {DEFAULT_WAIT_SEC})",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=DEFAULT_TIMEOUT_SEC,
+        help=f"Overall timeout in seconds (default: {DEFAULT_TIMEOUT_SEC})",
+    )
+    parser.add_argument(
+        "--threshold",
+        type=int,
+        default=5,
+        help="Min avg brightness to consider non-black (default: 5)",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Print commands without executing")
-    parser.add_argument("--mc-dir", type=Path, default=None, help="Override auto-detected Minecraft directory")
+    parser.add_argument(
+        "--mc-dir", type=Path, default=None, help="Override auto-detected Minecraft directory"
+    )
     return parser
 
 
