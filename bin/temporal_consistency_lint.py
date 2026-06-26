@@ -40,6 +40,7 @@ def _get_numpy():
     global _numpy
     if _numpy is None:
         import numpy as np  # type: ignore[import]
+
         _numpy = np
     return _numpy
 
@@ -49,6 +50,7 @@ def _get_pil_image():
     global _PIL_Image
     if _PIL_Image is None:
         from PIL import Image  # type: ignore[import]
+
         _PIL_Image = Image
     return _PIL_Image
 
@@ -58,7 +60,13 @@ def _get_pil_image():
 # ---------------------------------------------------------------------------
 
 SUPPORTED_EXTENSIONS: Tuple[str, ...] = (
-    ".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".tif", ".webp",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".bmp",
+    ".tiff",
+    ".tif",
+    ".webp",
 )
 
 logger = logging.getLogger(__name__)
@@ -105,11 +113,11 @@ def _compute_flow_magnitude(
     dt = curr - prev
 
     # Flow components (Lucas-Kanade simplified, per-pixel)
-    denom = gx_avg ** 2 + gy_avg ** 2 + 1e-6
+    denom = gx_avg**2 + gy_avg**2 + 1e-6
     u = -(gx_avg * dt) / denom  # horizontal flow
     v = -(gy_avg * dt) / denom  # vertical flow
 
-    return np.sqrt(u ** 2 + v ** 2)
+    return np.sqrt(u**2 + v**2)
 
 
 def _mean_flow(flow: "np.ndarray") -> float:
@@ -148,8 +156,7 @@ def detect_temporal_artifacts(
 
     # Collect and sort frame paths
     candidates = sorted(
-        p for p in frame_dir.iterdir()
-        if p.is_file() and p.suffix.lower() in SUPPORTED_EXTENSIONS
+        p for p in frame_dir.iterdir() if p.is_file() and p.suffix.lower() in SUPPORTED_EXTENSIONS
     )
     if len(candidates) < 3:
         logger.warning("Need at least 3 frames; found %d", len(candidates))
@@ -167,9 +174,7 @@ def detect_temporal_artifacts(
     for i in range(len(frames) - 1):
         flow_map = _compute_flow_magnitude(frames[i], frames[i + 1])
         flow_magnitudes.append(_mean_flow(flow_map))
-        logger.debug(
-            "Flow[%d→%d] = %.4f", i, i + 1, flow_magnitudes[-1]
-        )
+        logger.debug("Flow[%d→%d] = %.4f", i, i + 1, flow_magnitudes[-1])
 
     # Detect discontinuities: relative change > threshold
     violations: List[Tuple[int, int, float, float]] = []
@@ -184,8 +189,12 @@ def detect_temporal_artifacts(
             logger.warning(
                 "DISCONTINUITY at pair %d→%d: flow %.4f → %.4f "
                 "(rel_change=%.2f%%, threshold=%.2f%%)",
-                i, i + 1, f_a, f_b,
-                rel_change * 100, threshold * 100,
+                i,
+                i + 1,
+                f_a,
+                f_b,
+                rel_change * 100,
+                threshold * 100,
             )
 
     return violations
@@ -194,6 +203,7 @@ def detect_temporal_artifacts(
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -222,7 +232,8 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Glob pattern for frame filenames (default: '*').",
     )
     parser.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Enable debug logging.",
     )
@@ -262,6 +273,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # Report
     if args.json:
         import json
+
         result = {
             "frame_dir": str(frame_dir),
             "threshold": args.threshold,
@@ -285,11 +297,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             for idx_a, idx_b, fa, fb in violations:
                 denom = max(abs(fa), abs(fb), 1e-6)
                 rel = abs(fb - fa) / denom * 100
-                print(
-                    f"  Frame pair {idx_a}→{idx_b}: "
-                    f"flow {fa:.4f} → {fb:.4f}  "
-                    f"(Δ = {rel:.1f}%)"
-                )
+                print(f"  Frame pair {idx_a}→{idx_b}: flow {fa:.4f} → {fb:.4f}  (Δ = {rel:.1f}%)")
             print(f"{'=' * 60}\n")
         else:
             print("Temporal consistency lint PASSED — no artifacts detected.")
