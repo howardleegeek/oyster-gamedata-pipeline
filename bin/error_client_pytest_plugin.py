@@ -44,6 +44,7 @@ from urllib.request import Request, urlopen
 
 # ── helpers ────────────────────────────────────────────────────────────────
 
+
 def _should_report() -> bool:
     """Return *True* when error reporting is **not** opted out."""
     no_report = os.environ.get("OYSTER_NO_ERROR_REPORT", "").strip().lower()
@@ -123,6 +124,7 @@ def _send_report(payload: Dict[str, Any]) -> bool:
 
 # ── pytest hooks ───────────────────────────────────────────────────────────
 
+
 def pytest_addoption(parser: Any) -> None:
     """Register CLI flags for the plugin."""
     group = parser.getgroup("error_client", "G231 error reporting")
@@ -142,9 +144,7 @@ def pytest_configure(config: Any) -> None:
     )
 
 
-def pytest_runtest_makereport(
-    item: Any, call: Any
-) -> Optional[Any]:
+def pytest_runtest_makereport(item: Any, call: Any) -> Optional[Any]:
     """
     Hook invoked after each test phase.
 
@@ -199,6 +199,7 @@ def pytest_runtest_makereport(
 
 # ── standalone CLI ─────────────────────────────────────────────────────────
 
+
 def main(argv: Optional[List[str]] = None) -> int:
     """
     CLI entry-point for sending a test-failure report manually.
@@ -208,24 +209,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description="G231 error client – send test-failure reports",
     )
-    parser.add_argument(
-        "--test-name", required=True, help="Fully-qualified test name"
-    )
-    parser.add_argument(
-        "--exception-type", default="Exception", help="Exception class name"
-    )
-    parser.add_argument(
-        "--exception-msg", default="", help="Exception message text"
-    )
-    parser.add_argument(
-        "--traceback", default="", help="Full traceback string"
-    )
-    parser.add_argument(
-        "--file-path", default="", help="Source file path"
-    )
-    parser.add_argument(
-        "--line-number", type=int, default=0, help="Source line number"
-    )
+    parser.add_argument("--test-name", required=True, help="Fully-qualified test name")
+    parser.add_argument("--exception-type", default="Exception", help="Exception class name")
+    parser.add_argument("--exception-msg", default="", help="Exception message text")
+    parser.add_argument("--traceback", default="", help="Full traceback string")
+    parser.add_argument("--file-path", default="", help="Source file path")
+    parser.add_argument("--line-number", type=int, default=0, help="Source line number")
     parser.add_argument(
         "--dry-run",
         action="store_true",
