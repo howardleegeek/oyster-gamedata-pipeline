@@ -19,6 +19,7 @@ Built into a single Windows .exe by .github/workflows/build-qa-validator-exe.yml
 using PyInstaller --onefile --windowed on a windows-latest runner.
 Backed by bin/lint_v3_prd_grounded.py (G165 — 24-criteria PRD-grounded lint).
 """
+
 from __future__ import annotations
 
 import sys
@@ -167,16 +168,10 @@ class ValidatorApp(tk.Tk):
 
     def _render(self, report, clip_name: str) -> None:
         if report.failed_count == 0:
-            self._set_verdict(
-                f"✓ 通过\n{report.passed_count}/{report.total_checks}", GREEN
-            )
-            self._subtitle.config(
-                text=f"{clip_name} 符合买方规格，可以交付。", fg=GREEN
-            )
+            self._set_verdict(f"✓ 通过\n{report.passed_count}/{report.total_checks}", GREEN)
+            self._subtitle.config(text=f"{clip_name} 符合买方规格，可以交付。", fg=GREEN)
         else:
-            self._set_verdict(
-                f"✗ 失败\n{report.failed_count}/{report.total_checks}", RED
-            )
+            self._set_verdict(f"✗ 失败\n{report.failed_count}/{report.total_checks}", RED)
             self._subtitle.config(
                 text=(
                     f"{clip_name} 有 {report.failed_count} 项不符合规格 — "
@@ -188,9 +183,7 @@ class ValidatorApp(tk.Tk):
         self._detail.delete("1.0", "end")
         for r in report.results:
             mark = "✓" if r.passed else "✗"
-            self._detail.insert(
-                "end", f"{mark}  [{r.criterion_id:2}] {r.name}: {r.message}\n"
-            )
+            self._detail.insert("end", f"{mark}  [{r.criterion_id:2}] {r.name}: {r.message}\n")
 
     def _render_error(self, exc: Exception, clip_name: str) -> None:
         self._set_verdict("⚠️ 出错", ORANGE)

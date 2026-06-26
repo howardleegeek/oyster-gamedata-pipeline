@@ -8,6 +8,11 @@
 - Picked: ruff format bin/buyer_signup_flow.py (smallest unformatted bin file: 249 lines, 5 long function signatures, 4 multi-line dict literals, 1 multi-line list; no existing test). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic line-wrap + multi-line literals), AST parse + import smoke OK before/after, no risk of test masking (no test file exists), follows established cadence of formatting small bin files.
 - Result: committed 2c9c702d (ruff format applied: line-wrap 5 long signatures — CompanyInfo.__init__, SalesContact.__init__, CompanyInfo.to_dict, SalesContact.to_dict, generate_jwt, insert_buyer, CompanyInfo.__str__ summary list; multi-line dict literals in to_dict x2 and jwt payload; 1 file changed, 128 insertions(+), 47 deletions(-); ruff check + ruff format --check clean; AST parse + import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect, no JWT/crypto logic change (signature preserved, payload dict keys unchanged).)
 
+## Round 371 @ 2026-06-26T03:30:00Z
+
+- Picked: ruff format bin/recorder_post_pipeline.py (smallest unformatted bin file: 265 lines). Justification: measurable code smell, single-file scope, no behavior change, import smoke OK, no test for this file, follows established cadence.
+- Result: committed 7859cf41 (ruff format applied; 1 file changed, 52 insertions(+), 46 deletions(-); ruff check + ruff format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
+
 
 ## Round 263 @ 2026-06-24T18:00:00Z
 
@@ -1060,3 +1065,14 @@ b4c97dbd638c75a1d826e641df598879876660ed
 ## Round 377 @ 2026-06-26T12:40:38Z
 - Picked: ruff format bin/daemon_control.py (smallest unformatted bin file: 276 lines; single quotes → double quotes, trailing whitespace cleanup, blank line normalization). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change (purely cosmetic), no test references (no test-masking risk), import smoke OK, AST parse OK, follows established cadence of Rounds 254-376 small-bin-file formats.
 - Result: committed 39783c30 (ruff format applied: single quotes → double quotes, trailing whitespace cleanup, blank line normalization in bin/daemon_control.py; 1 file changed, 71 insertions(+), 65 deletions(-); ruff check + format --check clean; import smoke OK; AST parse OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
+
+
+## Round 371 @ 2026-06-26T12:46Z
+
+- Picked: ruff format bin/batch_dashboard.py (315-line bin file, cosmetic line-wrapping, trailing whitespace trim, blank line normalization; no existing test). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change, AST parse OK, ruff check clean, follows established cadence of formatting bin files.
+- Result: committed 1e89a247 (ruff format applied to bin/batch_dashboard.py; 1 file changed, 56 insertions(+), 51 deletions(-); ruff check + format --check clean; AST parse OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — line wrapping, trailing whitespace trimmed, blank line normalization. No silent error swallow, no race condition, no off-by-one, no security impact, no test masking (no tests reference this file), no brand cross-reference, no module-level side effect.)
+
+## Round 378 @ 2026-06-26T13:00:00Z
+
+- Picked: ruff format bin/qa_validator_gui.py (smallest unformatted bin file at 267 lines; blank line after module docstring, collapse multi-line tkinter config/insert calls onto single lines that fit within 88 chars). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change (purely cosmetic line-wrap + blank-line normalization), no test references (verified via grep — no test-masking risk), AST parse + import smoke OK, follows established cadence of Rounds 254-377 small-bin-file formats.
+- Result: committed a2907bed (ruff format applied: blank line after module docstring, collapsed 3 multi-line tkinter widget config/insert calls in _render method onto single lines; 1 file changed, 5 insertions(+), 12 deletions(-); ruff check + ruff format --check clean; AST parse + import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect, no Unicode string change (CJK characters preserved byte-for-byte), no tkinter API change.)
