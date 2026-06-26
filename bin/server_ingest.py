@@ -25,6 +25,7 @@ def _get_boto3():
     if boto3 is None:
         try:
             import boto3 as _boto3
+
             boto3 = _boto3
         except ImportError:
             raise ImportError("boto3 is required. Install with: pip install boto3")
@@ -51,7 +52,7 @@ def fetch_tarball_from_s3(bucket: str, key: str, local_dir: Path) -> Path:
     local_path = local_dir / filename
 
     boto3 = _get_boto3()
-    s3 = boto3.client('s3')
+    s3 = boto3.client("s3")
     s3.download_file(bucket, key, str(local_path))
 
     return local_path
@@ -79,9 +80,9 @@ def lint_one(tarball_path: Path) -> dict:
                 messages.append(f"File not found: {path}")
                 return False, messages
             try:
-                with tarfile.open(p, 'r:gz') as tar:
+                with tarfile.open(p, "r:gz") as tar:
                     names = tar.getnames()
-                    required = ['video.mp4', 'action_camera.bin', 'gameinfo.xlsx']
+                    required = ["video.mp4", "action_camera.bin", "gameinfo.xlsx"]
                     missing = [f for f in required if f not in names]
                     if missing:
                         messages.append(f"Missing required files: {missing}")
@@ -134,21 +135,24 @@ def write_submission(db_path: str, submission: dict) -> int:
     """)
 
     # Insert submission
-    cursor.execute("""
+    cursor.execute(
+        """
         INSERT INTO submissions (
             vendor_id, batch_id, clip_id, sha256, size_bytes,
             uploaded_at, lint_status, lint_details
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        submission.get("vendor_id", ""),
-        submission.get("batch_id", ""),
-        submission.get("clip_id", ""),
-        submission.get("sha256", ""),
-        submission.get("size_bytes", 0),
-        submission.get("uploaded_at", datetime.now(timezone.utc).isoformat()),
-        submission.get("lint_status", "unknown"),
-        submission.get("lint_details", ""),
-    ))
+    """,
+        (
+            submission.get("vendor_id", ""),
+            submission.get("batch_id", ""),
+            submission.get("clip_id", ""),
+            submission.get("sha256", ""),
+            submission.get("size_bytes", 0),
+            submission.get("uploaded_at", datetime.now(timezone.utc).isoformat()),
+            submission.get("lint_status", "unknown"),
+            submission.get("lint_details", ""),
+        ),
+    )
 
     submission_id = cursor.lastrowid
     conn.commit()
@@ -201,6 +205,7 @@ def process_message(msg: dict, bucket: str, db_path: str) -> str:
 
                 # Calculate file hash and size
                 import hashlib
+
                 sha256_hash = hashlib.sha256()
                 with open(local_path, "rb") as f:
                     for chunk in iter(lambda: f.read(8192), b""):
@@ -239,7 +244,7 @@ def poll_loop(queue_url: str, bucket: str, db_path: str, max_messages: int = 10)
         max_messages: Maximum messages to process per poll
     """
     boto3 = _get_boto3()
-    sqs = boto3.client('sqs')
+    sqs = boto3.client("sqs")
 
     while True:
         try:
@@ -247,8 +252,8 @@ def poll_loop(queue_url: str, bucket: str, db_path: str, max_messages: int = 10)
                 QueueUrl=queue_url,
                 MaxNumberOfMessages=max_messages,
                 WaitTimeSeconds=20,
-                AttributeNames=['All'],
-                MessageAttributeNames=['All'],
+                AttributeNames=["All"],
+                MessageAttributeNames=["All"],
             )
 
             messages = response.get("Messages", [])
@@ -263,10 +268,7 @@ def poll_loop(queue_url: str, bucket: str, db_path: str, max_messages: int = 10)
                 print(f"[{datetime.now(timezone.utc).isoformat()}] {status}")
 
                 # Delete message after successful processing
-                sqs.delete_message(
-                    QueueUrl=queue_url,
-                    ReceiptHandle=receipt_handle
-                )
+                sqs.delete_message(QueueUrl=queue_url, ReceiptHandle=receipt_handle)
 
         except KeyboardInterrupt:
             print("Poll loop interrupted")
@@ -275,6 +277,7 @@ def poll_loop(queue_url: str, bucket: str, db_path: str, max_messages: int = 10)
             print(f"Poll error: {e}")
             # Sleep briefly before retrying
             import time
+
             time.sleep(5)
 
 
@@ -288,9 +291,7 @@ def main(argv: list[str]) -> int:
     Returns:
         Exit code
     """
-    parser = argparse.ArgumentParser(
-        description="S3-event lint worker for buyer-spec tarballs"
-    )
+    parser = argparse.ArgumentParser(description="S3-event lint worker for buyer-spec tarballs")
     parser.add_argument(
         "--queue-url",
         required=True,
@@ -323,7 +324,7 @@ def main(argv: list[str]) -> int:
     if args.once:
         # Process single message for testing
         boto3 = _get_boto3()
-        sqs = boto3.client('sqs')
+        sqs = boto3.client("sqs")
         response = sqs.receive_message(
             QueueUrl=args.queue_url,
             MaxNumberOfMessages=1,
@@ -334,10 +335,7 @@ def main(argv: list[str]) -> int:
             status = process_message(messages[0], args.bucket, args.db)
             print(status)
             # Delete the message
-            sqs.delete_message(
-                QueueUrl=args.queue_url,
-                ReceiptHandle=messages[0]["ReceiptHandle"]
-            )
+            sqs.delete_message(QueueUrl=args.queue_url, ReceiptHandle=messages[0]["ReceiptHandle"])
         else:
             print("No messages available")
         return 0
