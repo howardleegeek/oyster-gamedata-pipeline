@@ -52,6 +52,7 @@ Usage
 
 Standalone — stdlib only.
 """
+
 from __future__ import annotations
 
 import json
@@ -80,6 +81,7 @@ ALL_BUTTONS = ("forward", "backward", "left", "right", "jump", "sprint", "attack
 @dataclass
 class _ButtonState:
     """Tracks held-state of a discrete button over time."""
+
     pressed: bool = False
     last_change_t: float = 0.0
 
@@ -87,6 +89,7 @@ class _ButtonState:
 @dataclass
 class _ResamplerState:
     """Mutable state carried across the timeline scan."""
+
     buttons: Dict[str, _ButtonState] = field(
         default_factory=lambda: {b: _ButtonState() for b in ALL_BUTTONS}
     )
@@ -116,7 +119,7 @@ def _apply_event(state: _ResamplerState, ev: Dict[str, Any]) -> None:
         if button is None:
             return
         bs = state.buttons[button]
-        bs.pressed = (et == "key_down")
+        bs.pressed = et == "key_down"
         bs.last_change_t = ev["t"]
     elif et == "mouse_delta":
         state.pending_yaw += float(ev.get("yaw", 0.0))
