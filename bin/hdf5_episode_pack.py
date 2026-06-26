@@ -21,6 +21,7 @@ def _get_h5py():
     global _h5py
     if _h5py is None:
         import h5py
+
         _h5py = h5py
     return _h5py
 
@@ -30,6 +31,7 @@ def _get_np():
     global _np
     if _np is None:
         import numpy
+
         _np = numpy
     return _np
 
@@ -40,8 +42,9 @@ logger = logging.getLogger(__name__)
 
 def setup_logging(verbose: bool = False) -> None:
     """Configure logging level based on verbosity flag."""
-    logging.basicConfig(level=logging.DEBUG if verbose else logging.INFO,
-                        format="%(levelname)s: %(message)s")
+    logging.basicConfig(
+        level=logging.DEBUG if verbose else logging.INFO, format="%(levelname)s: %(message)s"
+    )
 
 
 def validate_dependencies() -> None:
@@ -58,7 +61,13 @@ def validate_dependencies() -> None:
 
 def discover_episode_files(input_dir: Path) -> Dict[str, List[Path]]:
     """Discover episode data files by type in the input directory."""
-    files: Dict[str, List[Path]] = {"actions": [], "depth": [], "seg": [], "imu": [], "metadata": []}
+    files: Dict[str, List[Path]] = {
+        "actions": [],
+        "depth": [],
+        "seg": [],
+        "imu": [],
+        "metadata": [],
+    }
     if not input_dir.is_dir():
         return files
     for f in sorted(input_dir.rglob("*")):
@@ -96,6 +105,7 @@ def load_data_file(file_path: Path) -> Optional[Any]:
         elif suffix in [".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp"]:
             try:
                 from PIL import Image
+
                 return np.array(Image.open(file_path))
             except ImportError:
                 logger.warning(f"PIL not available for image: {file_path}")
@@ -105,8 +115,12 @@ def load_data_file(file_path: Path) -> Optional[Any]:
     return None
 
 
-def pack_episode(input_dir: Path, output_path: Path, compression: Optional[str] = None,
-                 compression_opts: Optional[int] = None) -> Tuple[int, int]:
+def pack_episode(
+    input_dir: Path,
+    output_path: Path,
+    compression: Optional[str] = None,
+    compression_opts: Optional[int] = None,
+) -> Tuple[int, int]:
     """Pack all episode data into a single HDF5 file. Returns (files_packed, files_skipped)."""
     h5py, np = _get_h5py(), _get_np()
     files_by_type = discover_episode_files(input_dir)
@@ -150,10 +164,16 @@ def pack_episode(input_dir: Path, output_path: Path, compression: Optional[str] 
 def main(argv: Optional[List[str]] = None) -> int:
     """Main entry point for HDF5 episode packing."""
     parser = argparse.ArgumentParser(description="Pack episode data into a single HDF5 file.")
-    parser.add_argument("input_dir", type=Path, help="Input directory containing episode data files")
+    parser.add_argument(
+        "input_dir", type=Path, help="Input directory containing episode data files"
+    )
     parser.add_argument("-o", "--output", type=Path, required=True, help="Output HDF5 file path")
-    parser.add_argument("--compress", choices=["gzip", "lzf", "szip"], default=None,
-                        help="Compression algorithm for HDF5 datasets")
+    parser.add_argument(
+        "--compress",
+        choices=["gzip", "lzf", "szip"],
+        default=None,
+        help="Compression algorithm for HDF5 datasets",
+    )
     parser.add_argument("--level", type=int, default=4, help="Gzip compression level (0-9)")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
     args = parser.parse_args(argv)
@@ -171,8 +191,11 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     try:
         packed, skipped = pack_episode(
-            args.input_dir, args.output, compression=args.compress,
-            compression_opts=args.level if args.compress == "gzip" else None)
+            args.input_dir,
+            args.output,
+            compression=args.compress,
+            compression_opts=args.level if args.compress == "gzip" else None,
+        )
         logger.info(f"Packed {packed} files, skipped {skipped} files -> {args.output}")
         return 0
     except Exception as e:
