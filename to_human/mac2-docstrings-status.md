@@ -380,3 +380,13 @@ Note: Also added docstring to reset_vendor in same commit (minor spec deviation 
 - File: bin/rate_limiter.py::VendorRateLimiter.save_state
 - Added: docstring=Y, type-hints=N (already had)
 - Commit: e7e783ae5
+
+## Round @ 2026-06-26T02:12:25Z
+- File: bin/redteam_lint.py::attack_drop_video
+- Added: docstring=N (already had docstring), type-hints=Y
+- Commit: 1215de477
+
+## Round @ 2026-06-26T02:30:00Z
+- File: bin/per_frame_object_bbox.py::FrameData.get_visible_2d
+- Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: 4c44240c2
