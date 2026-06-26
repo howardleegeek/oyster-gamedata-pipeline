@@ -13,6 +13,11 @@
 - Picked: ruff format bin/recorder_post_pipeline.py (smallest unformatted bin file: 265 lines). Justification: measurable code smell, single-file scope, no behavior change, import smoke OK, no test for this file, follows established cadence.
 - Result: committed 7859cf41 (ruff format applied; 1 file changed, 52 insertions(+), 46 deletions(-); ruff check + ruff format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
 
+## Round 372 @ 2026-06-26T03:45:00Z
+
+- Picked: ruff format bin/buyer_dashboard_html.py (278 lines, 2nd smallest unformatted bin file after bug_report.py at 365). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic line-wrap + dict literals + trailing commas), AST parse + import smoke OK, no test for this file, follows established cadence.
+- Result: committed b756eb31 (ruff format applied: dict literals, f-strings, trailing commas; 1 file changed, 23 insertions(+), 24 deletions(-); ruff check + format --check clean; AST parse + import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
+
 
 ## Round 263 @ 2026-06-24T18:00:00Z
 
@@ -97,6 +102,7 @@
 
 - Picked: ruff format src/oyster_agent_runner/lint/lint_buyer_spec.py (1593-line lint module, only remaining src file needing format; 4 changes: f-string line wrapping at lines 358, 369, 421, 509). Justification: measurable code smell, single-file scope, no behavior change, targeted test passes (test_spec_lint.py 8/8), no risk of test masking, continues established pattern of formatting the codebase.
 - Result: committed 6875fa64 (ruff format applied black-compatible line wrapping to lint_buyer_spec.py; 4 f-string concatenation changes; tests/test_spec_lint.py 8/8 pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: pure cosmetic f-string concatenation changes — no silent error swallow, no race condition, no off-by-one, no security issue, no test masking, no brand cross-reference, no module-level side effect.). Self-review: pure cosmetic line wrap — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
 
 ## Round 264 @ 2026-06-24T18:00:00Z
 
