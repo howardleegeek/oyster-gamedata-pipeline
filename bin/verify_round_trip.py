@@ -492,6 +492,21 @@ def load_records(clip_dir: Path) -> list[dict[str, Any]]:
 
 
 def run_all_checks(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Run all four round-trip integrity checks on recorded clip data.
+
+    Executes the complete verification suite:
+      1. Keyboard event reconstruction (check1_keyboard)
+      2. Mouse position reconstruction (check2_mouse_position)
+      3. Quaternion ↔ Euler round-trip (check3_quat_euler)
+      4. Frame-time consistency (check4_frame_time)
+
+    Args:
+        records: List of frame dictionaries from action_camera.json.
+
+    Returns:
+        List of check result dictionaries, each containing 'check', 'name',
+        'passed', and any failure details like 'first_mismatches'.
+    """
     return [
         check1_keyboard(records),
         check2_mouse_position(records),
