@@ -17,7 +17,12 @@
 ## Round 372 @ 2026-06-26T03:45:00Z
 
 - Picked: ruff format bin/buyer_dashboard_html.py (278 lines, 2nd smallest unformatted bin file after bug_report.py at 365). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic line-wrap + dict literals + trailing commas), AST parse + import smoke OK, no test for this file, follows established cadence.
-- Result: committed b756eb31 (ruff format applied: dict literals, f-strings, trailing commas; 1 file changed, 23 insertions(+), 24 deletions(-); ruff check + format --check clean; AST parse + import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
+- Result: committed b756eb31 (ruff format applied: dict literals, f-strings, trailing commas; 1 file changed, 23 insertions(+), 24 deletions(-); ruff check + forma
+
+## Round 393 @ 2026-06-26T21:09:00Z
+
+- Picked: ruff format bin/end_to_end_consumer_smoke.py (340 lines, smallest remaining unformatted bin file: 61 unformatted bin/ files in queue, all >=340 lines, no test references this file, so safest single-file scope pick). Justification: measurable code smell (ruff format --check fails), single-file scope, no behavior change (purely cosmetic: line-wrap 2 long list literals — the install_files list and the G165 lint_checks list — plus blank lines after class defs), AST parse + py_compile + import smoke + ruff check + ruff format --check all OK before/after, no risk of test masking (no test references this file), follows established cadence.
+- Result: committed 5a03ce17 (ruff format applied; 1 file changed, 60 insertions(+), 17 deletions(-); pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect, no logic change (signature preserved, list element order preserved, no dict key change).)t --check clean; AST parse + import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
 
 ## Round 373 @ 2026-06-26T04:00:00Z
 
@@ -1219,3 +1224,12 @@ b4c97dbd638c75a1d826e641df598879876660ed
 
 - Picked: ruff format bin/extract_audio_event_track.py (326 lines, smallest unformatted bin file; has a referenced test test_audio_event_track.py 14/14). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change (purely cosmetic line-wrap + spacing around **), targeted test passes (14/14 unchanged), no risk of test masking, follows established cadence.
 - Result: committed 0a5e0196 (1 file changed, 18 insertions(+), 10 deletions(-); ruff check clean; ruff format --check clean; AST parse OK; tests/test_audio_event_track.py 14/14 pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — line-wrap argparse sox command, de-wrap noise_power conditional, remove spaces around ** per ruff default, wrap long f-string. No silent error swallow, no race, no off-by-one, no security impact, no test masking (14/14 unchanged), no brand cross-reference, no module-level side effect, no logic change in audio processing math.)
+
+## Round 383 @ 2026-06-26T20:49:17Z
+- Picked: ruff format bin/real_depth_filler.py (smallest unformatted bin file: 328 lines, single line reflow). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change (purely cosmetic line reflow in f-string), ruff check clean, AST parse OK, import smoke OK, follows established cadence of small-bin-file formats (Rounds 254-382).
+- Result: committed e4f5887c (ruff format applied: 1 line reflow in progress print f-string; 1 file changed, 1 insertion(+), 1 deletion(-); ruff check + format --check clean; AST parse OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
+
+## Round 373 @ 2026-06-26T04:00:00Z
+
+- Picked: ruff format bin/epal_session_lifecycle_hook.py (338 lines, smallest unformatted bin file). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic line-wrap + trailing commas + blank lines), import smoke OK, no test for this file, follows established cadence.
+- Result: committed eb46982a (ruff format applied: blank lines after docstrings, line-wrapping, trailing commas; 1 file changed, 88 insertions(+), 31 deletions(-); ruff check + ruff format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
