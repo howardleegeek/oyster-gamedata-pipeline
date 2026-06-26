@@ -1040,3 +1040,8 @@ b4c97dbd638c75a1d826e641df598879876660ed
 ## Round 2026-06-26T10:48:31Z
 - Picked: ruff format bin/crash_reporter.py (smallest unformatted bin file: 390 lines, collapsed multiline conditionals in prompt_consent and watch_dir; test exists: 37/37 pass). Justification: measurable code smell, single-file scope, no behavior change, targeted test passes, no risk of test masking, follows established cadence.
 - Result: committed 94b62143 (ruff format applied: collapsed multiline conditionals in bin/crash_reporter.py; 1 file changed, 7 deletions(-), 2 insertions(+); ruff check + format --check clean; 37/37 tests pass in tests/test_crash_reporter.py; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no module-level side effect.)
+
+## Round 374 @ 2026-06-26T11:07:48Z
+
+- Picked: ruff format bin/build_bundled_installer/gen_mc_args_template.py (smallest unformatted bin file: 254 lines; line-wrap long RuntimeError message, asset_index expression). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic line-wrap), import smoke OK, no test references this file (no test-masking risk), follows established cadence of small-bin-file formats.
+- Result: committed b619608d (ruff format applied: line-wrap long RuntimeError message in generate_template(), asset_index expression; 1 file changed, 6 insertions(+), 2 deletions(-); ruff check + format --check clean; import smoke OK; no behavior change. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
