@@ -14,6 +14,7 @@ human auditability.
 Stdlib only — ``statistics.fmean`` and ``statistics.stdev`` keep this callable in
 headless harnesses without numpy.
 """
+
 from __future__ import annotations
 
 import math
@@ -69,7 +70,12 @@ def r20a_quat_norm_distribution(
     n_out = sum(1 for n in norms if abs(n - mu) > 3.0 * sigma) if sigma > 0 else 0
     passed = offset <= max_offset and sigma <= max_std
     return DriftResult(
-        "R20a", passed, offset, max_offset, n_out, len(norms),
+        "R20a",
+        passed,
+        offset,
+        max_offset,
+        n_out,
+        len(norms),
         f"mu={mu:.3e} sigma={sigma:.3e}",
     )
 
@@ -99,7 +105,12 @@ def r20b_mouse_dx_cumulative(
     if math.isnan(drift):
         return _abstain("R20b", "nan_in_stat", tolerance)
     return DriftResult(
-        "R20b", drift <= tolerance, drift, tolerance, 0, len(records),
+        "R20b",
+        drift <= tolerance,
+        drift,
+        tolerance,
+        0,
+        len(records),
         f"sum={s:.3e} delta_x={delta_x:.3e}",
     )
 
@@ -115,14 +126,18 @@ def r20c_fps_jitter(
         return _abstain("R20c", "empty_records", max_offset_ms)
     if len(records) < min_frames:
         return _abstain(
-            "R20c", f"insufficient_sample({len(records)}<{min_frames})", max_offset_ms,
+            "R20c",
+            f"insufficient_sample({len(records)}<{min_frames})",
+            max_offset_ms,
         )
     declared_fps = float(records[0].get("fps", 30.0))
     target_dt_ms = 1000.0 / declared_fps if declared_fps > 0 else 1000.0 / 30.0
     dts_ms: list[float] = []
     try:
         for i in range(len(records) - 1):
-            dt = (_parse_time(records[i + 1]["time"]) - _parse_time(records[i]["time"])).total_seconds() * 1000.0
+            dt = (
+                _parse_time(records[i + 1]["time"]) - _parse_time(records[i]["time"])
+            ).total_seconds() * 1000.0
             if dt < 0:
                 return _abstain("R20c", "non_monotone_time", max_offset_ms)
             dts_ms.append(dt)
@@ -134,7 +149,12 @@ def r20c_fps_jitter(
     n_out = sum(1 for dt in dts_ms if abs(dt - mu) > 3.0 * sigma) if sigma > 0 else 0
     passed = offset <= max_offset_ms and sigma <= max_std_ms
     return DriftResult(
-        "R20c", passed, offset, max_offset_ms, n_out, len(dts_ms),
+        "R20c",
+        passed,
+        offset,
+        max_offset_ms,
+        n_out,
+        len(dts_ms),
         f"mu_dt={mu:.3f}ms target={target_dt_ms:.3f}ms sigma={sigma:.3f}ms",
     )
 
@@ -151,7 +171,9 @@ def r20d_speed_profile(
         return _abstain("R20d", "empty_records", max_outlier_pct)
     if len(records) < min_frames:
         return _abstain(
-            "R20d", f"insufficient_sample({len(records)}<{min_frames})", max_outlier_pct,
+            "R20d",
+            f"insufficient_sample({len(records)}<{min_frames})",
+            max_outlier_pct,
         )
     mags: list[float] = []
     for r in records:
@@ -167,7 +189,12 @@ def r20d_speed_profile(
     mu = statistics.fmean(mags)
     passed = ratio <= max_outlier_pct and mu <= max_mean_speed
     return DriftResult(
-        "R20d", passed, ratio, max_outlier_pct, n_high, len(mags),
+        "R20d",
+        passed,
+        ratio,
+        max_outlier_pct,
+        n_high,
+        len(mags),
         f"mu_speed={mu:.3f}m/s ratio_high={ratio:.3f}",
     )
 
@@ -183,7 +210,9 @@ def r20e_yaw_turn_rate(
         return _abstain("R20e", "empty_records", max_outlier_pct)
     if len(records) < min_frames:
         return _abstain(
-            "R20e", f"insufficient_sample({len(records)}<{min_frames})", max_outlier_pct,
+            "R20e",
+            f"insufficient_sample({len(records)}<{min_frames})",
+            max_outlier_pct,
         )
     rates: list[float] = []
     try:
@@ -195,7 +224,9 @@ def r20e_yaw_turn_rate(
             d_yaw = float(oula_n1[1]) - float(oula_n[1])
             # 360° wrap-around: take shortest signed delta.
             d_yaw = (d_yaw + 180.0) % 360.0 - 180.0
-            dt = (_parse_time(records[i + 1]["time"]) - _parse_time(records[i]["time"])).total_seconds()
+            dt = (
+                _parse_time(records[i + 1]["time"]) - _parse_time(records[i]["time"])
+            ).total_seconds()
             if dt <= 0:
                 return _abstain("R20e", "non_monotone_time", max_outlier_pct)
             rates.append(abs(d_yaw) / dt)
@@ -205,6 +236,11 @@ def r20e_yaw_turn_rate(
     ratio = n_extreme / len(rates) if rates else 0.0
     passed = ratio <= max_outlier_pct
     return DriftResult(
-        "R20e", passed, ratio, max_outlier_pct, n_extreme, len(rates),
+        "R20e",
+        passed,
+        ratio,
+        max_outlier_pct,
+        n_extreme,
+        len(rates),
         f"ratio_extreme={ratio:.3f} max_rate={max(rates) if rates else 0.0:.1f}deg/s",
     )
