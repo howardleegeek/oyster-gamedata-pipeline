@@ -14,6 +14,7 @@ Implementation history:
     real HF model). Verified locally: model loads (~100MB), inference
     returns a per-frame depth tensor.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -243,9 +244,7 @@ def infer_depth_for_video(
                 # transformers pipeline returns {"predicted_depth": Tensor, "depth": PIL.Image}
                 pt = result.get("predicted_depth")
                 if pt is None:
-                    raise RuntimeError(
-                        f"frame {frame_idx}: pipeline returned no predicted_depth"
-                    )
+                    raise RuntimeError(f"frame {frame_idx}: pipeline returned no predicted_depth")
                 depth = pt.squeeze().detach().cpu().numpy().astype(np.float32)
 
                 target = output_dir / f"frame_{frame_idx:06d}.exr"
