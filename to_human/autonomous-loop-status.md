@@ -16,7 +16,12 @@
 ## Round 372 @ 2026-06-26T03:45:00Z
 
 - Picked: ruff format bin/buyer_dashboard_html.py (278 lines, 2nd smallest unformatted bin file after bug_report.py at 365). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic line-wrap + dict literals + trailing commas), AST parse + import smoke OK, no test for this file, follows established cadence.
-- Result: committed b756eb31 (ruff format applied: dict literals, f-strings, trailing commas; 1 file changed, 23 insertions(+), 24 deletions(-); ruff check + format --check clean; AST parse + import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
+- Result: committed b756eb31 (ruff format applied: dict literals, f-strings, trailing commas; 1 file changed, 23 insertions(+), 24 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff.)
+
+## Round 373 @ 2026-06-26T04:00:00Z
+
+- Picked: ruff format bin/bug_report.py (365 lines, smallest unformatted bin file). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic spacing in f-string calculations), ruff check + format --check clean, no test for this file, follows established cadence.
+- Result: committed 652a1281 (ruff format applied: spacing in f-string calculations — (1024*1024) → (1024 * 1024); 1 file changed, 3 insertions(+), 3 deletions(-); ruff check + format --check clean; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.) --check clean; AST parse + import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
 
 
 ## Round 263 @ 2026-06-24T18:00:00Z
