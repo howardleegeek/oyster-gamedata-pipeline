@@ -33,7 +33,6 @@ def _write_xlsx(path: str, sheets: dict) -> None:
 
 
 class TestValidateXlsx(unittest.TestCase):
-
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
 
