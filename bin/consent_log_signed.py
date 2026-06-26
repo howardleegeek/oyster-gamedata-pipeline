@@ -5,6 +5,7 @@ G221 · bin/consent_log_signed.py
 Legally-binding signed consent log: HMAC-signed entry per recording session
 capturing user_id + game + timestamp + opt-in version; serves GDPR/CCPA/COPPA.
 """
+
 import argparse
 import base64
 import hashlib
@@ -19,6 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 class ConsentLogError(Exception):
     """Base exception for consent log operations."""
+
     pass
 
 
@@ -31,7 +33,7 @@ class ConsentEntry:
         game: str,
         timestamp: Optional[str] = None,
         opt_in_version: str = "1.0",
-        signature: Optional[str] = None
+        signature: Optional[str] = None,
     ):
         self.user_id = user_id
         self.game = game
@@ -45,7 +47,7 @@ class ConsentEntry:
             "game": self.game,
             "timestamp": self.timestamp,
             "opt_in_version": self.opt_in_version,
-            "signature": self.signature
+            "signature": self.signature,
         }
 
     @classmethod
@@ -55,7 +57,7 @@ class ConsentEntry:
             game=data["game"],
             timestamp=data["timestamp"],
             opt_in_version=data["opt_in_version"],
-            signature=data.get("signature")
+            signature=data.get("signature"),
         )
 
 
@@ -71,7 +73,7 @@ class ConsentLogSigned:
         self,
         log_file: Union[str, Path],
         secret_key: Optional[bytes] = None,
-        key_file: Optional[Union[str, Path]] = None
+        key_file: Optional[Union[str, Path]] = None,
     ):
         self.log_file = Path(log_file)
         self.key_file = Path(key_file) if key_file else None
@@ -111,9 +113,7 @@ class ConsentLogSigned:
     def _compute_signature(self, entry: ConsentEntry) -> str:
         """Compute HMAC-SHA256 signature for a consent entry."""
         canonical = f"{entry.user_id}|{entry.game}|{entry.timestamp}|{entry.opt_in_version}"
-        signature = hmac.new(
-            self.secret_key, canonical.encode("utf-8"), hashlib.sha256
-        ).digest()
+        signature = hmac.new(self.secret_key, canonical.encode("utf-8"), hashlib.sha256).digest()
         return base64.b64encode(signature).decode()
 
     def _read_entries(self) -> List[ConsentEntry]:
@@ -127,16 +127,12 @@ class ConsentLogSigned:
         data = {
             "version": "1.0",
             "created": datetime.now(timezone.utc).isoformat(),
-            "entries": [e.to_dict() for e in entries]
+            "entries": [e.to_dict() for e in entries],
         }
         self.log_file.write_text(json.dumps(data, indent=2))
 
     def add_entry(
-        self,
-        user_id: str,
-        game: str,
-        opt_in_version: str = "1.0",
-        timestamp: Optional[str] = None
+        self, user_id: str, game: str, opt_in_version: str = "1.0", timestamp: Optional[str] = None
     ) -> ConsentEntry:
         """Add a new signed consent entry to the log."""
         entry = ConsentEntry(
@@ -192,15 +188,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        log = ConsentLogSigned(
-            log_file=args.log_file,
-            key_file=getattr(args, "key_file", None)
-        )
+        log = ConsentLogSigned(log_file=args.log_file, key_file=getattr(args, "key_file", None))
 
         if args.command == "add":
-            entry = log.add_entry(
-                user_id=args.user_id, game=args.game, opt_in_version=args.version
-            )
+            entry = log.add_entry(user_id=args.user_id, game=args.game, opt_in_version=args.version)
             print("Added consent entry:")
             print(f"  User: {entry.user_id}")
             print(f"  Game: {entry.game}")
