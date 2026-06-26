@@ -84,7 +84,8 @@ def discover_session(explicit: Path | None) -> Path | None:
             continue
         sessions = sorted(
             (p for p in root.glob("session_*") if p.is_dir()),
-            key=lambda p: p.stat().st_mtime, reverse=True,
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
         )
         if sessions:
             return sessions[0]
@@ -130,7 +131,9 @@ def zip_session(session: Path, dest: Path) -> int:
 def http_post_json(url: str, body: dict, token: str, timeout: int = 60) -> dict:
     data = json.dumps(body).encode("utf-8")
     req = request.Request(
-        url, data=data, method="POST",
+        url,
+        data=data,
+        method="POST",
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {token}",
@@ -146,7 +149,9 @@ def http_put_file(url: str, file_path: Path, timeout: int = 1800) -> int:
     size = file_path.stat().st_size
     with file_path.open("rb") as fp:
         req = request.Request(
-            url, data=fp, method="PUT",
+            url,
+            data=fp,
+            method="PUT",
             headers={
                 "Content-Type": "application/octet-stream",
                 "Content-Length": str(size),
@@ -163,16 +168,26 @@ def http_put_file(url: str, file_path: Path, timeout: int = 1800) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("session_path", nargs="?", default=None,
-                        help="Path to session_* directory (default: newest in OysterClips)")
-    parser.add_argument("--token", default=None,
-                        help="Bearer token (or set OYSTER_RECORDER_TOKEN env)")
-    parser.add_argument("--backend", default=os.environ.get("OYSTER_BACKEND", DEFAULT_BACKEND),
-                        help=f"Backend base URL (default: {DEFAULT_BACKEND})")
-    parser.add_argument("--keep-zip", action="store_true",
-                        help="Don't delete the temp zip after upload")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Run all checks + zip but skip actual upload")
+    parser.add_argument(
+        "session_path",
+        nargs="?",
+        default=None,
+        help="Path to session_* directory (default: newest in OysterClips)",
+    )
+    parser.add_argument(
+        "--token", default=None, help="Bearer token (or set OYSTER_RECORDER_TOKEN env)"
+    )
+    parser.add_argument(
+        "--backend",
+        default=os.environ.get("OYSTER_BACKEND", DEFAULT_BACKEND),
+        help=f"Backend base URL (default: {DEFAULT_BACKEND})",
+    )
+    parser.add_argument(
+        "--keep-zip", action="store_true", help="Don't delete the temp zip after upload"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Run all checks + zip but skip actual upload"
+    )
     args = parser.parse_args(argv)
 
     print("Oyster Recorder Session Uploader v0.1")
@@ -221,8 +236,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\nrequesting signed URL from {args.backend} ...")
         signed = http_post_json(
             f"{args.backend}/api/v1/upload/signed-url",
-            {"session_id": session.name, "filename": zip_path.name,
-             "size_bytes": zip_size, "content_type": "application/zip"},
+            {
+                "session_id": session.name,
+                "filename": zip_path.name,
+                "size_bytes": zip_size,
+                "content_type": "application/zip",
+            },
             token,
         )
         upload_url = signed.get("upload_url") or signed.get("url")
