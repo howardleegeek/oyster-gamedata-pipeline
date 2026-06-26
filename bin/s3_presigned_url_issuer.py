@@ -78,8 +78,9 @@ class RateLimiter:
 class S3Client:
     """S3 client for presigned URL generation."""
 
-    def __init__(self, bucket: str, region: str = "us-east-1",
-                 access_key: str = "", secret_key: str = "") -> None:
+    def __init__(
+        self, bucket: str, region: str = "us-east-1", access_key: str = "", secret_key: str = ""
+    ) -> None:
         self.bucket = bucket
         self.region = region
         self._client = None
@@ -111,7 +112,13 @@ class PostgresAuditor:
     """Postgres auditor for upload-intent rows."""
 
     def __init__(self, host: str, port: int, user: str, password: str, database: str) -> None:
-        self.params = {"host": host, "port": port, "user": user, "password": password, "database": database}
+        self.params = {
+            "host": host,
+            "port": port,
+            "user": user,
+            "password": password,
+            "database": database,
+        }
         self._conn = None
 
     def _conn_get(self) -> Any:
@@ -119,8 +126,9 @@ class PostgresAuditor:
             self._conn = _lazy_import("psycopg2").connect(**self.params)
         return self._conn
 
-    def write_upload_intent(self, vendor_key: str, clip_id: str,
-                            s3_key: str, url: str) -> int | None:
+    def write_upload_intent(
+        self, vendor_key: str, clip_id: str, s3_key: str, url: str
+    ) -> int | None:
         """Write upload-intent row, return row ID."""
         conn = self._conn_get()
         cur = conn.cursor()
@@ -128,7 +136,7 @@ class PostgresAuditor:
             cur.execute(
                 "INSERT INTO upload_intents (vendor_key, clip_id, s3_object_key, "
                 "presigned_url, created_at, status) VALUES (%s,%s,%s,%s,%s,%s) RETURNING id",
-                (vendor_key, clip_id, s3_key, url, datetime.utcnow(), "pending")
+                (vendor_key, clip_id, s3_key, url, datetime.utcnow(), "pending"),
             )
             row_id = cur.fetchone()[0]
             conn.commit()
@@ -150,14 +158,25 @@ def build_s3_key(vendor_key: str, clip_id: str) -> str:
     return f"uploads/{vendor_key}/{clip_id}/{ts}"
 
 
-def process_clip(s3: S3Client, auditor: PostgresAuditor | None,
-                 limiter: RateLimiter, vendor_key: str, clip_id: str) -> dict[str, Any]:
+def process_clip(
+    s3: S3Client,
+    auditor: PostgresAuditor | None,
+    limiter: RateLimiter,
+    vendor_key: str,
+    clip_id: str,
+) -> dict[str, Any]:
     """Process one clip: rate-limit, generate URL, write audit."""
     limiter.acquire(vendor_key)
     s3_key = build_s3_key(vendor_key, clip_id)
     url = s3.generate_presigned_put_url(s3_key)
     row_id = auditor.write_upload_intent(vendor_key, clip_id, s3_key, url) if auditor else None
-    return {"vendor_key": vendor_key, "clip_id": clip_id, "s3_key": s3_key, "url": url, "id": row_id}
+    return {
+        "vendor_key": vendor_key,
+        "clip_id": clip_id,
+        "s3_key": s3_key,
+        "url": url,
+        "id": row_id,
+    }
 
 
 def read_batch(path: str) -> list[tuple[str, str]]:
@@ -178,9 +197,15 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--vendor-key", help="Vendor key for single issuance")
     p.add_argument("--clip-id", help="Clip ID for single issuance")
     p.add_argument("--batch-file", help="CSV with vendor_key,clip_id columns")
-    p.add_argument("--rate-limit", type=int, default=10, help="Rate limit per vendor/sec (default: 10)")
-    p.add_argument("--expiration-hours", type=int, default=24, help="URL expiration hours (default: 24)")
-    p.add_argument("--dry-run", action="store_true", help="Generate URLs without writing to Postgres")
+    p.add_argument(
+        "--rate-limit", type=int, default=10, help="Rate limit per vendor/sec (default: 10)"
+    )
+    p.add_argument(
+        "--expiration-hours", type=int, default=24, help="URL expiration hours (default: 24)"
+    )
+    p.add_argument(
+        "--dry-run", action="store_true", help="Generate URLs without writing to Postgres"
+    )
     args = p.parse_args(argv)
 
     # Validate
@@ -203,7 +228,11 @@ def main(argv: list[str] | None = None) -> int:
 
     # Init clients
     s3 = S3Client(s3_bucket, aws_region, aws_key, aws_secret)
-    auditor = PostgresAuditor(pg_host, pg_port, pg_user, pg_password, pg_database) if not args.dry_run else None
+    auditor = (
+        PostgresAuditor(pg_host, pg_port, pg_user, pg_password, pg_database)
+        if not args.dry_run
+        else None
+    )
     limiter = RateLimiter(args.rate_limit)
 
     try:
