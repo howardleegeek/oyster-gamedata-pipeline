@@ -97,7 +97,16 @@ class GracefulShutdownHandler:
             logger.error("Shutdown error: %s", e)
         sys.exit(0)
     
-    def _flush_writes(self):
+    def _flush_writes(self) -> None:
+        """Flush in-flight clip writes to disk.
+
+        Iterates through registered but incomplete writes and persists them
+        to disk within the configured flush_timeout. Writes are attempted in
+        order; any failures are logged but do not stop processing of remaining
+        writes. Successfully written clips are marked as completed.
+
+        The method acquires the internal lock to ensure thread-safe operation.
+        """
         with self._lock:
             if not self._writes:
                 return
