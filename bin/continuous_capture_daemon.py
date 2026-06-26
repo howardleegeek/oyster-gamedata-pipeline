@@ -20,13 +20,15 @@ import psutil
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+
 class DaemonState(Enum):
-    IDLE = "IDLE"           # Waiting for MC to start
-    ARMED = "ARMED"         # MC detected, recorder ARMed
-    RECORDING = "RECORDING" # Session in progress
-    FINALIZING = "FINALIZING" # Session ended, running canonical_pipeline
-    UPLOADING = "UPLOADING" # Session queued for upload daemon
-    COOLDOWN = "COOLDOWN"   # 30s before re-arming
+    IDLE = "IDLE"  # Waiting for MC to start
+    ARMED = "ARMED"  # MC detected, recorder ARMed
+    RECORDING = "RECORDING"  # Session in progress
+    FINALIZING = "FINALIZING"  # Session ended, running canonical_pipeline
+    UPLOADING = "UPLOADING"  # Session queued for upload daemon
+    COOLDOWN = "COOLDOWN"  # 30s before re-arming
+
 
 class ContinuousCaptureDaemon:
     def __init__(self):
@@ -79,11 +81,8 @@ class ContinuousCaptureDaemon:
         log_file = self.oyster_dir / "daemon.log"
         logging.basicConfig(
             level=logging.INFO,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler(log_file),
-                logging.StreamHandler()
-            ]
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            handlers=[logging.FileHandler(log_file), logging.StreamHandler()],
         )
         self.logger = logging.getLogger("oyster_daemon")
 
@@ -91,7 +90,7 @@ class ContinuousCaptureDaemon:
         """Load persisted state from file"""
         if self.state_file.exists():
             try:
-                with open(self.state_file, 'r') as f:
+                with open(self.state_file, "r") as f:
                     return json.load(f)
             except (json.JSONDecodeError, IOError):
                 pass
@@ -105,10 +104,10 @@ class ContinuousCaptureDaemon:
             "started_at": self.session_started.isoformat() if self.session_started else None,
             "total_sessions_today": self.total_sessions_today,
             "total_uptime_hours": self.total_uptime_hours,
-            "last_updated": datetime.now().isoformat()
+            "last_updated": datetime.now().isoformat(),
         }
         try:
-            with open(self.state_file, 'w') as f:
+            with open(self.state_file, "w") as f:
                 json.dump(state_data, f, indent=2)
         except IOError as e:
             self.logger.error(f"Failed to save state: {e}")
@@ -128,11 +127,11 @@ class ContinuousCaptureDaemon:
                 "errors": self.errors_this_hour.copy(),
                 "disk_free_gb": disk_free_gb,
                 "total_sessions_today": self.total_sessions_today,
-                "total_uptime_hours": self.total_uptime_hours
+                "total_uptime_hours": self.total_uptime_hours,
             }
 
             try:
-                with open(self.heartbeat_log, 'a') as f:
+                with open(self.heartbeat_log, "a") as f:
                     f.write(json.dumps(heartbeat_data) + "\n")
             except IOError as e:
                 self.logger.error(f"Failed to write heartbeat: {e}")
@@ -145,7 +144,9 @@ class ContinuousCaptureDaemon:
 
             # Check disk space and pause if needed
             if disk_free_gb < 10:
-                self.logger.warning(f"Low disk space: {disk_free_gb:.1f} GB free. Pausing auto-arm.")
+                self.logger.warning(
+                    f"Low disk space: {disk_free_gb:.1f} GB free. Pausing auto-arm."
+                )
                 self.paused = True
 
     def _get_free_disk_gb(self):
@@ -163,20 +164,20 @@ class ContinuousCaptureDaemon:
         try:
             if system == "Windows":
                 result = subprocess.run(
-                    ['tasklist', '/FI', 'IMAGENAME eq javaw.exe'],
-                    capture_output=True, text=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)
+                    ["tasklist", "/FI", "IMAGENAME eq javaw.exe"],
+                    capture_output=True,
+                    text=True,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                 )
                 return "javaw.exe" in result.stdout
             elif system == "Darwin":  # macOS
                 result = subprocess.run(
-                    ['pgrep', '-f', 'minecraft'],
-                    capture_output=True, text=True
+                    ["pgrep", "-f", "minecraft"], capture_output=True, text=True
                 )
                 return result.returncode == 0
             else:  # Linux
                 result = subprocess.run(
-                    ['pgrep', '-f', 'java.*minecraft'],
-                    capture_output=True, text=True
+                    ["pgrep", "-f", "java.*minecraft"], capture_output=True, text=True
                 )
                 return result.returncode == 0
         except Exception as e:
@@ -189,20 +190,20 @@ class ContinuousCaptureDaemon:
         try:
             if system == "Windows":
                 result = subprocess.run(
-                    ['tasklist', '/FI', 'IMAGENAME eq OysterRecorder.exe'],
-                    capture_output=True, text=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)
+                    ["tasklist", "/FI", "IMAGENAME eq OysterRecorder.exe"],
+                    capture_output=True,
+                    text=True,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                 )
                 return "OysterRecorder.exe" in result.stdout
             elif system == "Darwin":  # macOS
                 result = subprocess.run(
-                    ['pgrep', '-f', 'OysterRecorder'],
-                    capture_output=True, text=True
+                    ["pgrep", "-f", "OysterRecorder"], capture_output=True, text=True
                 )
                 return result.returncode == 0
             else:  # Linux
                 result = subprocess.run(
-                    ['pgrep', '-f', 'OysterRecorder'],
-                    capture_output=True, text=True
+                    ["pgrep", "-f", "OysterRecorder"], capture_output=True, text=True
                 )
                 return result.returncode == 0
         except Exception as e:
@@ -253,8 +254,7 @@ class ContinuousCaptureDaemon:
             finalize_script = project_root / "bin" / "canonical_pipeline.py"
             if finalize_script.exists():
                 result = subprocess.run(
-                    [sys.executable, str(finalize_script)],
-                    capture_output=True, text=True
+                    [sys.executable, str(finalize_script)], capture_output=True, text=True
                 )
                 if result.returncode == 0:
                     self.logger.info("Finalize completed successfully")
@@ -289,11 +289,11 @@ class ContinuousCaptureDaemon:
                 "clip_file": str(latest_clip),
                 "session_id": self.session_id,
                 "created_at": datetime.now().isoformat(),
-                "status": "pending"
+                "status": "pending",
             }
 
             job_file = upload_queue_dir / f"upload_{self.session_id}.json"
-            with open(job_file, 'w') as f:
+            with open(job_file, "w") as f:
                 json.dump(upload_job, f, indent=2)
 
             self.logger.info(f"Queued upload for session {self.session_id}")
@@ -457,6 +457,7 @@ class ContinuousCaptureDaemon:
         self.logger.info("Resuming daemon auto-arm")
         self.paused = False
 
+
 def main():
     """Main entry point"""
     daemon = ContinuousCaptureDaemon()
@@ -482,7 +483,7 @@ def main():
     with python_daemon.DaemonContext(
         pidfile=daemon.pidfile.PIDLockFile(str(pid_file)),
         stdout=open(Path.home() / ".oyster" / "daemon.out", "w"),
-        stderr=open(Path.home() / ".oyster" / "daemon.err", "w")
+        stderr=open(Path.home() / ".oyster" / "daemon.err", "w"),
     ):
         daemon.run()
 
