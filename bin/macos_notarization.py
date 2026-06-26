@@ -25,6 +25,7 @@ from typing import List, Optional, Tuple
 
 class NotarizationError(Exception):
     """Custom exception for notarization failures."""
+
     pass
 
 
@@ -41,7 +42,7 @@ class NotarizationWorkflow:
         issuer_id: Optional[str] = None,
         team_id: Optional[str] = None,
         sign_identity: Optional[str] = None,
-        verbose: bool = False
+        verbose: bool = False,
     ) -> None:
         """Initialize notarization workflow with authentication credentials."""
         self.bundle_id = bundle_id
@@ -71,7 +72,9 @@ class NotarizationWorkflow:
 
     def find_signing_identity(self) -> Optional[str]:
         """Find Developer ID signing certificate in keychain."""
-        _, stdout, _ = self.run_cmd(["security", "find-identity", "-v", "-p", "codesigning"], check=False)
+        _, stdout, _ = self.run_cmd(
+            ["security", "find-identity", "-v", "-p", "codesigning"], check=False
+        )
         for line in stdout.splitlines():
             if "Developer ID Application" in line and '"' in line:
                 return line.split('"')[1]
@@ -84,10 +87,19 @@ class NotarizationWorkflow:
             raise NotarizationError("No signing identity found")
         self.log(f"Signing {app_path} with identity: {identity}")
         # Sign the app bundle with deep flag for embedded content
-        self.run_cmd([
-            "codesign", "--sign", identity, "--force", "--deep",
-            "--options", "runtime", "--timestamp", str(app_path)
-        ])
+        self.run_cmd(
+            [
+                "codesign",
+                "--sign",
+                identity,
+                "--force",
+                "--deep",
+                "--options",
+                "runtime",
+                "--timestamp",
+                str(app_path),
+            ]
+        )
 
     def codesign_pkg(self, pkg_path: Path) -> None:
         """Codesign a .pkg installer."""
@@ -101,9 +113,9 @@ class NotarizationWorkflow:
 
     def verify_signature(self, target_path: Path) -> bool:
         """Verify code signature is valid."""
-        ret, _, stderr = self.run_cmd([
-            "codesign", "--verify", "--deep", "--strict", str(target_path)
-        ], check=False)
+        ret, _, stderr = self.run_cmd(
+            ["codesign", "--verify", "--deep", "--strict", str(target_path)], check=False
+        )
         if ret == 0:
             self.log(f"Signature verified: {target_path}")
             return True
@@ -115,7 +127,14 @@ class NotarizationWorkflow:
         if self.api_key and self.api_key_id and self.issuer_id:
             return ["--key", self.api_key, "--key-id", self.api_key_id, "--issuer", self.issuer_id]
         if self.apple_id and self.password and self.team_id:
-            return ["--apple-id", self.apple_id, "--password", self.password, "--team-id", self.team_id]
+            return [
+                "--apple-id",
+                self.apple_id,
+                "--password",
+                self.password,
+                "--team-id",
+                self.team_id,
+            ]
         return ["--keychain-profile", "notarytool-profile"]
 
     def submit_notarization(self, target_path: Path) -> str:
@@ -129,7 +148,11 @@ class NotarizationWorkflow:
             self.run_cmd(["ditto", "-c", "-k", "--keepParent", str(target_path), str(zip_path)])
             submit_path = zip_path
 
-        cmd = ["xcrun", "notarytool", "submit", str(submit_path)] + self.build_auth_args() + ["--wait", "--output-format", "json"]
+        cmd = (
+            ["xcrun", "notarytool", "submit", str(submit_path)]
+            + self.build_auth_args()
+            + ["--wait", "--output-format", "json"]
+        )
         _, stdout, _ = self.run_cmd(cmd, check=False)
         try:
             result = json.loads(stdout)
@@ -154,13 +177,17 @@ class NotarizationWorkflow:
 
     def verify_notarization(self, target_path: Path) -> bool:
         """Verify notarization is valid."""
-        ret, _, _ = self.run_cmd(["spctl", "--assess", "--verbose=4", "--type", "install", str(target_path)], check=False)
+        ret, _, _ = self.run_cmd(
+            ["spctl", "--assess", "--verbose=4", "--type", "install", str(target_path)], check=False
+        )
         if ret == 0:
             self.log(f"Notarization verified: {target_path}")
             return True
         # Alternative check for .app
         if target_path.suffix == ".app":
-            ret, _, _ = self.run_cmd(["codesign", "--test-requirement=notarization", str(target_path)], check=False)
+            ret, _, _ = self.run_cmd(
+                ["codesign", "--test-requirement=notarization", str(target_path)], check=False
+            )
             return ret == 0
         return False
 
@@ -213,7 +240,7 @@ Examples:
   %(prog)s --app /path/to/App.app --bundle-id com.example.app
   %(prog)s --pkg /path/to/Installer.pkg --bundle-id com.example.pkg
   %(prog)s --app MyApp.app --apple-id user@example.com --password xxxx --team-id XXXXXX
-        """
+        """,
     )
 
     target = parser.add_mutually_exclusive_group(required=True)
@@ -241,7 +268,10 @@ Examples:
     has_apple_id = all([args.apple_id, args.password, args.team_id])
     has_api_key = all([args.api_key, args.api_key_id, args.issuer_id])
     if not (has_apple_id or has_api_key):
-        print("Warning: No complete authentication provided. Will use keychain profile.", file=sys.stderr)
+        print(
+            "Warning: No complete authentication provided. Will use keychain profile.",
+            file=sys.stderr,
+        )
 
     target_path = args.app or args.pkg
     is_pkg = args.pkg is not None
@@ -259,7 +289,7 @@ Examples:
         issuer_id=args.issuer_id,
         team_id=args.team_id,
         sign_identity=args.sign_identity,
-        verbose=args.verbose
+        verbose=args.verbose,
     )
 
     return 0 if workflow.run(target_path, is_pkg=is_pkg) else 1
