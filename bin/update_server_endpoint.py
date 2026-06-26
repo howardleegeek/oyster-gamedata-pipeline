@@ -29,6 +29,7 @@ def _get_fastapi():
     global _fastapi
     if _fastapi is None:
         import fastapi
+
         _fastapi = fastapi
     return _fastapi
 
@@ -38,13 +39,14 @@ def _get_pydantic():
     global _pydantic
     if _pydantic is None:
         import pydantic
+
         _pydantic = pydantic
     return _pydantic
 
 
 class UpdateInfo:
     """Update information model for the auto-updater."""
-    
+
     def __init__(
         self,
         version: str,
@@ -58,7 +60,7 @@ class UpdateInfo:
         self.sha256 = sha256
         self.release_notes = release_notes
         self.min_system_version = min_system_version
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         result = {
@@ -74,7 +76,7 @@ class UpdateInfo:
 
 class UpdateCheckResponse:
     """Response model for /api/updates/check endpoint."""
-    
+
     def __init__(
         self,
         latest_version: str,
@@ -90,7 +92,7 @@ class UpdateCheckResponse:
         self.release_notes = release_notes
         self.update_available = update_available
         self.min_system_version = min_system_version
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         result = {
@@ -107,10 +109,10 @@ class UpdateCheckResponse:
 
 def parse_version(version: str) -> tuple[int, ...]:
     """Parse version string into tuple for comparison.
-    
+
     Args:
         version: Version string like "1.2.3"
-        
+
     Returns:
         Tuple of integers for comparison, e.g., (1, 2, 3)
     """
@@ -122,11 +124,11 @@ def parse_version(version: str) -> tuple[int, ...]:
 
 def is_newer_version(current: str, latest: str) -> bool:
     """Check if latest version is newer than current version.
-    
+
     Args:
         current: Current version string
         latest: Latest version string
-        
+
     Returns:
         True if latest is newer than current
     """
@@ -137,22 +139,22 @@ def is_newer_version(current: str, latest: str) -> bool:
 
 def load_update_data(data_path: Path) -> dict[str, UpdateInfo]:
     """Load update data from JSON file.
-    
+
     Args:
         data_path: Path to the updates data directory
-        
+
     Returns:
         Dictionary mapping platform to UpdateInfo
     """
     updates_file = data_path / "updates.json"
-    
+
     if not updates_file.exists():
         # Return empty dict if no updates file
         return {}
-    
+
     with open(updates_file, "r", encoding="utf-8") as f:
         data = json.load(f)
-    
+
     updates = {}
     for platform, info in data.items():
         updates[platform] = UpdateInfo(
@@ -162,57 +164,59 @@ def load_update_data(data_path: Path) -> dict[str, UpdateInfo]:
             release_notes=info.get("release_notes", ""),
             min_system_version=info.get("min_system_version"),
         )
-    
+
     return updates
 
 
 def create_app(data_path: Path):
     """Create FastAPI application with update endpoint.
-    
+
     Args:
         data_path: Path to the updates data directory
-        
+
     Returns:
         FastAPI application instance
     """
     fastapi = _get_fastapi()
-    
+
     app = fastapi.FastAPI(
         title="G225 Update Server",
         description="Auto-updater endpoint for G225 client",
         version="1.0.0",
     )
-    
+
     # Load update data at startup
     updates = load_update_data(data_path)
-    
+
     @app.get("/api/updates/check")
     async def check_update(
-        platform: str = fastapi.Query(..., description="Target platform (e.g., windows, macos, linux)"),
+        platform: str = fastapi.Query(
+            ..., description="Target platform (e.g., windows, macos, linux)"
+        ),
         current: str = fastapi.Query(..., description="Current version string"),
     ) -> dict[str, Any]:
         """Check for available updates.
-        
+
         Query parameters:
             platform: Target platform (windows, macos, linux)
             current: Current version string (e.g., "1.0.0")
-            
+
         Returns:
             JSON with latest version, download URL, SHA256, release notes,
             and whether an update is available
         """
         # Normalize platform name
         platform_key = platform.lower()
-        
+
         if platform_key not in updates:
             return {
                 "error": f"Platform '{platform}' not supported",
                 "update_available": False,
             }
-        
+
         update_info = updates[platform_key]
         update_available = is_newer_version(current, update_info.version)
-        
+
         response = UpdateCheckResponse(
             latest_version=update_info.version,
             download_url=update_info.download_url,
@@ -221,23 +225,23 @@ def create_app(data_path: Path):
             update_available=update_available,
             min_system_version=update_info.min_system_version,
         )
-        
+
         return response.to_dict()
-    
+
     @app.get("/health")
     async def health_check() -> dict[str, str]:
         """Health check endpoint."""
         return {"status": "healthy"}
-    
+
     return app
 
 
 def main(argv: list[str]) -> int:
     """Main entry point for the update server.
-    
+
     Args:
         argv: Command line arguments (excluding script name)
-        
+
     Returns:
         Exit code (0 for success, non-zero for error)
     """
@@ -250,36 +254,36 @@ Examples:
     %(prog)s --port 443 --data-path /etc/app/updates --host 0.0.0.0
         """,
     )
-    
+
     parser.add_argument(
         "--port",
         type=int,
         default=8080,
         help="Port to listen on (default: 8080)",
     )
-    
+
     parser.add_argument(
         "--host",
         type=str,
         default="127.0.0.1",
         help="Host to bind to (default: 127.0.0.1)",
     )
-    
+
     parser.add_argument(
         "--data-path",
         type=Path,
         default=Path("./updates"),
         help="Path to updates data directory (default: ./updates)",
     )
-    
+
     parser.add_argument(
         "--reload",
         action="store_true",
         help="Enable auto-reload for development",
     )
-    
+
     args = parser.parse_args(argv)
-    
+
     # Validate data path
     if not args.data_path.exists():
         print(f"Warning: Data path '{args.data_path}' does not exist", file=sys.stderr)
@@ -287,10 +291,10 @@ Examples:
         temp_dir = Path(tempfile.mkdtemp())
         print(f"Using temporary directory: {temp_dir}", file=sys.stderr)
         args.data_path = temp_dir
-    
+
     # Create FastAPI app
     app = create_app(args.data_path)
-    
+
     # Import uvicorn for running the server
     try:
         import uvicorn
@@ -298,7 +302,7 @@ Examples:
         print("Error: uvicorn is required to run the server", file=sys.stderr)
         print("Install with: pip install uvicorn", file=sys.stderr)
         return 1
-    
+
     # Run the server
     uvicorn.run(
         app,
@@ -306,7 +310,7 @@ Examples:
         port=args.port,
         reload=args.reload,
     )
-    
+
     return 0
 
 
