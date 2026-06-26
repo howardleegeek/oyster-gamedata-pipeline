@@ -209,9 +209,7 @@ def main(argv: Optional[list] = None) -> int:
     """CLI entry point."""
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="OysterRecorder first-run consent flow"
-    )
+    parser = argparse.ArgumentParser(description="OysterRecorder first-run consent flow")
     parser.add_argument(
         "--check",
         action="store_true",
