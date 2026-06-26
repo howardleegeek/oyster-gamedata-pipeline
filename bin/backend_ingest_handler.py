@@ -24,8 +24,7 @@ from typing import Any, Dict, Optional, Tuple
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -86,8 +85,7 @@ class G165LintValidator:
 
                 # Check for manifest file
                 manifest_found = any(
-                    "manifest" in name.lower() and name.endswith(".json")
-                    for name in members
+                    "manifest" in name.lower() and name.endswith(".json") for name in members
                 )
                 if not manifest_found:
                     self.errors.append("No manifest.json file found")
@@ -200,14 +198,22 @@ def get_db_connection() -> Any:
     from psycopg2.extras import RealDictCursor
 
     return psycopg2.connect(
-        host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER,
-        password=DB_PASSWORD, sslmode=DB_SSL_MODE, cursor_factory=RealDictCursor
+        host=DB_HOST,
+        port=DB_PORT,
+        dbname=DB_NAME,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        sslmode=DB_SSL_MODE,
+        cursor_factory=RealDictCursor,
     )
 
 
 def write_clip_row(
-    vendor_id: str, duration: float, sha256: str, s3_uri: str,
-    metadata: Optional[Dict[str, Any]] = None
+    vendor_id: str,
+    duration: float,
+    sha256: str,
+    s3_uri: str,
+    metadata: Optional[Dict[str, Any]] = None,
 ) -> Tuple[bool, str]:
     """
     Write clip row to Postgres database.
@@ -231,7 +237,7 @@ def write_clip_row(
         """
         cursor.execute(
             query,
-            (vendor_id, duration, sha256, s3_uri, json.dumps(metadata or {}), datetime.utcnow())
+            (vendor_id, duration, sha256, s3_uri, json.dumps(metadata or {}), datetime.utcnow()),
         )
         result = cursor.fetchone()
         conn.commit()
@@ -258,8 +264,13 @@ def process_tarball(tarball_path: Path, vendor_id: str, cleanup: bool = True) ->
         Dictionary with processing results.
     """
     result: Dict[str, Any] = {
-        "success": False, "vendor_id": vendor_id, "sha256": None,
-        "duration": None, "s3_uri": None, "clip_id": None, "error": None
+        "success": False,
+        "vendor_id": vendor_id,
+        "sha256": None,
+        "duration": None,
+        "s3_uri": None,
+        "clip_id": None,
+        "error": None,
     }
 
     extract_dir = None
@@ -294,9 +305,11 @@ def process_tarball(tarball_path: Path, vendor_id: str, cleanup: bool = True) ->
 
         # Write to database
         db_success, db_result = write_clip_row(
-            vendor_id=vendor_id, duration=result["duration"],
-            sha256=sha256, s3_uri=upload_result,
-            metadata={"original_filename": tarball_path.name}
+            vendor_id=vendor_id,
+            duration=result["duration"],
+            sha256=sha256,
+            s3_uri=upload_result,
+            metadata={"original_filename": tarball_path.name},
         )
         if not db_success:
             result["error"] = f"Database write failed: {db_result}"
@@ -329,6 +342,7 @@ def create_app() -> Any:
 
     class IngestResponse(BaseModel):
         """Response model for ingest endpoint."""
+
         success: bool
         vendor_id: str
         sha256: Optional[str] = None
@@ -340,7 +354,7 @@ def create_app() -> Any:
     app = FastAPI(
         title="Vendor Tarball Ingest Handler",
         description="Endpoint for uploading and processing vendor tarballs",
-        version="1.0.0"
+        version="1.0.0",
     )
 
     @app.post("/v1/ingest", response_model=IngestResponse)
@@ -458,6 +472,7 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     elif args.command == "serve":
         import uvicorn
+
         print(f"Starting server on {args.host}:{args.port}")
         app = create_app()
         uvicorn.run(app, host=args.host, port=args.port)
