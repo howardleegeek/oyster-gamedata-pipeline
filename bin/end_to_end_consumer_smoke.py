@@ -27,16 +27,20 @@ from typing import Optional
 def _lazy_import_pydantic():
     try:
         import pydantic
+
         return pydantic
     except ImportError:
         return None
 
+
 def _lazy_import_yaml():
     try:
         import yaml
+
         return yaml
     except ImportError:
         return None
+
 
 # Constants
 APP_NAME = "OysterClips"
@@ -45,9 +49,12 @@ G165_LINT_COUNT = 24
 TARBALL_OUTPUT_DIR = Path.home() / "Documents" / "OysterClips"
 MOCK_PROVIDER_DURATION_SECS = 5 * 60  # 5 minutes
 
+
 class SmokeTestError(Exception):
     """Base exception for smoke test failures."""
+
     pass
+
 
 class InstallerSimulator:
     """Simulates the installer run for the consumer app."""
@@ -62,8 +69,11 @@ class InstallerSimulator:
         self.install_dir.mkdir(parents=True, exist_ok=True)
 
         app_files = [
-            "oysterclips.py", "config.yaml", "provider_mock.py",
-            "consumer_client.py", "utils.py",
+            "oysterclips.py",
+            "config.yaml",
+            "provider_mock.py",
+            "consumer_client.py",
+            "utils.py",
         ]
         for filename in app_files:
             filepath = self.install_dir / filename
@@ -76,6 +86,7 @@ class InstallerSimulator:
 
         print(f"[Installer] Installed {len(self.installed_files)} files")
         return True
+
 
 class GameLauncher:
     """Simulates game launch with provider trajectory."""
@@ -142,6 +153,7 @@ class GameLauncher:
             trajectory_file.write_text(json.dumps(self.trajectory_data, indent=2))
         return True
 
+
 class TarballCreator:
     """Creates PRD-compliant tarball at ~/Documents/OysterClips/."""
 
@@ -161,7 +173,8 @@ class TarballCreator:
 
         result = subprocess.run(
             ["tar", "-czf", str(self.tarball_path), "-C", str(self.source_dir), "."],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         )
 
         if result.returncode != 0:
@@ -172,6 +185,7 @@ class TarballCreator:
         size_kb = self.tarball_path.stat().st_size / 1024
         print(f"[TarballCreator] Created {self.tarball_path.name} ({size_kb:.1f} KB)")
         return True
+
 
 class G165Linter:
     """Mock G165 linter that asserts 24/24 passes."""
@@ -187,23 +201,43 @@ class G165Linter:
         print("[G165Linter] Running G165 lint checks...")
 
         lint_categories = [
-            "syntax_check", "import_check", "naming_convention", "docstring_check",
-            "type_hint_check", "error_handling", "resource_cleanup", "security_check",
-            "performance_check", "test_coverage", "code_complexity", "dead_code",
-            "unused_imports", "indentation", "line_length", "whitespace",
-            "consistent_naming", "exception_handling", "logging_usage", "config_management",
-            "dependency_check", "api_documentation", "error_messages", "code_duplication",
+            "syntax_check",
+            "import_check",
+            "naming_convention",
+            "docstring_check",
+            "type_hint_check",
+            "error_handling",
+            "resource_cleanup",
+            "security_check",
+            "performance_check",
+            "test_coverage",
+            "code_complexity",
+            "dead_code",
+            "unused_imports",
+            "indentation",
+            "line_length",
+            "whitespace",
+            "consistent_naming",
+            "exception_handling",
+            "logging_usage",
+            "config_management",
+            "dependency_check",
+            "api_documentation",
+            "error_messages",
+            "code_duplication",
         ]
 
         assert len(lint_categories) == G165_LINT_COUNT
 
         for check_id, category in enumerate(lint_categories, start=1):
-            self.results.append({
-                "check_id": check_id,
-                "category": category,
-                "status": "PASS",
-                "message": f"{category} check passed",
-            })
+            self.results.append(
+                {
+                    "check_id": check_id,
+                    "category": category,
+                    "status": "PASS",
+                    "message": f"{category} check passed",
+                }
+            )
             self.passed += 1
 
         self.failed = G165_LINT_COUNT - self.passed
@@ -213,6 +247,7 @@ class G165Linter:
             print(f"[G165Linter] FAILED: Expected {G165_LINT_COUNT}, got {self.passed}")
             return False
         return True
+
 
 def verify_python_syntax(file_path: Path) -> bool:
     """Verify a Python file has valid syntax."""
@@ -224,10 +259,12 @@ def verify_python_syntax(file_path: Path) -> bool:
         print(f"[SyntaxCheck] {file_path}: {e}")
         return False
 
+
 def cleanup_temp_dir(temp_dir: Optional[Path]) -> None:
     """Clean up temporary directory."""
     if temp_dir and temp_dir.exists():
         shutil.rmtree(temp_dir)
+
 
 def main(argv: Optional[list[str]] = None) -> int:
     """Main entry point for the end-to-end consumer smoke test."""
@@ -237,8 +274,12 @@ def main(argv: Optional[list[str]] = None) -> int:
         epilog="Validates: installer -> game launch -> trajectory -> auto-stop -> tarball -> G165 lint",
     )
     parser.add_argument("--fast", action="store_true", help="Run with reduced timing")
-    parser.add_argument("--output-dir", type=Path, default=TARBALL_OUTPUT_DIR,
-                        help=f"Output directory (default: {TARBALL_OUTPUT_DIR})")
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=TARBALL_OUTPUT_DIR,
+        help=f"Output directory (default: {TARBALL_OUTPUT_DIR})",
+    )
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
 
     args = parser.parse_args(argv)
@@ -329,12 +370,14 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(f"\n[UNEXPECTED ERROR] {e}")
         if args.verbose:
             import traceback
+
             traceback.print_exc()
         return 1
     finally:
         if temp_dir and temp_dir.exists():
             print(f"\n[Cleanup] Removing temp directory: {temp_dir}")
             cleanup_temp_dir(temp_dir)
+
 
 if __name__ == "__main__":
     sys.exit(main())
