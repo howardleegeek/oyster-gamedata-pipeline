@@ -49,6 +49,7 @@ def sparkline(values):
 # Statistics helpers
 # ---------------------------------------------------------------------------
 
+
 def mean(values):
     """Arithmetic mean of a list of numbers."""
     if not values:
@@ -82,6 +83,7 @@ def linear_slope(values):
 # ---------------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------------
+
 
 def load_runs(results_dir):
     """Load all JSON audit reports from *results_dir*, sorted by timestamp."""
@@ -117,6 +119,7 @@ def load_runs(results_dir):
 # Schema drift detection
 # ---------------------------------------------------------------------------
 
+
 def check_schema_drift(runs):
     """Warn if total_items varies wildly across runs."""
     totals = [r.get("total_items", 0) for r in runs]
@@ -134,6 +137,7 @@ def check_schema_drift(runs):
 # ---------------------------------------------------------------------------
 # Time-series extraction
 # ---------------------------------------------------------------------------
+
 
 def build_timeseries(runs):
     """Build per-item and per-QM time-series from a list of run dicts."""
@@ -186,6 +190,7 @@ def build_timeseries(runs):
 # Regression / improvement detection
 # ---------------------------------------------------------------------------
 
+
 def detect_transitions(item_series):
     """Find PASS->FAIL (regressions) and FAIL->PASS (improvements)."""
     regressions = []
@@ -208,8 +213,10 @@ def detect_transitions(item_series):
 # Markdown report generation
 # ---------------------------------------------------------------------------
 
-def generate_report(runs, item_series, qm_series, pass_rate_series,
-                    regressions, improvements, lookback=10):
+
+def generate_report(
+    runs, item_series, qm_series, pass_rate_series, regressions, improvements, lookback=10
+):
     """Generate the TREND-REPORT.md content."""
     lines = []
     lines.append("# Audit Trend Report\n")
@@ -245,7 +252,7 @@ def generate_report(runs, item_series, qm_series, pass_rate_series,
 
     # Header
     header = "| Item | Status Trend | "
-    header += " | ".join(f"R{i+1}" for i in range(len(display_runs)))
+    header += " | ".join(f"R{i + 1}" for i in range(len(display_runs)))
     header += " |"
     lines.append(header)
     sep = "|------|--------------|" + "|".join("---" for _ in display_runs) + "|"
@@ -332,8 +339,8 @@ def generate_report(runs, item_series, qm_series, pass_rate_series,
 # Machine-readable JSON output
 # ---------------------------------------------------------------------------
 
-def build_trend_data(runs, item_series, qm_series, pass_rate_series,
-                     regressions, improvements):
+
+def build_trend_data(runs, item_series, qm_series, pass_rate_series, regressions, improvements):
     """Build a dict for trend-data.json."""
     return {
         "total_runs": len(runs),
@@ -347,21 +354,13 @@ def build_trend_data(runs, item_series, qm_series, pass_rate_series,
             }
             for r in runs
         ],
-        "pass_rate_series": [
-            {"timestamp": ts, "rate": rate} for ts, rate in pass_rate_series
-        ],
+        "pass_rate_series": [{"timestamp": ts, "rate": rate} for ts, rate in pass_rate_series],
         "item_series": {
-            name: [
-                {"timestamp": ts, "status": status}
-                for ts, status in series
-            ]
+            name: [{"timestamp": ts, "status": status} for ts, status in series]
             for name, series in item_series.items()
         },
         "qm_series": {
-            k: [
-                {"timestamp": ts, "value": v}
-                for ts, v in series
-            ]
+            k: [{"timestamp": ts, "value": v} for ts, v in series]
             for k, series in qm_series.items()
         },
         "regressions": [
@@ -378,6 +377,7 @@ def build_trend_data(runs, item_series, qm_series, pass_rate_series,
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -432,8 +432,13 @@ def main():
 
     # Generate report
     report = generate_report(
-        runs, item_series, qm_series, pass_rate_series,
-        regressions, improvements, lookback,
+        runs,
+        item_series,
+        qm_series,
+        pass_rate_series,
+        regressions,
+        improvements,
+        lookback,
     )
 
     # Write markdown
@@ -443,8 +448,12 @@ def main():
 
     # Write machine-readable JSON
     trend_data = build_trend_data(
-        runs, item_series, qm_series, pass_rate_series,
-        regressions, improvements,
+        runs,
+        item_series,
+        qm_series,
+        pass_rate_series,
+        regressions,
+        improvements,
     )
     trend_json_path = os.path.join(os.path.dirname(out_path) or ".", "trend-data.json")
     with open(trend_json_path, "w", encoding="utf-8") as fh:
