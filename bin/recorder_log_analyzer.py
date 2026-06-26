@@ -45,9 +45,7 @@ PATTERNS: list[dict] = [
     {
         "code": "FULL_DESKTOP_CAPTURE",
         "severity": "critical",
-        "regex": re.compile(
-            r"ffmpeg:\s*full-desktop capture\b.*title unsafe", re.IGNORECASE
-        ),
+        "regex": re.compile(r"ffmpeg:\s*full-desktop capture\b.*title unsafe", re.IGNORECASE),
         "summary": (
             "Recording captured the entire desktop instead of just the "
             "Minecraft window because gdigrab couldn't grab a non-ASCII "
@@ -58,9 +56,7 @@ PATTERNS: list[dict] = [
     {
         "code": "PLACEHOLDER_GAMESTATE",
         "severity": "critical",
-        "regex": re.compile(
-            r"package:\s*no game-state JSONL.*placeholder", re.IGNORECASE
-        ),
+        "regex": re.compile(r"package:\s*no game-state JSONL.*placeholder", re.IGNORECASE),
         "summary": (
             "Tarball shipped with placeholder camera/player coords "
             "(constant [0,64,0]) because the Fabric mod was not loaded. "
@@ -99,9 +95,7 @@ PATTERNS: list[dict] = [
     {
         "code": "FFMPEG_FATAL",
         "severity": "high",
-        "regex": re.compile(
-            r"ffmpeg:.*(error|fatal|cannot|failed)", re.IGNORECASE
-        ),
+        "regex": re.compile(r"ffmpeg:.*(error|fatal|cannot|failed)", re.IGNORECASE),
         "summary": (
             "ffmpeg reported an error during capture or encoding. Most "
             "captures stop here; the tarball may be incomplete."
@@ -186,6 +180,7 @@ class Report:
 # Loaders
 # =============================================================================
 
+
 def load_log_and_sysinfo(path: Path | None) -> tuple[str, dict[str, str]]:
     """Return (log_text, sysinfo_dict). Handles .log, .zip, or stdin."""
     if path is None:
@@ -218,6 +213,7 @@ def _parse_sysinfo(text: str) -> dict[str, str]:
 # =============================================================================
 # Analysis
 # =============================================================================
+
 
 def extract_run_info(log_text: str, sysinfo: dict[str, str]) -> RunInfo:
     """Pull version + platform + size from sysinfo first, log second."""
@@ -259,7 +255,11 @@ def classify(log_text: str) -> tuple[list[Issue], list[str]]:
             m = pat["regex"].search(log_text)
             if m:
                 start_line = log_text[: m.start()].count("\n") + 1
-                evidence = lines[start_line - 1] if 0 < start_line <= len(lines) else m.group(0).splitlines()[0]
+                evidence = (
+                    lines[start_line - 1]
+                    if 0 < start_line <= len(lines)
+                    else m.group(0).splitlines()[0]
+                )
                 issues.append(
                     Issue(
                         code=pat["code"],
@@ -302,6 +302,7 @@ def classify(log_text: str) -> tuple[list[Issue], list[str]]:
 # =============================================================================
 # CLI
 # =============================================================================
+
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
