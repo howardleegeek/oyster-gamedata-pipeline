@@ -30,7 +30,7 @@ def load_batch_manifest() -> Dict[str, Any]:
     manifest_path = BATCH_DIR / "batch_manifest.json"
 
     if manifest_path.exists():
-        with open(manifest_path, 'r') as f:
+        with open(manifest_path, "r") as f:
             return json.load(f)
 
     return {
@@ -38,7 +38,7 @@ def load_batch_manifest() -> Dict[str, Any]:
         "scene": "unknown",
         "operator_id": "unknown",
         "quota": {"1": 10, "2": 10, "3": 10, "4": 5},
-        "sessions": []
+        "sessions": [],
     }
 
 
@@ -53,7 +53,7 @@ def load_session_grade(session_id: str) -> Dict[str, Any]:
 
     for path in possible_paths:
         if path.exists():
-            with open(path, 'r') as f:
+            with open(path, "r") as f:
                 return json.load(f)
 
     return {}
@@ -65,7 +65,7 @@ def get_route_type_description(route_type: int) -> str:
         1: "Normal Exploration A",
         2: "Normal Exploration B",
         3: "Special/Loop Pattern",
-        4: "Rare Special Pattern"
+        4: "Rare Special Pattern",
     }
     return descriptions.get(route_type, "Unknown")
 
@@ -98,7 +98,7 @@ def calculate_statistics(manifest: Dict[str, Any]) -> Dict[str, Any]:
             "current": current,
             "target": target,
             "remaining": max(0, target - current),
-            "met": current >= target
+            "met": current >= target,
         }
 
     # Extract audit scores
@@ -116,12 +116,14 @@ def calculate_statistics(manifest: Dict[str, Any]) -> Dict[str, Any]:
     for session in sessions:
         if session.get("grade") == "FAIL":
             grade_info = load_session_grade(session.get("id", ""))
-            failed_sessions.append({
-                "session_id": session.get("id", "unknown"),
-                "route_type": session.get("route_type", 0),
-                "reason": grade_info.get("failure_reason", "Unknown"),
-                "details": grade_info.get("failure_details", "")
-            })
+            failed_sessions.append(
+                {
+                    "session_id": session.get("id", "unknown"),
+                    "route_type": session.get("route_type", 0),
+                    "reason": grade_info.get("failure_reason", "Unknown"),
+                    "details": grade_info.get("failure_details", ""),
+                }
+            )
 
     return {
         "total_sessions": len(sessions),
@@ -129,17 +131,15 @@ def calculate_statistics(manifest: Dict[str, Any]) -> Dict[str, Any]:
         "quota_status": quota_status,
         "audit_scores": audit_scores,
         "failed_sessions": failed_sessions,
-        "pass_rate": sum(1 for s in sessions if s.get("grade") == "PASS") / max(len(sessions), 1) * 100
+        "pass_rate": sum(1 for s in sessions if s.get("grade") == "PASS")
+        / max(len(sessions), 1)
+        * 100,
     }
 
 
 def render_dashboard():
     """Render the Streamlit dashboard."""
-    st.set_page_config(
-        page_title="Batch Dashboard",
-        page_icon="📊",
-        layout="wide"
-    )
+    st.set_page_config(page_title="Batch Dashboard", page_icon="📊", layout="wide")
 
     st.title("📊 Batch Progress Dashboard")
 
@@ -165,14 +165,16 @@ def render_dashboard():
 
     quota_data = []
     for rt, status in stats["quota_status"].items():
-        quota_data.append({
-            "Route Type": f"Type {rt}",
-            "Description": get_route_type_description(int(rt)),
-            "Current": status["current"],
-            "Target": status["target"],
-            "Remaining": status["remaining"],
-            "Status": "✅ Met" if status["met"] else "⚠️ In Progress"
-        })
+        quota_data.append(
+            {
+                "Route Type": f"Type {rt}",
+                "Description": get_route_type_description(int(rt)),
+                "Current": status["current"],
+                "Target": status["target"],
+                "Remaining": status["remaining"],
+                "Status": "✅ Met" if status["met"] else "⚠️ In Progress",
+            }
+        )
 
     quota_df = pd.DataFrame(quota_data)
     st.dataframe(quota_df, use_container_width=True)
@@ -185,18 +187,17 @@ def render_dashboard():
         fig = go.Figure()
         for rt, status in stats["quota_status"].items():
             pct = min(100, (status["current"] / max(status["target"], 1)) * 100)
-            fig.add_trace(go.Bar(
-                name=f"Type {rt}",
-                x=[f"Type {rt}"],
-                y=[pct],
-                text=f"{status['current']}/{status['target']}",
-                textposition='auto',
-            ))
+            fig.add_trace(
+                go.Bar(
+                    name=f"Type {rt}",
+                    x=[f"Type {rt}"],
+                    y=[pct],
+                    text=f"{status['current']}/{status['target']}",
+                    textposition="auto",
+                )
+            )
         fig.update_layout(
-            yaxis_title="Completion %",
-            yaxis=dict(range=[0, 120]),
-            showlegend=False,
-            height=300
+            yaxis_title="Completion %", yaxis=dict(range=[0, 120]), showlegend=False, height=300
         )
         st.plotly_chart(fig, use_container_width=True)
 
@@ -226,13 +227,15 @@ def render_dashboard():
             total = counts["total"]
             if total > 0:
                 rate = (counts["pass"] / total) * 100
-                pass_rate_data.append({
-                    "Route Type": f"Type {rt}",
-                    "Pass Rate": rate,
-                    "Pass": counts["pass"],
-                    "Fail": counts["fail"],
-                    "Pending": counts["pending"]
-                })
+                pass_rate_data.append(
+                    {
+                        "Route Type": f"Type {rt}",
+                        "Pass Rate": rate,
+                        "Pass": counts["pass"],
+                        "Fail": counts["fail"],
+                        "Pending": counts["pending"],
+                    }
+                )
 
         if pass_rate_data:
             pass_df = pd.DataFrame(pass_rate_data)
@@ -250,7 +253,7 @@ def render_dashboard():
             x=stats["audit_scores"],
             nbins=20,
             labels={"x": "Audit Score"},
-            title="Audit Score Histogram"
+            title="Audit Score Histogram",
         )
         st.plotly_chart(fig, use_container_width=True)
     else:
@@ -275,13 +278,15 @@ def render_dashboard():
     re_record_needed = []
     for rt, status in stats["quota_status"].items():
         if not status["met"]:
-            re_record_needed.append({
-                "Route Type": f"Type {rt}",
-                "Description": get_route_type_description(int(rt)),
-                "Needed": status["remaining"],
-                "Current": status["current"],
-                "Target": status["target"]
-            })
+            re_record_needed.append(
+                {
+                    "Route Type": f"Type {rt}",
+                    "Description": get_route_type_description(int(rt)),
+                    "Needed": status["remaining"],
+                    "Current": status["current"],
+                    "Target": status["target"],
+                }
+            )
 
     if re_record_needed:
         st.warning("⚠️ Some route types need more recordings")
