@@ -19,6 +19,7 @@ from typing import Optional
 # Lazy imports for optional dependencies
 try:
     import yaml
+
     YAML_AVAILABLE = True
 except ImportError:
     YAML_AVAILABLE = False
@@ -26,6 +27,7 @@ except ImportError:
 
 class NetworkType:
     """Network type classification."""
+
     UNMETERED = "unmetered"
     METERED = "metered"
     CELLULAR = "cellular"
@@ -113,6 +115,7 @@ class NetworkThrottleAware:
         try:
             # Use scutil to get network information
             import subprocess
+
             result = subprocess.run(
                 ["scutil", "--nwi"],
                 capture_output=True,
@@ -136,10 +139,10 @@ class NetworkThrottleAware:
     def check_and_update(self) -> bool:
         """Check network type and update throttling state. Returns True if state changed."""
         network_type = self.detect_network_type()
-        should_pause = (
-            network_type in (NetworkType.METERED, NetworkType.CELLULAR)
-            and self._config.get("pause_on_metered", True)
-        )
+        should_pause = network_type in (
+            NetworkType.METERED,
+            NetworkType.CELLULAR,
+        ) and self._config.get("pause_on_metered", True)
         with self._lock:
             if should_pause != self._paused:
                 self._paused = should_pause
@@ -225,7 +228,8 @@ Examples:
     # Monitor command
     monitor_parser = subparsers.add_parser("monitor", help="Run continuous monitoring")
     monitor_parser.add_argument(
-        "-i", "--interval",
+        "-i",
+        "--interval",
         type=int,
         default=30,
         help="Check interval in seconds (default: 30)",
