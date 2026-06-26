@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class RLDSStep:
     """Single step in an RLDS episode."""
+
     observation: Dict[str, Any] = field(default_factory=dict)
     action: List[float] = field(default_factory=list)
     reward: float = 0.0
@@ -40,6 +41,7 @@ class RLDSStep:
 @dataclass
 class RLDSConfig:
     """Configuration for RLDS dataset export."""
+
     dataset_name: str = "rlds_dataset"
     version: str = "1.0.0"
     description: str = "RLDS dataset exported from tarball"
@@ -49,14 +51,14 @@ class RLDSConfig:
 
 class TarballParser:
     """Parser for extracting RLDS data from tarball archives."""
-    
+
     SUPPORTED_EXTENSIONS = (".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2")
-    
+
     def __init__(self, tarball_path: Path, extract_dir: Path):
         self.tarball_path = tarball_path
         self.extract_dir = extract_dir
         self._extracted = False
-    
+
     def validate_tarball(self) -> bool:
         """Validate that the tarball exists and is readable."""
         if not self.tarball_path.exists() or not self.tarball_path.is_file():
@@ -65,7 +67,7 @@ class TarballParser:
         if not self.tarball_path.name.endswith(self.SUPPORTED_EXTENSIONS):
             logger.warning(f"Unexpected file extension: {self.tarball_path.suffix}")
         return True
-    
+
     def extract(self) -> Path:
         """Extract tarball contents to the extraction directory."""
         if not self.validate_tarball():
@@ -73,12 +75,13 @@ class TarballParser:
         self.extract_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Extracting {self.tarball_path} to {self.extract_dir}")
         with tarfile.open(self.tarball_path, "r:*") as tar:
-            members = [m for m in tar.getmembers()
-                       if not m.name.startswith("/") and ".." not in m.name]
+            members = [
+                m for m in tar.getmembers() if not m.name.startswith("/") and ".." not in m.name
+            ]
             tar.extractall(path=self.extract_dir, members=members)
         self._extracted = True
         return self.extract_dir
-    
+
     def iter_episodes(self) -> Iterator[List[RLDSStep]]:
         """Iterate over episodes in the extracted data."""
         if not self._extracted:
@@ -97,7 +100,7 @@ class TarballParser:
                             yield steps
                 except Exception as e:
                     logger.warning(f"Failed to parse {fpath}: {e}")
-    
+
     def _parse_json_episode(self, path: Path) -> List[RLDSStep]:
         """Parse an episode from a JSON file."""
         with open(path, "r", encoding="utf-8") as f:
@@ -105,20 +108,23 @@ class TarballParser:
         steps = []
         episode_data = data.get("steps", [data]) if isinstance(data, dict) else data
         for i, step_data in enumerate(episode_data):
-            steps.append(RLDSStep(
-                observation=step_data.get("observation", {}),
-                action=step_data.get("action", []),
-                reward=float(step_data.get("reward", 0.0)),
-                discount=float(step_data.get("discount", 1.0)),
-                is_first=(i == 0),
-                is_last=(i == len(episode_data) - 1),
-                is_terminal=step_data.get("is_terminal", False),
-            ))
+            steps.append(
+                RLDSStep(
+                    observation=step_data.get("observation", {}),
+                    action=step_data.get("action", []),
+                    reward=float(step_data.get("reward", 0.0)),
+                    discount=float(step_data.get("discount", 1.0)),
+                    is_first=(i == 0),
+                    is_last=(i == len(episode_data) - 1),
+                    is_terminal=step_data.get("is_terminal", False),
+                )
+            )
         return steps
-    
+
     def _parse_numpy_episode(self, path: Path) -> List[RLDSStep]:
         """Parse an episode from a numpy file."""
         import numpy as np
+
         data = np.load(str(path), allow_pickle=True)
         if path.suffix == ".npz":
             observations = data.get("observations", data.get("obs", []))
@@ -133,25 +139,27 @@ class TarballParser:
             obs = observations[i] if i < len(observations) else {}
             action = actions[i].tolist() if i < len(actions) else []
             reward = float(rewards[i]) if i < len(rewards) else 0.0
-            steps.append(RLDSStep(
-                observation={"array": obs} if not isinstance(obs, dict) else obs,
-                action=action,
-                reward=reward,
-                is_first=(i == 0),
-                is_last=(i == n_steps - 1),
-            ))
+            steps.append(
+                RLDSStep(
+                    observation={"array": obs} if not isinstance(obs, dict) else obs,
+                    action=action,
+                    reward=reward,
+                    is_first=(i == 0),
+                    is_last=(i == n_steps - 1),
+                )
+            )
         return steps
 
 
 class RLDSWriter:
     """Writer for RLDS format shards."""
-    
+
     def __init__(self, output_dir: Path, config: RLDSConfig):
         self.output_dir = output_dir
         self.config = config
         self._episode_count = 0
         self._step_count = 0
-    
+
     def write_dataset_info(self) -> None:
         """Write dataset metadata in RLDS format."""
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -167,7 +175,7 @@ class RLDSWriter:
         with open(self.output_dir / "dataset_info.json", "w", encoding="utf-8") as f:
             json.dump(dataset_info, f, indent=2)
         logger.info(f"Wrote dataset info to {self.output_dir / 'dataset_info.json'}")
-    
+
     def write_episode(self, steps: List[RLDSStep], episode_id: Optional[int] = None) -> None:
         """Write a single episode to RLDS format."""
         if episode_id is None:
@@ -189,7 +197,7 @@ class RLDSWriter:
         self._episode_count += 1
         self._step_count += len(steps)
         logger.debug(f"Wrote episode {episode_id} with {len(steps)} steps")
-    
+
     def _serialize(self, data: Any) -> Any:
         """Serialize data for JSON compatibility."""
         if isinstance(data, dict):
@@ -201,7 +209,7 @@ class RLDSWriter:
         elif isinstance(data, (int, float, str, bool, type(None))):
             return data
         return str(data)
-    
+
     def finalize(self) -> Dict[str, int]:
         """Finalize the RLDS dataset and return statistics."""
         self.write_dataset_info()
@@ -218,7 +226,9 @@ class RLDSWriter:
         }
         with open(self.output_dir / "features.json", "w", encoding="utf-8") as f:
             json.dump(features_spec, f, indent=2)
-        logger.info(f"Finalized RLDS dataset: {self._episode_count} episodes, {self._step_count} steps")
+        logger.info(
+            f"Finalized RLDS dataset: {self._episode_count} episodes, {self._step_count} steps"
+        )
         return {"episode_count": self._episode_count, "step_count": self._step_count}
 
 
@@ -252,12 +262,23 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Examples:\n  %(prog)s --input data.tar.gz --output ./rlds_output\n  %(prog)s -i data.tar.gz -o ./output --name my_dataset",
     )
-    parser.add_argument("-i", "--input", type=Path, required=True,
-                        help="Input tarball path (supports .tar, .tar.gz, .tgz, .tar.bz2)")
-    parser.add_argument("-o", "--output", type=Path, required=True,
-                        help="Output directory for RLDS files")
-    parser.add_argument("-n", "--name", type=str, default="rlds_dataset",
-                        help="Dataset name (default: rlds_dataset)")
+    parser.add_argument(
+        "-i",
+        "--input",
+        type=Path,
+        required=True,
+        help="Input tarball path (supports .tar, .tar.gz, .tgz, .tar.bz2)",
+    )
+    parser.add_argument(
+        "-o", "--output", type=Path, required=True, help="Output directory for RLDS files"
+    )
+    parser.add_argument(
+        "-n",
+        "--name",
+        type=str,
+        default="rlds_dataset",
+        help="Dataset name (default: rlds_dataset)",
+    )
     parser.add_argument("-d", "--desc", type=str, default="", help="Dataset description")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
     parser.add_argument("--version", action="version", version="%(prog)s 1.0.0")
@@ -282,7 +303,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             dataset_name=args.name,
             description=args.desc,
         )
-        logger.info(f"Export complete: {stats['episode_count']} episodes, {stats['step_count']} steps")
+        logger.info(
+            f"Export complete: {stats['episode_count']} episodes, {stats['step_count']} steps"
+        )
         logger.info(f"Output written to: {args.output}")
         return 0
     except ValueError as e:
