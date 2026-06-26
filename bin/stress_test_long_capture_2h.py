@@ -4,6 +4,7 @@
 Confirms scene_id rotation and clip cap enforcement under sustained
 capture load. Uses only stdlib so it runs on any vendor environment.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -22,6 +23,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class Clip:
     """A single captured clip within a scene."""
+
     scene_id: str
     clip_index: int
     start_offset_sec: float
@@ -33,6 +35,7 @@ class Clip:
 @dataclass
 class CaptureSession:
     """Aggregates all clips produced during a simulated capture run."""
+
     clips: List[Clip] = field(default_factory=list)
     total_frames: int = 0
     total_duration_sec: float = 0.0
@@ -70,8 +73,13 @@ def simulate_capture(
             duration_sec=clip_dur,
         )
         session.add(clip)
-        logger.debug("clip %d scene=%s dur=%.1f min frames=%d",
-                     scene_idx, clip.scene_id, clip_dur / 60.0, frames)
+        logger.debug(
+            "clip %d scene=%s dur=%.1f min frames=%d",
+            scene_idx,
+            clip.scene_id,
+            clip_dur / 60.0,
+            frames,
+        )
         elapsed += clip_dur
         scene_idx += 1
 
@@ -90,13 +98,16 @@ def validate_session(
     expected_total = duration_minutes * 60.0
 
     if abs(session.total_duration_sec - expected_total) > 0.001:
-        errors.append(f"Total duration mismatch: expected {expected_total:.2f}s, "
-                      f"got {session.total_duration_sec:.2f}s")
+        errors.append(
+            f"Total duration mismatch: expected {expected_total:.2f}s, "
+            f"got {session.total_duration_sec:.2f}s"
+        )
 
     for clip in session.clips:
         if clip.duration_sec > cap_sec + 0.001:
-            errors.append(f"Clip {clip.clip_index} exceeds cap: "
-                         f"{clip.duration_sec:.2f}s > {cap_sec:.2f}s")
+            errors.append(
+                f"Clip {clip.clip_index} exceeds cap: {clip.duration_sec:.2f}s > {cap_sec:.2f}s"
+            )
 
     scene_ids = [c.scene_id for c in session.clips]
     if len(scene_ids) != len(set(scene_ids)):
@@ -149,31 +160,55 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description="Stress test: simulate 2-hour capture with 30-min clip cap"
     )
-    parser.add_argument("--duration-minutes", type=float, default=120.0,
-                       help="Total capture duration in minutes (default: 120)")
-    parser.add_argument("--clip-cap-minutes", type=float, default=30.0,
-                       help="Maximum clip duration in minutes (default: 30)")
-    parser.add_argument("--fps", type=int, default=30,
-                       help="Frames per second for simulation (default: 30)")
-    parser.add_argument("--seed", type=int, default=42,
-                       help="Seed for deterministic scene_id generation (default: 42)")
-    parser.add_argument("--output-dir", type=Path, default=None,
-                       help="Output directory for report (default: temp dir)")
-    parser.add_argument("--verbose", "-v", action="store_true",
-                       help="Enable debug logging")
+    parser.add_argument(
+        "--duration-minutes",
+        type=float,
+        default=120.0,
+        help="Total capture duration in minutes (default: 120)",
+    )
+    parser.add_argument(
+        "--clip-cap-minutes",
+        type=float,
+        default=30.0,
+        help="Maximum clip duration in minutes (default: 30)",
+    )
+    parser.add_argument(
+        "--fps", type=int, default=30, help="Frames per second for simulation (default: 30)"
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Seed for deterministic scene_id generation (default: 42)",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        help="Output directory for report (default: temp dir)",
+    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable debug logging")
     args = parser.parse_args(argv)
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(asctime)s %(levelname)s %(message)s"
+        format="%(asctime)s %(levelname)s %(message)s",
     )
 
-    logger.info("Starting stress test: %.1f min capture, %.1f min clip cap, %d fps",
-                args.duration_minutes, args.clip_cap_minutes, args.fps)
+    logger.info(
+        "Starting stress test: %.1f min capture, %.1f min clip cap, %d fps",
+        args.duration_minutes,
+        args.clip_cap_minutes,
+        args.fps,
+    )
 
     session = simulate_capture(args.duration_minutes, args.clip_cap_minutes, args.fps, args.seed)
-    logger.info("Simulation complete: %d clips, %d frames, %.2f sec total",
-                len(session.clips), session.total_frames, session.total_duration_sec)
+    logger.info(
+        "Simulation complete: %d clips, %d frames, %.2f sec total",
+        len(session.clips),
+        session.total_frames,
+        session.total_duration_sec,
+    )
 
     errors = validate_session(session, args.duration_minutes, args.clip_cap_minutes, args.fps)
     if errors:
