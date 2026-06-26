@@ -25,6 +25,12 @@
 - Picked: ruff format bin/prd_test_video_no_ui.py (smallest unformatted bin file: 182 lines, multi-line list formatting, line wrapping). Justification: measurable code smell, single-file scope, no behavior change, module import smoke OK, no risk of test masking, follows established cadence.
 - Result: committed 56d67838 (ruff format added blank lines between function defs, multi-line list/collection formatting, and line wrapping in bin/prd_test_video_no_ui.py; 1 file changed, 59 insertions(+), 19 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.)_init__.py; 1 file changed, 1 insertion(+); ruff check + ruff format --check clean; targeted test passes (v2prime_glm_residuals 13/13); pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic blank line — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
 
+## Round 346 @ 2026-06-25T20:48:00Z
+
+- Picked: ruff format bin/route_planner.py (smallest unformatted bin file: 202 lines, collapsed 2-line function signature on first manifest entries, replaced single quotes with double quotes, trimmed trailing whitespace, added trailing comma to dict literal). Justification: measurable code smell (ruff format --check flagged it), single-file scope, no behavior change, targeted test tests/test_route_planner.py 14/14 pass (no test masking), AST parse OK, follows established cadence of Rounds 254–345.
+- Result: committed 49d326d7 (ruff format applied to bin/route_planner.py; 1 file changed, 37 insertions(+), 49 deletions(-); ruff check + ruff format --check clean; AST parse OK; 14/14 tests pass in tests/test_route_planner.py; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race condition, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect, no behavior change.)
+
+
 ## Round 267 @ 2026-06-24T21:30:00Z
 
 - Picked: ruff format bin/v1_claude_residuals/r21_monotonic_frame.py (smallest unformatted bin file: 68 lines, single blank line needed after module docstring; follows established pattern). Justification: measurable code smell, single-file scope, no behavior change, targeted test exists, no risk of test masking, follows established cadence.
