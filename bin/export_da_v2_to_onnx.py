@@ -11,6 +11,7 @@ Usage:
         --opset 17 \
         --upload-to-oss
 """
+
 import argparse
 import hashlib
 import json
@@ -65,6 +66,7 @@ def upload_to_oss(local_dir: pathlib.Path, bucket: str, prefix: str) -> None:
 
 def _env_or_die(name: str) -> str:
     import os
+
     val = os.environ.get(name)
     if not val:
         print(f"  ERROR: environment variable {name} not set")
@@ -73,9 +75,7 @@ def _env_or_die(name: str) -> str:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Export Depth Anything V2 to ONNX format"
-    )
+    parser = argparse.ArgumentParser(description="Export Depth Anything V2 to ONNX format")
     parser.add_argument(
         "--model-id",
         default="depth-anything/Depth-Anything-V2-Small-hf",
@@ -146,9 +146,7 @@ def main():
             out = model(**inputs)
         pt_time = (time.time() - t0) / 10
     pt_depth = out.predicted_depth.squeeze().cpu().float().numpy()
-    print(
-        f"  PyTorch ({device}): {pt_time * 1000:.1f}ms/frame, output shape {pt_depth.shape}"
-    )
+    print(f"  PyTorch ({device}): {pt_time * 1000:.1f}ms/frame, output shape {pt_depth.shape}")
 
     # 3. Export to ONNX
     print("[3/4] Exporting to ONNX...")
@@ -184,9 +182,7 @@ def main():
     try:
         import onnxruntime as ort
 
-        sess = ort.InferenceSession(
-            str(onnx_path), providers=["CPUExecutionProvider"]
-        )
+        sess = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
         pv = inputs_cpu["pixel_values"].numpy()
         _ = sess.run(None, {"pixel_values": pv})
         t0 = time.time()
