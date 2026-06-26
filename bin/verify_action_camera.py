@@ -35,6 +35,7 @@ Usage:
 
 Exit code: 0 if all enabled layers pass, else number of failed layers.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -44,14 +45,15 @@ import sys
 from pathlib import Path
 from typing import Any
 
-EPS_QUAT_NORM = 0.01           # ‖q‖ within ±1%
-EPS_PITCH_DEG = 0.1            # pitch in [-90.1°, 90.1°]
-EPS_EULER_RT_DEG = 0.5         # round-trip euler tolerance (degrees)
-EPS_QUAT_JUMP = 0.5            # max slerp angular distance between adjacent frames
+EPS_QUAT_NORM = 0.01  # ‖q‖ within ±1%
+EPS_PITCH_DEG = 0.1  # pitch in [-90.1°, 90.1°]
+EPS_EULER_RT_DEG = 0.5  # round-trip euler tolerance (degrees)
+EPS_QUAT_JUMP = 0.5  # max slerp angular distance between adjacent frames
 PRD_REF_YAW90 = (0.0, 0.7071068, 0.0, 0.7071068)
 
 
 # ---- Quaternion math (no scipy/numpy dep) ----------------------------------
+
 
 def quat_norm(q: tuple[float, float, float, float]) -> float:
     return math.sqrt(sum(x * x for x in q))
@@ -86,8 +88,7 @@ def quat_to_euler_zyx(q: tuple[float, float, float, float]) -> tuple[float, floa
     roll = math.degrees(math.atan2(sinr_cosp, cosr_cosp))
 
     sinp = 2 * (qw * qy - qz * qx)
-    pitch = math.degrees(math.copysign(math.pi / 2, sinp) if abs(sinp) >= 1
-                         else math.asin(sinp))
+    pitch = math.degrees(math.copysign(math.pi / 2, sinp) if abs(sinp) >= 1 else math.asin(sinp))
 
     siny_cosp = 2 * (qw * qz + qx * qy)
     cosy_cosp = 1 - 2 * (qy * qy + qz * qz)
@@ -108,6 +109,7 @@ def quat_angular_distance(a: tuple[float, ...], b: tuple[float, ...]) -> float:
 
 # ---- Field reading ----------------------------------------------------------
 
+
 def _vec3(value: Any) -> tuple[float, float, float]:
     """Accept either dict {x,y,z} or list [x,y,z]."""
     if isinstance(value, dict):
@@ -120,14 +122,19 @@ def _vec3(value: Any) -> tuple[float, float, float]:
 def _quat(value: Any) -> tuple[float, float, float, float]:
     """Accept dict {x,y,z,w} or list [x,y,z,w]."""
     if isinstance(value, dict):
-        return (float(value.get("x", 0)), float(value.get("y", 0)),
-                float(value.get("z", 0)), float(value.get("w", 1)))
+        return (
+            float(value.get("x", 0)),
+            float(value.get("y", 0)),
+            float(value.get("z", 0)),
+            float(value.get("w", 1)),
+        )
     if isinstance(value, list) and len(value) >= 4:
         return (float(value[0]), float(value[1]), float(value[2]), float(value[3]))
     return (0.0, 0.0, 0.0, 1.0)
 
 
 # ---- Layer checks ----------------------------------------------------------
+
 
 def layer1_math_invariants(records: list[dict]) -> dict:
     """Check unit-norm quaternions, pitch range, euler↔quat round-trip."""
@@ -150,8 +157,7 @@ def layer1_math_invariants(records: list[dict]) -> dict:
         # Round-trip euler[roll,pitch,yaw] → quat → euler
         q_rt = euler_zyx_to_quat(0.0, e[0], e[1])
         e_rt = quat_to_euler_zyx(q_rt)
-        for axis_name, original, rebuilt in zip(("pitch", "yaw"), (e[0], e[1]),
-                                                 (e_rt[1], e_rt[2])):
+        for axis_name, original, rebuilt in zip(("pitch", "yaw"), (e[0], e[1]), (e_rt[1], e_rt[2])):
             err = min(abs(original - rebuilt), abs(360 - abs(original - rebuilt)))
             rt_errors.append(err)
             if err > EPS_EULER_RT_DEG and i < 100:  # limit noise
@@ -212,16 +218,19 @@ def layer3_behavioral(records: list[dict]) -> dict:
         cum_dx += float(r.get("mouse_dx", 0))
     yaw_total = 0.0
     if records:
-        e_first = _vec3(records[0].get("camera_rotation_euler") or
-                        records[0].get("camera_rotation_oula"))
-        e_last = _vec3(records[-1].get("camera_rotation_euler") or
-                       records[-1].get("camera_rotation_oula"))
+        e_first = _vec3(
+            records[0].get("camera_rotation_euler") or records[0].get("camera_rotation_oula")
+        )
+        e_last = _vec3(
+            records[-1].get("camera_rotation_euler") or records[-1].get("camera_rotation_oula")
+        )
         yaw_total = e_last[1] - e_first[1]
     # Frame timestamp continuity
     times = []
     for r in records[:1000]:
         try:
             from datetime import datetime
+
             t = datetime.strptime(r["time"][:23], "%Y-%m-%d %H:%M:%S.%f")
             times.append(t)
         except Exception:
@@ -293,11 +302,13 @@ def layer5_cross_tool(records: list[dict], clip_dir: Path) -> dict:
 
 # ---- main -----------------------------------------------------------------
 
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("clip_dir", type=Path, help="Path to extracted clip dir")
-    p.add_argument("--layer", default="1,2,3,4,5",
-                   help="Comma-separated layers to run (default: all)")
+    p.add_argument(
+        "--layer", default="1,2,3,4,5", help="Comma-separated layers to run (default: all)"
+    )
     p.add_argument("--json", action="store_true", help="Emit JSON report")
     args = p.parse_args(argv)
 
