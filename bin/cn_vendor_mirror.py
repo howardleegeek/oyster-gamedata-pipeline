@@ -49,6 +49,7 @@ def _env(name: str, *, default: Optional[str] = None) -> str:
 
 class OSSConfig:
     """Aliyun OSS connection parameters from environment."""
+
     def __init__(self) -> None:
         self.access_key_id: str = _env("OSS_ACCESS_KEY_ID")
         self.access_key_secret: str = _env("OSS_ACCESS_KEY_SECRET")
@@ -59,6 +60,7 @@ class OSSConfig:
 
 class S3Config:
     """Upstream S3 connection parameters from environment."""
+
     def __init__(self) -> None:
         self.access_key_id: str = _env("S3_ACCESS_KEY_ID")
         self.secret_access_key: str = _env("S3_SECRET_ACCESS_KEY")
@@ -69,6 +71,7 @@ class S3Config:
 # ---------------------------------------------------------------------------
 # Aliyun OSS presigned URL (stdlib-only, no oss2 dependency)
 # ---------------------------------------------------------------------------
+
 
 def _hmac_sha1(key: bytes, msg: bytes) -> bytes:
     """Compute HMAC-SHA1 digest."""
@@ -102,12 +105,9 @@ def generate_presigned_url(
     """
     expires = int(time.time()) + expires_seconds
     canonical = f"/{cfg.bucket}/{object_key}"
-    string_to_sign = (
-        f"{http_method}\n\n\n{expires}\n{canonical}"
-    )
+    string_to_sign = f"{http_method}\n\n\n{expires}\n{canonical}"
     signature = base64.b64encode(
-        _hmac_sha1(cfg.access_key_secret.encode("utf-8"),
-                    string_to_sign.encode("utf-8"))
+        _hmac_sha1(cfg.access_key_secret.encode("utf-8"), string_to_sign.encode("utf-8"))
     ).decode("utf-8")
     encoded_key = urllib.parse.quote(object_key, safe="")
     return (
@@ -122,9 +122,11 @@ def generate_presigned_url(
 # S3 download / OSS upload helpers (lazy import of boto3 / oss2)
 # ---------------------------------------------------------------------------
 
+
 def _download_from_s3(s3_cfg: S3Config, key: str, dest: Path) -> None:
     """Download a single object from S3 to *dest*."""
     import boto3  # noqa: PLC0415
+
     s3 = boto3.client(
         "s3",
         aws_access_key_id=s3_cfg.access_key_id,
@@ -138,6 +140,7 @@ def _download_from_s3(s3_cfg: S3Config, key: str, dest: Path) -> None:
 def _upload_to_oss(oss_cfg: OSSConfig, key: str, src: Path) -> None:
     """Upload a local file to Aliyun OSS."""
     import oss2  # noqa: PLC0415
+
     auth = oss2.Auth(oss_cfg.access_key_id, oss_cfg.access_key_secret)
     bucket = oss2.Bucket(auth, f"https://{oss_cfg.endpoint}", oss_cfg.bucket)
     with open(src, "rb") as fh:
@@ -148,6 +151,7 @@ def _upload_to_oss(oss_cfg: OSSConfig, key: str, src: Path) -> None:
 # ---------------------------------------------------------------------------
 # Sync logic
 # ---------------------------------------------------------------------------
+
 
 def sync_object(s3_cfg: S3Config, oss_cfg: OSSConfig, key: str) -> str:
     """
@@ -181,6 +185,7 @@ def sync_object(s3_cfg: S3Config, oss_cfg: OSSConfig, key: str) -> str:
 def sync_prefix(s3_cfg: S3Config, oss_cfg: OSSConfig, prefix: str) -> list[str]:
     """Mirror all objects under *prefix* from S3 to OSS. Returns presigned URLs."""
     import boto3  # noqa: PLC0415
+
     s3 = boto3.client(
         "s3",
         aws_access_key_id=s3_cfg.access_key_id,
@@ -200,6 +205,7 @@ def sync_prefix(s3_cfg: S3Config, oss_cfg: OSSConfig, prefix: str) -> list[str]:
 # List helper
 # ---------------------------------------------------------------------------
 
+
 def list_objects(oss_cfg: OSSConfig, prefix: str = "") -> list[dict]:
     """
     List objects in the OSS bucket under *prefix*.
@@ -207,6 +213,7 @@ def list_objects(oss_cfg: OSSConfig, prefix: str = "") -> list[dict]:
     Returns a list of dicts with keys ``Key``, ``Size``, ``LastModified``.
     """
     import oss2  # noqa: PLC0415
+
     auth = oss2.Auth(oss_cfg.access_key_id, oss_cfg.access_key_secret)
     bucket = oss2.Bucket(auth, f"https://{oss_cfg.endpoint}", oss_cfg.bucket)
     return [
@@ -219,6 +226,7 @@ def list_objects(oss_cfg: OSSConfig, prefix: str = "") -> list[dict]:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def _build_parser() -> argparse.ArgumentParser:
     """Construct the argument parser."""
     parser = argparse.ArgumentParser(
@@ -228,10 +236,10 @@ def _build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_issue = sub.add_parser("issue", help="Generate a presigned download URL")
-    p_issue.add_argument("--object", dest="object_key", required=True,
-                         help="OSS object key")
-    p_issue.add_argument("--expires", type=int, default=3600,
-                         help="URL validity in seconds (default 3600)")
+    p_issue.add_argument("--object", dest="object_key", required=True, help="OSS object key")
+    p_issue.add_argument(
+        "--expires", type=int, default=3600, help="URL validity in seconds (default 3600)"
+    )
     p_issue.add_argument("--method", default="GET", choices=["GET", "HEAD"])
 
     p_sync = sub.add_parser("sync", help="Mirror object(s) from S3 → OSS")
@@ -273,8 +281,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "issue":
         url = generate_presigned_url(
-            oss_cfg, args.object_key,
-            expires_seconds=args.expires, http_method=args.method,
+            oss_cfg,
+            args.object_key,
+            expires_seconds=args.expires,
+            http_method=args.method,
         )
         print(url)
         return 0
