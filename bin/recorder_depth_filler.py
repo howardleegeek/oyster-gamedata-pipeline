@@ -24,6 +24,7 @@ Standalone CLI:
 
 Spec: G261 (W31 wave). PP0 priority. ~180 lines.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -104,16 +105,17 @@ def extract_frames(
     cmd = [
         ffmpeg_bin,
         "-y",
-        "-i", str(video_path),
-        "-vf", f"fps={fps}",
-        "-vsync", "vfr",
+        "-i",
+        str(video_path),
+        "-vf",
+        f"fps={fps}",
+        "-vsync",
+        "vfr",
         pattern,
     ]
     proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if proc.returncode != 0:
-        raise RuntimeError(
-            f"ffmpeg failed (rc={proc.returncode}): {proc.stderr[-512:]}"
-        )
+        raise RuntimeError(f"ffmpeg failed (rc={proc.returncode}): {proc.stderr[-512:]}")
     pngs = sorted(out_rgb_dir.glob("frame_*.png"))
     if not pngs:
         raise RuntimeError(f"ffmpeg produced no frames in {out_rgb_dir}")
@@ -202,9 +204,7 @@ def fill_clip_depth(
         rgb_dir = clip_dir / "rgb"
         rgb_dir.mkdir(exist_ok=True)
         n_frames = extract_frames(video, rgb_dir, fps=fps, ffmpeg_bin=ffmpeg_bin)
-        n_exr = run_depth_inference(
-            rgb_dir, depth_dir, model_id, near_m, far_m, batch_size, device
-        )
+        n_exr = run_depth_inference(rgb_dir, depth_dir, model_id, near_m, far_m, batch_size, device)
     else:
         with tempfile.TemporaryDirectory(prefix="oyster_depth_rgb_") as td:
             rgb_dir = Path(td)
@@ -215,12 +215,18 @@ def fill_clip_depth(
 
     LOG.info(
         "clip=%s frames=%d exr=%d expected=%d",
-        clip_dir.name, n_frames, n_exr, expected_frames,
+        clip_dir.name,
+        n_frames,
+        n_exr,
+        expected_frames,
     )
     if n_exr < expected_frames:
         LOG.warning(
             "wrote %d/%d EXR frames — clip may be shorter than %ds at %d fps",
-            n_exr, expected_frames, DEFAULT_CLIP_SECONDS, fps,
+            n_exr,
+            expected_frames,
+            DEFAULT_CLIP_SECONDS,
+            fps,
         )
     return depth_dir
 
@@ -231,9 +237,15 @@ def main(argv: Optional[list] = None) -> int:
         description="Generate per-clip DepthAnything-V2 EXR depth maps."
     )
     parser.add_argument("--clip-dir", required=True, help="Directory containing video.mp4")
-    parser.add_argument("--fps", type=int, default=DEFAULT_FPS, help="Frame extraction fps (default 6)")
-    parser.add_argument("--expected-frames", type=int, default=EXPECTED_FRAME_COUNT,
-                        help="Expected EXR count (warn-only)")
+    parser.add_argument(
+        "--fps", type=int, default=DEFAULT_FPS, help="Frame extraction fps (default 6)"
+    )
+    parser.add_argument(
+        "--expected-frames",
+        type=int,
+        default=EXPECTED_FRAME_COUNT,
+        help="Expected EXR count (warn-only)",
+    )
     parser.add_argument("--model-id", default="depth-anything/Depth-Anything-V2-Small-hf")
     parser.add_argument("--near-m", type=float, default=0.5)
     parser.add_argument("--far-m", type=float, default=30.0)
