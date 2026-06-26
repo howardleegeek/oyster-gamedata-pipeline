@@ -26,6 +26,7 @@ def _lazy_import_yaml() -> Optional[Any]:
     """Lazy import PyYAML module."""
     try:
         import yaml
+
         return yaml
     except ImportError:
         return None
@@ -35,6 +36,7 @@ def _lazy_import_pydantic() -> Optional[Any]:
     """Lazy import pydantic module."""
     try:
         import pydantic
+
         return pydantic
     except ImportError:
         return None
@@ -44,6 +46,7 @@ def _lazy_import_torch() -> Optional[Any]:
     """Lazy import torch module."""
     try:
         import torch
+
         return torch
     except ImportError:
         return None
@@ -96,10 +99,10 @@ class BuyerSpecValidator:
         r'(?i)secret[_-]?key\s*[:=]\s*["\']?[a-zA-Z0-9]{16,}',
         r'(?i)password\s*[:=]\s*["\']?[^\s"\']{8,}',
         r'(?i)token\s*[:=]\s*["\']?[a-zA-Z0-9]{20,}',
-        r'(?i)bearer\s+[a-zA-Z0-9._-]{20,}',
+        r"(?i)bearer\s+[a-zA-Z0-9._-]{20,}",
     ]
 
-    SHELL_PATTERN = re.compile(r'subprocess\..*\(.*shell\s*=\s*True')
+    SHELL_PATTERN = re.compile(r"subprocess\..*\(.*shell\s*=\s*True")
     TMP_PATH_PATTERN = re.compile(r'["\']/tmp/[^"\']*["\']')
 
     def __init__(self, verbose: bool = False, strict: bool = False) -> None:
@@ -147,9 +150,9 @@ class BuyerSpecValidator:
         self._check_hardcoded_tmp(content, result)
 
         # Check for imports that should be lazy
-        if 'import pydantic' in content or 'from pydantic' in content:
+        if "import pydantic" in content or "from pydantic" in content:
             result.add_info("Found pydantic import - ensure lazy import if needed")
-        if 'import torch' in content or 'from torch' in content:
+        if "import torch" in content or "from torch" in content:
             result.add_info("Found torch import - ensure lazy import if needed")
 
         return result
@@ -159,11 +162,11 @@ class BuyerSpecValidator:
         result = ValidationResult(file_path)
 
         # Check for set -euo pipefail
-        if not re.search(r'^set\s+.*e.*u.*o.*pipefail', content, re.MULTILINE):
+        if not re.search(r"^set\s+.*e.*u.*o.*pipefail", content, re.MULTILINE):
             result.add_warning("Missing 'set -euo pipefail' at top of bash script")
 
         # Check for EXIT trap
-        if not re.search(r'trap.*EXIT', content, re.IGNORECASE):
+        if not re.search(r"trap.*EXIT", content, re.IGNORECASE):
             result.add_warning("Missing EXIT trap for cleanup")
 
         # Check for shell=True usage
@@ -176,15 +179,12 @@ class BuyerSpecValidator:
         self._check_secrets(content, result)
 
         # Validate bash syntax
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sh", delete=False) as tmp:
             tmp.write(content)
             tmp.flush()
             try:
                 proc = subprocess.run(
-                    ['bash', '-n', tmp.name],
-                    capture_output=True,
-                    text=True,
-                    timeout=5
+                    ["bash", "-n", tmp.name], capture_output=True, text=True, timeout=5
                 )
                 if proc.returncode != 0:
                     result.add_error(f"Bash syntax error: {proc.stderr.strip()}")
@@ -235,10 +235,10 @@ class BuyerSpecValidator:
         result = ValidationResult(file_path)
 
         # Basic markdown validation - check for common structure
-        lines = content.split('\n')
+        lines = content.split("\n")
 
         # Check for at least one heading
-        has_heading = any(line.strip().startswith('#') for line in lines)
+        has_heading = any(line.strip().startswith("#") for line in lines)
         if not has_heading:
             result.add_warning("No headings found in markdown file")
 
@@ -246,12 +246,12 @@ class BuyerSpecValidator:
         in_list = False
         for i, line in enumerate(lines):
             stripped = line.strip()
-            if stripped.startswith('- ') or stripped.startswith('* ') or stripped.startswith('1. '):
+            if stripped.startswith("- ") or stripped.startswith("* ") or stripped.startswith("1. "):
                 in_list = True
             elif stripped and in_list:
                 # Check for continuation without proper indentation
-                if not (stripped.startswith('  ') or stripped.startswith('\t')):
-                    result.add_warning(f"List continuation issue at line {i+1}")
+                if not (stripped.startswith("  ") or stripped.startswith("\t")):
+                    result.add_warning(f"List continuation issue at line {i + 1}")
 
         # Check for secrets
         self._check_secrets(content, result)
@@ -267,7 +267,7 @@ class BuyerSpecValidator:
             return result
 
         try:
-            content = path.read_text(encoding='utf-8')
+            content = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             result = ValidationResult(file_path)
             result.add_error(f"File is not valid UTF-8: {file_path}")
@@ -275,14 +275,14 @@ class BuyerSpecValidator:
 
         suffix = path.suffix.lower()
         validators: Dict[str, Callable[[str, str], ValidationResult]] = {
-            '.py': self.validate_python_syntax,
-            '.sh': self.validate_bash_structure,
-            '.bash': self.validate_bash_structure,
-            '.yaml': self.validate_yaml_structure,
-            '.yml': self.validate_yaml_structure,
-            '.md': self.validate_markdown_structure,
-            '.markdown': self.validate_markdown_structure,
-            '.json': self.validate_json_structure,
+            ".py": self.validate_python_syntax,
+            ".sh": self.validate_bash_structure,
+            ".bash": self.validate_bash_structure,
+            ".yaml": self.validate_yaml_structure,
+            ".yml": self.validate_yaml_structure,
+            ".md": self.validate_markdown_structure,
+            ".markdown": self.validate_markdown_structure,
+            ".json": self.validate_json_structure,
         }
 
         if suffix in validators:
@@ -321,11 +321,13 @@ class BuyerSpecValidator:
                     print(f"  INFO: {info}", file=sys.stderr)
 
         strict_errors = total_warnings if self.strict else 0
-        print(f"\n{'='*50}", file=sys.stderr)
+        print(f"\n{'=' * 50}", file=sys.stderr)
 
         if total_errors + strict_errors > 0:
-            print(f"FAILED: {total_errors + strict_errors} error(s), {total_warnings} warning(s)",
-                  file=sys.stderr)
+            print(
+                f"FAILED: {total_errors + strict_errors} error(s), {total_warnings} warning(s)",
+                file=sys.stderr,
+            )
             return 1
 
         if total_warnings > 0:
@@ -347,24 +349,12 @@ def main(argv: List[str]) -> int:
         Exit code (0 for success, non-zero for failure).
     """
     parser = argparse.ArgumentParser(
-        description='Stricter independent validator for buyer specifications.',
-        epilog='Validates Python, Bash, YAML, JSON, and Markdown files.'
+        description="Stricter independent validator for buyer specifications.",
+        epilog="Validates Python, Bash, YAML, JSON, and Markdown files.",
     )
-    parser.add_argument(
-        'files',
-        nargs='+',
-        help='Files to validate'
-    )
-    parser.add_argument(
-        '-v', '--verbose',
-        action='store_true',
-        help='Enable verbose output'
-    )
-    parser.add_argument(
-        '-s', '--strict',
-        action='store_true',
-        help='Treat warnings as errors'
-    )
+    parser.add_argument("files", nargs="+", help="Files to validate")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
+    parser.add_argument("-s", "--strict", action="store_true", help="Treat warnings as errors")
 
     args = parser.parse_args(argv)
 
@@ -372,5 +362,5 @@ def main(argv: List[str]) -> int:
     return validator.validate_files(args.files)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))
