@@ -967,3 +967,4 @@ b4c97dbd638c75a1d826e641df598879876660ed
 - Result: committed fe8b2431 (ruff format applied to bin/recorder_mp4_faststart.py; 1 file changed, 56 insertions(+), 59 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect, no behavior change.)
 
 
+
