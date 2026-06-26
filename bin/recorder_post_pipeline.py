@@ -89,7 +89,8 @@ class PipelineReport:
                     "status": p.status,
                     "detail": p.detail,
                     "duration_s": round(p.duration_s, 3),
-                } for p in self.phases
+                }
+                for p in self.phases
             ],
         }
 
@@ -110,8 +111,7 @@ def _try_import(module_name: str) -> Optional[Any]:
         except (ImportError, ModuleNotFoundError) as exc:
             last_exc = exc
             continue
-    logger.info("Sibling %s not available: %s — skipping phase",
-                module_name, last_exc)
+    logger.info("Sibling %s not available: %s — skipping phase", module_name, last_exc)
     return None
 
 
@@ -120,73 +120,71 @@ def _run_phase(name: str, fn: Callable[[], str]) -> PhaseResult:
     started = time.monotonic()
     try:
         detail = fn() or ""
-        return PhaseResult(name=name, status="ok", detail=detail,
-                           duration_s=time.monotonic() - started)
+        return PhaseResult(
+            name=name, status="ok", detail=detail, duration_s=time.monotonic() - started
+        )
     except Exception as exc:  # noqa: BLE001 — boundary catch by design
         logger.warning("Phase %s failed: %s", name, exc, exc_info=True)
-        return PhaseResult(name=name, status="failed", detail=str(exc),
-                           duration_s=time.monotonic() - started)
+        return PhaseResult(
+            name=name, status="failed", detail=str(exc), duration_s=time.monotonic() - started
+        )
 
 
 def run_audio_phase(clip_dir: Path) -> PhaseResult:
     """Run audio post-processing if a sibling helper is available."""
     primary = _try_import("recorder_audio_postprocess")
     if primary is not None and hasattr(primary, "process_clip"):
-        return _run_phase(PHASE_AUDIO,
-                          lambda: str(primary.process_clip(clip_dir)))
+        return _run_phase(PHASE_AUDIO, lambda: str(primary.process_clip(clip_dir)))
     fallback = _try_import("audio_track_extractor")
     if fallback is not None and hasattr(fallback, "extract_and_validate"):
         video = clip_dir / "video.mp4"
         if not video.exists():
-            return PhaseResult(name=PHASE_AUDIO, status="skipped",
-                               detail="video.mp4 missing")
+            return PhaseResult(name=PHASE_AUDIO, status="skipped", detail="video.mp4 missing")
         return _run_phase(
             PHASE_AUDIO,
             lambda: str(fallback.extract_and_validate(video, clip_dir)),
         )
-    return PhaseResult(name=PHASE_AUDIO, status="skipped",
-                       detail="no audio sibling available")
+    return PhaseResult(name=PHASE_AUDIO, status="skipped", detail="no audio sibling available")
 
 
 def run_depth_phase(clip_dir: Path) -> PhaseResult:
     """Run depth-fill if a sibling helper is available."""
     primary = _try_import("recorder_dav2_runner")
     if primary is not None and hasattr(primary, "run_clip"):
-        return _run_phase(PHASE_DEPTH,
-                          lambda: str(primary.run_clip(clip_dir)))
+        return _run_phase(PHASE_DEPTH, lambda: str(primary.run_clip(clip_dir)))
     # The smoke test only emits a single .exr; treat its presence as a
     # diagnostic rather than a real depth fill.
     fallback = _try_import("depth_anything_smoke")
     if fallback is not None and hasattr(fallback, "main"):
-        return PhaseResult(name=PHASE_DEPTH, status="skipped",
-                           detail="only smoke runner available; "
-                                  "real depth fill needs G275")
-    return PhaseResult(name=PHASE_DEPTH, status="skipped",
-                       detail="no depth sibling available")
+        return PhaseResult(
+            name=PHASE_DEPTH,
+            status="skipped",
+            detail="only smoke runner available; real depth fill needs G275",
+        )
+    return PhaseResult(name=PHASE_DEPTH, status="skipped", detail="no depth sibling available")
 
 
 def run_manifest_phase(clip_dir: Path) -> PhaseResult:
     """Run manifest regeneration if a sibling helper is available."""
     primary = _try_import("recorder_manifest")
     if primary is not None and hasattr(primary, "write_manifest"):
-        return _run_phase(PHASE_MANIFEST,
-                          lambda: str(primary.write_manifest(clip_dir)))
+        return _run_phase(PHASE_MANIFEST, lambda: str(primary.write_manifest(clip_dir)))
     fallback = _try_import("generate_manifest")
     if fallback is not None and hasattr(fallback, "build_manifest"):
         out_path = clip_dir / "MANIFEST.json"
 
         def _build() -> str:
             manifest = fallback.build_manifest(str(clip_dir))
-            out_path.write_text(json.dumps(manifest, indent=2,
-                                           sort_keys=True))
+            out_path.write_text(json.dumps(manifest, indent=2, sort_keys=True))
             return str(out_path)
+
         return _run_phase(PHASE_MANIFEST, _build)
-    return PhaseResult(name=PHASE_MANIFEST, status="skipped",
-                       detail="no manifest sibling available")
+    return PhaseResult(
+        name=PHASE_MANIFEST, status="skipped", detail="no manifest sibling available"
+    )
 
 
-def run_pipeline(clip_dir: Path,
-                 skip: Optional[List[str]] = None) -> PipelineReport:
+def run_pipeline(clip_dir: Path, skip: Optional[List[str]] = None) -> PipelineReport:
     """Run the full post-pipeline against ``clip_dir``.
 
     Args:
@@ -199,8 +197,7 @@ def run_pipeline(clip_dir: Path,
         :class:`PipelineReport` describing each phase's outcome.
     """
     skip_set = set(skip or [])
-    report = PipelineReport(clip_dir=str(clip_dir),
-                            started_at=time.time())
+    report = PipelineReport(clip_dir=str(clip_dir), started_at=time.time())
     runners = {
         PHASE_AUDIO: run_audio_phase,
         PHASE_DEPTH: run_depth_phase,
@@ -208,8 +205,9 @@ def run_pipeline(clip_dir: Path,
     }
     for phase in DEFAULT_PHASES:
         if phase in skip_set:
-            report.phases.append(PhaseResult(name=phase, status="skipped",
-                                             detail="--skip-" + phase))
+            report.phases.append(
+                PhaseResult(name=phase, status="skipped", detail="--skip-" + phase)
+            )
             continue
         report.phases.append(runners[phase](clip_dir))
     report.finished_at = time.time()
@@ -219,18 +217,21 @@ def run_pipeline(clip_dir: Path,
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--clip-dir", type=Path, required=True,
-                        help="Recorder clip directory to post-process")
-    parser.add_argument("--skip-audio", action="store_true",
-                        help="Skip audio extraction phase")
-    parser.add_argument("--skip-depth", action="store_true",
-                        help="Skip depth-fill phase")
-    parser.add_argument("--skip-manifest", action="store_true",
-                        help="Skip manifest regeneration phase")
-    parser.add_argument("--report-json", type=Path, default=None,
-                        help="Optional path for writing the pipeline report")
-    parser.add_argument("--verbose", action="store_true",
-                        help="Enable DEBUG logging")
+    parser.add_argument(
+        "--clip-dir", type=Path, required=True, help="Recorder clip directory to post-process"
+    )
+    parser.add_argument("--skip-audio", action="store_true", help="Skip audio extraction phase")
+    parser.add_argument("--skip-depth", action="store_true", help="Skip depth-fill phase")
+    parser.add_argument(
+        "--skip-manifest", action="store_true", help="Skip manifest regeneration phase"
+    )
+    parser.add_argument(
+        "--report-json",
+        type=Path,
+        default=None,
+        help="Optional path for writing the pipeline report",
+    )
+    parser.add_argument("--verbose", action="store_true", help="Enable DEBUG logging")
     return parser.parse_args(argv)
 
 
@@ -256,8 +257,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.report_json:
         args.report_json.write_text(json.dumps(report.to_dict(), indent=2))
     for phase in report.phases:
-        logger.info("phase=%s status=%s detail=%s duration=%.2fs",
-                    phase.name, phase.status, phase.detail, phase.duration_s)
+        logger.info(
+            "phase=%s status=%s detail=%s duration=%.2fs",
+            phase.name,
+            phase.status,
+            phase.detail,
+            phase.duration_s,
+        )
     return 2 if report.hard_failed() else 0
 
 
