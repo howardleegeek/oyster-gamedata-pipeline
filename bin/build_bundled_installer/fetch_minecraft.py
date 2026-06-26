@@ -88,9 +88,7 @@ RUNTIME_MANIFEST_PATH = MC_INSTANCE_DIR / "manifest-mc.json"
 DOWNLOAD_TIMEOUT_SEC = 120
 DOWNLOAD_RETRIES = 3
 DOWNLOAD_CHUNK = 1 << 16  # 64 KiB
-USER_AGENT = (
-    "oyster-agent-runner-bundled-installer/1.0 (+https://piston-meta.mojang.com)"
-)
+USER_AGENT = "oyster-agent-runner-bundled-installer/1.0 (+https://piston-meta.mojang.com)"
 
 
 # ---------------------------------------------------------------------------
@@ -208,19 +206,13 @@ def _download_with_retries(url: str, dest: Path) -> int:
             if attempt < DOWNLOAD_RETRIES:
                 backoff = 2 ** (attempt - 1)
                 _log(
-                    f"  attempt {attempt}/{DOWNLOAD_RETRIES} failed: {exc}; "
-                    f"retrying in {backoff}s"
+                    f"  attempt {attempt}/{DOWNLOAD_RETRIES} failed: {exc}; retrying in {backoff}s"
                 )
                 time.sleep(backoff)
             else:
-                _err(
-                    f"  attempt {attempt}/{DOWNLOAD_RETRIES} failed: {exc}; "
-                    f"giving up"
-                )
+                _err(f"  attempt {attempt}/{DOWNLOAD_RETRIES} failed: {exc}; giving up")
 
-    raise RuntimeError(
-        f"download failed after {DOWNLOAD_RETRIES} attempts: {last_exc}"
-    )
+    raise RuntimeError(f"download failed after {DOWNLOAD_RETRIES} attempts: {last_exc}")
 
 
 def _download_json(url: str) -> dict[str, Any]:
@@ -274,10 +266,7 @@ def _fetch_with_sha1_pin(
 
     got = _sha1_file(dest)
     if got.lower() != expected_sha1.lower():
-        _err(
-            f"{label}: SHA-1 mismatch — refusing to keep file. "
-            f"expected={expected_sha1} got={got}"
-        )
+        _err(f"{label}: SHA-1 mismatch — refusing to keep file. expected={expected_sha1} got={got}")
         try:
             dest.unlink()
         except OSError:
@@ -285,10 +274,7 @@ def _fetch_with_sha1_pin(
         sys.exit(2)
 
     if expected_size is not None and dest.stat().st_size != expected_size:
-        _err(
-            f"{label}: size mismatch — expected {expected_size}, "
-            f"got {dest.stat().st_size}"
-        )
+        _err(f"{label}: size mismatch — expected {expected_size}, got {dest.stat().st_size}")
         sys.exit(2)
 
     return bytes_dl
@@ -357,9 +343,7 @@ def _maven_path(name: str) -> Path:
 # ---------------------------------------------------------------------------
 
 
-def _resolve_version_manifest_url(
-    version_manifest_url: str, version_id: str
-) -> tuple[str, str]:
+def _resolve_version_manifest_url(version_manifest_url: str, version_id: str) -> tuple[str, str]:
     """Find the per-version manifest URL + sha1 for `version_id` in the index.
 
     Returns (manifest_url, manifest_sha1). Hard-fails if the version isn't
@@ -442,9 +426,7 @@ def _fetch_client_jar(per_version: dict[str, Any], version_id: str) -> int:
 # ---------------------------------------------------------------------------
 
 
-def _fetch_libraries(
-    per_version: dict[str, Any], target_os: str
-) -> tuple[int, int, int]:
+def _fetch_libraries(per_version: dict[str, Any], target_os: str) -> tuple[int, int, int]:
     """Download every library (matching the rules) into bundle/mc-instance/libraries.
 
     Returns (bytes_downloaded, libraries_kept, libraries_skipped).
@@ -766,8 +748,7 @@ def _fetch_one_asset_object(
         except OSError:
             pass
         raise RuntimeError(
-            f"asset object {logical_name!r}: SHA-1 mismatch — "
-            f"expected={sha1} got={got}"
+            f"asset object {logical_name!r}: SHA-1 mismatch — expected={sha1} got={got}"
         )
 
     actual = dest.stat().st_size
@@ -777,8 +758,7 @@ def _fetch_one_asset_object(
         except OSError:
             pass
         raise RuntimeError(
-            f"asset object {logical_name!r}: size mismatch — "
-            f"expected={size} got={actual}"
+            f"asset object {logical_name!r}: size mismatch — expected={size} got={actual}"
         )
 
     return logical_name, sha1, bytes_dl, False
@@ -825,10 +805,7 @@ def _fetch_asset_objects(asset_index_id: str) -> tuple[int, int, int, int]:
         sha1 = entry.get("hash")
         size = entry.get("size")
         if not isinstance(sha1, str) or not isinstance(size, int):
-            _err(
-                f"asset index entry malformed for {logical_name!r}: "
-                f"hash={sha1!r} size={size!r}"
-            )
+            _err(f"asset index entry malformed for {logical_name!r}: hash={sha1!r} size={size!r}")
             sys.exit(7)
         unique_objects.setdefault(sha1, (logical_name, size))
 
@@ -962,9 +939,7 @@ def _write_runtime_manifest(
             "instance_size_bytes_total": _dir_size_bytes(MC_INSTANCE_DIR),
         },
     }
-    RUNTIME_MANIFEST_PATH.write_text(
-        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
-    )
+    RUNTIME_MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     _log(f"wrote {RUNTIME_MANIFEST_PATH.relative_to(REPO_ROOT)}")
 
 
@@ -988,9 +963,7 @@ def main() -> int:
     MC_INSTANCE_DIR.mkdir(parents=True, exist_ok=True)
 
     # Stage 0: discover the per-version manifest URL.
-    pv_url, pv_sha1 = _resolve_version_manifest_url(
-        version_manifest_url, version_id
-    )
+    pv_url, pv_sha1 = _resolve_version_manifest_url(version_manifest_url, version_id)
     _log(f"  per-version manifest: {pv_url}")
     _log(f"  per-version sha1    : {pv_sha1}")
 
@@ -1015,13 +988,8 @@ def main() -> int:
     # Stage 2b: extract native .dlls from windows-x64 classifier jars
     target_arch: str = pin["platform"]["arch"]
     _log(f"extracting native dlls (target arch: {target_arch})")
-    natives_jars, natives_dlls = _extract_natives(
-        per_version, target_os, target_arch, version_id
-    )
-    _log(
-        f"  natives: {natives_dlls} dll(s) extracted from "
-        f"{natives_jars} classifier jar(s)"
-    )
+    natives_jars, natives_dlls = _extract_natives(per_version, target_os, target_arch, version_id)
+    _log(f"  natives: {natives_dlls} dll(s) extracted from {natives_jars} classifier jar(s)")
 
     # Stage 3: asset index JSON
     _log(f"fetching asset index {asset_index_id}")
@@ -1032,18 +1000,11 @@ def main() -> int:
     # and ``_fetch_asset_index`` already silently prefers upstream when
     # they disagree. Re-read it here so ``_fetch_asset_objects`` opens
     # the file we actually wrote (e.g. ``assets/indexes/19.json``).
-    resolved_asset_id: str = (
-        per_version.get("assetIndex", {}).get("id") or asset_index_id
-    )
+    resolved_asset_id: str = per_version.get("assetIndex", {}).get("id") or asset_index_id
 
     # Stage 3b: asset OBJECTS — ~4035 files / ~390 MB, parallelised.
-    _log(
-        f"fetching asset objects for index {resolved_asset_id!r} "
-        f"(parallel pool, SHA-1 verified)"
-    )
-    objs_total, objs_cached, objs_dl, objs_bytes = _fetch_asset_objects(
-        resolved_asset_id
-    )
+    _log(f"fetching asset objects for index {resolved_asset_id!r} (parallel pool, SHA-1 verified)")
+    objs_total, objs_cached, objs_dl, objs_bytes = _fetch_asset_objects(resolved_asset_id)
     bytes_dl_total += objs_bytes
     _log(
         f"  asset objects: {objs_total} total, {objs_dl} downloaded, "
@@ -1067,8 +1028,7 @@ def main() -> int:
 
     instance_size = _dir_size_bytes(MC_INSTANCE_DIR)
     _log(
-        f"done. bundle/mc-instance/ = {instance_size:,} bytes "
-        f"({instance_size / (1 << 20):.1f} MiB)"
+        f"done. bundle/mc-instance/ = {instance_size:,} bytes ({instance_size / (1 << 20):.1f} MiB)"
     )
     _log(f"  (downloaded this run: {bytes_dl_total:,} bytes)")
     return 0
