@@ -143,6 +143,15 @@ class VendorRateLimiter:
             return self._buckets[vendor_id]
 
     def consume(self, vendor_id: str, tokens: float = 1.0) -> bool:
+        """Consume tokens for a vendor and persist state.
+
+        Args:
+            vendor_id: Unique vendor identifier.
+            tokens: Number of tokens to consume. Defaults to 1.0.
+
+        Returns:
+            True if tokens were successfully consumed, False if insufficient tokens.
+        """
         result = self.get_bucket(vendor_id).consume(tokens)
         self.save_state()
         return result
