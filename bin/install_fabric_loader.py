@@ -23,6 +23,7 @@ fields" — never crashes the user's MC.
 
 Module entry point: :func:`ensure_installed`.
 """
+
 from __future__ import annotations
 
 import os
@@ -89,9 +90,9 @@ def detect_minecraft_dir() -> Path | None:
     return None
 
 
-def fabric_profile_present(mc_dir: Path,
-                           mc_version: str = MC_VERSION,
-                           loader_version: str = FABRIC_LOADER_VERSION) -> Path | None:
+def fabric_profile_present(
+    mc_dir: Path, mc_version: str = MC_VERSION, loader_version: str = FABRIC_LOADER_VERSION
+) -> Path | None:
     """Check if the Fabric loader profile for the given MC version is
     already installed under ``<mc_dir>/versions/``. Returns the profile
     dir if present, None otherwise.
@@ -108,17 +109,19 @@ def fabric_profile_present(mc_dir: Path,
     for sub in versions_dir.iterdir():
         if not sub.is_dir():
             continue
-        m = re.match(rf"fabric-loader-([0-9.]+)-{re.escape(mc_version)}$",
-                     sub.name)
+        m = re.match(rf"fabric-loader-([0-9.]+)-{re.escape(mc_version)}$", sub.name)
         if m and (sub / f"{sub.name}.json").is_file():
             return sub
     return None
 
 
-def install_fabric_loader(mc_dir: Path, fabric_installer_jar: Path,
-                          mc_version: str = MC_VERSION,
-                          loader_version: str = FABRIC_LOADER_VERSION,
-                          java_bin: str | None = None) -> tuple[bool, str]:
+def install_fabric_loader(
+    mc_dir: Path,
+    fabric_installer_jar: Path,
+    mc_version: str = MC_VERSION,
+    loader_version: str = FABRIC_LOADER_VERSION,
+    java_bin: str | None = None,
+) -> tuple[bool, str]:
     """Run ``fabric-installer.jar client`` headlessly. Returns
     ``(success, message)``.
 
@@ -137,14 +140,19 @@ def install_fabric_loader(mc_dir: Path, fabric_installer_jar: Path,
     # ``client`` subcommand of fabric-installer is non-interactive when
     # all flags are passed.
     cmd = [
-        java, "-jar", str(fabric_installer_jar),
+        java,
+        "-jar",
+        str(fabric_installer_jar),
         "client",
-        "-dir", str(mc_dir),
-        "-mcversion", mc_version,
-        "-loader", loader_version,
+        "-dir",
+        str(mc_dir),
+        "-mcversion",
+        mc_version,
+        "-loader",
+        loader_version,
         "-noprofile",  # don't add to launcher_profiles.json — Oyster
-                       # recorder leaves the user's launcher profile alone;
-                       # they pick our profile themselves the first time.
+        # recorder leaves the user's launcher profile alone;
+        # they pick our profile themselves the first time.
     ]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
@@ -154,8 +162,7 @@ def install_fabric_loader(mc_dir: Path, fabric_installer_jar: Path,
         return False, f"fabric installer crashed: {e}"
     if proc.returncode != 0:
         return False, (
-            f"fabric installer exited {proc.returncode}: "
-            f"stderr={proc.stderr.strip()[:200]!r}"
+            f"fabric installer exited {proc.returncode}: stderr={proc.stderr.strip()[:200]!r}"
         )
     return True, "fabric loader installed"
 
@@ -187,9 +194,7 @@ def drop_mod_jar(mc_dir: Path, source_jar: Path) -> tuple[bool, Path | None, str
             existing.unlink()
             removed.append(existing.name)
         except OSError as e:
-            return False, None, (
-                f"could not remove old mod jar {existing.name}: {e}"
-            )
+            return False, None, (f"could not remove old mod jar {existing.name}: {e}")
 
     try:
         shutil.copy2(source_jar, dest)
@@ -202,9 +207,9 @@ def drop_mod_jar(mc_dir: Path, source_jar: Path) -> tuple[bool, Path | None, str
     return True, dest, msg
 
 
-def ensure_installed(fabric_installer_jar: Path,
-                     mod_jar: Path,
-                     mc_dir: Path | None = None) -> InstallResult:
+def ensure_installed(
+    fabric_installer_jar: Path, mod_jar: Path, mc_dir: Path | None = None
+) -> InstallResult:
     """Top-level entry point. Returns :class:`InstallResult`.
 
     Steps (all idempotent + fail-soft):
@@ -221,7 +226,7 @@ def ensure_installed(fabric_installer_jar: Path,
         return InstallResult(
             installed=False,
             reason="Minecraft Java Edition install not found; install MC "
-                   "first or set MINECRAFT_DIR_OVERRIDE",
+            "first or set MINECRAFT_DIR_OVERRIDE",
         )
 
     profile = fabric_profile_present(mc_dir)
@@ -232,15 +237,14 @@ def ensure_installed(fabric_installer_jar: Path,
         profile = fabric_profile_present(mc_dir)
         if profile is None:
             return InstallResult(
-                installed=False, mc_dir=mc_dir,
-                reason="fabric installer reported success but profile dir "
-                       "not found post-install",
+                installed=False,
+                mc_dir=mc_dir,
+                reason="fabric installer reported success but profile dir not found post-install",
             )
 
     ok, dest, msg = drop_mod_jar(mc_dir, mod_jar)
     if not ok:
-        return InstallResult(installed=False, mc_dir=mc_dir,
-                             fabric_profile_dir=profile, reason=msg)
+        return InstallResult(installed=False, mc_dir=mc_dir, fabric_profile_dir=profile, reason=msg)
 
     return InstallResult(
         installed=True,
@@ -258,15 +262,15 @@ def main(argv: list[str] | None = None) -> int:
         python install_fabric_loader.py <fabric_installer.jar> <mod.jar>
     """
     import argparse  # noqa: PLC0415 — keep deferred for lean import
+
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("fabric_installer", type=Path,
-                        help="Path to fabric-installer.jar")
-    parser.add_argument("mod_jar", type=Path,
-                        help="Path to oyster-recorder-mod-X.Y.Z.jar")
+    parser.add_argument("fabric_installer", type=Path, help="Path to fabric-installer.jar")
+    parser.add_argument("mod_jar", type=Path, help="Path to oyster-recorder-mod-X.Y.Z.jar")
     args = parser.parse_args(argv)
 
     result = ensure_installed(args.fabric_installer, args.mod_jar)
     import json  # noqa: PLC0415
+
     print(json.dumps(result.to_dict(), indent=2))
     return 0 if result.installed else 1
 
