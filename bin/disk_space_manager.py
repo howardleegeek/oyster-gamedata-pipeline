@@ -33,37 +33,48 @@ BYTE_TO_GB = 1024**3
 
 class ClipMetadata:
     """Represents metadata for a local clip."""
-    
-    def __init__(self, clip_id: str, file_path: Path, size_bytes: int,
-                 last_accessed: datetime, status: str) -> None:
+
+    def __init__(
+        self, clip_id: str, file_path: Path, size_bytes: int, last_accessed: datetime, status: str
+    ) -> None:
         self.clip_id = clip_id
         self.file_path = file_path
         self.size_bytes = size_bytes
         self.last_accessed = last_accessed
         self.status = status  # "uploaded", "pending", "local_only"
-    
+
     def to_dict(self) -> dict:
-        return {"clip_id": self.clip_id, "file_path": str(self.file_path),
-                "size_bytes": self.size_bytes, "last_accessed": self.last_accessed.isoformat(),
-                "status": self.status}
-    
+        return {
+            "clip_id": self.clip_id,
+            "file_path": str(self.file_path),
+            "size_bytes": self.size_bytes,
+            "last_accessed": self.last_accessed.isoformat(),
+            "status": self.status,
+        }
+
     @classmethod
     def from_dict(cls, data: dict) -> "ClipMetadata":
-        return cls(data["clip_id"], Path(data["file_path"]), data["size_bytes"],
-                   datetime.fromisoformat(data["last_accessed"]), data["status"])
+        return cls(
+            data["clip_id"],
+            Path(data["file_path"]),
+            data["size_bytes"],
+            datetime.fromisoformat(data["last_accessed"]),
+            data["status"],
+        )
 
 
 class DiskSpaceManager:
     """Manages disk space for local clips with LRU cleanup."""
-    
-    def __init__(self, clips_dir: Path, metadata_path: Optional[Path] = None,
-                 cap_bytes: Optional[int] = None) -> None:
+
+    def __init__(
+        self, clips_dir: Path, metadata_path: Optional[Path] = None, cap_bytes: Optional[int] = None
+    ) -> None:
         self.clips_dir = clips_dir
         self.metadata_path = metadata_path or clips_dir / ".clip_metadata.json"
         self.cap_bytes = cap_bytes or DEFAULT_CAP_GB * BYTE_TO_GB
         if not self.clips_dir.exists():
             raise FileNotFoundError(f"Clips directory not found: {clips_dir}")
-    
+
     def get_current_usage(self) -> int:
         """Calculate current disk usage in bytes."""
         total = 0
@@ -72,10 +83,10 @@ class DiskSpaceManager:
                 if item.is_file() and not item.name.startswith("."):
                     total += item.stat().st_size
         return total
-    
+
     def get_usage_percentage(self) -> float:
         return self.get_current_usage() / self.cap_bytes
-    
+
     def load_metadata(self) -> dict:
         """Load clip metadata from JSON file."""
         metadata = {}
@@ -88,13 +99,13 @@ class DiskSpaceManager:
             except (json.JSONDecodeError, KeyError) as e:
                 logger.warning(f"Failed to load metadata: {e}")
         return metadata
-    
+
     def save_metadata(self, metadata: dict) -> None:
         """Save clip metadata to JSON file."""
         data = {cid: clip.to_dict() for cid, clip in metadata.items()}
         with open(self.metadata_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
-    
+
     def get_clips_sorted_by_lru(self) -> list[ClipMetadata]:
         """Get all clips sorted by last access time (LRU first)."""
         metadata = self.load_metadata()
@@ -104,27 +115,29 @@ class DiskSpaceManager:
                 clip_id = item.stem
                 stat = item.stat()
                 clip = metadata.get(clip_id) or ClipMetadata(
-                    clip_id, item, stat.st_size,
-                    datetime.fromtimestamp(stat.st_atime), "local_only")
+                    clip_id, item, stat.st_size, datetime.fromtimestamp(stat.st_atime), "local_only"
+                )
                 clips.append(clip)
         clips.sort(key=lambda c: c.last_accessed)
         return clips
-    
+
     def get_deletable_clips(self) -> list[ClipMetadata]:
         """Get clips that can be safely deleted (not pending)."""
         return [c for c in self.get_clips_sorted_by_lru() if c.status != "pending"]
-    
+
     def check_and_warn(self) -> bool:
         """Check storage usage and warn if above threshold. Returns True if warning issued."""
         usage_pct = self.get_usage_percentage()
         current_gb = self.get_current_usage() / BYTE_TO_GB
         cap_gb = self.cap_bytes / BYTE_TO_GB
         if usage_pct >= WARNING_THRESHOLD:
-            logger.warning(f"Storage at {usage_pct*100:.1f}% ({current_gb:.2f} / {cap_gb:.2f} GB)")
+            logger.warning(
+                f"Storage at {usage_pct * 100:.1f}% ({current_gb:.2f} / {cap_gb:.2f} GB)"
+            )
             return True
-        logger.info(f"Storage: {usage_pct*100:.1f}% ({current_gb:.2f} / {cap_gb:.2f} GB)")
+        logger.info(f"Storage: {usage_pct * 100:.1f}% ({current_gb:.2f} / {cap_gb:.2f} GB)")
         return False
-    
+
     def cleanup(self, dry_run: bool = False, force: bool = False) -> tuple[int, int]:
         """Clean up old clips to stay under cap. Returns (files_deleted, bytes_freed)."""
         current = self.get_current_usage()
@@ -141,7 +154,9 @@ class DiskSpaceManager:
             if not clip.file_path.exists():
                 continue
             if dry_run:
-                logger.info(f"[DRY] Would delete {clip.file_path.name} ({clip.size_bytes/BYTE_TO_GB:.4f} GB)")
+                logger.info(
+                    f"[DRY] Would delete {clip.file_path.name} ({clip.size_bytes / BYTE_TO_GB:.4f} GB)"
+                )
             else:
                 try:
                     clip.file_path.unlink()
@@ -152,16 +167,21 @@ class DiskSpaceManager:
             files_deleted += 1
             bytes_freed += clip.size_bytes
         return files_deleted, bytes_freed
-    
+
     def get_status_summary(self) -> dict:
         """Get summary of current disk space status."""
         clips = self.get_clips_sorted_by_lru()
         counts = {"uploaded": 0, "pending": 0, "local_only": 0}
         for c in clips:
             counts[c.status] = counts.get(c.status, 0) + 1
-        return {"current_bytes": self.get_current_usage(), "cap_bytes": self.cap_bytes,
-                "usage_percentage": self.get_usage_percentage(), "total_clips": len(clips),
-                "status_counts": counts, "above_warning": self.get_usage_percentage() >= WARNING_THRESHOLD}
+        return {
+            "current_bytes": self.get_current_usage(),
+            "cap_bytes": self.cap_bytes,
+            "usage_percentage": self.get_usage_percentage(),
+            "total_clips": len(clips),
+            "status_counts": counts,
+            "above_warning": self.get_usage_percentage() >= WARNING_THRESHOLD,
+        }
 
 
 def parse_size(size_str: str) -> int:
@@ -171,7 +191,7 @@ def parse_size(size_str: str) -> int:
     for unit, mult in units:
         if size_str.endswith(unit):
             try:
-                return int(float(size_str[:-len(unit)]) * mult)
+                return int(float(size_str[: -len(unit)]) * mult)
             except ValueError:
                 pass
     try:
@@ -183,10 +203,15 @@ def parse_size(size_str: str) -> int:
 def main(argv: Optional[list[str]] = None) -> int:
     """Main entry point."""
     parser = argparse.ArgumentParser(description="Manage local clip storage with automatic cleanup")
-    parser.add_argument("--clips-dir", type=Path, default=Path.cwd() / "clips",
-                        help="Directory containing clips")
-    parser.add_argument("--cap", type=str, default=f"{DEFAULT_CAP_GB}GB",
-                        help=f"Storage cap (default: {DEFAULT_CAP_GB}GB)")
+    parser.add_argument(
+        "--clips-dir", type=Path, default=Path.cwd() / "clips", help="Directory containing clips"
+    )
+    parser.add_argument(
+        "--cap",
+        type=str,
+        default=f"{DEFAULT_CAP_GB}GB",
+        help=f"Storage cap (default: {DEFAULT_CAP_GB}GB)",
+    )
     parser.add_argument("--check", action="store_true", help="Check current storage usage")
     parser.add_argument("--cleanup", action="store_true", help="Run cleanup to free space")
     parser.add_argument("--dry-run", action="store_true", help="Simulate cleanup without deleting")
@@ -216,9 +241,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         above_warning = manager.check_and_warn()
         deleted, freed = manager.cleanup(dry_run=args.dry_run, force=args.force)
         if args.dry_run:
-            logger.info(f"[DRY] Would delete {deleted} files, free {freed/BYTE_TO_GB:.2f} GB")
+            logger.info(f"[DRY] Would delete {deleted} files, free {freed / BYTE_TO_GB:.2f} GB")
         else:
-            logger.info(f"Deleted {deleted} files, freed {freed/BYTE_TO_GB:.2f} GB")
+            logger.info(f"Deleted {deleted} files, freed {freed / BYTE_TO_GB:.2f} GB")
         return 2 if above_warning else 0
     above_warning = manager.check_and_warn()
     return 2 if above_warning else 0
