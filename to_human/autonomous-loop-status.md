@@ -1,3 +1,12 @@
+## Round 266 @ 2026-06-24T21:00:00Z
+
+- Picked: ruff format bin/v2prime_glm_residuals/__init__.py (smallest unformatted file: 54 lines, single blank line needed after module docstring; same pattern as previous rounds). Justification: measurable code smell, single-file scope, no behavior change, targeted test passes (v2prime 13/13), no risk of test masking, follows established cadence.
+- Result: committed 4ca6bdfe (ruff format added blank line after module docstring in bin/v2prime_glm_residuals/_
+
+## Round 370 @ 2026-06-26T03:15:00Z
+
+- Picked: ruff format bin/buyer_signup_flow.py (smallest unformatted bin file: 249 lines, 5 long function signatures, 4 multi-line dict literals, 1 multi-line list; no existing test). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic line-wrap + multi-line literals), AST parse + import smoke OK before/after, no risk of test masking (no test file exists), follows established cadence of formatting small bin files.
+- Result: committed 2c9c702d (ruff format applied: line-wrap 5 long signatures — CompanyInfo.__init__, SalesContact.__init__, CompanyInfo.to_dict, SalesContact.to_dict, generate_jwt, insert_buyer, CompanyInfo.__str__ summary list; multi-line dict literals in to_dict x2 and jwt payload; 1 file changed, 128 insertions(+), 47 deletions(-); ruff check + ruff format --check clean; AST parse + import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect, no JWT/crypto logic change (signature preserved, payload dict keys unchanged).)
 
 
 ## Round 263 @ 2026-06-24T18:00:00Z
