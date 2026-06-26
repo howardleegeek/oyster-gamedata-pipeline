@@ -17,6 +17,7 @@ Usage:
 
 Author: G254 Engineering  |  Version: 1.0
 """
+
 from __future__ import annotations
 
 import argparse
@@ -28,11 +29,13 @@ from typing import Any, Optional
 # Lazy imports (vendors may not have these installed)
 try:
     import yaml  # type: ignore[import-not-found]
+
     HAS_YAML: bool = True
 except ImportError:
     HAS_YAML = False
 try:
     from PIL import Image  # type: ignore[import-not-found]
+
     HAS_PIL: bool = True
 except ImportError:
     HAS_PIL = False
@@ -53,6 +56,7 @@ class CompanionRating:
         companion_id: Unique identifier for the companion.
         notes: Optional free-text notes about the rating.
     """
+
     __slots__ = ("rating", "companion_id", "notes")
 
     def __init__(self, rating: int, companion_id: str, notes: str = "") -> None:
@@ -64,16 +68,23 @@ class CompanionRating:
 
     def to_dict(self) -> dict[str, Any]:
         """Serialise to a plain dict suitable for JSON/YAML embedding."""
-        return {"rating": self.rating, "companion_id": self.companion_id,
-                "notes": self.notes, "version": METADATA_VERSION,
-                "premium_multiplier": PREMIUM_MULTIPLIERS[self.rating],
-                "training_weight": TRAINING_WEIGHTS[self.rating]}
+        return {
+            "rating": self.rating,
+            "companion_id": self.companion_id,
+            "notes": self.notes,
+            "version": METADATA_VERSION,
+            "premium_multiplier": PREMIUM_MULTIPLIERS[self.rating],
+            "training_weight": TRAINING_WEIGHTS[self.rating],
+        }
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "CompanionRating":
         """Deserialise from a dict (ignores extra keys)."""
-        return cls(rating=int(d["rating"]), companion_id=str(d["companion_id"]),
-                   notes=str(d.get("notes", "")))
+        return cls(
+            rating=int(d["rating"]),
+            companion_id=str(d["companion_id"]),
+            notes=str(d.get("notes", "")),
+        )
 
     def __repr__(self) -> str:
         return f"CompanionRating(rating={self.rating}, companion_id={self.companion_id!r})"
@@ -119,8 +130,9 @@ def write_metadata(path: Path, data: dict[str, Any]) -> None:
     elif ext in (".yaml", ".yml"):
         if not HAS_YAML:
             raise ImportError("PyYAML is required to write YAML metadata")
-        path.write_text(yaml.safe_dump(data, default_flow_style=False, sort_keys=False),
-                        encoding="utf-8")
+        path.write_text(
+            yaml.safe_dump(data, default_flow_style=False, sort_keys=False), encoding="utf-8"
+        )
     else:
         raise ValueError(f"Unsupported metadata extension: {ext}")
 
@@ -140,8 +152,7 @@ def embed_rating_as_sidecar(image_path: Path, rating: CompanionRating) -> Path:
     with Image.open(image_path) as img:
         img.verify()
     sidecar = image_path.with_suffix(image_path.suffix + ".rating.json")
-    sidecar.write_text(json.dumps({METADATA_KEY: rating.to_dict()}, indent=2),
-                       encoding="utf-8")
+    sidecar.write_text(json.dumps({METADATA_KEY: rating.to_dict()}, indent=2), encoding="utf-8")
     return sidecar
 
 
@@ -162,8 +173,9 @@ def read_rating_from_sidecar(image_path: Path) -> Optional[CompanionRating]:
     return CompanionRating.from_dict(raw) if raw else None
 
 
-def batch_apply(ratings_path: Path, metadata_dir: Path,
-                dry_run: bool = False) -> list[dict[str, Any]]:
+def batch_apply(
+    ratings_path: Path, metadata_dir: Path, dry_run: bool = False
+) -> list[dict[str, Any]]:
     """Apply companion ratings from a ratings file to all metadata in a dir.
 
     The ratings file (JSON or YAML) should be a mapping of companion_id ->
@@ -197,16 +209,23 @@ def batch_apply(ratings_path: Path, metadata_dir: Path,
             continue
         companion_id = meta.get("companion_id", "")
         if companion_id not in rating_map:
-            results.append({"file": str(mf), "status": "skipped",
-                            "detail": f"no rating for {companion_id!r}"})
+            results.append(
+                {"file": str(mf), "status": "skipped", "detail": f"no rating for {companion_id!r}"}
+            )
             continue
         r = CompanionRating(rating=rating_map[companion_id], companion_id=companion_id)
         meta[METADATA_KEY] = r.to_dict()
         if not dry_run:
             write_metadata(mf, meta)
-        results.append({"file": str(mf), "status": "updated", "rating": r.rating,
-                        "premium_multiplier": PREMIUM_MULTIPLIERS[r.rating],
-                        "training_weight": TRAINING_WEIGHTS[r.rating]})
+        results.append(
+            {
+                "file": str(mf),
+                "status": "updated",
+                "rating": r.rating,
+                "premium_multiplier": PREMIUM_MULTIPLIERS[r.rating],
+                "training_weight": TRAINING_WEIGHTS[r.rating],
+            }
+        )
     return results
 
 
@@ -214,7 +233,8 @@ def build_parser() -> argparse.ArgumentParser:
     """Construct the argparse CLI parser."""
     parser = argparse.ArgumentParser(
         prog="epal_companion_quality_score",
-        description="Wire EPal companion ratings (1-5 stars) into clip metadata.")
+        description="Wire EPal companion ratings (1-5 stars) into clip metadata.",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("embed", help="Embed a rating into a metadata file")
     p.add_argument("metadata", type=Path, help="Path to metadata file")
@@ -249,8 +269,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.command == "embed":
-            rating = CompanionRating(rating=args.rating, companion_id=args.companion_id,
-                                     notes=args.notes)
+            rating = CompanionRating(
+                rating=args.rating, companion_id=args.companion_id, notes=args.notes
+            )
             meta = read_metadata(args.metadata)
             meta[METADATA_KEY] = rating.to_dict()
             out = args.output or args.metadata
@@ -273,8 +294,9 @@ def main(argv: Optional[list[str]] = None) -> int:
             if args.rating is not None:
                 if not args.companion_id:
                     parser.error("--companion-id is required with --rating")
-                rating = CompanionRating(rating=args.rating, companion_id=args.companion_id,
-                                         notes=args.notes)
+                rating = CompanionRating(
+                    rating=args.rating, companion_id=args.companion_id, notes=args.notes
+                )
                 sidecar_path = embed_rating_as_sidecar(args.image, rating)
                 print(f"[sidecar] Wrote {sidecar_path}")
             else:
