@@ -105,8 +105,7 @@ def reset_consent(path: Optional[Path] = None) -> bool:
         return False
 
 
-def show_dialog(parent: Optional[Any] = None,
-                terms: str = CONSENT_TERMS) -> bool:
+def show_dialog(parent: Optional[Any] = None, terms: str = CONSENT_TERMS) -> bool:
     """Render the Tk consent dialog. Returns True iff user accepted."""
     try:
         import tkinter as tk
@@ -152,7 +151,7 @@ def show_dialog(parent: Optional[Any] = None,
             root.destroy()
 
     tk.Button(btns, text="Decline", width=12, command=_decline).pack(side="right")
-    tk.Button(btns, text="Accept",  width=12, command=_accept).pack(side="right", padx=(0, 8))
+    tk.Button(btns, text="Accept", width=12, command=_accept).pack(side="right", padx=(0, 8))
 
     if root is not None:
         try:
@@ -176,12 +175,15 @@ def ensure_consent(path: Optional[Path] = None) -> bool:
 def main(argv: Optional[list] = None) -> int:
     """CLI entry point."""
     parser = argparse.ArgumentParser(description="Recorder first-run EULA")
-    parser.add_argument("--check", action="store_true",
-                        help="Exit 0 iff valid consent exists; do not show UI")
-    parser.add_argument("--reset", action="store_true",
-                        help="Delete existing consent.json and exit")
-    parser.add_argument("--path", type=Path, default=None,
-                        help="Override consent.json path (testing only)")
+    parser.add_argument(
+        "--check", action="store_true", help="Exit 0 iff valid consent exists; do not show UI"
+    )
+    parser.add_argument(
+        "--reset", action="store_true", help="Delete existing consent.json and exit"
+    )
+    parser.add_argument(
+        "--path", type=Path, default=None, help="Override consent.json path (testing only)"
+    )
     args = parser.parse_args(argv)
 
     if args.reset:
