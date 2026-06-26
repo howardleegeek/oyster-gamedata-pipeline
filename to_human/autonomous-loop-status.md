@@ -18,7 +18,12 @@
 ## Round 266 @ 2026-06-24T21:00:00Z
 
 - Picked: ruff format bin/v2prime_glm_residuals/__init__.py (smallest unformatted file: 54 lines, single blank line needed after module docstring; same pattern as previous rounds). Justification: measurable code smell, single-file scope, no behavior change, targeted test passes (v2prime 13/13), no risk of test masking, follows established cadence.
-- Result: committed 4ca6bdfe (ruff format added blank line after module docstring in bin/v2prime_glm_residuals/__init__.py; 1 file changed, 1 insertion(+); ruff check + ruff format --check clean; targeted test passes (v2prime_glm_residuals 13/13); pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic blank line — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+- Result: committed 4ca6bdfe (ruff format added blank line after module docstring in bin/v2prime_glm_residuals/__init__.py; 1 file changed, 1 insertion(+); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic blank line — no silent error swallow, no race, no off-by-one, no security impact, no test masking.)
+
+## Round 267 @ 2026-06-24T22:00:00Z
+
+- Picked: ruff format bin/prd_test_video_no_ui.py (smallest unformatted bin file: 182 lines, multi-line list formatting, line wrapping). Justification: measurable code smell, single-file scope, no behavior change, module import smoke OK, no risk of test masking, follows established cadence.
+- Result: committed 56d67838 (ruff format added blank lines between function defs, multi-line list/collection formatting, and line wrapping in bin/prd_test_video_no_ui.py; 1 file changed, 59 insertions(+), 19 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.)_init__.py; 1 file changed, 1 insertion(+); ruff check + ruff format --check clean; targeted test passes (v2prime_glm_residuals 13/13); pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic blank line — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
 
 ## Round 267 @ 2026-06-24T21:30:00Z
 
@@ -790,3 +795,8 @@ b4c97dbd638c75a1d826e641df598879876660ed
 
 - Picked: ruff format bin/manifest_signer.py (182 lines; trailing comma, long-line wrap, list-arg reformat). Justification: measurable code smell, single-file scope, no behavior change, no tests reference this module (no risk of test masking), follows established cadence of formatting small bin files.
 - Result: committed e2d1690c (ruff format applied trailing comma, line-wrapping, list-arg reformat to bin/manifest_signer.py; 1 file changed, 13 insertions(+), 20 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 335 @ 2026-06-26T02:00:00Z
+
+- Picked: ruff format bin/prd_test_video_no_ui.py (smallest unformatted bin file: 182 lines, multi-line list formatting, line wrapping). Justification: measurable code smell, single-file scope, no behavior change, module import smoke OK, no risk of test masking, follows established cadence.
+- Result: committed 56d67838 (ruff format added blank lines between function defs, multi-line list/collection formatting, and line wrapping in bin/prd_test_video_no_ui.py; 1 file changed, 59 insertions(+), 19 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.)
