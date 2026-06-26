@@ -104,9 +104,7 @@ _MESSAGE: str = (
 
 def _notify_macos(title: str, message: str) -> bool:
     """Show a notification on macOS via ``osascript``."""
-    script = (
-        f'display notification "{message}" with title "{title}"'
-    )
+    script = f'display notification "{message}" with title "{title}"'
     try:
         subprocess.run(
             ["osascript", "-e", script],
@@ -136,11 +134,11 @@ def _notify_linux(title: str, message: str) -> bool:
 def _notify_windows(title: str, message: str) -> bool:
     """Show a toast notification on Windows 10+ via PowerShell."""
     ps_script = (
-        f'[Windows.UI.Notifications.ToastNotificationManager, '
+        f"[Windows.UI.Notifications.ToastNotificationManager, "
         f"Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null; "
-        f'$template = [Windows.UI.Notifications.ToastTemplateType]::ToastText02; '
-        f'$xml = [Windows.UI.Notifications.ToastNotificationManager]::'
-        f'GetTemplateContent($template).GetXml(); '
+        f"$template = [Windows.UI.Notifications.ToastTemplateType]::ToastText02; "
+        f"$xml = [Windows.UI.Notifications.ToastNotificationManager]::"
+        f"GetTemplateContent($template).GetXml(); "
         f'$xml.GetElementsByTagName("text")[0].AppendChild('
         f'$xml.CreateTextNode("{title}")); '
         f'$xml.GetElementsByTagName("text")[1].AppendChild('
