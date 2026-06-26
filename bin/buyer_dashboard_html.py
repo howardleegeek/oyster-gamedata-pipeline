@@ -48,7 +48,7 @@ class ClipAnalyzer:
             if HAS_PIL:
                 # Create colored placeholder
                 color_val = 50 + i * 30
-                img_data = f'<svg width="320" height="180"><rect width="320" height="180" fill="rgb({color_val},100,150)"/><text x="160" y="90" text-anchor="middle" fill="white">Frame {i+1}</text></svg>'
+                img_data = f'<svg width="320" height="180"><rect width="320" height="180" fill="rgb({color_val},100,150)"/><text x="160" y="90" text-anchor="middle" fill="white">Frame {i + 1}</text></svg>'
                 self.preview_frames.append((img_data, timestamp))
             else:
                 self.preview_frames.append((None, timestamp))
@@ -61,13 +61,13 @@ class ClipAnalyzer:
             "issues": [
                 {"type": "warning", "description": "Low contrast in scene", "timestamp": 45.5},
                 {"type": "warning", "description": "Minor frame drops", "timestamp": 120.2},
-                {"type": "info", "description": "Good audio quality", "timestamp": 0}
+                {"type": "info", "description": "Good audio quality", "timestamp": 0},
             ],
             "metadata": {
                 "analyzed_at": datetime.now().isoformat(),
                 "clip_duration": 180.5,
-                "resolution": "1920x1080"
-            }
+                "resolution": "1920x1080",
+            },
         }
         return self.lint_results
 
@@ -76,17 +76,14 @@ class ClipAnalyzer:
         self.diversity_stats = {
             "color": {
                 "palette": ["#2E4057", "#048BA8", "#16DB93", "#EFEA5A", "#F29E4C"],
-                "color_variance": 0.78
+                "color_variance": 0.78,
             },
-            "composition": {
-                "shot_types": ["wide", "medium", "closeup"],
-                "framing_variance": 0.72
-            },
+            "composition": {"shot_types": ["wide", "medium", "closeup"], "framing_variance": 0.72},
             "summary": {
                 "overall_diversity_score": 0.73,
                 "strengths": ["Color variety", "Shot composition"],
-                "areas_for_improvement": ["Pacing"]
-            }
+                "areas_for_improvement": ["Pacing"],
+            },
         }
         return self.diversity_stats
 
@@ -103,33 +100,35 @@ class ClipAnalyzer:
         for i, (img_data, timestamp) in enumerate(self.preview_frames):
             time_str = self.format_timestamp(timestamp * 180)  # Assume 3min clip
             if img_data:
-                frames_html += f'''
+                frames_html += f"""
                 <div class="col-md-4 col-lg-2 mb-3">
                     <div class="preview-frame">
                         {img_data}
                         <div class="timestamp">{time_str}</div>
                     </div>
-                </div>'''
+                </div>"""
             else:
-                frames_html += f'''
+                frames_html += f"""
                 <div class="col-md-4 col-lg-2 mb-3">
                     <div class="preview-frame">
-                        <div class="placeholder">Frame {i+1}<br>{time_str}</div>
+                        <div class="placeholder">Frame {i + 1}<br>{time_str}</div>
                     </div>
-                </div>'''
+                </div>"""
 
         # Prepare lint issues
         lint_html = ""
         for issue in self.lint_results.get("issues", []):
-            color = {"critical": "danger", "warning": "warning", "info": "info"}.get(issue["type"], "info")
-            lint_html += f'''
+            color = {"critical": "danger", "warning": "warning", "info": "info"}.get(
+                issue["type"], "info"
+            )
+            lint_html += f"""
             <div class="alert alert-{color}">
                 <strong>{issue["type"].upper()}</strong>: {issue["description"]}
                 <span class="float-end">{self.format_timestamp(issue["timestamp"])}</span>
-            </div>'''
+            </div>"""
 
         # Generate HTML
-        return f'''<!DOCTYPE html>
+        return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -151,7 +150,7 @@ class ClipAnalyzer:
         <div class="container">
             <h1><i class="bi bi-film"></i> Clip Analysis Dashboard</h1>
             <p class="lead">{self.clip_path.name}</p>
-            <p><small>Generated {datetime.now().strftime('%Y-%m-%d %H:%M')}</small></p>
+            <p><small>Generated {datetime.now().strftime("%Y-%m-%d %H:%M")}</small></p>
         </div>
     </div>
 
@@ -214,7 +213,7 @@ class ClipAnalyzer:
                 <div class="card">
                     <div class="card-header"><h4>Clip Info</h4></div>
                     <div class="card-body">
-                        {"".join(f'<p><strong>{k}:</strong> {v}</p>' for k, v in self.lint_results["metadata"].items())}
+                        {"".join(f"<p><strong>{k}:</strong> {v}</p>" for k, v in self.lint_results["metadata"].items())}
                     </div>
                 </div>
             </div>
@@ -229,7 +228,7 @@ class ClipAnalyzer:
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
-</html>'''
+</html>"""
 
     def generate_report(self) -> bool:
         """Generate the complete HTML report."""
@@ -246,7 +245,7 @@ class ClipAnalyzer:
 
         try:
             self.output_path.parent.mkdir(parents=True, exist_ok=True)
-            self.output_path.write_text(html, encoding='utf-8')
+            self.output_path.write_text(html, encoding="utf-8")
             print(f"Report saved: {self.output_path}", file=sys.stderr)
             return True
         except Exception as e:
