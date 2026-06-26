@@ -43,9 +43,11 @@ WEBHOOK_SECRET_ENV: str = "EPAL_WEBHOOK_SECRET"
 # Data models
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class SessionContext:
     """Mutable state for an active EPal session."""
+
     session_id: str
     companion_id: str
     is_paid: bool
@@ -66,6 +68,7 @@ class SessionContext:
 @dataclass
 class SessionEndPayload:
     """Payload produced when a session ends."""
+
     session_id: str
     companion_id: str
     rating: int
@@ -87,7 +90,11 @@ _active_sessions: Dict[str, SessionContext] = {}
 
 def _state_file(session_id: str) -> Path:
     """Return the path to the persisted state file for a session."""
-    base = Path(DEFAULT_STATE_DIR) if DEFAULT_STATE_DIR else Path(tempfile.mkdtemp(prefix="epal_state_"))
+    base = (
+        Path(DEFAULT_STATE_DIR)
+        if DEFAULT_STATE_DIR
+        else Path(tempfile.mkdtemp(prefix="epal_state_"))
+    )
     base.mkdir(parents=True, exist_ok=True)
     return base / f"{session_id}.json"
 
@@ -109,10 +116,13 @@ def _load_session(session_id: str) -> Optional[SessionContext]:
 # Recorder helpers
 # ---------------------------------------------------------------------------
 
+
 def _start_recorder(session_id: str, temp_dir: str) -> tuple[int, str]:
     """Start the recording process. Returns (pid, recording_path)."""
     rec_path = os.path.join(temp_dir, f"{session_id}.rec")
-    Path(rec_path).write_text(f"RECORDER_START {session_id} {datetime.now(timezone.utc).isoformat()}\n")
+    Path(rec_path).write_text(
+        f"RECORDER_START {session_id} {datetime.now(timezone.utc).isoformat()}\n"
+    )
     pid = os.getpid()  # In production: subprocess.Popen(RECORDER_CMD, ...).pid
     logger.info("Recorder started: pid=%s path=%s", pid, rec_path)
     return pid, rec_path
@@ -139,9 +149,14 @@ def _compute_checksum(path: str) -> str:
 # Upload helper
 # ---------------------------------------------------------------------------
 
+
 def _upload_artefact(payload: SessionEndPayload) -> str:
     """Upload the session artefact. Returns the destination path."""
-    upload_base = Path(DEFAULT_UPLOAD_DIR) if DEFAULT_UPLOAD_DIR else Path(tempfile.mkdtemp(prefix="epal_upload_"))
+    upload_base = (
+        Path(DEFAULT_UPLOAD_DIR)
+        if DEFAULT_UPLOAD_DIR
+        else Path(tempfile.mkdtemp(prefix="epal_upload_"))
+    )
     upload_base.mkdir(parents=True, exist_ok=True)
     dest = upload_base / f"{payload.session_id}_end.json"
     dest.write_text(json.dumps(payload.to_dict(), indent=2))
@@ -153,16 +168,25 @@ def _upload_artefact(payload: SessionEndPayload) -> str:
 # Core webhook handlers
 # ---------------------------------------------------------------------------
 
+
 def handle_session_start(
-    session_id: str, companion_id: str, is_paid: bool, companion_opt_in: bool,
+    session_id: str,
+    companion_id: str,
+    is_paid: bool,
+    companion_opt_in: bool,
 ) -> Dict[str, Any]:
     """
     Process a session_start webhook.
 
     Recorder starts ONLY when is_paid AND companion_opt_in are both True.
     """
-    logger.info("session_start: id=%s companion=%s paid=%s opt_in=%s",
-                session_id, companion_id, is_paid, companion_opt_in)
+    logger.info(
+        "session_start: id=%s companion=%s paid=%s opt_in=%s",
+        session_id,
+        companion_id,
+        is_paid,
+        companion_opt_in,
+    )
 
     if not is_paid:
         return {"status": "skipped", "reason": "session_not_paid", "session_id": session_id}
@@ -173,20 +197,30 @@ def handle_session_start(
     pid, rec_path = _start_recorder(session_id, temp_dir)
 
     ctx = SessionContext(
-        session_id=session_id, companion_id=companion_id,
-        is_paid=True, companion_opt_in=True,
+        session_id=session_id,
+        companion_id=companion_id,
+        is_paid=True,
+        companion_opt_in=True,
         started_at=datetime.now(timezone.utc).isoformat(),
-        recorder_pid=pid, recording_path=rec_path, temp_dir=temp_dir,
+        recorder_pid=pid,
+        recording_path=rec_path,
+        temp_dir=temp_dir,
     )
     _active_sessions[session_id] = ctx
     _persist_session(ctx)
 
-    return {"status": "recording_started", "session_id": session_id,
-            "recorder_pid": pid, "recording_path": rec_path}
+    return {
+        "status": "recording_started",
+        "session_id": session_id,
+        "recorder_pid": pid,
+        "recording_path": rec_path,
+    }
 
 
 def handle_session_end(
-    session_id: str, companion_id: str, rating: int,
+    session_id: str,
+    companion_id: str,
+    rating: int,
 ) -> Dict[str, Any]:
     """
     Process a session_end webhook.
@@ -200,13 +234,19 @@ def handle_session_end(
         return {"status": "error", "reason": "session_not_found", "session_id": session_id}
 
     if ctx.companion_id != companion_id:
-        return {"status": "error", "reason": "companion_id_mismatch",
-                "expected": ctx.companion_id, "received": companion_id}
+        return {
+            "status": "error",
+            "reason": "companion_id_mismatch",
+            "expected": ctx.companion_id,
+            "received": companion_id,
+        }
 
     if ctx.recorder_pid is not None and ctx.recording_path:
         _stop_recorder(ctx.recorder_pid, ctx.recording_path)
 
-    started = datetime.fromisoformat(ctx.started_at) if ctx.started_at else datetime.now(timezone.utc)
+    started = (
+        datetime.fromisoformat(ctx.started_at) if ctx.started_at else datetime.now(timezone.utc)
+    )
     ended = datetime.now(timezone.utc)
     duration = (ended - started).total_seconds()
 
@@ -214,27 +254,40 @@ def handle_session_end(
     checksum = _compute_checksum(rec_path) if rec_path and Path(rec_path).exists() else ""
 
     provenance = {
-        "companion_id": companion_id, "session_id": session_id,
-        "is_paid": str(ctx.is_paid), "companion_opt_in": str(ctx.companion_opt_in),
-        "started_at": ctx.started_at, "ended_at": ended.isoformat(),
+        "companion_id": companion_id,
+        "session_id": session_id,
+        "is_paid": str(ctx.is_paid),
+        "companion_opt_in": str(ctx.companion_opt_in),
+        "started_at": ctx.started_at,
+        "ended_at": ended.isoformat(),
     }
 
     payload = SessionEndPayload(
-        session_id=session_id, companion_id=companion_id, rating=rating,
-        ended_at=ended.isoformat(), duration_seconds=duration,
-        recording_path=rec_path, checksum_sha256=checksum, provenance=provenance,
+        session_id=session_id,
+        companion_id=companion_id,
+        rating=rating,
+        ended_at=ended.isoformat(),
+        duration_seconds=duration,
+        recording_path=rec_path,
+        checksum_sha256=checksum,
+        provenance=provenance,
     )
     upload_dest = _upload_artefact(payload)
     _active_sessions.pop(session_id, None)
 
-    return {"status": "session_ended", "session_id": session_id,
-            "upload_dest": upload_dest, "duration_seconds": duration,
-            "checksum_sha256": checksum}
+    return {
+        "status": "session_ended",
+        "session_id": session_id,
+        "upload_dest": upload_dest,
+        "duration_seconds": duration,
+        "checksum_sha256": checksum,
+    }
 
 
 # ---------------------------------------------------------------------------
 # HTTP webhook server
 # ---------------------------------------------------------------------------
+
 
 class WebhookHandler(BaseHTTPRequestHandler):
     """Minimal HTTP handler for EPal lifecycle webhooks."""
@@ -265,12 +318,15 @@ class WebhookHandler(BaseHTTPRequestHandler):
         body = self._read_body()
         if self.path == "/v1/epal/session_start":
             result = handle_session_start(
-                body.get("session_id", ""), body.get("companion_id", ""),
-                bool(body.get("is_paid", False)), bool(body.get("companion_opt_in", False)),
+                body.get("session_id", ""),
+                body.get("companion_id", ""),
+                bool(body.get("is_paid", False)),
+                bool(body.get("companion_opt_in", False)),
             )
         elif self.path == "/v1/epal/session_end":
             result = handle_session_end(
-                body.get("session_id", ""), body.get("companion_id", ""),
+                body.get("session_id", ""),
+                body.get("companion_id", ""),
                 int(body.get("rating", 0)),
             )
         else:
@@ -286,6 +342,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="EPal Session Lifecycle Webhook Handler")
@@ -311,12 +368,12 @@ def _build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     """Entry point for the EPal session lifecycle hook CLI."""
     args = _build_parser().parse_args(argv)
-    logging.basicConfig(level=logging.INFO,
-                        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    )
 
     if args.command == "session-start":
-        result = handle_session_start(args.session_id, args.companion_id,
-                                      args.is_paid, args.opt_in)
+        result = handle_session_start(args.session_id, args.companion_id, args.is_paid, args.opt_in)
     elif args.command == "session-end":
         result = handle_session_end(args.session_id, args.companion_id, args.rating)
     elif args.command == "serve":
