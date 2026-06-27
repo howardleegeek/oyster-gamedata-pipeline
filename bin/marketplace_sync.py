@@ -23,10 +23,12 @@ from typing import Any, Dict, Optional
 # Try to import requests, fall back to urllib
 try:
     import requests
+
     HAS_REQUESTS = True
 except ImportError:
     import urllib.error
     import urllib.request
+
     HAS_REQUESTS = False
 
 
@@ -118,14 +120,21 @@ class OysterClient:
     """Client for Oyster Marketplace API."""
 
     def __init__(self, base_url: Optional[str] = None, api_key: Optional[str] = None):
-        self.base_url = (base_url or os.environ.get("OYSTER_API_URL", "https://api.oyster.ai")).rstrip("/")
+        self.base_url = (
+            base_url or os.environ.get("OYSTER_API_URL", "https://api.oyster.ai")
+        ).rstrip("/")
         self.api_key = api_key or os.environ.get("OYSTER_API_KEY", "")
         self.session_id = None
 
         if not self.api_key:
-            print("Warning: No API key provided. Set OYSTER_API_KEY environment variable.", file=sys.stderr)
+            print(
+                "Warning: No API key provided. Set OYSTER_API_KEY environment variable.",
+                file=sys.stderr,
+            )
 
-    def _request(self, method: str, path: str, params: Optional[Dict] = None, data: Optional[Dict] = None) -> Dict:
+    def _request(
+        self, method: str, path: str, params: Optional[Dict] = None, data: Optional[Dict] = None
+    ) -> Dict:
         """Make HTTP request to API."""
         url = f"{self.base_url}{path}"
         headers = {
@@ -158,7 +167,7 @@ class OysterClient:
 
             req_data = None
             if data:
-                req_data = json.dumps(data).encode('utf-8')
+                req_data = json.dumps(data).encode("utf-8")
 
             req = urllib.request.Request(
                 url,
@@ -169,7 +178,7 @@ class OysterClient:
 
             try:
                 with urllib.request.urlopen(req, timeout=30) as response:
-                    return json.loads(response.read().decode('utf-8'))
+                    return json.loads(response.read().decode("utf-8"))
             except urllib.error.HTTPError as e:
                 if e.code == 429:
                     retry_after = e.headers.get("Retry-After", "60")
@@ -226,7 +235,7 @@ def download_file(url: str, output_path: str) -> None:
         response = requests.get(url, stream=True, timeout=300)
         response.raise_for_status()
 
-        with open(output_path, 'wb') as f:
+        with open(output_path, "wb") as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
     else:
@@ -263,7 +272,7 @@ def cmd_sync(args):
 
     # Save session metadata
     metadata_path = os.path.join(args.output, "sessions.json")
-    with open(metadata_path, 'w') as f:
+    with open(metadata_path, "w") as f:
         json.dump(result, f, indent=2)
     print(f"Saved metadata to: {metadata_path}")
 
@@ -351,7 +360,9 @@ def cmd_list(args):
         print(f"ID: {session['id']}")
         print(f"  Game: {session['game']}, Scene: {session['scene']}")
         print(f"  Audit Score: {session['audit_score']}, Quality: {session['quality_score']}")
-        print(f"  Depth: {session['has_depth']}, Audio: {session['has_audio']}, Voice: {session['has_voice']}")
+        print(
+            f"  Depth: {session['has_depth']}, Audio: {session['has_audio']}, Voice: {session['has_voice']}"
+        )
         print()
 
 
@@ -369,7 +380,7 @@ Examples:
 
   # Create bulk download job
   oyster-marketplace bulk --filter "has_depth and has_audio" --wait --output ./downloads/
-"""
+""",
     )
 
     parser.add_argument("--api-url", help="Oyster API base URL")
@@ -389,7 +400,9 @@ Examples:
     bulk_parser.add_argument("--filter", "-f", default="", help="Filter expression")
     bulk_parser.add_argument("--since", help="Only sessions created since this date")
     bulk_parser.add_argument("--wait", "-w", action="store_true", help="Wait for job completion")
-    bulk_parser.add_argument("--poll-interval", type=int, default=5, help="Poll interval in seconds")
+    bulk_parser.add_argument(
+        "--poll-interval", type=int, default=5, help="Poll interval in seconds"
+    )
     bulk_parser.add_argument("--output", "-o", help="Output directory for download")
 
     # List command
