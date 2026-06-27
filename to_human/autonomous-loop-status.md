@@ -1,5 +1,6 @@
 Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
 
+
 ## Round 380 @ 2026-06-27T09:47:26Z
 
 - Picked: ruff format tests/test_runner_thinking_event.py (smallest unformatted file in repo at 171 lines; 1 multi-line assert statement). Justification: measurable code smell, single-file scope, no behavior change (cosmetic assert parenthesization only), targeted test passes (4/4), follows established cadence.
