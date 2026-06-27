@@ -261,7 +261,7 @@ class TestInputLatencyTelemetry(unittest.TestCase):
         create_synthetic_game_state(self.game_state_path, game_ticks)
 
         latencies = compute_latencies(self.inputs_path, self.game_state_path)
-        result = write_output(latencies, self.output_path)
+        write_output(latencies, self.output_path)
 
         # Verify output file
         with open(self.output_path) as f:
