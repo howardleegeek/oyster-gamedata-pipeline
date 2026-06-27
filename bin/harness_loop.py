@@ -48,6 +48,7 @@ State invariants:
     - completed gaps idempotent (skip if already in git)
     - never edit existing files (cluster truncates) — only NEW files allowed
 """
+
 from __future__ import annotations
 
 import argparse
@@ -66,8 +67,8 @@ SPEC_DIR = Path("/tmp/harness_specs")
 MAC2_HOST = "howard-mac2"
 MAC2_WORK = "/Users/howardlee/aliyun_work"
 MINIMAX = f"{MAC2_WORK}/minimax_agent_simple.py"
-MAX_PARALLEL = 8           # mac-2 stable concurrency
-POLL_INTERVAL_S = 60       # check every 60s
+MAX_PARALLEL = 8  # mac-2 stable concurrency
+POLL_INTERVAL_S = 60  # check every 60s
 MAX_RETRIES = 3
 SLEEP_BETWEEN_LOOPS_S = 30
 
@@ -136,14 +137,23 @@ def save_gaps(data: dict[str, Any]) -> None:
 
     # Step 1: pull latest disk state (concurrent commits may have added gaps)
     try:
-        run(["git", "-C", str(REPO_ROOT), "pull", "--rebase", "--autostash",
-             "origin", "main"], check=False, timeout=30)
+        run(
+            ["git", "-C", str(REPO_ROOT), "pull", "--rebase", "--autostash", "origin", "main"],
+            check=False,
+            timeout=30,
+        )
     except Exception as e:
         log.warning(f"  save_gaps pull-before-write skipped: {e}")
 
     # Step 2: 3-way merge — preserve concurrent gap additions
-    DAEMON_OWNED_FIELDS = {"status", "dispatched_at", "completed_at",
-                            "fail_reason", "retries", "skip_reason"}
+    DAEMON_OWNED_FIELDS = {
+        "status",
+        "dispatched_at",
+        "completed_at",
+        "fail_reason",
+        "retries",
+        "skip_reason",
+    }
     try:
         if GAPS_YAML.exists():
             disk = yaml.safe_load(GAPS_YAML.read_text()) or {}
@@ -237,17 +247,17 @@ def generate_spec(gap: dict) -> str:
     Spec is intentionally simple: 1 NEW file, no edits, no dependencies.
     Cluster reliably handles this (vs the rc6 disaster of edit-existing).
     """
-    return f"""# {gap['id']} · {gap['title']}
+    return f"""# {gap["id"]} · {gap["title"]}
 
 ## Purpose
-{gap.get('purpose', 'Production-grade vendor pipeline component')}.
+{gap.get("purpose", "Production-grade vendor pipeline component")}.
 
 ## Constraints
-- ONLY write 1 NEW file: `{gap['title']}`
+- ONLY write 1 NEW file: `{gap["title"]}`
 - NO edits to existing files (harness rule — cluster truncates large edits)
 - NO external runtime deps that vendors don't already have
   (stdlib + numpy/PIL/PyYAML/openpyxl OK; pydantic/torch must be lazy import)
-- Target line count: {gap.get('lines_estimate', 100)} (±50% acceptable)
+- Target line count: {gap.get("lines_estimate", 100)} (±50% acceptable)
 - Type hints + docstrings + module-level header
 
 ## Implementation
@@ -263,7 +273,7 @@ def generate_spec(gap: dict) -> str:
 - No hardcoded credentials / API keys
 
 ## Submit
-1. write_file('{gap['title']}', ...)
+1. write_file('{gap["title"]}', ...)
 2. run_cmd to verify syntax (e.g. `python3 -c 'import ast; ast.parse(open(\"...\").read())'`)
 3. finish
 
@@ -276,12 +286,13 @@ import socket as _net
 
 # When this daemon runs ON mac-2 itself, skip ssh — operate directly on local fs.
 IS_LOCAL_TO_MAC2 = (
-    "Howards-MacBook-Pro-2" in _net.gethostname()
-    or os.environ.get("HARNESS_LOCAL_MAC2") == "1"
+    "Howards-MacBook-Pro-2" in _net.gethostname() or os.environ.get("HARNESS_LOCAL_MAC2") == "1"
 )
 
 
-def run(cmd: list[str], check: bool = True, capture: bool = True, timeout: int = 60) -> subprocess.CompletedProcess:
+def run(
+    cmd: list[str], check: bool = True, capture: bool = True, timeout: int = 60
+) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, check=check, capture_output=capture, text=True, timeout=timeout)
 
 
@@ -355,7 +366,9 @@ def dispatch(gap: dict) -> bool:
 
 # ----------------------------------------------------------------- collection
 def is_completed(gap_id: str) -> bool:
-    res = ssh_run(f"grep -q 'TASK RESULT: completed' {MAC2_WORK}/{gap_id}/agent.log && echo YES || echo NO")
+    res = ssh_run(
+        f"grep -q 'TASK RESULT: completed' {MAC2_WORK}/{gap_id}/agent.log && echo YES || echo NO"
+    )
     return "YES" in res.stdout
 
 
@@ -393,11 +406,13 @@ def verify_syntax(path: Path, gap: dict | None = None) -> bool:
         text = path.read_text()
         if suffix == ".py":
             import ast
+
             ast.parse(text)
         elif suffix == ".sh" or suffix == ".bash":
             run(["bash", "-n", str(path)])
         elif suffix in {".yml", ".yaml"}:
             import yaml
+
             yaml.safe_load(text)
         elif suffix == ".md":
             if len(text) < 100:  # too small to be a real doc
@@ -473,7 +488,7 @@ def acquire_or_check_lock(data: dict) -> bool:
     age = time.time() - cur_hb if cur_hb else 9e9
 
     if cur_host == HOSTNAME:
-        return True   # we are the owner; refresh heartbeat
+        return True  # we are the owner; refresh heartbeat
     if cur_host and age < LOCK_TTL_S:
         log.warning(f"Lock held by {cur_host} (age={int(age)}s, ttl={LOCK_TTL_S}s); exiting.")
         return False
@@ -580,11 +595,21 @@ def harness_loop(once: bool = False, dry_run: bool = False) -> int:
                 # paths-ignore in the workflows already handles audit_gaps.yaml-only
                 # diffs, but [skip ci] is belt-and-suspenders + works on platforms
                 # that don't support paths-ignore (e.g. some self-hosted runners).
-                run(["git", "-C", str(REPO_ROOT), "commit", "-m",
-                     f"chore(harness): heartbeat from {HOSTNAME} iter={iteration} [skip ci]",
-                     "--allow-empty"], check=False)
-                run(["git", "-C", str(REPO_ROOT), "push", "origin", "main"],
-                    check=False, timeout=60)
+                run(
+                    [
+                        "git",
+                        "-C",
+                        str(REPO_ROOT),
+                        "commit",
+                        "-m",
+                        f"chore(harness): heartbeat from {HOSTNAME} iter={iteration} [skip ci]",
+                        "--allow-empty",
+                    ],
+                    check=False,
+                )
+                run(
+                    ["git", "-C", str(REPO_ROOT), "push", "origin", "main"], check=False, timeout=60
+                )
             except Exception as e:
                 log.warning(f"  heartbeat push skipped: {e}")
 
