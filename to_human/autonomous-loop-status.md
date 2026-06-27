@@ -1408,3 +1408,13 @@ b4c97dbd638c75a1d826e641df598879876660ed
 
 - Picked: ruff format bin/error_report_service.py (640 lines, smallest unformatted bin file with existing test). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change (cosmetic: regex definitions collapsed to single line, blank line added after path-scrub block, list comprehension line-wrapped, patch suffix regex collapsed), AST parse + ruff check + format all clean before+after, 46/46 targeted tests pass (no test masking), follows established cadence of formatting bin files.
 - Result: committed 52afea5a (1 file changed, 13 insertions(+), 36 deletions(-); ruff check + format --check clean; 46/46 tests/test_error_report.py pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (46/46 pass), no brand cross-reference, no module-level side effect, regex patterns unchanged (same compiled regex strings).)
+
+## Round 373 @ 2026-06-26T03:50:00Z
+
+- Picked: ruff format bin/version_compat_checker.py (smallest unformatted bin file: 613 lines, had existing test test_version_compat.py with 40 tests). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic reformat), import smoke OK, targeted test passes (40/40), follows established cadence.
+- Result: committed ea73f324 (ruff format applied: 1 file changed, 3 insertions(+), 8 deletions(-); ruff check + format clean; import smoke OK; tests pass 40/40; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking.)
+
+## Round 414 @ 2026-06-27T04:15:00Z
+
+- Picked: ruff format bin/harness_loop.py (631 lines, smallest unformatted bin file with no test references). Justification: measurable code smell, single-file scope, no behavior change (cosmetic: 46 insertions, 21 deletions for line-wrapping + dict/list literals), import smoke OK, no test references this file, follows established cadence.
+- Result: committed 9313a054 (ruff format applied: 1 file changed, 46 insertions(+), 21 deletions(-); ruff check + format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
