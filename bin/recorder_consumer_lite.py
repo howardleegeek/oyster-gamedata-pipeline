@@ -138,7 +138,7 @@ class RecorderError(RuntimeError):
 
 
 RELEASES_API = (
-    "https://api.github.com/repos/howardleegeek/oyster-gamedata-pipeline" "/releases?per_page=20"
+    "https://api.github.com/repos/howardleegeek/oyster-gamedata-pipeline/releases?per_page=20"
 )
 
 
@@ -630,8 +630,7 @@ def _probe_duration_with_ffprobe(path: Path) -> Optional[float]:
     if proc.returncode != 0:
         stderr = (proc.stderr or "").strip()
         _trace(
-            "duration_probe: ffprobe failed "
-            f"rc={proc.returncode} path={path} stderr={stderr[:300]}"
+            f"duration_probe: ffprobe failed rc={proc.returncode} path={path} stderr={stderr[:300]}"
         )
         return None
     duration = _positive_duration_from_text(proc.stdout)
@@ -3797,8 +3796,7 @@ def _start_ffmpeg_capture_layer(
             returncode = proc.poll()
             stderr = _video_capture_stderr_text(handle)
             raise VideoCaptureLayerError(
-                f"ddagrab stderr reported error rc={returncode}; "
-                f"stderr_log={handle.stderr_path}",
+                f"ddagrab stderr reported error rc={returncode}; stderr_log={handle.stderr_path}",
                 returncode=returncode,
                 stderr=stderr,
                 stderr_log=handle.stderr_path,
@@ -5056,8 +5054,7 @@ class RecorderApp(tk.Tk):
         self._hint = tk.Label(
             self,
             text=(
-                f"录制完成后会保存到: {_output_dir()}\n"
-                f"如果出问题，点上面按钮自动打包诊断包到桌面。"
+                f"录制完成后会保存到: {_output_dir()}\n如果出问题，点上面按钮自动打包诊断包到桌面。"
             ),
             font=("Helvetica", 9),
             bg="white",
@@ -5500,7 +5497,7 @@ class RecorderApp(tk.Tk):
                     if rt["mouse_oob"] > 0:
                         issues.append(f"{rt['mouse_oob']}个鼠标越界")
                     if rt["last_event_age_ms"] > 5000:
-                        issues.append(f"事件停顿 {rt['last_event_age_ms']/1000:.1f}s")
+                        issues.append(f"事件停顿 {rt['last_event_age_ms'] / 1000:.1f}s")
                     quality_line = f"\n⚠️ 数据精度: {', '.join(issues)}"
         except Exception:
             pass
@@ -5561,7 +5558,7 @@ class RecorderApp(tk.Tk):
         self._set(
             "📊 处理深度图中…",
             "#1976d2",
-            "录制已结束，正在生成每帧深度图。\n" "深度图完成后会打包成最终 tarball。",
+            "录制已结束，正在生成每帧深度图。\n深度图完成后会打包成最终 tarball。",
         )
 
         # Build the progress widgets. We keep refs in a list so
@@ -6034,7 +6031,7 @@ class RecorderApp(tk.Tk):
                     self._set(
                         "准备好",
                         TEXT_GRAY,
-                        "先打开 Minecraft 玩一会儿确认它不崩。\n" "确认后再点上面 ▶ 开始录制。",
+                        "先打开 Minecraft 玩一会儿确认它不崩。\n确认后再点上面 ▶ 开始录制。",
                     )
             time.sleep(0.5)
         if self._stop_event.is_set():
@@ -6049,7 +6046,7 @@ class RecorderApp(tk.Tk):
         self._set(
             "⏳ 等待进入游戏窗口",
             ORANGE,
-            "游戏已启动。录制器会等真实 Minecraft 游戏窗口稳定后自动开始，" "不会录启动器。",
+            "游戏已启动。录制器会等真实 Minecraft 游戏窗口稳定后自动开始，不会录启动器。",
         )
         self._mc_window_rect = _wait_for_stable_minecraft_window(
             timeout_sec=120,
@@ -6136,7 +6133,7 @@ class RecorderApp(tk.Tk):
             self._set(
                 "● 正在录制",
                 RED,
-                "玩你的 Minecraft 即可，退出游戏会自动停止录制。" "（视频 + 键鼠输入同步采集中）",
+                "玩你的 Minecraft 即可，退出游戏会自动停止录制。（视频 + 键鼠输入同步采集中）",
             )
         elif self._video_started:
             self._set("● 正在录制（仅视频）", RED, "键鼠采集未启动，仅录制视频。继续玩游戏即可。")
@@ -6650,7 +6647,7 @@ class RecorderApp(tk.Tk):
                     self._set(
                         "⚠️ 已跳过深度图",
                         "#d97706",
-                        "tarball 完成，但深度数据未包含。\n" "下游买家规格会在深度项标记 FAIL。",
+                        "tarball 完成，但深度数据未包含。\n下游买家规格会在深度项标记 FAIL。",
                     )
             except Exception as e:
                 self.after(0, self._hide_depth_progress_ui)
@@ -6661,9 +6658,7 @@ class RecorderApp(tk.Tk):
                     client_skip_reason=RAW_ONLY_DEPTH_SKIP_REASON,
                 )
                 _trace(
-                    "depth: "
-                    f"{RAW_ONLY_DEPTH_SKIP_REASON}; skipping local client inference "
-                    f"({e!r})"
+                    f"depth: {RAW_ONLY_DEPTH_SKIP_REASON}; skipping local client inference ({e!r})"
                 )
         else:
             if depth_dir.exists():
@@ -7132,7 +7127,7 @@ class RecorderApp(tk.Tk):
                 self._video_capture_attempt_log.append(attempt)
                 _trace(f"video_capture: layer={layer} failed: {exc}")
 
-        _trace("WARNING: ALL video capture layers failed: " f"{errors}. Continuing with NO video.")
+        _trace(f"WARNING: ALL video capture layers failed: {errors}. Continuing with NO video.")
         self._video_capture_mode = "none"
         self._video_capture_handle = None
         self._obs_capture_handle = None
@@ -7174,7 +7169,7 @@ class RecorderApp(tk.Tk):
                 )
             if layer in _VIDEO_AUTO_LAYERS:
                 failed_layers.add(layer)
-                _trace("video_capture: marked layer failed for next auto retry " f"layer={layer}")
+                _trace(f"video_capture: marked layer failed for next auto retry layer={layer}")
         if encoder == _SOFTWARE_VIDEO_ENCODER.name and (not valid or frames_under_expected):
             self._video_load_reduction_recommended = True
             _trace(
@@ -7341,14 +7336,14 @@ def _emergency_error_box(exc: BaseException) -> None:
     try:
         root = tk.Tk()
         root.withdraw()
-        msg = "录制器启动失败。\n\n" f"{type(exc).__name__}: {exc}\n\n"
+        msg = f"录制器启动失败。\n\n{type(exc).__name__}: {exc}\n\n"
         if remote_url:
             msg += (
                 f"日志已自动上传，工程师可访问：\n{remote_url}\n\n"
                 "你不用做任何事，工程师会从这个链接看到出错原因。"
             )
         else:
-            msg += f"日志在本机：{_STARTUP_LOG}\n" "如果方便，把这个文件发给工程师。"
+            msg += f"日志在本机：{_STARTUP_LOG}\n如果方便，把这个文件发给工程师。"
         messagebox.showerror(
             title="Oyster 录制器 — 启动错误",
             message=msg,
