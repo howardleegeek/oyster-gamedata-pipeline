@@ -75,17 +75,17 @@ class TestTriggers:
         on = workflow.get("on", workflow.get(True, {}))
         pr = on.get("pull_request", {})
         paths = pr.get("paths", [])
-        assert any(
-            "vendor/recorder" in p for p in paths
-        ), f"PR paths must include vendor/recorder, got: {paths}"
+        assert any("vendor/recorder" in p for p in paths), (
+            f"PR paths must include vendor/recorder, got: {paths}"
+        )
 
     def test_paths_include_workflow_file(self, workflow):
         on = workflow.get("on", workflow.get(True, {}))
         pr = on.get("pull_request", {})
         paths = pr.get("paths", [])
-        assert any(
-            "recorder-cargo-check.yml" in p for p in paths
-        ), f"PR paths must include the workflow file itself, got: {paths}"
+        assert any("recorder-cargo-check.yml" in p for p in paths), (
+            f"PR paths must include the workflow file itself, got: {paths}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -100,9 +100,9 @@ class TestJobConfig:
     def test_runs_on_ubuntu(self, workflow):
         jobs = workflow["jobs"]
         for job_name, job_def in jobs.items():
-            assert (
-                job_def.get("runs-on") == "ubuntu-latest"
-            ), f"Job '{job_name}' must run on ubuntu-latest"
+            assert job_def.get("runs-on") == "ubuntu-latest", (
+                f"Job '{job_name}' must run on ubuntu-latest"
+            )
 
     def test_timeout_minutes(self, workflow):
         jobs = workflow["jobs"]
@@ -163,17 +163,17 @@ class TestSteps:
         cache_steps = [s for s in self.steps if "actions/cache" in s.get("uses", "")]
         assert len(cache_steps) > 0
         cache_path = cache_steps[0].get("with", {}).get("path", "")
-        assert (
-            "vendor/recorder/target" in cache_path
-        ), f"Cache path must include vendor/recorder/target, got: {cache_path}"
+        assert "vendor/recorder/target" in cache_path, (
+            f"Cache path must include vendor/recorder/target, got: {cache_path}"
+        )
 
     def test_cache_key_includes_cargo_lock_hash(self):
         cache_steps = [s for s in self.steps if "actions/cache" in s.get("uses", "")]
         assert len(cache_steps) > 0
         cache_key = str(cache_steps[0].get("with", {}).get("key", ""))
-        assert (
-            "Cargo.lock" in cache_key
-        ), f"Cache key must include Cargo.lock hash, got: {cache_key}"
+        assert "Cargo.lock" in cache_key, (
+            f"Cache key must include Cargo.lock hash, got: {cache_key}"
+        )
 
     def test_cargo_check_present(self):
         run_steps = [s for s in self.steps if "run" in s]
@@ -199,9 +199,9 @@ class TestSteps:
         run_steps = [s for s in self.steps if "run" in s]
         combined = " ".join(s["run"] for s in run_steps)
         assert "--release" in combined, "cargo check should use --release flag"
-        assert (
-            "--no-default-features" in combined
-        ), "cargo check should use --no-default-features flag"
+        assert "--no-default-features" in combined, (
+            "cargo check should use --no-default-features flag"
+        )
 
     def test_tee_log(self):
         """cargo check output should be tee'd to a log file."""
@@ -215,9 +215,9 @@ class TestSteps:
         assert len(failure_steps) > 0, "Must have a step with 'if: failure()' for PR comment"
         # Check it uses github-script or similar to post a comment
         uses = [s.get("uses", "") for s in failure_steps]
-        assert any(
-            "github-script" in u for u in uses
-        ), "Failure step should use actions/github-script to post PR comment"
+        assert any("github-script" in u for u in uses), (
+            "Failure step should use actions/github-script to post PR comment"
+        )
 
 
 # ---------------------------------------------------------------------------
