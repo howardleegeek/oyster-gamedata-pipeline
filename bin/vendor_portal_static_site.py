@@ -29,6 +29,7 @@ from typing import Any, Dict, List, Optional
 # Configuration data-class (pure stdlib, no pydantic)
 # ---------------------------------------------------------------------------
 
+
 class SiteConfig:
     """Holds all parameters needed to render the static SPA."""
 
@@ -70,6 +71,7 @@ class SiteConfig:
 # ---------------------------------------------------------------------------
 # HTML template
 # ---------------------------------------------------------------------------
+
 
 def _build_html(config: SiteConfig) -> str:
     """Return the complete HTML document string."""
@@ -389,16 +391,14 @@ document.addEventListener("DOMContentLoaded", () => App.init());
 def _html_escape(text: str) -> str:
     """Minimal HTML entity escaping for template interpolation."""
     return (
-        text.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace('"', "&quot;")
+        text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
     )
 
 
 # ---------------------------------------------------------------------------
 # Favicon generator (inline SVG data-URL)
 # ---------------------------------------------------------------------------
+
 
 def _default_favicon_data_url(primary_color: str) -> str:
     """Return a data-URL for a simple SVG favicon matching the brand colour."""
@@ -407,9 +407,10 @@ def _default_favicon_data_url(primary_color: str) -> str:
         '<rect width="64" height="64" rx="12" fill="{c}"/>'
         '<text x="32" y="44" text-anchor="middle" fill="#fff" '
         'font-size="36" font-family="sans-serif" font-weight="bold">V</text>'
-        '</svg>'
+        "</svg>"
     ).format(c=primary_color)
     import base64
+
     encoded = base64.b64encode(svg.encode()).decode()
     return "data:image/svg+xml;base64," + encoded
 
@@ -417,6 +418,7 @@ def _default_favicon_data_url(primary_color: str) -> str:
 # ---------------------------------------------------------------------------
 # File writer
 # ---------------------------------------------------------------------------
+
 
 def _write_site(config: SiteConfig) -> Path:
     """Generate the static site into *config.output_dir* and return the path."""
@@ -436,9 +438,7 @@ def _write_site(config: SiteConfig) -> Path:
         ).hexdigest()[:12],
     }
     manifest_path = out / "manifest.json"
-    manifest_path.write_text(
-        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
-    )
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
     return index_path
 
@@ -446,12 +446,14 @@ def _write_site(config: SiteConfig) -> Path:
 def _utc_iso_now() -> str:
     """Return current UTC time in ISO-8601 without external deps."""
     import datetime
+
     return datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
