@@ -25,7 +25,7 @@ class TestExtractFrames:
         # Track subprocess.run calls
         run_calls = []
 
-        def mock_run(cmd, capture_output=False, text=False):
+        def mock_run(cmd, capture_output=False, text=False, check=False):
             run_calls.append(cmd)
             # Create fake frame files
             os.makedirs(output_dir, exist_ok=True)
@@ -51,19 +51,21 @@ class TestExtractFrames:
 
     def test_extract_frames_handles_ffmpeg_error(self, monkeypatch, tmp_path):
         """Test that extract_frames raises error on ffmpeg failure."""
-        from depth_inference_pipeline import DepthInferenceError, extract_frames
+        from depth_inference_pipeline import extract_frames
 
         video_path = str(tmp_path / "test_video.mp4")
         output_dir = str(tmp_path / "frames")
 
         Path(video_path).touch()
 
-        def mock_run(cmd, capture_output=False, text=False):
+        def mock_run(cmd, capture_output=False, text=False, check=False):
+            if check:
+                raise subprocess.CalledProcessError(1, cmd, "ffmpeg error: invalid codec", "ffmpeg error: invalid codec")
             return MagicMock(returncode=1, stderr="ffmpeg error: invalid codec", stdout="")
 
         monkeypatch.setattr(subprocess, "run", mock_run)
 
-        with pytest.raises(DepthInferenceError, match="ffmpeg failed"):
+        with pytest.raises(RuntimeError, match="ffmpeg failed"):
             extract_frames(video_path, output_dir)
 
 
