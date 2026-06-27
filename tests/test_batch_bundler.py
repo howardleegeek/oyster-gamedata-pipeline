@@ -130,9 +130,9 @@ def test_integration(tmp_path):
     # Check tarball arcname: subdir/file3.txt should be session_a/subdir/file3.txt
     with tarfile.open(tarball, "r:gz") as tar:
         names = tar.getnames()
-        assert (
-            "session_a/subdir/file3.txt" in names
-        ), f"Expected session_a/subdir/file3.txt in {names}"
+        assert "session_a/subdir/file3.txt" in names, (
+            f"Expected session_a/subdir/file3.txt in {names}"
+        )
         assert "session_a/file1.txt" in names
         assert "session_a/file2.txt" in names
 
