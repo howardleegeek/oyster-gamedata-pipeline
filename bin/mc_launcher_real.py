@@ -64,6 +64,7 @@ def find_minecraft_launcher() -> str:
     try:
         # Try to import minecraft-launcher-lib
         import minecraft_launcher_lib  # noqa: F401
+
         return "minecraft-launcher-lib"
     except ImportError:
         # Fallback to system binary
@@ -239,6 +240,7 @@ def launch_minecraft(
 
     # Set up duration timer if specified
     if duration_sec:
+
         def kill_after_duration():
             time.sleep(duration_sec)
             if process.poll() is None:  # Still running
@@ -355,7 +357,7 @@ def send_rcon_command(host: str, port: int, password: str, command: str) -> str:
 
         # Authenticate
         send_packet(1, 3, password)  # 3 = SERVERDATA_AUTH
-        
+
         # Receive auth response
         auth_id, auth_type, _ = recv_packet()
 
@@ -364,7 +366,7 @@ def send_rcon_command(host: str, port: int, password: str, command: str) -> str:
 
         # Send command
         send_packet(2, 2, command)  # 2 = SERVERDATA_EXECCOMMAND
-        
+
         # Receive command response
         cmd_id, cmd_type, response = recv_packet()
 
@@ -381,9 +383,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     Returns:
         Exit code (0 for success, non-zero for error)
     """
-    parser = argparse.ArgumentParser(
-        description="Launch Minecraft client in spectator mode"
-    )
+    parser = argparse.ArgumentParser(description="Launch Minecraft client in spectator mode")
     parser.add_argument(
         "--server",
         default="localhost:25565",
