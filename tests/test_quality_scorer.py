@@ -165,9 +165,9 @@ class TestDeterminism:
         result1 = compute_quality_score(typical_session)
         result2 = compute_quality_score(typical_session)
         for key in result1["components"]:
-            assert (
-                result1["components"][key] == result2["components"][key]
-            ), f"Component {key} is not deterministic"
+            assert result1["components"][key] == result2["components"][key], (
+                f"Component {key} is not deterministic"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -215,7 +215,9 @@ class TestPercentileStability:
         scores = [10.0, 20.0, 30.0, 40.0, 50.0]
         ranks = [compute_percentile_rank(scores, s) for s in scores]
         for i in range(len(ranks) - 1):
-            assert ranks[i] <= ranks[i + 1], f"Percentile not monotonic: {ranks[i]} > {ranks[i+1]}"
+            assert ranks[i] <= ranks[i + 1], (
+                f"Percentile not monotonic: {ranks[i]} > {ranks[i + 1]}"
+            )
 
     def test_batch_aggregate_percentile_consistency(self):
         """Batch aggregate should produce consistent percentile ranks."""
@@ -261,9 +263,9 @@ class TestNoDoubleCounting:
         }
         result = compute_quality_score(session)
         assert result["components"]["audit_norm"] > 0, "Audit norm should be high"
-        assert (
-            result["components"]["failure_recovery"] == 0.0
-        ), "Failure recovery should be 0 when no valid recoveries exist"
+        assert result["components"]["failure_recovery"] == 0.0, (
+            "Failure recovery should be 0 when no valid recoveries exist"
+        )
 
     def test_audit_and_failure_recovery_independent(self):
         """
