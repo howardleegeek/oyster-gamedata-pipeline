@@ -39,9 +39,9 @@ class TestDockerfile:
 
     def test_from_python312_slim(self):
         """Must use python:3.12-slim base image."""
-        assert any(
-            line.startswith("FROM python:3.12-slim") for line in self.lines
-        ), "Dockerfile must start with 'FROM python:3.12-slim'"
+        assert any(line.startswith("FROM python:3.12-slim") for line in self.lines), (
+            "Dockerfile must start with 'FROM python:3.12-slim'"
+        )
 
     def test_pip_install_fastapi_uvicorn(self):
         """Must install fastapi and uvicorn via pip."""
@@ -142,9 +142,9 @@ class TestDeployScript:
 
     def test_shebang(self):
         """Script must start with a bash shebang."""
-        assert self.text.startswith("#!/usr/bin/env bash") or self.text.startswith(
-            "#!/bin/bash"
-        ), "Script must have a bash shebang"
+        assert self.text.startswith("#!/usr/bin/env bash") or self.text.startswith("#!/bin/bash"), (
+            "Script must have a bash shebang"
+        )
 
     def test_set_strict_mode(self):
         """Script must use set -euo pipefail for safety."""
