@@ -39,6 +39,22 @@ class MockLLMProvider:
         self.call_count = 0
 
     def chat(self, system: str, messages: list[dict], temperature: float) -> str:
+        """Generate a deterministic chat response with a canned action.
+
+        Args:
+            system: System prompt string providing context to the agent.
+            messages: List of message dicts with 'role' and 'content' keys,
+                following OpenAI's chat completion format.
+            temperature: Sampling temperature (unused in mock provider).
+
+        Returns:
+            str: Full text of the assistant's reply in the format
+                "<reasoning>\\n<action>{\"op\": \"...\"}</action>".
+
+        Note:
+            This mock always returns the same reasoning and action stored in
+            `canned_action`, making tests fully deterministic.
+        """
         self.call_count += 1
         action_json = json.dumps(self.canned_action)
         return f"{self.reasoning}\n<action>{action_json}</action>"
