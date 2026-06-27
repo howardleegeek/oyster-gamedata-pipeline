@@ -119,16 +119,12 @@ _UNIX_HOME_RE = re.compile(
 # 3. Other absolute Windows paths (no Users prefix):  C:\foo\bar
 #    Negative-look-ahead skips any drive letter immediately followed by
 #    "Users" (which was already handled by _WIN_USER_RE).
-_WIN_ABS_RE = re.compile(
-    r"\b[A-Za-z]:\\(?![Uu]sers\\)[^\s\"'`]+"
-)
+_WIN_ABS_RE = re.compile(r"\b[A-Za-z]:\\(?![Uu]sers\\)[^\s\"'`]+")
 # 4. Absolute unix paths NOT under /Users or /home (those go through
 #    _UNIX_HOME_RE above).  We only collapse known system-level prefixes
 #    here so deliberate non-PII paths like "/usr/bin/python3" stay
 #    readable.
-_UNIX_ABS_RE = re.compile(
-    r"(?<![A-Za-z])(/(?:tmp|var|opt|private|mnt|data)/[^\s\"'`,)]+)"
-)
+_UNIX_ABS_RE = re.compile(r"(?<![A-Za-z])(/(?:tmp|var|opt|private|mnt|data)/[^\s\"'`,)]+)")
 # 5. IPv4
 _IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 # 6. Email addresses
@@ -159,6 +155,7 @@ def scrub_pii(blob: str) -> str:
     s = _UNIX_HOME_RE.sub(r"\1<USER>", s)
     s = _WIN_ABS_RE.sub("<PATH>", s)
     s = _UNIX_ABS_RE.sub("<PATH>", s)
+
     # Canonicalise AppData casing — match is case-insensitive but the
     # replacement must use Title-case so identical crashes from systems
     # with different locales hash the same.
@@ -184,10 +181,7 @@ def scrub_context(ctx: dict[str, Any]) -> dict[str, Any]:
         elif isinstance(v, (int, float, bool)) or v is None:
             out[k] = v
         elif isinstance(v, list):
-            out[k] = [
-                scrub_pii(item[:1024]) if isinstance(item, str) else item
-                for item in v[:32]
-            ]
+            out[k] = [scrub_pii(item[:1024]) if isinstance(item, str) else item for item in v[:32]]
         elif isinstance(v, dict):
             out[k] = scrub_context(v)
         else:
@@ -199,9 +193,7 @@ def scrub_context(ctx: dict[str, Any]) -> dict[str, Any]:
 # Fingerprint (dedup key)
 # ---------------------------------------------------------------------------
 
-_PATCH_SUFFIX_RE = re.compile(
-    r"^(v?\d+\.\d+\.\d+(?:-[A-Za-z]+\d+)?)(?:\.[0-9]+)*$"
-)
+_PATCH_SUFFIX_RE = re.compile(r"^(v?\d+\.\d+\.\d+(?:-[A-Za-z]+\d+)?)(?:\.[0-9]+)*$")
 
 
 def _normalise_version_for_fp(v: str) -> str:
@@ -225,9 +217,7 @@ def _normalise_os_for_fp(os_str: str) -> str:
     return s[:32] or "unknown"
 
 
-def fingerprint_stack(
-    scrubbed_stack: str, os_str: str, recorder_version: str
-) -> str:
+def fingerprint_stack(scrubbed_stack: str, os_str: str, recorder_version: str) -> str:
     """Stable dedup hash.  hex digest, 32 chars."""
     base = "|".join(
         [
@@ -259,12 +249,8 @@ def validate_report(raw: dict[str, Any]) -> ErrorReport:
         raise ErrorReportError("report body must be a JSON object")
 
     recorder_version = raw.get("recorder_version")
-    if not isinstance(recorder_version, str) or not _VERSION_RE.match(
-        recorder_version.strip()
-    ):
-        raise ErrorReportError(
-            "recorder_version is required and must be semver-like"
-        )
+    if not isinstance(recorder_version, str) or not _VERSION_RE.match(recorder_version.strip()):
+        raise ErrorReportError("recorder_version is required and must be semver-like")
     if len(recorder_version) > MAX_VERSION_LEN:
         raise ErrorReportError(f"recorder_version exceeds {MAX_VERSION_LEN} chars")
 
@@ -278,9 +264,7 @@ def validate_report(raw: dict[str, Any]) -> ErrorReport:
     if not isinstance(stack, str) or not stack.strip():
         raise ErrorReportError("stack_trace is required")
     if len(stack.encode("utf-8")) > MAX_STACK_BYTES:
-        raise ErrorReportError(
-            f"stack_trace exceeds {MAX_STACK_BYTES} bytes"
-        )
+        raise ErrorReportError(f"stack_trace exceeds {MAX_STACK_BYTES} bytes")
 
     ctx = raw.get("context", {})
     if ctx is None:
@@ -293,15 +277,11 @@ def validate_report(raw: dict[str, Any]) -> ErrorReport:
     anon_id = raw.get("anon_id")
     if anon_id is not None:
         if not isinstance(anon_id, str) or not _ANON_ID_RE.match(anon_id):
-            raise ErrorReportError(
-                f"anon_id must match {_ANON_ID_RE.pattern!r}"
-            )
+            raise ErrorReportError(f"anon_id must match {_ANON_ID_RE.pattern!r}")
 
     severity = raw.get("severity", "crash")
     if not isinstance(severity, str) or severity not in ALLOWED_SEVERITIES:
-        raise ErrorReportError(
-            f"severity must be one of {ALLOWED_SEVERITIES}"
-        )
+        raise ErrorReportError(f"severity must be one of {ALLOWED_SEVERITIES}")
 
     return ErrorReport(
         recorder_version=recorder_version.strip(),
@@ -426,9 +406,7 @@ class ErrorReportStore:
         """Insert/upsert a report, returning the row state after the write."""
         scrubbed_stack = scrub_pii(report.stack_trace)
         scrubbed_ctx = scrub_context(report.context)
-        fp = fingerprint_stack(
-            scrubbed_stack, report.os, report.recorder_version
-        )
+        fp = fingerprint_stack(scrubbed_stack, report.os, report.recorder_version)
         when = (now or _dt.datetime.now(tz=_dt.timezone.utc)).isoformat()
 
         with self._cursor() as cur:
@@ -587,8 +565,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="error_report_service",
         description=(
-            "G231-G240 · W28 error reporting (record + summary) using "
-            "a local SQLite store."
+            "G231-G240 · W28 error reporting (record + summary) using a local SQLite store."
         ),
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
