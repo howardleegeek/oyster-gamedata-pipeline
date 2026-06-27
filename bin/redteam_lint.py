@@ -154,7 +154,16 @@ def attack_action_camera_pitch_out_of_range(b: Path) -> None:
     p.write_text(json.dumps(arr))
 
 
-def attack_action_camera_fx_ne_fy(b: Path):
+def attack_action_camera_fx_ne_fy(b: Path) -> None:
+    """Attack: set camera intrinsics fx != fy (asymmetric focal lengths).
+
+    Modifies action_camera.json in place to set fx=960.0 and fy=480.0,
+    which violates the PRD requirement that fx must equal fy for valid
+    camera intrinsics.
+
+    Args:
+        b: Path to the directory containing action_camera.json.
+    """
     p = b / "action_camera.json"
     arr = json.loads(p.read_text())
     for r in arr:
