@@ -10,13 +10,15 @@ def _create_mock_gh(tmpdir, mock_output="", mock_exit=0):
     """Create a mock `gh` script that records calls and returns mock output."""
     mock_gh = os.path.join(tmpdir, "gh")
     with open(mock_gh, "w") as f:
-        f.write(textwrap.dedent(f"""\
+        f.write(
+            textwrap.dedent(f"""\
             #!/usr/bin/env bash
             # Mock gh CLI — records invocations to a log file
             LOGFILE="{tmpdir}/gh_calls.log"
             echo "$*" >> "$LOGFILE"
             exit {mock_exit}
-        """))
+        """)
+        )
     os.chmod(mock_gh, 0o755)
     return mock_gh
 
