@@ -61,9 +61,7 @@ def list_open_prs() -> list[PRInfo]:
         ["gh", "pr", "list", "--state", "open", "--json", "number,headRefName"],
     )
     raw: list[dict[str, Any]] = json.loads(result.stdout)
-    return [
-        PRInfo(number=item["number"], head_ref_name=item["headRefName"]) for item in raw
-    ]
+    return [PRInfo(number=item["number"], head_ref_name=item["headRefName"]) for item in raw]
 
 
 def filter_prs(prs: list[PRInfo], *, only_pattern: str | None = None) -> list[PRInfo]:
@@ -93,9 +91,7 @@ def rebase_pr(pr: PRInfo, *, dry_run: bool = False) -> RebaseResult:
     try:
         run_cmd(["git", "fetch", "origin"])
     except subprocess.CalledProcessError as exc:
-        return RebaseResult(
-            pr=pr, success=False, error=f"git fetch failed: {exc.stderr.strip()}"
-        )
+        return RebaseResult(pr=pr, success=False, error=f"git fetch failed: {exc.stderr.strip()}")
 
     # Step 2: checkout the branch
     try:
@@ -126,9 +122,7 @@ def rebase_pr(pr: PRInfo, *, dry_run: bool = False) -> RebaseResult:
     try:
         run_cmd(["git", "push", "--force-with-lease", "origin", branch])
     except subprocess.CalledProcessError as exc:
-        return RebaseResult(
-            pr=pr, success=False, error=f"push failed: {exc.stderr.strip()}"
-        )
+        return RebaseResult(pr=pr, success=False, error=f"push failed: {exc.stderr.strip()}")
 
     return RebaseResult(pr=pr, success=True)
 
@@ -247,9 +241,7 @@ def main(argv: list[str] | None = None) -> int:
     error_count = sum(1 for r in results if r.error and not r.conflict_diff)
 
     print(f"\n{'=' * 50}")
-    print(
-        f"Summary: {success_count} succeeded, {conflict_count} conflicts, {error_count} errors"
-    )
+    print(f"Summary: {success_count} succeeded, {conflict_count} conflicts, {error_count} errors")
     print(f"{'=' * 50}")
 
     return 0 if (conflict_count + error_count) == 0 else 1
