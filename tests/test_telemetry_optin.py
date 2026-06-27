@@ -237,7 +237,6 @@ class TestSendTelemetry:
             patch("bin.telemetry.LAST_UPLOAD_MARKER", marker),
             patch("bin.telemetry._dispatch_upload") as mock_dispatch,
         ):
-
             result = send_telemetry(consent_path=opted_in_consent)
 
             assert result is True
@@ -291,7 +290,6 @@ class TestSendTelemetry:
             patch("bin.telemetry.LAST_UPLOAD_MARKER", marker),
             patch("bin.telemetry._dispatch_upload") as mock_dispatch,
         ):
-
             # Should not raise – dispatch is fire-and-forget
             result = send_telemetry(consent_path=opted_in_consent)
             # Dispatched successfully (the failure happens inside the thread)
