@@ -11,6 +11,11 @@ Self-review: cosmetic reformat only — no silent error swallow, no race, no off
 - Picked: ruff format tests/test_upload_r2.py (245 lines, 1 multi-line assert). Justification: measurable code smell, second-smallest unformatted test file (224-line file has broken tests), single-file scope, no behavior change, targeted test passes (13/13), follows established cadence.
 - Result: committed 33f7e89e (ruff format applied: parenthesized 1 multi-line assert message; 1 file changed, 1 insertion(+), 1 deletion(-); ruff check + ruff format --check clean; pytest tests/test_upload_r2.py 13/13 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (asserts same condition), no brand cross-reference, no module-level side effect.)
 
+## Round 382 @ 2026-06-27T10:00:00Z
+
+- Picked: ruff format tests/test_web_workflows.py (282 lines, 17 multi-line asserts). Justification: measurable code smell, second-smallest unformatted test file (224-line file has broken tests), single-file scope, no behavior change, targeted test passes (17/17), follows established cadence.
+- Result: committed d25a827c (ruff format applied: parenthesized 17 multi-line assert messages; 1 file changed, 41 insertions(+), 41 deletions(-); ruff check + ruff format --check clean; pytest tests/test_web_workflows.py 17/17 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (asserts same conditions), no brand cross-reference, no module-level side effect.)
+
 ## Round 372
 ## Round 266 @ 2026-06-24T21:00:00Z
 
