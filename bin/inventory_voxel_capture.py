@@ -102,6 +102,19 @@ class FrameCapture:
         return json.dumps(self.to_dict(), indent=indent)
     
     def to_npz(self, path: str) -> None:
+        """Save FrameCapture data to a compressed NumPy archive.
+
+        Args:
+            path: File path for the output .npz file.
+
+        Raises:
+            ImportError: If numpy is not installed.
+
+        Note:
+            Saves the following arrays: frame_index, player_pos, timestamp_ms,
+            voxel_block_ids (if voxel present), voxel_centre (if voxel present),
+            inv_slots, inv_item_ids, inv_counts, inv_damage (if inventory present).
+        """
         np = _np()
         if np is None: raise ImportError("numpy required")
         data = {
