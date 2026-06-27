@@ -12,6 +12,11 @@ Self-review: cosmetic reformat only — no silent error swallow, no race, no off
 - Picked: none — repo fully clean: ruff format (752 files), ruff check (all pass), pytest collection (3294 tests), no TODOs in source code, no bare excepts, no code smells. Same status as previous rounds (411-415).
 - Result: skipped (no good candidate)
 
+## Round 417 @ 2026-06-27T23:38:01Z
+
+- Picked: F841 unused variable in tests/test_input_latency_telemetry.py:264 — `result = write_output(...)` assigned but never used (test validates output file directly). Justification: measurable code smell, single-file scope, simple removal, targeted test passes (10/10), reduces F841 count from 7 to 6.
+- Result: committed 5797d2ea (removed unused variable assignment; ruff check --select=F841 now clean for this file; pytest tests/test_input_latency_telemetry.py 10/10 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: F841 fix — removed unused result variable; test verifies output file directly, return value unnecessary. No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (all 10 tests still pass), no brand cross-reference, no module-level side effect.)
+
 ## Round 414 @ 2026-06-28T15:20:00Z
 
 - Picked: none — repo fully clean: ruff format (752 files), ruff check (all pass), pytest collection (3294 tests), no TODOs in source code, no bare excepts. Same status as previous rounds.
