@@ -92,8 +92,8 @@ def test_recorder_requires_game_sized_window_before_recording() -> None:
 def test_recorder_does_not_iconify_after_ffmpeg_start() -> None:
     src = (BIN_DIR / "recorder_consumer_lite.py").read_text(encoding="utf-8")
 
-    assert "window " "iconified to taskbar" not in src
-    assert "self.after(0, self." "iconify)" not in src
+    assert "window iconified to taskbar" not in src
+    assert "self.after(0, self.iconify)" not in src
     assert "post-ffmpeg iconify skipped" in src
 
 
