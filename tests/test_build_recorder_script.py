@@ -49,12 +49,14 @@ def tmp_project(tmp_path):
     vendor.mkdir(parents=True)
 
     cargo_toml = vendor / "Cargo.toml"
-    cargo_toml.write_text(textwrap.dedent("""\
+    cargo_toml.write_text(
+        textwrap.dedent("""\
         [package]
         name = "oyster-recorder"
         version = "2.5.1"
         edition = "2021"
-    """))
+    """)
+    )
 
     target_release = vendor / "target" / "release"
     target_release.mkdir(parents=True)
