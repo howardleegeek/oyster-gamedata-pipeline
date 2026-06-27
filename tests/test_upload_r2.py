@@ -117,7 +117,7 @@ class TestUploadToR2:
         )
 
         # Verify returned URL
-        expected_url = f"{full_env['R2_ENDPOINT'].rstrip('/')}" f"/{full_env['R2_BUCKET']}/foo.exe"
+        expected_url = f"{full_env['R2_ENDPOINT'].rstrip('/')}/{full_env['R2_BUCKET']}/foo.exe"
         assert url == expected_url
 
     @mock.patch("upload_to_r2.boto3.Session")
