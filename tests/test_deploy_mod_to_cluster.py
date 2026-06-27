@@ -168,8 +168,7 @@ def test_drops_jar_into_each_fabric_paper_dir(tmp_path: Path):
 
     proc = _run_script([paper1, paper2, paper3], mod)
     assert proc.returncode == 0, (
-        f"expected exit 0, got {proc.returncode}\n"
-        f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
+        f"expected exit 0, got {proc.returncode}\nSTDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
     )
     for paper in (paper1, paper2, paper3):
         staged = list((paper / "mods").glob("oyster-recorder-mod-*.jar"))
@@ -232,9 +231,9 @@ def test_refuses_non_fabric_paper_dir(tmp_path: Path):
     mod = _make_fake_mod_jar(tmp_path)
 
     proc = _run_script([paper], mod)
-    assert (
-        proc.returncode != 0
-    ), f"expected non-zero exit on vanilla Paper, got 0\n{proc.stdout}\n{proc.stderr}"
+    assert proc.returncode != 0, (
+        f"expected non-zero exit on vanilla Paper, got 0\n{proc.stdout}\n{proc.stderr}"
+    )
     # Importantly: no mod jar was dropped.
     staged = list((paper / "mods").glob("oyster-recorder-mod-*.jar"))
     assert staged == [], f"vanilla Paper got a mod jar dropped: {staged}"
@@ -332,7 +331,7 @@ def test_exits_2_when_mod_jar_override_missing(tmp_path: Path):
     fake = tmp_path / "does_not_exist.jar"
     proc = _run_script([paper], fake)
     assert proc.returncode == 2, (
-        f"expected exit 2 (mod jar unobtainable), got {proc.returncode}\n" f"STDERR:\n{proc.stderr}"
+        f"expected exit 2 (mod jar unobtainable), got {proc.returncode}\nSTDERR:\n{proc.stderr}"
     )
     # No jar dropped.
     assert list((paper / "mods").glob("oyster-recorder-mod-*.jar")) == []
