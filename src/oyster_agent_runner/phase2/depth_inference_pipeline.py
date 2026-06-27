@@ -16,6 +16,7 @@ but will raise RuntimeError with installation hints when functions are called.
 
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 
@@ -247,6 +248,94 @@ def video_to_depth_exrs(video_path: str, output_dir: str, fps: float = 6.0) -> i
     finally:
         # Clean up temporary frames
         if temp_dir.exists():
+            shutil.rmtree(temp_dir)
+            print(f"Cleaned up temporary directory: {temp_dir}")
+
+
+# Test compatibility aliases and custom exception
+class DepthInferenceError(RuntimeError):
+    """Exception raised when depth inference fails due to missing dependencies or processing errors."""
+
+    pass
+
+
+def infer_depth(frame_path: str, output_path: str) -> str:
+    """
+    Run depth inference on a single RGB image.
+
+    Args:
+        frame_path: Path to the input RGB image
+        output_path: Path where the depth EXR file will be saved
+
+    Returns:
+        Path to the generated depth EXR file
+
+    Raises:
+        DepthInferenceError: If required dependencies are not installed
+    """
+    try:
+        # Delegate to batch function with single input
+        count = infer_depth_batch([frame_path], str(Path(output_path).parent))
+    except RuntimeError as e:
+        # Convert RuntimeError to DepthInferenceError for test compatibility
+        raise DepthInferenceError(str(e)) from e
+    if count == 0:
+        raise DepthInferenceError("Failed to generate depth map")
+    return output_path
+
+
+def video_to_depth(
+    video_path: str, output_dir: str, fps: float = 6.0, cleanup: bool = True
+) -> list[str]:
+    """
+    Convert video to depth EXR files with cleanup control.
+
+    Args:
+        video_path: Path to the input video file
+        output_dir: Directory where depth EXR files will be saved
+        fps: Frames per second to extract (default: 6.0)
+        cleanup: Whether to clean up temporary files (default: True)
+
+    Returns:
+        List of paths to generated depth EXR files
+    """
+    # Get the output_dir path
+    output_dir_path = Path(output_dir)
+    output_dir_path.mkdir(parents=True, exist_ok=True)
+
+    # Create temporary directory for frames using mkdtemp
+    temp_dir = tempfile.mkdtemp(prefix="depth_frames_")
+
+    try:
+        # Step 1: Extract frames
+        print(f"Extracting frames from {video_path} at {fps} FPS...")
+        frame_paths = extract_frames(str(video_path), temp_dir, fps)
+        print(f"Extracted {len(frame_paths)} frames")
+
+        if not frame_paths:
+            print("No frames extracted, exiting")
+            return []
+
+        # Step 2: Infer depth maps using infer_depth for each frame
+        print(f"Running depth inference on {len(frame_paths)} frames...")
+        depth_paths = []
+        for i, frame_path in enumerate(frame_paths):
+            # Generate output path for this frame
+            frame_stem = Path(frame_path).stem
+            depth_path = output_dir_path / f"{frame_stem}_depth.exr"
+            try:
+                infer_depth(frame_path, str(depth_path))
+                depth_paths.append(str(depth_path))
+                print(f"  Processed frame {i + 1}/{len(frame_paths)}: {depth_path}")
+            except Exception as e:
+                print(f"  Warning: Failed to process frame {frame_path}: {e}")
+
+        print(f"Generated {len(depth_paths)} depth EXR files")
+        return depth_paths
+
+    finally:
+        # Clean up temporary frames if requested
+        if cleanup and Path(temp_dir).exists():
             shutil.rmtree(temp_dir)
             print(f"Cleaned up temporary directory: {temp_dir}")
 
