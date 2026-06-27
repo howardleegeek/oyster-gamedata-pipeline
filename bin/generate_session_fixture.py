@@ -39,6 +39,7 @@ from pathlib import Path
 # Minimal EXR writer (no OpenEXR dependency)
 # ---------------------------------------------------------------------------
 
+
 def _write_minimal_exr(path: Path) -> None:
     """Write a tiny valid OpenEXR file (1×1 pixel, R channel, FLOAT).
 
@@ -105,6 +106,7 @@ def _write_minimal_exr(path: Path) -> None:
 # ---------------------------------------------------------------------------
 # Session builder
 # ---------------------------------------------------------------------------
+
 
 def generate_session_fixture(
     output_dir: str,
@@ -269,19 +271,38 @@ def generate_session_fixture(
         ws = wb.active
         ws.title = "GameInfo"
         headers = [
-            "game_name", "game_version", "session_id", "start_time",
-            "end_time", "duration_s", "resolution", "fps",
-            "player_id", "map_name", "game_mode", "difficulty",
-            "recording_software", "recording_version",
+            "game_name",
+            "game_version",
+            "session_id",
+            "start_time",
+            "end_time",
+            "duration_s",
+            "resolution",
+            "fps",
+            "player_id",
+            "map_name",
+            "game_mode",
+            "difficulty",
+            "recording_software",
+            "recording_version",
         ]
         for col, h in enumerate(headers, 1):
             ws.cell(row=1, column=col, value=h)
         values = [
-            "test_game", "1.0.0", base.name,
-            "2024-01-01T00:00:00.000Z", "2024-01-01T00:00:01.000Z",
-            video_seconds, f"{video_width}x{video_height}", 60,
-            "player_001", "test_map", "competitive", "normal",
-            "recorder_lite", "0.1.0",
+            "test_game",
+            "1.0.0",
+            base.name,
+            "2024-01-01T00:00:00.000Z",
+            "2024-01-01T00:00:01.000Z",
+            video_seconds,
+            f"{video_width}x{video_height}",
+            60,
+            "player_001",
+            "test_map",
+            "competitive",
+            "normal",
+            "recorder_lite",
+            "0.1.0",
         ]
         for col, v in enumerate(values, 1):
             ws.cell(row=2, column=col, value=v)
@@ -353,6 +374,7 @@ def _write_minimal_mp4(
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="S29 — Generate synthetic session fixture for CI / sweep testing"
@@ -382,12 +404,8 @@ def main() -> int:
         default=1.0,
         help="Duration of synthetic recording.mp4 (default: 1.0)",
     )
-    parser.add_argument(
-        "--video-width", type=int, default=640, help="Video width (default: 640)"
-    )
-    parser.add_argument(
-        "--video-height", type=int, default=480, help="Video height (default: 480)"
-    )
+    parser.add_argument("--video-width", type=int, default=640, help="Video width (default: 640)")
+    parser.add_argument("--video-height", type=int, default=480, help="Video height (default: 480)")
     parser.add_argument(
         "--tick-count",
         type=int,
