@@ -58,6 +58,12 @@ class BBox2D:
         return self.occlusion <= oc and self.truncation <= tr
 
     def to_dict(self) -> Dict[str, Any]:
+        """Convert 2D bounding box to a dictionary representation.
+
+        Returns:
+            A dictionary containing all 2D bbox fields: x, y, width, height,
+            confidence, class_id, track_id, occlusion, and truncation.
+        """
         return dict(x=self.x, y=self.y, width=self.width, height=self.height,
                     confidence=self.confidence, class_id=self.class_id,
                     track_id=self.track_id, occlusion=self.occlusion,
