@@ -32,6 +32,7 @@ CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "monitor_t
 # Data Loading
 # ---------------------------------------------------------------------------
 
+
 def load_metrics(hours: int = 24) -> list[dict]:
     """Load metrics from JSONL file for the last N hours."""
     if not os.path.exists(METRICS_FILE):
@@ -88,6 +89,7 @@ def load_thresholds() -> dict:
     """Load threshold config."""
     if os.path.exists(CONFIG_PATH):
         import yaml
+
         with open(CONFIG_PATH, "r") as f:
             return yaml.safe_load(f)
     return {}
@@ -96,6 +98,7 @@ def load_thresholds() -> dict:
 # ---------------------------------------------------------------------------
 # Health Status Computation
 # ---------------------------------------------------------------------------
+
 
 def compute_component_health(metrics: list[dict]) -> dict[str, dict]:
     """Compute current health status for each component."""
@@ -208,6 +211,7 @@ def compute_uptime(metrics: list[dict]) -> dict[str, float]:
 # Streamlit UI
 # ---------------------------------------------------------------------------
 
+
 def render_health_cards(components: dict[str, dict]):
     """Render health status cards for each component."""
     cols = st.columns(min(len(components), 4))
@@ -215,7 +219,10 @@ def render_health_cards(components: dict[str, dict]):
         col = cols[i % len(cols)]
         with col:
             st.markdown(f"### {info['icon']} {name.replace('_', ' ').title()}")
-            st.markdown(f"**Status:** <span style='color:{info['color']}'>{info['status'].upper()}</span>", unsafe_allow_html=True)
+            st.markdown(
+                f"**Status:** <span style='color:{info['color']}'>{info['status'].upper()}</span>",
+                unsafe_allow_html=True,
+            )
 
             if info.get("error"):
                 st.error(f"Error: {info['error']}")
@@ -246,8 +253,13 @@ def render_uptime_chart(uptime: dict[str, float]):
     ax.set_title("Last 24h Uptime per Component")
 
     for bar, val in zip(bars, values):
-        ax.text(bar.get_width() + 0.5, bar.get_y() + bar.get_height() / 2,
-                f"{val:.1f}%", va="center", fontsize=10)
+        ax.text(
+            bar.get_width() + 0.5,
+            bar.get_y() + bar.get_height() / 2,
+            f"{val:.1f}%",
+            va="center",
+            fontsize=10,
+        )
 
     st.pyplot(fig)
     plt.close(fig)
@@ -382,6 +394,7 @@ def render_alerts(alerts: list[dict]):
 # ---------------------------------------------------------------------------
 # Main Page
 # ---------------------------------------------------------------------------
+
 
 def main():
     st.set_page_config(page_title="Oyster System Health", page_icon="🦪", layout="wide")
