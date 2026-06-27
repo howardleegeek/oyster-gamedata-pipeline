@@ -16,7 +16,12 @@
 ## Round 372 @ 2026-06-26T03:45:00Z
 
 - Picked: ruff format bin/buyer_dashboard_html.py (278 lines, 2nd smallest unformatted bin file after bug_report.py at 365). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic line-wrap + dict literals + trailing commas), AST parse + import smoke OK, no test for this file, follows established cadence.
-- Result: committed b756eb31 (ruff format applied: dict literals, f-strings, trailing commas; 1 file changed, 23 insertions(+), 24 deletions(-); ruff check + ruff format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
+- Result: committed b756eb31 (ruff format applied: dict literals, f-strings, trailing commas; 1 file changed, 23 insertions(+), 24 deletions(-); ruff check + ruff format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff.
+
+## Round 375 @ 2026-06-26T04:00:00Z
+
+- Picked: ruff format tests/test_batch_bundler.py (smallest unformatted test file: 179 lines, 3 lines needed for trailing comma in imports). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic), targeted test passes (7/7), follows established cadence.
+- Result: committed d6600991 (ruff format applied: trailing comma in imports; 1 file changed, 3 insertions(+), 3 deletions(-); ruff check clean; tests pass 7/7; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
 
 ## Round 373 @ 2026-06-27T00:00:00Z
 
