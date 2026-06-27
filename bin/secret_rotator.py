@@ -31,6 +31,29 @@ class Config:
         self.state_file = state_file or Path(os.path.expanduser("~"), ".secret_rotator", "state.json")
     @classmethod
     def from_env(cls, **kw: Any) -> "Config":
+        """Create Config from environment variables.
+
+        Reads AWS credentials and configuration from environment variables:
+        - AWS_ACCESS_KEY_ID
+        - AWS_SECRET_ACCESS_KEY
+        - AWS_REGION (default: us-east-1)
+        - ROTATION_DAYS (default: 90)
+        - OVERLAP_DAYS (default: 14)
+        - IAM_USER (default: secret-rotator-user)
+        - STATE_FILE (optional)
+
+        Args:
+            **kw: Additional keyword arguments passed to Config constructor.
+
+        Returns:
+            Config: A new Config instance populated from environment variables.
+
+        Example:
+            >>> import os
+            >>> os.environ["AWS_ACCESS_KEY_ID"] = "AKIAIOSFODNN7EXAMPLE"
+            >>> os.environ["AWS_SECRET_ACCESS_KEY"] = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+            >>> config = Config.from_env()
+        """
         return cls(aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
             aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
             aws_region=os.environ.get("AWS_REGION", DEFAULT_REGION),
