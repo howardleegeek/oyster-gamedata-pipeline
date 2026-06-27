@@ -89,9 +89,9 @@ def load_or_generate_keypair(keyfile: str):
 
 
 def canonical_json(obj: dict) -> bytes:
-    return json.dumps(
-        obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    ).encode("utf-8")
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode(
+        "utf-8"
+    )
 
 
 def sha256_hex(data: bytes) -> str:
@@ -405,9 +405,7 @@ bash verify.sh <bundle.tar.gz> --expect-pubkey <fingerprint>
 """
 
 
-def create_bundle(
-    session_dir: str, keyfile: str, output_path: str | None = None
-) -> str:
+def create_bundle(session_dir: str, keyfile: str, output_path: str | None = None) -> str:
     """Create an offline provenance bundle.
 
     Args:
@@ -473,9 +471,7 @@ def create_bundle(
                 fpath = os.path.join(tmpdir, fname)
                 bundle_tar.add(fpath, arcname=fname)
 
-    session_size = (
-        os.path.getsize(session_tar_path) if os.path.exists(session_tar_path) else 0
-    )
+    session_size = os.path.getsize(session_tar_path) if os.path.exists(session_tar_path) else 0
     bundle_size = os.path.getsize(output_path)
     ratio = bundle_size / session_size if session_size > 0 else 0
 
