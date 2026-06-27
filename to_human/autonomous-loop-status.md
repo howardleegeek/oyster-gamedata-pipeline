@@ -32,3 +32,4 @@
 
 - Picked: ruff format bin/oyster_play.py (smallest unformatted bin file remaining: 784 lines; this round's diff is the minimum 1-line fix — ruff joined an implicit string-concat `"javaw " "cmd line"` into a single string on line 726). Justification: measurable code smell (ruff format --check flagging this file out of 388 in bin/), single-file scope, no behavior change (purely cosmetic string-join in argparse help text), AST parse + import smoke OK before/after, targeted test passes (tests/bin/test_one_click_consumer_flow.py 9/9), no risk of test masking, follows established cadence.
 - Result: <pending — see commit in this round>. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect, no logic change (argparse help text is user-facing string only).
+
