@@ -141,8 +141,7 @@ def test_iter_steps_deterministic_10x(bundle_dir: Path) -> None:
     assert baseline, "expected at least one ReplayStep in baseline"
     for i, run in enumerate(runs[1:], start=1):
         assert run == baseline, (
-            f"iter_steps non-deterministic at iteration {i}: "
-            f"baseline={baseline!r} drift={run!r}"
+            f"iter_steps non-deterministic at iteration {i}: baseline={baseline!r} drift={run!r}"
         )
 
 
@@ -220,8 +219,7 @@ def test_replay_against_mockenv_deterministic_10x(bundle_dir: Path) -> None:
     assert baseline, "expected non-empty ReplayDriftReport snapshot"
     for i, run in enumerate(runs[1:], start=1):
         assert run == baseline, (
-            f"replay_against non-deterministic at iteration {i}: "
-            f"baseline={baseline} drift={run}"
+            f"replay_against non-deterministic at iteration {i}: baseline={baseline} drift={run}"
         )
 
 
@@ -312,6 +310,5 @@ def test_replayer_instances_independent_10x(bundle_dir: Path) -> None:
     baseline = runs[0]
     for i, run in enumerate(runs[1:], start=1):
         assert run == baseline, (
-            f"cross-instance determinism failed at iteration {i}: "
-            f"baseline={baseline} drift={run}"
+            f"cross-instance determinism failed at iteration {i}: baseline={baseline} drift={run}"
         )
