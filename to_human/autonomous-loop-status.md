@@ -66,3 +66,4 @@
 
 - Picked: ruff format backend/codex_api.py (smallest unformatted file: 293 lines, 4 line changes; consistent with established cadence of formatting non-test Python files). Justification: measurable code smell (ruff format violation), single-file scope, no behavior change, ruff check + import smoke OK, follows established cadence.
 - Result: committed d1608884 (ruff format applied: 4 insertions, 5 deletions; ruff check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
