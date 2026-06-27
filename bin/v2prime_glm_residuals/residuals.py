@@ -13,25 +13,68 @@ from typing import Any, Dict, List, Optional, Union
 
 # --- Valid Windows VK codes from PRD ---
 VK_TO_KEY = {
-    112: 'F1', 113: 'F2', 114: 'F3', 115: 'F4',
-    116: 'F5', 117: 'F6', 118: 'F7', 119: 'F8',
-    120: 'F9', 121: 'F10', 122: 'F11', 123: 'F12',
-    27: 'ESC',
-    192: '`',
-    48: '0', 49: '1', 50: '2', 51: '3', 52: '4',
-    53: '5', 54: '6', 55: '7', 56: '8', 57: '9',
-    81: 'Q', 87: 'W', 69: 'E', 82: 'R', 84: 'T',
-    89: 'Y', 85: 'U', 73: 'I', 79: 'O', 80: 'P',
-    65: 'A', 83: 'S', 68: 'D', 70: 'F', 71: 'G',
-    72: 'H', 74: 'J', 75: 'K', 76: 'L',
-    90: 'Z', 88: 'X', 67: 'C', 86: 'V', 66: 'B',
-    78: 'N', 77: 'M',
-    9: 'TAB',
-    20: 'CAPS',
-    16: 'LSHIFT', 160: 'LSHIFT', 161: 'RSHIFT',
-    17: 'LCTRL', 162: 'LCTRL', 163: 'RCTRL',
-    18: 'LALT', 164: 'LALT', 165: 'RALT',
-    32: 'SPACE',
+    112: "F1",
+    113: "F2",
+    114: "F3",
+    115: "F4",
+    116: "F5",
+    117: "F6",
+    118: "F7",
+    119: "F8",
+    120: "F9",
+    121: "F10",
+    122: "F11",
+    123: "F12",
+    27: "ESC",
+    192: "`",
+    48: "0",
+    49: "1",
+    50: "2",
+    51: "3",
+    52: "4",
+    53: "5",
+    54: "6",
+    55: "7",
+    56: "8",
+    57: "9",
+    81: "Q",
+    87: "W",
+    69: "E",
+    82: "R",
+    84: "T",
+    89: "Y",
+    85: "U",
+    73: "I",
+    79: "O",
+    80: "P",
+    65: "A",
+    83: "S",
+    68: "D",
+    70: "F",
+    71: "G",
+    72: "H",
+    74: "J",
+    75: "K",
+    76: "L",
+    90: "Z",
+    88: "X",
+    67: "C",
+    86: "V",
+    66: "B",
+    78: "N",
+    77: "M",
+    9: "TAB",
+    20: "CAPS",
+    16: "LSHIFT",
+    160: "LSHIFT",
+    161: "RSHIFT",
+    17: "LCTRL",
+    162: "LCTRL",
+    163: "RCTRL",
+    18: "LALT",
+    164: "LALT",
+    165: "RALT",
+    32: "SPACE",
 }
 VALID_VK_CODES = set(VK_TO_KEY.keys())
 
@@ -57,8 +100,13 @@ def r13_keycode_replay(
     threshold = 0.0
 
     def _abstain(reason: str) -> Dict[str, Any]:
-        return {"name": name, "passed": False, "residual": float("nan"),
-                "threshold": threshold, "note": f"ABSTAIN:{reason}"}
+        return {
+            "name": name,
+            "passed": False,
+            "residual": float("nan"),
+            "threshold": threshold,
+            "note": f"ABSTAIN:{reason}",
+        }
 
     # ── ABSTAIN gates ───────────────────────────────────────────────
     if inputs_path is None:
@@ -118,11 +166,15 @@ def r13_keycode_replay(
     if passed:
         note = "OK"
     else:
-        note = (f"keyCode mismatch: replay={sorted(held_keys)} "
-                f"vs frame={sorted(actual)}")
+        note = f"keyCode mismatch: replay={sorted(held_keys)} vs frame={sorted(actual)}"
 
-    return {"name": name, "passed": passed, "residual": residual,
-            "threshold": threshold, "note": note}
+    return {
+        "name": name,
+        "passed": passed,
+        "residual": residual,
+        "threshold": threshold,
+        "note": note,
+    }
 
 
 # ── r01: quaternion norm ──────────────────────────────────────────────
@@ -131,11 +183,21 @@ def r01_quat_norm(frame: Dict[str, Any]) -> Dict[str, Any]:
     threshold = 1e-3
     quat = _get(frame, "camera_rotation_quaternion")
     if quat is None or len(quat) != 4:
-        return {"name": "r01_quat_norm", "passed": False, "residual": float("inf"), "threshold": threshold}
+        return {
+            "name": "r01_quat_norm",
+            "passed": False,
+            "residual": float("inf"),
+            "threshold": threshold,
+        }
     qx, qy, qz, qw = quat
     norm = math.sqrt(qx * qx + qy * qy + qz * qz + qw * qw)
     residual = abs(norm - 1.0)
-    return {"name": "r01_quat_norm", "passed": residual <= threshold, "residual": residual, "threshold": threshold}
+    return {
+        "name": "r01_quat_norm",
+        "passed": residual <= threshold,
+        "residual": residual,
+        "threshold": threshold,
+    }
 
 
 # ── r02: euler ↔ quaternion consistency (ZYX intrinsic Hamilton) ──────
@@ -156,8 +218,12 @@ def r02_euler_quat_consistency(frame: Dict[str, Any]) -> Dict[str, Any]:
     euler = _get(frame, "camera_rotation_oula")
     quat = _get(frame, "camera_rotation_quaternion")
     if euler is None or quat is None or len(euler) != 3 or len(quat) != 4:
-        return {"name": "r02_euler_quat_consistency", "passed": False,
-                "residual": float("inf"), "threshold": threshold}
+        return {
+            "name": "r02_euler_quat_consistency",
+            "passed": False,
+            "residual": float("inf"),
+            "threshold": threshold,
+        }
 
     # euler is [pitch, yaw, roll] in degrees per PRD (Pitch=X idx0, Yaw=Y idx1, Roll=Z idx2)
     pitch_deg, yaw_deg, roll_deg = euler
@@ -183,16 +249,18 @@ def r02_euler_quat_consistency(frame: Dict[str, Any]) -> Dict[str, Any]:
 
     # quaternion sign ambiguity: q and -q represent same rotation
     diff_pos = math.sqrt(
-        (exp_x - act_x) ** 2 + (exp_y - act_y) ** 2 +
-        (exp_z - act_z) ** 2 + (exp_w - act_w) ** 2
+        (exp_x - act_x) ** 2 + (exp_y - act_y) ** 2 + (exp_z - act_z) ** 2 + (exp_w - act_w) ** 2
     )
     diff_neg = math.sqrt(
-        (exp_x + act_x) ** 2 + (exp_y + act_y) ** 2 +
-        (exp_z + act_z) ** 2 + (exp_w + act_w) ** 2
+        (exp_x + act_x) ** 2 + (exp_y + act_y) ** 2 + (exp_z + act_z) ** 2 + (exp_w + act_w) ** 2
     )
     residual = min(diff_pos, diff_neg)
-    return {"name": "r02_euler_quat_consistency", "passed": residual <= threshold,
-            "residual": residual, "threshold": threshold}
+    return {
+        "name": "r02_euler_quat_consistency",
+        "passed": residual <= threshold,
+        "residual": residual,
+        "threshold": threshold,
+    }
 
 
 # ── r03: kinematics — position delta vs speed*dt ─────────────────────
@@ -211,7 +279,12 @@ def r03_kinematics(frame: Dict[str, Any], prev_frame: Optional[Dict[str, Any]]) 
     fps = _get(frame, "fps")
 
     if pos is None or prev_pos is None or speed is None or fps is None or fps <= 0:
-        return {"name": "r03_kinematics", "passed": False, "residual": float("inf"), "threshold": threshold}
+        return {
+            "name": "r03_kinematics",
+            "passed": False,
+            "residual": float("inf"),
+            "threshold": threshold,
+        }
 
     dt = 1.0 / fps
     dx = pos[0] - prev_pos[0]
@@ -222,25 +295,42 @@ def r03_kinematics(frame: Dict[str, Any], prev_frame: Optional[Dict[str, Any]]) 
     expected = speed_mag * dt
     denom = max(distance, expected, 1e-6)
     residual = abs(distance - expected) / denom
-    return {"name": "r03_kinematics", "passed": residual <= threshold, "residual": residual, "threshold": threshold}
+    return {
+        "name": "r03_kinematics",
+        "passed": residual <= threshold,
+        "residual": residual,
+        "threshold": threshold,
+    }
 
 
 # ── r04: mouse dx should be diff of mouse_x between frames ──────────
-def r04_mouse_dx_diff(frame: Dict[str, Any], prev_frame: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+def r04_mouse_dx_diff(
+    frame: Dict[str, Any], prev_frame: Optional[Dict[str, Any]]
+) -> Dict[str, Any]:
     """
     mouse_dx[0] should ≈ mouse_x[0](t) - mouse_x[0](t-1) (normalized).
     Residual = |mouse_dx[0] - (mouse_x[0] - prev_mouse_x[0])|.
     """
     threshold = 0.1
     if prev_frame is None:
-        return {"name": "r04_mouse_dx_diff", "passed": True, "residual": 0.0, "threshold": threshold}
+        return {
+            "name": "r04_mouse_dx_diff",
+            "passed": True,
+            "residual": 0.0,
+            "threshold": threshold,
+        }
 
     mx = _get(frame, "mouse_x")
     prev_mx = _get(prev_frame, "mouse_x")
     mdx = _get(frame, "mouse_dx")
 
     if mx is None or prev_mx is None or mdx is None:
-        return {"name": "r04_mouse_dx_diff", "passed": False, "residual": float("inf"), "threshold": threshold}
+        return {
+            "name": "r04_mouse_dx_diff",
+            "passed": False,
+            "residual": float("inf"),
+            "threshold": threshold,
+        }
 
     mx_val = mx[0] if isinstance(mx, list) else mx
     prev_mx_val = prev_mx[0] if isinstance(prev_mx, list) else prev_mx
@@ -248,7 +338,12 @@ def r04_mouse_dx_diff(frame: Dict[str, Any], prev_frame: Optional[Dict[str, Any]
 
     expected_dx = mx_val - prev_mx_val
     residual = abs(mdx_val - expected_dx)
-    return {"name": "r04_mouse_dx_diff", "passed": residual <= threshold, "residual": residual, "threshold": threshold}
+    return {
+        "name": "r04_mouse_dx_diff",
+        "passed": residual <= threshold,
+        "residual": residual,
+        "threshold": threshold,
+    }
 
 
 # ── r05: dt consistency — 1/fps vs time delta ────────────────────────
@@ -280,7 +375,12 @@ def r05_dt(frame: Dict[str, Any], prev_frame: Optional[Dict[str, Any]]) -> Dict[
     actual_dt = (t - pt).total_seconds()
     expected_dt = 1.0 / fps
     residual = abs(actual_dt - expected_dt)
-    return {"name": "r05_dt", "passed": residual <= threshold, "residual": residual, "threshold": threshold}
+    return {
+        "name": "r05_dt",
+        "passed": residual <= threshold,
+        "residual": residual,
+        "threshold": threshold,
+    }
 
 
 # ── r06: euler angles within [-180, 180] ─────────────────────────────
@@ -292,7 +392,12 @@ def r06_angle_range(frame: Dict[str, Any]) -> Dict[str, Any]:
     threshold = 0.0
     euler = _get(frame, "camera_rotation_oula")
     if euler is None or len(euler) != 3:
-        return {"name": "r06_angle_range", "passed": False, "residual": float("inf"), "threshold": threshold}
+        return {
+            "name": "r06_angle_range",
+            "passed": False,
+            "residual": float("inf"),
+            "threshold": threshold,
+        }
 
     max_overshoot = 0.0
     for angle in euler:
@@ -301,8 +406,12 @@ def r06_angle_range(frame: Dict[str, Any]) -> Dict[str, Any]:
         elif angle > 180.0:
             max_overshoot = max(max_overshoot, angle - 180.0)
 
-    return {"name": "r06_angle_range", "passed": max_overshoot <= threshold,
-            "residual": max_overshoot, "threshold": threshold}
+    return {
+        "name": "r06_angle_range",
+        "passed": max_overshoot <= threshold,
+        "residual": max_overshoot,
+        "threshold": threshold,
+    }
 
 
 # ── r07: mouse_x/y in [0,1], mouse_dx/dy in [-1,1] ─────────────────
@@ -318,7 +427,12 @@ def r07_mouse_range(frame: Dict[str, Any]) -> Dict[str, Any]:
     mdy = _get(frame, "mouse_dy")
 
     if mx is None or my is None or mdx is None or mdy is None:
-        return {"name": "r07_mouse_range", "passed": False, "residual": float("inf"), "threshold": threshold}
+        return {
+            "name": "r07_mouse_range",
+            "passed": False,
+            "residual": float("inf"),
+            "threshold": threshold,
+        }
 
     mx_val = mx[0] if isinstance(mx, list) else mx
     my_val = my[0] if isinstance(my, list) else my
@@ -339,8 +453,12 @@ def r07_mouse_range(frame: Dict[str, Any]) -> Dict[str, Any]:
         elif v > 1.0:
             overshoot = max(overshoot, v - 1.0)
 
-    return {"name": "r07_mouse_range", "passed": overshoot <= threshold,
-            "residual": overshoot, "threshold": threshold}
+    return {
+        "name": "r07_mouse_range",
+        "passed": overshoot <= threshold,
+        "residual": overshoot,
+        "threshold": threshold,
+    }
 
 
 # ── r08: fx == fy in camera_intrinsics ───────────────────────────────
@@ -352,15 +470,30 @@ def r08_fx_eq_fy(frame: Dict[str, Any]) -> Dict[str, Any]:
     threshold = 1e-6
     intrinsics = _get(frame, "camera_intrinsics")
     if intrinsics is None:
-        return {"name": "r08_fx_eq_fy", "passed": False, "residual": float("inf"), "threshold": threshold}
+        return {
+            "name": "r08_fx_eq_fy",
+            "passed": False,
+            "residual": float("inf"),
+            "threshold": threshold,
+        }
 
     fx = intrinsics.get("fx")
     fy = intrinsics.get("fy")
     if fx is None or fy is None:
-        return {"name": "r08_fx_eq_fy", "passed": False, "residual": float("inf"), "threshold": threshold}
+        return {
+            "name": "r08_fx_eq_fy",
+            "passed": False,
+            "residual": float("inf"),
+            "threshold": threshold,
+        }
 
     residual = abs(fx - fy)
-    return {"name": "r08_fx_eq_fy", "passed": residual <= threshold, "residual": residual, "threshold": threshold}
+    return {
+        "name": "r08_fx_eq_fy",
+        "passed": residual <= threshold,
+        "residual": residual,
+        "threshold": threshold,
+    }
 
 
 # ── r09: keyCode values must be valid VK codes ──────────────────────
@@ -379,8 +512,12 @@ def r09_keycode_vk(frame: Dict[str, Any]) -> Dict[str, Any]:
         return {"name": "r09_keycode_vk", "passed": False, "residual": 1.0, "threshold": threshold}
 
     invalid_count = sum(1 for k in keycodes if k not in VALID_VK_CODES)
-    return {"name": "r09_keycode_vk", "passed": invalid_count <= threshold,
-            "residual": float(invalid_count), "threshold": threshold}
+    return {
+        "name": "r09_keycode_vk",
+        "passed": invalid_count <= threshold,
+        "residual": float(invalid_count),
+        "threshold": threshold,
+    }
 
 
 # ── r10: speed magnitude within physical limits ─────────────────────
@@ -393,12 +530,21 @@ def r10_speed_max(frame: Dict[str, Any]) -> Dict[str, Any]:
     threshold = 0.0
     speed = _get(frame, "camera_speed")
     if speed is None or len(speed) != 3:
-        return {"name": "r10_speed_max", "passed": False, "residual": float("inf"), "threshold": threshold}
+        return {
+            "name": "r10_speed_max",
+            "passed": False,
+            "residual": float("inf"),
+            "threshold": threshold,
+        }
 
     mag = math.sqrt(speed[0] ** 2 + speed[1] ** 2 + speed[2] ** 2)
     overshoot = max(0.0, mag - speed_limit)
-    return {"name": "r10_speed_max", "passed": overshoot <= threshold,
-            "residual": overshoot, "threshold": threshold}
+    return {
+        "name": "r10_speed_max",
+        "passed": overshoot <= threshold,
+        "residual": overshoot,
+        "threshold": threshold,
+    }
 
 
 # ── r12: fps within expected range ───────────────────────────────────
@@ -411,7 +557,12 @@ def r12_fps_range(frame: Dict[str, Any]) -> Dict[str, Any]:
     threshold = 0.0
     fps = _get(frame, "fps")
     if fps is None:
-        return {"name": "r12_fps_range", "passed": False, "residual": float("inf"), "threshold": threshold}
+        return {
+            "name": "r12_fps_range",
+            "passed": False,
+            "residual": float("inf"),
+            "threshold": threshold,
+        }
 
     overshoot = 0.0
     if fps < lo:
@@ -419,8 +570,12 @@ def r12_fps_range(frame: Dict[str, Any]) -> Dict[str, Any]:
     elif fps > hi:
         overshoot = fps - hi
 
-    return {"name": "r12_fps_range", "passed": overshoot <= threshold,
-            "residual": overshoot, "threshold": threshold}
+    return {
+        "name": "r12_fps_range",
+        "passed": overshoot <= threshold,
+        "residual": overshoot,
+        "threshold": threshold,
+    }
 
 
 # ── r18: session_id manifest binding (Frankenstein-splice defense) ───
@@ -438,8 +593,13 @@ def r18_session_manifest(
     threshold = 0.0
 
     def _abstain(reason: str) -> Dict[str, Any]:
-        return {"name": name, "passed": False, "residual": float("nan"),
-                "threshold": threshold, "note": f"ABSTAIN:{reason}"}
+        return {
+            "name": name,
+            "passed": False,
+            "residual": float("nan"),
+            "threshold": threshold,
+            "note": f"ABSTAIN:{reason}",
+        }
 
     if manifest_path is None:
         return _abstain("no_manifest_path")
@@ -462,17 +622,25 @@ def r18_session_manifest(
 
     frame_sid = rec["session_id"]
     if frame_sid != manifest_sid:
-        return {"name": name, "passed": False, "residual": 1.0,
-                "threshold": threshold,
-                "note": f"session_id mismatch: frame={frame_sid!r} manifest={manifest_sid!r}"}
-    return {"name": name, "passed": True, "residual": 0.0,
-            "threshold": threshold, "note": "OK"}
+        return {
+            "name": name,
+            "passed": False,
+            "residual": 1.0,
+            "threshold": threshold,
+            "note": f"session_id mismatch: frame={frame_sid!r} manifest={manifest_sid!r}",
+        }
+    return {"name": name, "passed": True, "residual": 0.0, "threshold": threshold, "note": "OK"}
 
 
 # ── r20: dataset-level distribution drift detectors ──────────────────
 def _drift_abstain(name: str, reason: str, threshold: float = 0.0) -> Dict[str, Any]:
-    return {"name": name, "passed": False, "residual": float("nan"),
-            "threshold": threshold, "note": f"ABSTAIN:{reason}"}
+    return {
+        "name": name,
+        "passed": False,
+        "residual": float("nan"),
+        "threshold": threshold,
+        "note": f"ABSTAIN:{reason}",
+    }
 
 
 def _parse_time(s: str) -> datetime:
@@ -504,9 +672,13 @@ def r20a_quat_norm_distribution(
     sigma = statistics.stdev(norms) if len(norms) > 1 else 0.0
     offset = abs(mu - 1.0)
     passed = offset <= max_offset and sigma <= max_std
-    return {"name": name, "passed": passed, "residual": offset,
-            "threshold": max_offset,
-            "note": f"mu={mu:.3e} sigma={sigma:.3e} sample={len(norms)}"}
+    return {
+        "name": name,
+        "passed": passed,
+        "residual": offset,
+        "threshold": max_offset,
+        "note": f"mu={mu:.3e} sigma={sigma:.3e} sample={len(norms)}",
+    }
 
 
 def r20b_mouse_dx_cumulative(
@@ -534,9 +706,13 @@ def r20b_mouse_dx_cumulative(
     drift = abs(s - delta_x)
     if math.isnan(drift):
         return _drift_abstain(name, "nan_in_stat", tolerance)
-    return {"name": name, "passed": drift <= tolerance, "residual": drift,
-            "threshold": tolerance,
-            "note": f"sum={s:.3e} delta_x={delta_x:.3e} sample={len(records)}"}
+    return {
+        "name": name,
+        "passed": drift <= tolerance,
+        "residual": drift,
+        "threshold": tolerance,
+        "note": f"sum={s:.3e} delta_x={delta_x:.3e} sample={len(records)}",
+    }
 
 
 def r20c_fps_jitter(
@@ -550,13 +726,17 @@ def r20c_fps_jitter(
     if not records:
         return _drift_abstain(name, "empty_records", max_offset_ms)
     if len(records) < min_frames:
-        return _drift_abstain(name, f"insufficient_sample({len(records)}<{min_frames})", max_offset_ms)
+        return _drift_abstain(
+            name, f"insufficient_sample({len(records)}<{min_frames})", max_offset_ms
+        )
     declared_fps = float(records[0].get("fps", 30.0))
     target_dt_ms = 1000.0 / declared_fps if declared_fps > 0 else 1000.0 / 30.0
     dts_ms: List[float] = []
     try:
         for i in range(len(records) - 1):
-            dt = (_parse_time(records[i + 1]["time"]) - _parse_time(records[i]["time"])).total_seconds() * 1000.0
+            dt = (
+                _parse_time(records[i + 1]["time"]) - _parse_time(records[i]["time"])
+            ).total_seconds() * 1000.0
             if dt < 0:
                 return _drift_abstain(name, "non_monotone_time", max_offset_ms)
             dts_ms.append(dt)
@@ -566,9 +746,13 @@ def r20c_fps_jitter(
     sigma = statistics.stdev(dts_ms) if len(dts_ms) > 1 else 0.0
     offset = abs(mu - target_dt_ms)
     passed = offset <= max_offset_ms and sigma <= max_std_ms
-    return {"name": name, "passed": passed, "residual": offset,
-            "threshold": max_offset_ms,
-            "note": f"mu_dt={mu:.3f}ms target={target_dt_ms:.3f}ms sigma={sigma:.3f}ms sample={len(dts_ms)}"}
+    return {
+        "name": name,
+        "passed": passed,
+        "residual": offset,
+        "threshold": max_offset_ms,
+        "note": f"mu_dt={mu:.3f}ms target={target_dt_ms:.3f}ms sigma={sigma:.3f}ms sample={len(dts_ms)}",
+    }
 
 
 def r20d_speed_profile(
@@ -583,7 +767,9 @@ def r20d_speed_profile(
     if not records:
         return _drift_abstain(name, "empty_records", max_outlier_pct)
     if len(records) < min_frames:
-        return _drift_abstain(name, f"insufficient_sample({len(records)}<{min_frames})", max_outlier_pct)
+        return _drift_abstain(
+            name, f"insufficient_sample({len(records)}<{min_frames})", max_outlier_pct
+        )
     mags: List[float] = []
     for r in records:
         s = r.get("camera_speed")
@@ -597,9 +783,13 @@ def r20d_speed_profile(
     ratio = n_high / len(mags)
     mu = statistics.fmean(mags)
     passed = ratio <= max_outlier_pct and mu <= max_mean_speed
-    return {"name": name, "passed": passed, "residual": ratio,
-            "threshold": max_outlier_pct,
-            "note": f"mu_speed={mu:.3f}m/s ratio_high={ratio:.3f} sample={len(mags)}"}
+    return {
+        "name": name,
+        "passed": passed,
+        "residual": ratio,
+        "threshold": max_outlier_pct,
+        "note": f"mu_speed={mu:.3f}m/s ratio_high={ratio:.3f} sample={len(mags)}",
+    }
 
 
 def r20e_yaw_turn_rate(
@@ -613,17 +803,23 @@ def r20e_yaw_turn_rate(
     if not records:
         return _drift_abstain(name, "empty_records", max_outlier_pct)
     if len(records) < min_frames:
-        return _drift_abstain(name, f"insufficient_sample({len(records)}<{min_frames})", max_outlier_pct)
+        return _drift_abstain(
+            name, f"insufficient_sample({len(records)}<{min_frames})", max_outlier_pct
+        )
     rates: List[float] = []
     try:
         for i in range(len(records) - 1):
             oula_n = records[i].get("camera_rotation_oula")
             oula_n1 = records[i + 1].get("camera_rotation_oula")
             if not oula_n or not oula_n1 or len(oula_n) < 2 or len(oula_n1) < 2:
-                return _drift_abstain(name, "malformed_field(camera_rotation_oula)", max_outlier_pct)
+                return _drift_abstain(
+                    name, "malformed_field(camera_rotation_oula)", max_outlier_pct
+                )
             d_yaw = float(oula_n1[1]) - float(oula_n[1])
             d_yaw = (d_yaw + 180.0) % 360.0 - 180.0
-            dt = (_parse_time(records[i + 1]["time"]) - _parse_time(records[i]["time"])).total_seconds()
+            dt = (
+                _parse_time(records[i + 1]["time"]) - _parse_time(records[i]["time"])
+            ).total_seconds()
             if dt <= 0:
                 return _drift_abstain(name, "non_monotone_time", max_outlier_pct)
             rates.append(abs(d_yaw) / dt)
@@ -633,9 +829,13 @@ def r20e_yaw_turn_rate(
     ratio = n_extreme / len(rates) if rates else 0.0
     passed = ratio <= max_outlier_pct
     max_rate = max(rates) if rates else 0.0
-    return {"name": name, "passed": passed, "residual": ratio,
-            "threshold": max_outlier_pct,
-            "note": f"ratio_extreme={ratio:.3f} max_rate={max_rate:.1f}deg/s sample={len(rates)}"}
+    return {
+        "name": name,
+        "passed": passed,
+        "residual": ratio,
+        "threshold": max_outlier_pct,
+        "note": f"ratio_extreme={ratio:.3f} max_rate={max_rate:.1f}deg/s sample={len(rates)}",
+    }
 
 
 # ── r21: monotonic frame index (D-02 reorder defense) ────────────────
@@ -651,22 +851,41 @@ def r21_monotonic_frame(
     name = "R21"
     threshold = 0.0
     if neighbor is None:
-        return {"name": name, "passed": True, "residual": 0.0,
-                "threshold": threshold, "note": "last_frame_no_neighbor"}
+        return {
+            "name": name,
+            "passed": True,
+            "residual": 0.0,
+            "threshold": threshold,
+            "note": "last_frame_no_neighbor",
+        }
 
     rec_f = rec.get("frame")
     nbr_f = neighbor.get("frame")
     if not isinstance(rec_f, int) or not isinstance(nbr_f, int):
-        return {"name": name, "passed": False, "residual": float("nan"),
-                "threshold": threshold, "note": "ABSTAIN:frame_index_missing"}
+        return {
+            "name": name,
+            "passed": False,
+            "residual": float("nan"),
+            "threshold": threshold,
+            "note": "ABSTAIN:frame_index_missing",
+        }
 
     residual = float(max(0, rec_f - nbr_f + 1))
     if residual == 0.0:
-        return {"name": name, "passed": True, "residual": 0.0,
-                "threshold": threshold, "note": f"{rec_f} < {nbr_f}"}
-    return {"name": name, "passed": False, "residual": residual,
+        return {
+            "name": name,
+            "passed": True,
+            "residual": 0.0,
             "threshold": threshold,
-            "note": f"out_of_order: rec.frame={rec_f} >= neighbor.frame={nbr_f}"}
+            "note": f"{rec_f} < {nbr_f}",
+        }
+    return {
+        "name": name,
+        "passed": False,
+        "residual": residual,
+        "threshold": threshold,
+        "note": f"out_of_order: rec.frame={rec_f} >= neighbor.frame={nbr_f}",
+    }
 
 
 # ── Runner ───────────────────────────────────────────────────────────
@@ -691,7 +910,9 @@ ALL_PAIR_CHECKS = [
 ]
 
 
-def verify_frame(frame: Dict[str, Any], prev_frame: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+def verify_frame(
+    frame: Dict[str, Any], prev_frame: Optional[Dict[str, Any]] = None
+) -> List[Dict[str, Any]]:
     """Run all 11 residual checks on a single frame."""
     results = []
 
@@ -728,14 +949,16 @@ def verify_sequence(frames: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         worst = max(results_list, key=lambda r: r["residual"])
         all_passed = all(r["passed"] for r in results_list)
         fail_count = sum(1 for r in results_list if not r["passed"])
-        summary.append({
-            "name": name,
-            "passed": all_passed,
-            "residual": worst["residual"],
-            "threshold": worst["threshold"],
-            "total_frames": len(results_list),
-            "fail_count": fail_count,
-        })
+        summary.append(
+            {
+                "name": name,
+                "passed": all_passed,
+                "residual": worst["residual"],
+                "threshold": worst["threshold"],
+                "total_frames": len(results_list),
+                "fail_count": fail_count,
+            }
+        )
 
     return summary
 
@@ -770,7 +993,9 @@ def main():
         extra = ""
         if "fail_count" in r:
             extra = f"  ({r['fail_count']}/{r['total_frames']} frames failed)"
-        print(f"  [{status}] {r['name']}: residual={r['residual']:.6f} threshold={r['threshold']:.6f}{extra}")
+        print(
+            f"  [{status}] {r['name']}: residual={r['residual']:.6f} threshold={r['threshold']:.6f}{extra}"
+        )
 
     print()
     if passed_all:
