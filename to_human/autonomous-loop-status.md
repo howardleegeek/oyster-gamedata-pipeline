@@ -1,7 +1,7 @@
 ## Round 266 @ 2026-06-24T21:00:00Z
 
 - Picked: ruff format bin/v2prime_glm_residuals/__init__.py (smallest unformatted file: 54 lines, single blank line needed after module docstring; same pattern as previous rounds). Justification: measurable code smell, single-file scope, no behavior change, targeted test passes (v2prime 13/13), no risk of test masking, follows established cadence.
-- Result: committed 4ca6bdfe (ruff format added blank line after module docstring in bin/v2prime_glm_residuals/_
+- Result: committed 4ca6bdfe (ruff format added blank line after module docstring in bin/v2prime_glm_residuals/__
 
 ## Round 370 @ 2026-06-26T03:15:00Z
 
@@ -22,3 +22,13 @@
 
 - Picked: ruff format bin/sample_tarball_builder.py (smallest unformatted bin file: 782 lines). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic line-wrap + dict literals + trailing commas), ruff check + format --check clean, no test for this file, follows established cadence.
 - Result: committed 1309a869 (ruff format applied: dict literals, f-strings, trailing commas; 1 file changed, 19 insertions(+), 9 deletions(-); ruff check + format --check clean; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
+
+## Round 374 @ 2026-06-26T04:00:00Z
+
+- Picked: ruff format bin/preflight_recorder.py (714 lines, smallest unformatted bin file remaining). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic line-wrap + dict/list literals + trailing commas), AST parse + import smoke OK, targeted test passes (tests/test_preflight.py 18/18), no risk of test masking, follows established cadence.
+- Result: committed 9c0fed28 (ruff format applied: line-wrap long signatures, dict/list literals, trailing commas; 1 file changed, 106 insertions(+), 205 deletions(-); ruff check + format clean; import smoke OK; tests/test_preflight.py 18/18 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+## Round 375 @ 2026-06-26T04:15:00Z
+
+- Picked: ruff format bin/oyster_play.py (smallest unformatted bin file remaining: 784 lines; this round's diff is the minimum 1-line fix — ruff joined an implicit string-concat `"javaw " "cmd line"` into a single string on line 726). Justification: measurable code smell (ruff format --check flagging this file out of 388 in bin/), single-file scope, no behavior change (purely cosmetic string-join in argparse help text), AST parse + import smoke OK before/after, targeted test passes (tests/bin/test_one_click_consumer_flow.py 9/9), no risk of test masking, follows established cadence.
+- Result: <pending — see commit in this round>. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect, no logic change (argparse help text is user-facing string only).

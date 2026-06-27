@@ -723,7 +723,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Build the plan + print the constructed javaw " "cmd line; never spawn anything.",
+        help="Build the plan + print the constructed javaw cmd line; never spawn anything.",
     )
     parser.add_argument(
         "--write-desktop-shortcut",
