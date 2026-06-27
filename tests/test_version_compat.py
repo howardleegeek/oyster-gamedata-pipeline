@@ -212,9 +212,9 @@ class TestLoadMatrix:
         assert "entries" in data
         assert isinstance(data["entries"], dict)
         # Ensure at least one current entry
-        assert any(
-            "v0.28.0-rc19" in k for k in data["entries"]
-        ), "shipped matrix missing v0.28.0-rc19 family"
+        assert any("v0.28.0-rc19" in k for k in data["entries"]), (
+            "shipped matrix missing v0.28.0-rc19 family"
+        )
 
     def test_missing_file_raises(self, tmp_path):
         with pytest.raises(vcc.MatrixError):
