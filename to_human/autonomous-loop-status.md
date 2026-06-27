@@ -1315,3 +1315,8 @@ b4c97dbd638c75a1d826e641df598879876660ed
 
 - Picked: ruff format bin/seg_track_provider.py (smallest unformatted bin file: 381 lines). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic line-wrap + dict literals + trailing commas), AST parse + import smoke OK, no test for this file, follows established cadence.
 - Result: committed 603d445b (ruff format applied: 1 file changed, 133 insertions(+), 57 deletions(-); ruff check + format --check clean; AST parse OK after; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
+
+## Round 398 @ 2026-06-27T00:00:00Z
+
+- Picked: ruff format bin/video_artifact_scanner.py (391 lines, smallest unformatted bin file). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change (purely cosmetic line-wrap in print_human_readable), AST parse OK, targeted test passes (11/11 test_video_artifact_scanner.py), follows established cadence.
+- Result: committed b58152f5 (ruff format applied: combined two-line f-string into one line in print_human_readable; ruff check + format --check clean; tests pass 11/11; pushed to origin/fix/prd-test-action-per-second-ruff). Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.
