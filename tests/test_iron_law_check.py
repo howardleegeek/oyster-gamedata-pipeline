@@ -69,9 +69,9 @@ def test_skip_without_comment_is_blocked():
         )
 
         result = _run_script(repo)
-        assert (
-            result.returncode == 1
-        ), f"Expected exit 1, got {result.returncode}\nstderr: {result.stderr}"
+        assert result.returncode == 1, (
+            f"Expected exit 1, got {result.returncode}\nstderr: {result.stderr}"
+        )
         assert "skip" in result.stderr.lower() or "skip/xfail" in result.stderr.lower()
 
 
@@ -90,9 +90,9 @@ def test_skip_with_comment_is_allowed():
         )
 
         result = _run_script(repo)
-        assert (
-            result.returncode == 0
-        ), f"Expected exit 0, got {result.returncode}\nstderr: {result.stderr}"
+        assert result.returncode == 0, (
+            f"Expected exit 0, got {result.returncode}\nstderr: {result.stderr}"
+        )
 
 
 def test_xfail_without_comment_is_blocked():
@@ -110,9 +110,9 @@ def test_xfail_without_comment_is_blocked():
         )
 
         result = _run_script(repo)
-        assert (
-            result.returncode == 1
-        ), f"Expected exit 1, got {result.returncode}\nstderr: {result.stderr}"
+        assert result.returncode == 1, (
+            f"Expected exit 1, got {result.returncode}\nstderr: {result.stderr}"
+        )
 
 
 def test_xfail_with_comment_is_allowed():
@@ -132,9 +132,9 @@ def test_xfail_with_comment_is_allowed():
         )
 
         result = _run_script(repo)
-        assert (
-            result.returncode == 0
-        ), f"Expected exit 0, got {result.returncode}\nstderr: {result.stderr}"
+        assert result.returncode == 0, (
+            f"Expected exit 0, got {result.returncode}\nstderr: {result.stderr}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -157,9 +157,9 @@ def test_todo_real_data_is_blocked():
         )
 
         result = _run_script(repo)
-        assert (
-            result.returncode == 1
-        ), f"Expected exit 1, got {result.returncode}\nstderr: {result.stderr}"
+        assert result.returncode == 1, (
+            f"Expected exit 1, got {result.returncode}\nstderr: {result.stderr}"
+        )
         assert "placeholder" in result.stderr.lower()
 
 
@@ -178,9 +178,9 @@ def test_clean_file_passes():
         )
 
         result = _run_script(repo)
-        assert (
-            result.returncode == 0
-        ), f"Expected exit 0, got {result.returncode}\nstderr: {result.stderr}"
+        assert result.returncode == 0, (
+            f"Expected exit 0, got {result.returncode}\nstderr: {result.stderr}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -214,9 +214,9 @@ def test_collect_ignore_grow_is_blocked():
         )
 
         result = _run_script(repo)
-        assert (
-            result.returncode == 1
-        ), f"Expected exit 1, got {result.returncode}\nstderr: {result.stderr}"
+        assert result.returncode == 1, (
+            f"Expected exit 1, got {result.returncode}\nstderr: {result.stderr}"
+        )
         assert "collect_ignore" in result.stderr.lower() and "grew" in result.stderr.lower()
 
 
@@ -245,9 +245,9 @@ def test_collect_ignore_shrink_is_allowed():
         )
 
         result = _run_script(repo)
-        assert (
-            result.returncode == 0
-        ), f"Expected exit 0, got {result.returncode}\nstderr: {result.stderr}"
+        assert result.returncode == 0, (
+            f"Expected exit 0, got {result.returncode}\nstderr: {result.stderr}"
+        )
 
 
 def test_collect_ignore_unchanged_is_allowed():
@@ -276,9 +276,9 @@ def test_collect_ignore_unchanged_is_allowed():
         )
 
         result = _run_script(repo)
-        assert (
-            result.returncode == 0
-        ), f"Expected exit 0, got {result.returncode}\nstderr: {result.stderr}"
+        assert result.returncode == 0, (
+            f"Expected exit 0, got {result.returncode}\nstderr: {result.stderr}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -300,9 +300,9 @@ def test_empty_pr_is_blocked():
         ).stdout.strip()
 
         result = _run_script(repo, diff_base=head)
-        assert (
-            result.returncode == 1
-        ), f"Expected exit 1, got {result.returncode}\nstderr: {result.stderr}"
+        assert result.returncode == 1, (
+            f"Expected exit 1, got {result.returncode}\nstderr: {result.stderr}"
+        )
         assert "empty" in result.stderr.lower() or "no commits" in result.stderr.lower()
 
 
