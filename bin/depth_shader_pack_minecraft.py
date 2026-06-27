@@ -31,24 +31,42 @@ PACK_FORMAT = 8  # MC 1.19.3+
 GLSL_VERSION = "120"
 
 GBUFFER_PASSES = [
-    "basic", "terrain", "entities", "water", "hand", "clouds",
-    "skybasic", "skytextured", "weather", "block", "damagedblock",
-    "spidereyes", "textured", "solid",
+    "basic",
+    "terrain",
+    "entities",
+    "water",
+    "hand",
+    "clouds",
+    "skybasic",
+    "skytextured",
+    "weather",
+    "block",
+    "damagedblock",
+    "spidereyes",
+    "textured",
+    "solid",
 ]
 
 
 def generate_pack_mcmeta(fps: int) -> str:
     """Generate pack.mcmeta JSON content."""
-    return json.dumps({
-        "pack": {
-            "pack_format": PACK_FORMAT,
-            "description": f"Depth Z-Buffer Export @ {fps}fps - Ground-truth depth"
-        }
-    }, indent=2) + "\n"
+    return (
+        json.dumps(
+            {
+                "pack": {
+                    "pack_format": PACK_FORMAT,
+                    "description": f"Depth Z-Buffer Export @ {fps}fps - Ground-truth depth",
+                }
+            },
+            indent=2,
+        )
+        + "\n"
+    )
 
 
 def generate_icon_png(size: int = 8) -> bytes:
     """Generate minimal valid grayscale PNG icon."""
+
     def _chunk(ctype: bytes, data: bytes) -> bytes:
         chunk = ctype + data
         crc = zlib.crc32(chunk) & 0xFFFFFFFF
@@ -56,8 +74,11 @@ def generate_icon_png(size: int = 8) -> bytes:
 
     sig = b"\x89PNG\r\n\x1a\n"
     ihdr = _chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 0, 0, 0, 0))
-    raw = b"".join(b"\x00" + bytes([int(255 * (x + y) / (2 * size - 2)) if size > 1 else 128
-                                    for x in range(size)]) for y in range(size))
+    raw = b"".join(
+        b"\x00"
+        + bytes([int(255 * (x + y) / (2 * size - 2)) if size > 1 else 128 for x in range(size)])
+        for y in range(size)
+    )
     idat = _chunk(b"IDAT", zlib.compress(raw, 9))
     iend = _chunk(b"IEND", b"")
     return sig + ihdr + idat + iend
@@ -88,7 +109,9 @@ varying vec3 v_normal;
 
 def generate_gbuffers_vsh() -> str:
     """Generate gbuffer vertex shader."""
-    return _vsh_header() + """attribute vec4 vaPosition, vaColor, vaNormal;
+    return (
+        _vsh_header()
+        + """attribute vec4 vaPosition, vaColor, vaNormal;
 attribute vec2 vaTexCoord0;
 void main() {
     vec4 viewPos = gbufferModelView * vaPosition;
@@ -100,11 +123,14 @@ void main() {
     gl_FogFragCoord = length(viewPos.xyz);
 }
 """
+    )
 
 
 def generate_gbuffers_fsh() -> str:
     """Generate gbuffer fragment shader with depth export."""
-    return _fsh_header() + """void main() {
+    return (
+        _fsh_header()
+        + """void main() {
     // Sample depth from depthtex0 (linearized depth buffer)
     float depth = texture2D(depthtex0, v_texcoord).r;
     
@@ -129,11 +155,14 @@ def generate_gbuffers_fsh() -> str:
     gl_FragData[3] = vec4(0.0, 0.0, 0.0, 1.0); // gcolor
 }
 """
+    )
 
 
 def generate_composite_vsh() -> str:
     """Generate composite vertex shader for final pass."""
-    return _vsh_header() + """attribute vec4 vaPosition;
+    return (
+        _vsh_header()
+        + """attribute vec4 vaPosition;
 attribute vec2 vaTexCoord0;
 void main() {
     gl_Position = vaPosition;
@@ -143,11 +172,14 @@ void main() {
     v_normal = vec3(0.0, 0.0, 1.0);
 }
 """
+    )
 
 
 def generate_composite_fsh() -> str:
     """Generate composite fragment shader for depth export."""
-    return _fsh_header() + """uniform sampler2D colortex0, colortex1, colortex2, colortex3;
+    return (
+        _fsh_header()
+        + """uniform sampler2D colortex0, colortex1, colortex2, colortex3;
 uniform sampler2D depthtex1;
 uniform float frameTimeCounter;
 uniform int frameCounter;
@@ -176,6 +208,7 @@ void main() {
     }
 }
 """
+    )
 
 
 def generate_depth_capture_helper(fps: int) -> str:
@@ -372,21 +405,21 @@ const bool showPosition = false;
 def create_shader_pack(output_dir: Path, fps: int) -> Dict[str, int]:
     """Create complete shader pack directory structure."""
     counts = {"shaders": 0, "configs": 0, "assets": 0}
-    
+
     # Create directories
     shaders_dir = output_dir / "shaders"
     shaders_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Create pack.mcmeta
     pack_mcmeta = output_dir / "pack.mcmeta"
     pack_mcmeta.write_text(generate_pack_mcmeta(fps))
     counts["assets"] += 1
-    
+
     # Create icon.png
     icon_path = output_dir / "icon.png"
     icon_path.write_bytes(generate_icon_png())
     counts["assets"] += 1
-    
+
     # Create shaders
     shader_files = [
         ("gbuffers_basic.vsh", generate_gbuffers_vsh()),
@@ -394,22 +427,22 @@ def create_shader_pack(output_dir: Path, fps: int) -> Dict[str, int]:
         ("composite.vsh", generate_composite_vsh()),
         ("composite.fsh", generate_composite_fsh()),
     ]
-    
+
     for filename, content in shader_files:
         (shaders_dir / filename).write_text(content)
         counts["shaders"] += 1
-    
+
     # Create config file
     config_path = shaders_dir / "depth_export.properties"
     config_path.write_text(generate_shader_config(fps))
     counts["configs"] += 1
-    
+
     # Create helper script
     helper_path = output_dir / "depth_capture_helper.py"
     helper_path.write_text(generate_depth_capture_helper(fps))
     helper_path.chmod(0o755)  # Make executable
     counts["assets"] += 1
-    
+
     # Create README
     readme_path = output_dir / "README.md"
     readme_content = f"""# Depth Export Shader Pack for Minecraft
@@ -442,7 +475,7 @@ python3 depth_capture_helper.py ./capture_output --fps {fps}
 """
     readme_path.write_text(readme_content)
     counts["assets"] += 1
-    
+
     return counts
 
 
@@ -451,18 +484,29 @@ def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="depth_shader_pack_minecraft",
         description="Generate Iris/Sodium shader pack for Z-buffer depth export",
-        epilog="Example: %(prog)s -o ./depth_pack --fps 6"
+        epilog="Example: %(prog)s -o ./depth_pack --fps 6",
     )
-    parser.add_argument("-o", "--output", required=True, type=Path,
-                        help="Output directory for shader pack")
-    parser.add_argument("--fps", type=int, default=DEFAULT_FPS,
-                        help=f"Target FPS (default: {DEFAULT_FPS})")
-    parser.add_argument("--width", type=int, default=DEFAULT_WIDTH,
-                        help=f"Viewport width (default: {DEFAULT_WIDTH})")
-    parser.add_argument("--height", type=int, default=DEFAULT_HEIGHT,
-                        help=f"Viewport height (default: {DEFAULT_HEIGHT})")
-    parser.add_argument("-f", "--force", action="store_true",
-                        help="Overwrite existing output directory")
+    parser.add_argument(
+        "-o", "--output", required=True, type=Path, help="Output directory for shader pack"
+    )
+    parser.add_argument(
+        "--fps", type=int, default=DEFAULT_FPS, help=f"Target FPS (default: {DEFAULT_FPS})"
+    )
+    parser.add_argument(
+        "--width",
+        type=int,
+        default=DEFAULT_WIDTH,
+        help=f"Viewport width (default: {DEFAULT_WIDTH})",
+    )
+    parser.add_argument(
+        "--height",
+        type=int,
+        default=DEFAULT_HEIGHT,
+        help=f"Viewport height (default: {DEFAULT_HEIGHT})",
+    )
+    parser.add_argument(
+        "-f", "--force", action="store_true", help="Overwrite existing output directory"
+    )
 
     args = parser.parse_args(argv)
 
@@ -475,6 +519,7 @@ def main(argv: List[str] | None = None) -> int:
             print(f"Error: {args.output} exists. Use --force to overwrite", file=sys.stderr)
             return 1
         import shutil
+
         shutil.rmtree(args.output)
 
     print(f"Creating depth shader pack at: {args.output}")
@@ -486,7 +531,9 @@ def main(argv: List[str] | None = None) -> int:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 
-    print(f"\nCreated: {counts['shaders']} shaders, {counts['configs']} configs, {counts['assets']} assets")
+    print(
+        f"\nCreated: {counts['shaders']} shaders, {counts['configs']} configs, {counts['assets']} assets"
+    )
     print(f"Install: .minecraft/shaderpacks/{args.output.name}/")
     return 0
 
