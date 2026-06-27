@@ -18,6 +18,11 @@
 - Picked: ruff format bin/buyer_dashboard_html.py (278 lines, 2nd smallest unformatted bin file after bug_report.py at 365). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic line-wrap + dict literals + trailing commas), AST parse + import smoke OK, no test for this file, follows established cadence.
 - Result: committed b756eb31 (ruff format applied: dict literals, f-strings, trailing commas; 1 file changed, 23 insertions(+), 24 deletions(-); ruff check + ruff format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
 
+## Round 373 @ 2026-06-27T00:00:00Z
+
+- Picked: ruff format daemon/rsv_feeder.py (smallest unformatted daemon file: 12,479 bytes, 3 insertions, 9 deletions). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic line-wrap + trailing commas), tests pass (44/44), no risk of test masking, follows established cadence.
+- Result: committed 4e699c45 (ruff format daemon/rsv_feeder.py; 1 file changed, 3 insertions(+), 9 deletions(-); ruff check + ruff format --check clean; tests pass 44/44; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no module-level side effect.)
+
 ## Round 377 @ 2026-06-27T00:45:00Z
 
 - Picked: ruff format bin/prd_compliance_audit.py (1664 lines, smallest unformatted bin file: 6 formatting changes). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic spacing/quote changes), targeted tests pass (prd_audit 11/11 + canonical 2/2 passed, 2 skipped), follows established cadence.
@@ -42,5 +47,6 @@
 
 - Picked: ruff format bin/lint_v3_prd_grounded.py (smallest unformatted bin file: 2299 lines). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic line-wrap + dict literals + trailing commas), AST parse + ruff check/format clean, no test for this file, follows established cadence.
 - Result: committed 58a9551e (ruff format applied; 1 file changed, 1133 insertions(+), 641 deletions(-); ruff check + format clean; AST parse OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
+
 
 
