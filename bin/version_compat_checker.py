@@ -75,14 +75,10 @@ DEFAULT_UPGRADE_URL: str = (
 )
 
 # Recorder version regex — same shape as the update-server proxy.
-_RECORDER_VER_RE: re.Pattern[str] = re.compile(
-    r"^v?\d+\.\d+\.\d+(?:-[A-Za-z0-9.\-]+)?$"
-)
+_RECORDER_VER_RE: re.Pattern[str] = re.compile(r"^v?\d+\.\d+\.\d+(?:-[A-Za-z0-9.\-]+)?$")
 
 # Pipeline (this repo) version regex — accepts e.g. "0.1.0-rc8".
-_PIPELINE_VER_RE: re.Pattern[str] = re.compile(
-    r"^\d+\.\d+\.\d+(?:-[A-Za-z0-9.\-]+)?$"
-)
+_PIPELINE_VER_RE: re.Pattern[str] = re.compile(r"^\d+\.\d+\.\d+(?:-[A-Za-z0-9.\-]+)?$")
 
 MANIFEST_VERSION_KEYS: tuple[str, ...] = (
     "recorder_version",
@@ -476,8 +472,7 @@ def check_recorder_compat(
                 recorder_version=rv,
                 matched_entry=matched_key,
                 reason=(
-                    f"pipeline_version {pipeline_version!r} is not a recognised "
-                    "version string"
+                    f"pipeline_version {pipeline_version!r} is not a recognised version string"
                 ),
                 upgrade_url=upgrade_url,
                 min_pipeline=min_pipeline,
