@@ -54,6 +54,17 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Launch the uvicorn HTTP server for oyster-agent-runner.
+
+    Args:
+        argv: Command-line arguments (default: sys.argv).
+
+    Returns:
+        Exit code: 0 on normal shutdown, 2 on configuration error.
+
+    Raises:
+        SystemExit: Propagated from uvicorn on fatal error.
+    """
     args = _parse_args(argv)
 
     if not os.environ.get("OYSTER_API_TOKEN"):
