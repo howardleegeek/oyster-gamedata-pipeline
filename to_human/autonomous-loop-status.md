@@ -295,3 +295,8 @@ Self-review: cosmetic reformat only — no silent error swallow, no race, no off
 - Picked: no good candidate found this round — exiting (ruff format clean on all 752 files; ruff check clean; sampled tests pass; no PRD gaps with clear acceptance criteria; last round completed successfully)
 - Result: skipped (no good candidate)
 
+## Round 410 @ 2026-06-28T16:30:00Z
+
+- Picked: no good candidate found this round — exiting (ruff format clean on all 752 files; ruff check clean; sampled tests pass (71 passed); no module-level side effects; PRD gaps require Howard credentials; last round completed)
+- Result: skipped (no good candidate)
+
