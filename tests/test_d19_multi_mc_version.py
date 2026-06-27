@@ -38,7 +38,7 @@ def test_build_gradle_declares_all_4_mc_versions():
     src = _read("mc-mod/build.gradle")
     for v in EXPECTED_MC_VERSIONS:
         assert f'"{v}"' in src, (
-            f"mc-mod/build.gradle MC_MATRIX missing key {v!r} — " f"add a row for it"
+            f"mc-mod/build.gradle MC_MATRIX missing key {v!r} — add a row for it"
         )
 
 
@@ -46,17 +46,17 @@ def test_build_gradle_reads_MC_VERSION_env():
     """build.gradle must look up MC_VERSION from env so the GHA matrix
     can pass per-cell config."""
     src = _read("mc-mod/build.gradle")
-    assert (
-        'System.getenv("MC_VERSION")' in src
-    ), "build.gradle must read System.getenv('MC_VERSION') for D19 matrix"
+    assert 'System.getenv("MC_VERSION")' in src, (
+        "build.gradle must read System.getenv('MC_VERSION') for D19 matrix"
+    )
 
 
 def test_build_gradle_unknown_version_throws():
     """Unknown MC version must fail loudly, not silently use a default."""
     src = _read("mc-mod/build.gradle")
-    assert (
-        "throw new GradleException" in src
-    ), "build.gradle must throw on unknown MC_VERSION (no silent fallback)"
+    assert "throw new GradleException" in src, (
+        "build.gradle must throw on unknown MC_VERSION (no silent fallback)"
+    )
     assert "Unknown MC_VERSION" in src
 
 
@@ -74,7 +74,7 @@ def test_fabric_mod_json_has_templated_minecraft_depends():
     data = json.loads(src)
     mc_dep = data.get("depends", {}).get("minecraft", "")
     assert mc_dep == "${mc_depends}", (
-        f"fabric.mod.json depends.minecraft must be '${{mc_depends}}' " f"template, got {mc_dep!r}"
+        f"fabric.mod.json depends.minecraft must be '${{mc_depends}}' template, got {mc_dep!r}"
     )
 
 
@@ -143,8 +143,7 @@ def test_ci_matrix_subset_of_gradle_matrix():
     yaml_src = _read(".github/workflows/build-mc-mod.yml")
     for v in EXPECTED_CI_VERSIONS:
         assert v in EXPECTED_GRADLE_VERSIONS, (
-            f"CI version {v} not declared in gradle matrix — add to "
-            f"build.gradle MC_MATRIX first"
+            f"CI version {v} not declared in gradle matrix — add to build.gradle MC_MATRIX first"
         )
         assert v in yaml_src, f"GHA workflow missing CI version {v}"
 
