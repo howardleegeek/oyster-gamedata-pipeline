@@ -208,7 +208,7 @@ def _check_vector4_quaternion(name: str, value: Any) -> list[str]:
         components = tuple(float(x) for x in value)
     else:
         issues.append(
-            f"{name}: must be dict {{x,y,z,w}} or list[number]×4, " f"got {type(value).__name__}"
+            f"{name}: must be dict {{x,y,z,w}} or list[number]×4, got {type(value).__name__}"
         )
         return issues
     # Norm check
@@ -316,7 +316,7 @@ def validate_record(record: Any, *, index: int) -> list[str]:
     for group, aliases in _EULER_ALIASES.items():
         if not any(a in record for a in aliases):
             issues.append(
-                f"[{index}] missing required field '{aliases[0]}' " f"(or alias '{aliases[1]}')"
+                f"[{index}] missing required field '{aliases[0]}' (or alias '{aliases[1]}')"
             )
 
     # Bail early if missing critical fields (avoid downstream key errors)
