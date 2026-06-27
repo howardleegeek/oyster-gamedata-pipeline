@@ -94,15 +94,15 @@ class TestSetupBlock:
 
     def test_privileges_lowest(self, iss_content):
         """Must be per-user install — no admin."""
-        assert re.search(
-            r"PrivilegesRequired\s*=\s*lowest", iss_content, re.IGNORECASE
-        ), "PrivilegesRequired must be 'lowest' for per-user install"
+        assert re.search(r"PrivilegesRequired\s*=\s*lowest", iss_content, re.IGNORECASE), (
+            "PrivilegesRequired must be 'lowest' for per-user install"
+        )
 
     def test_localappdata_install_dir(self, iss_content):
         """Install dir must be under {localappdata}."""
-        assert re.search(
-            r"DefaultDirName\s*=\s*\{localappdata\}", iss_content, re.IGNORECASE
-        ), "DefaultDirName must use {localappdata}"
+        assert re.search(r"DefaultDirName\s*=\s*\{localappdata\}", iss_content, re.IGNORECASE), (
+            "DefaultDirName must use {localappdata}"
+        )
 
     def test_output_filename_pattern(self, iss_content):
         """Output must match OysterRecorder-setup-vX.Y.Z.exe pattern."""
@@ -114,28 +114,28 @@ class TestSetupBlock:
 
     def test_compression_lzma2(self, iss_content):
         """Must use lzma2 compression."""
-        assert re.search(
-            r"Compression\s*=\s*lzma2", iss_content, re.IGNORECASE
-        ), "Compression must be lzma2"
+        assert re.search(r"Compression\s*=\s*lzma2", iss_content, re.IGNORECASE), (
+            "Compression must be lzma2"
+        )
 
     def test_wizard_style_modern(self, iss_content):
         """Must use modern wizard style (Inno Setup 6.x)."""
-        assert re.search(
-            r"WizardStyle\s*=\s*modern", iss_content, re.IGNORECASE
-        ), "WizardStyle must be 'modern' (Inno Setup 6.x)"
+        assert re.search(r"WizardStyle\s*=\s*modern", iss_content, re.IGNORECASE), (
+            "WizardStyle must be 'modern' (Inno Setup 6.x)"
+        )
 
     def test_app_id_present(self, iss_content):
         """Must have a valid AppId GUID defined (Inno uses {{ to escape literal {)."""
         # The AppId is defined via #define MyAppId "{{GUID}}" and referenced as AppId={#MyAppId}
-        assert re.search(
-            r"#define\s+MyAppId\s+.*\{\{[0-9A-Fa-f-]+\}\}", iss_content
-        ), "AppId must be defined as a valid GUID with {{ }} escaping"
+        assert re.search(r"#define\s+MyAppId\s+.*\{\{[0-9A-Fa-f-]+\}\}", iss_content), (
+            "AppId must be defined as a valid GUID with {{ }} escaping"
+        )
 
     def test_solid_compression(self, iss_content):
         """Solid compression should be enabled."""
-        assert re.search(
-            r"SolidCompression\s*=\s*yes", iss_content, re.IGNORECASE
-        ), "SolidCompression should be 'yes'"
+        assert re.search(r"SolidCompression\s*=\s*yes", iss_content, re.IGNORECASE), (
+            "SolidCompression should be 'yes'"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -167,9 +167,9 @@ class TestRegistryAutostart:
 
     def test_uninsdeletevalue_flag(self, iss_content):
         """Registry entry must be cleaned up on uninstall."""
-        assert re.search(
-            r"Flags:.*uninsdeletevalue", iss_content, re.IGNORECASE
-        ), "Registry entry must have uninsdeletevalue flag"
+        assert re.search(r"Flags:.*uninsdeletevalue", iss_content, re.IGNORECASE), (
+            "Registry entry must have uninsdeletevalue flag"
+        )
 
     def test_exe_path_in_registry_value(self, iss_content):
         """ValueData must reference the installed exe path ({app} + exe name)."""
@@ -227,9 +227,9 @@ class TestFilesSection:
 
     def test_ignoreversion_flag(self, iss_content):
         """Main exe should have ignoreversion flag."""
-        assert re.search(
-            r"Flags:.*ignoreversion", iss_content, re.IGNORECASE
-        ), "Files should have ignoreversion flag"
+        assert re.search(r"Flags:.*ignoreversion", iss_content, re.IGNORECASE), (
+            "Files should have ignoreversion flag"
+        )
 
     def test_obs_runtime_files_are_required(self, iss_content):
         """OBS core DLLs must be explicit required installer inputs."""
@@ -275,21 +275,21 @@ class TestRunSection:
 
     def test_skipifsilent_flag(self, iss_content):
         """Post-install run must have skipifsilent for /SILENT support."""
-        assert re.search(
-            r"Flags:.*skipifsilent", iss_content, re.IGNORECASE
-        ), "[Run] must have skipifsilent flag for silent install support"
+        assert re.search(r"Flags:.*skipifsilent", iss_content, re.IGNORECASE), (
+            "[Run] must have skipifsilent flag for silent install support"
+        )
 
     def test_nowait_flag(self, iss_content):
         """Post-install run should be nowait."""
-        assert re.search(
-            r"Flags:.*nowait", iss_content, re.IGNORECASE
-        ), "[Run] should have nowait flag"
+        assert re.search(r"Flags:.*nowait", iss_content, re.IGNORECASE), (
+            "[Run] should have nowait flag"
+        )
 
     def test_postinstall_flag(self, iss_content):
         """Post-install run should have postinstall flag."""
-        assert re.search(
-            r"Flags:.*postinstall", iss_content, re.IGNORECASE
-        ), "[Run] should have postinstall flag"
+        assert re.search(r"Flags:.*postinstall", iss_content, re.IGNORECASE), (
+            "[Run] should have postinstall flag"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -302,15 +302,15 @@ class TestVersionInjection:
 
     def test_appversion_define(self, iss_content):
         """Must have #ifndef AppVersion for CI injection."""
-        assert re.search(
-            r"#ifndef\s+AppVersion", iss_content
-        ), "Must have #ifndef AppVersion for CI injection"
+        assert re.search(r"#ifndef\s+AppVersion", iss_content), (
+            "Must have #ifndef AppVersion for CI injection"
+        )
 
     def test_appversion_fallback(self, iss_content):
         """Fallback version should be a dev string."""
-        assert re.search(
-            r'#define\s+AppVersion\s+"[\d.]+-dev"', iss_content
-        ), "Fallback AppVersion should be a dev string"
+        assert re.search(r'#define\s+AppVersion\s+"[\d.]+-dev"', iss_content), (
+            "Fallback AppVersion should be a dev string"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -359,9 +359,9 @@ class TestPostinstallBat:
 
     def test_reg_add_command(self, bat_content):
         """Must use reg add to write the Run key."""
-        assert re.search(
-            r"reg\s+add", bat_content, re.IGNORECASE
-        ), "Batch must use 'reg add' command"
+        assert re.search(r"reg\s+add", bat_content, re.IGNORECASE), (
+            "Batch must use 'reg add' command"
+        )
 
     def test_hkcu_run_key(self, bat_content):
         """Must target HKCU Run key."""
@@ -369,9 +369,9 @@ class TestPostinstallBat:
 
     def test_oyster_recorder_value(self, bat_content):
         """Must reference OysterRecorder as value name."""
-        assert re.search(
-            r"OysterRecorder", bat_content, re.IGNORECASE
-        ), "Batch must reference OysterRecorder"
+        assert re.search(r"OysterRecorder", bat_content, re.IGNORECASE), (
+            "Batch must reference OysterRecorder"
+        )
 
     def test_tray_parameter(self, bat_content):
         """Must include --tray parameter."""
@@ -379,9 +379,9 @@ class TestPostinstallBat:
 
     def test_error_handling(self, bat_content):
         """Must have error handling."""
-        assert re.search(
-            r"errorlevel|ERROR", bat_content, re.IGNORECASE
-        ), "Batch must check errorlevel"
+        assert re.search(r"errorlevel|ERROR", bat_content, re.IGNORECASE), (
+            "Batch must check errorlevel"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -397,18 +397,18 @@ class TestNoBundledJRE:
         files_section = re.search(r"\[Files\](.*?)(?=\[|$)", iss_content, re.DOTALL | re.IGNORECASE)
         if files_section:
             files_text = files_section.group(1)
-            assert not re.search(
-                r"jre|jdk|java", files_text, re.IGNORECASE
-            ), "[Files] must not reference JRE/JDK/Java"
+            assert not re.search(r"jre|jdk|java", files_text, re.IGNORECASE), (
+                "[Files] must not reference JRE/JDK/Java"
+            )
 
     def test_no_minecraft_in_files(self, iss_content):
         """No Minecraft references in [Files]."""
         files_section = re.search(r"\[Files\](.*?)(?=\[|$)", iss_content, re.DOTALL | re.IGNORECASE)
         if files_section:
             files_text = files_section.group(1)
-            assert not re.search(
-                r"minecraft|\.minecraft", files_text, re.IGNORECASE
-            ), "[Files] must not reference Minecraft"
+            assert not re.search(r"minecraft|\.minecraft", files_text, re.IGNORECASE), (
+                "[Files] must not reference Minecraft"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -421,21 +421,21 @@ class TestCodeSection:
 
     def test_is_app_running_function(self, iss_content):
         """Must have IsAppRunning helper."""
-        assert re.search(
-            r"function\s+IsAppRunning", iss_content
-        ), "Must define IsAppRunning() function"
+        assert re.search(r"function\s+IsAppRunning", iss_content), (
+            "Must define IsAppRunning() function"
+        )
 
     def test_tasklist_check(self, iss_content):
         """IsAppRunning should use tasklist."""
-        assert re.search(
-            r"tasklist", iss_content, re.IGNORECASE
-        ), "IsAppRunning should use tasklist.exe"
+        assert re.search(r"tasklist", iss_content, re.IGNORECASE), (
+            "IsAppRunning should use tasklist.exe"
+        )
 
     def test_cur_step_changed(self, iss_content):
         """Must have CurStepChanged for post-install hooks."""
-        assert re.search(
-            r"procedure\s+CurStepChanged", iss_content
-        ), "Must define CurStepChanged() procedure"
+        assert re.search(r"procedure\s+CurStepChanged", iss_content), (
+            "Must define CurStepChanged() procedure"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -452,9 +452,9 @@ class TestUninstall:
 
     def test_taskkill_force(self, iss_content):
         """Uninstall must use taskkill /F (may span lines with \\)."""
-        assert re.search(
-            r"taskkill.*?/F", iss_content, re.IGNORECASE | re.DOTALL
-        ), "Uninstall must use taskkill /F"
+        assert re.search(r"taskkill.*?/F", iss_content, re.IGNORECASE | re.DOTALL), (
+            "Uninstall must use taskkill /F"
+        )
 
     def test_uninstall_display_icon(self, iss_content):
         """Must set UninstallDisplayIcon."""
