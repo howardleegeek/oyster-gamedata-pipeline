@@ -95,9 +95,7 @@ def discover_sessions(root: pathlib.Path) -> list[pathlib.Path]:
     return sessions
 
 
-def filter_new_sessions(
-    sessions: list[pathlib.Path], state: dict
-) -> list[pathlib.Path]:
+def filter_new_sessions(sessions: list[pathlib.Path], state: dict) -> list[pathlib.Path]:
     """Return sessions not yet in state or whose hash changed."""
     new: list[pathlib.Path] = []
     for s in sessions:
@@ -370,14 +368,10 @@ def main(argv: list[str] | None = None) -> int:
         else DEFAULT_FINALIZED_DIR
     )
     state_path = (
-        pathlib.Path(args.state_file).expanduser()
-        if args.state_file
-        else DEFAULT_STATE_FILE
+        pathlib.Path(args.state_file).expanduser() if args.state_file else DEFAULT_STATE_FILE
     )
     dashboard_path = (
-        pathlib.Path(args.dashboard_file)
-        if args.dashboard_file
-        else DEFAULT_DASHBOARD_FILE
+        pathlib.Path(args.dashboard_file) if args.dashboard_file else DEFAULT_DASHBOARD_FILE
     )
 
     if args.once:
