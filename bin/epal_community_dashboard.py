@@ -13,6 +13,7 @@ Usage:
     python3 epal_community_dashboard.py --user-id u123 --output html
     python3 epal_community_dashboard.py --user-id u123 --output json --stdout
 """
+
 from __future__ import annotations
 
 import argparse
@@ -29,9 +30,11 @@ from typing import Any, Dict, List, Optional, Sequence
 # Data Models
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ClipEntry:
     """A single clip contribution record."""
+
     clip_id: str
     user_id: str
     title: str
@@ -48,6 +51,7 @@ class ClipEntry:
 @dataclass
 class UserStats:
     """Aggregated statistics for a single user."""
+
     user_id: str
     display_name: str
     total_clips: int = 0
@@ -59,6 +63,7 @@ class UserStats:
 @dataclass
 class DashboardSnapshot:
     """Complete dashboard data for rendering."""
+
     user_id: str
     display_name: str
     week_label: str
@@ -83,10 +88,16 @@ class DashboardSnapshot:
 # Data Loading Utilities
 # ---------------------------------------------------------------------------
 
+
 def _parse_datetime(dt_str: str) -> datetime:
     """Parse ISO format datetime string with fallbacks."""
-    for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%SZ",
-                "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+    for fmt in (
+        "%Y-%m-%dT%H:%M:%S%z",
+        "%Y-%m-%dT%H:%M:%SZ",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d",
+    ):
         try:
             dt = datetime.strptime(dt_str.strip(), fmt)
             if dt.tzinfo is None:
@@ -110,15 +121,17 @@ def _load_clips_csv(path: Path) -> List[ClipEntry]:
     clips: List[ClipEntry] = []
     with open(path, "r", encoding="utf-8", newline="") as fh:
         for row in csv.DictReader(fh):
-            clips.append(ClipEntry(
-                clip_id=row.get("clip_id", ""),
-                user_id=row.get("user_id", ""),
-                title=row.get("title", ""),
-                created_at=row.get("created_at", ""),
-                views=int(row.get("views", 0) or 0),
-                likes=int(row.get("likes", 0) or 0),
-                bonus_amount=float(row.get("bonus_amount", 0.0) or 0.0),
-            ))
+            clips.append(
+                ClipEntry(
+                    clip_id=row.get("clip_id", ""),
+                    user_id=row.get("user_id", ""),
+                    title=row.get("title", ""),
+                    created_at=row.get("created_at", ""),
+                    views=int(row.get("views", 0) or 0),
+                    likes=int(row.get("likes", 0) or 0),
+                    bonus_amount=float(row.get("bonus_amount", 0.0) or 0.0),
+                )
+            )
     return clips
 
 
@@ -145,6 +158,7 @@ def load_users(data_dir: Path) -> Dict[str, str]:
 # ---------------------------------------------------------------------------
 # Aggregation Logic
 # ---------------------------------------------------------------------------
+
 
 def get_week_bounds() -> tuple[datetime, datetime]:
     """Get start and end of current week (Monday to Sunday, UTC)."""
@@ -210,6 +224,7 @@ def get_user_rank(leaderboard: List[UserStats], user_id: str) -> int:
 # Dashboard Generation
 # ---------------------------------------------------------------------------
 
+
 def build_dashboard(
     clips: List[ClipEntry],
     users: Dict[str, str],
@@ -238,13 +253,15 @@ def build_dashboard(
     # Top 5 leaderboard entries
     top5 = []
     for idx, stats in enumerate(leaderboard[:5], start=1):
-        top5.append({
-            "rank": idx,
-            "user_id": stats.user_id,
-            "display_name": users.get(stats.user_id, stats.user_id),
-            "total_bonus": stats.total_bonus,
-            "total_clips": stats.total_clips,
-        })
+        top5.append(
+            {
+                "rank": idx,
+                "user_id": stats.user_id,
+                "display_name": users.get(stats.user_id, stats.user_id),
+                "total_bonus": stats.total_bonus,
+                "total_clips": stats.total_clips,
+            }
+        )
 
     return DashboardSnapshot(
         user_id=user_id,
@@ -262,6 +279,7 @@ def build_dashboard(
 # ---------------------------------------------------------------------------
 # Output Rendering
 # ---------------------------------------------------------------------------
+
 
 def render_html(snapshot: DashboardSnapshot) -> str:
     """Render dashboard as HTML for iframe embedding."""
@@ -321,13 +339,13 @@ def render_html(snapshot: DashboardSnapshot) -> str:
     <div class="section">
       <h2>Recent Clips</h2>
       <div class="clip-list">
-        {''.join(f'<div class="clip-item"><div class="clip-title">{c.get("title", "Untitled")}</div><div class="clip-meta">{c.get("views", 0)} views · {c.get("likes", 0)} likes · ${c.get("bonus_amount", 0):.2f}</div></div>' for c in snapshot.recent_clips) if snapshot.recent_clips else '<div class="clip-item"><div class="clip-title">No clips yet</div></div>'}
+        {"".join(f'<div class="clip-item"><div class="clip-title">{c.get("title", "Untitled")}</div><div class="clip-meta">{c.get("views", 0)} views · {c.get("likes", 0)} likes · ${c.get("bonus_amount", 0):.2f}</div></div>' for c in snapshot.recent_clips) if snapshot.recent_clips else '<div class="clip-item"><div class="clip-title">No clips yet</div></div>'}
       </div>
     </div>
     <div class="section">
       <h2>Leaderboard</h2>
       <div class="leaderboard">
-        {''.join(f'<div class="lb-item {"highlight" if e["user_id"] == snapshot.user_id else ""}"><span class="lb-rank">{e["rank"]}</span><span class="lb-name">{e["display_name"]}</span><span class="lb-bonus">${e["total_bonus"]:.2f}</span></div>' for e in snapshot.leaderboard_top5)}
+        {"".join(f'<div class="lb-item {"highlight" if e["user_id"] == snapshot.user_id else ""}"><span class="lb-rank">{e["rank"]}</span><span class="lb-name">{e["display_name"]}</span><span class="lb-bonus">${e["total_bonus"]:.2f}</span></div>' for e in snapshot.leaderboard_top5)}
       </div>
     </div>
     <div class="footer">Generated {snapshot.generated_at} · {snapshot.total_community_members} members</div>
@@ -340,6 +358,7 @@ def render_html(snapshot: DashboardSnapshot) -> str:
 # CLI Entry Point
 # ---------------------------------------------------------------------------
 
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     """Main entry point with argument parsing."""
     parser = argparse.ArgumentParser(
@@ -347,23 +366,31 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         description="EPal Community Dashboard Widget",
     )
     parser.add_argument(
-        "--user-id", required=True,
+        "--user-id",
+        required=True,
         help="User ID to generate dashboard for",
     )
     parser.add_argument(
-        "--data-dir", type=Path, default=Path("."),
+        "--data-dir",
+        type=Path,
+        default=Path("."),
         help="Directory containing clips.json/clips.csv and users.json",
     )
     parser.add_argument(
-        "--output", choices=["html", "json"], default="html",
+        "--output",
+        choices=["html", "json"],
+        default="html",
         help="Output format (default: html)",
     )
     parser.add_argument(
-        "--stdout", action="store_true",
+        "--stdout",
+        action="store_true",
         help="Write output to stdout instead of file",
     )
     parser.add_argument(
-        "--output-dir", type=Path, default=None,
+        "--output-dir",
+        type=Path,
+        default=None,
         help="Output directory (default: temp dir)",
     )
 
