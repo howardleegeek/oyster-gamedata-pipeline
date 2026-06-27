@@ -16,6 +16,11 @@ Self-review: cosmetic reformat only — no silent error swallow, no race, no off
 - Picked: ruff format tests/test_web_workflows.py (282 lines, 17 multi-line asserts). Justification: measurable code smell, second-smallest unformatted test file (224-line file has broken tests), single-file scope, no behavior change, targeted test passes (17/17), follows established cadence.
 - Result: committed d25a827c (ruff format applied: parenthesized 17 multi-line assert messages; 1 file changed, 41 insertions(+), 41 deletions(-); ruff check + ruff format --check clean; pytest tests/test_web_workflows.py 17/17 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (asserts same conditions), no brand cross-reference, no module-level side effect.)
 
+## Round 386 @ 2026-06-27T11:57:18Z
+
+- Picked: ruff format tests/test_upload_release_asset.py (296 lines, 1 multi-line call). Justification: measurable code smell, third-smallest unformatted test file (smallest 224-line file has broken tests, 282-line file already done in round 382), single-file scope, no behavior change (cosmetic call parenthesization only), targeted test passes (10/10), follows established cadence.
+- Result: committed 06db0085 (ruff format applied: parenthesized 1 multi-line f.write call; 1 file changed, 4 insertions(+), 2 deletions(-); ruff check + ruff format --check clean; pytest tests/test_upload_release_asset.py 10/10 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic call parenthesization only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (asserts same f-string content), no brand cross-reference, no module-level side effect.)
+
 ## Round 372
 ## Round 266 @ 2026-06-24T21:00:00Z
 
