@@ -162,6 +162,7 @@ def discover_session(explicit: Path | None) -> Path | None:
 
     if kind == "tarball":
         import tarfile
+
         extract_root = Path.home() / ".oyster_preflight_extracted"
         extract_root.mkdir(exist_ok=True)
         target = extract_root / path.stem.replace(".tar", "")
@@ -203,9 +204,7 @@ def precheck(session: Path) -> tuple[bool, list[str]]:
 
     mp4 = session / "recording.mp4"
     if mp4.exists() and mp4.stat().st_size < 1_000_000:
-        problems.append(
-            f"recording.mp4 只有 {mp4.stat().st_size} bytes — 录制极可能被截断"
-        )
+        problems.append(f"recording.mp4 只有 {mp4.stat().st_size} bytes — 录制极可能被截断")
 
     state = session / "game_state.jsonl"
     if state.exists() and state.stat().st_size > 0:
@@ -242,9 +241,7 @@ def run_canonical_pipeline(session: Path) -> tuple[bool, str]:
     # allows 10 fails). For full depth, tester must run on Howard's mac1.
     cmd = [sys.executable, str(CANONICAL_PIPELINE), str(session), "--skip-depth"]
     try:
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=600, check=False
-        )
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600, check=False)
     except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
         return False, f"canonical_pipeline 启动失败: {type(exc).__name__}: {exc}"
 
@@ -268,9 +265,7 @@ def run_audit(session: Path) -> dict | None:
 
     cmd = [sys.executable, str(AUDIT_SCRIPT), str(session), "--json"]
     try:
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=300, check=False
-        )
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300, check=False)
     except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
         print(red(f"❌ 审计脚本启动失败: {type(exc).__name__}: {exc}"))
         return None
@@ -316,14 +311,10 @@ def render_verdict(audit: dict, session: Path) -> int:
         verdict_line = green(f"✅ GREEN — {passed}/{total} PASS ({pct:.1f}%) — 可发货")
         code = 0
     elif passed >= YELLOW_FLOOR:
-        verdict_line = yellow(
-            f"⚠️ YELLOW — {passed}/{total} PASS ({pct:.1f}%) — 可用但有遗憾"
-        )
+        verdict_line = yellow(f"⚠️ YELLOW — {passed}/{total} PASS ({pct:.1f}%) — 可用但有遗憾")
         code = 1
     else:
-        verdict_line = red(
-            f"❌ RED — {passed}/{total} PASS ({pct:.1f}%) — 重录一次"
-        )
+        verdict_line = red(f"❌ RED — {passed}/{total} PASS ({pct:.1f}%) — 重录一次")
         code = 2
 
     print(verdict_line)
@@ -360,10 +351,7 @@ def render_verdict(audit: dict, session: Path) -> int:
     state_lines = sum(1 for _ in state.open(encoding="utf-8")) if state.exists() else 0
     input_lines = sum(1 for _ in inputs.open(encoding="utf-8")) if inputs.exists() else 0
     mp4_mb = (mp4.stat().st_size / 1024 / 1024) if mp4.exists() else 0
-    print(
-        f"录制摘要: mp4={mp4_mb:.1f}MB, game_state={state_lines} 行, "
-        f"inputs={input_lines} 行"
-    )
+    print(f"录制摘要: mp4={mp4_mb:.1f}MB, game_state={state_lines} 行, inputs={input_lines} 行")
     print()
 
     if code != 0:
@@ -400,9 +388,7 @@ def main(argv: list[str]) -> int:
         print("请检查：")
         print("  1. 你已经运行过 OysterPlay 并完成了一次 Minecraft 录制")
         print("  2. session 目录在 %USERPROFILE%\\Documents\\OysterClips\\")
-        print(
-            "  3. 或直接传入路径: python tester_preflight.py <session_dir>"
-        )
+        print("  3. 或直接传入路径: python tester_preflight.py <session_dir>")
         return 3
 
     print(f"找到 session: {session}")
