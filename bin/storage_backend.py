@@ -98,9 +98,7 @@ class TarballMetadata:
 
     def __post_init__(self) -> None:
         if self.d5_verdict not in VALID_VERDICTS:
-            raise ValueError(
-                f"d5_verdict must be one of {VALID_VERDICTS}, got {self.d5_verdict!r}"
-            )
+            raise ValueError(f"d5_verdict must be one of {VALID_VERDICTS}, got {self.d5_verdict!r}")
         if len(self.sha256) != 64 or not all(c in "0123456789abcdef" for c in self.sha256):
             raise ValueError(f"sha256 must be 64 hex chars, got {self.sha256!r}")
         if self.size_bytes <= 0:
@@ -181,7 +179,9 @@ class StorageBackend(ABC):
         """Return [{asset_name, sha256, size_bytes, uploaded_at, ...}, ...]."""
 
     @abstractmethod
-    def get_signed_url(self, asset_name: str, ttl_seconds: int = DEFAULT_SIGNED_URL_TTL_SECONDS) -> str:
+    def get_signed_url(
+        self, asset_name: str, ttl_seconds: int = DEFAULT_SIGNED_URL_TTL_SECONDS
+    ) -> str:
         """Generate a fresh signed download URL (default 24h TTL)."""
 
     @abstractmethod
@@ -214,9 +214,7 @@ class LocalFileStorageBackend(StorageBackend):
     def __init__(self, root: Path | str | None = None, base_url: str | None = None) -> None:
         self.root = Path(root or os.environ.get("STORAGE_LOCAL_ROOT", "/tmp/oyster_storage"))
         self.root.mkdir(parents=True, exist_ok=True)
-        self.base_url = base_url or os.environ.get(
-            "STORAGE_LOCAL_BASE_URL", f"file://{self.root}"
-        )
+        self.base_url = base_url or os.environ.get("STORAGE_LOCAL_BASE_URL", f"file://{self.root}")
 
     def _meta_path(self, asset_name: str) -> Path:
         return self.root / f"{asset_name}.metadata.json"
@@ -274,7 +272,9 @@ class LocalFileStorageBackend(StorageBackend):
         out.sort(key=lambda a: a.get("uploaded_at", ""), reverse=True)
         return out
 
-    def get_signed_url(self, asset_name: str, ttl_seconds: int = DEFAULT_SIGNED_URL_TTL_SECONDS) -> str:
+    def get_signed_url(
+        self, asset_name: str, ttl_seconds: int = DEFAULT_SIGNED_URL_TTL_SECONDS
+    ) -> str:
         # file:// URLs don't actually expire; we synthesize a fragment for parity
         # with cloud backends so tests can assert ttl propagation.
         expires_at = int(time.time()) + ttl_seconds
@@ -327,6 +327,7 @@ class S3StorageBackend(StorageBackend):
             self.client = client
         else:
             import boto3  # lazy: keeps import cost off the local-only path
+
             kwargs: dict[str, Any] = {"region_name": self.region}
             if self.endpoint_url:
                 kwargs["endpoint_url"] = self.endpoint_url
@@ -374,9 +375,7 @@ class S3StorageBackend(StorageBackend):
             Body=json.dumps(metadata.to_dict()).encode("utf-8"),
             ContentType="application/json",
         )
-        logger.info(
-            "s3: uploaded %s/%s (%d bytes)", self.bucket, asset_name, metadata.size_bytes
-        )
+        logger.info("s3: uploaded %s/%s (%d bytes)", self.bucket, asset_name, metadata.size_bytes)
         return UploadResult(
             storage_url=f"s3://{self.bucket}/{asset_name}",
             signed_url=self.get_signed_url(asset_name),
@@ -406,7 +405,9 @@ class S3StorageBackend(StorageBackend):
         out.sort(key=lambda a: a.get("uploaded_at", ""), reverse=True)
         return out
 
-    def get_signed_url(self, asset_name: str, ttl_seconds: int = DEFAULT_SIGNED_URL_TTL_SECONDS) -> str:
+    def get_signed_url(
+        self, asset_name: str, ttl_seconds: int = DEFAULT_SIGNED_URL_TTL_SECONDS
+    ) -> str:
         return self.client.generate_presigned_url(
             ClientMethod="get_object",
             Params={"Bucket": self.bucket, "Key": asset_name},
@@ -465,7 +466,9 @@ class GitHubReleaseStorageBackend(StorageBackend):
         self.gh_runner = gh_runner or self._default_gh_runner
 
     @staticmethod
-    def _default_gh_runner(args: list[str], input_bytes: bytes | None = None) -> tuple[int, str, str]:
+    def _default_gh_runner(
+        args: list[str], input_bytes: bytes | None = None
+    ) -> tuple[int, str, str]:
         """Run `gh <args>` and return (rc, stdout, stderr)."""
         proc = subprocess.run(
             ["gh"] + args,
@@ -473,8 +476,10 @@ class GitHubReleaseStorageBackend(StorageBackend):
             capture_output=True,
             check=False,
         )
-        return proc.returncode, proc.stdout.decode("utf-8", errors="replace"), proc.stderr.decode(
-            "utf-8", errors="replace"
+        return (
+            proc.returncode,
+            proc.stdout.decode("utf-8", errors="replace"),
+            proc.stderr.decode("utf-8", errors="replace"),
         )
 
     def _gh_asset_name(self, path: Path, metadata: TarballMetadata) -> str:
@@ -525,6 +530,7 @@ class GitHubReleaseStorageBackend(StorageBackend):
 
         # Symlink so gh upload uses our chosen asset_name.
         import tempfile
+
         tmp_dir = Path(tempfile.mkdtemp(prefix="gh_upload_"))
         link = tmp_dir / asset_name
         try:
@@ -574,8 +580,7 @@ class GitHubReleaseStorageBackend(StorageBackend):
         tarballs = [
             a
             for a in assets
-            if a.get("name", "").endswith(".tar.gz")
-            and a.get("name") not in self.protected_assets
+            if a.get("name", "").endswith(".tar.gz") and a.get("name") not in self.protected_assets
         ]
         tarballs.sort(key=lambda a: a.get("createdAt", ""), reverse=True)
         for old in tarballs[self.keep_newest :]:
@@ -615,7 +620,9 @@ class GitHubReleaseStorageBackend(StorageBackend):
         out.sort(key=lambda a: a.get("uploaded_at", ""), reverse=True)
         return out
 
-    def get_signed_url(self, asset_name: str, ttl_seconds: int = DEFAULT_SIGNED_URL_TTL_SECONDS) -> str:
+    def get_signed_url(
+        self, asset_name: str, ttl_seconds: int = DEFAULT_SIGNED_URL_TTL_SECONDS
+    ) -> str:
         # GitHub release assets are public; "signed URL" is just the canonical
         # download URL. ttl_seconds is ignored.
         return f"https://github.com/{self.repo}/releases/download/{self.tag}/{asset_name}"
