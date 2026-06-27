@@ -30,7 +30,7 @@ class TestExtractFrames:
             # Create fake frame files
             os.makedirs(output_dir, exist_ok=True)
             for i in range(3):
-                Path(os.path.join(output_dir, f"frame_{i+1:04d}.png")).touch()
+                Path(os.path.join(output_dir, f"frame_{i + 1:04d}.png")).touch()
             return MagicMock(returncode=0, stderr="", stdout="")
 
         monkeypatch.setattr(subprocess, "run", mock_run)
@@ -60,7 +60,9 @@ class TestExtractFrames:
 
         def mock_run(cmd, capture_output=False, text=False, check=False):
             if check:
-                raise subprocess.CalledProcessError(1, cmd, "ffmpeg error: invalid codec", "ffmpeg error: invalid codec")
+                raise subprocess.CalledProcessError(
+                    1, cmd, "ffmpeg error: invalid codec", "ffmpeg error: invalid codec"
+                )
             return MagicMock(returncode=1, stderr="ffmpeg error: invalid codec", stdout="")
 
         monkeypatch.setattr(subprocess, "run", mock_run)
