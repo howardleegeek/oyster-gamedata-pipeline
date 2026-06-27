@@ -97,8 +97,7 @@ def test_resolve_profile_chain_leaf_main(fake_install: Path) -> None:
     leaf = m.fabric_profile_json(fake_install)
     resolved = m.resolve_profile_chain(leaf)
     assert resolved.main_class == m.EXPECTED_FABRIC_MAIN, (
-        "vanilla parent's net.minecraft.client.main.Main is "
-        "wrongly overwriting Fabric's KnotClient"
+        "vanilla parent's net.minecraft.client.main.Main is wrongly overwriting Fabric's KnotClient"
     )
 
 
