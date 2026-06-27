@@ -998,6 +998,7 @@ b4c97dbd638c75a1d826e641df598879876660ed
 - Picked: ruff format bin/recorder_window_capture_helper.py (smallest unformatted bin file: 228 lines, blank line after module docstring, collapsed multiline ctypes.WINFUNCTYPE call, collapsed ValueError message, reformatted ffmpeg args list). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change, targeted test exists (tests/bin/test_recorder_window_capture_helper.py 9/9 pass), no risk of test masking, follows established cadence of small-bin-file formats (Rounds 254-354).
 - Result: committed 80abad01 (ruff format added blank line after module docstring, collapsed multiline ctypes.WINFUNCTYPE call, collapsed ValueError message, reformatted ffmpeg args list in bin/recorder_window_capture_helper.py; 1 file changed, 15 insertions(+), 12 deletions(-); ruff check + format --check clean; 9/9 tests pass in tests/bin/test_recorder_window_capture_helper.py; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting only — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
 
+
 ## Round 351 @ 2026-06-26T07:00:00Z
 
 - Picked: ruff format bin/sync_tolerance_gate.py (smallest unformatted bin file: 317 lines, spacing around math operators in f-strings needs formatting). Justification: measurable code smell, single-file scope, no behavior change, targeted test passes (9/9), no risk of test masking, follows established cadence.
