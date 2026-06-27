@@ -19,6 +19,11 @@
 - Picked: ruff format bin/buyer_dashboard_html.py (278 lines, 2nd smallest unformatted bin file after bug_report.py at 365). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic line-wrap + dict literals + trailing commas), AST parse + import smoke OK, no test for this file, follows established cadence.
 - Result: committed b756eb31 (ruff format applied: dict literals, f-strings, trailing commas; 1 file changed, 23 insertions(+), 24 deletions(-); ruff check + format --check clean; AST parse + import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
 
+## Round 373 @ 2026-06-27T00:19:00Z
+
+- Picked: ruff format bin/generate_manifest.py (400 lines, smallest unformatted bin file). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic line-wrap + dict literals + trailing commas), AST parse OK, has test (19 tests pass), follows established cadence.
+- Result: committed 0f05d26b (ruff format applied; 1 file changed, 186 insertions(+), 142 deletions(-); ruff check + format --check clean; tests pass (19/19); pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, test masking not applicable (test exists and passes), no brand cross-reference, no module-level side effect.)t --check clean; AST parse + import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
+
 ## Round 374 @ 2026-06-26T23:36:59Z
 
 - Picked: ruff format bin/edge_test_negative_timestamps.py (403 lines, smallest unformatted bin file). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change (purely cosmetic: blank lines after docstrings, line-wrap for-loop fmt list, trailing whitespace cleanup, single->double quote normalization on str.replace args), AST parse + import smoke OK pre/post, no test references this file (no test masking risk), follows established cadence of small-bin-file formats.
@@ -1296,3 +1301,17 @@ b4c97dbd638c75a1d826e641df598879876660ed
 
 - Picked: ruff format bin/telemetry.py (smallest unformatted bin file at 355 lines). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change (cosmetic reformat), zero test imports (only test_telemetry_optin.py imports module-level functions, not file-level), ruff check clean, AST parse OK, import smoke OK, follows established cadence of small-bin-file formats.
 - Result: committed bffe32b7 (ruff format applied: 1 file changed, 1 insertion(+), 3 deletions(-); ruff check + format --check clean; AST parse + import smoke OK; tests/test_telemetry_optin.py 34/34 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (34 tests passed), no brand cross-reference, no module-level side effect.)
+
+## Round 400 @ 2026-06-26T23:47:40Z
+
+- Picked: ruff format bin/per_frame_object_bbox.py (smallest unformatted bin file: 378 lines, zero test references). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change (cosmetic: line-wrap, trailing commas), zero test references (no test-masking risk), follows established cadence of small-bin-file formats (Rounds 254-399).
+- Result: committed 72d088a7 (ruff format applied: 1 file changed, 8 insertions(+), 7 deletions(-); ruff check + format --check clean; AST parse + import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (zero test references), no brand cross-reference, no module-level side effect.)
+
+## Round 398 @ 2026-06-27T00:00:00Z
+- Picked: ruff format bin/continuous_capture_daemon.py (491 lines, test references via test_state_machine.py — verified grep). Justification: measurable code smell (ruff format --check fail), smallest unformatted bin file without existing test (tied at 478-495 with 3 others, picked by alphabetical), single-file scope, no behavior change, import smoke OK, targeted test passes (18/18 test_state_machine.py), follows established cadence of small-bin-file formats.
+- Result: committed 44f3b3ec (ruff format applied: 35 insertions(+), 34 deletions(-); ruff check + format --check clean; import smoke ok; targeted test_state_machine.py passes 18/18; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race condition, no off-by-one, no security impact, no test masking (test imports and uses ContinuousCaptureDaemon class), no module-level side effect.)
+
+## Round 373 @ 2026-06-26T04:00:00Z
+
+- Picked: ruff format bin/seg_track_provider.py (smallest unformatted bin file: 381 lines). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic line-wrap + dict literals + trailing commas), AST parse + import smoke OK, no test for this file, follows established cadence.
+- Result: committed 603d445b (ruff format applied: 1 file changed, 133 insertions(+), 57 deletions(-); ruff check + format --check clean; AST parse OK after; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
