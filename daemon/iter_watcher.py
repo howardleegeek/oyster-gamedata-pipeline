@@ -273,9 +273,7 @@ def run_audit(session_dir: Path) -> list[dict]:
 
     if result.returncode not in (0, 1):
         # 0 = all pass, 1 = some fail, anything else = error
-        log.error(
-            "Audit exited with code %d: %s", result.returncode, result.stderr[:500]
-        )
+        log.error("Audit exited with code %d: %s", result.returncode, result.stderr[:500])
         raise RuntimeError(f"Audit failed with exit code {result.returncode}")
 
     # Parse JSON from stdout
@@ -435,9 +433,7 @@ def run_once(*, dry_run: bool = False) -> list[Path]:
 
 def run_daemon(*, dry_run: bool = False, interval: int = 3600) -> None:
     """Run the watcher in a loop, sleeping *interval* seconds between cycles."""
-    log.info(
-        "Starting iter_watcher daemon (interval=%ds, dry_run=%s)", interval, dry_run
-    )
+    log.info("Starting iter_watcher daemon (interval=%ds, dry_run=%s)", interval, dry_run)
     while True:
         try:
             run_once(dry_run=dry_run)

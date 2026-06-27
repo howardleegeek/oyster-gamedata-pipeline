@@ -373,9 +373,7 @@ def dispatch_spec(
         entry.status = "dead"
         entry.last_error = f"Exceeded max retries ({DEFAULT_MAX_RETRIES})"
         state.update_entry(entry)
-        logger.warning(
-            "Marking spec as dead after %d failures: %s", entry.attempts, spec.task_id
-        )
+        logger.warning("Marking spec as dead after %d failures: %s", entry.attempts, spec.task_id)
         return entry
 
     # Prepare working dir
@@ -605,9 +603,7 @@ def main(argv: list[str] | None = None) -> int:
         state.save(state_file)
 
         if args.dry_run:
-            print(
-                f"\n[DRY-RUN] Dispatch cycle complete. {len(results)} specs processed."
-            )
+            print(f"\n[DRY-RUN] Dispatch cycle complete. {len(results)} specs processed.")
             for r in results:
                 print(f"  {r.task_id}: {r.status} (attempts: {r.attempts})")
         else:
@@ -621,9 +617,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     # Daemon mode
-    logger.info(
-        "Starting cluster dispatcher daemon (poll every %ds)...", args.poll_interval
-    )
+    logger.info("Starting cluster dispatcher daemon (poll every %ds)...", args.poll_interval)
     while True:
         try:
             results = run_dispatch_cycle(
