@@ -463,7 +463,6 @@ class TestRunAudit:
             mock.patch.object(audit_mod, "step_check_backend_sessions", return_value=True),
             mock.patch.object(audit_mod, "step_shutdown_backend"),
         ):
-
             rc = audit_mod.run_audit()
 
             assert rc == 0
@@ -477,7 +476,6 @@ class TestRunAudit:
             mock.patch.object(audit_mod, "step_wait_ready", return_value=False),
             mock.patch.object(audit_mod, "step_shutdown_backend"),
         ):
-
             rc = audit_mod.run_audit()
 
             assert rc == 1
@@ -492,7 +490,6 @@ class TestRunAudit:
             mock.patch.object(audit_mod, "step_generate_fixture", return_value=False),
             mock.patch.object(audit_mod, "step_shutdown_backend"),
         ):
-
             rc = audit_mod.run_audit()
 
             assert rc == 1
@@ -524,7 +521,6 @@ class TestRunAudit:
             mock.patch.object(audit_mod, "step_check_backend_sessions", return_value=True),
             mock.patch.object(audit_mod, "step_shutdown_backend"),
         ):
-
             rc = audit_mod.run_audit()
 
             assert rc == 1
@@ -556,7 +552,6 @@ class TestRunAudit:
             mock.patch.object(audit_mod, "step_check_backend_sessions", return_value=False),
             mock.patch.object(audit_mod, "step_shutdown_backend"),
         ):
-
             rc = audit_mod.run_audit()
 
             assert rc == 1
@@ -570,7 +565,6 @@ class TestRunAudit:
             mock.patch.object(audit_mod, "step_wait_ready", side_effect=RuntimeError("boom")),
             mock.patch.object(audit_mod, "step_shutdown_backend"),
         ):
-
             rc = audit_mod.run_audit()
 
             assert rc == 1
@@ -586,7 +580,6 @@ class TestRunAudit:
             mock.patch.object(audit_mod, "step_wait_ready", return_value=False),
             mock.patch.object(audit_mod, "step_shutdown_backend") as mock_shutdown,
         ):
-
             audit_mod.run_audit()
 
             mock_shutdown.assert_called_once_with(mock_proc)
