@@ -780,6 +780,19 @@ def build_entries() -> list[dict]:
 
 
 def main(apply: bool = False) -> int:
+    """Generate or apply new audit gap specs to docs/audit_gaps.yaml.
+
+    Args:
+        apply: If False, performs a dry-run that prints what would be added
+            without modifying the file. If True, actually writes new gap entries.
+
+    Returns:
+        int: Exit code (0 for success, non-zero for errors).
+
+    Example:
+        >>> spec_generator.main()          # dry-run
+        >>> spec_generator.main(apply=True)  # actually write
+    """
     data = yaml.safe_load(GAPS_FILE.read_text())
     existing_ids = {g["id"] for g in data.get("gaps", [])}
     new_entries = [e for e in build_entries() if e["id"] not in existing_ids]
