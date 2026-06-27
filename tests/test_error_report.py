@@ -276,7 +276,7 @@ class TestStoreRecord:
         report = ers.validate_report(
             _minimal(
                 stack_trace=(
-                    "File C:\\Users\\Howard\\foo.py, line 1\n" "  contact howard.li@berkeley.edu\n"
+                    "File C:\\Users\\Howard\\foo.py, line 1\n  contact howard.li@berkeley.edu\n"
                 )
             )
         )
