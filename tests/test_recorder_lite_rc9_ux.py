@@ -106,9 +106,9 @@ def test_real_documents_dir_mac_branch_returns_path(monkeypatch: pytest.MonkeyPa
     result = m._real_documents_dir()
 
     assert isinstance(result, Path), "must return a Path object"
-    assert (
-        result == Path.home() / "Documents"
-    ), f"non-Windows branch must return ~/Documents, got {result}"
+    assert result == Path.home() / "Documents", (
+        f"non-Windows branch must return ~/Documents, got {result}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -155,8 +155,7 @@ def test_detect_gpu_available_returns_bool(monkeypatch: pytest.MonkeyPatch) -> N
     result_no_gpu = m._detect_gpu_available()
     assert isinstance(result_no_gpu, bool), "must return a bool on Windows path"
     assert result_no_gpu is False, (
-        "Windows-without-NVIDIA-or-DirectML must return False so the "
-        "skip checkbox is pre-checked"
+        "Windows-without-NVIDIA-or-DirectML must return False so the skip checkbox is pre-checked"
     )
 
 
