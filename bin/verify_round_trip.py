@@ -38,6 +38,7 @@ CLI:
 
 Exit code = number of failed checks (0 = all pass).
 """
+
 from __future__ import annotations
 
 import argparse
@@ -55,13 +56,14 @@ from verify_action_camera import (  # noqa: E402
     quat_to_euler_zyx,
 )
 
-EPS_EULER_RT_DEG = 0.5            # quaternion → euler round-trip tolerance
-EPS_MOUSE_REL = 0.01              # 1% of screen for mouse cumulative-sum check
-EPS_FRAME_INDEX = 1               # ±1 frame for time consistency
-SAMPLE_BAD_FRAMES = 5             # show first N mismatching frames per check
+EPS_EULER_RT_DEG = 0.5  # quaternion → euler round-trip tolerance
+EPS_MOUSE_REL = 0.01  # 1% of screen for mouse cumulative-sum check
+EPS_FRAME_INDEX = 1  # ±1 frame for time consistency
+SAMPLE_BAD_FRAMES = 5  # show first N mismatching frames per check
 
 
 # ---- Field readers (handles both buyer-spec and PRD shapes) ----------------
+
 
 def _frame_index(rec: dict[str, Any]) -> int | None:
     """Recorded frame index. Buyer-spec uses `frame_index`, PRD uses `frame`."""
@@ -84,6 +86,7 @@ def _timestamp_seconds(rec: dict[str, Any], base: float | None) -> float | None:
     if not isinstance(raw, str):
         return None
     from datetime import datetime
+
     try:
         t = datetime.strptime(raw[:23], "%Y-%m-%d %H:%M:%S.%f")
     except ValueError:
@@ -127,6 +130,7 @@ def _fps(records: list[dict[str, Any]]) -> float:
 
 # ---- Check 1 — Keyboard event reconstruction --------------------------------
 
+
 def reconstruct_key_events(records: list[dict[str, Any]]) -> list[tuple[int, str, int]]:
     """Diff frame-to-frame keyCode lists into synthetic (frame, type, kc) events.
 
@@ -146,8 +150,7 @@ def reconstruct_key_events(records: list[dict[str, Any]]) -> list[tuple[int, str
     return events
 
 
-def replay_key_events(events: list[tuple[int, str, int]],
-                      frame_count: int) -> list[list[int]]:
+def replay_key_events(events: list[tuple[int, str, int]], frame_count: int) -> list[list[int]]:
     """Replay (frame, type, kc) tuples through the recorder's latching logic.
 
     Same algorithm as recorder_consumer_lite._run_one_session: events at frame F
@@ -198,6 +201,7 @@ def check1_keyboard(records: list[dict[str, Any]]) -> dict[str, Any]:
 
 # ---- Check 2 — Mouse position reconstruction --------------------------------
 
+
 def check2_mouse_position(records: list[dict[str, Any]]) -> dict[str, Any]:
     """Σ mouse_dx from frame 0 should reach mouse_x[N] - mouse_x[0].
 
@@ -245,8 +249,10 @@ def check2_mouse_position(records: list[dict[str, Any]]) -> dict[str, Any]:
         # Modulo screen-wrap tolerance: re-anchor to [0, 1] then compare.
         ex_mod = expected_x - math.floor(expected_x)
         ey_mod = expected_y - math.floor(expected_y)
-        residual = max(min(abs(cur[0] - expected_x), abs(cur[0] - ex_mod)),
-                       min(abs(cur[1] - expected_y), abs(cur[1] - ey_mod)))
+        residual = max(
+            min(abs(cur[0] - expected_x), abs(cur[0] - ex_mod)),
+            min(abs(cur[1] - expected_y), abs(cur[1] - ey_mod)),
+        )
         if residual > EPS_MOUSE_REL:
             mismatches_norm.append((i, cur[0] - expected_x, cur[1] - expected_y))
 
@@ -267,8 +273,10 @@ def check2_mouse_position(records: list[dict[str, Any]]) -> dict[str, Any]:
         expected_y = pos0[1] + cum_py
         ex_mod = expected_x - math.floor(expected_x)
         ey_mod = expected_y - math.floor(expected_y)
-        residual = max(min(abs(cur[0] - expected_x), abs(cur[0] - ex_mod)),
-                       min(abs(cur[1] - expected_y), abs(cur[1] - ey_mod)))
+        residual = max(
+            min(abs(cur[0] - expected_x), abs(cur[0] - ex_mod)),
+            min(abs(cur[1] - expected_y), abs(cur[1] - ey_mod)),
+        )
         if residual > EPS_MOUSE_REL:
             mismatches_px.append((i, cur[0] - expected_x, cur[1] - expected_y))
 
@@ -297,10 +305,10 @@ def check2_mouse_position(records: list[dict[str, Any]]) -> dict[str, Any]:
 
 # ---- Check 3 — Quaternion ↔ Euler round-trip --------------------------------
 
+
 def check3_quat_euler(records: list[dict[str, Any]]) -> dict[str, Any]:
     has_euler_field = any(
-        "camera_rotation_euler" in r or "camera_rotation_oula" in r
-        for r in records
+        "camera_rotation_euler" in r or "camera_rotation_oula" in r for r in records
     )
     if not has_euler_field:
         return {
@@ -336,10 +344,7 @@ def check3_quat_euler(records: list[dict[str, Any]]) -> dict[str, Any]:
             max_err = err
         if err > EPS_EULER_RT_DEG:
             mismatches.append((i, err))
-    samples = [
-        f"frame {i}: euler_rt_err={err:.3f}°"
-        for i, err in mismatches[:SAMPLE_BAD_FRAMES]
-    ]
+    samples = [f"frame {i}: euler_rt_err={err:.3f}°" for i, err in mismatches[:SAMPLE_BAD_FRAMES]]
     return {
         "check": 3,
         "name": "Quaternion-Euler round-trip",
@@ -353,6 +358,7 @@ def check3_quat_euler(records: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 # ---- Check 4 — Frame-time consistency ---------------------------------------
+
 
 def check4_frame_time(records: list[dict[str, Any]]) -> dict[str, Any]:
     if not records:
@@ -371,6 +377,7 @@ def check4_frame_time(records: list[dict[str, Any]]) -> dict[str, Any]:
     base: float | None = None
     if "time" in records[0] and isinstance(records[0]["time"], str):
         from datetime import datetime
+
         try:
             t = datetime.strptime(records[0]["time"][:23], "%Y-%m-%d %H:%M:%S.%f")
             base = t.timestamp()
@@ -421,6 +428,7 @@ def check4_frame_time(records: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 # ---- Loader & CLI -----------------------------------------------------------
+
 
 def load_records(clip_dir: Path) -> list[dict[str, Any]]:
     ac_path = clip_dir / "action_camera.json"
