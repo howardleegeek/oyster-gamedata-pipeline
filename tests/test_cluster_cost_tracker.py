@@ -93,7 +93,7 @@ class TestParseDispatchLog:
 
     def test_log_no_model_header(self, mock_cluster_dir):
         """Log without model header should return None."""
-        content = "[turn 0] assistant: Hello\n" "[turn 1] assistant: Done\n"
+        content = "[turn 0] assistant: Hello\n[turn 1] assistant: Done\n"
         log_path = _write_dispatch_log(mock_cluster_dir, content)
         result = parse_dispatch_log(str(log_path))
 
