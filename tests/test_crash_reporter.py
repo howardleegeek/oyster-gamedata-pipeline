@@ -425,9 +425,7 @@ class TestCLI:
         watch_dir = tmp_path / "logs"
         watch_dir.mkdir()
         (watch_dir / "crash-test.log").write_text(
-            "thread 'main' panicked at 'test', src/main.rs:1:1\n"
-            "recorder_version: 1.0\n"
-            "os: Linux\n"
+            "thread 'main' panicked at 'test', src/main.rs:1:1\nrecorder_version: 1.0\nos: Linux\n"
         )
         monkeypatch.setattr(
             "bin.crash_reporter._read_telemetry",
