@@ -270,3 +270,13 @@ Self-review: cosmetic reformat only — no silent error swallow, no race, no off
 
 - Picked: ruff format patches/cluster-week3-2026-05-18/B1-bundler-broken/test_batch_bundler.py (325 lines, 7 tests pass). Justification: measurable code smell (unformatted file with passing tests), smallest unformatted test file (224-line phase2 file has pre-existing ImportError failures blocking quality gate; other unformatted files are source files without test coverage), single-file scope, no behavior change (cosmetic reformat only), targeted tests pass 7/7, follows established cadence.
 - Result: committed a7a41779 (ruff format applied: 1 file changed, 97 insertions(+), 78 deletions(-); ruff check + ruff format --check clean; pytest tests/test_batch_bundler.py 7/7 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (7/7 pass), no brand cross-reference, no module-level side effect.)
+
+
+## Round 405 @ 2026-06-28T15:00:00Z
+
+- Picked: ruff format patches/cluster-week1-2026-05-18/D2-zbuffer-exr/zbuffer_to_exr.py (310 lines, 14 tests pass). Justification: measurable code smell, smallest unformatted file with passing tests (5 files need format, this one has existing tests), single-file scope, no behavior change (cosmetic reformat), targeted tests pass 14/14, follows established cadence.
+- Result: committed 16a0088f (ruff format applied: 93 insertions(+), 85 deletions(-); ruff check clean; pytest patches/cluster-week1-2026-05-18/D2-zbuffer-exr/test_zbuffer_to_exr.py 14/14 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (14/14 pass), no brand cross-reference, no module-level side effect.)
+
+## Round 406 @ 2026-06-28T15:10:00Z
+- Picked: ruff format scripts/verify_deployed_backend.py (523 lines, 49 tests pass). Justification: measurable code smell, smallest unformatted file with passing tests, single-file scope, no behavior change (cosmetic reformat), targeted tests pass 49/49, follows established cadence.
+- Result: committed f8387ade (ruff format applied: 1 insertion(+), 2 deletions(-); ruff check clean; pytest tests/test_verify_deployed_backend.py 49/49 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (49 tests pass), no brand cross-reference, no module-level side effect.)
