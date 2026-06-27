@@ -42,8 +42,8 @@ CONFIG = {
     "poll_interval_s": 2,
     "alt_tab_degraded_threshold_s": 20,
     "pause_menu_abort_threshold_s": 30,
-    "idle_abort_threshold_s": 300,       # 5 min
-    "idle_warning_ticks": 60,            # ticks before warning
+    "idle_abort_threshold_s": 300,  # 5 min
+    "idle_warning_ticks": 60,  # ticks before warning
     "death_stationary_degraded_threshold_s": 60,
     "recorder_exe_name": "OysterRecorder.exe",
     "game_state_path": "game_state.jsonl",
@@ -51,10 +51,10 @@ CONFIG = {
     "watchdog_events_path": "watchdog_events.jsonl",
     "session_grade_path": "session_grade.json",
     "ui_zones": {
-        "chat":        {"x": 10,  "y": 500, "w": 300, "h": 100},
-        "pause_menu":  {"x": 300, "y": 200, "w": 400, "h": 300},
+        "chat": {"x": 10, "y": 500, "w": 300, "h": 100},
+        "pause_menu": {"x": 300, "y": 200, "w": 400, "h": 300},
         "death_screen": {"x": 300, "y": 250, "w": 400, "h": 200},
-        "inventory":   {"x": 200, "y": 150, "w": 500, "h": 350},
+        "inventory": {"x": 200, "y": 150, "w": 500, "h": 350},
     },
     "base_payout_usd": 10.0,
 }
@@ -156,6 +156,7 @@ def find_mc_hwnd() -> Optional[int]:
 # Pixel sampling (cheap OCR alternative)
 # ---------------------------------------------------------------------------
 
+
 def sample_ui_zone(zone: Dict[str, int]) -> Optional[bytes]:
     """
     Sample pixels from a known UI zone.
@@ -166,6 +167,7 @@ def sample_ui_zone(zone: Dict[str, int]) -> Optional[bytes]:
         return None
     try:
         import mss
+
         with mss.mss() as sct:
             monitor = {
                 "top": zone["y"],
@@ -233,6 +235,7 @@ def detect_inventory_from_pixels(pixel_data: Optional[bytes]) -> bool:
 # ---------------------------------------------------------------------------
 # Game state reader
 # ---------------------------------------------------------------------------
+
 
 def read_last_position(game_state_path: str) -> Optional[Dict[str, float]]:
     """Read the last line of game_state.jsonl and extract position."""
@@ -302,9 +305,11 @@ def detect_death_in_log(log_lines: List[str]) -> bool:
 # Event tracking
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class EventState:
     """Tracks the current state of a monitored event."""
+
     event_name: str
     started_at: Optional[float] = None
     total_duration_s: float = 0.0
@@ -404,6 +409,7 @@ class Watchdog:
                 mc_visible = False
                 try:
                     import psutil
+
                     proc = psutil.Process(fg_pid)
                     name = proc.name().lower()
                     if "java" in name or "minecraft" in name:
@@ -421,7 +427,10 @@ class Watchdog:
                 log.info("Alt-tab detected: MC lost focus")
             else:
                 duration = time.time() - self.alt_tab_started_at
-                if duration >= self.config["alt_tab_degraded_threshold_s"] and not self.alt_tab_state.triggered:
+                if (
+                    duration >= self.config["alt_tab_degraded_threshold_s"]
+                    and not self.alt_tab_state.triggered
+                ):
                     self.alt_tab_state.triggered = True
                     self.alt_tab_state.total_duration_s = duration
                     self._emit_event("alt_tab_out", duration, "degraded")
@@ -445,7 +454,10 @@ class Watchdog:
                 log.info("Pause menu detected")
             else:
                 duration = time.time() - self.pause_menu_started_at
-                if duration >= self.config["pause_menu_abort_threshold_s"] and not self.pause_menu_state.triggered:
+                if (
+                    duration >= self.config["pause_menu_abort_threshold_s"]
+                    and not self.pause_menu_state.triggered
+                ):
                     self.pause_menu_state.triggered = True
                     self.pause_menu_state.total_duration_s = duration
                     self._emit_event("pause_menu_open", duration, "aborted")
@@ -467,7 +479,7 @@ class Watchdog:
             dx = abs(current_pos["x"] - self.last_position["x"])
             dy = abs(current_pos["y"] - self.last_position["y"])
             dz = abs(current_pos["z"] - self.last_position["z"])
-            distance = (dx + dy + dz)
+            distance = dx + dy + dz
 
             if distance < 0.01:  # Essentially stationary
                 self.position_unchanged_ticks += 1
@@ -485,7 +497,10 @@ class Watchdog:
         # Check idle abort threshold
         if self.position_unchanged_ticks >= self.config["idle_warning_ticks"]:
             idle_duration = self.position_unchanged_ticks * self.config["poll_interval_s"]
-            if idle_duration >= self.config["idle_abort_threshold_s"] and not self.idle_state.triggered:
+            if (
+                idle_duration >= self.config["idle_abort_threshold_s"]
+                and not self.idle_state.triggered
+            ):
                 self.idle_state.triggered = True
                 self.idle_state.total_duration_s = idle_duration
                 self._emit_event("idle_detected", idle_duration, "aborted")
@@ -515,7 +530,10 @@ class Watchdog:
                     dy = abs(self.last_position["y"] - self.death_position["y"])
                     dz = abs(self.last_position["z"] - self.death_position["z"])
                     if (dx + dy + dz) < 0.1:
-                        if duration >= self.config["death_stationary_degraded_threshold_s"] and not self.death_state.triggered:
+                        if (
+                            duration >= self.config["death_stationary_degraded_threshold_s"]
+                            and not self.death_state.triggered
+                        ):
                             self.death_state.triggered = True
                             self.death_state.total_duration_s = duration
                             self._emit_event("death_stationary", duration, "degraded")
@@ -534,9 +552,13 @@ class Watchdog:
             # Try to find the recorder process
             try:
                 import psutil
+
                 for proc in psutil.process_iter(["name"]):
                     try:
-                        if self.config["recorder_exe_name"].lower() in (proc.info["name"] or "").lower():
+                        if (
+                            self.config["recorder_exe_name"].lower()
+                            in (proc.info["name"] or "").lower()
+                        ):
                             self.recorder_pid = proc.pid
                             log.info(f"Found recorder PID: {self.recorder_pid}")
                             break
@@ -596,7 +618,9 @@ class Watchdog:
             "reasons": self.grade_reasons,
             "estimated_payout_usd": payout,
             "events_count": len(self.events),
-            "session_duration_s": round(time.time() - self._start_time, 2) if hasattr(self, "_start_time") else 0,
+            "session_duration_s": round(time.time() - self._start_time, 2)
+            if hasattr(self, "_start_time")
+            else 0,
         }
 
         path = self.config["session_grade_path"]
@@ -613,7 +637,9 @@ class Watchdog:
         log.info(f"Alt-tab degraded threshold: {self.config['alt_tab_degraded_threshold_s']}s")
         log.info(f"Pause menu abort threshold: {self.config['pause_menu_abort_threshold_s']}s")
         log.info(f"Idle abort threshold: {self.config['idle_abort_threshold_s']}s")
-        log.info(f"Death stationary degraded threshold: {self.config['death_stationary_degraded_threshold_s']}s")
+        log.info(
+            f"Death stationary degraded threshold: {self.config['death_stationary_degraded_threshold_s']}s"
+        )
 
         # Find MC window
         if _is_windows:
@@ -652,8 +678,12 @@ def main():
     parser.add_argument("--config", type=str, help="Path to JSON config file")
     parser.add_argument("--game-state", type=str, default=None, help="Path to game_state.jsonl")
     parser.add_argument("--mc-log", type=str, default=None, help="Path to MC server log")
-    parser.add_argument("--output-dir", type=str, default=".", help="Output directory for events and grade")
-    parser.add_argument("--poll-interval", type=float, default=None, help="Poll interval in seconds")
+    parser.add_argument(
+        "--output-dir", type=str, default=".", help="Output directory for events and grade"
+    )
+    parser.add_argument(
+        "--poll-interval", type=float, default=None, help="Poll interval in seconds"
+    )
     parser.add_argument("--base-payout", type=float, default=None, help="Base payout in USD")
 
     args = parser.parse_args()
