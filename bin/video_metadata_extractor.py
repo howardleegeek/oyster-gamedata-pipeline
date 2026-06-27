@@ -54,6 +54,14 @@ def extract_metadata(video_path: str) -> dict:
 
 
 def main() -> None:
+    """Run the video metadata extraction CLI.
+    
+    Parses command-line arguments, calls extract_metadata() on the
+    specified video file, and prints the resulting metadata as JSON.
+    
+    Exits:
+        0 on success, 1 on error.
+    """
     parser = argparse.ArgumentParser(description="Extract video metadata via ffprobe")
     parser.add_argument("--video", required=True, help="Path to the video file")
     args = parser.parse_args()
