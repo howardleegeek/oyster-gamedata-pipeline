@@ -33,3 +33,9 @@
 - Picked: ruff format bin/oyster_play.py (smallest unformatted bin file remaining: 784 lines; this round's diff is the minimum 1-line fix — ruff joined an implicit string-concat `"javaw " "cmd line"` into a single string on line 726). Justification: measurable code smell (ruff format --check flagging this file out of 388 in bin/), single-file scope, no behavior change (purely cosmetic string-join in argparse help text), AST parse + import smoke OK before/after, targeted test passes (tests/bin/test_one_click_consumer_flow.py 9/9), no risk of test masking, follows established cadence.
 - Result: <pending — see commit in this round>. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect, no logic change (argparse help text is user-facing string only).
 
+## Round 376 @ 2026-06-26T04:30:00Z
+
+- Picked: ruff format bin/lint_v3_prd_grounded.py (smallest unformatted bin file: 2299 lines). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic line-wrap + dict literals + trailing commas), AST parse + ruff check/format clean, no test for this file, follows established cadence.
+- Result: committed 58a9551e (ruff format applied; 1 file changed, 1133 insertions(+), 641 deletions(-); ruff check + format clean; AST parse OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
+
+
