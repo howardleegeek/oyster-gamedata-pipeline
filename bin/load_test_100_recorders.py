@@ -395,7 +395,7 @@ async def run_load_test(
     metrics = aggregate_metrics(results, total_duration, backend_url)
 
     logger.info(
-        "Load test complete: %d/%d success, p95=%.1fms, error_rate=%.1f%%, " "duration=%.1fs",
+        "Load test complete: %d/%d success, p95=%.1fms, error_rate=%.1f%%, duration=%.1fs",
         metrics.successful,
         metrics.total_recorders,
         metrics.p95_latency_ms,
