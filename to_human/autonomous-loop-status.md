@@ -284,3 +284,7 @@ Self-review: cosmetic reformat only — no silent error swallow, no race, no off
 ## Round 407 @ 2026-06-28T15:25:00Z
 - Picked: ruff format dashboard/server.py (541 lines, 32 tests pass). Justification: measurable code smell, smallest unformatted source file with passing tests (test_dashboard_api.py 32/32), single-file scope, no behavior change (cosmetic reformat), targeted tests pass 32/32, follows established cadence.
 - Result: committed 3f7cc799 (ruff format applied: 69 insertions(+), 93 deletions(-); ruff check + ruff format --check clean; pytest tests/test_dashboard_api.py 32/32 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (32/32 pass), no brand cross-reference, no module-level side effect.)
+
+## Round 408 @ 2026-06-28T15:30:00Z
+- Picked: no good candidate found this round — exiting (ruff format clean on all 752 files; ruff check clean; tests pass; no PRD gaps with clear acceptance criteria; last round completed successfully)
+- Result: skipped (no good candidate)
