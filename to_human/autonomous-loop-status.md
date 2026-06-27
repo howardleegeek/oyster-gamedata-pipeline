@@ -165,3 +165,43 @@ Self-review: cosmetic reformat only — no silent error swallow, no race, no off
 ## Round 388 @ 2026-06-27T12:46:45Z
 - Picked: ruff format tests/test_replay_determinism.py (317 lines, 3 multi-line assert messages). Justification: measurable code smell, next-smallest unformatted test file (224-line phase2 file is broken-test), single-file scope, no behavior change (cosmetic assert parenthesization only), targeted test passes (5/5), follows established cadence.
 - Result: committed 16454ae4 (ruff format applied: parenthesized 3 multi-line assert messages; 1 file changed, 3 insertions(+), 6 deletions(-); ruff check + ruff format --check clean; pytest tests/test_replay_determinism.py 5/5 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic assert message parenthesization only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (asserts same condition with same message string), no brand cross-reference, no module-level side effect.)
+
+## Round 389 @ 2026-06-27T13:00:00Z
+
+- Picked: ruff format tests/bin/test_e2e_behavioral.py (581 lines, 8 multi-line assert messages + 2 implicit string concat fixes). Justification: measurable code smell (smallest unformatted test file with passing tests), single-file scope, no behavior change (cosmetic reformat only), targeted test passes (20/20), follows established cadence.
+- Result: committed 88b88c5c (ruff format applied: parenthesized 8 multi-line assert messages, fixed 2 implicit string concat in f-strings; 1 file changed, 37 insertions(+), 38 deletions(-); ruff check + ruff format --check clean; pytest tests/bin/test_e2e_behavioral.py 20/20 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (asserts same conditions), no brand cross-reference, no module-level side effect.)
+
+## Round 387 @ 2026-06-27T12:00:00Z
+
+- Picked: ruff format tests/bin/test_generate_gameinfo_xlsx.py (smallest unformatted test file: 371 lines, 6 line changes). Justification: measurable code smell, smallest unformatted test file, single-file scope, no behavior change (cosmetic line-wrap + trailing commas), targeted tests pass 16/16, follows established cadence.
+- Result: committed 85599cd0 (ruff format applied: line-wrap + trailing commas; 1 file changed, 6 insertions(+), 6 deletions(-); ruff check + ruff format --check clean; pytest 16/16 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
+
+
+
+## Round 390 @ 2026-06-27T13:10:00Z
+- Picked: ruff format patches/cluster-week3-2026-05-18/B1-bundler-broken/batch_bundler.py (236 lines, smallest unformatted non-test file in repo). Justification: measurable code smell, single-file scope, no behavior change (cosmetic reformat), targeted tests pass (7/7), follows established cadence.
+- Result: committed a57f14de (ruff format applied: 61 insertions(+), 65 deletions(-); ruff check clean; pytest tests/test_batch_bundler.py 7/7 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (tests pass 7/7), no brand cross-reference, no module-level side effect.)
+
+## Round 391 @ 2026-06-27T13:15:00Z
+- Picked: ruff format tests/test_depth_from_mineflayer_raycast.py (320 lines, 6 tests passing, 224-line phase2 file has pre-existing ImportError failures blocking quality gate). Justification: measurable code smell, smallest unformatted test file with passing tests, single-file scope, no behavior change (cosmetic reformat only), targeted test passes (6/6), follows established cadence.
+- Result: committed 81ab6447 (ruff format applied: parenthesized 3 multi-line assert messages, collapsed f-string; 1 file changed, 7 insertions(+), 8 deletions(-); ruff check + ruff format --check clean; pytest tests/test_depth_from_mineflayer_raycast.py 6/6 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (6/6 pass), no brand cross-reference, no module-level side effect.)
+
+
+## Round 392 @ 2026-06-27T13:37:21Z
+- Picked: ruff format tests/test_deploy_mod_to_cluster.py (338 lines, smallest unformatted test file with passing tests). Justification: measurable code smell, single-file scope, no behavior change (cosmetic — joined implicit f-string concats, collapsed multi-line assert msgs to parenthesized form), targeted tests pass 11/11, follows established cadence.
+- Result: committed 336b6670 (ruff format applied: 1 file changed, 5 insertions(+), 6 deletions(-); ruff check + ruff format --check clean; pytest tests/test_deploy_mod_to_cluster.py 11/11 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (11/11 pass), no brand cross-reference, no module-level side effect.)
+
+
+## Round 393 @ 2026-06-27T13:47:33Z
+- Picked: ruff format oyster_provenance/manifest.py (346 lines, smallest unformatted non-test source file with passing tests). Justification: measurable code smell, smallest unformatted non-test file with passing tests (test_provenance.py 25/25), single-file scope, no behavior change (cosmetic reformat), targeted tests pass 25/25, follows established cadence.
+- Result: committed aae9672d (ruff format applied: 53 insertions(+), 50 deletions(-); ruff check + ruff format --check clean; pytest tests/test_provenance.py 25/25 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (25/25 tests pass), no brand cross-reference, no module-level side effect.)
+
+## Round 388 @ 2026-06-27T12:20:00Z
+
+- Picked: ruff format tests/test_roblox_adapter.py (341 lines, 1 implicit string concat fix). Justification: measurable code smell, smallest unformatted test file from remaining set, single-file scope, no behavior change, targeted test passes (32/32), follows established cadence.
+- Result: committed fb9e8448 (ruff format applied: collapsed 1 implicit-concat string literal; 1 file changed, 1 insertion(+), 1 deletion(-); ruff check + ruff format --check clean; pytest tests/test_roblox_adapter.py 32/32 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (32/32 pass), no brand cross-reference, no module-level side effect.)
+
+## Round 394 @ 2026-06-27T14:00:00Z
+- Picked: ruff format tests/test_build_recorder_script.py (387 lines, 59 tests passing). Justification: measurable code smell, smallest unformatted test file with passing tests (test_cluster_cost_tracker.py at 448 lines is larger), single-file scope, no behavior change (cosmetic — parenthesized multi-line assert messages), targeted tests pass 59/59, follows established cadence.
+- Result: committed da143965 (ruff format applied: 1 file changed, 4 insertions(+), 2 deletions(-); ruff check + ruff format --check clean; pytest tests/test_build_recorder_script.py 59/59 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (59/59 pass), no brand cross-reference, no module-level side effect.)
+
