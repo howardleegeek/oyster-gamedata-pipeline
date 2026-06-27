@@ -93,13 +93,13 @@ ACTION_CAMERA_FIELDS: tuple[str, ...] = (
     "mouse_dy",
     "keyCode",
     "camera_position",
-    "camera_rotation_oula",          # PDF p4 字面拼音
+    "camera_rotation_oula",  # PDF p4 字面拼音
     "camera_rotation_quaternion",
-    "camera_Follow Offset",           # PDF p4 字面带空格 + 大写 F
+    "camera_Follow Offset",  # PDF p4 字面带空格 + 大写 F
     "camera_intrinsics",
     "camera_speed",
     "player_position",
-    "player_rotation_oula",          # PDF p5 字面拼音
+    "player_rotation_oula",  # PDF p5 字面拼音
     "player_rotation_quaternion",
     "player_speed",
     "metric_scale",
@@ -111,6 +111,7 @@ assert len(ACTION_CAMERA_FIELDS) == 20, "PRD demands exactly 20 fields per frame
 # Synthetic event helpers — same shape pynput's listeners append into
 # ``RecorderApp._captured_events``.
 # ---------------------------------------------------------------------------
+
 
 def make_key_event(timestamp_ms: int, key_code: int, is_down: bool) -> dict[str, Any]:
     """Build a key event in the recorder's internal event format."""
@@ -152,6 +153,7 @@ def make_mouse_click(
 # ---------------------------------------------------------------------------
 # Core: action_camera.json synthesis.
 # ---------------------------------------------------------------------------
+
 
 def synthesize_action_camera_records(
     events: list[dict[str, Any]],
@@ -207,10 +209,7 @@ def synthesize_action_camera_records(
         t_str = t.strftime("%Y-%m-%d %H:%M:%S.") + f"{t.microsecond // 1000:03d}"
 
         # Apply every event whose timestamp is ≤ this frame's window.
-        while (
-            ev_idx < len(sorted_events)
-            and sorted_events[ev_idx].get("timestamp_ms", 0) <= f_ms
-        ):
+        while ev_idx < len(sorted_events) and sorted_events[ev_idx].get("timestamp_ms", 0) <= f_ms:
             ev = sorted_events[ev_idx]
             et = ev.get("event_type", "")
             if et == "key_down":
@@ -232,29 +231,31 @@ def synthesize_action_camera_records(
         mdy = (cur_my - prev_my) / screen_h
         prev_mx, prev_my = cur_mx, cur_my
 
-        records.append({
-            "frame": f,
-            "time": t_str,
-            "fps": fps,
-            "route_type": 1,
-            # PRD 文件2: mouse_* are list[float]; mouse_x/y ∈ [0,1], dx/dy ∈ [-1,1]
-            "mouse_x": [mx_n],
-            "mouse_y": [my_n],
-            "mouse_dx": [mdx],
-            "mouse_dy": [mdy],
-            "keyCode": list(cur_keys) if cur_keys else [],
-            "camera_position": [0.0, 64.0, 0.0],
-            "camera_rotation_oula": [0.0, 0.0, 0.0],          # PDF p4 字面
-            "camera_rotation_quaternion": [0.0, 0.0, 0.0, 1.0],
-            "camera_Follow Offset": [0.0, 1.6, 0.0],          # PDF p4 字面
-            "camera_intrinsics": dict(intrinsics),
-            "camera_speed": [0.0, 0.0, 0.0],
-            "player_position": [0.0, 64.0, 0.0],
-            "player_rotation_oula": [0.0, 0.0, 0.0],          # PDF p5 字面
-            "player_rotation_quaternion": [0.0, 0.0, 0.0, 1.0],
-            "player_speed": [0.0, 0.0, 0.0],
-            "metric_scale": 1.0,
-        })
+        records.append(
+            {
+                "frame": f,
+                "time": t_str,
+                "fps": fps,
+                "route_type": 1,
+                # PRD 文件2: mouse_* are list[float]; mouse_x/y ∈ [0,1], dx/dy ∈ [-1,1]
+                "mouse_x": [mx_n],
+                "mouse_y": [my_n],
+                "mouse_dx": [mdx],
+                "mouse_dy": [mdy],
+                "keyCode": list(cur_keys) if cur_keys else [],
+                "camera_position": [0.0, 64.0, 0.0],
+                "camera_rotation_oula": [0.0, 0.0, 0.0],  # PDF p4 字面
+                "camera_rotation_quaternion": [0.0, 0.0, 0.0, 1.0],
+                "camera_Follow Offset": [0.0, 1.6, 0.0],  # PDF p4 字面
+                "camera_intrinsics": dict(intrinsics),
+                "camera_speed": [0.0, 0.0, 0.0],
+                "player_position": [0.0, 64.0, 0.0],
+                "player_rotation_oula": [0.0, 0.0, 0.0],  # PDF p5 字面
+                "player_rotation_quaternion": [0.0, 0.0, 0.0, 1.0],
+                "player_speed": [0.0, 0.0, 0.0],
+                "metric_scale": 1.0,
+            }
+        )
 
     return records
 
@@ -265,6 +266,7 @@ def synthesize_action_camera_records(
 # helper expects a {"frames": [...]} wrapper which the recorder does not
 # emit).
 # ---------------------------------------------------------------------------
+
 
 def merge_replay_camera_track(
     action_camera_path: Path,
@@ -306,9 +308,11 @@ def merge_replay_camera_track(
 # clip-id / output-dir / lint side-effects.
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class PackagingResult:
     """What :func:`package_tarball` returns."""
+
     tarball: Path
     clip_dir: Path
     action_camera_path: Path
@@ -355,13 +359,18 @@ def package_tarball(
     if clip_ts is None:
         clip_ts = datetime.fromtimestamp(started_at).strftime("%Y%m%d-%H%M%S")
     if mc_window_rect is None:
-        mc_window_rect = {"x": 0, "y": 0, "width": SCREEN_W, "height": SCREEN_H,
-                          "title": "Minecraft", "recordDpi": 96}
+        mc_window_rect = {
+            "x": 0,
+            "y": 0,
+            "width": SCREEN_W,
+            "height": SCREEN_H,
+            "title": "Minecraft",
+            "recordDpi": 96,
+        }
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    tmp_dir = Path(tempfile.mkdtemp(prefix=f"oyster-rec-test-{clip_ts}-",
-                                    dir=str(out_dir)))
+    tmp_dir = Path(tempfile.mkdtemp(prefix=f"oyster-rec-test-{clip_ts}-", dir=str(out_dir)))
     clip_dir = tmp_dir / f"clip-{clip_ts}"
     clip_dir.mkdir(parents=True, exist_ok=True)
 
@@ -376,6 +385,7 @@ def package_tarball(
     rect = mc_window_rect
     try:
         import generate_systeminfo_json as gsi  # noqa: PLC0415
+
         sys_info = gsi.build_systeminfo(
             game_process_name="javaw.exe",
             x=int(rect.get("x", 0)),
@@ -401,9 +411,7 @@ def package_tarball(
     sys_info["actual_duration_sec"] = round(float(elapsed_sec), 1)
     sys_info["partial"] = elapsed_sec < 300.0
     systeminfo_path = clip_dir / "systeminfo.json"
-    systeminfo_path.write_text(
-        json.dumps(sys_info, indent=2), encoding="utf-8"
-    )
+    systeminfo_path.write_text(json.dumps(sys_info, indent=2), encoding="utf-8")
 
     # 3. action_camera.json — the heart of the test.
     records = synthesize_action_camera_records(
@@ -424,6 +432,7 @@ def package_tarball(
     gameinfo_path = clip_dir / "gameinfo.xlsx"
     try:
         import generate_gameinfo_xlsx as ggx  # noqa: PLC0415
+
         mc_version = ggx.parse_game_version_from_window_title(str(rect.get("title", "")))
         game_info = ggx.build_gameinfo_dict(
             game_name="Minecraft",
@@ -466,9 +475,8 @@ def package_tarball(
     intrinsics_path = clip_dir / "intrinsics.yaml"
     try:
         import yaml  # noqa: PLC0415
-        intrinsics_path.write_text(
-            yaml.safe_dump(intrinsics, sort_keys=False), encoding="utf-8"
-        )
+
+        intrinsics_path.write_text(yaml.safe_dump(intrinsics, sort_keys=False), encoding="utf-8")
     except Exception:
         intrinsics_path.write_text(
             "\n".join(f"{k}: {v}" for k, v in intrinsics.items()),
@@ -483,6 +491,7 @@ def package_tarball(
             from bin.recorder_replay_mod_postprocess import (  # noqa: PLC0415
                 extract_camera_track,
             )
+
             result = extract_camera_track(Path(mcpr_path), hz=int(fps))
             replay_status = result.status
             replay_metadata = dict(result.metadata)
@@ -515,28 +524,39 @@ def package_tarball(
 # so we don't need to import the Tk-coupled module.
 # ---------------------------------------------------------------------------
 
+
 def _write_minimal_xlsx_stub(path: Path) -> None:
     """Hand-rolled minimal valid OOXML zip."""
     import zipfile
 
-    ct = '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' \
-         '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' \
-         '<Default Extension="xml" ContentType="application/xml"/>' \
-         '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' \
-         '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' \
-         '</Types>'
-    rels = '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' \
-           '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' \
-           '</Relationships>'
-    workbook = '<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"' \
-               ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' \
-               '<sheets><sheet name="GameInfo" sheetId="1" r:id="rId1"/></sheets></workbook>'
-    workbook_rels = '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' \
-                    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' \
-                    '</Relationships>'
-    sheet1 = '<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' \
-             '<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>test-harness</t></is></c></row></sheetData>' \
-             '</worksheet>'
+    ct = (
+        '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="xml" ContentType="application/xml"/>'
+        '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+        '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        "</Types>"
+    )
+    rels = (
+        '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+        "</Relationships>"
+    )
+    workbook = (
+        '<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"'
+        ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        '<sheets><sheet name="GameInfo" sheetId="1" r:id="rId1"/></sheets></workbook>'
+    )
+    workbook_rels = (
+        '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+        "</Relationships>"
+    )
+    sheet1 = (
+        '<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        '<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>test-harness</t></is></c></row></sheetData>'
+        "</worksheet>"
+    )
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("[Content_Types].xml", ct)
         zf.writestr("_rels/.rels", rels)
@@ -549,6 +569,7 @@ def _write_minimal_xlsx_stub(path: Path) -> None:
 # Synthetic .mcpr builder — used by the Replay Mod path test to create a
 # fixture .mcpr without depending on Replay Mod itself.
 # ---------------------------------------------------------------------------
+
 
 def build_synthetic_mcpr(
     out_path: Path,
@@ -619,16 +640,18 @@ def build_replay_camera_samples(
         # Yaw-only quaternion: rotate around Y by theta.
         cy = math.cos(theta * 0.5)
         sy = math.sin(theta * 0.5)
-        samples.append(CameraSample(
-            t_seconds=round(i / hz, 6),
-            pos_x=pos_x,
-            pos_y=pos_y,
-            pos_z=pos_z,
-            quat_w=cy,
-            quat_x=0.0,
-            quat_y=sy,
-            quat_z=0.0,
-        ))
+        samples.append(
+            CameraSample(
+                t_seconds=round(i / hz, 6),
+                pos_x=pos_x,
+                pos_y=pos_y,
+                pos_z=pos_z,
+                quat_w=cy,
+                quat_x=0.0,
+                quat_y=sy,
+                quat_z=0.0,
+            )
+        )
     return samples
 
 
