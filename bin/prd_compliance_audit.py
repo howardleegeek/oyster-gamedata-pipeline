@@ -308,7 +308,7 @@ def _evaluate_h8(session: Path) -> dict:
                 "id": "H8",
                 "status": "PASS",
                 "evidence": f"engine Z-buffer ground truth with "
-                f"{gap_miss_ratio*100:.1f}% gap misses (PASS_DEGRADED)",
+                f"{gap_miss_ratio * 100:.1f}% gap misses (PASS_DEGRADED)",
             }
         if gap_miss_ratio < 0.01:
             return {
@@ -559,7 +559,7 @@ def audit_group_v_mp4(session: Path) -> list[dict]:
         _result(
             "V1",
             vstream.get("width") == 1920 and vstream.get("height") == 1080,
-            f'resolution: {vstream.get("width")}x{vstream.get("height")}',
+            f"resolution: {vstream.get('width')}x{vstream.get('height')}",
         )
     )
     fps_str = vstream.get("avg_frame_rate", "0/1")
@@ -571,7 +571,7 @@ def audit_group_v_mp4(session: Path) -> list[dict]:
     codec = vstream.get("codec_name", "")
     items.append(_result("V4", codec in ("h264", "hevc"), f"codec: {codec}"))
     br = int(fmt.get("bit_rate", 0))
-    items.append(_result("V5", br <= 12_000_000, f"bitrate: {br/1e6:.1f} Mbps"))
+    items.append(_result("V5", br <= 12_000_000, f"bitrate: {br / 1e6:.1f} Mbps"))
     items.append(
         _result(
             "V6",
@@ -882,7 +882,7 @@ def audit_group_a_placeholder(session: Path) -> list[dict]:
     if not isinstance(data, list) or len(data) < 100:
         items.append(
             _result(
-                "A21", False, f"too few frames ({len(data) if hasattr(data,'__len__') else 'N/A'})"
+                "A21", False, f"too few frames ({len(data) if hasattr(data, '__len__') else 'N/A'})"
             )
         )
         items.append(_result("A22", False, "too few frames"))
@@ -1347,7 +1347,7 @@ def audit_group_session_sanity(session: Path) -> list[dict]:
         _result(
             "SS2",
             abs(ac_n - frames_n) <= 5,
-            f"ac_rows={ac_n} frames_rows={frames_n} diff={abs(ac_n-frames_n)} (max 5)",
+            f"ac_rows={ac_n} frames_rows={frames_n} diff={abs(ac_n - frames_n)} (max 5)",
         )
     )
 
@@ -1430,7 +1430,7 @@ def audit_group_anti_replay(session: Path) -> list[dict]:
         return items
     if not isinstance(d, list) or len(d) < 500:
         items.append(
-            _result("AR1", False, f"too few frames ({len(d) if hasattr(d,'__len__') else 'N/A'})")
+            _result("AR1", False, f"too few frames ({len(d) if hasattr(d, '__len__') else 'N/A'})")
         )
         items.append(_result("AR2", False, "too few frames"))
         return items
