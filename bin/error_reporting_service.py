@@ -44,16 +44,18 @@ def _lazy_imports() -> None:
         import psycopg2
         from fastapi import FastAPI, HTTPException, Request
         from pydantic import BaseModel
+
         # Store in module globals
-        globals()['FastAPI'] = FastAPI
-        globals()['HTTPException'] = HTTPException
-        globals()['Request'] = Request
-        globals()['BaseModel'] = BaseModel
-        globals()['psycopg2'] = psycopg2
+        globals()["FastAPI"] = FastAPI
+        globals()["HTTPException"] = HTTPException
+        globals()["Request"] = Request
+        globals()["BaseModel"] = BaseModel
+        globals()["psycopg2"] = psycopg2
 
 
 class ErrorReport(BaseModel):
     """Schema for incoming error reports."""
+
     severity: str
     source: str
     user_id: str
@@ -120,8 +122,7 @@ class ErrorStore:
 
         # Check for duplicate
         cur.execute(
-            "SELECT 1 FROM error_reports WHERE traceback_hash = %s LIMIT 1",
-            (traceback_hash,)
+            "SELECT 1 FROM error_reports WHERE traceback_hash = %s LIMIT 1", (traceback_hash,)
         )
         if cur.fetchone():
             cur.close()
@@ -142,7 +143,7 @@ class ErrorStore:
                 traceback_hash,
                 report.traceback,
                 report.context_json,
-            )
+            ),
         )
         conn.commit()
         cur.close()
@@ -165,9 +166,7 @@ class RateLimiter:
         self._user_requests: dict[str, list[float]] = defaultdict(list)
         self._lock = Lock()
 
-    def _clean_old_requests(
-        self, requests: list[float], now: float
-    ) -> list[float]:
+    def _clean_old_requests(self, requests: list[float], now: float) -> list[float]:
         """Remove requests outside the time window."""
         cutoff = now - self.window_seconds
         return [ts for ts in requests if ts > cutoff]
@@ -187,19 +186,21 @@ class RateLimiter:
 
         with self._lock:
             # Check IP rate limit
-            ip_requests = self._clean_old_requests(
-                self._ip_requests[ip].copy(), now
-            )
+            ip_requests = self._clean_old_requests(self._ip_requests[ip].copy(), now)
             if len(ip_requests) >= self.per_ip:
-                return False, f"Rate limit exceeded for IP: {self.per_ip} requests per {self.window_seconds}s"
+                return (
+                    False,
+                    f"Rate limit exceeded for IP: {self.per_ip} requests per {self.window_seconds}s",
+                )
             self._ip_requests[ip] = ip_requests + [now]
 
             # Check user rate limit
-            user_requests = self._clean_old_requests(
-                self._user_requests[user_id].copy(), now
-            )
+            user_requests = self._clean_old_requests(self._user_requests[user_id].copy(), now)
             if len(user_requests) >= self.per_user:
-                return False, f"Rate limit exceeded for user: {self.per_user} requests per {self.window_seconds}s"
+                return (
+                    False,
+                    f"Rate limit exceeded for user: {self.per_user} requests per {self.window_seconds}s",
+                )
             self._user_requests[user_id] = user_requests + [now]
 
         return True, ""
@@ -215,7 +216,7 @@ def compute_traceback_hash(traceback: str) -> str:
     Returns:
         Hex-encoded SHA256 hash
     """
-    return hashlib.sha256(traceback.encode('utf-8')).hexdigest()
+    return hashlib.sha256(traceback.encode("utf-8")).hexdigest()
 
 
 def get_client_ip(request: Request) -> str:
@@ -229,10 +230,10 @@ def get_client_ip(request: Request) -> str:
         Client IP address string
     """
     # Check for forwarded header (reverse proxy)
-    forwarded = request.headers.get('X-Forwarded-For')
+    forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
-        return forwarded.split(',')[0].strip()
-    return request.client.host if request.client else 'unknown'
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 
 def create_app(
@@ -395,13 +396,13 @@ def main(argv: list[str]) -> int:
     # Validate required arguments
     if not args.database_url:
         logger.error("DATABASE_URL is required")
-        print("Error: --database-url or DATABASE_URL environment variable is required",
-              file=sys.stderr)
+        print(
+            "Error: --database-url or DATABASE_URL environment variable is required",
+            file=sys.stderr,
+        )
         return 1
 
-    logger.info(
-        f"Starting Error Reporting Service on {args.host}:{args.port}"
-    )
+    logger.info(f"Starting Error Reporting Service on {args.host}:{args.port}")
     logger.info(
         f"Rate limits - IP: {args.rate_limit_per_ip}, User: {args.rate_limit_per_user}, "
         f"Window: {args.rate_window_seconds}s"
@@ -416,6 +417,7 @@ def main(argv: list[str]) -> int:
         )
 
         import uvicorn
+
         uvicorn.run(app, host=args.host, port=args.port)
     except KeyboardInterrupt:
         logger.info("Shutting down server...")
