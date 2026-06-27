@@ -172,7 +172,16 @@ def attack_action_camera_fx_ne_fy(b: Path) -> None:
     p.write_text(json.dumps(arr))
 
 
-def attack_frame_gap(b: Path):
+def attack_frame_gap(b: Path) -> None:
+    """Remove frames 100-110 from action_camera.json to create a frame gap.
+
+    This attack tests whether the lint detects missing frames in the sequence.
+    The function deletes a chunk of frames without renumbering, leaving
+    a gap in the frame sequence that should trigger a lint failure.
+
+    Args:
+        b: Path to the directory containing action_camera.json.
+    """
     p = b / "action_camera.json"
     arr = json.loads(p.read_text())
     # remove a chunk in the middle
