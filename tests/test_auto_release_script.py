@@ -88,14 +88,16 @@ def _run_script(git_log_output, latest_tag="v0.4.1", dry_run="true", extra_tags=
         os.makedirs(wrapper_dir)
         wrapper_path = os.path.join(wrapper_dir, "git")
         with open(wrapper_path, "w") as f:
-            f.write(textwrap.dedent(f"""\
+            f.write(
+                textwrap.dedent(f"""\
                     #!/usr/bin/env bash
                     if [[ "$*" == *"log"*"--format"* ]]; then
                         echo '{git_log_output}'
                     else
                         /usr/bin/git "$@"
                     fi
-                    """))
+                    """)
+            )
         os.chmod(wrapper_path, 0o755)
 
         # Copy the script into the temp repo
@@ -155,7 +157,7 @@ class TestSemVerMinorBump:
     """Minor bump when feat: commit is present."""
 
     def test_minor_bump_from_feat(self):
-        log_output = "abc1234 feat: add new search endpoint\n" "def5678 fix: handle null response\n"
+        log_output = "abc1234 feat: add new search endpoint\ndef5678 fix: handle null response\n"
         result = _run_script(log_output, latest_tag="v0.4.1")
         assert result.returncode == 0
         assert "v0.5.0" in result.stdout
@@ -167,7 +169,7 @@ class TestSemVerMinorBump:
         assert "v0.5.0" in result.stdout
 
     def test_minor_bump_feat_at_end(self):
-        log_output = "abc1234 fix: typo in readme\n" "def5678 feat: add dark mode toggle\n"
+        log_output = "abc1234 fix: typo in readme\ndef5678 feat: add dark mode toggle\n"
         result = _run_script(log_output, latest_tag="v0.4.1")
         assert result.returncode == 0
         assert "v0.5.0" in result.stdout
@@ -177,7 +179,7 @@ class TestSemVerMajorBump:
     """Major bump when BREAKING CHANGE is present."""
 
     def test_major_bump_from_breaking_change(self):
-        log_output = "abc1234 feat!: redesign authentication flow\n" "def5678 fix: update tests\n"
+        log_output = "abc1234 feat!: redesign authentication flow\ndef5678 fix: update tests\n"
         result = _run_script(log_output, latest_tag="v0.4.1")
         assert result.returncode == 0
         assert "v1.0.0" in result.stdout
