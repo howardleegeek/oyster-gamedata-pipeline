@@ -46,9 +46,9 @@ class TestBuildGameinfoDict:
         result = build_gameinfo_dict(recording_date=None)
 
         today_iso = date.today().isoformat()
-        assert (
-            result["recording_date"] == today_iso
-        ), f"Expected today's date {today_iso}, got {result['recording_date']}"
+        assert result["recording_date"] == today_iso, (
+            f"Expected today's date {today_iso}, got {result['recording_date']}"
+        )
 
     def test_recording_date_preserved_when_provided(self):
         """Test that recording_date is preserved when explicitly provided."""
@@ -115,9 +115,9 @@ class TestWriteReadRoundtrip:
             # Verify all fields match
             for field in FIELD_NAMES:
                 assert field in result, f"Missing field after read: {field}"
-                assert (
-                    result[field] == test_data[field]
-                ), f"Field {field} mismatch: {result[field]} != {test_data[field]}"
+                assert result[field] == test_data[field], (
+                    f"Field {field} mismatch: {result[field]} != {test_data[field]}"
+                )
 
         finally:
             if os.path.exists(temp_path):
