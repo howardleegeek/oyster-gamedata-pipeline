@@ -24,6 +24,7 @@ Exit code: 0 if files structurally identical, 1 if any divergence, 99 on I/O err
 
 Stdlib only — no numpy / pandas / scipy / colorama deps.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -72,8 +73,10 @@ def _normalize_vec(value: Any) -> Any:
     Other shapes are returned untouched so we don't over-eagerly mutate
     keyCode arrays etc.
     """
-    if isinstance(value, list) and len(value) in (3, 4) and all(
-        isinstance(v, (int, float)) for v in value
+    if (
+        isinstance(value, list)
+        and len(value) in (3, 4)
+        and all(isinstance(v, (int, float)) for v in value)
     ):
         keys = ["x", "y", "z", "w"][: len(value)]
         return {k: float(v) for k, v in zip(keys, value)}
@@ -282,22 +285,26 @@ def diff_frame(
             note = f"alias: {ka} ↔ {kb}" if ka != kb else ""
             va = rec_a[ka]
             vb = rec_b[kb]
-            rows.append(FieldRow(
-                key=ka if ka == kb else f"{ka} | {kb}",
-                val_a=va,
-                val_b=vb,
-                match=values_match(va, vb),
-                note=note,
-            ))
+            rows.append(
+                FieldRow(
+                    key=ka if ka == kb else f"{ka} | {kb}",
+                    val_a=va,
+                    val_b=vb,
+                    match=values_match(va, vb),
+                    note=note,
+                )
+            )
             consumed_b.add(kb)
         else:
-            rows.append(FieldRow(
-                key=ka,
-                val_a=rec_a[ka],
-                val_b=SENTINEL_MISSING,
-                match=False,
-                note="only in A",
-            ))
+            rows.append(
+                FieldRow(
+                    key=ka,
+                    val_a=rec_a[ka],
+                    val_b=SENTINEL_MISSING,
+                    match=False,
+                    note="only in A",
+                )
+            )
 
     # Pass 2: keys only in B.
     for kb in rec_b.keys():
@@ -308,13 +315,15 @@ def diff_frame(
         alias_partner = alias_map_b_to_a.get(kb)
         if alias_partner and alias_partner in rec_a:
             continue  # already handled in pass 1
-        rows.append(FieldRow(
-            key=kb,
-            val_a=SENTINEL_MISSING,
-            val_b=rec_b[kb],
-            match=False,
-            note="only in B",
-        ))
+        rows.append(
+            FieldRow(
+                key=kb,
+                val_a=SENTINEL_MISSING,
+                val_b=rec_b[kb],
+                match=False,
+                note="only in B",
+            )
+        )
 
     return rows
 
@@ -393,9 +402,13 @@ def render_terminal(
     # ---- Structural ----
     out.append(c("STRUCTURAL", ANSI_CYAN + ANSI_BOLD))
     if structural.count_a == structural.count_b:
-        out.append(f"  record count    {c(MARK_MATCH, ANSI_GREEN)}  {structural.count_a} = {structural.count_b}")
+        out.append(
+            f"  record count    {c(MARK_MATCH, ANSI_GREEN)}  {structural.count_a} = {structural.count_b}"
+        )
     else:
-        out.append(f"  record count    {c(MARK_DIFF, ANSI_RED)}  A={structural.count_a}  B={structural.count_b}")
+        out.append(
+            f"  record count    {c(MARK_DIFF, ANSI_RED)}  A={structural.count_a}  B={structural.count_b}"
+        )
 
     fd = structural.field_diff
     out.append(f"  shared fields   ({len(fd.shared)}): {', '.join(sorted(fd.shared)) or '<none>'}")
@@ -405,7 +418,9 @@ def render_terminal(
         out.append(f"  only in B       {c(MARK_DIFF, ANSI_RED)}  {sorted(fd.only_b)}")
     if fd.aliases:
         for ka, kb in fd.aliases:
-            out.append(f"  alias detected  {c(MARK_DIFF, ANSI_YELLOW)}  '{ka}' (A) ↔ '{kb}' (B)  ← likely typo divergence")
+            out.append(
+                f"  alias detected  {c(MARK_DIFF, ANSI_YELLOW)}  '{ka}' (A) ↔ '{kb}' (B)  ← likely typo divergence"
+            )
 
     if structural.pct_same_field_set >= 99.999:
         same_marker = c(MARK_MATCH, ANSI_GREEN)
@@ -476,24 +491,32 @@ def render_html(
     parts: list[str] = []
     parts.append("<!DOCTYPE html><html><head><meta charset='utf-8'>")
     parts.append("<title>verify_visual_diff</title><style>")
-    parts.append("body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;"
-                 "margin:24px;background:#fafafa;color:#222}")
-    parts.append("h1{margin-bottom:4px}h2{border-bottom:2px solid #ccc;padding-bottom:4px;"
-                 "margin-top:32px}")
-    parts.append("table{border-collapse:collapse;width:100%;margin-bottom:16px;"
-                 "font-family:ui-monospace,Menlo,monospace;font-size:12px}")
-    parts.append("th,td{border:1px solid #ccc;padding:4px 8px;text-align:left;"
-                 "vertical-align:top}")
+    parts.append(
+        "body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;"
+        "margin:24px;background:#fafafa;color:#222}"
+    )
+    parts.append(
+        "h1{margin-bottom:4px}h2{border-bottom:2px solid #ccc;padding-bottom:4px;margin-top:32px}"
+    )
+    parts.append(
+        "table{border-collapse:collapse;width:100%;margin-bottom:16px;"
+        "font-family:ui-monospace,Menlo,monospace;font-size:12px}"
+    )
+    parts.append("th,td{border:1px solid #ccc;padding:4px 8px;text-align:left;vertical-align:top}")
     parts.append("th{background:#eee}")
     parts.append("tr.match td{background:#eaffea}tr.diff td{background:#ffecec}")
     parts.append("tr.diff td.note{background:#fff7d6;color:#665200;font-style:italic}")
     parts.append(".mark{font-weight:bold;text-align:center}")
     parts.append(".match-mark{color:#080}.diff-mark{color:#a00}")
     parts.append(".missing{color:#999;font-style:italic}")
-    parts.append(".badge{display:inline-block;padding:1px 6px;border-radius:3px;"
-                 "font-size:11px;margin-left:6px}")
-    parts.append(".badge-ok{background:#d6f5d6;color:#080}.badge-warn{background:#ffe1a8;"
-                 "color:#8a4500}.badge-bad{background:#ffd1d1;color:#a00}")
+    parts.append(
+        ".badge{display:inline-block;padding:1px 6px;border-radius:3px;"
+        "font-size:11px;margin-left:6px}"
+    )
+    parts.append(
+        ".badge-ok{background:#d6f5d6;color:#080}.badge-warn{background:#ffe1a8;"
+        "color:#8a4500}.badge-bad{background:#ffd1d1;color:#a00}"
+    )
     parts.append("</style></head><body>")
     parts.append(f"<h1>verify_visual_diff: {e(clip_a.name)} ⇄ {e(clip_b.name)}</h1>")
     parts.append(f"<p><b>A:</b> <code>{e(str(clip_a))}</code> ({structural.count_a} records)<br>")
@@ -505,18 +528,18 @@ def render_html(
     rc_class = "match" if structural.count_a == structural.count_b else "diff"
     parts.append(
         f'<tr class="{rc_class}"><td>record count</td>'
-        f'<td>{structural.count_a}</td><td>{structural.count_b}</td>'
+        f"<td>{structural.count_a}</td><td>{structural.count_b}</td>"
         f'<td class="note">paired by index</td></tr>'
     )
     fd = structural.field_diff
     parts.append(
-        f'<tr><td>shared fields</td><td colspan=2><code>{e(", ".join(sorted(fd.shared)))}</code></td>'
-        f'<td>{len(fd.shared)} keys</td></tr>'
+        f"<tr><td>shared fields</td><td colspan=2><code>{e(', '.join(sorted(fd.shared)))}</code></td>"
+        f"<td>{len(fd.shared)} keys</td></tr>"
     )
     for ka, kb in fd.aliases:
         parts.append(
             f'<tr class="diff"><td>alias / typo divergence</td>'
-            f'<td><code>{e(ka)}</code></td><td><code>{e(kb)}</code></td>'
+            f"<td><code>{e(ka)}</code></td><td><code>{e(kb)}</code></td>"
             f'<td class="note">flagged — likely same field, different spelling</td></tr>'
         )
     if fd.only_a:
@@ -530,8 +553,8 @@ def render_html(
             f'<td class="note">missing in A</td></tr>'
         )
     parts.append(
-        f'<tr><td>same field set</td><td colspan=2>{structural.pct_same_field_set:.2f}%</td>'
-        f'<td>of paired records</td></tr>'
+        f"<tr><td>same field set</td><td colspan=2>{structural.pct_same_field_set:.2f}%</td>"
+        f"<td>of paired records</td></tr>"
     )
     parts.append("</table>")
 
@@ -543,8 +566,7 @@ def render_html(
             n = structural.drift_sample_count_per_field.get(k, 0)
             cls = "match" if d <= NUMERIC_EPS else "diff"
             parts.append(
-                f'<tr class="{cls}"><td><code>{e(k)}</code></td>'
-                f'<td>{d:.6g}</td><td>{n}</td></tr>'
+                f'<tr class="{cls}"><td><code>{e(k)}</code></td><td>{d:.6g}</td><td>{n}</td></tr>'
             )
         parts.append("</table>")
 
@@ -555,10 +577,8 @@ def render_html(
         rec_b = records_b[idx] if 0 <= idx < len(records_b) else None
         rows = diff_frame(rec_a, rec_b, structural.field_diff.aliases)
         ndiff = sum(1 for r in rows if not r.match)
-        badge = ('badge-ok' if ndiff == 0 else 'badge-bad')
-        parts.append(
-            f'<h3>frame {idx} <span class="badge {badge}">{ndiff} diffs</span></h3>'
-        )
+        badge = "badge-ok" if ndiff == 0 else "badge-bad"
+        parts.append(f'<h3>frame {idx} <span class="badge {badge}">{ndiff} diffs</span></h3>')
         parts.append("<table>")
         parts.append("<tr><th>·</th><th>key</th><th>A</th><th>B</th><th>note</th></tr>")
         for row in rows:
@@ -568,10 +588,10 @@ def render_html(
             parts.append(
                 f'<tr class="{cls}">'
                 f'<td class="mark {mark_cls}">{mark}</td>'
-                f'<td><code>{e(row.key)}</code></td>'
-                f'{cell(row.val_a)}{cell(row.val_b)}'
+                f"<td><code>{e(row.key)}</code></td>"
+                f"{cell(row.val_a)}{cell(row.val_b)}"
                 f'<td class="note">{e(row.note)}</td>'
-                f'</tr>'
+                f"</tr>"
             )
         parts.append("</table>")
 
@@ -623,20 +643,22 @@ def render_json(
         rec_a = records_a[idx] if 0 <= idx < len(records_a) else None
         rec_b = records_b[idx] if 0 <= idx < len(records_b) else None
         rows = diff_frame(rec_a, rec_b, structural.field_diff.aliases)
-        payload["frames"].append({
-            "index": idx,
-            "diff_count": sum(1 for r in rows if not r.match),
-            "rows": [
-                {
-                    "key": r.key,
-                    "val_a": _json_safe(r.val_a),
-                    "val_b": _json_safe(r.val_b),
-                    "match": r.match,
-                    "note": r.note,
-                }
-                for r in rows
-            ],
-        })
+        payload["frames"].append(
+            {
+                "index": idx,
+                "diff_count": sum(1 for r in rows if not r.match),
+                "rows": [
+                    {
+                        "key": r.key,
+                        "val_a": _json_safe(r.val_a),
+                        "val_b": _json_safe(r.val_b),
+                        "match": r.match,
+                        "note": r.note,
+                    }
+                    for r in rows
+                ],
+            }
+        )
     return json.dumps(payload, indent=2, default=str)
 
 
@@ -679,11 +701,15 @@ def main(argv: list[str] | None = None) -> int:
     elif args.json:
         out = render_json(args.clip_a, args.clip_b, frames, records_a, records_b, structural)
     else:
-        use_color = (not args.no_color) and (
-            args.output is None and sys.stdout.isatty()
-        )
+        use_color = (not args.no_color) and (args.output is None and sys.stdout.isatty())
         out = render_terminal(
-            args.clip_a, args.clip_b, frames, records_a, records_b, structural, use_color,
+            args.clip_a,
+            args.clip_b,
+            frames,
+            records_a,
+            records_b,
+            structural,
+            use_color,
         )
 
     if args.output:
