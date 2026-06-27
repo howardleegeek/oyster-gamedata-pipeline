@@ -162,9 +162,7 @@ def generate_listing(
     lines.append(f"| Distinct games | {num_games} |")
     lines.append(f"| Total recording time | {total_hours:.1f} hours |")
     lines.append(f"| Avg session duration | {avg_dur_min:.1f} minutes |")
-    lines.append(
-        f"| BUYER_READY sessions | {buyer_ready_count} ({buyer_ready_pct:.0f}%) |"
-    )
+    lines.append(f"| BUYER_READY sessions | {buyer_ready_count} ({buyer_ready_pct:.0f}%) |")
     lines.append(f"| DEGRADED sessions | {degraded_count} |")
     lines.append(f"| FAIL sessions | {fail_count} |")
     lines.append(f"| Overall pass rate | {pass_rate}% |")
@@ -190,12 +188,8 @@ def generate_listing(
         "A representative sample of **5 BUYER_READY sessions** is available for evaluation:"
     )
     lines.append("")
-    lines.append(
-        f"- **Download:** [sample_data_v{version}.tar.gz](#) _(placeholder — link TBD)_"
-    )
-    lines.append(
-        f"- **Size:** ~{(total_hours / max(evaluated, 1) * 5 * 150):.0f} MB (estimated)"
-    )
+    lines.append(f"- **Download:** [sample_data_v{version}.tar.gz](#) _(placeholder — link TBD)_")
+    lines.append(f"- **Size:** ~{(total_hours / max(evaluated, 1) * 5 * 150):.0f} MB (estimated)")
     lines.append(
         "- **Contents:** recording.mp4, game_state.jsonl, MANIFEST.signed.json per session"
     )
@@ -204,9 +198,7 @@ def generate_listing(
     # --- Section 5: Provenance Verify Quickstart ---
     lines.append("## 🔐 Provenance Verify Quickstart")
     lines.append("")
-    lines.append(
-        "Every session includes an Ed25519-signed manifest. Verify integrity with:"
-    )
+    lines.append("Every session includes an Ed25519-signed manifest. Verify integrity with:")
     lines.append("")
     lines.append("```bash")
     lines.append("# 1. Install dependencies")
@@ -217,9 +209,7 @@ def generate_listing(
     lines.append("")
     lines.append("# 3. Verify all sessions in a batch")
     lines.append("for f in sample_data_v*/MANIFEST.signed.json; do")
-    lines.append(
-        '  python3 bin/provenance_verify.py "$f" && echo "✓ $f" || echo "✗ $f"'
-    )
+    lines.append('  python3 bin/provenance_verify.py "$f" && echo "✓ $f" || echo "✗ $f"')
     lines.append("done")
     lines.append("```")
     lines.append("")
@@ -294,9 +284,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERROR: Invalid JSON in {args.input}: {exc}", file=sys.stderr)
         return 1
 
-    content = generate_listing(
-        sweep, version=args.version, price_per_session=args.price
-    )
+    content = generate_listing(sweep, version=args.version, price_per_session=args.price)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(content, encoding="utf-8")
