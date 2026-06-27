@@ -45,7 +45,6 @@ def real_keypair(tmp_keyfile):
     seed = private_key.private_bytes_raw()
     pubkey = private_key.public_key().public_bytes_raw()
 
-    keydir = os.path.dirname(tmp_keyfile)
     with open(tmp_keyfile, "wb") as f:
         f.write(seed)
     with open(tmp_keyfile + ".pub", "wb") as f:
