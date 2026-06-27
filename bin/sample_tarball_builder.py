@@ -275,6 +275,7 @@ def synthesize_inputs_jsonl(out_path: str, frame_count: int = 9000) -> str:
     spot-checks without bloating the tarball.
     """
     import json as _json
+
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     # Walk through frames at 30 fps and synthesize press/release pairs every
@@ -287,12 +288,20 @@ def synthesize_inputs_jsonl(out_path: str, frame_count: int = 9000) -> str:
         for i in range(0, frame_count, interval):
             kc = keycodes[(i // interval) % len(keycodes)]
             # press
-            _json.dump({"frame": i, "ts_ms": int(i * 1000 / 30),
-                        "keyCode": kc, "event": "keydown"}, f)
+            _json.dump(
+                {"frame": i, "ts_ms": int(i * 1000 / 30), "keyCode": kc, "event": "keydown"}, f
+            )
             f.write("\n")
             # release one frame later
-            _json.dump({"frame": i + 1, "ts_ms": int((i + 1) * 1000 / 30),
-                        "keyCode": kc, "event": "keyup"}, f)
+            _json.dump(
+                {
+                    "frame": i + 1,
+                    "ts_ms": int((i + 1) * 1000 / 30),
+                    "keyCode": kc,
+                    "event": "keyup",
+                },
+                f,
+            )
             f.write("\n")
     return str(out_path)
 
@@ -311,6 +320,7 @@ def synthesize_audio_check(out_path: str, duration_sec: float = 300.0) -> str:
     that pretty-print the histogram don't show empty buckets.
     """
     import json as _json
+
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -357,6 +367,7 @@ def synthesize_latency(out_path: str, frame_count: int = 9000) -> str:
     """
     import json as _json
     import math as _math
+
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     # One latency sample per second of recording at 30 fps -> 300 entries.
@@ -364,8 +375,7 @@ def synthesize_latency(out_path: str, frame_count: int = 9000) -> str:
     for sec in range(int(frame_count / 30)):
         # Sinusoidal ripple around 12 ms ± 3 ms (always < 20 ms).
         lat_ms = 12.0 + 3.0 * _math.sin(sec / 7.0)
-        samples.append({"frame": sec * 30, "ts_ms": sec * 1000,
-                        "latency_ms": round(lat_ms, 3)})
+        samples.append({"frame": sec * 30, "ts_ms": sec * 1000, "latency_ms": round(lat_ms, 3)})
     payload = {
         "measurements": samples,
         "bound_ms": 20.0,
@@ -708,11 +718,11 @@ def build_sample_tarball(
 
         size = output_path.stat().st_size
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Tarball created: {output_path}")
         print(f"SHA-256: {sha256.hexdigest()}")
-        print(f"Size: {size:,} bytes ({size / (1024*1024):.2f} MB)")
-        print(f"{'='*60}")
+        print(f"Size: {size:,} bytes ({size / (1024 * 1024):.2f} MB)")
+        print(f"{'=' * 60}")
 
         # Output for release artifact (machine-readable)
         print(f"\nRELEASE_ARTIFACT_SHA256={sha256.hexdigest()}")
