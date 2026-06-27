@@ -275,9 +275,7 @@ def _default_github_fetch(url: str, headers: dict[str, str]) -> dict[str, Any]:
         with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_SECONDS) as resp:
             raw = resp.read(MAX_GH_RESPONSE_BYTES + 1)
             if len(raw) > MAX_GH_RESPONSE_BYTES:
-                raise UpstreamError(
-                    f"GitHub response exceeded {MAX_GH_RESPONSE_BYTES} bytes"
-                )
+                raise UpstreamError(f"GitHub response exceeded {MAX_GH_RESPONSE_BYTES} bytes")
             try:
                 return json.loads(raw.decode("utf-8"))
             except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -285,9 +283,7 @@ def _default_github_fetch(url: str, headers: dict[str, str]) -> dict[str, Any]:
     except urllib.error.HTTPError as exc:
         # Surface 404 distinctly so callers can tell repo-missing from
         # transient network failure.
-        raise UpstreamError(
-            f"GitHub HTTPError {exc.code} for {url}"
-        ) from exc
+        raise UpstreamError(f"GitHub HTTPError {exc.code} for {url}") from exc
     except urllib.error.URLError as exc:
         raise UpstreamError(f"GitHub unreachable: {exc.reason}") from exc
 
@@ -457,8 +453,7 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help=(
-            "Override cache TTL for this invocation only "
-            f"(default: {DEFAULT_CACHE_TTL_SECONDS})."
+            f"Override cache TTL for this invocation only (default: {DEFAULT_CACHE_TTL_SECONDS})."
         ),
     )
     return parser
