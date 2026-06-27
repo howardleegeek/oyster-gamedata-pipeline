@@ -34,6 +34,7 @@ Buyer rubric (informally synthesized from VPT/DROID/RT-X/SIMA-2 literature):
   - Mouse-event inter-arrival time log-normal distributed (Kolmogorov-Smirnov
     test against synthetic uniform should reject H0)
 """
+
 from __future__ import annotations
 
 import argparse
@@ -135,8 +136,10 @@ def p1_trajectory_smoothness(game_state: list) -> dict:
         "autocorr_lag5": round(rho5, 4),
         "autocorr_lag20_1sec": round(rho20, 4),
         "verdict": (
-            "smooth" if rho1 > 0.5
-            else "jittery" if rho1 > 0.1
+            "smooth"
+            if rho1 > 0.5
+            else "jittery"
+            if rho1 > 0.1
             else "DISCONTINUOUS (teleport / fake?)"
         ),
     }
@@ -207,7 +210,9 @@ def p2_mouse_camera_coherence(inputs: list, action_camera: list, game_state: lis
     y_var = sum((x - y_mean) ** 2 for x in yaw_per_window) / n_w
     if m_var == 0 or y_var == 0:
         return {"ok": True, "windowed_correlation": 0.0, "verdict": "one channel is constant"}
-    cov = sum((mouse_per_window[i] - m_mean) * (yaw_per_window[i] - y_mean) for i in range(n_w)) / n_w
+    cov = (
+        sum((mouse_per_window[i] - m_mean) * (yaw_per_window[i] - y_mean) for i in range(n_w)) / n_w
+    )
     corr = cov / (m_var * y_var) ** 0.5
 
     # Also: % of windows with significant activity in BOTH
@@ -222,8 +227,10 @@ def p2_mouse_camera_coherence(inputs: list, action_camera: list, game_state: lis
         "windows_mouse_only": mouse_only,
         "windows_yaw_only": yaw_only,
         "verdict": (
-            "COHERENT (mouse motion drives camera, 1-sec window)" if corr > 0.4
-            else "weak coherence (corr 0.15-0.4)" if corr > 0.15
+            "COHERENT (mouse motion drives camera, 1-sec window)"
+            if corr > 0.4
+            else "weak coherence (corr 0.15-0.4)"
+            if corr > 0.15
             else "DECOUPLED at 1-sec window (mouse and camera independent)"
         ),
     }
@@ -250,8 +257,10 @@ def p3_input_to_effect_latency(inputs: list, game_state: list) -> dict:
 
     # Game state ticks with velocity
     game_state_with_v = [
-        (d.get("timestamp_ms", 0) / 1000.0,
-         (d.get("velocity_x", 0)**2 + d.get("velocity_z", 0)**2) ** 0.5)
+        (
+            d.get("timestamp_ms", 0) / 1000.0,
+            (d.get("velocity_x", 0) ** 2 + d.get("velocity_z", 0) ** 2) ** 0.5,
+        )
         for d in game_state
         if d.get("timestamp_ms") and d.get("velocity_x") is not None
     ]
@@ -273,7 +282,11 @@ def p3_input_to_effect_latency(inputs: list, game_state: list) -> dict:
                 latencies_ms.append((tick_t - w_ts) * 1000)
                 break
     if len(latencies_ms) < 3:
-        return {"ok": True, "matched": 0, "verdict": "TOO FEW W-press→velocity matches (decoupled?)"}
+        return {
+            "ok": True,
+            "matched": 0,
+            "verdict": "TOO FEW W-press→velocity matches (decoupled?)",
+        }
 
     latencies_ms.sort()
     p50 = latencies_ms[len(latencies_ms) // 2]
@@ -286,8 +299,7 @@ def p3_input_to_effect_latency(inputs: list, game_state: list) -> dict:
         "latency_p50_ms": round(p50, 1),
         "latency_p99_ms": round(p99, 1),
         "verdict": (
-            "REAL (50-200ms p50 expected)" if 30 <= p50 <= 250
-            else "OFF (not human input timing)"
+            "REAL (50-200ms p50 expected)" if 30 <= p50 <= 250 else "OFF (not human input timing)"
         ),
     }
 
@@ -313,7 +325,7 @@ def p4_coord_handedness(game_state: list) -> dict:
     # clearly dominating) AND >= 3 consecutive airborne. This is the regime
     # where Y-up convention is unambiguously testable.
     sustained_falling_v_y = []  # all airborne for reporting
-    deep_falling_v_y = []        # |V_y| > 0.3 AND negative AND airborne 3+
+    deep_falling_v_y = []  # |V_y| > 0.3 AND negative AND airborne 3+
     consecutive_air = 0
     for d in game_state:
         on_ground = d.get("on_ground", True)
@@ -352,8 +364,10 @@ def p4_coord_handedness(game_state: list) -> dict:
         "coarse_pct_negative_all_airborne": round(coarse_pct, 1),
         "deep_pct_negative_postapex": round(deep_pct, 1),
         "verdict": (
-            f"Y_UP convention CONFIRMED ({deep_pct:.0f}% negative on deep-fall ticks)" if deep_pct >= 95
-            else f"Y_UP probable but some sign-flip ({deep_pct:.0f}% — investigate)" if deep_pct >= 70
+            f"Y_UP convention CONFIRMED ({deep_pct:.0f}% negative on deep-fall ticks)"
+            if deep_pct >= 95
+            else f"Y_UP probable but some sign-flip ({deep_pct:.0f}% — investigate)"
+            if deep_pct >= 70
             else f"INVERTED or mixed Y-axis sign (only {deep_pct:.0f}% negative on deep-fall)"
         ),
     }
@@ -384,8 +398,10 @@ def p5_velocity_unit_verification(action_camera: list) -> dict:
         "p99_speed": round(p99, 3),
         "p50_speed": round(p50, 3),
         "verdict": (
-            "m/s CONFIRMED (matches MC vanilla sprint 5.6)" if 4.0 < max_speed < 7.5
-            else "m/s but slow (walking only, no sprint)" if 0.5 < max_speed < 4.0
+            "m/s CONFIRMED (matches MC vanilla sprint 5.6)"
+            if 4.0 < max_speed < 7.5
+            else "m/s but slow (walking only, no sprint)"
+            if 0.5 < max_speed < 4.0
             else f"UNIT MISMATCH (max={max_speed:.3f}, expected 5.6 m/s)"
         ),
     }
@@ -405,7 +421,8 @@ def p6_gameplay_event_diversity(inputs: list) -> dict:
         "gameplay_event_types": counts,
         "distinct_gameplay_types": len(counts),
         "verdict": (
-            "diverse gameplay" if len(counts) >= 3
+            "diverse gameplay"
+            if len(counts) >= 3
             else f"only {len(counts)} gameplay event types (low diversity)"
         ),
     }
@@ -418,7 +435,8 @@ def p7_bot_detection(inputs: list) -> dict:
     Coarse test: coefficient of variation (stddev / mean) on mouse-move dt.
     Human: CV ~0.5-1.5. Bot at fixed rate: CV near 0."""
     mouse_times = [
-        e.get("timestamp", 0) for e in inputs
+        e.get("timestamp", 0)
+        for e in inputs
         if e.get("event_type") == "MOUSE_MOVE" and isinstance(e.get("timestamp"), (int, float))
     ]
     if len(mouse_times) < 100:
@@ -439,15 +457,19 @@ def p7_bot_detection(inputs: list) -> dict:
         "median_dt_ms": round(median_dt, 3),
         "cv_dt": round(cv, 4),
         "verdict": (
-            "human-like (CV in 0.3-2.0)" if 0.3 <= cv <= 2.0
-            else "ROBOTIC (CV too low — fixed-rate bot?)" if cv < 0.3
+            "human-like (CV in 0.3-2.0)"
+            if 0.3 <= cv <= 2.0
+            else "ROBOTIC (CV too low — fixed-rate bot?)"
+            if cv < 0.3
             else f"BURSTY (CV={cv:.2f} — possibly real burst-input session)"
         ),
     }
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("session_dir")
     ap.add_argument("--json-out", help="optional: write raw results to this path")
     args = ap.parse_args()
@@ -456,28 +478,50 @@ def main() -> int:
     print(f"\n=== Data PRECISION audit: {sess.name} ===\n")
 
     inputs = load_jsonl(sess / "inputs.jsonl") if (sess / "inputs.jsonl").exists() else []
-    game_state = load_jsonl(sess / "game_state.jsonl") if (sess / "game_state.jsonl").exists() else []
-    action_camera = load_action_camera(sess / "action_camera.json") if (sess / "action_camera.json").exists() else []
-    print(f"Loaded: {len(inputs)} input events, {len(game_state)} game_state ticks, {len(action_camera)} action_camera rows")
+    game_state = (
+        load_jsonl(sess / "game_state.jsonl") if (sess / "game_state.jsonl").exists() else []
+    )
+    action_camera = (
+        load_action_camera(sess / "action_camera.json")
+        if (sess / "action_camera.json").exists()
+        else []
+    )
+    print(
+        f"Loaded: {len(inputs)} input events, {len(game_state)} game_state ticks, {len(action_camera)} action_camera rows"
+    )
 
     results = {}
     results["p1_trajectory_smoothness"] = p1_trajectory_smoothness(game_state)
-    print("\n[P1] Trajectory smoothness:", json.dumps(results["p1_trajectory_smoothness"], indent=2))
+    print(
+        "\n[P1] Trajectory smoothness:", json.dumps(results["p1_trajectory_smoothness"], indent=2)
+    )
 
-    results["p2_mouse_camera_coherence"] = p2_mouse_camera_coherence(inputs, action_camera, game_state)
-    print("\n[P2] Mouse↔camera coherence:", json.dumps(results["p2_mouse_camera_coherence"], indent=2))
+    results["p2_mouse_camera_coherence"] = p2_mouse_camera_coherence(
+        inputs, action_camera, game_state
+    )
+    print(
+        "\n[P2] Mouse↔camera coherence:", json.dumps(results["p2_mouse_camera_coherence"], indent=2)
+    )
 
     results["p3_input_to_effect_latency"] = p3_input_to_effect_latency(inputs, game_state)
-    print("\n[P3] Input→effect latency:", json.dumps(results["p3_input_to_effect_latency"], indent=2))
+    print(
+        "\n[P3] Input→effect latency:", json.dumps(results["p3_input_to_effect_latency"], indent=2)
+    )
 
     results["p4_coord_handedness"] = p4_coord_handedness(game_state)
-    print("\n[P4] Coordinate handedness (gravity test):", json.dumps(results["p4_coord_handedness"], indent=2))
+    print(
+        "\n[P4] Coordinate handedness (gravity test):",
+        json.dumps(results["p4_coord_handedness"], indent=2),
+    )
 
     results["p5_velocity_unit"] = p5_velocity_unit_verification(action_camera)
     print("\n[P5] Velocity unit verification:", json.dumps(results["p5_velocity_unit"], indent=2))
 
     results["p6_event_diversity"] = p6_gameplay_event_diversity(inputs)
-    print("\n[P6] Gameplay event diversity (lifecycle excluded):", json.dumps(results["p6_event_diversity"], indent=2))
+    print(
+        "\n[P6] Gameplay event diversity (lifecycle excluded):",
+        json.dumps(results["p6_event_diversity"], indent=2),
+    )
 
     results["p7_bot_detection"] = p7_bot_detection(inputs)
     print("\n[P7] Bot-detection (mouse dt CV):", json.dumps(results["p7_bot_detection"], indent=2))
@@ -508,7 +552,9 @@ def main() -> int:
         flags.append(f"P4: HANDEDNESS BUG ({p4.get('pct_negative')}% negative V_y on falling)")
 
     p5 = results["p5_velocity_unit"]
-    if p5.get("ok") and ("blocks/tick" in (p5.get("verdict") or "") or "UNKNOWN" in (p5.get("verdict") or "")):
+    if p5.get("ok") and (
+        "blocks/tick" in (p5.get("verdict") or "") or "UNKNOWN" in (p5.get("verdict") or "")
+    ):
         flags.append(f"P5: velocity UNIT MISMATCH ({p5.get('verdict')})")
 
     p6 = results["p6_event_diversity"]
