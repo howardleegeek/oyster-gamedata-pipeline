@@ -336,8 +336,7 @@ def print_human_readable(result: Dict[str, Any], session_id: str):
     for stutter in result["stutters"]:
         timestamp = format_timestamp(stutter["frame"] / 60.0)
         print(
-            f"    [{timestamp}] frame {stutter['frame']} "
-            f"(hamming jump {stutter['hamming_jump']})"
+            f"    [{timestamp}] frame {stutter['frame']} (hamming jump {stutter['hamming_jump']})"
         )
 
     print()
