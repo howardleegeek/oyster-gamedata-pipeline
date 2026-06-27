@@ -16,7 +16,12 @@
 ## Round 372 @ 2026-06-26T03:45:00Z
 
 - Picked: ruff format bin/buyer_dashboard_html.py (278 lines, 2nd smallest unformatted bin file after bug_report.py at 365). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic line-wrap + dict literals + trailing commas), AST parse + import smoke OK, no test for this file, follows established cadence.
-- Result: committed b756eb31 (ruff format applied: dict literals, f-strings, trailing commas; 1 file changed, 23 insertions(+), 24 deletions(-); ruff check + format --check clean; AST parse + import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
+- Result: committed b756eb31 (ruff format applied: dict literals, f-strings, trailing commas; 1 file changed, 23 insertions(+), 24 deletions(-); ruff check + ruff format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
+
+## Round 377 @ 2026-06-27T00:45:00Z
+
+- Picked: ruff format bin/prd_compliance_audit.py (1664 lines, smallest unformatted bin file: 6 formatting changes). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic spacing/quote changes), targeted tests pass (prd_audit 11/11 + canonical 2/2 passed, 2 skipped), follows established cadence.
+- Result: committed 70a35e27 (ruff format applied: spacing around operators, f-string quote normalization; 1 file changed, 6 insertions(+), 6 deletions(-); ruff check + ruff format --check clean; tests passed (16 passed, 2 skipped); pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (tests pass), no brand cross-reference, no module-level side effect.)t --check clean; AST parse + import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
 
 ## Round 373 @ 2026-06-26T04:00:00Z
 
