@@ -354,7 +354,6 @@ def test_integration():
             ),
             patch("bin.recorder_rate_limiter.CONFIG_DIR", config_dir),
         ):
-
             # Create default config
             config = {"min_free_gb": 10.0, "max_daily_sessions": 50, "max_pending_gb": 100.0}
 
