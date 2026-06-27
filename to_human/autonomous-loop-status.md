@@ -1,3 +1,11 @@
+Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
+
+## Round 380 @ 2026-06-27T09:47:26Z
+
+- Picked: ruff format tests/test_runner_thinking_event.py (smallest unformatted file in repo at 171 lines; 1 multi-line assert statement). Justification: measurable code smell, single-file scope, no behavior change (cosmetic assert parenthesization only), targeted test passes (4/4), follows established cadence.
+- Result: committed 86190961 (ruff format applied: parenthesized 1 multi-line assert message; 1 file changed, 3 insertions(+), 3 deletions(-); ruff check + ruff format --check clean; pytest tests/test_runner_thinking_event.py 4/4 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic assert parenthesization only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (asserts same condition with same message string), no brand cross-reference, no module-level side effect.)
+
+## Round 372
 ## Round 266 @ 2026-06-24T21:00:00Z
 
 - Picked: ruff format bin/v2prime_glm_residuals/__init__.py (smallest unformatted file: 54 lines, single blank line needed after module docstring; same pattern as previous rounds). Justification: measurable code smell, single-file scope, no behavior change, targeted test passes (v2prime 13/13), no risk of test masking, follows established cadence.
@@ -81,3 +89,8 @@
 
 - Picked: ruff format server/oauth.py (363 lines, smallest unformatted server file). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic line-wrap + trailing commas), targeted test passes (test_oauth_flow.py 23/23), follows established cadence.
 - Result: committed e9e27fa1 (ruff format applied: 1 file changed, 85 insertions(+), 72 deletions(-); ruff check + ruff format --check clean; tests pass 23/23; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (tests pass), no brand cross-reference.)
+
+## Round 373 @ 2026-06-26T04:00:00Z
+
+- Picked: ruff format oyster_provenance/sign.py (260 lines, smallest unformatted non-bin file in current scan; contains Ed25519 cryptographic signing logic). Justification: measurable code smell, single-file scope, no behavior change (cosmetic line-wrap + quote style), targeted provenance tests pass (35/35), no risk of test masking, follows established cadence.
+- Result: committed d019ee0d (ruff format applied: single quotes → double quotes, class member spacing, multi-line function signatures, dict literal wrapping; 1 file changed, 65 insertions(+), 58 deletions(-); ruff check clean; 35 provenance tests pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (tests explicitly cover sign/verify), no crypto logic change.)
