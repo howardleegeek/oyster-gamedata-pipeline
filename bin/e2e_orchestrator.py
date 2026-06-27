@@ -71,40 +71,35 @@ def discover_latest_session(host: str, user: str) -> Optional[str]:
 def pull_session_via_tar(host: str, user: str, session_id: str, local_stage_dir: str) -> bool:
     """Pull session from minipc1 using tar-over-SSH (handles space-in-path)."""
     remote_recordings_path = rf"%LOCALAPPDATA%\GameData Recorder\recordings\{session_id}"
-    
+
     # Use tar -c | tar -x pattern for reliable transfer
-    tar_cmd = (
-        f'cd "{remote_recordings_path}" && tar -c -f - .'
-    )
-    
+    tar_cmd = f'cd "{remote_recordings_path}" && tar -c -f - .'
+
     ssh_tar_cmd = f'ssh -o StrictHostKeyChecking=no {user}@{host} "{tar_cmd}"'
-    
+
     # Create local stage directory
     os.makedirs(local_stage_dir, exist_ok=True)
-    
+
     # Pull via tar
     try:
         proc = subprocess.Popen(
-            ssh_tar_cmd,
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            ssh_tar_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
-        
+
         # Extract locally (ignore return code - tar will error via proc if extraction fails)
         subprocess.run(
             ["tar", "-x", "-f", "-", "-C", local_stage_dir],
             stdin=proc.stdout,
-            stderr=subprocess.PIPE
+            stderr=subprocess.PIPE,
         )
-        
+
         proc.wait()
-        
+
         if proc.returncode != 0:
             stderr = proc.stderr.read().decode() if proc.stderr else ""
             print(f"Failed to pull session: {stderr}")
             return False
-            
+
         print(f"Successfully pulled session to {local_stage_dir}")
         return True
     except Exception as e:
@@ -115,24 +110,24 @@ def pull_session_via_tar(host: str, user: str, session_id: str, local_stage_dir:
 def run_canonical_pipeline(session_dir: str, target_score: int) -> Dict[str, Any]:
     """Run canonical_pipeline.py on the session."""
     pipeline_script = Path(__file__).parent / "canonical_pipeline.py"
-    
+
     if not pipeline_script.exists():
         return {"status": "FAIL", "score": "0/0", "error": "canonical_pipeline.py not found"}
-    
+
     # Bug-fix 2026-05-17: canonical_pipeline.py takes session_dir as positional
     # arg (per local repo signature). Previously this only set cwd but didn't
     # pass session_dir, causing argparse to fail "the following arguments are required".
-    cmd = [sys.executable, str(pipeline_script), str(session_dir),
-           "--target-score", str(target_score)]
+    cmd = [
+        sys.executable,
+        str(pipeline_script),
+        str(session_dir),
+        "--target-score",
+        str(target_score),
+    ]
 
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=600
-        )
-        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+
         # Bug-fix 2026-05-17: the previous regex `(\d+)/(\d+)` matched the FIRST
         # N/M anywhere in output — canonical_pipeline's step counter is
         # "[1/10] Transform game_state.jsonl", which the greedy regex grabbed
@@ -149,14 +144,10 @@ def run_canonical_pipeline(session_dir: str, target_score: int) -> Dict[str, Any
                 score = "unknown"
         else:
             score = f"{score_match.group(1)}/{score_match.group(2)}"
-        
+
         status = "PASS" if result.returncode == 0 else "FAIL"
-        
-        return {
-            "status": status,
-            "score": score,
-            "output": result.stdout + result.stderr
-        }
+
+        return {"status": status, "score": score, "output": result.stdout + result.stderr}
     except subprocess.TimeoutExpired:
         return {"status": "FAIL", "score": "0/0", "error": "timeout"}
     except Exception as e:
@@ -166,23 +157,18 @@ def run_canonical_pipeline(session_dir: str, target_score: int) -> Dict[str, Any
 def run_feature_test(test_name: str, session_dir: str) -> Dict[str, Any]:
     """Run a feature integration test."""
     test_script = Path(__file__).parent / "e2e_tests" / f"{test_name}.py"
-    
+
     if not test_script.exists():
         return {"status": "SKIP", "evidence": f"test script {test_name}.py not found"}
-    
+
     cmd = [sys.executable, str(test_script), "--session-dir", session_dir]
-    
+
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=300
-        )
-        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+
         # Parse output for status
         output = result.stdout + result.stderr
-        
+
         # Look for status markers in output
         if "PASS" in output and "FAIL" not in output:
             status = "PASS"
@@ -195,7 +181,7 @@ def run_feature_test(test_name: str, session_dir: str) -> Dict[str, Any]:
         else:
             status = "FAIL"
             evidence = output[:500]  # First 500 chars of error
-        
+
         return {"status": status, "evidence": evidence}
     except subprocess.TimeoutExpired:
         return {"status": "FAIL", "evidence": "timeout"}
@@ -210,25 +196,27 @@ def check_idempotent(session_id: str, archive_dir: str) -> bool:
     return report_file.exists()
 
 
-def archive_artifacts(session_id: str, session_dir: str, archive_dir: str, report: Dict) -> List[str]:
+def archive_artifacts(
+    session_id: str, session_dir: str, archive_dir: str, report: Dict
+) -> List[str]:
     """Archive test artifacts."""
     session_archive = Path(archive_dir) / session_id
     session_archive.mkdir(parents=True, exist_ok=True)
-    
+
     artifacts = []
-    
+
     # Copy session directory
     dest_session = session_archive / "session"
     if Path(session_dir).exists():
         shutil.copytree(session_dir, dest_session, dirs_exist_ok=True)
         artifacts.append(str(dest_session))
-    
+
     # Write report
     report_file = session_archive / "e2e_test_report.json"
     with open(report_file, "w") as f:
         json.dump(report, f, indent=2)
     artifacts.append(str(report_file))
-    
+
     return artifacts
 
 
@@ -251,11 +239,11 @@ def send_log_notification(session_id: str, report: Dict) -> bool:
     """Log notification to file."""
     log_file = Path(DEFAULT_ARCHIVE_DIR) / "notifications.log"
     log_file.parent.mkdir(parents=True, exist_ok=True)
-    
+
     with open(log_file, "a") as f:
         f.write(f"[{datetime.datetime.utcnow().isoformat()}] ")
         f.write(f"Session: {session_id}, Overall: {report.get('overall', 'UNKNOWN')}\n")
-    
+
     print(f"Logged notification to {log_file}")
     return True
 
@@ -265,6 +253,7 @@ def send_telegram_notification(session_id: str, report: Dict) -> bool:
     # Import notification module
     try:
         from e2e_notify import TelegramNotifier
+
         notifier = TelegramNotifier()
         return notifier.send(session_id, report)
     except ImportError:
@@ -279,6 +268,7 @@ def send_slack_notification(session_id: str, report: Dict) -> bool:
     """Send notification via Slack."""
     try:
         from e2e_notify import SlackNotifier
+
         notifier = SlackNotifier()
         return notifier.send(session_id, report)
     except ImportError:
@@ -293,13 +283,14 @@ def send_push_notification(session_id: str, report: Dict) -> bool:
     """Send push notification via Claude Code PushNotification tool."""
     overall = report.get("overall", "UNKNOWN")
     message = f"E2E Test {overall}: Session {session_id}"
-    
+
     try:
         # Try to use Claude Code's PushNotification tool
         import subprocess
+
         result = subprocess.run(
             ["osascript", "-e", f'display notification "{message}" with title "E2E Test"'],
-            capture_output=True
+            capture_output=True,
         )
         return result.returncode == 0
     except Exception as e:
@@ -313,40 +304,28 @@ def main():
         "--session-source",
         choices=["minipc1", "local"],
         default="minipc1",
-        help="Source of session (minipc1 or local)"
+        help="Source of session (minipc1 or local)",
     )
     parser.add_argument(
-        "--session-dir",
-        type=str,
-        help="Local session directory (for --session-source local)"
+        "--session-dir", type=str, help="Local session directory (for --session-source local)"
     )
     parser.add_argument(
-        "--target-score",
-        type=int,
-        default=101,
-        help="Target score for canonical_pipeline"
+        "--target-score", type=int, default=101, help="Target score for canonical_pipeline"
     )
     parser.add_argument(
         "--notify-on-fail",
         type=str,
         choices=["telegram", "slack", "log", "pushnotification"],
         default="log",
-        help="Notification backend on failure"
+        help="Notification backend on failure",
     )
     parser.add_argument(
-        "--archive-dir",
-        type=str,
-        default=DEFAULT_ARCHIVE_DIR,
-        help="Archive directory for results"
+        "--archive-dir", type=str, default=DEFAULT_ARCHIVE_DIR, help="Archive directory for results"
     )
-    parser.add_argument(
-        "--skip-idempotency",
-        action="store_true",
-        help="Skip idempotency check"
-    )
-    
+    parser.add_argument("--skip-idempotency", action="store_true", help="Skip idempotency check")
+
     args = parser.parse_args()
-    
+
     # Determine session
     if args.session_source == "minipc1":
         # Discover latest session
@@ -354,34 +333,36 @@ def main():
         if not session_id:
             print("ERROR: Could not discover latest session on minipc1")
             sys.exit(1)
-        
+
         # Check idempotency
         if not args.skip_idempotency and check_idempotent(session_id, args.archive_dir):
             print(f"Session {session_id} already tested (idempotent), skipping")
             sys.exit(0)
-        
+
         # Pull session
         stage_dir = DEFAULT_SESSION_DIR.format(uuid=uuid.uuid4().hex[:8])
         if not pull_session_via_tar(MINIPC1_HOST, MINIPC1_USER, session_id, stage_dir):
             print("ERROR: Failed to pull session from minipc1")
             sys.exit(1)
-        
+
         session_dir = stage_dir
     else:
         # Local session
         if not args.session_dir:
             print("ERROR: --session-dir required for --session-source local")
             sys.exit(1)
-        
+
         session_dir = args.session_dir
         # Extract session_id from directory name
         session_id = Path(session_dir).name
-    
+
     # Run canonical pipeline
     print(f"Running canonical_pipeline on {session_id}...")
     pipeline_result = run_canonical_pipeline(session_dir, args.target_score)
-    print(f"Canonical pipeline: {pipeline_result['status']} ({pipeline_result.get('score', 'N/A')})")
-    
+    print(
+        f"Canonical pipeline: {pipeline_result['status']} ({pipeline_result.get('score', 'N/A')})"
+    )
+
     # Run feature tests
     features = {}
     for test_name in FEATURE_TESTS:
@@ -389,16 +370,16 @@ def main():
         result = run_feature_test(test_name, session_dir)
         features[test_name.replace("test_", "").replace("_integration", "")] = result
         print(f"  {test_name}: {result['status']} - {result.get('evidence', '')}")
-    
+
     # Determine overall status
     all_pass = pipeline_result["status"] == "PASS"
     for feat in features.values():
         if feat["status"] not in ("PASS", "SKIP"):
             all_pass = False
             break
-    
+
     overall = "PASS" if all_pass else "FAIL"
-    
+
     # Build report
     report = {
         "ran_at": datetime.datetime.utcnow().isoformat() + "Z",
@@ -406,39 +387,39 @@ def main():
         "session_source": args.session_source,
         "canonical_pipeline": {
             "status": pipeline_result["status"],
-            "score": pipeline_result.get("score", "unknown")
+            "score": pipeline_result.get("score", "unknown"),
         },
         "features": features,
         "overall": overall,
         "notifications_sent": [],
-        "artifacts": []
+        "artifacts": [],
     }
-    
+
     # Archive artifacts
     artifacts = archive_artifacts(session_id, session_dir, args.archive_dir, report)
     report["artifacts"] = artifacts
-    
+
     # Send notification on failure
     notifications_sent = []
     if overall == "FAIL":
         if send_notification(args.notify_on_fail, session_id, report):
             notifications_sent.append(args.notify_on_fail)
-    
+
     report["notifications_sent"] = notifications_sent
-    
+
     # Write final report
     report_file = Path(args.archive_dir) / session_id / "e2e_test_report.json"
     with open(report_file, "w") as f:
         json.dump(report, f, indent=2)
-    
+
     print(f"\nE2E Test Report: {overall}")
     print(f"Report saved to: {report_file}")
-    
+
     # Cleanup on success
     if overall == "PASS" and args.session_source == "minipc1":
         shutil.rmtree(session_dir, ignore_errors=True)
         print(f"Cleaned up {session_dir}")
-    
+
     # Exit with appropriate code
     sys.exit(0 if overall == "PASS" else 1)
 
