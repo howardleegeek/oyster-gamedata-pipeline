@@ -152,3 +152,12 @@ Self-review: cosmetic reformat only — no silent error swallow, no race, no off
 - Picked: ruff format tests/test_rate_limiter.py (smallest unformatted test file at 385 lines; 1 extra blank line removed). Justification: measurable code smell, single-file scope, no behavior change (cosmetic reformat only), targeted test passes (17/17), follows established cadence.
 - Result: committed 6c1c9473 (ruff format applied: removed 1 extra blank line in test_integration(); 1 file changed, 1 deletion(-); ruff check + ruff format --check clean; pytest tests/test_rate_limiter.py 17/17 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (17/17 tests pass), no brand cross-reference, no module-level side effect.)
 
+
+## Round 387 @ 2026-06-27T12:03:00Z
+
+- Picked: ruff format tests/test_auto_release_script.py (355 lines, multi-line string and implicit string concat fixes). Justification: measurable code smell (unformatted file in repo), single-file scope, no behavior change (cosmetic reformat only), targeted test passes (25/25), follows established cadence.
+- Result: committed bb584e5c (ruff format applied: parenthesized multiline strings, fixed implicit string concat; 1 file changed, 7 insertions(+), 5 deletions(-); ruff check + ruff format --check clean; pytest tests/test_auto_release_script.py 25/25 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (25/25 pass), no brand cross-reference, no module-level side effect.)
+
+## Round 387 @ 2026-06-27T12:10:00Z
+- Picked: ruff format tests/test_iron_law_check.py (353 lines, 30 multi-line assert messages). Justification: measurable code smell, smallest unformatted test file from remaining set, single-file scope, no behavior change, targeted test passes (13/13), follows established cadence.
+- Result: committed d36a7332 (ruff format applied: parenthesized 30 multi-line assert messages; 1 file changed, 30 insertions(+), 30 deletions(-); ruff check + ruff format --check clean; pytest tests/test_iron_law_check.py 13/13 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (asserts same conditions), no brand cross-reference, no module-level side effect.)
