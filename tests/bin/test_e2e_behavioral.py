@@ -223,9 +223,9 @@ def test_keycode_is_list_of_int(action_camera_records) -> None:
         kc = rec["keyCode"]
         assert isinstance(kc, list), f"frame {idx}: keyCode should be list, got {type(kc).__name__}"
         for v in kc:
-            assert isinstance(v, int) and not isinstance(
-                v, bool
-            ), f"frame {idx}: keyCode entries must be int, got {type(v).__name__}"
+            assert isinstance(v, int) and not isinstance(v, bool), (
+                f"frame {idx}: keyCode entries must be int, got {type(v).__name__}"
+            )
 
 
 @pytest.mark.integration
@@ -282,15 +282,15 @@ def test_mouse_dx_matches_synthetic_pixel_delta(
         # Either 0 or +5px/SCREEN_W (within float tolerance) — never any
         # other value, because events are 100 ms aligned and 5 px each.
         if abs(dx) > ATOL:
-            assert math.isclose(
-                dx, expected_unit, abs_tol=ATOL
-            ), f"unexpected mouse_dx {dx}; should be 0 or {expected_unit}"
+            assert math.isclose(dx, expected_unit, abs_tol=ATOL), (
+                f"unexpected mouse_dx {dx}; should be 0 or {expected_unit}"
+            )
             nonzero_count += 1
         total_dx += dx
     # 49 events × 5 px / SCREEN_W
     expected_total = 49 * 5.0 / SCREEN_W
     assert math.isclose(total_dx, expected_total, abs_tol=ATOL), (
-        f"sum of mouse_dx={total_dx}, expected {expected_total} " f"(49 moves × 5 px / {SCREEN_W})"
+        f"sum of mouse_dx={total_dx}, expected {expected_total} (49 moves × 5 px / {SCREEN_W})"
     )
     # Sanity: at least one move-frame got recorded.
     assert nonzero_count >= 1
@@ -315,7 +315,7 @@ def test_mouse_x_normalized_and_consistent_with_cumulative_dx(
         # frame, so cumulative model gives running_x within ATOL of the
         # frame's mouse_x.
         assert math.isclose(mx, running_x, abs_tol=ATOL), (
-            f"frame {idx}: mouse_x={mx} drifted from cumulative dx model " f"({running_x})"
+            f"frame {idx}: mouse_x={mx} drifted from cumulative dx model ({running_x})"
         )
 
 
@@ -325,13 +325,13 @@ def test_quaternion_unit_norm(action_camera_records) -> None:
     for idx, rec in enumerate(action_camera_records):
         for key in ("camera_rotation_quaternion", "player_rotation_quaternion"):
             q = rec[key]
-            assert (
-                isinstance(q, list) and len(q) == 4
-            ), f"frame {idx}.{key}: must be a 4-element list"
+            assert isinstance(q, list) and len(q) == 4, (
+                f"frame {idx}.{key}: must be a 4-element list"
+            )
             norm = math.sqrt(sum(c * c for c in q))
-            assert (
-                abs(norm - 1.0) < QUAT_NORM_TOL
-            ), f"frame {idx}.{key}: ‖q‖={norm}, expected 1.0 ± {QUAT_NORM_TOL}"
+            assert abs(norm - 1.0) < QUAT_NORM_TOL, (
+                f"frame {idx}.{key}: ‖q‖={norm}, expected 1.0 ± {QUAT_NORM_TOL}"
+            )
 
 
 @pytest.mark.integration
@@ -340,12 +340,11 @@ def test_camera_intrinsics_pinhole(action_camera_records) -> None:
     for idx, rec in enumerate(action_camera_records):
         intr = rec["camera_intrinsics"]
         assert isinstance(intr, dict)
-        assert {"fx", "fy", "cx", "cy"}.issubset(
-            intr.keys()
-        ), f"frame {idx}: intrinsics missing fx/fy/cx/cy"
+        assert {"fx", "fy", "cx", "cy"}.issubset(intr.keys()), (
+            f"frame {idx}: intrinsics missing fx/fy/cx/cy"
+        )
         assert math.isclose(intr["fx"], intr["fy"], abs_tol=1e-3), (
-            f"frame {idx}: fx={intr['fx']} != fy={intr['fy']} "
-            f"(buyer-spec requires pinhole model)"
+            f"frame {idx}: fx={intr['fx']} != fy={intr['fy']} (buyer-spec requires pinhole model)"
         )
 
 
@@ -361,9 +360,9 @@ def test_route_type_is_int(action_camera_records) -> None:
     """``route_type`` is an int (1/2/3 per BUYER_SPEC L77)."""
     for idx, rec in enumerate(action_camera_records):
         rt = rec["route_type"]
-        assert isinstance(rt, int) and not isinstance(
-            rt, bool
-        ), f"frame {idx}: route_type={rt!r} not int"
+        assert isinstance(rt, int) and not isinstance(rt, bool), (
+            f"frame {idx}: route_type={rt!r} not int"
+        )
         assert rt in (1, 2, 3), f"frame {idx}: route_type={rt} not in 1/2/3"
 
 
@@ -378,9 +377,9 @@ def test_time_field_iso_aligned_to_fps(action_camera_records, fixed_started_at: 
         delta = (t - base).total_seconds()
         expected = idx / FPS
         # Recorder rounds millisecond field, so allow 1 ms slack.
-        assert (
-            abs(delta - expected) < 0.002
-        ), f"frame {idx}: time={rec['time']} ⇒ Δ={delta}s, expected {expected}s"
+        assert abs(delta - expected) < 0.002, (
+            f"frame {idx}: time={rec['time']} ⇒ Δ={delta}s, expected {expected}s"
+        )
 
 
 @pytest.mark.integration
@@ -401,15 +400,15 @@ def test_vector_fields_are_3_or_4_element_lists(action_camera_records) -> None:
     for idx, rec in enumerate(action_camera_records):
         for k in vec3_fields:
             v = rec[k]
-            assert (
-                isinstance(v, list) and len(v) == 3
-            ), f"frame {idx}.{k}: expected 3-element list, got {v!r}"
+            assert isinstance(v, list) and len(v) == 3, (
+                f"frame {idx}.{k}: expected 3-element list, got {v!r}"
+            )
             assert all(isinstance(c, (int, float)) for c in v)
         for k in vec4_fields:
             v = rec[k]
-            assert (
-                isinstance(v, list) and len(v) == 4
-            ), f"frame {idx}.{k}: expected 4-element list, got {v!r}"
+            assert isinstance(v, list) and len(v) == 4, (
+                f"frame {idx}.{k}: expected 4-element list, got {v!r}"
+            )
             assert all(isinstance(c, (int, float)) for c in v)
 
 
@@ -418,9 +417,9 @@ def test_metric_scale_is_positive_float(action_camera_records) -> None:
     """``metric_scale`` is the world:meter ratio — must be a positive float."""
     for idx, rec in enumerate(action_camera_records):
         ms = rec["metric_scale"]
-        assert (
-            isinstance(ms, (int, float)) and ms > 0
-        ), f"frame {idx}: metric_scale={ms!r} should be positive number"
+        assert isinstance(ms, (int, float)) and ms > 0, (
+            f"frame {idx}: metric_scale={ms!r} should be positive number"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -469,7 +468,7 @@ def test_replay_mod_path_fills_camera_pose(
     )
     # Step 2 — confirm the stub ran and reported its synthetic mc version.
     assert result.replay_status in ("stub", "ok"), (
-        f"replay status was {result.replay_status} — pipeline failed to " f"invoke postprocess"
+        f"replay status was {result.replay_status} — pipeline failed to invoke postprocess"
     )
     assert result.replay_metadata.get("mc_version") == "1.20.4"
 
@@ -527,9 +526,9 @@ def test_replay_mod_no_mcpr_keeps_placeholder_zeros(
         mcpr_path=None,
         clip_ts="20260505-120000-vanilla",
     )
-    assert (
-        result.replay_status is None
-    ), "replay postprocess should be skipped entirely without a .mcpr"
+    assert result.replay_status is None, (
+        "replay postprocess should be skipped entirely without a .mcpr"
+    )
     records = json.loads(result.action_camera_path.read_text(encoding="utf-8"))
     # All camera_position entries are the recorder's [0, 64, 0] placeholder.
     for idx, rec in enumerate(records):
