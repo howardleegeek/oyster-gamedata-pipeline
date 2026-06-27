@@ -167,7 +167,7 @@ def test_e2e_overlay_produces_real_action_camera(tmp_path):
     # the JSONL time window if the synthetic data is shorter).
     ratio = len(flagged) / len(records)
     assert ratio > 0.8, (
-        f"only {ratio:.1%} of records have _real_game_state — overlay " f"didn't reach most frames"
+        f"only {ratio:.1%} of records have _real_game_state — overlay didn't reach most frames"
     )
 
     # Verify position values are real (non-constant, non-default).
@@ -209,8 +209,7 @@ def test_e2e_no_overlay_falls_back_cleanly(tmp_path):
     assert records, "no records produced"
     flagged = [r for r in records if r.get("_real_game_state") is True]
     assert not flagged, (
-        f"records carry _real_game_state without overlay — false-positive "
-        f"({len(flagged)} flagged)"
+        f"records carry _real_game_state without overlay — false-positive ({len(flagged)} flagged)"
     )
 
 
