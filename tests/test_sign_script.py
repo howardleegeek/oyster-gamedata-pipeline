@@ -63,22 +63,22 @@ class TestPowerShellSyntax:
         # Balanced braces
         open_braces = ps1_content.count("{")
         close_braces = ps1_content.count("}")
-        assert (
-            open_braces == close_braces
-        ), f"Unbalanced braces: {open_braces} open, {close_braces} close"
+        assert open_braces == close_braces, (
+            f"Unbalanced braces: {open_braces} open, {close_braces} close"
+        )
 
         # Balanced parentheses
         open_parens = ps1_content.count("(")
         close_parens = ps1_content.count(")")
-        assert (
-            open_parens == close_parens
-        ), f"Unbalanced parentheses: {open_parens} open, {close_parens} close"
+        assert open_parens == close_parens, (
+            f"Unbalanced parentheses: {open_parens} open, {close_parens} close"
+        )
 
     def test_param_block_present(self, ps1_content):
         """Script must have a param() block."""
-        assert re.search(
-            r"\[CmdletBinding\(\)\]", ps1_content
-        ), "Missing [CmdletBinding()] attribute"
+        assert re.search(r"\[CmdletBinding\(\)\]", ps1_content), (
+            "Missing [CmdletBinding()] attribute"
+        )
         assert re.search(r"param\s*\(", ps1_content), "Missing param() block"
 
     def test_mandatory_filepath_param(self, ps1_content):
@@ -88,9 +88,9 @@ class TestPowerShellSyntax:
 
     def test_error_action_preference(self, ps1_content):
         """Script should set ErrorActionPreference."""
-        assert re.search(
-            r'\$ErrorActionPreference\s*=\s*"Stop"', ps1_content
-        ), 'Missing $ErrorActionPreference = "Stop"'
+        assert re.search(r'\$ErrorActionPreference\s*=\s*"Stop"', ps1_content), (
+            'Missing $ErrorActionPreference = "Stop"'
+        )
 
     def test_no_plain_text_passwords(self, ps1_content):
         """No hardcoded passwords in the script."""
@@ -118,9 +118,9 @@ class TestPowerShellSyntax:
 
     def test_sign_file_function(self, ps1_content):
         """Script must have a function to invoke signtool."""
-        assert re.search(
-            r"function\s+Invoke-SignFile", ps1_content
-        ), "Missing Invoke-SignFile function"
+        assert re.search(r"function\s+Invoke-SignFile", ps1_content), (
+            "Missing Invoke-SignFile function"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -137,9 +137,9 @@ class TestRequiredFeatures:
 
     def test_ev_cert_password_env_var(self, ps1_content):
         """Script must read EV_CERT_PASSWORD from environment."""
-        assert (
-            "EV_CERT_PASSWORD" in ps1_content
-        ), "Missing EV_CERT_PASSWORD environment variable reference"
+        assert "EV_CERT_PASSWORD" in ps1_content, (
+            "Missing EV_CERT_PASSWORD environment variable reference"
+        )
 
     def test_base64_decode(self, ps1_content):
         """Script must decode base64 .pfx."""
@@ -156,9 +156,9 @@ class TestRequiredFeatures:
     def test_cert_store_fallback(self, ps1_content):
         """Script must support cert store lookup."""
         assert "UseCertStore" in ps1_content, "Missing -UseCertStore switch"
-        assert (
-            "Cert:\\" in ps1_content or "Cert:" in ps1_content
-        ), "Missing certificate store path reference"
+        assert "Cert:\\" in ps1_content or "Cert:" in ps1_content, (
+            "Missing certificate store path reference"
+        )
 
     def test_graceful_skip_warning(self, ps1_content):
         """Script must warn when no cert is available."""
@@ -205,17 +205,17 @@ class TestWorkflowIntegration:
         assert workflow_content is not None
 
     def test_workflow_references_sign_script(self, workflow_content):
-        assert (
-            "sign_installer.ps1" in workflow_content
-        ), "Workflow does not reference sign_installer.ps1"
+        assert "sign_installer.ps1" in workflow_content, (
+            "Workflow does not reference sign_installer.ps1"
+        )
 
     def test_workflow_uses_ev_cert_pfx_secret(self, workflow_content):
         assert "EV_CERT_PFX" in workflow_content, "Workflow does not reference EV_CERT_PFX secret"
 
     def test_workflow_has_unsigned_warning(self, workflow_content):
-        assert (
-            "unsigned" in workflow_content.lower() or "UNSIGNED" in workflow_content
-        ), "Workflow does not warn about unsigned builds"
+        assert "unsigned" in workflow_content.lower() or "UNSIGNED" in workflow_content, (
+            "Workflow does not warn about unsigned builds"
+        )
 
     def test_workflow_triggers_on_recorder_tag(self, workflow_content):
         assert "recorder-v" in workflow_content, "Workflow does not trigger on recorder-v* tags"
@@ -226,18 +226,18 @@ class TestWorkflowIntegration:
         assert "if:" in workflow_content, "Workflow signing step is not conditional"
 
     def test_workflow_runs_on_windows(self, workflow_content):
-        assert (
-            "windows-latest" in workflow_content or "windows" in workflow_content.lower()
-        ), "Workflow does not target Windows runner"
+        assert "windows-latest" in workflow_content or "windows" in workflow_content.lower(), (
+            "Workflow does not target Windows runner"
+        )
 
     def test_workflow_promotes_ev_secret_to_job_env(self, workflow_content):
         assert (
             "EV_CERT_PFX: ${{ secrets.EV_CERT_PFX || secrets.EV_CERT_PFX_BASE64 }}"
             in workflow_content
         ), "EV_CERT_PFX must be job env so step if: can evaluate it"
-        assert (
-            "EV_CERT_PASSWORD: ${{ secrets.EV_CERT_PASSWORD }}" in workflow_content
-        ), "EV_CERT_PASSWORD must be available to sign_installer.ps1"
+        assert "EV_CERT_PASSWORD: ${{ secrets.EV_CERT_PASSWORD }}" in workflow_content, (
+            "EV_CERT_PASSWORD must be available to sign_installer.ps1"
+        )
 
     def test_workflow_sign_and_unsigned_conditions_are_complementary(self, workflow_content):
         assert "if: env.EV_CERT_PFX != ''" in workflow_content
@@ -316,9 +316,9 @@ class TestMockedSigntool:
         # Check that all function definitions have matching closing braces
         func_pattern = re.compile(r"function\s+(\w+)")
         functions = func_pattern.findall(ps1_content)
-        assert (
-            len(functions) >= 2
-        ), f"Expected at least 2 functions, found {len(functions)}: {functions}"
+        assert len(functions) >= 2, (
+            f"Expected at least 2 functions, found {len(functions)}: {functions}"
+        )
 
     def test_find_signtool_searches_sdk_paths(self, ps1_content):
         """Find-SignTool must search Windows SDK paths."""
@@ -360,9 +360,9 @@ class TestMockedSigntool:
             if "No EV certificate provided" in stripped or "UNSIGNED" in stripped:
                 in_skip_section = True
             if in_skip_section and stripped.startswith("exit"):
-                assert (
-                    "exit 0" in stripped.lower()
-                ), f"Graceful skip should exit 0, found: {stripped}"
+                assert "exit 0" in stripped.lower(), (
+                    f"Graceful skip should exit 0, found: {stripped}"
+                )
                 break
         else:
             pytest.fail("Could not find exit statement in graceful skip section")
@@ -443,9 +443,9 @@ class TestPowerShellRuntime:
             text=True,
             timeout=30,
         )
-        assert (
-            result.returncode == 0
-        ), f"PowerShell syntax check failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+        assert result.returncode == 0, (
+            f"PowerShell syntax check failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+        )
 
     def test_ps1_parses_without_errors(self):
         """Parse the script and check for parser errors."""
@@ -469,9 +469,9 @@ class TestPowerShellRuntime:
             text=True,
             timeout=30,
         )
-        assert (
-            result.returncode == 0
-        ), f"PowerShell parser found errors:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+        assert result.returncode == 0, (
+            f"PowerShell parser found errors:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -529,9 +529,9 @@ class TestYamlValidation:
         on_section = data.get("on", {})
         push = on_section.get("push", {})
         tags = push.get("tags", [])
-        assert any(
-            "recorder-v" in str(t) for t in tags
-        ), f"Workflow does not filter on recorder-v* tags. Found: {tags}"
+        assert any("recorder-v" in str(t) for t in tags), (
+            f"Workflow does not filter on recorder-v* tags. Found: {tags}"
+        )
 
     def test_yaml_permissions(self, workflow_content):
         """Workflow must have contents: write permission for releases."""
