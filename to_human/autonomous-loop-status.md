@@ -98,6 +98,11 @@
 - Picked: ruff format bin/recorder_close_confirm.py (smallest unformatted file: 66 lines, 2 blank lines needed between functions). Justification: measurable code smell, single-file scope, no behavior change, module import smoke OK, no risk of test masking, follows established cadence of formatting small bin files.
 - Result: committed 10c765c1 (ruff format added blank lines between functions in bin/recorder_close_confirm.py; 1 file changed, 2 insertions(+); ruff check + ruff format --check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic formatting — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)nit__.py; 1 file changed, 1 insertion(+); ruff check clean; import smoke OK; 13/13 tests pass (v2prime); pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic blank line — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
 
+
+## Round 373 @ 2026-06-26T04:00:00Z
+
+- Picked: ruff format bin/update_server_proxy.py (497 lines, smallest unformatted bin file without existing test). Justification: measurable code smell, single-file scope, no behavior change, import smoke OK, no test for this file, follows established cadence.
+- Result: committed d3791a88 (ruff format applied: 1 file changed, 3 insertions(+), 8 deletions(-); ruff check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
 ## Round 256 @ 2026-06-24T16:00:00Z
 
 - Picked: ruff format src/oyster_agent_runner/buyer_spec_v2_camera_intrinsics.py (small src file with formatting violations; 226 lines, 4 spacing changes in f-strings). Justification: measurable code smell, single-file scope, no behavior change, targeted test passes (test_buyer_spec_adapter 35/35), no risk of test masking.
@@ -1369,3 +1374,9 @@ b4c97dbd638c75a1d826e641df598879876660ed
 
 - Picked: ruff format bin/depth_from_mineflayer_raycast.py (478 lines, smallest unformatted bin file with existing test). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change (cosmetic line-wrap + dict literals + trailing commas), targeted test passes (6/6), follows established cadence.
 - Result: committed c1a0b23e (ruff format applied: 8 insertions(+), 11 deletions(-); ruff check + format --check clean; 6/6 tests pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (6/6 pass), no brand cross-reference, no module-level side effect.)
+
+
+## Round 406 @ 2026-06-27T02:28:00Z
+
+- Picked: ruff format bin/update_server_proxy.py (497 lines, smallest unformatted bin file without existing test). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change, import smoke OK, no test for this file, follows established cadence.
+- Result: committed d3791a88 (ruff format applied: 1 file changed, 3 insertions(+), 8 deletions(-); ruff check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references), no brand cross-reference, no module-level side effect.)
