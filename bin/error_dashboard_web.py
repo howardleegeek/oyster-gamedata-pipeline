@@ -26,7 +26,11 @@ from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import parse_qs, urlparse
 
 SEVERITY_LEVELS: Tuple[str, ...] = (
-    "debug", "info", "warning", "error", "critical",
+    "debug",
+    "info",
+    "warning",
+    "error",
+    "critical",
 )
 
 
@@ -61,8 +65,15 @@ def generate_sample_errors(count: int = 200) -> List[Dict[str, Any]]:
         user, message, traceback, sha256_dedup_key.
     """
     import random
-    sources = ["api_gateway", "auth_service", "payment_processor",
-               "user_service", "notification_engine", "data_pipeline"]
+
+    sources = [
+        "api_gateway",
+        "auth_service",
+        "payment_processor",
+        "user_service",
+        "notification_engine",
+        "data_pipeline",
+    ]
     severities = ["debug", "info", "warning", "error", "critical"]
     users = [f"user_{i}" for i in range(1, 21)]
     messages = [
@@ -78,10 +89,10 @@ def generate_sample_errors(count: int = 200) -> List[Dict[str, Any]]:
         "Configuration key missing in environment",
     ]
     tracebacks = [
-        "Traceback (most recent call last):\n  File \"app.py\", line 42, in handle_request\n    result = await service.call()\n  File \"service.py\", line 89, in call\n    raise ConnectionError(\"Timeout after 30s\")\nConnectionError: Timeout after 30s",
-        "Traceback (most recent call last):\n  File \"auth.py\", line 123, in validate_token\n    payload = jwt.decode(token, key)\n  File \"jwt/__init__.py\", line 45, in decode\n    raise InvalidTokenError(\"Signature verification failed\")\nInvalidTokenError: Signature verification failed",
-        "Traceback (most recent call last):\n  File \"rate_limit.py\", line 67, in check_limit\n    if count > limit:\n  File \"redis_client.py\", line 34, in __gt__\n    raise RateLimitExceeded(f\"Limit {limit} exceeded\")\nRateLimitExceeded: Limit 1000 exceeded",
-        "Traceback (most recent call last):\n  File \"db.py\", line 156, in execute_query\n    cursor.execute(sql)\n  File \"psycopg2/extensions.py\", line 23, in execute\n    raise DeadlockDetected(\"Deadlock detected\")\nDeadlockDetected: Deadlock detected",
+        'Traceback (most recent call last):\n  File "app.py", line 42, in handle_request\n    result = await service.call()\n  File "service.py", line 89, in call\n    raise ConnectionError("Timeout after 30s")\nConnectionError: Timeout after 30s',
+        'Traceback (most recent call last):\n  File "auth.py", line 123, in validate_token\n    payload = jwt.decode(token, key)\n  File "jwt/__init__.py", line 45, in decode\n    raise InvalidTokenError("Signature verification failed")\nInvalidTokenError: Signature verification failed',
+        'Traceback (most recent call last):\n  File "rate_limit.py", line 67, in check_limit\n    if count > limit:\n  File "redis_client.py", line 34, in __gt__\n    raise RateLimitExceeded(f"Limit {limit} exceeded")\nRateLimitExceeded: Limit 1000 exceeded',
+        'Traceback (most recent call last):\n  File "db.py", line 156, in execute_query\n    cursor.execute(sql)\n  File "psycopg2/extensions.py", line 23, in execute\n    raise DeadlockDetected("Deadlock detected")\nDeadlockDetected: Deadlock detected',
     ]
     errors: List[Dict[str, Any]] = []
     now = _now_utc()
@@ -93,15 +104,17 @@ def generate_sample_errors(count: int = 200) -> List[Dict[str, Any]]:
         ts = now - timedelta(minutes=random.randint(0, 1440))
         dedup_input = f"{msg}|{src}|{sev}"
         sha256_key = hashlib.sha256(dedup_input.encode()).hexdigest()
-        errors.append({
-            "timestamp": _iso(ts),
-            "severity": sev,
-            "source": src,
-            "user": user,
-            "message": msg,
-            "traceback": random.choice(tracebacks),
-            "sha256_dedup_key": sha256_key,
-        })
+        errors.append(
+            {
+                "timestamp": _iso(ts),
+                "severity": sev,
+                "source": src,
+                "user": user,
+                "message": msg,
+                "traceback": random.choice(tracebacks),
+                "sha256_dedup_key": sha256_key,
+            }
+        )
     return errors
 
 
@@ -562,7 +575,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         store.add_errors(generate_sample_errors())
 
     if not store.get_all():
-        print("No error data available. Use --sample to generate sample data or --data-file to load from file.")
+        print(
+            "No error data available. Use --sample to generate sample data or --data-file to load from file."
+        )
         return 1
 
     print(f"Loaded {len(store.get_all())} error records")
