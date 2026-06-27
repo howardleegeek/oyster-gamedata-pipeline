@@ -310,7 +310,6 @@ class TestStrictBuyerIntegration(unittest.TestCase):
             patch("end_to_end_gate_smoke._run_b2_provenance") as mock_b2,
             patch("end_to_end_gate_smoke.os.path.isdir", return_value=True),
         ):
-
             # Set up gate mocks
             gate_map = {
                 "H8_depth_source": "prd_compliance_audit_H8_patch.py",
