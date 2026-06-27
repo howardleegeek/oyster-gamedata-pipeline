@@ -339,7 +339,7 @@ def resolve_profile_chain(
             # Vanilla profile may instead be ``versions/1.21.4/1.21.4.json``
             # which we already covered above. Anything else is an error.
             raise FileNotFoundError(
-                f"inheritsFrom '{parent_name}' points to missing profile: " f"{parent_path}"
+                f"inheritsFrom '{parent_name}' points to missing profile: {parent_path}"
             )
         parent_profile = _load_json(parent_path)
         visited.add(parent_name)
