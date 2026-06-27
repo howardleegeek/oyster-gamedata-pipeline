@@ -663,7 +663,7 @@ def step10_manifest_audit(sess: pathlib.Path, target_score: Optional[int] = None
     if fails:
         print("  REMAINING FAILS:")
         for it in fails:
-            print(f"    {it['id']:8s} - {it.get('evidence','')[:90]}")
+            print(f"    {it['id']:8s} - {it.get('evidence', '')[:90]}")
     passed = counts.get("PASS", 0)
     if target_score is not None and passed < target_score:
         print(f"\n  TARGET MISSED: {passed} < {target_score}")
@@ -848,7 +848,7 @@ def step12_upload_gate_strict(sess: pathlib.Path) -> tuple[bool, list[str]]:
             )
             if proc.returncode != 0 and proc.returncode != 1:
                 blocked.append(
-                    f"{gate_id}: {script} crashed (exit {proc.returncode}): " f"{proc.stderr[:200]}"
+                    f"{gate_id}: {script} crashed (exit {proc.returncode}): {proc.stderr[:200]}"
                 )
                 continue
             data = json.loads(proc.stdout.strip().split("\n")[-1])
