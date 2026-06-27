@@ -33,14 +33,17 @@ import yaml
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "monitor_thresholds.yaml")
 
+
 def load_config() -> dict:
     """Load thresholds config from YAML."""
     with open(CONFIG_PATH, "r") as f:
         return yaml.safe_load(f)
 
+
 def expand_oyster_path(path: str) -> str:
     """Expand ~ in oyster paths."""
     return os.path.expanduser(path)
+
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -56,6 +59,7 @@ log = logging.getLogger("oyster_monitor")
 # ---------------------------------------------------------------------------
 # Health Checkers
 # ---------------------------------------------------------------------------
+
 
 class HealthChecker:
     """Check /api/health endpoints."""
@@ -176,7 +180,7 @@ class UploadBacklogChecker:
                     except OSError:
                         pass
 
-        backlog_gb = total_bytes / (1024 ** 3)
+        backlog_gb = total_bytes / (1024**3)
         return {
             "status": "ok",
             "backlog_gb": round(backlog_gb, 2),
@@ -207,9 +211,11 @@ class ErrorRateChecker:
                 with open(log_file, "r") as f:
                     for line in f:
                         # Check if line contains error indicators
-                        if re.search(r'\b(ERROR|CRITICAL|FATAL|Exception|Traceback)\b', line, re.IGNORECASE):
+                        if re.search(
+                            r"\b(ERROR|CRITICAL|FATAL|Exception|Traceback)\b", line, re.IGNORECASE
+                        ):
                             # Try to extract timestamp
-                            ts_match = re.match(r'(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2})', line)
+                            ts_match = re.match(r"(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2})", line)
                             if ts_match:
                                 try:
                                     ts = datetime.fromisoformat(ts_match.group(1).replace(" ", "T"))
@@ -247,8 +253,15 @@ class DiskChecker:
     def check(self) -> dict:
         """SSH to minipc1 and check free disk space."""
         try:
-            cmd = ["ssh", "-o", f"ConnectTimeout={self.timeout}", "-o", "StrictHostKeyChecking=no",
-                   f"{self.user}@{self.host}", "df -BG / | tail -1 | awk '{print $4}'"]
+            cmd = [
+                "ssh",
+                "-o",
+                f"ConnectTimeout={self.timeout}",
+                "-o",
+                "StrictHostKeyChecking=no",
+                f"{self.user}@{self.host}",
+                "df -BG / | tail -1 | awk '{print $4}'",
+            ]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=self.timeout + 5)
 
             if result.returncode == 0:
@@ -330,7 +343,9 @@ class DaemonStuckChecker:
                 else:
                     game_state_growing = False
 
-            is_stuck = (age_minutes > self.stuck_minutes) or (daemon_state == "RECORDING" and not game_state_growing)
+            is_stuck = (age_minutes > self.stuck_minutes) or (
+                daemon_state == "RECORDING" and not game_state_growing
+            )
 
             return {
                 "status": "stuck" if is_stuck else "ok",
@@ -356,6 +371,7 @@ class DaemonStuckChecker:
 # Metrics Writer
 # ---------------------------------------------------------------------------
 
+
 class MetricsWriter:
     """Write metrics to JSONL file."""
 
@@ -375,6 +391,7 @@ class MetricsWriter:
 # Main Monitor Loop
 # ---------------------------------------------------------------------------
 
+
 class OysterMonitor:
     """Main monitor daemon."""
 
@@ -385,7 +402,9 @@ class OysterMonitor:
 
         # Initialize checkers
         self.health_checker = HealthChecker(config.get("health_endpoints", {}))
-        self.daemon_state_checker = DaemonStateChecker(config.get("daemon_state_file", "~/.oyster/daemon_state.json"))
+        self.daemon_state_checker = DaemonStateChecker(
+            config.get("daemon_state_file", "~/.oyster/daemon_state.json")
+        )
         self.upload_backlog_checker = UploadBacklogChecker(config.get("oyster_dir", "~/.oyster"))
         self.error_rate_checker = ErrorRateChecker(config.get("oyster_dir", "~/.oyster"))
         self.disk_checker = DiskChecker(
@@ -397,7 +416,9 @@ class OysterMonitor:
             config.get("oyster_dir", "~/.oyster"),
             config.get("daemon_stuck_minutes", 30),
         )
-        self.metrics_writer = MetricsWriter(config.get("metrics_file", "~/.oyster/monitor_metrics.jsonl"))
+        self.metrics_writer = MetricsWriter(
+            config.get("metrics_file", "~/.oyster/monitor_metrics.jsonl")
+        )
 
         # Signal handling
         signal.signal(signal.SIGTERM, self._handle_signal)
