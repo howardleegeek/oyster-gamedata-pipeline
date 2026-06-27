@@ -375,7 +375,7 @@ class DatasetLevelResidualTests(unittest.TestCase):
         self.assertEqual(
             result["residuals"]["R20a"]["REJECT"],
             1,
-            msg=f"R20a should REJECT under quat drift, " f"got {result['residuals']['R20a']}",
+            msg=f"R20a should REJECT under quat drift, got {result['residuals']['R20a']}",
         )
         self.assertEqual(result["residuals"]["R20a"]["COMMIT"], 0)
 
@@ -400,7 +400,7 @@ class DatasetLevelResidualTests(unittest.TestCase):
         self.assertEqual(
             result["residuals"]["R22"]["REJECT"],
             1,
-            msg=f"R22 should REJECT on hash mismatch, " f"got {result['residuals']['R22']}",
+            msg=f"R22 should REJECT on hash mismatch, got {result['residuals']['R22']}",
         )
         self.assertEqual(result["residuals"]["R22"]["COMMIT"], 0)
 
