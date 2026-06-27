@@ -141,3 +141,9 @@ Self-review: cosmetic reformat only — no silent error swallow, no race, no off
 
 - Picked: ruff format tests/bin/test_one_click_consumer_flow.py (294 lines, 2 implicit-concatenated string literals in assert messages; tests/phase2/test_depth_inference_pipeline.py at 224 lines still has pre-existing ImportError failures blocking quality gate). Justification: measurable code smell (unformatted file in repo), single-file scope, no behavior change (cosmetic reparenthesization only), targeted test passes (9/9, 0 skipped/xfail), follows established cadence.
 - Result: committed 9d03ae89 (ruff format applied: collapsed 2 implicit-concat string literals; 1 file changed, 2 insertions(+), 2 deletions(-); ruff check + ruff format --check clean; pytest tests/bin/test_one_click_consumer_flow.py 9/9 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reparenthesization only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (9/9 pass, 0 skipped/xfail, asserts same condition with same message string), no brand cross-reference, no module-level side effect.)
+
+## Round 386 @ 2026-06-27T11:35:00Z
+
+- Picked: ruff format tests/test_rate_limiter.py (smallest unformatted test file at 385 lines; 1 extra blank line removed). Justification: measurable code smell, single-file scope, no behavior change (cosmetic reformat only), targeted test passes (17/17), follows established cadence.
+- Result: committed 6c1c9473 (ruff format applied: removed 1 extra blank line in test_integration(); 1 file changed, 1 deletion(-); ruff check + ruff format --check clean; pytest tests/test_rate_limiter.py 17/17 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (17/17 tests pass), no brand cross-reference, no module-level side effect.)
+
