@@ -274,9 +274,9 @@ def test_checkout_route_returns_503_when_not_configured():
         return
     src = p.read_text()
     assert "status: 503" in src, "Iron-law: /api/checkout must return 503 when not configured."
-    assert (
-        "fakeSession" not in src and "dev_session_" not in src
-    ), "Iron-law: /api/checkout must NOT mint dev_session_* fake Stripe sessions."
+    assert "fakeSession" not in src and "dev_session_" not in src, (
+        "Iron-law: /api/checkout must NOT mint dev_session_* fake Stripe sessions."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -322,17 +322,17 @@ def test_recorder_hard_gates_placeholder_in_v026_plus():
     ), "RECORDER_VERSION must be >= 0.26.0 for iron-law hard-gate"
 
     # 2. RecorderError class must exist.
-    assert (
-        "class RecorderError" in src
-    ), "RecorderError exception class must be defined for iron-law hard-gates"
+    assert "class RecorderError" in src, (
+        "RecorderError exception class must be defined for iron-law hard-gates"
+    )
 
     # 3. The hard-gate: when JSONL missing + no allow_placeholder → RecorderError.
-    assert (
-        "raise RecorderError(" in src
-    ), "Recorder must raise RecorderError when game-state JSONL is missing"
-    assert (
-        "Real game-state Fabric mod not loaded" in src
-    ), "Hard-gate error message must include 'Real game-state Fabric mod not loaded'"
+    assert "raise RecorderError(" in src, (
+        "Recorder must raise RecorderError when game-state JSONL is missing"
+    )
+    assert "Real game-state Fabric mod not loaded" in src, (
+        "Hard-gate error message must include 'Real game-state Fabric mod not loaded'"
+    )
 
     # 4. The old silent fallback line must be GONE.
     assert (
@@ -353,19 +353,19 @@ def test_recorder_allows_placeholder_with_explicit_flag():
     assert "--allow-placeholder" in src, "Recorder must accept --allow-placeholder CLI flag"
 
     # 2. When flag is set, metadata.json must contain data_authenticity.
-    assert (
-        '"data_authenticity": "placeholder"' in src or '"data_authenticity"' in src
-    ), "Recorder must write data_authenticity='placeholder' to metadata.json"
+    assert '"data_authenticity": "placeholder"' in src or '"data_authenticity"' in src, (
+        "Recorder must write data_authenticity='placeholder' to metadata.json"
+    )
 
     # 3. Warning text about constant fields must be present.
-    assert (
-        "camera/player fields are constant [0.0, 64.0, 0.0]" in src
-    ), "Placeholder metadata must warn about constant [0.0, 64.0, 0.0] fields"
+    assert "camera/player fields are constant [0.0, 64.0, 0.0]" in src, (
+        "Placeholder metadata must warn about constant [0.0, 64.0, 0.0] fields"
+    )
 
     # 4. allow_placeholder must bypass the hard-gate.
-    assert (
-        "allow_placeholder" in src
-    ), "The allow_placeholder flag must be checked in the hard-gate logic"
+    assert "allow_placeholder" in src, (
+        "The allow_placeholder flag must be checked in the hard-gate logic"
+    )
 
 
 def test_recorder_window_capture_uses_geometry_not_title():
@@ -385,9 +385,9 @@ def test_recorder_window_capture_uses_geometry_not_title():
     src = _read_recorder_source()
 
     # (a) Source-level: recorder must use geometry-based capture.
-    assert (
-        '_VIDEO_AUTO_LAYERS = ("obs", "windows-capture", "ddagrab", "mss", "gdigrab")' in src
-    ), "Recorder auto mode must try WGC, then ddagrab, then mss, then gdigrab"
+    assert '_VIDEO_AUTO_LAYERS = ("obs", "windows-capture", "ddagrab", "mss", "gdigrab")' in src, (
+        "Recorder auto mode must try WGC, then ddagrab, then mss, then gdigrab"
+    )
     assert '"ddagrab"' in src, "Recorder must keep explicit DXGI ddagrab diagnostics"
     assert "crop=" in src, "Recorder must crop ddagrab to the Minecraft geometry"
     assert '"-offset_x"' in src, "Recorder must use -offset_x in ffmpeg cmd"
@@ -398,9 +398,9 @@ def test_recorder_window_capture_uses_geometry_not_title():
     # (a) Source-level: title-based capture must be gone.
     assert "title_safe" not in src, "Iron-law: the title_safe branch must be removed entirely"
     assert 'f"title={mc_title}"' not in src, "Iron-law: -i title=... capture must be removed"
-    assert (
-        "full-desktop capture (title unsafe" not in src
-    ), "Iron-law: the 'title unsafe' fallback log line must be removed"
+    assert "full-desktop capture (title unsafe" not in src, (
+        "Iron-law: the 'title unsafe' fallback log line must be removed"
+    )
 
     # (b) Helper function: build_window_args always uses geometry.
     from bin.recorder_window_capture_helper import WindowRect, build_window_args
@@ -427,9 +427,9 @@ def test_recorder_window_capture_uses_geometry_not_title():
     assert "1920x1080" in args, "video_size must match window dimensions"
     assert args[-2:] == ["-i", "desktop"], "Must use -i desktop, not -i title=..."
     for arg in args:
-        assert not arg.startswith(
-            "title="
-        ), f"Iron-law: must NOT use title-based capture. Found: {arg}"
+        assert not arg.startswith("title="), (
+            f"Iron-law: must NOT use title-based capture. Found: {arg}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -444,9 +444,9 @@ def test_optical_flow_no_placeholder_frames():
         "Iron-law: optical_flow_provider must NOT have _placeholder_frames(). "
         "It must raise RuntimeError when imageio is unavailable."
     )
-    assert (
-        "generating placeholder frames" not in src
-    ), "Iron-law: optical_flow_provider must not log 'generating placeholder frames'."
+    assert "generating placeholder frames" not in src, (
+        "Iron-law: optical_flow_provider must not log 'generating placeholder frames'."
+    )
 
 
 def test_depth_anything_smoke_no_mock_model():
@@ -456,9 +456,9 @@ def test_depth_anything_smoke_no_mock_model():
         "Iron-law: depth_anything_smoke must NOT define MockDepthModel. "
         "It must raise RuntimeError when depth_anything_v2 is unavailable."
     )
-    assert (
-        "using mock model" not in src
-    ), "Iron-law: depth_anything_smoke must not log 'using mock model'."
+    assert "using mock model" not in src, (
+        "Iron-law: depth_anything_smoke must not log 'using mock model'."
+    )
 
 
 def test_recorder_dav2_runner_no_mock_depth():
@@ -477,9 +477,9 @@ def test_vendor_alpha_dashboard_no_sample_data():
         "Iron-law: vendor_alpha_dashboard must NOT have load_sample_data(). "
         "It must read real metrics files or hard-fail."
     )
-    assert (
-        "vendor_hash" not in src
-    ), "Iron-law: vendor_alpha_dashboard must not derive fake metrics from hash."
+    assert "vendor_hash" not in src, (
+        "Iron-law: vendor_alpha_dashboard must not derive fake metrics from hash."
+    )
 
 
 def test_sample_tarball_builder_no_fake_exr():
