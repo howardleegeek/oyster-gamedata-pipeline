@@ -83,6 +83,11 @@ class FPSMetrics:
 
     @property
     def max_fps(self) -> float:
+        """Return the maximum FPS across all samples.
+
+        Returns:
+            Maximum FPS as float, or 0.0 if no samples collected.
+        """
         return max(self.samples) if self.samples else 0.0
 
     @property
