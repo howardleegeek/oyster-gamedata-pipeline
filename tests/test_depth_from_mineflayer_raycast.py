@@ -148,15 +148,14 @@ class TestHappyPathLookingDown:
         depth = _read_exr_z_channel(out_dir / "frame_000000.exr", TEST_W, TEST_H)
         cx, cy = TEST_W // 2, TEST_H // 2
         assert depth[cy, cx] == pytest.approx(6.0, abs=0.30), (
-            f"expected ~6 m to ground when looking straight down from y=70, "
-            f"got {depth[cy, cx]:.3f}"
+            f"expected ~6 m to ground when looking straight down from y=70, got {depth[cy, cx]:.3f}"
         )
         # Sky should be impossible (camera looks down) — every pixel should
         # have hit the ground within ``max_depth``. The diagonal corners go
         # at an angle, so they hit slightly farther — but never max_depth.
-        assert (
-            depth < DEFAULT_MAX_DEPTH_M
-        ).all(), "every pixel should hit the ground when looking straight down"
+        assert (depth < DEFAULT_MAX_DEPTH_M).all(), (
+            "every pixel should hit the ground when looking straight down"
+        )
 
 
 class TestBotLookingHorizontally:
@@ -315,6 +314,6 @@ class TestStationaryBotEmitsIdenticalFrames:
 
         # All three frames captured identical pose → identical depth →
         # identical EXR bytes → identical sha256.
-        assert (
-            len(set(hashes.values())) == 1
-        ), "stationary bot should yield byte-identical depth EXRs"
+        assert len(set(hashes.values())) == 1, (
+            "stationary bot should yield byte-identical depth EXRs"
+        )
