@@ -72,3 +72,12 @@
 - Picked: ruff format backend/codex_api.py (smallest unformatted file: 293 lines, 4 line changes; consistent with established cadence of formatting non-test Python files). Justification: measurable code smell (ruff format violation), single-file scope, no behavior change, ruff check + import smoke OK, follows established cadence.
 - Result: committed d1608884 (ruff format applied: 4 insertions, 5 deletions; ruff check clean; import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect.)
 
+
+## Round 373 @ 2026-06-26T04:00:00Z
+- Picked: ruff format daemon/cluster_dispatcher.py and iter_watcher.py (2 unformatted daemon files: 373+435 lines, multi-line logger calls; related test files exist). Justification: measurable code smell, single-file scope, no behavior change (cosmetic line consolidation), targeted tests pass (79/79), follows established cadence.
+- Result: committed e0be669f (ruff format consolidated multi-line logger.warning/error/print/info calls to single line in 2 daemon files; tests/test_iter_watcher.py + test_cluster_dispatcher.py pass 79/79; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking, no module-level side effect.)
+
+## Round 379 @ 2026-06-27T09:00:00Z
+
+- Picked: ruff format server/oauth.py (363 lines, smallest unformatted server file). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic line-wrap + trailing commas), targeted test passes (test_oauth_flow.py 23/23), follows established cadence.
+- Result: committed e9e27fa1 (ruff format applied: 1 file changed, 85 insertions(+), 72 deletions(-); ruff check + ruff format --check clean; tests pass 23/23; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (tests pass), no brand cross-reference.)
