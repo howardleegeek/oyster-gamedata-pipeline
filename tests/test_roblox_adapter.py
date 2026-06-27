@@ -233,7 +233,7 @@ class TestExtractIdsFromLogs:
         """Test various log formats Roblox might use."""
         log_dir = tmp_path / "logs"
         log_dir.mkdir()
-        (log_dir / "Player.log").write_text("place_id: 55555\n" "universe_id = 66666\n")
+        (log_dir / "Player.log").write_text("place_id: 55555\nuniverse_id = 66666\n")
         result = _extract_ids_from_logs(log_dir)
         assert result["place_id"] == "55555"
         assert result["universe_id"] == "66666"
