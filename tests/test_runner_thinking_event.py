@@ -123,9 +123,9 @@ def test_thinking_event_precedes_reasoning_event_per_step(tmp_path: Path) -> Non
             step_no = ev["event_args"]["step"]
             # By the time AGENT_STEP fires, the thinking event for that
             # step (if any) must already be in the file.
-            assert (
-                step_no in seen_thinking_for_step
-            ), f"step {step_no}: AGENT_STEP appeared before LLM_THINKING"
+            assert step_no in seen_thinking_for_step, (
+                f"step {step_no}: AGENT_STEP appeared before LLM_THINKING"
+            )
 
 
 def test_thinking_provider_with_empty_thinking_emits_no_event(tmp_path: Path) -> None:
