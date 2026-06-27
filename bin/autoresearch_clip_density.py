@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 DEFAULT_SCENE_TYPES: Tuple[str, ...] = ("combat", "build", "explore")
 
 
-def _get_numpy():
-    """Lazy-import numpy."""
+def _get_numpy() -> "Any":  # type: ignore[type-arg]
+    """Lazy-import numpy module for array operations."""
     import numpy as np  # noqa: F811
     return np
 
