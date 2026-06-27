@@ -84,9 +84,7 @@ def redact_chat_message(message: str) -> str:
 # ---------------------------------------------------------------------------
 
 EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
-PHONE_RE = re.compile(
-    r"(?:\+?1[-.\s]?)?" r"(?:\(?\d{3}\)?[-.\s]?)" r"\d{3}[-.\s]?\d{4}"
-)
+PHONE_RE = re.compile(r"(?:\+?1[-.\s]?)?" r"(?:\(?\d{3}\)?[-.\s]?)" r"\d{3}[-.\s]?\d{4}")
 DISCORD_TAG_RE = re.compile(r"@\w+#\d{4}")
 DISCORD_NAME_RE = re.compile(r"@\w+")
 
@@ -240,9 +238,7 @@ def redact_rgb_directory(
         return stats
 
     image_extensions = {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".webp"}
-    frames = sorted(
-        p for p in rgb_dir.iterdir() if p.suffix.lower() in image_extensions
-    )
+    frames = sorted(p for p in rgb_dir.iterdir() if p.suffix.lower() in image_extensions)
 
     for frame_path in frames:
         count = redact_frame_file(frame_path, padding=padding)
@@ -260,9 +256,7 @@ def redact_rgb_directory(
 # ---------------------------------------------------------------------------
 
 
-def redact_file_content(
-    content: str, player_username: str, pseudonymized_name: str
-) -> str:
+def redact_file_content(content: str, player_username: str, pseudonymized_name: str) -> str:
     """Redact PII from file content."""
 
     # Replace player username
@@ -310,9 +304,7 @@ def redact_file_content(
     return content
 
 
-def redact_jsonl_file(
-    filepath: Path, player_username: str, pseudonymized_name: str
-) -> int:
+def redact_jsonl_file(filepath: Path, player_username: str, pseudonymized_name: str) -> int:
     """Redact PII from a JSONL file. Returns count of redacted entries."""
     if not filepath.exists():
         return 0
@@ -354,9 +346,7 @@ def redact_jsonl_file(
     return redacted_count
 
 
-def redact_json_file(
-    filepath: Path, player_username: str, pseudonymized_name: str
-) -> int:
+def redact_json_file(filepath: Path, player_username: str, pseudonymized_name: str) -> int:
     """Redact PII from a JSON file. Returns count of redacted fields."""
     if not filepath.exists():
         return 0
@@ -390,25 +380,17 @@ def redact_json_data(data: Any, player_username: str, pseudonymized_name: str) -
                 elif isinstance(value, list):
                     result[key] = ["[redacted]" for _ in value]
                 else:
-                    result[key] = redact_json_data(
-                        value, player_username, pseudonymized_name
-                    )
+                    result[key] = redact_json_data(value, player_username, pseudonymized_name)
             elif key in ["player", "username", "player_username", "user"]:
                 if isinstance(value, str) and value == player_username:
                     result[key] = pseudonymized_name
                 else:
-                    result[key] = redact_json_data(
-                        value, player_username, pseudonymized_name
-                    )
+                    result[key] = redact_json_data(value, player_username, pseudonymized_name)
             else:
-                result[key] = redact_json_data(
-                    value, player_username, pseudonymized_name
-                )
+                result[key] = redact_json_data(value, player_username, pseudonymized_name)
         return result
     elif isinstance(data, list):
-        return [
-            redact_json_data(item, player_username, pseudonymized_name) for item in data
-        ]
+        return [redact_json_data(item, player_username, pseudonymized_name) for item in data]
     elif isinstance(data, str):
         return redact_file_content(data, player_username, pseudonymized_name)
     else:
@@ -431,9 +413,7 @@ def redact_session(session_dir: Path, dry_run: bool = False) -> Dict[str, Any]:
                         if isinstance(player, str):
                             player_username = player
                         elif isinstance(player, dict):
-                            player_username = player.get("username") or player.get(
-                                "name"
-                            )
+                            player_username = player.get("username") or player.get("name")
                         if player_username:
                             break
                 except json.JSONDecodeError:
@@ -455,9 +435,7 @@ def redact_session(session_dir: Path, dry_run: bool = False) -> Dict[str, Any]:
     }
 
     if dry_run:
-        print(
-            f"DRY RUN: Would pseudonymize '{player_username}' -> '{pseudonymized_name}'"
-        )
+        print(f"DRY RUN: Would pseudonymize '{player_username}' -> '{pseudonymized_name}'")
         return stats
 
     # Process JSONL files
@@ -499,9 +477,7 @@ def redact_session(session_dir: Path, dry_run: bool = False) -> Dict[str, Any]:
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="PII Redactor - Redact PII from session data"
-    )
+    parser = argparse.ArgumentParser(description="PII Redactor - Redact PII from session data")
     parser.add_argument("session_dir", type=Path, help="Session directory to redact")
     parser.add_argument(
         "--dry-run",
