@@ -45,9 +45,7 @@ try:
     from fastapi import FastAPI, HTTPException
     from pydantic import BaseModel, Field
 except ImportError as e:
-    raise SystemExit(
-        "missing deps: pip install fastapi uvicorn pydantic"
-    ) from e
+    raise SystemExit("missing deps: pip install fastapi uvicorn pydantic") from e
 
 # ---------------------------------------------------------------------------
 # Config
@@ -77,8 +75,9 @@ _running_procs: dict[str, subprocess.Popen] = {}
 
 class CodexTask(BaseModel):
     prompt: str = Field(..., min_length=1, description="Task instructions for Codex")
-    repo_dir: str = Field(default_factory=lambda: DEFAULT_REPO,
-                          description="Working directory for codex exec -C")
+    repo_dir: str = Field(
+        default_factory=lambda: DEFAULT_REPO, description="Working directory for codex exec -C"
+    )
     model: str | None = Field(default=None, description="Override model (e.g. 'o3')")
     timeout_sec: int = Field(default=1200, ge=30, le=3600)
     full_auto: bool = Field(default=True, description="Pass --full-auto")
