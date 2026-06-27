@@ -70,7 +70,7 @@ def _run_audit(session_dir: pathlib.Path) -> dict:
     )
     if not proc.stdout:
         pytest.fail(
-            f"audit script produced no stdout. stderr (last 500 chars):\n" f"{proc.stderr[-500:]}"
+            f"audit script produced no stdout. stderr (last 500 chars):\n{proc.stderr[-500:]}"
         )
     return json.loads(proc.stdout)
 
@@ -160,12 +160,12 @@ def test_post_finalize_merges_existing_metadata(tmp_path: pathlib.Path):
     )
 
     # Spot-check that nested fields survive too
-    assert (
-        after.get("hardware_specs", {}).get("cpu", {}).get("cores") == 16
-    ), "MERGE REGRESSION: hardware_specs.cpu nested field was lost"
-    assert (
-        after.get("input_stats", {}).get("wasd_apm") == 20.21
-    ), "MERGE REGRESSION: input_stats nested field was lost"
+    assert after.get("hardware_specs", {}).get("cpu", {}).get("cores") == 16, (
+        "MERGE REGRESSION: hardware_specs.cpu nested field was lost"
+    )
+    assert after.get("input_stats", {}).get("wasd_apm") == 20.21, (
+        "MERGE REGRESSION: input_stats nested field was lost"
+    )
 
 
 # ---------------------------------------------------------------------------
