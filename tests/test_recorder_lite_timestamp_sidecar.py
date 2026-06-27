@@ -135,9 +135,9 @@ def test_timestamps_sidecar_written_with_all_fields(
     extract_dir = tmp_path / "extract"
     with tarfile.open(tar_path, "r:gz") as tf:
         names = set(tf.getnames())
-        assert (
-            "clip-20260527-123456/timestamps.json" in names
-        ), f"timestamps.json missing from tarball; got {sorted(names)}"
+        assert "clip-20260527-123456/timestamps.json" in names, (
+            f"timestamps.json missing from tarball; got {sorted(names)}"
+        )
         tf.extractall(extract_dir)
 
     sidecar_path = extract_dir / "clip-20260527-123456" / "timestamps.json"
