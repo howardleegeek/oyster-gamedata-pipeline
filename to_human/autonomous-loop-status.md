@@ -240,3 +240,13 @@ Self-review: cosmetic reformat only — no silent error swallow, no race, no off
 ## Round <400> @ 2026-06-27T16:30:00Z
 - Picked: ruff format oyster_provenance/anchor.py (395 lines, smallest unformatted non-test source file with passing tests). Justification: measurable code smell, smallest unformatted non-test source file with passing tests (test_provenance.py 25/25), single-file scope, no behavior change (cosmetic reformat), targeted tests pass 25/25, follows established cadence.
 - Result: committed f00c9262 (ruff format applied: 79 insertions(+), 76 deletions(-); ruff check + ruff format --check clean; pytest tests/test_provenance.py 25/25 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (25/25 tests pass), no brand cross-reference, no module-level side effect.)
+
+
+## Round 398 @ 2026-06-27T17:00:00Z
+
+- Picked: ruff format tests/test_provenance_offline_bundle.py (499 lines, 1 multi-line assert). Justification: measurable code smell (unformatted file in repo), single-file scope, no behavior change (cosmetic reformat only), targeted test passes (20/20), follows established cadence.
+- Result: committed 261f4a94 (ruff format applied: parenthesized 1 multi-line assert message; 1 file changed, 3 insertions(+), 3 deletions(-); ruff check + ruff format --check clean; pytest tests/test_provenance_offline_bundle.py 20/20 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (20/20 pass, 0 skipped/xfail, asserts same condition with same message string), no brand cross-reference, no module-level side effect.)
+
+## Round 399 @ 2026-06-27T17:30:00Z
+- Picked: ruff format server/payout_engine.py (446 lines, blank line normalizations + quote style fixes). Justification: measurable code smell, smallest unformatted server file with passing tests (18/18), single-file scope, no behavior change (cosmetic reformat), targeted tests pass 18/18, follows established cadence.
+- Result: committed a93bc5fd (ruff format applied: added blank lines after class/enum defs, normalized quotes; 1 file changed, 93 insertions(+), 66 deletions(-); ruff check + ruff format --check clean; pytest tests/test_payout_engine.py 18/18 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (18/18 pass), no brand cross-reference, no module-level side effect.)
