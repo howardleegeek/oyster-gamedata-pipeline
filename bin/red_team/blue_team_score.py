@@ -9,6 +9,7 @@ For each attack:
 Usage:
     python -m bin.red_team.blue_team_score
 """
+
 from __future__ import annotations
 
 import copy
@@ -59,9 +60,15 @@ def _baseline_frame() -> tuple[dict, dict]:
     qy = math.sin(half)
     qw = math.cos(half)
     n = {
-        "frame": 0, "time": "2026-05-05 19:30:00.000", "fps": 30.0, "route_type": 1,
+        "frame": 0,
+        "time": "2026-05-05 19:30:00.000",
+        "fps": 30.0,
+        "route_type": 1,
         "session_id": _CANONICAL_SESSION_ID,
-        "mouse_x": [0.5], "mouse_y": [0.5], "mouse_dx": [0.0], "mouse_dy": [0.0],
+        "mouse_x": [0.5],
+        "mouse_y": [0.5],
+        "mouse_dx": [0.0],
+        "mouse_dy": [0.0],
         "keyCode": [87],
         "camera_position": [0.0, 64.0, 0.0],
         "camera_rotation_oula": [0.0, 90.0, 0.0],
@@ -126,8 +133,12 @@ def _synthesize_dataset(rec: dict, neighbor: dict | None, fi_id: str) -> list[di
         # frames would actually look like under R20a's 1e-5 threshold.
         scale = math.sqrt(1.0 + 5e-5)
         for f in dataset:
-            f["camera_rotation_quaternion"] = [0.0, math.sin(math.radians(45.0)) * scale,
-                                               0.0, math.cos(math.radians(45.0)) * scale]
+            f["camera_rotation_quaternion"] = [
+                0.0,
+                math.sin(math.radians(45.0)) * scale,
+                0.0,
+                math.cos(math.radians(45.0)) * scale,
+            ]
     elif fi_id == "C-02":
         # mouse_dx +5e-7/frame produces 4.5e-3 cumulative over 9000 frames.
         # Compress that into 50 frames by dividing the target drift by 50:
@@ -274,6 +285,7 @@ def _vote_v3(fn, *args) -> bool:
     try:
         r = fn(*args)
         from bin.v3_physics_oracle.residuals import Verdict
+
         return r.verdict == Verdict.FAIL
     except Exception:
         return True
@@ -415,6 +427,7 @@ def _detect_count(
     from bin.v3_physics_oracle.residuals import (
         r12_fps_fixed_30 as v3_r12,
     )
+
     rec = attack.mutated_rec
     nbr = attack.mutated_neighbor
     counts: dict[str, int] = {}
@@ -422,39 +435,82 @@ def _detect_count(
     def add(name: str, c: int) -> None:
         counts[name] = c
 
-    add("R01", _vote_v1(v1_r01, rec) + _vote_v2(v2_r01, rec)
-              + _vote_v2(v2p_r01, rec) + _vote_v3(v3_r01, rec))
-    add("R02", _vote_v1(v1_r02, rec) + _vote_v2(v2_r02, rec)
-              + _vote_v2(v2p_r02, rec) + _vote_v3(v3_r02, rec))
+    add(
+        "R01",
+        _vote_v1(v1_r01, rec)
+        + _vote_v2(v2_r01, rec)
+        + _vote_v2(v2p_r01, rec)
+        + _vote_v3(v3_r01, rec),
+    )
+    add(
+        "R02",
+        _vote_v1(v1_r02, rec)
+        + _vote_v2(v2_r02, rec)
+        + _vote_v2(v2p_r02, rec)
+        + _vote_v3(v3_r02, rec),
+    )
     if nbr is not None:
-        add("R03", _vote_v1(v1_r03, rec, nbr, 30.0) + _vote_v2(v2_r03, rec, nbr, 30.0)
-                  + _vote_v2(v2p_r03, rec, nbr))
-        add("R04", _vote_v1(v1_r04, rec, nbr) + _vote_v2(v2_r04, rec, nbr)
-                  + _vote_v2(v2p_r04, rec, nbr))
-        add("R05", _vote_v1(v1_r05, rec, nbr, 30.0) + _vote_v2(v2_r05, rec, nbr)
-                  + _vote_v2(v2p_r05, rec, nbr))
-    add("R06", _vote_v1(v1_r06, rec) + _vote_v2(v2_r06, rec)
-              + _vote_v2(v2p_r06, rec))
-    add("R07", _vote_v1(v1_r07, rec) + _vote_v2(v2_r07, rec)
-              + _vote_v2(v2p_r07, rec) + _vote_v3(v3_r07, rec))
-    add("R08", _vote_v1(v1_r08, rec) + _vote_v2(v2_r08, rec)
-              + _vote_v2(v2p_r08, rec) + _vote_v3(v3_r08, rec))
-    add("R09", _vote_v1(v1_r09, rec) + _vote_v2(v2_r09, rec)
-              + _vote_v2(v2p_r09, rec) + _vote_v3(v3_r09, rec))
-    add("R10", _vote_v1(v1_r10, rec) + _vote_v2(v2_r10, rec)
-              + _vote_v2(v2p_r10, rec))
-    add("R12", _vote_v1(v1_r12, rec) + _vote_v2(v2_r12, rec)
-              + _vote_v2(v2p_r12, rec) + _vote_v3(v3_r12, rec))
+        add(
+            "R03",
+            _vote_v1(v1_r03, rec, nbr, 30.0)
+            + _vote_v2(v2_r03, rec, nbr, 30.0)
+            + _vote_v2(v2p_r03, rec, nbr),
+        )
+        add(
+            "R04",
+            _vote_v1(v1_r04, rec, nbr) + _vote_v2(v2_r04, rec, nbr) + _vote_v2(v2p_r04, rec, nbr),
+        )
+        add(
+            "R05",
+            _vote_v1(v1_r05, rec, nbr, 30.0)
+            + _vote_v2(v2_r05, rec, nbr)
+            + _vote_v2(v2p_r05, rec, nbr),
+        )
+    add("R06", _vote_v1(v1_r06, rec) + _vote_v2(v2_r06, rec) + _vote_v2(v2p_r06, rec))
+    add(
+        "R07",
+        _vote_v1(v1_r07, rec)
+        + _vote_v2(v2_r07, rec)
+        + _vote_v2(v2p_r07, rec)
+        + _vote_v3(v3_r07, rec),
+    )
+    add(
+        "R08",
+        _vote_v1(v1_r08, rec)
+        + _vote_v2(v2_r08, rec)
+        + _vote_v2(v2p_r08, rec)
+        + _vote_v3(v3_r08, rec),
+    )
+    add(
+        "R09",
+        _vote_v1(v1_r09, rec)
+        + _vote_v2(v2_r09, rec)
+        + _vote_v2(v2p_r09, rec)
+        + _vote_v3(v3_r09, rec),
+    )
+    add("R10", _vote_v1(v1_r10, rec) + _vote_v2(v2_r10, rec) + _vote_v2(v2p_r10, rec))
+    add(
+        "R12",
+        _vote_v1(v1_r12, rec)
+        + _vote_v2(v2_r12, rec)
+        + _vote_v2(v2p_r12, rec)
+        + _vote_v3(v3_r12, rec),
+    )
 
     # New residuals (V₁-only currently — V₂/V₂' GLM dispatches future work):
     # R21 monotonic-frame closes D-02
     if nbr is not None:
         from bin.v1_claude_residuals.r21_monotonic_frame import r21_monotonic_frame
+
         try:
             r21 = r21_monotonic_frame(rec, nbr)
-            add("R21", 1 if not r21.passed and not (
-                isinstance(r21.residual, float) and r21.residual != r21.residual
-            ) else 0)
+            add(
+                "R21",
+                1
+                if not r21.passed
+                and not (isinstance(r21.residual, float) and r21.residual != r21.residual)
+                else 0,
+            )
         except Exception:
             add("R21", 1)
 
@@ -487,9 +543,7 @@ def _detect_count(
             fake_video = buyer_reference_path.parent / "video.mp4"
             try:
                 r24 = v4_buyer_reference_diff(rec, nbr, buyer_reference_path, fake_video)
-                is_abstain = (
-                    isinstance(r24.residual, float) and math.isnan(r24.residual)
-                )
+                is_abstain = isinstance(r24.residual, float) and math.isnan(r24.residual)
                 add("R24", 1 if (not r24.passed and not is_abstain) else 0)
             except Exception:
                 # Treat exceptions as detection (matches R18/R21/R22 contract).
@@ -502,6 +556,7 @@ def _detect_count(
     # than letting NaN→FAIL noise flip honest attacks.
     if manifest_path is not None:
         from bin.v1_claude_residuals.r18_session_manifest import r18_session_manifest
+
         try:
             r18 = r18_session_manifest(rec, nbr, manifest_path)
             is_abstain = isinstance(r18.residual, float) and math.isnan(r18.residual)
@@ -524,6 +579,7 @@ def _detect_count(
             r20d_speed_profile,
             r20e_yaw_turn_rate,
         )
+
         dataset = _synthesize_dataset(rec, nbr, attack.fi_id)
         # Each sub-residual gets its own slot so the V1-only acceptance
         # rule (count == 1 ⇒ caught) can fire on any of the five.
@@ -536,9 +592,7 @@ def _detect_count(
         ):
             try:
                 r = fn(dataset)
-                is_abstain = (
-                    isinstance(r.sample_stat, float) and math.isnan(r.sample_stat)
-                )
+                is_abstain = isinstance(r.sample_stat, float) and math.isnan(r.sample_stat)
                 add(slot, 1 if (not r.passed and not is_abstain) else 0)
             except Exception:
                 add(slot, 1)
@@ -548,10 +602,10 @@ def _detect_count(
     # depth_dir bound) which we already model by skipping the call.
     if attack.fi_id == "D-04":
         from bin.v1_claude_residuals.r22_depth_hash import r22_depth_hash
+
         depth_dir, manifest = _make_d04_depth_fixture()
         try:
-            r22 = r22_depth_hash(rec, nbr, depth_dir=depth_dir,
-                                 manifest_path=manifest)
+            r22 = r22_depth_hash(rec, nbr, depth_dir=depth_dir, manifest_path=manifest)
             is_abstain = isinstance(r22.residual, float) and math.isnan(r22.residual)
             add("R22", 1 if (not r22.passed and not is_abstain) else 0)
         except Exception:
@@ -563,15 +617,20 @@ def _detect_count(
     # harness runs on hosts without ffprobe installed.
     if attack.fi_id == "D-05":
         from bin.v1_claude_residuals import r23_video_codec
+
         video = _make_d05_video_fixture()
-        fake_ffprobe_stdout = json.dumps({
-            "streams": [{
-                "codec_type": "video",
-                "codec_name": "h264",  # PRD requires hevc
-                "width": 1920,
-                "height": 1080,
-            }],
-        })
+        fake_ffprobe_stdout = json.dumps(
+            {
+                "streams": [
+                    {
+                        "codec_type": "video",
+                        "codec_name": "h264",  # PRD requires hevc
+                        "width": 1920,
+                        "height": 1080,
+                    }
+                ],
+            }
+        )
 
         class _FakeCompleted:
             def __init__(self) -> None:
@@ -579,10 +638,16 @@ def _detect_count(
                 self.stderr = ""
                 self.returncode = 0
 
-        with patch("bin.v1_claude_residuals.r23_video_codec.shutil.which",
-                   return_value="/usr/bin/ffprobe"), \
-             patch("bin.v1_claude_residuals.r23_video_codec.subprocess.run",
-                   return_value=_FakeCompleted()):
+        with (
+            patch(
+                "bin.v1_claude_residuals.r23_video_codec.shutil.which",
+                return_value="/usr/bin/ffprobe",
+            ),
+            patch(
+                "bin.v1_claude_residuals.r23_video_codec.subprocess.run",
+                return_value=_FakeCompleted(),
+            ),
+        ):
             try:
                 r23 = r23_video_codec(rec, nbr, video_path=video)
                 is_abstain = isinstance(r23.residual, float) and math.isnan(r23.residual)
@@ -615,23 +680,30 @@ def main() -> int:
         # We give Red the harshest realistic test: count >= 2 OR
         # (count == 1 AND residual is in the V1-only set).
         v1_only = {
-            "R13", "R18", "R21", "R24",
-            "R20a", "R20b", "R20c", "R20d", "R20e",
-            "R22", "R23",
+            "R13",
+            "R18",
+            "R21",
+            "R24",
+            "R20a",
+            "R20b",
+            "R20c",
+            "R20d",
+            "R20e",
+            "R22",
+            "R23",
         }
-        caught = any(
-            c >= 2 or (c >= 1 and rname in v1_only)
-            for rname, c in counts.items()
+        caught = any(c >= 2 or (c >= 1 and rname in v1_only) for rname, c in counts.items())
+        scores.append(
+            BlueScore(
+                fi_id=case.fi_id,
+                bucket=case.bucket,
+                label=case.label,
+                severity=case.severity,
+                expected=case.expected_residuals,
+                detected_by=counts,
+                bft_caught=caught,
+            )
         )
-        scores.append(BlueScore(
-            fi_id=case.fi_id,
-            bucket=case.bucket,
-            label=case.label,
-            severity=case.severity,
-            expected=case.expected_residuals,
-            detected_by=counts,
-            bft_caught=caught,
-        ))
 
     # Print bucket summaries
     print()
