@@ -17,7 +17,12 @@
 ## Round 372 @ 2026-06-26T03:45:00Z
 
 - Picked: ruff format bin/buyer_dashboard_html.py (278 lines, 2nd smallest unformatted bin file after bug_report.py at 365). Justification: measurable code smell, single-file scope, no behavior change (purely cosmetic line-wrap + dict literals + trailing commas), AST parse + import smoke OK, no test for this file, follows established cadence.
-- Result: committed b756eb31 (ruff format applied: dict literals, f-strings, trailing commas; 1 file changed, 23 insertions(+), 24 deletions(-); ruff check + format --check clean; AST parse + import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
+- Result: committed b756eb31 (ruff format applied: dict literals, f-strings, trailing commas; 1 file changed, 23 insertions(+), 24 deletions(-); ruff check + format --check clean; AST parse + import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference.)
+
+## Round 373 @ 2026-06-26T03:55:00Z
+
+- Picked: ruff format bin/load_test_100_recorders.py (471 lines, smallest unformatted bin file). Justification: measurable code smell, single-file scope, no behavior change (fixed implicit string concatenation), AST parse + import smoke OK, targeted test passes (test_load_test_harness.py 30/30), follows established cadence.
+- Result: committed 6550ec48 (ruff format fixed implicit string concatenation in logger.info call; 1 file changed, 1 insertion(+), 1 deletion(-); ruff check + format --check clean; test_load_test_harness.py passes 30/30; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking.)t --check clean; AST parse + import smoke OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (no test references this file), no brand cross-reference, no module-level side effect.)
 
 ## Round 373 @ 2026-06-27T00:19:00Z
 
@@ -1359,3 +1364,8 @@ b4c97dbd638c75a1d826e641df598879876660ed
 
 - Picked: ruff format bin/oyster_monitor.py (465 lines, smallest unformatted bin file with no test references). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change (cosmetic: blank lines after section headers, line-wrap of regex/ssh-cmd list/conditional expressions, single→double quote normalization, parenthesization of `1024**3`), AST parse + ruff check + ruff format --check all clean before and after, no test references this file (only stale pyc), follows established cadence of formatting small bin files.
 - Result: committed 2b3bfbd2 (ruff format applied; 1 file changed, 29 insertions(+), 8 deletions(-); ruff check + format --check clean; AST parse OK; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race condition, no off-by-one, no security impact (ssh command list semantics unchanged: same args, just multi-line), no test masking (no test references), no brand cross-reference, no module-level side effect added; pre-existing `logging.basicConfig` call only had its keyword args line-wrapped, not introduced.)
+
+## Round 405 @ 2026-06-27T03:00:00Z
+
+- Picked: ruff format bin/depth_from_mineflayer_raycast.py (478 lines, smallest unformatted bin file with existing test). Justification: measurable code smell (ruff format --check fail), single-file scope, no behavior change (cosmetic line-wrap + dict literals + trailing commas), targeted test passes (6/6), follows established cadence.
+- Result: committed c1a0b23e (ruff format applied: 8 insertions(+), 11 deletions(-); ruff check + format --check clean; 6/6 tests pass; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no race, no off-by-one, no security impact, no test masking (6/6 pass), no brand cross-reference, no module-level side effect.)
