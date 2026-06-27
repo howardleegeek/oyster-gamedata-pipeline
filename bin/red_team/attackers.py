@@ -8,6 +8,7 @@ Each attacker takes (baseline_frame, neighbor_frame) and returns an
 ``AttackResult`` describing the mutated input plus metadata. The Blue
 team scoring harness uses ``ATTACK_CATALOG`` to iterate all attacks.
 """
+
 from __future__ import annotations
 
 import copy
@@ -19,6 +20,7 @@ from typing import Callable
 @dataclass(frozen=True)
 class AttackResult:
     """One mutated input ready to feed into BFT verifiers."""
+
     fi_id: str
     bucket: str  # "A" | "B" | "C" | "D"
     label: str
@@ -42,6 +44,7 @@ class AttackCase:
 # ---------------------------------------------------------------------------
 # Bucket B — multi-field coordinated mutations
 # ---------------------------------------------------------------------------
+
 
 def _b01_oula_quat_consistent_swap(rec: dict, neighbor: dict) -> AttackResult:
     """Mutate oula AND quat to a different SELF-CONSISTENT Hamilton pair.
@@ -167,6 +170,7 @@ def _b05_dataset_replay_splice(rec: dict, neighbor: dict) -> AttackResult:
 # Bucket C — sub-threshold perturbations
 # ---------------------------------------------------------------------------
 
+
 def _c01_quat_norm_just_under_threshold(rec: dict, neighbor: dict) -> AttackResult:
     new = copy.deepcopy(rec)
     q = list(new["camera_rotation_quaternion"])
@@ -254,6 +258,7 @@ def _c05_speed_just_under_v_max(rec: dict, neighbor: dict) -> AttackResult:
 # ---------------------------------------------------------------------------
 # Bucket D — replay / temporal attacks
 # ---------------------------------------------------------------------------
+
 
 def _d01_timestamp_skip(rec: dict, neighbor: dict) -> AttackResult:
     new = copy.deepcopy(rec)
@@ -351,44 +356,93 @@ def _d05_video_codec_mismatch(rec: dict, neighbor: dict) -> AttackResult:
 # ---------------------------------------------------------------------------
 
 bucket_b_attacks: tuple[AttackCase, ...] = (
-    AttackCase("B-01", "B", "oula+quat self-consistent swap", "high",
-               ("R13", "R24"), _b01_oula_quat_consistent_swap),
-    AttackCase("B-02", "B", "pos+speed ×2 coordinated", "medium",
-               ("R10",), _b02_pos_speed_consistent_scale),
-    AttackCase("B-03", "B", "keyCode + inputs.jsonl W→B coordinated", "critical",
-               ("R24",), _b03_keycode_W_to_B_full_swap),
-    AttackCase("B-04", "B", "time+fps proportional dilate", "high",
-               ("R12", "R15"), _b04_time_fps_proportional_dilate),
-    AttackCase("B-05", "B", "dataset replay splice (AC[A] + video[B])", "critical",
-               ("R18", "R15", "R16", "R24"), _b05_dataset_replay_splice),
+    AttackCase(
+        "B-01",
+        "B",
+        "oula+quat self-consistent swap",
+        "high",
+        ("R13", "R24"),
+        _b01_oula_quat_consistent_swap,
+    ),
+    AttackCase(
+        "B-02", "B", "pos+speed ×2 coordinated", "medium", ("R10",), _b02_pos_speed_consistent_scale
+    ),
+    AttackCase(
+        "B-03",
+        "B",
+        "keyCode + inputs.jsonl W→B coordinated",
+        "critical",
+        ("R24",),
+        _b03_keycode_W_to_B_full_swap,
+    ),
+    AttackCase(
+        "B-04",
+        "B",
+        "time+fps proportional dilate",
+        "high",
+        ("R12", "R15"),
+        _b04_time_fps_proportional_dilate,
+    ),
+    AttackCase(
+        "B-05",
+        "B",
+        "dataset replay splice (AC[A] + video[B])",
+        "critical",
+        ("R18", "R15", "R16", "R24"),
+        _b05_dataset_replay_splice,
+    ),
 )
 
 bucket_c_attacks: tuple[AttackCase, ...] = (
-    AttackCase("C-01", "C", "quat norm 1 + 5e-7 (sub-R01-threshold)", "low",
-               ("R20a",), _c01_quat_norm_just_under_threshold),
-    AttackCase("C-02", "C", "mouse_dx +5e-7 (sub-R04-threshold)", "low",
-               ("R20b",), _c02_mouse_dx_subepsilon),
-    AttackCase("C-03", "C", "fps=29.51 (R12 lower-bound)", "low",
-               ("R20c",), _c03_fps_at_lower_bound),
-    AttackCase("C-04", "C", "pitch=180.001 (R06 over)", "medium",
-               ("R06", "R02"), _c04_pitch_180p001_overshoot),
-    AttackCase("C-05", "C", "speed=49.99 (R10 just under)", "medium",
-               ("R03", "R20d"), _c05_speed_just_under_v_max),
+    AttackCase(
+        "C-01",
+        "C",
+        "quat norm 1 + 5e-7 (sub-R01-threshold)",
+        "low",
+        ("R20a",),
+        _c01_quat_norm_just_under_threshold,
+    ),
+    AttackCase(
+        "C-02",
+        "C",
+        "mouse_dx +5e-7 (sub-R04-threshold)",
+        "low",
+        ("R20b",),
+        _c02_mouse_dx_subepsilon,
+    ),
+    AttackCase(
+        "C-03", "C", "fps=29.51 (R12 lower-bound)", "low", ("R20c",), _c03_fps_at_lower_bound
+    ),
+    AttackCase(
+        "C-04",
+        "C",
+        "pitch=180.001 (R06 over)",
+        "medium",
+        ("R06", "R02"),
+        _c04_pitch_180p001_overshoot,
+    ),
+    AttackCase(
+        "C-05",
+        "C",
+        "speed=49.99 (R10 just under)",
+        "medium",
+        ("R03", "R20d"),
+        _c05_speed_just_under_v_max,
+    ),
 )
 
 bucket_d_attacks: tuple[AttackCase, ...] = (
-    AttackCase("D-01", "D", "timestamp 33→66ms skip", "high",
-               ("R05",), _d01_timestamp_skip),
-    AttackCase("D-02", "D", "frame index out-of-order", "medium",
-               (), _d02_frame_index_reorder),
-    AttackCase("D-03", "D", "inputs.jsonl truncated", "medium",
-               (), _d03_inputs_jsonl_truncated),
-    AttackCase("D-04", "D", "depth content shuffled", "critical",
-               ("R18", "R22"), _d04_depth_files_shuffled),
-    AttackCase("D-05", "D", "video codec mismatch", "medium",
-               ("R23",), _d05_video_codec_mismatch),
+    AttackCase("D-01", "D", "timestamp 33→66ms skip", "high", ("R05",), _d01_timestamp_skip),
+    AttackCase("D-02", "D", "frame index out-of-order", "medium", (), _d02_frame_index_reorder),
+    AttackCase("D-03", "D", "inputs.jsonl truncated", "medium", (), _d03_inputs_jsonl_truncated),
+    AttackCase(
+        "D-04", "D", "depth content shuffled", "critical", ("R18", "R22"), _d04_depth_files_shuffled
+    ),
+    AttackCase("D-05", "D", "video codec mismatch", "medium", ("R23",), _d05_video_codec_mismatch),
 )
 
 ATTACK_CATALOG: tuple[AttackCase, ...] = (
-    *bucket_b_attacks, *bucket_c_attacks, *bucket_d_attacks,
+    *bucket_b_attacks,
+    *bucket_c_attacks,
+    *bucket_d_attacks,
 )
