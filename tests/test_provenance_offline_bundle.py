@@ -184,9 +184,9 @@ class TestBundleCreation:
                 session_size += os.path.getsize(os.path.join(root, fname))
 
         # Allow 1.2× ratio (bundle has metadata + overhead)
-        assert (
-            bundle_size <= session_size * 1.2 + 5000
-        ), f"bundle too large: {bundle_size} vs session {session_size}"
+        assert bundle_size <= session_size * 1.2 + 5000, (
+            f"bundle too large: {bundle_size} vs session {session_size}"
+        )
 
     def test_bundle_session_dir_not_found(self, real_keypair):
         keyfile, _ = real_keypair
