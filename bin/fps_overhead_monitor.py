@@ -92,6 +92,11 @@ class FPSMetrics:
 
     @property
     def std_dev(self) -> float:
+        """Return the standard deviation of FPS samples.
+
+        Returns:
+            Standard deviation as float, or 0.0 if fewer than 2 samples.
+        """
         return stdev(self.samples) if len(self.samples) >= 2 else 0.0
 
     def reset(self) -> None:
