@@ -50,6 +50,7 @@ bulk_jobs_store: Dict[str, Dict] = {}
 # Sessions storage (mock data)
 sessions_store: Dict[str, Dict] = {}
 
+
 # JWT verification (integrates with #24 OAuth flow)
 async def verify_jwt(token: str) -> Dict:
     """Verify JWT token and return buyer info."""
@@ -59,30 +60,30 @@ async def verify_jwt(token: str) -> Dict:
         raise HTTPException(status_code=401, detail="Invalid token")
     return {"buyer_id": "buyer_123", "role": "buyer"}
 
+
 async def get_current_buyer(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict:
     """Extract and verify buyer from JWT token."""
     token = credentials.credentials
     return await verify_jwt(token)
 
+
 def check_rate_limit(buyer_id: str) -> None:
     """Check and enforce rate limit per buyer."""
     now = time.time()
     hour_ago = now - 3600
-    
+
     if buyer_id not in rate_limit_store:
         rate_limit_store[buyer_id] = []
-    
+
     # Clean old requests
     rate_limit_store[buyer_id] = [t for t in rate_limit_store[buyer_id] if t > hour_ago]
-    
+
     if len(rate_limit_store[buyer_id]) >= RATE_LIMIT_PER_HOUR:
         retry_after = int(rate_limit_store[buyer_id][0] + 3600 - now) + 1
         raise HTTPException(
-            status_code=429,
-            detail="Rate limit exceeded",
-            headers={"Retry-After": str(retry_after)}
+            status_code=429, detail="Rate limit exceeded", headers={"Retry-After": str(retry_after)}
         )
-    
+
     rate_limit_store[buyer_id].append(now)
 
 
@@ -102,12 +103,14 @@ class Session(BaseModel):
     status: str = "available"
     download_urls: Optional[Dict[str, str]] = None
 
+
 class SessionList(BaseModel):
     sessions: List[Session]
     total: int
     page: int
     page_size: int
     has_more: bool
+
 
 class AuditResult(BaseModel):
     session_id: str
@@ -116,16 +119,21 @@ class AuditResult(BaseModel):
     passed: bool
     timestamp: datetime
 
+
 class VerifyResult(BaseModel):
     session_id: str
     verified: bool
     provenance_chain: List[Dict]
     timestamp: datetime
 
+
 class WebhookRegistration(BaseModel):
     url: str
-    events: List[str] = Field(default=["session.created", "session.audit_passed", "session.approved", "payout.completed"])
+    events: List[str] = Field(
+        default=["session.created", "session.audit_passed", "session.approved", "payout.completed"]
+    )
     secret: str
+
 
 class WebhookInfo(BaseModel):
     id: str
@@ -133,9 +141,11 @@ class WebhookInfo(BaseModel):
     events: List[str]
     created_at: datetime
 
+
 class BulkDownloadRequest(BaseModel):
     filters: Dict[str, Any]
     since: Optional[str] = None
+
 
 class BulkDownloadJob(BaseModel):
     job_id: str
@@ -145,8 +155,10 @@ class BulkDownloadJob(BaseModel):
     total_sessions: Optional[int] = None
     expires_at: Optional[datetime] = None
 
+
 class ApprovalRequest(BaseModel):
     notes: Optional[str] = None
+
 
 class RejectionRequest(BaseModel):
     reason: str
@@ -158,17 +170,17 @@ def generate_signed_url(session_id: str, file_type: str) -> str:
     """Generate a signed download URL for a file."""
     expires = int(time.time()) + 3600
     signature = hmac.new(
-        b"download_secret_key",
-        f"{session_id}:{file_type}:{expires}".encode(),
-        hashlib.sha256
+        b"download_secret_key", f"{session_id}:{file_type}:{expires}".encode(), hashlib.sha256
     ).hexdigest()[:16]
     return f"https://storage.oyster.ai/sessions/{session_id}/{file_type}?expires={expires}&sig={signature}"
+
 
 def compute_job_id(filters: Dict, since: Optional[str]) -> str:
     """Compute deterministic job ID for idempotent bulk downloads."""
     filter_str = str(sorted(filters.items())) + str(since or "")
     hash_input = filter_str.encode()
     return hashlib.sha256(hash_input).hexdigest()[:16]
+
 
 def filter_sessions(filters: Dict[str, Any]) -> List[Dict]:
     """Filter sessions based on criteria."""
@@ -186,7 +198,7 @@ def filter_sessions(filters: Dict[str, Any]) -> List[Dict]:
             "has_voice": False,
             "has_zbuffer": True,
             "created_at": datetime(2026, 5, 17, 10, 30, 0),
-            "status": "available"
+            "status": "available",
         },
         {
             "id": "sess_002",
@@ -200,10 +212,10 @@ def filter_sessions(filters: Dict[str, Any]) -> List[Dict]:
             "has_voice": True,
             "has_zbuffer": True,
             "created_at": datetime(2026, 5, 18, 14, 20, 0),
-            "status": "available"
-        }
+            "status": "available",
+        },
     ]
-    
+
     result = []
     for s in mock_sessions:
         match = True
@@ -228,7 +240,7 @@ def filter_sessions(filters: Dict[str, Any]) -> List[Dict]:
                 match = False
         if match:
             result.append(s)
-    
+
     return result
 
 
@@ -251,7 +263,7 @@ async def list_sessions(
 ):
     """List sessions with pagination and filters."""
     check_rate_limit(buyer["buyer_id"])
-    
+
     filters = {}
     if game:
         filters["game"] = game
@@ -271,20 +283,20 @@ async def list_sessions(
         filters["has_voice"] = has_voice
     if has_zbuffer is not None:
         filters["has_zbuffer"] = has_zbuffer
-    
+
     all_sessions = filter_sessions(filters)
     total = len(all_sessions)
-    
+
     start = (page - 1) * page_size
     end = start + page_size
     page_sessions = all_sessions[start:end]
-    
+
     return SessionList(
         sessions=[Session(**s) for s in page_sessions],
         total=total,
         page=page,
         page_size=page_size,
-        has_more=end < total
+        has_more=end < total,
     )
 
 
@@ -295,7 +307,7 @@ async def get_session(
 ):
     """Get single session metadata with signed download URLs."""
     check_rate_limit(buyer["buyer_id"])
-    
+
     # Mock session retrieval
     session_data = {
         "id": session_id,
@@ -315,9 +327,9 @@ async def get_session(
             "depth": generate_signed_url(session_id, "depth"),
             "audio": generate_signed_url(session_id, "audio"),
             "metadata": generate_signed_url(session_id, "metadata"),
-        }
+        },
     }
-    
+
     return Session(**session_data)
 
 
@@ -328,7 +340,7 @@ async def get_session_audit(
 ):
     """Get full audit JSON for a session."""
     check_rate_limit(buyer["buyer_id"])
-    
+
     return AuditResult(
         session_id=session_id,
         audit_score=105,
@@ -339,7 +351,7 @@ async def get_session_audit(
             "motion_blur": {"passed": True, "score": 92},
         },
         passed=True,
-        timestamp=datetime.utcnow()
+        timestamp=datetime.utcnow(),
     )
 
 
@@ -350,7 +362,7 @@ async def verify_session(
 ):
     """Verify session provenance."""
     check_rate_limit(buyer["buyer_id"])
-    
+
     return VerifyResult(
         session_id=session_id,
         verified=True,
@@ -360,7 +372,7 @@ async def verify_session(
             {"step": "audit", "timestamp": "2026-05-17T11:00:00Z", "node": "audit_worker_01"},
             {"step": "store", "timestamp": "2026-05-17T11:05:00Z", "node": "storage_cluster_01"},
         ],
-        timestamp=datetime.utcnow()
+        timestamp=datetime.utcnow(),
     )
 
 
@@ -371,17 +383,17 @@ async def create_bulk_download(
 ):
     """Initiate bulk download job. Idempotent within 24h window."""
     check_rate_limit(buyer["buyer_id"])
-    
+
     # Compute deterministic job ID for idempotency
     job_id = compute_job_id(request.filters, request.since)
-    
+
     # Check if job already exists and is less than 24h old
     if job_id in bulk_jobs_store:
         existing = bulk_jobs_store[job_id]
         age = datetime.utcnow() - existing["created_at"]
         if age < timedelta(hours=24):
             return BulkDownloadJob(**existing)
-    
+
     # Create new job
     job_data = {
         "job_id": job_id,
@@ -394,14 +406,16 @@ async def create_bulk_download(
         "since": request.since,
         "buyer_id": buyer["buyer_id"],
     }
-    
+
     bulk_jobs_store[job_id] = job_data
-    
+
     # In production, enqueue job for background processing
     # For now, simulate completion
     job_data["status"] = "completed"
-    job_data["download_url"] = f"https://storage.oyster.ai/bulk/{job_id}/download.tar.gz?expires={int(time.time()) + 86400}"
-    
+    job_data["download_url"] = (
+        f"https://storage.oyster.ai/bulk/{job_id}/download.tar.gz?expires={int(time.time()) + 86400}"
+    )
+
     return BulkDownloadJob(**job_data)
 
 
@@ -412,10 +426,10 @@ async def get_bulk_download_status(
 ):
     """Poll bulk download job status."""
     check_rate_limit(buyer["buyer_id"])
-    
+
     if job_id not in bulk_jobs_store:
         raise HTTPException(status_code=404, detail="Job not found")
-    
+
     return BulkDownloadJob(**bulk_jobs_store[job_id])
 
 
@@ -426,7 +440,7 @@ async def register_webhook(
 ):
     """Register a webhook URL for events."""
     check_rate_limit(buyer["buyer_id"])
-    
+
     webhook_id = f"wh_{uuid.uuid4().hex[:12]}"
     webhook_data = {
         "id": webhook_id,
@@ -436,14 +450,11 @@ async def register_webhook(
         "buyer_id": buyer["buyer_id"],
         "created_at": datetime.utcnow(),
     }
-    
+
     webhooks_store[webhook_id] = webhook_data
-    
+
     return WebhookInfo(
-        id=webhook_id,
-        url=webhook.url,
-        events=webhook.events,
-        created_at=webhook_data["created_at"]
+        id=webhook_id, url=webhook.url, events=webhook.events, created_at=webhook_data["created_at"]
     )
 
 
@@ -453,12 +464,9 @@ async def list_webhooks(
 ):
     """List registered webhooks for the buyer."""
     check_rate_limit(buyer["buyer_id"])
-    
-    buyer_webhooks = [
-        wh for wh in webhooks_store.values()
-        if wh["buyer_id"] == buyer["buyer_id"]
-    ]
-    
+
+    buyer_webhooks = [wh for wh in webhooks_store.values() if wh["buyer_id"] == buyer["buyer_id"]]
+
     return [
         WebhookInfo(id=wh["id"], url=wh["url"], events=wh["events"], created_at=wh["created_at"])
         for wh in buyer_webhooks
@@ -472,15 +480,15 @@ async def delete_webhook(
 ):
     """Unregister a webhook."""
     check_rate_limit(buyer["buyer_id"])
-    
+
     if webhook_id not in webhooks_store:
         raise HTTPException(status_code=404, detail="Webhook not found")
-    
+
     if webhooks_store[webhook_id]["buyer_id"] != buyer["buyer_id"]:
         raise HTTPException(status_code=403, detail="Not authorized")
-    
+
     del webhooks_store[webhook_id]
-    
+
     return {"status": "deleted"}
 
 
@@ -492,17 +500,21 @@ async def approve_session(
 ):
     """Approve a session, triggering payout."""
     check_rate_limit(buyer["buyer_id"])
-    
+
     # In production, trigger payout workflow
     # Emit webhook event
     from server.webhook_dispatcher import dispatch_event
-    await dispatch_event("session.approved", {
-        "session_id": session_id,
-        "buyer_id": buyer["buyer_id"],
-        "approved_at": datetime.utcnow().isoformat(),
-        "notes": approval.notes,
-    })
-    
+
+    await dispatch_event(
+        "session.approved",
+        {
+            "session_id": session_id,
+            "buyer_id": buyer["buyer_id"],
+            "approved_at": datetime.utcnow().isoformat(),
+            "notes": approval.notes,
+        },
+    )
+
     return {"status": "approved", "session_id": session_id}
 
 
@@ -514,15 +526,11 @@ async def reject_session(
 ):
     """Reject a session with reason."""
     check_rate_limit(buyer["buyer_id"])
-    
+
     # In production, update session status
     # Emit webhook event if needed
-    
-    return {
-        "status": "rejected",
-        "session_id": session_id,
-        "reason": rejection.reason
-    }
+
+    return {"status": "rejected", "session_id": session_id, "reason": rejection.reason}
 
 
 # Health check endpoint
