@@ -295,8 +295,7 @@ def check_appcast_with_retry(
     ):
         if verbose:
             print(
-                "  → appcast not yet at expected release; retrying "
-                f"in {retry_interval_seconds:g}s"
+                f"  → appcast not yet at expected release; retrying in {retry_interval_seconds:g}s"
             )
         time.sleep(max(0.0, retry_interval_seconds))
         result = check_appcast(client, verbose, expected_recorder_tag)
