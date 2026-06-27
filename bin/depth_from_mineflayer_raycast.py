@@ -62,9 +62,7 @@ RAY_STEP_M = 0.25
 GROUND_Y = 64.0
 
 
-def _camera_basis(yaw_rad: float, pitch_rad: float) -> tuple[
-    np.ndarray, np.ndarray, np.ndarray
-]:
+def _camera_basis(yaw_rad: float, pitch_rad: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Return ``(forward, right, down)`` unit vectors in world coordinates
     for a camera at Mineflayer ``(yaw_rad, pitch_rad)``.
 
@@ -272,9 +270,7 @@ def _iter_observation_events(
     if not metadata_jsonl.is_file():
         # Match the exception type expected by callers — they pattern-match
         # on FileNotFoundError, not the lower-level OSError.
-        raise FileNotFoundError(
-            f"metadata.jsonl not found: {metadata_jsonl}"
-        )
+        raise FileNotFoundError(f"metadata.jsonl not found: {metadata_jsonl}")
 
     poses: list[tuple[float, tuple[float, float, float], float, float]] = []
     with metadata_jsonl.open("r", encoding="utf-8") as fp:
@@ -386,9 +382,7 @@ def render_depth_for_session(
         # Per task constraint: never silently emit zero / placeholder output.
         # If we can't infer at least one frame from the metadata, the caller
         # has handed us a broken session and must be told.
-        raise RuntimeError(
-            f"no OBSERVATION events with position found in {metadata_jsonl}"
-        )
+        raise RuntimeError(f"no OBSERVATION events with position found in {metadata_jsonl}")
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -419,8 +413,11 @@ def render_depth_for_session(
                 src_ts = [float(i) for i in range(len(poses))]
             else:
                 src_ts = [
-                    (poses[i][0] if poses[i][0] is not None else
-                     t0 + (tN - t0) * i / max(1, len(poses) - 1))
+                    (
+                        poses[i][0]
+                        if poses[i][0] is not None
+                        else t0 + (tN - t0) * i / max(1, len(poses) - 1)
+                    )
                     for i in range(len(poses))
                 ]
             target_ts = np.linspace(t0, tN, target_frame_count)
