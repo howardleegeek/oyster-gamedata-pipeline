@@ -77,10 +77,9 @@ class RLDSFlagProcessor:
                 if start is not None:
                     boundaries.append({"start": start, "end": i - 1})
                 start = i
-            if rec.get("is_last"):
-                if start is not None:
-                    boundaries.append({"start": start, "end": i})
-                    start = None
+            if rec.get("is_last") and start is not None:
+                boundaries.append({"start": start, "end": i})
+                start = None
         if start is not None:
             boundaries.append({"start": start, "end": len(records) - 1})
         return boundaries
