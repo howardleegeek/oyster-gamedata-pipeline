@@ -357,9 +357,11 @@ def test_live_stripe_client_parses_http_error(cron_module):
         fp=io.BytesIO(body),
     )
 
-    with mock.patch("urllib.request.urlopen", side_effect=err):
-        with pytest.raises(cron_module.StripeError) as exc_info:
-            client.create_transfer(
+    with (
+        mock.patch("urllib.request.urlopen", side_effect=err),
+        pytest.raises(cron_module.StripeError) as exc_info,
+    ):
+        client.create_transfer(
                 amount_cents=1000,
                 destination_account_id="acct_xxx",
                 idempotency_key="k",
