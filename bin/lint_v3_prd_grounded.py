@@ -1140,11 +1140,11 @@ def _check_keycode(d: Path, rpt: LintReport) -> None:
         try:
             with open(jl) as f:
                 for ln in f:
-                    ln = ln.strip()
-                    if not ln:
+                    raw_line = ln.strip()
+                    if not raw_line:
                         continue
                     try:
-                        e = json.loads(ln)
+                        e = json.loads(raw_line)
                     except Exception:
                         continue
                     kc = e.get("keyCode")
