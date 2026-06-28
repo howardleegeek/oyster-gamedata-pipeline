@@ -1,3 +1,8 @@
+## Round 422 @ 2026-06-30T00:30:00Z
+- Picked: F841 unused variable in tests/test_rate_limiter.py:143 and :311 — two `count1 = count_sessions_today()` bindings where the return value is assigned but never used. Justification: measurable code smell, single-file scope, simple removal, targeted tests pass (17/17), preserves function call for its side effect (counter-file creation) per adjacent comment, reduces F841 count from 10 to 8.
+- Result: committed 3d2e1203 (removed two dead `count1 = count_sessions_today()` bindings; ruff check --select=F841 now clean for this file; pytest tests/test_rate_limiter.py 17/17 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: F841 fix — the function call is preserved for its side effect of creating the counter file, as indicated by the adjacent "First call should create counter file" / "First call creates counter" comments; only the unused binding was removed. No silent error swallow (no exception is being discarded — the function doesn't raise in normal use; if it did, the test would already fail with the same exception), no false-success (call still runs and has its side effect), no race (test is single-threaded and patches global state per-test), no off-by-one (no counter arithmetic touched), no security impact (test code only), no test masking (17/17 still pass), no brand cross-reference, no module-level side effect added.)
+
+
 
 ## Round 419 @ 2026-06-29T01:00:00Z
 
