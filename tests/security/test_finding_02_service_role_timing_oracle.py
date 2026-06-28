@@ -47,10 +47,7 @@ def unsafe_eq(presented: str, expected: str) -> bool:
     """Models JS's `===` — short-circuits at first byte difference."""
     if len(presented) != len(expected):
         return False
-    for a, b in zip(presented, expected):
-        if a != b:
-            return False
-    return True
+    return all(a == b for a, b in zip(presented, expected))
 
 
 def safe_eq(presented: str, expected: str) -> bool:
