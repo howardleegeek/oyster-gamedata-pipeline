@@ -70,7 +70,7 @@ class TestDepthAnythingV2:
             importlib.reload(depth_anything_v2)
 
             # is_available should return False
-            assert depth_anything_v2.is_available() == False
+            assert not depth_anything_v2.is_available()
         finally:
             # Restore torch
             if original_torch is not None:
@@ -95,7 +95,7 @@ class TestDepthAnythingV2:
         importlib.reload(depth_anything_v2)
 
         # is_available should return True
-        assert depth_anything_v2.is_available() == True
+        assert depth_anything_v2.is_available()
 
     def test_infer_depth_returns_false_when_unavailable(self, monkeypatch):
         """Test infer_depth returns False when is_available() is False."""
@@ -112,7 +112,7 @@ class TestDepthAnythingV2:
             try:
                 # infer_depth should return False without calling torch
                 result = infer_depth(input_path, output_path)
-                assert result == False
+                assert not result
             finally:
                 # Clean up
                 if os.path.exists(input_path):
@@ -174,7 +174,7 @@ class TestDepthAnythingV2:
         result = depth_anything_v2.infer_depth(str(input_path), str(output_path))
 
         # Verify results
-        assert result == True
+        assert result
 
         # Verify imageio.imread was called
         mock_imageio.imread.assert_called_once_with(str(input_path))
