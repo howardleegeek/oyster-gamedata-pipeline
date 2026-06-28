@@ -218,13 +218,14 @@ class OysterClient:
         downloaded = 0
         try:
             req = urllib.request.Request(url)
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                with open(temp_path, "wb") as f:
-                    while chunk := resp.read(chunk_size):
-                        f.write(chunk)
-                        downloaded += len(chunk)
-                        if progress_bar:
-                            progress_bar.set_current(downloaded)
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp, open(
+                temp_path, "wb"
+            ) as f:
+                while chunk := resp.read(chunk_size):
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if progress_bar:
+                        progress_bar.set_current(downloaded)
             if verify_checksum and clip.checksum:
                 self._verify_checksum(temp_path, clip.checksum)
             temp_path.rename(output_path)
