@@ -379,9 +379,7 @@ def _compute_verdict(gates_result: dict, strict_buyer: bool = False) -> dict:
                         f"{gate_id}={g['status']} (strict-buyer requires PASS)"
                     )
 
-    if fail_count > 0 or error_count > 0:
-        verdict = "FAIL"
-    elif strict_violations:
+    if fail_count > 0 or error_count > 0 or strict_violations:
         verdict = "FAIL"
     elif degraded_count > 0:
         verdict = "PASS_DEGRADED"
