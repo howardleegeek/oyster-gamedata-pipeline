@@ -42,8 +42,8 @@ def check_file(file_path: Path) -> List[UnpinnedDep]:
     except OSError:
         return unpinned
 
-    for num, line in enumerate(lines, start=1):
-        line = line.split("#")[0].strip()
+    for num, raw_line in enumerate(lines, start=1):
+        line = raw_line.split("#")[0].strip()
         if COMMENT_OR_OPTION.match(line):
             continue
         m = RANGE_PATTERN.match(line)
