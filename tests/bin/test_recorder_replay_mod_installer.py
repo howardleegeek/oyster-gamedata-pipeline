@@ -100,11 +100,13 @@ def test_install_dry_run(tmp_path: Path) -> None:
 
 
 def test_install_no_version_raises(tmp_path: Path) -> None:
-    with mock.patch(
-        "bin.recorder_replay_mod_installer.detect_minecraft_version", return_value=None
+    with (
+        mock.patch(
+            "bin.recorder_replay_mod_installer.detect_minecraft_version", return_value=None
+        ),
+        pytest.raises(LookupError),
     ):
-        with pytest.raises(LookupError):
-            install(repo_root=tmp_path, dry_run=True)
+        install(repo_root=tmp_path, dry_run=True)
 
 
 def test_install_full_with_mocks(tmp_path: Path) -> None:
