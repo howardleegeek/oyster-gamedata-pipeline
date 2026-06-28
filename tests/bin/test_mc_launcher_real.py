@@ -87,14 +87,14 @@ def test_find_launcher_falls_back_when_missing() -> None:
     if "minecraft_launcher_lib" in sys.modules:
         del sys.modules["minecraft_launcher_lib"]
 
-    # Mock shutil.which to return None
-    with mock.patch("shutil.which", return_value=None):
-        # Mock os.path.exists to return False for all paths
-        with mock.patch("os.path.exists", return_value=False):
-            with mock.patch("os.access", return_value=False):
-                # Should raise RuntimeError
-                with pytest.raises(RuntimeError, match="No Minecraft launcher found"):
-                    mc_launcher_real.find_minecraft_launcher()
+    # Mock shutil.which to return None, os.path.exists to return False, and os.access to return False
+    with (
+        mock.patch("shutil.which", return_value=None),
+        mock.patch("os.path.exists", return_value=False),
+        mock.patch("os.access", return_value=False),
+        pytest.raises(RuntimeError, match="No Minecraft launcher found"),
+    ):
+        mc_launcher_real.find_minecraft_launcher()
 
     # Restore original module if it existed
     if original_lib:
@@ -256,11 +256,12 @@ def test_rcon_command_auth_failure() -> None:
 
     mock_sock.recv = mock_recv
 
-    with mock.patch("socket.socket", return_value=mock_sock):
-        with pytest.raises(RuntimeError, match="RCON authentication failed"):
-            mc_launcher_real.send_rcon_command(
-                host="localhost", port=25575, password="wrongpass", command="test"
-            )
+    with mock.patch("socket.socket", return_value=mock_sock), pytest.raises(
+        RuntimeError, match="RCON authentication failed"
+    ):
+        mc_launcher_real.send_rcon_command(
+            host="localhost", port=25575, password="wrongpass", command="test"
+        )
 
 
 def test_rcon_command_connection_error() -> None:
@@ -279,20 +280,24 @@ def test_rcon_command_connection_error() -> None:
 def test_main_argparse() -> None:
     """Test argparse argument parsing."""
     # Test default values
-    with mock.patch("sys.argv", ["mc_launcher_real.py"]):
-        with mock.patch("mc_launcher_real.launch_minecraft") as mock_launch:
-            mock_process = mock.MagicMock()
-            mock_process.poll.return_value = None
-            mock_process.wait.return_value = 0
-            mock_launch.return_value = mock_process
+    with (
+        mock.patch("sys.argv", ["mc_launcher_real.py"]),
+        mock.patch("mc_launcher_real.launch_minecraft") as mock_launch,
+    ):
+        mock_process = mock.MagicMock()
+        mock_process.poll.return_value = None
+        mock_process.wait.return_value = 0
+        mock_launch.return_value = mock_process
 
-            with mock.patch("mc_launcher_real.wait_for_join", return_value=True):
-                with mock.patch("pathlib.Path.glob") as mock_glob:
-                    mock_file = mock.MagicMock()
-                    mock_file.__gt__ = mock.MagicMock(return_value=True)  # For sorting
-                    mock_glob.return_value = [mock_file]
+        with (
+            mock.patch("mc_launcher_real.wait_for_join", return_value=True),
+            mock.patch("pathlib.Path.glob") as mock_glob,
+        ):
+            mock_file = mock.MagicMock()
+            mock_file.__gt__ = mock.MagicMock(return_value=True)  # For sorting
+            mock_glob.return_value = [mock_file]
 
-                    mc_launcher_real.main([])
+            mc_launcher_real.main([])
 
     # Test with custom arguments
     test_args = [
@@ -316,52 +321,52 @@ def test_main_argparse() -> None:
         "2G",
     ]
 
-    with mock.patch("sys.argv", ["mc_launcher_real.py"] + test_args):
-        with mock.patch("mc_launcher_real.launch_minecraft") as mock_launch:
-            mock_process = mock.MagicMock()
-            mock_process.poll.return_value = None
-            mock_process.wait.return_value = 0
-            mock_launch.return_value = mock_process
+    with (
+        mock.patch("sys.argv", ["mc_launcher_real.py"] + test_args),
+        mock.patch("mc_launcher_real.launch_minecraft") as mock_launch,
+    ):
+        mock_process = mock.MagicMock()
+        mock_process.poll.return_value = None
+        mock_process.wait.return_value = 0
+        mock_launch.return_value = mock_process
 
-            with mock.patch("mc_launcher_real.wait_for_join", return_value=True):
-                with mock.patch("mc_launcher_real.send_rcon_command"):
-                    # Mock log file finding
-                    with mock.patch("pathlib.Path.glob") as mock_glob:
-                        mock_file = mock.MagicMock()
-                        mock_file.__gt__ = mock.MagicMock(return_value=True)
-                        mock_glob.return_value = [mock_file]
+        with (
+            mock.patch("mc_launcher_real.wait_for_join", return_value=True),
+            mock.patch("mc_launcher_real.send_rcon_command"),
+            mock.patch("pathlib.Path.glob") as mock_glob,
+            mock.patch("mc_launcher_real.offline_uuid", return_value="test-uuid"),
+        ):
+            mock_file = mock.MagicMock()
+            mock_file.__gt__ = mock.MagicMock(return_value=True)
+            mock_glob.return_value = [mock_file]
 
-                        with mock.patch("mc_launcher_real.offline_uuid", return_value="test-uuid"):
-                            mc_launcher_real.main(test_args)
+            mc_launcher_real.main(test_args)
 
 
 def test_launch_minecraft_fallback() -> None:
     """Test fallback to direct Java invocation when launcher not found."""
     # Mock find_minecraft_launcher to raise RuntimeError
-    with mock.patch(
-        "mc_launcher_real.find_minecraft_launcher", side_effect=RuntimeError("No launcher")
+    with (
+        mock.patch(
+            "mc_launcher_real.find_minecraft_launcher", side_effect=RuntimeError("No launcher")
+        ),
+        mock.patch("shutil.which", return_value="/usr/bin/java"),
+        mock.patch("subprocess.Popen") as mock_popen,
+        mock.patch("threading.Thread"),
+        mock.patch("pathlib.Path.mkdir"),
+        mock.patch("builtins.open", mock.mock_open()),
     ):
-        # Mock shutil.which to return a Java path
-        with mock.patch("shutil.which", return_value="/usr/bin/java"):
-            # Mock subprocess.Popen
-            with mock.patch("subprocess.Popen") as mock_popen:
-                mock_process = mock.MagicMock()
-                mock_process.stdout = io.StringIO()
-                mock_popen.return_value = mock_process
+        mock_process = mock.MagicMock()
+        mock_process.stdout = io.StringIO()
+        mock_popen.return_value = mock_process
 
-                # Mock threading.Thread
-                with mock.patch("threading.Thread"):
-                    # Mock Path.mkdir to avoid directory creation
-                    with mock.patch("pathlib.Path.mkdir"):
-                        # Mock open for log file
-                        with mock.patch("builtins.open", mock.mock_open()):
-                            mc_launcher_real.launch_minecraft()
+        mc_launcher_real.launch_minecraft()
 
-                            # Should have called Popen with Java command
-                            mock_popen.assert_called_once()
-                            call_args = mock_popen.call_args[0][0]
-                            assert call_args[0] == "/usr/bin/java"
-                            assert "-Xmx4G" in call_args
+        # Should have called Popen with Java command
+        mock_popen.assert_called_once()
+        call_args = mock_popen.call_args[0][0]
+        assert call_args[0] == "/usr/bin/java"
+        assert "-Xmx4G" in call_args
 
 
 def test_launch_minecraft_with_minecraft_launcher_lib() -> None:
@@ -371,121 +376,124 @@ def test_launch_minecraft_with_minecraft_launcher_lib() -> None:
     mock_lib.utils.get_minecraft_directory.return_value = "/fake/minecraft/dir"
     mock_lib.command.get_minecraft_command.return_value = ["/fake/launcher", "--args"]
 
-    with mock.patch.dict(sys.modules, {"minecraft_launcher_lib": mock_lib}):
-        with mock.patch(
-            "mc_launcher_real.find_minecraft_launcher", return_value="minecraft-launcher-lib"
-        ):
-            with mock.patch("subprocess.Popen") as mock_popen:
-                mock_process = mock.MagicMock()
-                mock_process.stdout = io.StringIO()
-                mock_popen.return_value = mock_process
+    with (
+        mock.patch.dict(sys.modules, {"minecraft_launcher_lib": mock_lib}),
+        mock.patch("mc_launcher_real.find_minecraft_launcher", return_value="minecraft-launcher-lib"),
+        mock.patch("subprocess.Popen") as mock_popen,
+        mock.patch("threading.Thread"),
+        mock.patch("pathlib.Path.mkdir"),
+        mock.patch("builtins.open", mock.mock_open()),
+    ):
+        mock_process = mock.MagicMock()
+        mock_process.stdout = io.StringIO()
+        mock_popen.return_value = mock_process
 
-                with mock.patch("threading.Thread"):
-                    with mock.patch("pathlib.Path.mkdir"):
-                        with mock.patch("builtins.open", mock.mock_open()):
-                            mc_launcher_real.launch_minecraft()
+        mc_launcher_real.launch_minecraft()
 
-                            # Should have used the library
-                            mock_lib.command.get_minecraft_command.assert_called_once()
-                            mock_popen.assert_called_once()
+        # Should have used the library
+        mock_lib.command.get_minecraft_command.assert_called_once()
+        mock_popen.assert_called_once()
 
 
 def test_launch_minecraft_with_system_launcher() -> None:
     """Test using system launcher binary."""
-    with mock.patch(
-        "mc_launcher_real.find_minecraft_launcher", return_value="/usr/bin/minecraft-launcher"
+    with (
+        mock.patch("mc_launcher_real.find_minecraft_launcher", return_value="/usr/bin/minecraft-launcher"),
+        mock.patch("subprocess.Popen") as mock_popen,
+        mock.patch("threading.Thread"),
+        mock.patch("pathlib.Path.mkdir"),
+        mock.patch("builtins.open", mock.mock_open()),
     ):
-        with mock.patch("subprocess.Popen") as mock_popen:
-            mock_process = mock.MagicMock()
-            mock_process.stdout = io.StringIO()
-            mock_popen.return_value = mock_process
+        mock_process = mock.MagicMock()
+        mock_process.stdout = io.StringIO()
+        mock_popen.return_value = mock_process
 
-            with mock.patch("threading.Thread"), mock.patch("pathlib.Path.mkdir"):
-                with mock.patch("builtins.open", mock.mock_open()):
-                    mc_launcher_real.launch_minecraft()
+        mc_launcher_real.launch_minecraft()
 
-                    # Should have called Popen with system launcher
-                    mock_popen.assert_called_once()
-                    call_args = mock_popen.call_args[0][0]
-                    assert call_args[0] == "/usr/bin/minecraft-launcher"
+        # Should have called Popen with system launcher
+        mock_popen.assert_called_once()
+        call_args = mock_popen.call_args[0][0]
+        assert call_args[0] == "/usr/bin/minecraft-launcher"
 
 
 def test_launch_minecraft_java_not_found() -> None:
     """Test error when Java not found in fallback mode."""
     # Mock find_minecraft_launcher to raise RuntimeError
-    with mock.patch(
-        "mc_launcher_real.find_minecraft_launcher", side_effect=RuntimeError("No launcher")
+    with (
+        mock.patch(
+            "mc_launcher_real.find_minecraft_launcher", side_effect=RuntimeError("No launcher")
+        ),
+        mock.patch("shutil.which", return_value=None),
+        pytest.raises(FileNotFoundError, match="Java not found"),
     ):
-        # Mock shutil.which to return None (Java not found)
-        with mock.patch("shutil.which", return_value=None):
-            with pytest.raises(FileNotFoundError, match="Java not found"):
-                mc_launcher_real.launch_minecraft()
+        mc_launcher_real.launch_minecraft()
 
 
 def test_main_client_fails_to_join() -> None:
     """Test main when client fails to join."""
-    with mock.patch("mc_launcher_real.launch_minecraft") as mock_launch:
+    with (
+        mock.patch("mc_launcher_real.launch_minecraft") as mock_launch,
+        mock.patch("mc_launcher_real.wait_for_join", return_value=False),
+        mock.patch("pathlib.Path.glob") as mock_glob,
+    ):
         mock_process = mock.MagicMock()
         mock_process.poll.return_value = None
         mock_process.terminate.return_value = None
         mock_process.wait.return_value = 0
         mock_launch.return_value = mock_process
 
-        with mock.patch("mc_launcher_real.wait_for_join", return_value=False):
-            with mock.patch("pathlib.Path.glob") as mock_glob:
-                mock_file = mock.MagicMock()
-                mock_file.__gt__ = mock.MagicMock(return_value=True)
-                mock_glob.return_value = [mock_file]
+        mock_file = mock.MagicMock()
+        mock_file.__gt__ = mock.MagicMock(return_value=True)
+        mock_glob.return_value = [mock_file]
 
-                # Should return error code 1
-                result = mc_launcher_real.main(["--server", "localhost:25565"])
-                assert result == 1
+        # Should return error code 1
+        result = mc_launcher_real.main(["--server", "localhost:25565"])
+        assert result == 1
 
-                # Should have terminated the process
-                mock_process.terminate.assert_called_once()
+        # Should have terminated the process
+        mock_process.terminate.assert_called_once()
 
 
 def test_main_with_rcon_commands() -> None:
     """Test main with RCON password provided."""
-    with mock.patch("mc_launcher_real.launch_minecraft") as mock_launch:
+    with (
+        mock.patch("mc_launcher_real.launch_minecraft") as mock_launch,
+        mock.patch("mc_launcher_real.wait_for_join", return_value=True),
+        mock.patch("pathlib.Path.glob") as mock_glob,
+        mock.patch("mc_launcher_real.offline_uuid", return_value="test-uuid-1234"),
+        mock.patch("mc_launcher_real.send_rcon_command") as mock_rcon,
+        mock.patch("time.sleep"),
+    ):
         mock_process = mock.MagicMock()
         mock_process.poll.return_value = None
         mock_process.wait.return_value = 0
         mock_launch.return_value = mock_process
 
-        with mock.patch("mc_launcher_real.wait_for_join", return_value=True):
-            with mock.patch("pathlib.Path.glob") as mock_glob:
-                mock_file = mock.MagicMock()
-                mock_file.__gt__ = mock.MagicMock(return_value=True)
-                mock_glob.return_value = [mock_file]
+        mock_file = mock.MagicMock()
+        mock_file.__gt__ = mock.MagicMock(return_value=True)
+        mock_glob.return_value = [mock_file]
 
-                with mock.patch("mc_launcher_real.offline_uuid", return_value="test-uuid-1234"):
-                    # Mock send_rcon_command to avoid actual socket calls
-                    with mock.patch("mc_launcher_real.send_rcon_command") as mock_rcon:
-                        mock_rcon.return_value = "OK"
+        mock_rcon.return_value = "OK"
 
-                        with mock.patch("time.sleep"):
-                            mc_launcher_real.main(
-                                ["--rcon-password", "testpass", "--duration", "10"]
-                            )
+        mc_launcher_real.main(["--rcon-password", "testpass", "--duration", "10"])
 
-                            # Should have sent RCON commands
-                            assert mock_rcon.call_count == 2
+        # Should have sent RCON commands
+        assert mock_rcon.call_count == 2
 
-                            # Get the call objects
-                            calls = mock_rcon.call_args_list
+        # Get the call objects
+        calls = mock_rcon.call_args_list
 
-                            # First call: gamemode command
-                            first_call = calls[0]
-                            # Get keyword arguments (since send_rcon_command is called with kwargs)
-                            first_kwargs = first_call[1]
-                            assert first_kwargs["password"] == "testpass"
-                            assert "gamemode spectator" in first_kwargs["command"]
+        # First call: gamemode command
+        first_call = calls[0]
+        # Get keyword arguments (since send_rcon_command is called with kwargs)
+        first_kwargs = first_call[1]
+        assert first_kwargs["password"] == "testpass"
+        assert "gamemode spectator" in first_kwargs["command"]
 
-                            # Second call: spectate command
-                            second_call = calls[1]
-                            second_kwargs = second_call[1]
-                            assert "spectate test-uuid-1234" in second_kwargs["command"]
+        # Second call: spectate command
+        second_call = calls[1]
+        second_kwargs = second_call[1]
+        assert "spectate test-uuid-1234" in second_kwargs["command"]
 
 
 if __name__ == "__main__":
