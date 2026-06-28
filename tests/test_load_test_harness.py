@@ -435,9 +435,11 @@ class TestRunLoadTest:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("aiohttp.ClientSession", return_value=mock_session):
-            with pytest.raises(RuntimeError, match="Backend not healthy"):
-                await run_load_test(
+        with (
+            patch("aiohttp.ClientSession", return_value=mock_session),
+            pytest.raises(RuntimeError, match="Backend not healthy")
+        ):
+            await run_load_test(
                     backend_url="http://localhost:8500",
                     num_recorders=10,
                 )
