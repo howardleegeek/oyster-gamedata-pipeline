@@ -280,13 +280,12 @@ class TestMain:
             assert os.path.exists(output_path)
 
             # Verify clip ID was used
-            with tarfile.open(output_path, "r:gz") as tar:
+            with tarfile.open(output_path, "r:gz") as tar, tempfile.TemporaryDirectory() as extract_dir:
                 # Extract and check gameinfo.xlsx
-                with tempfile.TemporaryDirectory() as extract_dir:
-                    tar.extract("gameinfo.xlsx", extract_dir)
-                    xlsx_path = os.path.join(extract_dir, "gameinfo.xlsx")
-                    # File should exist
-                    assert os.path.exists(xlsx_path)
+                tar.extract("gameinfo.xlsx", extract_dir)
+                xlsx_path = os.path.join(extract_dir, "gameinfo.xlsx")
+                # File should exist
+                assert os.path.exists(xlsx_path)
 
     def test_main_default_output(self):
         """Test that main() uses default output path."""
