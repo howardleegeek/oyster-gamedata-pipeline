@@ -117,13 +117,12 @@ def ensure_model(
 
     url = _hf_url(repo, filename)
     tmp = target.with_suffix(target.suffix + ".part")
-    with urllib.request.urlopen(url, timeout=60) as resp:  # noqa: S310 (HF only)
-        with open(tmp, "wb") as fh:
-            while True:
-                chunk = resp.read(1 << 20)
-                if not chunk:
-                    break
-                fh.write(chunk)
+    with urllib.request.urlopen(url, timeout=60) as resp, open(tmp, "wb") as fh:  # noqa: S310 (HF only)
+        while True:
+            chunk = resp.read(1 << 20)
+            if not chunk:
+                break
+            fh.write(chunk)
     os.replace(tmp, target)
     return target
 
