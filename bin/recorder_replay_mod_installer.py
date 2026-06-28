@@ -203,14 +203,13 @@ def download_jar(
         release.download_url,
         headers={"User-Agent": "oyster-recorder-replay-mod-installer/1.0"},
     )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (trusted)
-        with out.open("wb") as fh:
-            while True:
-                chunk = resp.read(chunk_size)
-                if not chunk:
-                    break
-                fh.write(chunk)
-                sha.update(chunk)
+    with urllib.request.urlopen(req, timeout=timeout) as resp, out.open("wb") as fh:  # noqa: S310 (trusted)
+        while True:
+            chunk = resp.read(chunk_size)
+            if not chunk:
+                break
+            fh.write(chunk)
+            sha.update(chunk)
 
     if release.sha256 and sha.hexdigest() != release.sha256:
         out.unlink(missing_ok=True)
