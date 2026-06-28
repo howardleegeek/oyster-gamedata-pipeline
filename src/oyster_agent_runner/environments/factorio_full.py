@@ -368,32 +368,26 @@ def main(argv: Optional[list[str]] = None) -> int:
         logger.error("No RCON password provided")
         return 1
 
-    output_file = None
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        output_file = open(args.output, "w", encoding="utf-8")
+        with open(args.output, "w", encoding="utf-8") as output_file:
+            try:
+                with RCONConnection(args.host, args.port, args.timeout) as rcon:
+                    if not rcon.authenticate(password):
+                        logger.error("Authentication failed")
+                        return 1
 
-    try:
-        with RCONConnection(args.host, args.port, args.timeout) as rcon:
-            if not rcon.authenticate(password):
-                logger.error("Authentication failed")
+                    observer = FactorioObserver(rcon, args.poll_interval, args.max_observations)
+                    for obs in observer.observe_loop(player_name=args.player):
+                        line = json.dumps(obs.to_dict())
+                        output_file.write(line + "\n")
+                        logger.info(f"Tick {obs.tick}: Player at {obs.player.position}")
+
+            except KeyboardInterrupt:
+                logger.info("Interrupted by user")
+            except Exception as e:
+                logger.error(f"Error: {e}")
                 return 1
-
-            observer = FactorioObserver(rcon, args.poll_interval, args.max_observations)
-            for obs in observer.observe_loop(player_name=args.player):
-                line = json.dumps(obs.to_dict())
-                if output_file:
-                    output_file.write(line + "\n")
-                logger.info(f"Tick {obs.tick}: Player at {obs.player.position}")
-
-    except KeyboardInterrupt:
-        logger.info("Interrupted by user")
-    except Exception as e:
-        logger.error(f"Error: {e}")
-        return 1
-    finally:
-        if output_file:
-            output_file.close()
 
     return 0
 
