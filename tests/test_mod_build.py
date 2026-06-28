@@ -244,7 +244,7 @@ def test_zbuffer_to_exr_source_marker():
             f.write(depth_data.tobytes())
 
         # Run zbuffer_to_exr.py
-        result = subprocess.run(
+        subprocess.run(
             [sys.executable, str(script_path)], cwd=tmpdir, capture_output=True, text=True
         )
 
