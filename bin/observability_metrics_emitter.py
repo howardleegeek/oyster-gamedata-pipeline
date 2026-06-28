@@ -41,8 +41,8 @@ def parse_labels(label_string: Optional[str]) -> Dict[str, str]:
         return {}
 
     labels = {}
-    for part in label_string.split(","):
-        part = part.strip()
+    for raw_part in label_string.split(","):
+        part = raw_part.strip()
         if not part:
             continue
         if "=" not in part:
