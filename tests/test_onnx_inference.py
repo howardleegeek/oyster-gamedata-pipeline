@@ -317,44 +317,50 @@ class TestCanonicalPipeline(unittest.TestCase):
     @unittest.skipUnless(_onnxruntime_available, "onnxruntime not installed")
     def test_detect_best_backend_windows(self):
         """Should detect DirectML on Windows."""
-        with patch("platform.system", return_value="Windows"):
-            with patch("onnxruntime.get_available_providers") as mock_prov:
-                mock_prov.return_value = [
-                    "DmlExecutionProvider",
-                    "CPUExecutionProvider",
-                ]
-                from canonical_pipeline import detect_best_backend
+        with (
+            patch("platform.system", return_value="Windows"),
+            patch("onnxruntime.get_available_providers") as mock_prov,
+        ):
+            mock_prov.return_value = [
+                "DmlExecutionProvider",
+                "CPUExecutionProvider",
+            ]
+            from canonical_pipeline import detect_best_backend
 
-                backend = detect_best_backend()
-                self.assertEqual(backend, "local-onnx-directml")
+            backend = detect_best_backend()
+            self.assertEqual(backend, "local-onnx-directml")
 
     @unittest.skipUnless(_torch_available, "torch not installed")
     def test_detect_best_backend_macos(self):
         """Should detect MPS on macOS."""
-        with patch("platform.system", return_value="Darwin"):
-            with patch("torch.backends.mps.is_available", return_value=True):
-                # Need to reload to clear cached import
-                import importlib
+        with (
+            patch("platform.system", return_value="Darwin"),
+            patch("torch.backends.mps.is_available", return_value=True),
+        ):
+            # Need to reload to clear cached import
+            import importlib
 
-                import canonical_pipeline
+            import canonical_pipeline
 
-                importlib.reload(canonical_pipeline)
+            importlib.reload(canonical_pipeline)
 
-                backend = canonical_pipeline.detect_best_backend()
-                self.assertEqual(backend, "local-mps")
+            backend = canonical_pipeline.detect_best_backend()
+            self.assertEqual(backend, "local-mps")
 
     def test_detect_best_backend_fallback_skip(self):
         """Should fall back to skip when nothing is available."""
-        with patch("platform.system", return_value="Linux"):
-            with patch.dict("sys.modules", {"torch": None, "onnxruntime": None}):
-                import importlib
+        with (
+            patch("platform.system", return_value="Linux"),
+            patch.dict("sys.modules", {"torch": None, "onnxruntime": None}),
+        ):
+            import importlib
 
-                import canonical_pipeline
+            import canonical_pipeline
 
-                importlib.reload(canonical_pipeline)
+            importlib.reload(canonical_pipeline)
 
-                backend = canonical_pipeline.detect_best_backend()
-                self.assertEqual(backend, "skip")
+            backend = canonical_pipeline.detect_best_backend()
+            self.assertEqual(backend, "skip")
 
 
 if __name__ == "__main__":
