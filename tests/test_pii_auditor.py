@@ -35,24 +35,24 @@ class TestPIIAuditor:
 
     def test_is_private_ip(self):
         """Test private IP detection."""
-        assert is_private_ip("192.168.1.1") == True
-        assert is_private_ip("10.0.0.1") == True
-        assert is_private_ip("172.16.0.1") == True
-        assert is_private_ip("172.31.0.1") == True
-        assert is_private_ip("127.0.0.1") == True
-        assert is_private_ip("8.8.8.8") == False
-        assert is_private_ip("1.2.3.4") == False
+        assert is_private_ip("192.168.1.1")
+        assert is_private_ip("10.0.0.1")
+        assert is_private_ip("172.16.0.1")
+        assert is_private_ip("172.31.0.1")
+        assert is_private_ip("127.0.0.1")
+        assert not is_private_ip("8.8.8.8")
+        assert not is_private_ip("1.2.3.4")
 
     def test_luhn_check(self):
         """Test Luhn algorithm for credit card validation."""
         # Valid test cards
-        assert luhn_check("4532015112830366") == True  # Visa
-        assert luhn_check("5425233430109903") == True  # Mastercard
-        assert luhn_check("378282246310005") == True  # Amex
+        assert luhn_check("4532015112830366")  # Visa
+        assert luhn_check("5425233430109903")  # Mastercard
+        assert luhn_check("378282246310005")  # Amex
 
         # Invalid numbers
-        assert luhn_check("1234567890123456") == False
-        assert luhn_check("9999999999999999") == False
+        assert not luhn_check("1234567890123456")
+        assert not luhn_check("9999999999999999")
 
     def test_detect_emails(self):
         """Test email detection."""
