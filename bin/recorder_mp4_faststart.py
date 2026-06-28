@@ -86,11 +86,7 @@ def is_mp4_output(args: List[str]) -> bool:
             i += 1
 
     # Check if any output file ends with .mp4
-    for output_file in output_files:
-        if output_file.lower().endswith(".mp4"):
-            return True
-
-    return False
+    return any(output_file.lower().endswith(".mp4") for output_file in output_files)
 
 
 def add_faststart_flag(args: List[str]) -> List[str]:

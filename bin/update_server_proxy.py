@@ -326,10 +326,7 @@ def _is_force_release(body: Optional[str]) -> bool:
     """Detect a force-update release by leading ``[FORCE]`` token in the body."""
     if not isinstance(body, str) or not body:
         return False
-    for line in body.splitlines():
-        if line.strip().upper().startswith(FORCE_TOKEN):
-            return True
-    return False
+    return any(line.strip().upper().startswith(FORCE_TOKEN) for line in body.splitlines())
 
 
 # ---------------------------------------------------------------------------
