@@ -58,10 +58,8 @@ def write_atomic(
     except Exception:
         # Clean up temp file on any error
         if temp_path and os.path.exists(temp_path):
-            try:
+            with contextlib.suppress(OSError):
                 os.unlink(temp_path)
-            except OSError:
-                pass
         raise
 
 
