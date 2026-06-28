@@ -1,4 +1,19 @@
 
+## Round 453 @ 2026-07-02T18:20:00Z
+
+- Picked: SIM115 file open without context manager in src/oyster_agent_runner/environments/factorio_full.py:374 — replaced with `with open(...)` for proper resource cleanup. Justification: measurable code smell (ruff SIM115), single-file scope, py_compile clean, ruff SIM115 clean for this file, 28/28 factorio tests pass.
+- Result: committed 0e1f27b7 (SIM115 fix in factorio_full.py); ruff check --select=SIM115 clean; python3 -m py_compile passes; pytest tests/ -k factorio 28/28 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: SIM115 fix only. No silent error swallow (context manager preserves behavior), no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
+## Round 452 @ 2026-07-02T18:10:00Z
+
+- Picked: SIM105 try-except-pass in src/oyster_agent_runner/environments/beamng_drive.py:290-293 — replaced with `contextlib.suppress(Exception)` for cleaner exception handling. Justification: measurable code smell (ruff SIM105), single-file scope, py_compile clean, ruff SIM105 clean for this file, 44/44 beamng tests pass.
+- Result: committed 2e904d05 (SIM105 fix in beamng_drive.py); ruff check --select=SIM105 clean; python3 -m py_compile passes; pytest tests/ -k beamng 44/44 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: SIM105 fix only. No silent error swallow (suppress preserves behavior), no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
+## Round 451 @ 2026-07-02T18:00:00Z
+
+- Picked: SIM105 try-except-pass in src/oyster_agent_runner/environments/cities_skylines.py:199-202 — replaced with `contextlib.suppress(OSError)` for cleaner exception handling. Justification: measurable code smell (ruff SIM105), single-file scope, py_compile clean, ruff SIM105 clean for this file, 8/8 game_plugins tests pass.
+- Result: committed c272ee0a (SIM105 fix in cities_skylines.py); ruff check --select=SIM105 clean; python3 -m py_compile passes; pytest tests/test_game_plugins.py 8/8 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: SIM105 fix only. No silent error swallow (suppress preserves behavior), no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
 ## Round 450 @ 2026-07-02T12:00:00Z
 
 - Picked: SIM105 try-except-pass in src/oyster_agent_runner/hmac_machine_id.py:58-61 — replaced with `contextlib.suppress(OSError, PermissionError)` for cleaner exception handling. Justification: measurable code smell (ruff SIM105), single-file scope, py_compile clean, ruff SIM105 clean for this file, 39/39 hmac tests pass.
