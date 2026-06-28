@@ -204,8 +204,8 @@ def _main(argv: List[str]) -> int:
     """CLI: read newline-delimited JSON events from stdin, write JSON to stdout."""
     duration = float(argv[0]) if argv else DEFAULT_DURATION
     events: List[Dict[str, Any]] = []
-    for line in sys.stdin:
-        line = line.strip()
+    for raw_line in sys.stdin:
+        line = raw_line.strip()
         if not line:
             continue
         try:
