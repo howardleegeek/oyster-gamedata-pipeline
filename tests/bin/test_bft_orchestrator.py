@@ -48,26 +48,25 @@ def _make_min_frame(idx: int) -> dict:
 
 def _write_inputs_jsonl(events: list[dict], fps: float = 30.0) -> Path:
     """Write a temp inputs.jsonl with session_start sentinel + events."""
-    f = tempfile.NamedTemporaryFile(
+    with tempfile.NamedTemporaryFile(
         mode="w",
         suffix=".jsonl",
         delete=False,
         encoding="utf-8",
-    )
-    f.write(
-        json.dumps(
-            {
-                "event_type": "session_start",
-                "timestamp_ms": 0,
-                "fps": fps,
-                "frame_count": 9000,
-            }
+    ) as f:
+        f.write(
+            json.dumps(
+                {
+                    "event_type": "session_start",
+                    "timestamp_ms": 0,
+                    "fps": fps,
+                    "frame_count": 9000,
+                }
+            )
+            + "\n"
         )
-        + "\n"
-    )
-    for ev in events:
-        f.write(json.dumps(ev) + "\n")
-    f.close()
+        for ev in events:
+            f.write(json.dumps(ev) + "\n")
     return Path(f.name)
 
 
