@@ -516,6 +516,15 @@ def run_all_checks(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run all round-trip integrity checks on a clip directory.
+
+    Args:
+        argv: Command-line arguments. If None, uses sys.argv.
+              Expected: <clip_dir> [--json]
+
+    Returns:
+        Exit code: number of failed checks (0 = all pass).
+    """
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("clip_dir", type=Path, help="Path to extracted clip directory")
     p.add_argument("--json", action="store_true", help="Emit machine-readable JSON report")
