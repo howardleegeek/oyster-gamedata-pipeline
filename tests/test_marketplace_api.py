@@ -499,9 +499,9 @@ class TestAuthentication:
 
     def test_invalid_auth_returns_401(self, client):
         """Test invalid auth token is rejected."""
-        response = client.get("/api/v1/sessions", headers={"Authorization": "Bearer invalid"})
         # Our mock accepts any token with length >= 10
         # In production, this would be 401
+        client.get("/api/v1/sessions", headers={"Authorization": "Bearer invalid"})
 
 
 class TestHealthCheck:
