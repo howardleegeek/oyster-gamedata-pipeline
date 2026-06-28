@@ -190,7 +190,16 @@ def attack_frame_gap(b: Path) -> None:
     p.write_text(json.dumps(arr))
 
 
-def attack_quaternion_not_unit(b: Path):
+def attack_quaternion_not_unit(b: Path) -> None:
+    """Adversarial attack: inject invalid (non-unit) quaternion into action_camera.json.
+
+    Replaces the first 50 camera rotation quaternions with {x:5.0, y:5.0, z:5.0, w:5.0},
+    which are not normalized (norm != 1.0). Used to test that lint_buyer_spec catches
+    quaternion normalization violations.
+
+    Args:
+        b: Path to directory containing action_camera.json.
+    """
     p = b / "action_camera.json"
     arr = json.loads(p.read_text())
     for r in arr[:50]:
