@@ -220,24 +220,19 @@ def filter_sessions(filters: Dict[str, Any]) -> List[Dict]:
     for s in mock_sessions:
         match = True
         for key, value in filters.items():
-            if key == "audit_score_min" and s["audit_score"] < value:
+            if (
+                (key == "audit_score_min" and s["audit_score"] < value)
+                or (key == "quality_score_min" and s["quality_score"] < value)
+                or (key == "has_depth" and s["has_depth"] != value)
+                or (key == "has_audio" and s["has_audio"] != value)
+                or (key == "has_voice" and s["has_voice"] != value)
+                or (key == "has_zbuffer" and s["has_zbuffer"] != value)
+                or (key == "game" and s["game"] != value)
+                or (key == "scene" and s["scene"] != value)
+                or (key == "route_type" and s["route_type"] != value)
+            ):
                 match = False
-            elif key == "quality_score_min" and s["quality_score"] < value:
-                match = False
-            elif key == "has_depth" and s["has_depth"] != value:
-                match = False
-            elif key == "has_audio" and s["has_audio"] != value:
-                match = False
-            elif key == "has_voice" and s["has_voice"] != value:
-                match = False
-            elif key == "has_zbuffer" and s["has_zbuffer"] != value:
-                match = False
-            elif key == "game" and s["game"] != value:
-                match = False
-            elif key == "scene" and s["scene"] != value:
-                match = False
-            elif key == "route_type" and s["route_type"] != value:
-                match = False
+                break
         if match:
             result.append(s)
 
