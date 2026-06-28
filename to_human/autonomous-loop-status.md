@@ -58,6 +58,11 @@
 - Picked: SIM110 for loop in bin/pii_auditor.py (line 38) — replaced with any() generator expression. Justification: measurable code smell (ruff SIM110), single-file scope, test passes.
 - Result: committed c88813b8 (fix SIM110 in bin/pii_auditor.py); ruff check --select=SIM110 clean for this file; pytest tests/test_pii_auditor.py 19/19 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Replaced explicit for loop with any() generator expression; preserved logic; no silent error swallow; no false-success; no race; no off-by-one; no security impact; no test masking; no brand cross-reference.
 
+## Round 491 @ 2026-08-04T02:50:00Z
+
+- Picked: PLW2901 loop variable overwritten in bin/transform_game_state_to_action_camera.py (lines 382, 510) — renamed `line` to `raw_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, has dedicated test (tests/bin/test_transform_game_state_to_action_camera.py 4/4 pass), follows established PLW2901 cleanup pattern.
+- Result: committed 78b236a3 (fix PLW2901 in bin/transform_game_state_to_action_camera.py); ruff check --select=PLW2901 clean for this file; pytest tests/bin/test_transform_game_state_to_action_camera.py 4/4 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed loop variable line->raw_line. Logic preserved (strip() still applied, JSON parsing intact). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
 ## Round 478 @ 2026-07-28T02:00:00Z
 
 - Picked: PLW2901 loop variable overwritten in bin/dependency_pinning_check.py (line 46) — renamed loop variable from `line` to `raw_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, py_compile passes, import test passes, follows established PLW2901 cleanup pattern.
