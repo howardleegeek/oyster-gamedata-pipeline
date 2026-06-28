@@ -226,9 +226,9 @@ class AlertStateManager:
             try:
                 with open(self.alerts_file, "r") as f:
                     for line in f:
-                        line = line.strip()
-                        if line:
-                            entry = json.loads(line)
+                        stripped = line.strip()
+                        if stripped:
+                            entry = json.loads(stripped)
                             aid = entry.get("alert_id")
                             if aid:
                                 self.state[aid] = entry
@@ -778,10 +778,10 @@ def main():
         if os.path.exists(metrics_file):
             with open(metrics_file, "r") as f:
                 for line in f:
-                    line = line.strip()
-                    if line:
+                    stripped = line.strip()
+                    if stripped:
                         try:
-                            metrics = json.loads(line)
+                            metrics = json.loads(stripped)
                             alerts = dispatcher.process_metrics(metrics)
                             log.info(f"Processed metrics, {len(alerts)} alert(s) fired")
                         except json.JSONDecodeError:
@@ -792,10 +792,10 @@ def main():
     else:
         # Read from stdin
         for line in sys.stdin:
-            line = line.strip()
-            if line:
+            stripped = line.strip()
+            if stripped:
                 try:
-                    metrics = json.loads(line)
+                    metrics = json.loads(stripped)
                     alerts = dispatcher.process_metrics(metrics)
                     log.info(f"Processed metrics, {len(alerts)} alert(s) fired")
                 except json.JSONDecodeError:
