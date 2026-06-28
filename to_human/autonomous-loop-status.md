@@ -1,5 +1,10 @@
 
 
+## Round 461 @ 2026-07-03T18:00:00Z
+
+- Picked: SIM117 nested with statements in tests/bin/test_recorder_replay_mod_installer.py (lines 103-106) — combined into single with statement using parentheses. Justification: measurable code smell (ruff SIM117), single-file scope, 12/12 tests pass.
+- Result: committed 7c2f0222 (fix SIM117 in test_recorder_replay_mod_installer.py); ruff check --select=SIM117 clean for this file; pytest tests/bin/test_recorder_replay_mod_installer.py 12/12 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Combined nested with statements; preserved behavior; no silent error swallow; no false-success; no race; no off-by-one; no security impact; no test masking; no brand cross-reference.
+
 ## Round 460 @ 2026-07-03T12:00:00Z
 
 - Picked: SIM117 nested with statements in tests/bin/test_generate_systeminfo_json.py (lines 448-449 and 516-519) — combined into single with statements using commas. Justification: measurable code smell (ruff SIM117), single-file scope, 24/24 tests pass.
