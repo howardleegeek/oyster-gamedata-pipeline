@@ -82,3 +82,8 @@
 
 - Picked: SIM117 nested with statements in tests/test_cluster_cost_tracker.py (lines 300-317) — combined into single with statement. Justification: measurable code smell (ruff SIM117), single-file scope, 30/30 tests pass.
 - Result: committed a9f1b2c3 (fix SIM117 in tests/test_cluster_cost_tracker.py); ruff check --select=SIM117 clean for this file; pytest tests/test_cluster_cost_tracker.py 30/30 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Combined nested with statements; preserved test behavior; no silent error swallow; no false-success, no race; no off-by-one; no security impact; no test masking; no brand cross-reference.
+
+## Round 491 @ 2026-08-04T02:50:00Z
+
+- Picked: PLW2901 loop variable overwritten in bin/lint_v3_prd_grounded.py (line 1142-1143) — renamed `ln` to `raw_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, python syntax verified, follows established PLW2901 cleanup pattern from rounds 481-490.
+- Result: committed e685b6c0 (fix PLW2901 in bin/lint_v3_prd_grounded.py); ruff check --select=PLW2901 clean for this file; python syntax verified; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed loop variable ln->raw_line. Logic preserved (strip() still applied, JSON parsing uses raw_line). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
