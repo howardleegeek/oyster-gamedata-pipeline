@@ -34,10 +34,10 @@ def load_jsonl(path):
     """Load a JSONL file, returning a list of dicts."""
     entries = []
     with open(path, "r") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                entries.append(json.loads(line))
+        for raw_line in f:
+            stripped_line = raw_line.strip()
+            if stripped_line:
+                entries.append(json.loads(stripped_line))
     return entries
 
 
