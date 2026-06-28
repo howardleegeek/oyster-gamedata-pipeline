@@ -337,18 +337,20 @@ def test_upload_raises_on_401(sample_tarball: Path) -> None:
     def fake_post(*a, **kw):
         return _fake_response(401, {"error": "Unauthorized"})
 
-    with mock.patch.dict(
-        sys.modules,
-        {"requests": mock.MagicMock(post=fake_post)},
+    with (
+        mock.patch.dict(
+            sys.modules,
+            {"requests": mock.MagicMock(post=fake_post)},
+        ),
+        pytest.raises(SystemExit) as exc,
     ):
-        with pytest.raises(SystemExit) as exc:
-            upload(
-                tarball=sample_tarball,
-                base_url="https://oyster-tester.test",
-                tester_id=SAMPLE_TESTER_ID,
-                duration_seconds=3600,
-                token="bad" * 22,  # 66 chars, will pass through but server 401s
-            )
+        upload(
+            tarball=sample_tarball,
+            base_url="https://oyster-tester.test",
+            tester_id=SAMPLE_TESTER_ID,
+            duration_seconds=3600,
+            token="bad" * 22,  # 66 chars, will pass through but server 401s
+        )
     payload = json.loads(str(exc.value))
     assert payload["http_status"] == 401
 
