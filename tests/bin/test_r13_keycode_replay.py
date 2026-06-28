@@ -17,26 +17,25 @@ from bin.v1_claude_residuals.r13_keycode_replay import r13_keycode_replay
 
 def _write_inputs_jsonl(events: list[dict], fps: float = 30.0) -> Path:
     """Write a temp inputs.jsonl and return its path."""
-    f = tempfile.NamedTemporaryFile(
+    with tempfile.NamedTemporaryFile(
         mode="w",
         suffix=".jsonl",
         delete=False,
         encoding="utf-8",
-    )
-    f.write(
-        json.dumps(
-            {
-                "event_type": "session_start",
-                "timestamp_ms": 0,
-                "fps": fps,
-                "frame_count": 9000,
-            }
+    ) as f:
+        f.write(
+            json.dumps(
+                {
+                    "event_type": "session_start",
+                    "timestamp_ms": 0,
+                    "fps": fps,
+                    "frame_count": 9000,
+                }
+            )
+            + "\n"
         )
-        + "\n"
-    )
-    for ev in events:
-        f.write(json.dumps(ev) + "\n")
-    f.close()
+        for ev in events:
+            f.write(json.dumps(ev) + "\n")
     return Path(f.name)
 
 
@@ -93,18 +92,19 @@ class TestR13KeyCodeReplay(unittest.TestCase):
 
     def test_abstain_no_session_start(self) -> None:
         """inputs.jsonl without session_start sentinel → ABSTAIN."""
-        f = tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False, encoding="utf-8")
-        f.write(
-            json.dumps(
-                {
-                    "event_type": "key_down",
-                    "key_code": 87,
-                    "timestamp_ms": 0,
-                }
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".jsonl", delete=False, encoding="utf-8"
+        ) as f:
+            f.write(
+                json.dumps(
+                    {
+                        "event_type": "key_down",
+                        "key_code": 87,
+                        "timestamp_ms": 0,
+                    }
+                )
+                + "\n"
             )
-            + "\n"
-        )
-        f.close()
         rec = {"frame": 0, "keyCode": [87]}
         r = r13_keycode_replay(rec, inputs_path=f.name)
         self.assertFalse(r.passed)
