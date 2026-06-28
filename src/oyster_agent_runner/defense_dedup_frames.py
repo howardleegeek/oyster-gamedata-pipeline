@@ -121,7 +121,7 @@ class FrameDeduplicationDefense:
         return {
             "scene_id": self.scene_id,
             "unique_frames_seen": len(self.seen_frame_ids),
-            "frame_ids": sorted(list(self.seen_frame_ids)),
+            "frame_ids": sorted(self.seen_frame_ids),
         }
 
     def reset_scene(self, new_scene_id: str | None = None) -> None:
