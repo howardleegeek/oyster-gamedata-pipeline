@@ -514,12 +514,12 @@ def run_mc_cmd(
 
     with MinecraftStreamWriter(output_dir) as streams:
         with trajectory_path.open(encoding="utf-8") as fh:
-            for ln in fh:
-                ln = ln.strip()
-                if not ln:
+            for line in fh:
+                stripped = line.strip()
+                if not stripped:
                     continue
                 try:
-                    payload = json.loads(ln)
+                    payload = json.loads(stripped)
                 except json.JSONDecodeError:
                     continue
                 try:
