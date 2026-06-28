@@ -77,7 +77,7 @@ class PlayerState:
     y: float = 0.0
     facing: str = "down"
     map_name: str = ""
-    keys: Dict[str, bool] = field(default_factory=lambda: {k: False for k in ACTION_KEYS})
+    keys: Dict[str, bool] = field(default_factory=lambda: dict.fromkeys(ACTION_KEYS, False))
     timestamp: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
