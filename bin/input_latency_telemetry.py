@@ -78,10 +78,10 @@ def read_jsonl_streaming(path):
     """Generator that yields parsed JSON lines from a file, handling partial writes."""
     with open(path, "r") as f:
         for line in f:
-            line = line.strip()
-            if line:
+            stripped_line = line.strip()
+            if stripped_line:
                 try:
-                    yield json.loads(line)
+                    yield json.loads(stripped_line)
                 except json.JSONDecodeError:
                     # Skip malformed lines (partial writes)
                     continue
