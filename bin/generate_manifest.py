@@ -322,8 +322,8 @@ def validate_manifest(manifest_path: str) -> tuple[bool, list[str]]:
         with open(manifest_path, "r") as f:
             content = f.read()
         # Simple parsing for basic validation
-        for line in content.split("\n"):
-            line = line.rstrip()
+        for raw_line in content.split("\n"):
+            line = raw_line.rstrip()
             if not line or line.startswith("#"):
                 continue
             if ":" in line and not line.startswith(" "):
