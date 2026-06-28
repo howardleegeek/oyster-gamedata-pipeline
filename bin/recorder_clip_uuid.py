@@ -94,6 +94,18 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
+    """Generate per-clip UUIDs and optionally persist to database.
+    
+    Supports two modes:
+    - Single clip: Generate UUID for a single clip_id and optionally write to DB.
+    - Directory: Process all files in a directory, generating UUIDs and renaming files.
+    
+    Args:
+        argv: Command-line arguments (default: sys.argv).
+    
+    Returns:
+        Exit code (0 for success, 1 for errors).
+    """
     parser = build_parser()
     args = parser.parse_args(argv)
     logging.basicConfig(
