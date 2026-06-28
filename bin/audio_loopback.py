@@ -96,10 +96,10 @@ def _ffmpeg_supports_wasapi() -> bool:
     if not out:
         return False
     # ffmpeg lists devices as e.g. " D  wasapi  Windows Audio Session API".
-    for line in out.splitlines():
-        if " wasapi" in line or line.strip().startswith("wasapi"):
-            return True
-    return False
+    return any(
+        " wasapi" in line or line.strip().startswith("wasapi")
+        for line in out.splitlines()
+    )
 
 
 def _list_dshow_audio_devices() -> List[str]:
