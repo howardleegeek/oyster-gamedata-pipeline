@@ -122,13 +122,12 @@ async def deliver_webhook(
     }
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                webhook_url,
-                data=payload_str,
-                headers=headers,
-                timeout=aiohttp.ClientTimeout(total=30),
-            ) as response:
+        async with aiohttp.ClientSession() as session, session.post(
+            webhook_url,
+            data=payload_str,
+            headers=headers,
+            timeout=aiohttp.ClientTimeout(total=30),
+        ) as response:
                 if response.status >= 200 and response.status < 300:
                     logger.info(f"Webhook delivered successfully to {webhook_url}")
                     return True
