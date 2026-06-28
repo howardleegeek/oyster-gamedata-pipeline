@@ -1,3 +1,8 @@
+## Round 432 @ 2026-07-02T01:00:00Z
+
+- Picked: E712 redundant boolean comparison in tests/test_pii_auditor.py at 12 sites (lines 38-44 for `is_private_ip`, lines 49-55 for `luhn_check`). Justification: measurable code smell (ruff E712 in test code), single-file scope, continuation of E712 cleanup pattern from rounds 423-425 and 431; all E712 sites in this file now fixed.
+- Result: committed 68c45cda (replaced 12 redundant == True/False assertions with truthy/falsy idioms; ruff check --select=E712 clean for this file; pytest 19/19 passed; pushed to origin/fix/prd-test-action-per-second-ruff). Self-review: E712 fix only — boolean equality assertions are semantically identical to truthy/falsy for Python booleans. No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect added.
+
 ## Round 431 @ 2026-06-28T06:39:08Z
 
 - Picked: E712 (== True/False redundant boolean comparison) in tests/phase2/test_depth_anything_v2.py at 4 sites (lines 73, 98, 115, 177). Justification: measurable code smell (ruff E712) in test code, single-file scope, identical to the E712 cleanup pattern established in rounds 423-425; only 12 E712 sites remain in tests/test_pii_auditor.py for future ticks.
@@ -93,6 +98,7 @@ Self-review: cosmetic reformat only — no silent error swallow, no race, no off
 
 - Picked: ruff format tests/test_upload_r2.py (245 lines, 1 multi-line assert). Justification: measurable code smell, second-smallest unformatted test file (224-line file has broken tests), single-file scope, no behavior change, targeted test passes (13/13), follows established cadence.
 - Result: committed 33f7e89e (ruff format applied: parenthesized 1 multi-line assert message; 1 file changed, 1 insertion(+), 1 deletion(-); ruff check + ruff format --check clean; pytest tests/test_upload_r2.py 13/13 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: cosmetic reformat only — no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking (asserts same condition), no brand cross-reference, no module-level side effect.)
+
 
 ## Round 382 @ 2026-06-27T10:00:00Z
 
