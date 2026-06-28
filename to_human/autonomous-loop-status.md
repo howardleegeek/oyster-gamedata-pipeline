@@ -612,3 +612,8 @@ Self-review: cosmetic reformat only — no silent error swallow, no race, no off
 - Picked: SIM117 nested with statements in tests/bin/test_mc_launcher_real.py — combined 7 test functions into single with statements using commas. Justification: measurable code smell (ruff SIM117), single-file scope, 17/17 tests pass.
 - Result: committed 0f6878b (fix SIM117 in test_mc_launcher_real.py); ruff check --select=SIM117 clean for this file; pytest tests/bin/test_mc_launcher_real.py 17/17 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Combined nested with statements; preserved behavior; no silent error swallow; no false-success; no race; no off-by-one; no security impact; no test masking; no brand cross-reference.
 
+
+## Round 462 @ 2026-07-03T14:00:00Z
+
+- Picked: SIM117 nested with statements in tests/test_verify_deployed_backend.py:623 — combined into single parenthesized `with (patch(...) as MockClient, patch(...))` form. Justification: measurable code smell (ruff SIM117), single-file scope, 49/49 tests pass.
+- Result: committed 7e005c41 (fix SIM117 in test_verify_deployed_backend.py); ruff check --select=SIM clean for this file; pytest tests/test_verify_deployed_backend.py 49/49 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Preserved both context managers' lifetimes; no try/except involved (no silent error swallow); tests still assert same exit code and call count (no false-success, no test masking); no race/off-by-one; no security impact; no brand cross-references; one logical change in one file.
