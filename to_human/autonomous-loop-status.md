@@ -1,3 +1,8 @@
+## Round 485 @ 2026-08-03T02:00:00Z
+
+- Picked: PLW2901 loop variable overwritten in bin/input_latency_analyzer.py (line 37-40) — renamed `line` to `stripped_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, tests pass (30/30), follows established PLW2901 cleanup pattern.
+- Result: committed d0bd4cba (fix PLW2901 in bin/input_latency_analyzer.py); ruff check --select=PLW2901 clean for this file; pytest tests/test_input_latency_analyzer.py 30/30 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed loop variable line->stripped_line to avoid self-assignment. Logic preserved (stripped line still used). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
 ## Round 482 @ 2026-08-01T02:00:00Z
 
 - Picked: PLW2901 loop variable overwritten in bin/game_state_overlay.py (line 47-48) — renamed `line` to `raw_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, import test passes, follows established PLW2901 cleanup pattern.
