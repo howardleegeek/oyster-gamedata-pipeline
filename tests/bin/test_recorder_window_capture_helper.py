@@ -81,9 +81,9 @@ def test_build_window_args_no_match_raises() -> None:
     with (
         mock.patch("bin.recorder_window_capture_helper.is_windows", return_value=True),
         mock.patch("bin.recorder_window_capture_helper.find_window", return_value=None),
+        pytest.raises(LookupError),
     ):
-        with pytest.raises(LookupError):
-            build_window_args("nope")
+        build_window_args("nope")
 
 
 def test_build_window_args_zero_area_raises() -> None:
@@ -91,9 +91,9 @@ def test_build_window_args_zero_area_raises() -> None:
     with (
         mock.patch("bin.recorder_window_capture_helper.is_windows", return_value=True),
         mock.patch("bin.recorder_window_capture_helper.find_window", return_value=bad),
+        pytest.raises(ValueError),
     ):
-        with pytest.raises(ValueError):
-            build_window_args("Minimised")
+        build_window_args("Minimised")
 
 
 def test_main_non_windows_reports_unsupported(capsys: pytest.CaptureFixture[str]) -> None:
