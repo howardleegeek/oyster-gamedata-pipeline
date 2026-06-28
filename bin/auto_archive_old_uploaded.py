@@ -3,6 +3,7 @@
 Cron job: archive sessions older than 14 days that have been confirmed uploaded.
 """
 
+import contextlib
 import json
 import shutil
 import subprocess
@@ -184,12 +185,10 @@ def cleanup_old_session_dirs() -> dict:
                         if mtime < cutoff_timestamp:
                             # Calculate size before deletion
                             dir_size = 0
-                            try:
+                            with contextlib.suppress(OSError, AttributeError):
                                 dir_size = sum(
                                     f.stat().st_size for f in item.rglob("*") if f.is_file()
                                 )
-                            except (OSError, AttributeError):
-                                pass
 
                             # Remove directory
                             shutil.rmtree(item)
