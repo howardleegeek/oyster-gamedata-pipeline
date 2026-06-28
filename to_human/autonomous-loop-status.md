@@ -1,4 +1,14 @@
 
+## Round 449 @ 2026-07-02T02:30:00Z
+
+- Picked: PLW2901 loop variable `rgb_path` overwritten by assignment in src/oyster_agent_runner/phase2/depth_inference_pipeline.py:136 — renamed `rgb_path` to `rgb_path_str` to avoid shadowing the iteration variable. Justification: measurable code smell (ruff PLW2901), single-file scope, py_compile clean, ruff PLW2901 clean, 5/5 tests pass.
+- Result: committed 6c8e3ef4 (PLW2901 fix in depth_inference_pipeline.py); ruff check --select=PLW2901 clean; python3 -m py_compile passes; pytest tests/phase2/test_depth_inference_pipeline.py 5/5 passed; pushed to origin/fix/prd-test-action-per-second-ruff). Self-review: PLW2901 fix only. No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
+## Round 448 @ 2026-06-30T10:00:00Z
+
+- Picked: SIM105 try-except-pass in src/oyster_agent_runner/defense_file_lock.py:88-91 — replaced with `contextlib.suppress(OSError)` for cleaner exception handling. Justification: measurable code smell (ruff SIM105), single-file scope, py_compile clean, ruff check clean for this file.
+- Result: committed 3cd60cb7 (SIM105 fix in defense_file_lock.py); ruff check --select=SIM clean; python3 -m py_compile passes; pushed to origin/fix/prd-test-action-per-second-ruff). Self-review: SIM105 fix only. No silent error swallow (suppress preserves behavior), no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
 ## Round 447 @ 2026-06-29T10:00:00Z
 
 - Picked: PLW2901 loop variable `ln` overwritten by assignment in src/oyster_agent_runner/cli.py:517-518 — renamed `ln` to `line` and use separate `stripped` variable to avoid overwriting. Also fixed C414 in defense_dedup_frames.py. Justification: measurable code smell (ruff PLW2901 + C414), single-file scopes, py_compile clean, ruff check clean, 12/12 tests pass.
