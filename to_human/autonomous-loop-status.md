@@ -1,3 +1,8 @@
+## Round 482 @ 2026-08-01T02:00:00Z
+
+- Picked: PLW2901 loop variable overwritten in bin/game_state_overlay.py (line 47-48) — renamed `line` to `raw_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, import test passes, follows established PLW2901 cleanup pattern.
+- Result: committed 7181a114 (fix PLW2901 in bin/game_state_overlay.py); ruff check --select=PLW2901 clean for this file; python import test passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed loop variable line->raw_line to avoid self-assignment. Logic preserved (stripped line still used). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
 ## Round 481 @ 2026-07-31T02:00:00Z
 
 - Picked: PLW2901 loop variables overwritten in bin/extract_audio_event_track.py (lines 61-65, 92-96, 151-155) — renamed `line` to `raw_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, import test passes, follows established PLW2901 cleanup pattern.
