@@ -1,4 +1,9 @@
 
+## Round 454 @ 2026-07-02T18:30:00Z
+
+- Picked: Broken test_obs_capture.py — method name `_auth_challenge_response` doesn't exist, and async `connect()` not awaited. Justification: failing test, clear fix scope, 5/5 tests now pass.
+- Result: committed 4eeafdad (fix test_obs_capture.py); pytest tests/phase2/test_obs_capture.py 5/5 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Fixed method name mismatch, added pytest.mark.asyncio decorator, no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
 ## Round 453 @ 2026-07-02T18:20:00Z
 
 - Picked: SIM115 file open without context manager in src/oyster_agent_runner/environments/factorio_full.py:374 — replaced with `with open(...)` for proper resource cleanup. Justification: measurable code smell (ruff SIM115), single-file scope, py_compile clean, ruff SIM115 clean for this file, 28/28 factorio tests pass.
