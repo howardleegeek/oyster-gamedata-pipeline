@@ -37,8 +37,6 @@ import zipfile
 from datetime import datetime, timezone
 
 UTC = timezone.utc
-
-UTC = UTC
 from importlib import metadata as importlib_metadata
 from pathlib import Path
 from typing import Any
