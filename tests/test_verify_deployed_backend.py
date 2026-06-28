@@ -620,17 +620,19 @@ class TestRun:
         ]
         mock_client = _make_mock_client(responses)
 
-        with patch("scripts.verify_deployed_backend.httpx.Client") as MockClient:
-            with patch("scripts.verify_deployed_backend.time.sleep"):
-                MockClient.return_value.__enter__ = MagicMock(return_value=mock_client)
-                MockClient.return_value.__exit__ = MagicMock(return_value=False)
-                code = run(
-                    "https://example.com",
-                    verbose=False,
-                    expected_recorder_tag="v0.8.11",
-                    appcast_retry_seconds=1,
-                    appcast_retry_interval=0,
-                )
+        with (
+            patch("scripts.verify_deployed_backend.httpx.Client") as MockClient,
+            patch("scripts.verify_deployed_backend.time.sleep"),
+        ):
+            MockClient.return_value.__enter__ = MagicMock(return_value=mock_client)
+            MockClient.return_value.__exit__ = MagicMock(return_value=False)
+            code = run(
+                "https://example.com",
+                verbose=False,
+                expected_recorder_tag="v0.8.11",
+                appcast_retry_seconds=1,
+                appcast_retry_interval=0,
+            )
 
         assert code == 0
         assert mock_client.get.call_count == 4
