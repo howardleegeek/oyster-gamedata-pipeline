@@ -218,6 +218,17 @@ class ErrorReporter:
             return json_data[: self.max_payload_size] + "..."
 
     def shutdown(self) -> None:
+        """Stop the error reporter background thread gracefully.
+        
+        Signals the background thread to stop and waits up to 5 seconds
+        for it to finish processing any pending errors.
+        
+        Args:
+            None
+            
+        Returns:
+            None
+        """
         self._stop.set()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=5.0)
