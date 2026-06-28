@@ -17,34 +17,40 @@ import mineflayer_runner as mr
 # ── 1. test_find_node_returns_path ──────────────────────────────────────────
 def test_find_node_returns_path():
     """Mock subprocess so find_node_executable returns a path."""
-    with patch("mineflayer_runner.shutil.which", return_value="/usr/bin/node"):
-        with patch("mineflayer_runner.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout="v20.11.0", stderr="")
-            result = mr.find_node_executable()
-            assert result == "/usr/bin/node"
-            mock_run.assert_called_once_with(
-                ["/usr/bin/node", "--version"],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
+    with (
+        patch("mineflayer_runner.shutil.which", return_value="/usr/bin/node"),
+        patch("mineflayer_runner.subprocess.run") as mock_run,
+    ):
+        mock_run.return_value = MagicMock(stdout="v20.11.0", stderr="")
+        result = mr.find_node_executable()
+        assert result == "/usr/bin/node"
+        mock_run.assert_called_once_with(
+            ["/usr/bin/node", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
 
 
 # ── 2. test_find_node_raises_when_missing ───────────────────────────────────
 def test_find_node_raises_when_missing():
     """When node is not in PATH, raise RuntimeError."""
-    with patch("mineflayer_runner.shutil.which", return_value=None):
-        with pytest.raises(RuntimeError, match="node executable not found"):
-            mr.find_node_executable()
+    with (
+        patch("mineflayer_runner.shutil.which", return_value=None),
+        pytest.raises(RuntimeError, match="node executable not found"),
+    ):
+        mr.find_node_executable()
 
 
 def test_find_node_raises_when_old_version():
     """When node version < 18, raise RuntimeError."""
-    with patch("mineflayer_runner.shutil.which", return_value="/usr/bin/node"):
-        with patch("mineflayer_runner.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout="v16.20.0", stderr="")
-            with pytest.raises(RuntimeError, match="node >= 18 required"):
-                mr.find_node_executable()
+    with (
+        patch("mineflayer_runner.shutil.which", return_value="/usr/bin/node"),
+        patch("mineflayer_runner.subprocess.run") as mock_run,
+    ):
+        mock_run.return_value = MagicMock(stdout="v16.20.0", stderr="")
+        with pytest.raises(RuntimeError, match="node >= 18 required"):
+            mr.find_node_executable()
 
 
 # ── 3. test_build_args_includes_all_flags ───────────────────────────────────
@@ -82,9 +88,11 @@ def test_build_args_includes_all_flags():
 # ── 4. test_mode_validation ────────────────────────────────────────────────
 def test_mode_validation():
     """build_node_args rejects unknown mode."""
-    with patch("mineflayer_runner.find_node_executable", return_value="/usr/bin/node"):
-        with pytest.raises(ValueError, match="Invalid mode"):
-            mr.build_node_args(
+    with (
+        patch("mineflayer_runner.find_node_executable", return_value="/usr/bin/node"),
+        pytest.raises(ValueError, match="Invalid mode"),
+    ):
+        mr.build_node_args(
                 bot_script="x",
                 server_host="h",
                 server_port=1,
@@ -105,28 +113,30 @@ def test_run_mineflayer_mode_validation():
 def test_run_mineflayer_uses_subprocess_run(tmp_path):
     """run_mineflayer should call subprocess.Popen with correct args."""
     out_dir = str(tmp_path / "out")
-    with patch("mineflayer_runner.find_node_executable", return_value="/usr/bin/node"):
-        with patch("mineflayer_runner.find_bot_script", return_value="/path/bot.js"):
-            mock_proc = MagicMock()
-            mock_proc.returncode = 0
-            mock_proc.wait.return_value = None
-            with patch("mineflayer_runner.subprocess.Popen", return_value=mock_proc) as mock_popen:
-                rc = mr.run_mineflayer(
-                    server_host="localhost",
-                    server_port=25565,
-                    username="DataPilot",
-                    mode="wasd_balanced",
-                    duration_sec=60.0,
-                    output_dir=out_dir,
-                    seed=42,
-                )
-                assert rc == 0
-                mock_popen.assert_called_once()
-                call_args = mock_popen.call_args[0][0]
-                assert call_args[0] == "/usr/bin/node"
-                assert call_args[1] == "/path/bot.js"
-                assert "--mode" in call_args
-                assert "wasd_balanced" in call_args
+    with (
+        patch("mineflayer_runner.find_node_executable", return_value="/usr/bin/node"),
+        patch("mineflayer_runner.find_bot_script", return_value="/path/bot.js"),
+    ):
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.wait.return_value = None
+        with patch("mineflayer_runner.subprocess.Popen", return_value=mock_proc) as mock_popen:
+            rc = mr.run_mineflayer(
+                server_host="localhost",
+                server_port=25565,
+                username="DataPilot",
+                mode="wasd_balanced",
+                duration_sec=60.0,
+                output_dir=out_dir,
+                seed=42,
+            )
+            assert rc == 0
+            mock_popen.assert_called_once()
+            call_args = mock_popen.call_args[0][0]
+            assert call_args[0] == "/usr/bin/node"
+            assert call_args[1] == "/path/bot.js"
+            assert "--mode" in call_args
+            assert "wasd_balanced" in call_args
 
 
 # ── 6. test_main_argparse ──────────────────────────────────────────────────
