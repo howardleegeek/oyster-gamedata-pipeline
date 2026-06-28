@@ -37,6 +37,7 @@ import signal
 import subprocess
 import time
 import uuid
+from contextlib import suppress
 from pathlib import Path
 from threading import Lock, Thread
 
@@ -153,10 +154,8 @@ def _run_codex_in_thread(job_id: str, task: CodexTask) -> None:
             )
         except subprocess.TimeoutExpired:
             proc.kill()
-            try:
+            with suppress(subprocess.TimeoutExpired):
                 proc.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                pass
             _update_job(
                 job_id,
                 status="timeout",
