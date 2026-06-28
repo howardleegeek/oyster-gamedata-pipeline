@@ -1,5 +1,10 @@
 
 
+## Round 465 @ 2026-06-28T16:27:42Z
+
+- Picked: SIM117 nested with statements in bin/generate_gameinfo_xlsx.py (lines 448-450) — combined into single with statement using comma-separated contexts. Justification: measurable code smell (ruff SIM117), single-file scope, 16/16 tests pass.
+- Result: committed 1b7a27bd (fix SIM117 in bin/generate_gameinfo_xlsx.py); ruff check --select=SIM117 clean for this file; pytest tests/bin/test_generate_gameinfo_xlsx.py 16/16 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Combined nested with statements; preserved behavior; no silent error swallow; no false-success; no race; no off-by-one; no security impact; no test masking; no brand cross-reference.
+
 ## Round 464 @ 2026-07-07T00:00:00Z
 
 - Picked: SIM117 nested with statements in tests/bin/test_spectator_follow.py (lines 143-146, 214-216) and tests/test_bug_report.py (lines 87-90, 95-98) — combined into single with statements using commas and parentheses. Justification: measurable code smell (ruff SIM117), single-file scope, 44/44 tests pass.
