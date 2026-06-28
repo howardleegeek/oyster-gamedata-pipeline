@@ -20,10 +20,10 @@ def read_camera_frames(session_dir: Path) -> List[Tuple[int, int]]:
         try:
             with open(camera_file, "r") as f:
                 for line in f:
-                    line = line.strip()
-                    if not line:
+                    stripped = line.strip()
+                    if not stripped:
                         continue
-                    data = json.loads(line)
+                    data = json.loads(stripped)
                     frame_id = data.get("frame_id")
                     timestamp_ns = data.get("timestamp_ns")
                     if frame_id is not None and timestamp_ns is not None:
@@ -47,10 +47,10 @@ def read_game_ticks(session_dir: Path) -> List[Tuple[int, float]]:
     try:
         with open(game_state_file, "r") as f:
             for line in f:
-                line = line.strip()
-                if not line:
+                stripped = line.strip()
+                if not stripped:
                     continue
-                data = json.loads(line)
+                data = json.loads(stripped)
                 tick_id = data.get("tick_id")
                 timestamp_ms = data.get("timestamp_ms")
                 if tick_id is not None and timestamp_ms is not None:
