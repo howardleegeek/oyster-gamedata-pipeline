@@ -445,9 +445,8 @@ def read_xlsx(path: str) -> Dict[str, Any]:
 
     except ImportError:
         # Fallback: parse XML manually
-        with zipfile.ZipFile(path, "r") as zf:
-            with zf.open("xl/worksheets/sheet1.xml") as f:
-                content = f.read().decode("utf-8")
+        with zipfile.ZipFile(path, "r") as zf, zf.open("xl/worksheets/sheet1.xml") as f:
+            content = f.read().decode("utf-8")
 
         # Extract cell values using regex
         # Find row 1 (header)
