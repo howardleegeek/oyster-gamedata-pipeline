@@ -2,6 +2,7 @@
 """Atomic file write helper using tempfile + os.replace."""
 
 import argparse
+import contextlib
 import os
 import sys
 import tempfile
@@ -48,10 +49,8 @@ def write_atomic(
 
         # Preserve permissions if requested
         if preserve_permissions and path.exists():
-            try:
+            with contextlib.suppress(OSError):  # Ignore permission errors
                 os.chmod(temp_path, path.stat().st_mode)
-            except OSError:
-                pass  # Ignore permission errors
 
         # Atomic replace
         os.replace(temp_path, path)
