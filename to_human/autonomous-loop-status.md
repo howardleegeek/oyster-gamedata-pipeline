@@ -3,6 +3,21 @@
 - Picked: PLW2901 loop variable overwritten in bin/generate_manifest.py (line 325-326) — renamed `line` to `raw_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, has dedicated test (tests/bin/test_generate_manifest.py 19/19 pass), follows established PLW2901 cleanup pattern from rounds 481-486.
 - Result: committed 957d7739 (fix PLW2901 in bin/generate_manifest.py); ruff check --select=PLW2901 clean for this file; pytest tests/bin/test_generate_manifest.py 19/19 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed loop variable line->raw_line. Logic preserved (rstrip() still applied, result stored in line). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
 
+## Round 489 @ 2026-08-04T02:30:00Z
+
+- Picked: PLW2901 loop variable overwritten in bin/pii_redactor.py (line 317-319) — renamed `line` to `raw_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, has dedicated test (tests/test_pii_redactor.py 28/28 pass), follows established PLW2901 cleanup pattern from rounds 481-488.
+- Result: committed 06a0ebac (fix PLW2901 in bin/pii_redactor.py); ruff check --select=PLW2901 clean for this file; pytest tests/test_pii_redactor.py 28/28 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed loop variable line->raw_line. Logic preserved (original_line stores raw, redact_file_content processes raw, JSON handling preserved). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
+## Round 490 @ 2026-08-04T02:40:00Z
+
+- Picked: PLW2901 loop variable overwritten in bin/prd_compliance_audit.py (lines 195, 1104) — renamed `line` to `raw_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, has dedicated test (tests/test_prd_audit_critical_score.py 6/6 pass), follows established PLW2901 cleanup pattern from rounds 481-489.
+- Result: committed 1a90bc59 (fix PLW2901 in bin/prd_compliance_audit.py); ruff check --select=PLW2901 clean for this file; pytest tests/test_prd_audit_critical_score.py 6/6 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed loop variable line->raw_line. Logic preserved (.strip() still applied, JSON parsing intact). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
+## Round 488 @ 2026-08-04T02:20:00Z
+
+- Picked: PLW2901 loop variable overwritten in bin/input_latency_telemetry.py (line 80-81, read_jsonl_streaming) — renamed `line` to `stripped_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, has dedicated test (tests/test_input_latency_telemetry.py 10/10 pass), follows established PLW2901 cleanup pattern from rounds 481-487.
+- Result: committed c3deba91 (fix PLW2901 in bin/input_latency_telemetry.py); ruff check --select=PLW2901 clean for this file; pytest tests/test_input_latency_telemetry.py 10/10 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed loop variable line->stripped_line. Logic preserved (json.loads applied to stripped_line, JSONDecodeError handling intact). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
 ## Round 486 @ 2026-08-04T02:00:00Z
 
 - Picked: PLW2901 loop variable overwritten in bin/verify_visual_diff.py (line 350-351, parse_frames_arg) — renamed `chunk` to `raw_chunk` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, has dedicated test (tests/bin/test_verify_visual_diff.py 22/22 pass), follows established PLW2901 cleanup pattern from rounds 481-485.
