@@ -1,4 +1,9 @@
 
+## Round 459 @ 2026-07-03T00:00:00Z
+
+- Picked: SIM115 file open without context manager in tests/bin/test_r13_keycode_replay.py — replaced with `with tempfile.NamedTemporaryFile(...) as f:` for proper resource cleanup. Justification: measurable code smell (ruff SIM115), single-file scope, 10/10 tests pass.
+- Result: committed f8595dd5 (fix SIM115 in test_r13_keycode_replay.py); ruff check --select=SIM115 clean for this file; pytest tests/bin/test_r13_keycode_replay.py 10/10 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Fixed file handle leak by using context manager; preserved behavior; no silent error swallow; no false-success; no race; no off-by-one; no security impact; no test masking; no brand cross-reference.
+
 ## Round 458 @ 2026-06-28T13:49:00Z
 
 - Picked: SIM105 try-except-pass in 2 source files (error_client_python.py and obs_capture_real.py) — replaced with contextlib.suppress. Justification: measurable code smell (ruff SIM105), single-file scope per commit, py_compile clean, module imports succeed.
