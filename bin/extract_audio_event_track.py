@@ -59,8 +59,8 @@ def count_audio_events(path):
     if not os.path.exists(path):
         return 0
     with open(path, "r") as f:
-        for line in f:
-            line = line.strip()
+        for raw_line in f:
+            line = raw_line.strip()
             if line:
                 try:
                     json.loads(line)
@@ -90,8 +90,8 @@ def run_sox_stat(audio_path):
         return None
 
     stats = {}
-    for line in stat_text.splitlines():
-        line = line.strip()
+    for raw_line in stat_text.splitlines():
+        line = raw_line.strip()
         if ":" in line:
             key, _, value = line.partition(":")
             key = key.strip().lower().replace(" ", "_")
@@ -149,8 +149,8 @@ def compute_snr_from_events(events_path):
 
     volumes = []
     with open(events_path, "r") as f:
-        for line in f:
-            line = line.strip()
+        for raw_line in f:
+            line = raw_line.strip()
             if line:
                 try:
                     event = json.loads(line)
