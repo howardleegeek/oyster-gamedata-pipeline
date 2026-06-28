@@ -87,7 +87,7 @@ def verify_signature(secret: str, payload: str, signature: str, identity: str = 
         return False
 
     # Constant-time comparison to prevent timing attacks
-    result = sum(ord(a) ^ ord(b) for a, b in zip(signature, expected))
+    result = sum(ord(a) ^ ord(b) for a, b in zip(signature, expected, strict=True))
     if result != 0:
         _global_limiter.record_failure(identity)
         return False
