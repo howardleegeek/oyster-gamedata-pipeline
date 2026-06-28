@@ -105,7 +105,7 @@ to get ``camera_position``.
 Camera intrinsics
 -----------------
 
-Minecraft default FOV is 70°. At 1920×1080::
+Minecraft default FOV is 70°. At 1920x1080::
 
     fx = (1920 / 2) / tan(70°/2) = 685.61
     fy = fx (square pixels)
@@ -139,7 +139,7 @@ try:  # pragma: no cover - import-resolution branch
     )
 
     _C8_AVAILABLE = True
-except Exception:  # noqa: BLE001 — any import failure → use fallback
+except Exception:  # any import failure → use fallback
     _C8_AVAILABLE = False
 
 # --- Buyer-spec field list (canonical order) -------------------------------
@@ -177,7 +177,7 @@ BUYER_SPEC_FIELDS: tuple[str, ...] = (
 MINECRAFT_DEFAULT_FOV_DEG: float = 70.0
 
 #: Default render resolution we assume when no game window dimensions are
-#: declared in the bundle. 1920×1080 matches the buyer's reference target.
+#: declared in the bundle. 1920x1080 matches the buyer's reference target.
 DEFAULT_VIDEO_WIDTH: int = 1920
 DEFAULT_VIDEO_HEIGHT: int = 1080
 
@@ -761,7 +761,7 @@ def adapt_phase1_to_buyer_spec(
     writes the buyer's deliverables into ``output_dir``:
 
     * ``action_camera.json`` — list of per-step records, 20 buyer fields each
-    * ``systeminfo.json`` — game window geometry stub (1920×1080 default)
+    * ``systeminfo.json`` — game window geometry stub (1920x1080 default)
     * ``gameinfo.json`` — minimal metadata payload (game name, fps, dims)
     * ``manifest.json`` — Phase 1 manifest copied through verbatim
 
@@ -819,7 +819,7 @@ def adapt_phase1_to_buyer_spec(
     # metadata-derived records. Closes Pipeline 2's last placeholder gap.
     if game_state_jsonl is not None and game_state_jsonl.exists():
         try:
-            import sys as _sys  # noqa: PLC0415
+            import sys as _sys 
 
             _bin_dir = str((Path(__file__).resolve().parent.parent.parent / "bin").resolve())
             if _bin_dir not in _sys.path:
@@ -827,7 +827,7 @@ def adapt_phase1_to_buyer_spec(
             from game_state_overlay import (
                 apply_to_record as _gs_apply,
             )
-            from game_state_overlay import (  # type: ignore  # noqa: PLC0415
+            from game_state_overlay import (  # type: ignore 
                 load as _gs_load,
             )
             from game_state_overlay import (
@@ -846,7 +846,7 @@ def adapt_phase1_to_buyer_spec(
         except Exception as _e:
             # fail-soft per iron-law-1: never break the pipeline because
             # the overlay had a hiccup. Log + fall through.
-            import logging as _logging  # noqa: PLC0415
+            import logging as _logging 
 
             _logging.getLogger(__name__).warning("game_state_overlay failed (non-fatal): %s", _e)
 
@@ -859,7 +859,7 @@ def adapt_phase1_to_buyer_spec(
     # tag) so D5 authenticity validator no longer flags this file as UNKNOWN.
     # `recordedAt` is generated NOW from system clock — real timestamp, not
     # a placeholder constant.
-    import datetime as _dt  # noqa: PLC0415
+    import datetime as _dt 
 
     game_name = "Minecraft"
     systeminfo = {
