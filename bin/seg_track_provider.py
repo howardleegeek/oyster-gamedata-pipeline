@@ -113,6 +113,13 @@ class Result:
     fps: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
+        """Convert frame result to a dictionary representation.
+
+        Returns:
+            Dict[str, Any]: Dictionary containing frame_id, timestamp,
+                instance_count, instances list with id, class_id, class_name,
+                pixels, centroid, bbox, track_id, processing_time_ms, and fps.
+        """
         return {
             "frame_id": self.frame_id, "timestamp": self.timestamp,
             "instance_count": len(self.instances),
