@@ -81,14 +81,16 @@ class TestStateMachine(unittest.TestCase):
 
     def test_idle_to_armed_transition(self):
         """Test transition from IDLE to ARMED when Minecraft starts"""
-        with patch.object(self.daemon, "_is_minecraft_running", return_value=True):
-            with patch.object(self.daemon, "_start_recorder", return_value=True):
-                self.daemon._transition_to(DaemonState.ARMED)
+        with (
+            patch.object(self.daemon, "_is_minecraft_running", return_value=True),
+            patch.object(self.daemon, "_start_recorder", return_value=True),
+        ):
+            self.daemon._transition_to(DaemonState.ARMED)
 
-                self.assertEqual(self.daemon.state, DaemonState.ARMED)
-                self.assertIsNotNone(self.daemon.session_id)
-                self.assertIsNotNone(self.daemon.session_started)
-                self.assertTrue(self.daemon.session_id.startswith("session_"))
+            self.assertEqual(self.daemon.state, DaemonState.ARMED)
+            self.assertIsNotNone(self.daemon.session_id)
+            self.assertIsNotNone(self.daemon.session_started)
+            self.assertTrue(self.daemon.session_id.startswith("session_"))
 
     def test_armed_to_recording_transition(self):
         """Test transition from ARMED to RECORDING when recorder starts"""
