@@ -164,11 +164,7 @@ def _is_private_world(world_id: str, instance_id: str) -> bool:
 
     # Check instance type keywords
     instance_lower = instance_id.lower()
-    for keyword in _PRIVATE_INSTANCE_KEYWORDS:
-        if keyword in instance_lower:
-            return True
-
-    return False
+    return any(keyword in instance_lower for keyword in _PRIVATE_INSTANCE_KEYWORDS)
 
 
 # ---------------------------------------------------------------------------
