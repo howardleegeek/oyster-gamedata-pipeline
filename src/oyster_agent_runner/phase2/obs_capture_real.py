@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextlib
 import hashlib
 import json
 import logging
@@ -88,10 +89,8 @@ class OBSRecorder:
         """Gracefully close the websocket connection."""
         if self._listener_task:
             self._listener_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._listener_task
-            except asyncio.CancelledError:
-                pass
             self._listener_task = None
         if self._ws:
             await self._ws.close()
