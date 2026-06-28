@@ -1,6 +1,11 @@
 
 
 
+## Round 478 @ 2026-07-28T02:00:00Z
+
+- Picked: PLW2901 loop variable overwritten in bin/dependency_pinning_check.py (line 46) — renamed loop variable from `line` to `raw_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, py_compile passes, import test passes, follows established PLW2901 cleanup pattern.
+- Result: committed 1e66a552 (fix PLW2901 in bin/dependency_pinning_check.py); ruff check --select=PLW2901 clean for this file; python3 -m py_compile passes; import test passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed loop variable line -> raw_line to avoid self-assignment. Logic preserved (stripped content still used). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
 ## Round 477 @ 2026-07-27T02:00:00Z
 
 - Picked: SIM110 for loop in bin/games/vrchat_adapter.py (line 167) — replaced with any() generator expression. Justification: measurable code smell (ruff SIM110), single-file scope, import test passes.
