@@ -247,98 +247,82 @@ class TestReportGeneration(unittest.TestCase):
             output_dir = Path(tmpdir)
             report_path = output_dir / "preflight_report.json"
 
-            with patch("preflight_recorder.OUTPUT_DIR", output_dir):
-                with patch("preflight_recorder.REPORT_PATH", report_path):
-                    # Mock all checks to pass
-                    with patch.object(
-                        preflight_recorder,
-                        "check_display_resolution",
-                        return_value={
-                            "name": "display_resolution",
-                            "ok": True,
-                            "value": "1920x1080",
-                        },
-                    ):
-                        with patch.object(
-                            preflight_recorder,
-                            "check_dpi",
-                            return_value={"name": "dpi", "ok": True, "value": 1.0},
-                        ):
-                            with patch.object(
-                                preflight_recorder,
-                                "check_minecraft_window",
-                                return_value={
-                                    "name": "minecraft_window",
-                                    "ok": True,
-                                    "value": "ok",
-                                },
-                            ):
-                                with patch.object(
-                                    preflight_recorder,
-                                    "check_overlapping_windows",
-                                    return_value={
-                                        "name": "overlapping_windows",
-                                        "ok": True,
-                                        "value": "none",
-                                    },
-                                ):
-                                    with patch.object(
-                                        preflight_recorder,
-                                        "check_audio_device",
-                                        return_value={
-                                            "name": "audio_device",
-                                            "ok": True,
-                                            "value": {},
-                                        },
-                                    ):
-                                        with patch.object(
-                                            preflight_recorder,
-                                            "check_fps",
-                                            return_value={
-                                                "name": "fps_capability",
-                                                "ok": True,
-                                                "value": {},
-                                            },
-                                        ):
-                                            with patch.object(
-                                                preflight_recorder,
-                                                "check_disk_space",
-                                                return_value={
-                                                    "name": "disk_space",
-                                                    "ok": True,
-                                                    "value": "50GB",
-                                                },
-                                            ):
-                                                with patch.object(
-                                                    preflight_recorder,
-                                                    "check_oyster_recorder",
-                                                    return_value={
-                                                        "name": "oyster_recorder",
-                                                        "ok": True,
-                                                        "value": {},
-                                                    },
-                                                ):
-                                                    with patch.object(
-                                                        preflight_recorder,
-                                                        "check_active_session",
-                                                        return_value={
-                                                            "name": "active_session",
-                                                            "ok": True,
-                                                            "value": "empty",
-                                                        },
-                                                    ):
-                                                        with patch.object(
-                                                            preflight_recorder,
-                                                            "check_network_tailscale",
-                                                            return_value={
-                                                                "name": "network_tailscale",
-                                                                "ok": True,
-                                                                "value": {},
-                                                            },
-                                                        ):
-                                                            report = (
-                                                                preflight_recorder.run_all_checks()
-                                                            )
+            # Mock all checks to pass
+            with (
+                patch("preflight_recorder.OUTPUT_DIR", output_dir),
+                patch("preflight_recorder.REPORT_PATH", report_path),
+                patch.object(
+                    preflight_recorder,
+                    "check_display_resolution",
+                    return_value={
+                        "name": "display_resolution",
+                        "ok": True,
+                        "value": "1920x1080",
+                    },
+                ),
+                patch.object(
+                    preflight_recorder,
+                    "check_dpi",
+                    return_value={"name": "dpi", "ok": True, "value": 1.0},
+                ),
+                patch.object(
+                    preflight_recorder,
+                    "check_minecraft_window",
+                    return_value={
+                        "name": "minecraft_window",
+                        "ok": True,
+                        "value": "ok",
+                    },
+                ),
+                patch.object(
+                    preflight_recorder,
+                    "check_overlapping_windows",
+                    return_value={
+                        "name": "overlapping_windows",
+                        "ok": True,
+                        "value": "none",
+                    },
+                ),
+                patch.object(
+                    preflight_recorder,
+                    "check_audio_device",
+                    return_value={"name": "audio_device", "ok": True, "value": {}},
+                ),
+                patch.object(
+                    preflight_recorder,
+                    "check_fps",
+                    return_value={"name": "fps_capability", "ok": True, "value": {}},
+                ),
+                patch.object(
+                    preflight_recorder,
+                    "check_disk_space",
+                    return_value={
+                        "name": "disk_space",
+                        "ok": True,
+                        "value": "50GB",
+                    },
+                ),
+                patch.object(
+                    preflight_recorder,
+                    "check_oyster_recorder",
+                    return_value={"name": "oyster_recorder", "ok": True, "value": {}},
+                ),
+                patch.object(
+                    preflight_recorder,
+                    "check_active_session",
+                    return_value={
+                        "name": "active_session",
+                        "ok": True,
+                        "value": "empty",
+                    },
+                ),
+                patch.object(
+                    preflight_recorder,
+                    "check_network_tailscale",
+                    return_value={"name": "network_tailscale", "ok": True, "value": {}},
+                ),
+            ):
+                report = preflight_recorder.run_all_checks()
 
             self.assertTrue(report["all_pass"])
             self.assertIn("ran_at", report)
@@ -354,98 +338,82 @@ class TestReportGeneration(unittest.TestCase):
             output_dir = Path(tmpdir)
             report_path = output_dir / "preflight_report.json"
 
-            with patch("preflight_recorder.OUTPUT_DIR", output_dir):
-                with patch("preflight_recorder.REPORT_PATH", report_path):
-                    # Mock one check to fail
-                    with patch.object(
-                        preflight_recorder,
-                        "check_display_resolution",
-                        return_value={
-                            "name": "display_resolution",
-                            "ok": False,
-                            "value": "2560x1440",
-                        },
-                    ):
-                        with patch.object(
-                            preflight_recorder,
-                            "check_dpi",
-                            return_value={"name": "dpi", "ok": True, "value": 1.0},
-                        ):
-                            with patch.object(
-                                preflight_recorder,
-                                "check_minecraft_window",
-                                return_value={
-                                    "name": "minecraft_window",
-                                    "ok": True,
-                                    "value": "ok",
-                                },
-                            ):
-                                with patch.object(
-                                    preflight_recorder,
-                                    "check_overlapping_windows",
-                                    return_value={
-                                        "name": "overlapping_windows",
-                                        "ok": True,
-                                        "value": "none",
-                                    },
-                                ):
-                                    with patch.object(
-                                        preflight_recorder,
-                                        "check_audio_device",
-                                        return_value={
-                                            "name": "audio_device",
-                                            "ok": True,
-                                            "value": {},
-                                        },
-                                    ):
-                                        with patch.object(
-                                            preflight_recorder,
-                                            "check_fps",
-                                            return_value={
-                                                "name": "fps_capability",
-                                                "ok": True,
-                                                "value": {},
-                                            },
-                                        ):
-                                            with patch.object(
-                                                preflight_recorder,
-                                                "check_disk_space",
-                                                return_value={
-                                                    "name": "disk_space",
-                                                    "ok": True,
-                                                    "value": "50GB",
-                                                },
-                                            ):
-                                                with patch.object(
-                                                    preflight_recorder,
-                                                    "check_oyster_recorder",
-                                                    return_value={
-                                                        "name": "oyster_recorder",
-                                                        "ok": True,
-                                                        "value": {},
-                                                    },
-                                                ):
-                                                    with patch.object(
-                                                        preflight_recorder,
-                                                        "check_active_session",
-                                                        return_value={
-                                                            "name": "active_session",
-                                                            "ok": True,
-                                                            "value": "empty",
-                                                        },
-                                                    ):
-                                                        with patch.object(
-                                                            preflight_recorder,
-                                                            "check_network_tailscale",
-                                                            return_value={
-                                                                "name": "network_tailscale",
-                                                                "ok": True,
-                                                                "value": {},
-                                                            },
-                                                        ):
-                                                            report = (
-                                                                preflight_recorder.run_all_checks()
-                                                            )
+            # Mock one check to fail
+            with (
+                patch("preflight_recorder.OUTPUT_DIR", output_dir),
+                patch("preflight_recorder.REPORT_PATH", report_path),
+                patch.object(
+                    preflight_recorder,
+                    "check_display_resolution",
+                    return_value={
+                        "name": "display_resolution",
+                        "ok": False,
+                        "value": "2560x1440",
+                    },
+                ),
+                patch.object(
+                    preflight_recorder,
+                    "check_dpi",
+                    return_value={"name": "dpi", "ok": True, "value": 1.0},
+                ),
+                patch.object(
+                    preflight_recorder,
+                    "check_minecraft_window",
+                    return_value={
+                        "name": "minecraft_window",
+                        "ok": True,
+                        "value": "ok",
+                    },
+                ),
+                patch.object(
+                    preflight_recorder,
+                    "check_overlapping_windows",
+                    return_value={
+                        "name": "overlapping_windows",
+                        "ok": True,
+                        "value": "none",
+                    },
+                ),
+                patch.object(
+                    preflight_recorder,
+                    "check_audio_device",
+                    return_value={"name": "audio_device", "ok": True, "value": {}},
+                ),
+                patch.object(
+                    preflight_recorder,
+                    "check_fps",
+                    return_value={"name": "fps_capability", "ok": True, "value": {}},
+                ),
+                patch.object(
+                    preflight_recorder,
+                    "check_disk_space",
+                    return_value={
+                        "name": "disk_space",
+                        "ok": True,
+                        "value": "50GB",
+                    },
+                ),
+                patch.object(
+                    preflight_recorder,
+                    "check_oyster_recorder",
+                    return_value={"name": "oyster_recorder", "ok": True, "value": {}},
+                ),
+                patch.object(
+                    preflight_recorder,
+                    "check_active_session",
+                    return_value={
+                        "name": "active_session",
+                        "ok": True,
+                        "value": "empty",
+                    },
+                ),
+                patch.object(
+                    preflight_recorder,
+                    "check_network_tailscale",
+                    return_value={"name": "network_tailscale", "ok": True, "value": {}},
+                ),
+            ):
+                report = preflight_recorder.run_all_checks()
 
             self.assertFalse(report["all_pass"])
 
