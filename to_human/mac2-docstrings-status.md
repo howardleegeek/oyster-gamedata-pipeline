@@ -81,6 +81,12 @@
 ## Round @ 2026-06-21T13:35:00Z
 - File: bin/inventory_voxel_capture.py::main
 - Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: f9e6b38d0
+
+## Round @ 2026-06-21T14:00:00Z
+- File: bin/verify_round_trip.py::main
+- Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: 04553ff9cc49e97f105cb2bc1be6a20a9273b198lready had type hints)
 - Commit: f5b3f2d10
 
 ## Round @ 2026-06-21T14:00:00Z
@@ -407,3 +413,13 @@ Note: Also added docstring to reset_vendor in same commit (minor spec deviation 
 - File: bin/per_frame_object_bbox.py::FrameData.get_visible_2d
 - Added: docstring=Y, type-hints=N (already had type hints)
 - Commit: 4c44240c2
+
+## Round @ 2026-06-28T03:33:08Z
+- File: bin/seg_track_provider.py::Result.to_dict
+- Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: 3a45155c4
+
+## Round @ 2026-06-28T04:00:00Z
+- File: bin/verify_round_trip.py::main
+- Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: 04553ff9cc49e97f105cb2bc1be6a20a9273b198
