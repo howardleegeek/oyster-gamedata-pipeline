@@ -101,7 +101,7 @@ class LanguageInstructionGenerator:
             "task": task,
             "narration_mode": mode,
             "timestamp": datetime.now(UTC).isoformat(),
-            "vla_compatible": {m: True for m in VLA_MODELS},
+            "vla_compatible": dict.fromkeys(VLA_MODELS, True),
         }
 
         if dense_narration or mode in ("dense", "verbose"):
