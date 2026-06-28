@@ -617,3 +617,8 @@ Self-review: cosmetic reformat only — no silent error swallow, no race, no off
 
 - Picked: SIM117 nested with statements in tests/test_verify_deployed_backend.py:623 — combined into single parenthesized `with (patch(...) as MockClient, patch(...))` form. Justification: measurable code smell (ruff SIM117), single-file scope, 49/49 tests pass.
 - Result: committed 7e005c41 (fix SIM117 in test_verify_deployed_backend.py); ruff check --select=SIM clean for this file; pytest tests/test_verify_deployed_backend.py 49/49 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Preserved both context managers' lifetimes; no try/except involved (no silent error swallow); tests still assert same exit code and call count (no false-success, no test masking); no race/off-by-one; no security impact; no brand cross-references; one logical change in one file.
+
+## Round 461 @ 2026-06-28T15:38:53Z
+
+- Picked: SIM117 nested with statements in tests/bin/test_mineflayer_runner.py (5 occurrences: lines 20, 36, 43, 85, 108) — combined into single parenthesized `with (...)` statements. Justification: measurable code smell (ruff SIM117), single-file scope, 10/10 tests pass.
+- Result: committed 28acce33 (fix SIM117 in test_mineflayer_runner.py); ruff check --select=SIM117 clean for this file (zero violations); pytest tests/bin/test_mineflayer_runner.py 10/10 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Combined 5 nested with blocks into parenthesized combined with statements; preserved all mock context enter/exit order (left-to-right identical to nested form); no silent error swallow; no false-success; no race; no off-by-one; no security impact; no test masking; no brand cross-reference.
