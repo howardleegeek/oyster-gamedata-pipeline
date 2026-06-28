@@ -145,8 +145,9 @@ class TestContinueOnError(unittest.TestCase):
         from contextlib import redirect_stdout
 
         f = io.StringIO()
-        with redirect_stdout(f):
-            with mock.patch.object(
+        with (
+            redirect_stdout(f),
+            mock.patch.object(
                 sys,
                 "argv",
                 [
@@ -155,12 +156,13 @@ class TestContinueOnError(unittest.TestCase):
                     str(self.root),
                     "--continue-on-error",
                 ],
-            ):
-                with mock.patch("subprocess.run", side_effect=mock_run):
-                    try:
-                        rsv.main()
-                    except SystemExit as e:
-                        self.assertEqual(e.code, 1)  # still exits 1 because there's a FAIL
+            ),
+            mock.patch("subprocess.run", side_effect=mock_run),
+        ):
+            try:
+                rsv.main()
+            except SystemExit as e:
+                self.assertEqual(e.code, 1)  # still exits 1 because there's a FAIL
 
         output = f.getvalue()
         # All 5 sessions should appear in output
@@ -189,8 +191,9 @@ class TestContinueOnError(unittest.TestCase):
         from contextlib import redirect_stdout
 
         f = io.StringIO()
-        with redirect_stdout(f):
-            with mock.patch.object(
+        with (
+            redirect_stdout(f),
+            mock.patch.object(
                 sys,
                 "argv",
                 [
@@ -198,12 +201,13 @@ class TestContinueOnError(unittest.TestCase):
                     "--sessions-root",
                     str(self.root),
                 ],
-            ):
-                with mock.patch("subprocess.run", side_effect=mock_run):
-                    try:
-                        rsv.main()
-                    except SystemExit as e:
-                        self.assertEqual(e.code, 1)
+            ),
+            mock.patch("subprocess.run", side_effect=mock_run),
+        ):
+            try:
+                rsv.main()
+            except SystemExit as e:
+                self.assertEqual(e.code, 1)
 
         output = f.getvalue()
         # session_001 and session_002 should appear, but not 003+
@@ -263,8 +267,9 @@ class TestOutputJsonSchema(unittest.TestCase):
         from contextlib import redirect_stdout
 
         f = io.StringIO()
-        with redirect_stdout(f):
-            with mock.patch.object(
+        with (
+            redirect_stdout(f),
+            mock.patch.object(
                 sys,
                 "argv",
                 [
@@ -277,12 +282,13 @@ class TestOutputJsonSchema(unittest.TestCase):
                     "--output",
                     str(self.output_path),
                 ],
-            ):
-                with mock.patch("subprocess.run", side_effect=mock_run):
-                    try:
-                        rsv.main()
-                    except SystemExit:
-                        pass
+            ),
+            mock.patch("subprocess.run", side_effect=mock_run),
+        ):
+            try:
+                rsv.main()
+            except SystemExit:
+                pass
 
         self.assertTrue(self.output_path.exists())
         data = json.loads(self.output_path.read_text())
@@ -336,8 +342,9 @@ class TestOutputJsonSchema(unittest.TestCase):
         from contextlib import redirect_stdout
 
         f = io.StringIO()
-        with redirect_stdout(f):
-            with mock.patch.object(
+        with (
+            redirect_stdout(f),
+            mock.patch.object(
                 sys,
                 "argv",
                 [
@@ -347,12 +354,13 @@ class TestOutputJsonSchema(unittest.TestCase):
                     "--output",
                     str(self.output_path),
                 ],
-            ):
-                with mock.patch("subprocess.run", side_effect=mock_run):
-                    try:
-                        rsv.main()
-                    except SystemExit:
-                        pass
+            ),
+            mock.patch("subprocess.run", side_effect=mock_run),
+        ):
+            try:
+                rsv.main()
+            except SystemExit:
+                pass
 
         data = json.loads(self.output_path.read_text())
         # ISO8601 check: should contain 'T' and end with 'Z'
@@ -397,8 +405,9 @@ class TestSample(unittest.TestCase):
         from contextlib import redirect_stdout
 
         f = io.StringIO()
-        with redirect_stdout(f):
-            with mock.patch.object(
+        with (
+            redirect_stdout(f),
+            mock.patch.object(
                 sys,
                 "argv",
                 [
@@ -408,12 +417,13 @@ class TestSample(unittest.TestCase):
                     "--sample",
                     "3",
                 ],
-            ):
-                with mock.patch("subprocess.run", side_effect=mock_run):
-                    try:
-                        rsv.main()
-                    except SystemExit as e:
-                        self.assertEqual(e.code, 0)
+            ),
+            mock.patch("subprocess.run", side_effect=mock_run),
+        ):
+            try:
+                rsv.main()
+            except SystemExit as e:
+                self.assertEqual(e.code, 0)
 
         output = f.getvalue()
         # Count how many session names appear
@@ -433,8 +443,9 @@ class TestSample(unittest.TestCase):
         from contextlib import redirect_stdout
 
         f = io.StringIO()
-        with redirect_stdout(f):
-            with mock.patch.object(
+        with (
+            redirect_stdout(f),
+            mock.patch.object(
                 sys,
                 "argv",
                 [
@@ -444,12 +455,13 @@ class TestSample(unittest.TestCase):
                     "--sample",
                     "20",
                 ],
-            ):
-                with mock.patch("subprocess.run", side_effect=mock_run):
-                    try:
-                        rsv.main()
-                    except SystemExit as e:
-                        self.assertEqual(e.code, 0)
+            ),
+            mock.patch("subprocess.run", side_effect=mock_run),
+        ):
+            try:
+                rsv.main()
+            except SystemExit as e:
+                self.assertEqual(e.code, 0)
 
         output = f.getvalue()
         # All 10 sessions should appear
@@ -471,8 +483,9 @@ class TestSample(unittest.TestCase):
         seen_sessions = set()
         for _ in range(5):
             f = io.StringIO()
-            with redirect_stdout(f):
-                with mock.patch.object(
+            with (
+                redirect_stdout(f),
+                mock.patch.object(
                     sys,
                     "argv",
                     [
@@ -482,12 +495,13 @@ class TestSample(unittest.TestCase):
                         "--sample",
                         "3",
                     ],
-                ):
-                    with mock.patch("subprocess.run", side_effect=mock_run):
-                        try:
-                            rsv.main()
-                        except SystemExit:
-                            pass
+                ),
+                mock.patch("subprocess.run", side_effect=mock_run),
+            ):
+                try:
+                    rsv.main()
+                except SystemExit:
+                    pass
 
             output = f.getvalue()
             for i in range(1, 11):
@@ -568,8 +582,9 @@ class TestGateTimeout(unittest.TestCase):
         from contextlib import redirect_stdout
 
         f = io.StringIO()
-        with redirect_stdout(f):
-            with mock.patch.object(
+        with (
+            redirect_stdout(f),
+            mock.patch.object(
                 sys,
                 "argv",
                 [
@@ -580,12 +595,13 @@ class TestGateTimeout(unittest.TestCase):
                     "--output",
                     str(output_path),
                 ],
-            ):
-                with mock.patch("subprocess.run", side_effect=mock_run):
-                    try:
-                        rsv.main()
-                    except SystemExit:
-                        pass
+            ),
+            mock.patch("subprocess.run", side_effect=mock_run),
+        ):
+            try:
+                rsv.main()
+            except SystemExit:
+                pass
 
         data = json.loads(output_path.read_text())
         self.assertEqual(data["sessions_timeout"], 1)
@@ -616,8 +632,9 @@ class TestDurationTracking(unittest.TestCase):
         from contextlib import redirect_stdout
 
         f = io.StringIO()
-        with redirect_stdout(f):
-            with mock.patch.object(
+        with (
+            redirect_stdout(f),
+            mock.patch.object(
                 sys,
                 "argv",
                 [
@@ -625,12 +642,13 @@ class TestDurationTracking(unittest.TestCase):
                     "--sessions-root",
                     str(root),
                 ],
-            ):
-                with mock.patch("subprocess.run", side_effect=mock_run):
-                    try:
-                        rsv.main()
-                    except SystemExit:
-                        pass
+            ),
+            mock.patch("subprocess.run", side_effect=mock_run),
+        ):
+            try:
+                rsv.main()
+            except SystemExit:
+                pass
 
         # Verify duration_s appears in the text report
         f.getvalue()  # noqa: F841
@@ -638,8 +656,9 @@ class TestDurationTracking(unittest.TestCase):
         # Let's check via --output
         output_path = root / "report.json"
         f2 = io.StringIO()
-        with redirect_stdout(f2):
-            with mock.patch.object(
+        with (
+            redirect_stdout(f2),
+            mock.patch.object(
                 sys,
                 "argv",
                 [
@@ -649,12 +668,13 @@ class TestDurationTracking(unittest.TestCase):
                     "--output",
                     str(output_path),
                 ],
-            ):
-                with mock.patch("subprocess.run", side_effect=mock_run):
-                    try:
-                        rsv.main()
-                    except SystemExit:
-                        pass
+            ),
+            mock.patch("subprocess.run", side_effect=mock_run),
+        ):
+            try:
+                rsv.main()
+            except SystemExit:
+                pass
 
         data = json.loads(output_path.read_text())
         self.assertEqual(len(data["per_session"]), 1)
