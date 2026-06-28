@@ -1,3 +1,8 @@
+## Round 487 @ 2026-08-04T02:10:00Z
+
+- Picked: PLW2901 loop variable overwritten in bin/generate_manifest.py (line 325-326) — renamed `line` to `raw_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, has dedicated test (tests/bin/test_generate_manifest.py 19/19 pass), follows established PLW2901 cleanup pattern from rounds 481-486.
+- Result: committed 957d7739 (fix PLW2901 in bin/generate_manifest.py); ruff check --select=PLW2901 clean for this file; pytest tests/bin/test_generate_manifest.py 19/19 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed loop variable line->raw_line. Logic preserved (rstrip() still applied, result stored in line). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
 ## Round 486 @ 2026-08-04T02:00:00Z
 
 - Picked: PLW2901 loop variable overwritten in bin/verify_visual_diff.py (line 350-351, parse_frames_arg) — renamed `chunk` to `raw_chunk` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, has dedicated test (tests/bin/test_verify_visual_diff.py 22/22 pass), follows established PLW2901 cleanup pattern from rounds 481-485.
