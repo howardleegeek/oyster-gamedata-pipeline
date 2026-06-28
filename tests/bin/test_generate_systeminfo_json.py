@@ -445,26 +445,26 @@ class TestMainFunction(unittest.TestCase):
 
         try:
             # Mock the detection functions
-            with patch("generate_systeminfo_json.detect_screen_dpi") as mock_dpi:
-                with patch("generate_systeminfo_json.detect_window_geometry") as mock_geo:
-                    mock_dpi.return_value = 1.5
-                    mock_geo.return_value = {
-                        "x": 150,
-                        "y": 250,
-                        "width": 1920,
-                        "height": 1080,
-                    }
+            with patch("generate_systeminfo_json.detect_screen_dpi") as mock_dpi, \
+                 patch("generate_systeminfo_json.detect_window_geometry") as mock_geo:
+                mock_dpi.return_value = 1.5
+                mock_geo.return_value = {
+                    "x": 150,
+                    "y": 250,
+                    "width": 1920,
+                    "height": 1080,
+                }
 
-                    # Run main with auto-detect flags
-                    test_args = [
-                        "--output",
-                        temp_path,
-                        "--auto-detect-dpi",
-                        "--auto-detect-window",
-                    ]
+                # Run main with auto-detect flags
+                test_args = [
+                    "--output",
+                    temp_path,
+                    "--auto-detect-dpi",
+                    "--auto-detect-window",
+                ]
 
-                    with patch("sys.argv", ["generate_systeminfo_json.py"] + test_args):
-                        return_code = main()
+                with patch("sys.argv", ["generate_systeminfo_json.py"] + test_args):
+                    return_code = main()
 
                     self.assertEqual(return_code, 0)
 
@@ -513,11 +513,11 @@ class TestMainFunction(unittest.TestCase):
 
         stderr_capture = io.StringIO()
 
-        with redirect_stderr(stderr_capture):
-            with patch("sys.argv", ["generate_systeminfo_json.py"]):
-                # This should raise SystemExit due to argparse
-                with self.assertRaises(SystemExit):
-                    main()
+        # This should raise SystemExit due to argparse
+        with redirect_stderr(stderr_capture), \
+             patch("sys.argv", ["generate_systeminfo_json.py"]), \
+             self.assertRaises(SystemExit):
+            main()
 
         # Check that error message mentions --output
         stderr_output = stderr_capture.getvalue()
