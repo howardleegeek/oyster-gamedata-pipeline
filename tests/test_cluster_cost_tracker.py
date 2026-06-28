@@ -297,12 +297,13 @@ class TestCLI:
 
         from daemon.cluster_cost_tracker import main
 
-        with patch.object(
-            __import__("daemon.cluster_cost_tracker", fromlist=["CLUSTER_GLOB"]),
-            "CLUSTER_GLOB",
-            pattern,
-        ):
-            with patch(
+        with (
+            patch.object(
+                __import__("daemon.cluster_cost_tracker", fromlist=["CLUSTER_GLOB"]),
+                "CLUSTER_GLOB",
+                pattern,
+            ),
+            patch(
                 "sys.argv",
                 [
                     "cluster_cost_tracker.py",
@@ -313,8 +314,9 @@ class TestCLI:
                     "--output",
                     output,
                 ],
-            ):
-                main()
+            ),
+        ):
+            main()
 
         captured = capsys.readouterr()
         report = json.loads(captured.out)
