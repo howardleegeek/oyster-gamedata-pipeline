@@ -1,5 +1,10 @@
 
 
+## Round 467 @ 2026-07-07T02:00:00Z
+
+- Picked: SIM117 nested with statements in sdk/python/oyster_buyer_sdk/__init__.py (lines 221-227) — combined into single with statement using comma-separated contexts. Justification: measurable code smell (ruff SIM117), production SDK code, single-file scope, import test passes.
+- Result: committed 06be2d33 (fix SIM117 in sdk/python/oyster_buyer_sdk/__init__.py); ruff check --select=SIM117 clean for this file; python import test passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Combined nested with statements; preserved download behavior; no silent error swallow; no false-success; no race conditions; no off-by-one; no security impact; no test masking; no brand cross-reference.
+
 ## Round 466 @ 2026-07-07T01:00:00Z
 
 - Picked: SIM117 nested with statements in bin/recorder_dav2_runner.py (lines 120-125) — combined into single with statement using comma-separated contexts. Justification: measurable code smell (ruff SIM117), single-file scope, 1/1 related test passes.
