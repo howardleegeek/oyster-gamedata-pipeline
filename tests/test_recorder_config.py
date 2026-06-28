@@ -54,7 +54,7 @@ def valid_config(tmp_path: Path) -> Path:
 @pytest.fixture
 def minimal_config(tmp_path: Path) -> Path:
     """Write a minimal valid config (only required keys)."""
-    cfg = {k: "" for k in REQUIRED_KEYS}
+    cfg = dict.fromkeys(REQUIRED_KEYS, "")
     cfg["auto_update_check_hours"] = 24
     cfg["telemetry_enabled"] = False
     path = tmp_path / "config.json"
@@ -236,7 +236,7 @@ class TestValidate:
     """Internal _validate helper."""
 
     def test_valid_config_passes(self) -> None:
-        cfg = {k: "val" for k in REQUIRED_KEYS}
+        cfg = dict.fromkeys(REQUIRED_KEYS, "val")
         _validate(cfg)  # should not raise
 
     def test_missing_key_raises(self) -> None:

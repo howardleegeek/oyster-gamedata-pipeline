@@ -40,7 +40,7 @@ class _FakeSMAPIHandler(BaseHTTPRequestHandler):
         key = payload["key"]
         self.server.calls.append(f"POST /press:{key}")
 
-        keys = {name: False for name in ACTION_KEYS}
+        keys = dict.fromkeys(ACTION_KEYS, False)
         keys[key] = True
         self.server.state = {
             **self.server.state,
@@ -72,7 +72,7 @@ def fake_relay() -> _FakeSMAPIRelay:
         "y": 44.0,
         "facing": "down",
         "map": "Farm",
-        "keys": {name: False for name in ACTION_KEYS},
+        "keys": dict.fromkeys(ACTION_KEYS, False),
         "timestamp": 1779469000.0,
     }
     server.calls = []
@@ -105,7 +105,7 @@ def test_reset_reads_state_and_returns_protocol_observation(fake_relay: _FakeSMA
         "map_name": "Farm",
         "player_position": {"x": 12.5, "y": 44.0},
         "facing": "down",
-        "keys": {name: False for name in ACTION_KEYS},
+        "keys": dict.fromkeys(ACTION_KEYS, False),
         "source": "smapi_relay",
     }
     assert env.is_running is True

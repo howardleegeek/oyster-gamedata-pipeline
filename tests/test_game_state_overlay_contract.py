@@ -105,7 +105,7 @@ def test_python_consumes_the_expected_field_set():
 def test_lookup_at_ms_returns_expected_fields():
     """Smoke test: round-trip a synthetic sample through lookup_at_ms +
     apply_to_record. Catches silent renames in either direction."""
-    sample = {f: 0 for f in EXPECTED_FIELDS}
+    sample = dict.fromkeys(EXPECTED_FIELDS, 0)
     sample["dimension"] = "minecraft:overworld"
     sample["game_mode"] = "SURVIVAL"
     sample["on_ground"] = True
