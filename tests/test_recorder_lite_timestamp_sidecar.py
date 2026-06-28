@@ -195,7 +195,6 @@ def test_timestamps_sidecar_skipped_when_no_video(tmp_path: Path) -> None:
 
     tar_path = app._package_tarball("20260527-654321")
 
-    extract_dir = tmp_path / "extract"
     with tarfile.open(tar_path, "r:gz") as tf:
         names = set(tf.getnames())
         assert "clip-20260527-654321/timestamps.json" not in names
