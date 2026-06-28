@@ -45,6 +45,7 @@ class TestR23VideoCodec(unittest.TestCase):
 
     def tearDown(self) -> None:
         from contextlib import suppress
+
         with suppress(FileNotFoundError):
             os.remove(self.video_path)
 

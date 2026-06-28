@@ -819,7 +819,7 @@ def adapt_phase1_to_buyer_spec(
     # metadata-derived records. Closes Pipeline 2's last placeholder gap.
     if game_state_jsonl is not None and game_state_jsonl.exists():
         try:
-            import sys as _sys 
+            import sys as _sys
 
             _bin_dir = str((Path(__file__).resolve().parent.parent.parent / "bin").resolve())
             if _bin_dir not in _sys.path:
@@ -827,7 +827,7 @@ def adapt_phase1_to_buyer_spec(
             from game_state_overlay import (
                 apply_to_record as _gs_apply,
             )
-            from game_state_overlay import (  # type: ignore 
+            from game_state_overlay import (  # type: ignore
                 load as _gs_load,
             )
             from game_state_overlay import (
@@ -846,7 +846,7 @@ def adapt_phase1_to_buyer_spec(
         except Exception as _e:
             # fail-soft per iron-law-1: never break the pipeline because
             # the overlay had a hiccup. Log + fall through.
-            import logging as _logging 
+            import logging as _logging
 
             _logging.getLogger(__name__).warning("game_state_overlay failed (non-fatal): %s", _e)
 
@@ -859,7 +859,7 @@ def adapt_phase1_to_buyer_spec(
     # tag) so D5 authenticity validator no longer flags this file as UNKNOWN.
     # `recordedAt` is generated NOW from system clock — real timestamp, not
     # a placeholder constant.
-    import datetime as _dt 
+    import datetime as _dt
 
     game_name = "Minecraft"
     systeminfo = {

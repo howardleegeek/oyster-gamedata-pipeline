@@ -20,6 +20,7 @@ def temp_db():
     yield path
     # Cleanup
     from contextlib import suppress
+
     with suppress(OSError):
         os.unlink(path)
 
