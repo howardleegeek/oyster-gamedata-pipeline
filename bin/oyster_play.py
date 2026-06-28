@@ -519,6 +519,18 @@ def run_session(
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the Oyster single-button consumer launcher CLI.
+
+    Parses command-line arguments, optionally writes a desktop shortcut,
+    and launches the game session.
+
+    Args:
+        argv: Command-line arguments (default: sys.argv). Pass an empty
+              list to run with defaults.
+
+    Returns:
+        Exit code: 0 on success, 1 on failure.
+    """
     parser = argparse.ArgumentParser(
         description="Oyster single-button consumer launcher",
     )
