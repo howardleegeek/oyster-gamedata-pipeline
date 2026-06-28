@@ -314,9 +314,9 @@ def redact_jsonl_file(filepath: Path, player_username: str, pseudonymized_name: 
 
     try:
         with open(filepath, "r", encoding="utf-8") as f:
-            for line in f:
-                original_line = line
-                line = redact_file_content(line, player_username, pseudonymized_name)
+            for raw_line in f:
+                original_line = raw_line
+                line = redact_file_content(raw_line, player_username, pseudonymized_name)
 
                 # Check if chat messages should be redacted
                 try:
