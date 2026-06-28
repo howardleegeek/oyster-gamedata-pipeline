@@ -44,10 +44,9 @@ def _make_reference(snapshots: list[dict], dataset_id: str = DATASET_ID) -> Path
         "video_frame_hashes": ["sha256:placeholder"] * len(snapshots),
     }
     payload["signature"] = compute_signature(payload, SECRET)
-    f = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8")
-    f.write(json.dumps(payload))
-    f.close()
-    return Path(f.name)
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as f:
+        f.write(json.dumps(payload))
+        return Path(f.name)
 
 
 class TestV4BuyerSigned(unittest.TestCase):
@@ -105,9 +104,8 @@ class TestV4BuyerSigned(unittest.TestCase):
         broken = json.loads(self.ref_path.read_text())
         broken.pop("signature")
         # File missing required signature key → schema_mismatch ABSTAIN
-        bad = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
-        bad.write(json.dumps(broken))
-        bad.close()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as bad:
+            bad.write(json.dumps(broken))
         try:
             r = v4_buyer_reference_diff(self.snapshots[1], buyer_reference_path=bad.name)
             self.assertFalse(r.passed)
@@ -118,9 +116,8 @@ class TestV4BuyerSigned(unittest.TestCase):
     def test_invalid_signature_abstains(self) -> None:
         tampered = json.loads(self.ref_path.read_text())
         tampered["signature"] = "deadbeef" * 8
-        bad = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
-        bad.write(json.dumps(tampered))
-        bad.close()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as bad:
+            bad.write(json.dumps(tampered))
         try:
             r = v4_buyer_reference_diff(self.snapshots[1], buyer_reference_path=bad.name)
             self.assertFalse(r.passed)
