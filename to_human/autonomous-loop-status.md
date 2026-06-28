@@ -1,4 +1,19 @@
 
+## Round 457 @ 2026-07-02T19:00:00Z
+
+- Picked: SIM115 file open without context manager in tests/bin/test_bft_orchestrator.py:51 — replaced with `with tempfile.NamedTemporaryFile(...) as f:` for proper resource cleanup. Justification: measurable code smell (ruff SIM115), single-file scope, 13/13 tests pass.
+- Result: committed 0831f2f8 (fix SIM115 in test_bft_orchestrator.py); ruff check --select=SIM115 clean for this file; pytest tests/bin/test_bft_orchestrator.py 13/13 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Fixed file handle leak, preserved behavior, no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
+## Round 456 @ 2026-07-02T18:50:00Z
+
+- Picked: SIM105 try-except-pass in 3 test files — replaced with contextlib.suppress. Justification: measurable code smell (ruff), single-file scope, tests pass 21/21.
+- Result: committed 259d1253 (fix SIM105 in test_audit_log.py, test_r15_fps_consistency.py, test_r23_video_codec.py); ruff check --select=SIM105 clean for these files; pytest tests/bin/test_audit_log.py tests/bin/test_r15_fps_consistency.py tests/bin/test_r23_video_codec.py 21/21 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Replaced try-except-pass with contextlib.suppress, preserved behavior, no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
+## Round 455 @ 2026-07-02T18:40:00Z
+
+- Picked: RUF002/RUF003 ambiguous × and RUF100 unused noqa in buyer_spec_adapter.py — replaced × with x, removed unused noqa directives. Justification: measurable code smell (ruff), single-file scope, py_compile clean, buyer_spec tests pass 5/5.
+- Result: committed 9c7f8d59 (fix RUF002/RUF003/RUF100 in buyer_spec_adapter.py); ruff check --select=RUF002,RUF003,RUF100 clean; python3 -m py_compile passes; pytest tests/ -k buyer_spec 5/5 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Fixed ambiguous unicode chars, removed unused noqa comments, preserved behavior, no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
 ## Round 454 @ 2026-07-02T18:30:00Z
 
 - Picked: Broken test_obs_capture.py — method name `_auth_challenge_response` doesn't exist, and async `connect()` not awaited. Justification: failing test, clear fix scope, 5/5 tests now pass.
