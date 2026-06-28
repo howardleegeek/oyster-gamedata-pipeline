@@ -223,15 +223,15 @@ class TestGracefulDegradation:
 
     def test_get_pytesseract_returns_none_when_missing(self, redactor_mod):
         """When pytesseract cannot be imported, _get_pytesseract returns None."""
-        # Force reload to clear any cached module
-        with mock.patch.dict(sys.modules, {"pytesseract": None}):
-            # Simulate ImportError
-            with mock.patch("builtins.__import__", side_effect=ImportError("no module")):
-                # Reset the module-level cache
-                redactor_mod._pytesseract = None
-                redactor_mod._pytesseract_error = None
-                result = redactor_mod._get_pytesseract()
-                assert result is None
+        # Force reload to clear any cached module; simulate ImportError
+        with mock.patch.dict(sys.modules, {"pytesseract": None}), mock.patch(
+            "builtins.__import__", side_effect=ImportError("no module")
+        ):
+            # Reset the module-level cache
+            redactor_mod._pytesseract = None
+            redactor_mod._pytesseract_error = None
+            result = redactor_mod._get_pytesseract()
+            assert result is None
 
     def test_redact_frame_without_ocr(self, redactor_mod, mock_ocr_image_clean):
         """redact_frame should return 0 redactions when OCR is unavailable."""
