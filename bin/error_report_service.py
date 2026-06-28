@@ -182,7 +182,9 @@ def scrub_context(ctx: dict[str, Any]) -> dict[str, Any]:
         elif isinstance(v, (int, float, bool)) or v is None:
             out[out_key] = v
         elif isinstance(v, list):
-            out[out_key] = [scrub_pii(item[:1024]) if isinstance(item, str) else item for item in v[:32]]
+            out[out_key] = [
+                scrub_pii(item[:1024]) if isinstance(item, str) else item for item in v[:32]
+            ]
         elif isinstance(v, dict):
             out[out_key] = scrub_context(v)
         else:
