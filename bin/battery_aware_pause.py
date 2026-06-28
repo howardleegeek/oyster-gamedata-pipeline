@@ -75,10 +75,12 @@ def _detect_linux() -> Tuple[str, Optional[float], bool]:
         for d in os.listdir(p):
             if not d.startswith("BAT"):
                 continue
-            status = open(f"{p}/{d}/status").read().strip().lower()
+            with open(f"{p}/{d}/status") as f:
+                status = f.read().strip().lower()
             pct = None
             try:
-                pct = float(open(f"{p}/{d}/capacity").read().strip())
+                with open(f"{p}/{d}/capacity") as f:
+                    pct = float(f.read().strip())
             except (ValueError, OSError):
                 pass
             if status in ("charging", "full"):
@@ -100,7 +102,8 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
     config = DEFAULT_CONFIG.copy()
     if path.exists():
         try:
-            config.update(json.load(open(path)))
+            with open(path) as f:
+                config.update(json.load(f))
         except (json.JSONDecodeError, OSError):
             pass
     return config
