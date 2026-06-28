@@ -191,8 +191,8 @@ def _paused_sample_stats(session: Path) -> tuple[int, int, str]:
     if gs_path.exists():
         try:
             with gs_path.open(encoding="utf-8") as fh:
-                for line in fh:
-                    line = line.strip()
+                for raw_line in fh:
+                    line = raw_line.strip()
                     if not line:
                         continue
                     try:
@@ -1100,8 +1100,8 @@ def audit_group_q_operator(session: Path) -> list[dict]:
         try:
             with inputs_path.open(encoding="utf-8") as fh:
                 events = []
-                for line in fh:
-                    line = line.strip()
+                for raw_line in fh:
+                    line = raw_line.strip()
                     if not line:
                         continue
                     try:
