@@ -15,7 +15,12 @@
 
 ## Round 488 @ 2026-08-04T02:20:00Z
 
-- Picked: PLW2901 loop variable overwritten in bin/input_latency_telemetry.py (line 80-81, read_jsonl_streaming) — renamed `line` to `stripped_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, has dedicated test (tests/test_input_latency_telemetry.py 10/10 pass), follows established PLW2901 cleanup pattern from rounds 481-487.
+- Picked: PLW2901 loop variable overwritten in bin/input_latency_telemetry.py (line 80-81, read_jsonl_streaming) — renamed `line` to `stripped_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, has dedicated test (tests/test_input_latency_telemetry.py 10/10 pass), follows established PLW2901
+
+## Round 491 @ 2026-08-04T02:50:00Z
+
+- Picked: PLW2901 loop variable overwritten in bin/recorder_record_resampler.py (line 208) — renamed `line` to `raw_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, no dedicated test exists for this module, verified manually that CLI works. Follows established PLW2901 cleanup pattern from rounds 481-490.
+- Result: committed b2f7b075 (fix PLW2901 in bin/recorder_record_resampler.py); ruff check --select=PLW2901 clean for this file; manual CLI smoke test passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed loop variable line->raw_line. Logic preserved (strip() still applied, JSON parsing intact). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no brand cross-reference. cleanup pattern from rounds 481-487.
 - Result: committed c3deba91 (fix PLW2901 in bin/input_latency_telemetry.py); ruff check --select=PLW2901 clean for this file; pytest tests/test_input_latency_telemetry.py 10/10 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed loop variable line->stripped_line. Logic preserved (json.loads applied to stripped_line, JSONDecodeError handling intact). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
 
 ## Round 486 @ 2026-08-04T02:00:00Z
@@ -92,3 +97,4 @@
 
 - Picked: PLW2901 loop variable overwritten in bin/lint_v3_prd_grounded.py (line 1142-1143) — renamed `ln` to `raw_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, python syntax verified, follows established PLW2901 cleanup pattern from rounds 481-490.
 - Result: committed e685b6c0 (fix PLW2901 in bin/lint_v3_prd_grounded.py); ruff check --select=PLW2901 clean for this file; python syntax verified; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed loop variable ln->raw_line. Logic preserved (strip() still applied, JSON parsing uses raw_line). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
