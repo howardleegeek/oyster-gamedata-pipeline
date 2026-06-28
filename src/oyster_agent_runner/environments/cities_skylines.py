@@ -10,6 +10,7 @@ Author: G179 Development Team
 """
 
 import argparse
+import contextlib
 import json
 import logging
 import os
@@ -196,10 +197,8 @@ class NamedPipeTransport:
     def disconnect(self) -> None:
         """Disconnect from the named pipe."""
         if self._pipe_fd is not None:
-            try:
+            with contextlib.suppress(OSError):
                 os.close(self._pipe_fd)
-            except OSError:
-                pass
             self._pipe_fd = None
             logger.info("Disconnected from pipe")
 
