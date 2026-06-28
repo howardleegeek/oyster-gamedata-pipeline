@@ -378,8 +378,8 @@ def merge_inputs(
         return 0
     events = []
     with inputs_path.open(encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
+        for raw_line in f:
+            line = raw_line.strip()
             if not line:
                 continue
             try:
@@ -506,8 +506,8 @@ def main(argv: list[str]) -> int:
 
     ticks = []
     with gs_path.open(encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
+        for raw_line in f:
+            line = raw_line.strip()
             if not line:
                 continue
             try:
