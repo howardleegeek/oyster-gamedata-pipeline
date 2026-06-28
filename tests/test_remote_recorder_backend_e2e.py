@@ -216,9 +216,11 @@ class TestStepHealthz:
         )
         import httpx
 
-        with httpx.Client(base_url=BACKEND_URL) as client:
-            with pytest.raises(AssertionError):
-                e2e_mod.step_healthz(client, BACKEND_URL)
+        with (
+            httpx.Client(base_url=BACKEND_URL) as client,
+            pytest.raises(AssertionError),
+        ):
+            e2e_mod.step_healthz(client, BACKEND_URL)
 
     def test_healthz_bad_status_field(self, mocked_backend):
         """healthz returns 200 but status != 'ok' → AssertionError."""
@@ -227,9 +229,11 @@ class TestStepHealthz:
         )
         import httpx
 
-        with httpx.Client(base_url=BACKEND_URL) as client:
-            with pytest.raises(AssertionError):
-                e2e_mod.step_healthz(client, BACKEND_URL)
+        with (
+            httpx.Client(base_url=BACKEND_URL) as client,
+            pytest.raises(AssertionError),
+        ):
+            e2e_mod.step_healthz(client, BACKEND_URL)
 
 
 # ---------------------------------------------------------------------------
@@ -253,9 +257,11 @@ class TestStepApplyTester:
         )
         import httpx
 
-        with httpx.Client(base_url=BACKEND_URL) as client:
-            with pytest.raises(AssertionError):
-                e2e_mod.step_apply_tester(client, BACKEND_URL)
+        with (
+            httpx.Client(base_url=BACKEND_URL) as client,
+            pytest.raises(AssertionError),
+        ):
+            e2e_mod.step_apply_tester(client, BACKEND_URL)
 
 
 # ---------------------------------------------------------------------------
@@ -280,9 +286,11 @@ class TestStepOAuthExchange:
         )
         import httpx
 
-        with httpx.Client(base_url=BACKEND_URL) as client:
-            with pytest.raises(AssertionError):
-                e2e_mod.step_oauth_exchange(client, BACKEND_URL)
+        with (
+            httpx.Client(base_url=BACKEND_URL) as client,
+            pytest.raises(AssertionError),
+        ):
+            e2e_mod.step_oauth_exchange(client, BACKEND_URL)
 
 
 # ---------------------------------------------------------------------------
@@ -353,9 +361,11 @@ class TestStepUploadViaSignedUrl:
             "operator_id": "OP-000",
             "status": "BUYER_READY",
         }
-        with httpx.Client(base_url=BACKEND_URL) as client:
-            with pytest.raises(AssertionError, match="upload PUT returned 500"):
-                e2e_mod.step_upload_via_signed_url(
+        with (
+            httpx.Client(base_url=BACKEND_URL) as client,
+            pytest.raises(AssertionError, match="upload PUT returned 500"),
+        ):
+            e2e_mod.step_upload_via_signed_url(
                     client,
                     BACKEND_URL,
                     "mock-google-at-abcdef1234567890",
