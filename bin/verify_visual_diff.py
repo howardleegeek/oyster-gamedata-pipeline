@@ -347,8 +347,8 @@ def parse_frames_arg(arg: str | None, n_a: int, n_b: int) -> list[int]:
     if not arg:
         return pick_default_frames(n_a, n_b)
     out = []
-    for chunk in arg.split(","):
-        chunk = chunk.strip()
+    for raw_chunk in arg.split(","):
+        chunk = raw_chunk.strip()
         if not chunk:
             continue
         try:
