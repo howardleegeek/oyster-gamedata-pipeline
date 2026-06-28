@@ -5,6 +5,8 @@ import hashlib
 import os
 import sys
 
+import pytest
+
 # Ensure obs_capture.py is importable
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -37,15 +39,20 @@ def test_OBSSpectatorCapture_custom_init():
 def test_obs_websocket_v5_auth_challenge_format():
     """When password set, helper produces correct base64+SHA256 (mock challenge salt)."""
     cap = obs_capture.OBSSpectatorCapture(password="mypassword")
-    challenge_salt = "mock_salt_123"
+    challenge = "mock_challenge_456"
+    salt = "mock_salt_123"
+    # _auth_hash: base64(SHA256(base64(SHA256(password + salt)) + challenge))
+    secret = hashlib.sha256(("mypassword" + salt).encode()).digest()
+    secret_b64 = base64.b64encode(secret).decode()
     expected = base64.b64encode(
-        hashlib.sha256(("mypassword" + challenge_salt).encode("utf-8")).digest()
+        hashlib.sha256((secret_b64 + challenge).encode("utf-8")).digest()
     ).decode("ascii")
-    result = cap._auth_challenge_response(challenge_salt)
+    result = cap._auth_hash(challenge, salt)
     assert result == expected
 
 
-def test_connect_returns_false_when_websocket_lib_missing(monkeypatch):
+@pytest.mark.asyncio
+async def test_connect_returns_false_when_websocket_lib_missing(monkeypatch):
     """Monkey-patch importlib so websocket-client import fails, assert connect() returns False."""
     import importlib
 
@@ -59,4 +66,5 @@ def test_connect_returns_false_when_websocket_lib_missing(monkeypatch):
     monkeypatch.setattr(importlib, "import_module", fake_import_module)
 
     cap = obs_capture.OBSSpectatorCapture()
-    assert cap.connect() is False
+    result = await cap.connect()
+    assert result is False
