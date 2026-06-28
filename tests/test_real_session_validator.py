@@ -281,22 +281,21 @@ class TestAllPass(unittest.TestCase):
         from contextlib import redirect_stdout
 
         f = io.StringIO()
-        with redirect_stdout(f):
-            with mock.patch.object(
-                sys,
-                "argv",
-                [
-                    "real_session_validator.py",
-                    "--sessions-root",
-                    str(self.root),
-                    "--keyfile",
-                    "/tmp/fake.key",
-                ],
-            ):
-                try:
-                    rsv.main()
-                except SystemExit as e:
-                    self.assertEqual(e.code, 0)
+        with redirect_stdout(f), mock.patch.object(
+            sys,
+            "argv",
+            [
+                "real_session_validator.py",
+                "--sessions-root",
+                str(self.root),
+                "--keyfile",
+                "/tmp/fake.key",
+            ],
+        ):
+            try:
+                rsv.main()
+            except SystemExit as e:
+                self.assertEqual(e.code, 0)
 
         output = f.getvalue()
         self.assertIn("Full PASS:          3 (100%)", output)
