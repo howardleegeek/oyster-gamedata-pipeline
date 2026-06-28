@@ -1,4 +1,16 @@
 
+## Round 447 @ 2026-06-29T10:00:00Z
+
+- Picked: PLW2901 loop variable `ln` overwritten by assignment in src/oyster_agent_runner/cli.py:517-518 — renamed `ln` to `line` and use separate `stripped` variable to avoid overwriting. Also fixed C414 in defense_dedup_frames.py. Justification: measurable code smell (ruff PLW2901 + C414), single-file scopes, py_compile clean, ruff check clean, 12/12 tests pass.
+- Result: committed 257d3e0d (PLW2901 fix in cli.py) + 2a05c219 (C414 fix in defense_dedup_frames.py); ruff check clean; py_compile passes; pytest tests/test_cli.py 12/12 passed; pushed to origin/fix/prd-test-action-per-second-ruff). Self-review: PLW2901 + C414 fixes only. No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
+## Round 446 @ 2026-06-28T10:57:53Z
+
+- Picked: PLW0127 self-assignment no-op `UTC = UTC` in tests/test_replay_determinism.py:33 — removed the no-op line; the real binding `UTC = timezone.utc` on line 31 is preserved and still used by `datetime(..., tzinfo=UTC)` at line 97. Justification: measurable code smell (ruff PLW0127), single-file scope, dead code elimination, py_compile clean, ruff PLW0127 clean for this file, 5/5 tests pass.
+- Result: committed 024ab9c1 (removed self-assignment no-op; ruff check --select=PLW0127 clean for test_replay_determinism.py; python3 -m py_compile passes; pytest tests/test_replay_determinism.py 5/5 passed; pushed to origin/fix/prd-test-action-per-second-ruff). Self-review: PLW0127 fix only — dropped `UTC = UTC` no-op. No silent error swallow (UTC binding preserved on line 31), no false-success (datetime(..., tzinfo=UTC) still resolves to timezone.utc), no race, no off-by-one, no security impact, no test masking (5/5 pass), no brand cross-reference, no module-level side effect added.
+
+## Round 445 @ 2026-06-28T10:00:00Z
+
 
 ## Round 441 @ 2026-06-28T09:00:17Z
 
