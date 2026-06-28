@@ -585,8 +585,8 @@ def build_sample_tarball(
 
     session_id = str(_uuid.uuid4())
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmpdir = Path(tmpdir)
+    with tempfile.TemporaryDirectory() as _tmpdir:
+        tmpdir = Path(_tmpdir)
 
         # Generate components
         print(f"Building sample tarball: {output_path}")
