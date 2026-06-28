@@ -87,7 +87,7 @@ class TestRateLimiter:
         assert config["min_free_gb"] == 10.0
         assert config["max_daily_sessions"] == 50
         assert config["max_pending_gb"] == 100.0
-        assert config["auto_delete_after_archive"] == False
+        assert not config["auto_delete_after_archive"]
 
     def test_load_config_existing(self):
         """Test loading existing configuration."""
@@ -106,7 +106,7 @@ class TestRateLimiter:
         assert config["min_free_gb"] == 5.0
         assert config["max_daily_sessions"] == 10
         assert config["max_pending_gb"] == 50.0
-        assert config["auto_delete_after_archive"] == True
+        assert config["auto_delete_after_archive"]
 
     def test_count_sessions_today_empty(self):
         """Test counting sessions when none exist."""
@@ -222,7 +222,7 @@ class TestRateLimiter:
 
             allowed, reason = can_record_now()
 
-            assert allowed == True
+            assert allowed
             assert reason == "ok"
 
     def test_can_record_now_low_disk(self):
@@ -233,7 +233,7 @@ class TestRateLimiter:
 
             allowed, reason = can_record_now()
 
-            assert allowed == False
+            assert not allowed
             assert "disk free" in reason
             assert "5.0GB" in reason or "5.0" in reason
 
@@ -247,7 +247,7 @@ class TestRateLimiter:
             with patch("bin.recorder_rate_limiter.count_sessions_today", return_value=50):
                 allowed, reason = can_record_now()
 
-                assert allowed == False
+                assert not allowed
                 assert "daily quota" in reason
                 assert "50/50" in reason
 
@@ -261,7 +261,7 @@ class TestRateLimiter:
             with patch("bin.recorder_rate_limiter.sum_pending_uploads_gb", return_value=150.0):
                 allowed, reason = can_record_now()
 
-                assert allowed == False
+                assert not allowed
                 assert "upload backlog" in reason
                 assert "150.0GB" in reason or "150.0" in reason
 
@@ -279,7 +279,7 @@ class TestRateLimiter:
 
             allowed, reason = can_record_now()
 
-            assert allowed == False
+            assert not allowed
             assert "disk free" in reason
             assert "15.0GB" in reason or "15.0" in reason
             assert "20GB" in reason or "20.0GB" in reason
@@ -365,7 +365,7 @@ def test_integration():
                 mock_disk_usage.return_value.free = 100 * 1e9
 
                 allowed, reason = can_record_now()
-                assert allowed == True
+                assert allowed
                 assert reason == "ok"
 
             # Test increment counter
