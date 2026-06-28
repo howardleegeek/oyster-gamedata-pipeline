@@ -19,10 +19,9 @@ def temp_db():
     os.close(fd)
     yield path
     # Cleanup
-    try:
+    from contextlib import suppress
+    with suppress(OSError):
         os.unlink(path)
-    except OSError:
-        pass
 
 
 class TestAuditLog:

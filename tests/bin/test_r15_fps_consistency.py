@@ -34,10 +34,9 @@ class TestR15FpsConsistency(unittest.TestCase):
             f.write(b"\x00")
 
     def tearDown(self) -> None:
-        try:
+        from contextlib import suppress
+        with suppress(FileNotFoundError):
             os.remove(self.video_path)
-        except FileNotFoundError:
-            pass
 
     def test_pass_when_30_over_1_matches_declared_30(self) -> None:
         rec = {"fps": 30}

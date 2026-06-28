@@ -44,10 +44,9 @@ class TestR23VideoCodec(unittest.TestCase):
             f.write(b"\x00")
 
     def tearDown(self) -> None:
-        try:
+        from contextlib import suppress
+        with suppress(FileNotFoundError):
             os.remove(self.video_path)
-        except FileNotFoundError:
-            pass
 
     def test_pass_when_hevc_1920x1080(self) -> None:
         with (
