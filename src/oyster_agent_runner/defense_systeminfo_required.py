@@ -90,15 +90,12 @@ def validate_systeminfo(
             )
 
     # 3. Value-level sanity checks
-    if "cpu_count" in payload and isinstance(payload["cpu_count"], int):
-        if payload["cpu_count"] < 1:
-            errors.append("value_error:cpu_count:must_be_positive")
-    if "memory_bytes" in payload and isinstance(payload["memory_bytes"], int):
-        if payload["memory_bytes"] < 0:
-            errors.append("value_error:memory_bytes:must_be_non_negative")
-    if "uptime_seconds" in payload and isinstance(payload["uptime_seconds"], (int, float)):
-        if payload["uptime_seconds"] < 0:
-            errors.append("value_error:uptime_seconds:must_be_non_negative")
+    if "cpu_count" in payload and isinstance(payload["cpu_count"], int) and payload["cpu_count"] < 1:
+        errors.append("value_error:cpu_count:must_be_positive")
+    if "memory_bytes" in payload and isinstance(payload["memory_bytes"], int) and payload["memory_bytes"] < 0:
+        errors.append("value_error:memory_bytes:must_be_non_negative")
+    if "uptime_seconds" in payload and isinstance(payload["uptime_seconds"], (int, float)) and payload["uptime_seconds"] < 0:
+        errors.append("value_error:uptime_seconds:must_be_non_negative")
 
     # 4. Strict mode — reject extra keys
     if strict:
