@@ -1,3 +1,8 @@
+## Round 486 @ 2026-08-04T02:00:00Z
+
+- Picked: PLW2901 loop variable overwritten in bin/verify_visual_diff.py (line 350-351, parse_frames_arg) — renamed `chunk` to `raw_chunk` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, has dedicated test (tests/bin/test_verify_visual_diff.py 22/22 pass), follows established PLW2901 cleanup pattern from rounds 481-485.
+- Result: committed 9b08f3a9 (fix PLW2901 in bin/verify_visual_diff.py); ruff check --select=PLW2901 clean for this file; pytest tests/bin/test_verify_visual_diff.py 22/22 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed loop variable chunk->raw_chunk. Logic preserved (split on comma, strip, skip empty, int() convert, SystemExit on bad index). No silent error swallow (SystemExit preserved), no false-success (int() conversion still raises), no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
 ## Round 485 @ 2026-08-03T02:00:00Z
 
 - Picked: PLW2901 loop variable overwritten in bin/input_latency_analyzer.py (line 37-40) — renamed `line` to `stripped_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, tests pass (30/30), follows established PLW2901 cleanup pattern.
