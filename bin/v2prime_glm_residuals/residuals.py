@@ -119,8 +119,8 @@ def r13_keycode_replay(
     events: List[Dict[str, Any]] = []
     session_start = None
     with open(inputs_path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
+        for raw_line in f:
+            line = raw_line.strip()
             if not line:
                 continue
             obj = json.loads(line)
