@@ -132,8 +132,8 @@ def infer_depth_batch(
 
     exr_count = 0
 
-    for rgb_path in rgb_paths:
-        rgb_path = Path(rgb_path)
+    for rgb_path_str in rgb_paths:
+        rgb_path = Path(rgb_path_str)
         if not rgb_path.exists():
             print(f"Warning: RGB file not found, skipping: {rgb_path}")
             continue
