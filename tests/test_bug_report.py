@@ -84,17 +84,21 @@ class TestLoadConfig:
         assert cfg["bug_report_webhook"] == "https://discord.com/api/webhooks/test/test-token"
 
     def test_load_config_missing_file(self):
-        with mock.patch.object(br, "CONFIG_PATH", "/nonexistent/path/config.json"):
-            with pytest.raises(SystemExit) as exc_info:
-                br.load_config()
+        with (
+            mock.patch.object(br, "CONFIG_PATH", "/nonexistent/path/config.json"),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            br.load_config()
         assert exc_info.value.code == 1
 
     def test_load_config_invalid_json(self, tmp_path):
         bad_json = tmp_path / "config.json"
         bad_json.write_text("{not valid json")
-        with mock.patch.object(br, "CONFIG_PATH", str(bad_json)):
-            with pytest.raises(SystemExit) as exc_info:
-                br.load_config()
+        with (
+            mock.patch.object(br, "CONFIG_PATH", str(bad_json)),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            br.load_config()
         assert exc_info.value.code == 1
 
 

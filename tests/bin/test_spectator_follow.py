@@ -140,11 +140,9 @@ def test_spectate_loop_respects_duration():
         _it.count(start=11.0),  # advances each call → inner loop + outer both exit
     )
 
-    with patch("time.time", side_effect=time_iter), patch("time.sleep"):
-        with patch("logging.info"):
-            with patch("logging.debug"):
-                # Run for 10 seconds with 5 second interval
-                commands_sent = spectate_loop(
+    with patch("time.time", side_effect=time_iter), patch("time.sleep"), patch("logging.info"), patch("logging.debug"):
+        # Run for 10 seconds with 5 second interval
+        commands_sent = spectate_loop(
                     rcon=mock_rcon,
                     bot_username="Bot",
                     spectator_username="Spectator",
@@ -211,10 +209,8 @@ def test_main_argparse_required_args():
         mock_rcon.authenticate.return_value = True
         mock_rcon_class.return_value.__enter__.return_value = mock_rcon
 
-        with patch("bin.spectator_follow.spectate_loop", return_value=1):
-            with patch("bin.spectator_follow.signal.signal"):
-                with patch("logging.basicConfig"):
-                    result = main(test_args)
+        with patch("bin.spectator_follow.spectate_loop", return_value=1), patch("bin.spectator_follow.signal.signal"), patch("logging.basicConfig"):
+            result = main(test_args)
 
     assert result == 0
 
