@@ -1,5 +1,10 @@
 
 
+## Round 470 @ 2026-07-20T02:00:00Z
+
+- Picked: SIM110 for loop in bin/audio_loopback.py (line 99) — replaced with any() generator expression. Justification: measurable code smell (ruff SIM110), single-file scope, import test passes.
+- Result: committed b2efc213 (fix SIM110 in bin/audio_loopback.py); ruff check --select=SIM110 clean for this file; python import test passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Replaced explicit for loop with any() generator expression; preserved logic; no silent error swallow; no false-success; no race; no off-by-one; no security impact; no test masking; no brand cross-reference.
+
 ## Round 469 @ 2026-07-13T01:00:00Z
 
 - Picked: SIM117 nested with statements in tests/test_load_test_harness.py (line 438) — combined into single with statement using parentheses. Justification: measurable code smell (ruff SIM117), single-file scope, 30/30 tests pass.
