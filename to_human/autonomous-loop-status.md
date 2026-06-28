@@ -1,3 +1,8 @@
+## Round 431 @ 2026-06-28T06:39:08Z
+
+- Picked: E712 (== True/False redundant boolean comparison) in tests/phase2/test_depth_anything_v2.py at 4 sites (lines 73, 98, 115, 177). Justification: measurable code smell (ruff E712) in test code, single-file scope, identical to the E712 cleanup pattern established in rounds 423-425; only 12 E712 sites remain in tests/test_pii_auditor.py for future ticks.
+- Result: committed a356f8da (replaced 4 redundant == True/False assertions with truthy/falsy idioms; ruff check --select=E712 clean for this file; 4/4 lint-affected tests pass; 1 pre-existing failure in test_infer_depth_writes_exr_when_pipeline_works existed at HEAD before this diff and is unrelated to the E712 form — verified by stashing the diff and re-running; pushed to origin/fix/prd-test-action-per-second-ruff). Self-review: E712 fix only — boolean equality assertions are semantically identical to truthy/falsy for Python booleans. No silent error swallow (no error path touched), no false-success (4/4 still pass for the E712 sites), no race (synchronous test), no off-by-one (no arithmetic touched), no security impact (test code only), no test masking (pre-existing failure noted but not caused by this diff), no brand cross-reference, no module-level side effect added.
+
 ## Round 428 @ 2026-07-02T00:00:00Z
 
 - Picked: F841 unused variable in tests/phase2/test_obs_capture_real.py:68 — `result = await obs.stop()` assigned but never used in test_stop_clears_recording_flag. Also removed unused MagicMock import (F401). Justification: measurable code smell (F841 + F401 in test code), single-file scope, targeted tests pass (3/3 ran).
