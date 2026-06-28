@@ -1,5 +1,6 @@
 
 
+
 ## Round 470 @ 2026-07-20T02:00:00Z
 
 - Picked: SIM110 for loop in bin/audio_loopback.py (line 99) — replaced with any() generator expression. Justification: measurable code smell (ruff SIM110), single-file scope, import test passes.
