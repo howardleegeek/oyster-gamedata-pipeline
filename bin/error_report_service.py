@@ -173,19 +173,20 @@ def scrub_context(ctx: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(ctx, dict):
         return {}
     out: dict[str, Any] = {}
-    for k, v in ctx.items():
-        if isinstance(k, str) and len(k) > 64:
-            k = k[:64]
+    for key, v in ctx.items():
+        out_key = key
+        if isinstance(key, str) and len(key) > 64:
+            out_key = key[:64]
         if isinstance(v, str):
-            out[k] = scrub_pii(v[:1024])
+            out[out_key] = scrub_pii(v[:1024])
         elif isinstance(v, (int, float, bool)) or v is None:
-            out[k] = v
+            out[out_key] = v
         elif isinstance(v, list):
-            out[k] = [scrub_pii(item[:1024]) if isinstance(item, str) else item for item in v[:32]]
+            out[out_key] = [scrub_pii(item[:1024]) if isinstance(item, str) else item for item in v[:32]]
         elif isinstance(v, dict):
-            out[k] = scrub_context(v)
+            out[out_key] = scrub_context(v)
         else:
-            out[k] = str(v)[:512]
+            out[out_key] = str(v)[:512]
     return out
 
 
