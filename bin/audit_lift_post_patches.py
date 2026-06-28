@@ -23,6 +23,7 @@ CLI:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime as dt
 import hashlib
 import json
@@ -76,13 +77,11 @@ def patch_metadata(session: Path, dry_run: bool = False) -> dict:
         m = re.match(r"^session_(\d{8})_(\d{6})_", session.name)
         if m:
             date_part, time_part = m.group(1), m.group(2)
-            try:
+            with contextlib.suppress(ValueError):
                 started_dt = dt.datetime.strptime(
                     date_part + time_part,
                     "%Y%m%d%H%M%S",
                 ).replace(tzinfo=dt.timezone.utc)
-            except ValueError:
-                pass
 
     if started_dt is None:
         mp4 = session / "recording.mp4"
@@ -164,10 +163,8 @@ def patch_audio_check(session: Path, dry_run: bool = False) -> dict:
         m = _ASTATS_KEY_RE.search(line)
         if m:
             key, val = m.group(1), m.group(2)
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 parsed[key.replace(" ", "_").lower()] = float(val)
-            except (ValueError, TypeError):
-                pass
 
     # Compute SNR (peak - rms = approximate dynamic range)
     rms_db = parsed.get("rms_level_db")
