@@ -1,5 +1,10 @@
 
 
+## Round 466 @ 2026-07-07T01:00:00Z
+
+- Picked: SIM117 nested with statements in bin/recorder_dav2_runner.py (lines 120-125) — combined into single with statement using comma-separated contexts. Justification: measurable code smell (ruff SIM117), single-file scope, 1/1 related test passes.
+- Result: committed ef6bff7e (fix SIM117 in bin/recorder_dav2_runner.py); ruff check --select=SIM117 clean for this file; pytest tests/test_iron_law_no_fake_data.py::test_recorder_dav2_runner_no_mock_depth 1/1 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Combined nested with statements; preserved download behavior; no silent error swallow; no false-success; no race; no off-by-one; no security impact; no test masking; no brand cross-reference.
+
 ## Round 465 @ 2026-06-28T16:27:42Z
 
 - Picked: SIM117 nested with statements in bin/generate_gameinfo_xlsx.py (lines 448-450) — combined into single with statement using comma-separated contexts. Justification: measurable code smell (ruff SIM117), single-file scope, 16/16 tests pass.
@@ -652,3 +657,8 @@ Self-review: cosmetic reformat only — no silent error swallow, no race, no off
 
 - Picked: SIM117 nested with in bin/recorder_replay_mod_installer.py:206 (download_jar) — combined `with urllib.request.urlopen(...) as resp:` / `with out.open("wb") as fh:` into single `with ... as resp, ... as fh:`. Justification: measurable code smell (ruff SIM117), single-file scope, behavior-preserving (chunk read/write/hasher loop unchanged, S310 noqa preserved), 12/12 targeted tests pass (matches pre-edit baseline), continuation of SIM cleanup pattern from rounds 462-465.
 - Result: committed b8b8a08b (fix SIM117 in bin/recorder_replay_mod_installer.py); ruff check --select=SIM117 clean for this file; ruff check clean overall; pytest tests/bin/test_recorder_replay_mod_installer.py 12/12 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: SIM117 fix only — combined urlopen+open into single with. Verified (1) no silent error swallow — no try/except added, (2) no false-success — sha.update still called every chunk inside the loop, (3) no race — single-threaded streaming, (4) no off-by-one — chunk loop preserved byte-for-byte, (5) no security change — S310 noqa comment preserved, (6) no test masking — 12/12 pass matches pre-edit baseline, (7) no brand cross-reference, (8) no module-level side effect.
+
+## Round 467 @ 2026-07-07T02:00:00Z
+
+- Picked: SIM117 nested with statements in tests/test_state_machine.py (lines 84-85) — combined into single parenthesized with statement, dedenting assertion block by one level. Justification: measurable code smell (ruff SIM117), single-file scope, 18/18 tests pass.
+- Result: committed 7c284bf7 (fix SIM117 in tests/test_state_machine.py); ruff check --select=SIM117 clean for this file; pytest tests/test_state_machine.py 18/18 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: combined nested with; preserved both patch contexts covering the assertion block (exit-time semantics unchanged); no silent error swallow; no false-success; no race; no off-by-one; no security impact; no test masking; no brand cross-reference.
