@@ -207,7 +207,18 @@ def attack_quaternion_not_unit(b: Path) -> None:
     p.write_text(json.dumps(arr))
 
 
-def attack_wasd_all_w(b: Path):
+def attack_wasd_all_w(b: Path) -> None:
+    """Set all keyCodes to [87] (W key only) in action_camera.json.
+
+    This attack modifies every frame's keyCode array to contain only
+    the W key (keyCode 87), simulating a player who only moves forward.
+
+    Args:
+        b: Path to a temporary directory containing action_camera.json.
+
+    Returns:
+        None. Modifies action_camera.json in-place.
+    """
     p = b / "action_camera.json"
     arr = json.loads(p.read_text())
     for r in arr:
