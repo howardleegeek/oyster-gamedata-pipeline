@@ -12,7 +12,7 @@ import os
 import sys
 import tempfile
 from collections.abc import Generator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from enum import Enum
 from types import TracebackType
 from typing import IO
@@ -85,10 +85,8 @@ class FileLock:
     ) -> None:
         if self._file_handle:
             if self._lock_acquired:
-                try:
+                with suppress(OSError):
                     fcntl.flock(self._file_handle.fileno(), fcntl.LOCK_UN)
-                except OSError:
-                    pass
             self._file_handle.close()
             self._file_handle = None
             self._lock_acquired = False
