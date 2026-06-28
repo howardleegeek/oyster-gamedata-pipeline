@@ -251,7 +251,13 @@ def write_manifest_yaml(manifest: dict, out_path: str) -> None:
             else:
                 return str(v)
         
-        def write_dict(d, indent=0):
+        def write_dict(d: dict, indent: int = 0) -> None:
+            """Recursively write a dict as YAML key-value pairs.
+
+            Args:
+                d: Dictionary to write as YAML.
+                indent: Current indentation level (number of 2-space increments).
+            """
             for k, v in d.items():
                 prefix = '  ' * indent
                 if isinstance(v, dict):
