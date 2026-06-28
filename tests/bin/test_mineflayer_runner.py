@@ -93,14 +93,14 @@ def test_mode_validation():
         pytest.raises(ValueError, match="Invalid mode"),
     ):
         mr.build_node_args(
-                bot_script="x",
-                server_host="h",
-                server_port=1,
-                username="u",
-                mode="INVALID",
-                duration_sec=1,
-                output_dir="o",
-            )
+            bot_script="x",
+            server_host="h",
+            server_port=1,
+            username="u",
+            mode="INVALID",
+            duration_sec=1,
+            output_dir="o",
+        )
 
 
 def test_run_mineflayer_mode_validation():
