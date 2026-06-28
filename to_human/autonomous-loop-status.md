@@ -1,4 +1,9 @@
 
+## Round 458 @ 2026-06-28T13:49:00Z
+
+- Picked: SIM105 try-except-pass in 2 source files (error_client_python.py and obs_capture_real.py) — replaced with contextlib.suppress. Justification: measurable code smell (ruff SIM105), single-file scope per commit, py_compile clean, module imports succeed.
+- Result: committed c5913604 (fix SIM105 in error_client_python.py) and 91589d8b (fix SIM105 in obs_capture_real.py); ruff check clean; py_compile passes; module imports succeed via PYTHONPATH=src; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Replaced try-except-pass with contextlib.suppress (narrow exception classes preserved: RuntimeError and asyncio.CancelledError), preserved behavior, no silent error swallow widened, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
 ## Round 457 @ 2026-07-02T19:00:00Z
 
 - Picked: SIM115 file open without context manager in tests/bin/test_bft_orchestrator.py:51 — replaced with `with tempfile.NamedTemporaryFile(...) as f:` for proper resource cleanup. Justification: measurable code smell (ruff SIM115), single-file scope, 13/13 tests pass.
