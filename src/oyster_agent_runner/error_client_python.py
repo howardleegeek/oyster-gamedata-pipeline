@@ -13,6 +13,7 @@ Usage:
 import argparse
 import asyncio
 import atexit
+import contextlib
 import datetime
 import json
 import os
@@ -283,10 +284,8 @@ def install_handlers(endpoint: Optional[str] = None) -> None:
         _global_reporter = ErrorReporter(endpoint=endpoint)
     sys.excepthook = _sys_excepthook
     threading.excepthook = _threading_excepthook
-    try:
+    with contextlib.suppress(RuntimeError):
         asyncio.get_event_loop().set_exception_handler(_asyncio_handler)
-    except RuntimeError:
-        pass  # No event loop running
     atexit.register(_atexit_handler)
 
 
