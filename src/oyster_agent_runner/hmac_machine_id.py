@@ -17,6 +17,7 @@ import hmac as _hmac
 import os
 import sys
 import uuid
+from contextlib import suppress
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -55,10 +56,8 @@ def _collect_raw_identifiers() -> bytes:
         Path("/sys/class/dmi/id/product_uuid"),
         Path("/etc/machine-id"),
     ):
-        try:
+        with suppress(OSError, PermissionError):
             parts.append(candidate.read_bytes().strip())
-        except (OSError, PermissionError):
-            pass
 
     parts.append(os.uname().nodename.encode())
     parts.append(str(os.cpu_count() or 0).encode())
