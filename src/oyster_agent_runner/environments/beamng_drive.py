@@ -7,6 +7,7 @@ and extracts ego pose at 60Hz.
 """
 
 import argparse
+import contextlib
 import json
 import logging
 import sys
@@ -287,10 +288,8 @@ class BeamNGDriveExtractor:
     def cleanup(self):
         """Clean up resources."""
         if self.beamng:
-            try:
+            with contextlib.suppress(Exception):
                 self.beamng.close()
-            except Exception:  # noqa: BLE001
-                pass
 
     def __enter__(self):
         self.connect()
