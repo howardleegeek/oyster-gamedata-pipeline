@@ -1,3 +1,8 @@
+## Round 433 @ 2026-06-28T07:11:04Z
+
+- Picked: C420 unnecessary dict comprehension in src/oyster_agent_runner/buyer_spec_v2_language_instruction.py:104 — `{m: True for m in VLA_MODELS}` replaced with `dict.fromkeys(VLA_MODELS, True)`. Justification: measurable code smell (ruff C420), single-file scope, targeted tests pass (39/39), continuation of ruff cleanup pattern.
+- Result: committed e7ac18de (replaced C420 dict comprehension with dict.fromkeys; ruff check --select=C420 clean for this file; pytest tests/test_buyer_spec_adapter.py tests/test_buyer_spec_compliance_doc.py 39/39 passed; pushed to origin/fix/prd-test-action-per-second-ruff). Self-review: C420 fix only — replaced unnecessary dict comprehension with dict.fromkeys() for cleaner idiom. No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference, no module-level side effect added.
+
 ## Round 432 @ 2026-07-02T01:00:00Z
 
 - Picked: E712 redundant boolean comparison in tests/test_pii_auditor.py at 12 sites (lines 38-44 for `is_private_ip`, lines 49-55 for `luhn_check`). Justification: measurable code smell (ruff E712 in test code), single-file scope, continuation of E712 cleanup pattern from rounds 423-425 and 431; all E712 sites in this file now fixed.
