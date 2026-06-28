@@ -35,10 +35,7 @@ PRIVATE_IP_RANGES = [
 
 def is_private_ip(ip: str) -> bool:
     """Check if IP is in private range."""
-    for pattern in PRIVATE_IP_RANGES:
-        if pattern.match(ip):
-            return True
-    return False
+    return any(pattern.match(ip) for pattern in PRIVATE_IP_RANGES)
 
 
 def luhn_check(card_number: str) -> bool:
