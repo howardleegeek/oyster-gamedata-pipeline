@@ -6,6 +6,11 @@
 ## Round 483 @ 2026-08-02T02:00:00Z
 
 - Picked: SIM110 for loop in tests/security/test_finding_02_service_role_timing_oracle.py (line 50-53) — replaced with all() generator expression. Justification: measurable code smell (ruff SIM110), single-file scope, test passes.
+
+## Round 484 @ 2026-06-28T21:36:39Z
+
+- Picked: PLW2901 loop variable overwritten in bin/observability_metrics_emitter.py (line 44-45) — renamed `part` to `raw_part` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, import test passes, follows established PLW2901 cleanup pattern.
+- Result: committed 0ae5de84 (fix PLW2901 in bin/observability_metrics_emitter.py); ruff check --select=PLW2901 clean for this file; python import test passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed loop variable part->raw_part to avoid self-assignment. Logic preserved (stripped part still used). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
 - Result: committed 3c841646 (fix SIM110 in test_finding_02_service_role_timing_oracle.py); ruff check --select=SIM110 clean; pytest tests/security/test_finding_02_service_role_timing_oracle.py 3/3 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Replaced explicit for loop with all() generator expression; preserved logic; no silent error swallow; no false-success; no race; no off-by-one; no security impact; no test masking; no brand cross-reference.
 
 ## Round 481 @ 2026-07-31T02:00:00Z
