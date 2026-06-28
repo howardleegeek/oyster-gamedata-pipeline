@@ -76,8 +76,8 @@ def parse_stream(stream) -> Iterator[dict]:
     Yields:
         Parsed JSON objects as dicts.
     """
-    for line in stream:
-        line = line.strip()
+    for raw_line in stream:
+        line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
         yield json.loads(line)
