@@ -122,23 +122,26 @@ async def deliver_webhook(
     }
 
     try:
-        async with aiohttp.ClientSession() as session, session.post(
-            webhook_url,
-            data=payload_str,
-            headers=headers,
-            timeout=aiohttp.ClientTimeout(total=30),
-        ) as response:
-                if response.status >= 200 and response.status < 300:
-                    logger.info(f"Webhook delivered successfully to {webhook_url}")
-                    return True
-                elif response.status >= 500:
-                    # Server error - retry
-                    logger.warning(f"Webhook got 5xx response: {response.status}")
-                    raise WebhookDeliveryError(f"Server error: {response.status}")
-                else:
-                    # Client error - don't retry
-                    logger.error(f"Webhook got client error: {response.status}")
-                    return False
+        async with (
+            aiohttp.ClientSession() as session,
+            session.post(
+                webhook_url,
+                data=payload_str,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=30),
+            ) as response,
+        ):
+            if response.status >= 200 and response.status < 300:
+                logger.info(f"Webhook delivered successfully to {webhook_url}")
+                return True
+            elif response.status >= 500:
+                # Server error - retry
+                logger.warning(f"Webhook got 5xx response: {response.status}")
+                raise WebhookDeliveryError(f"Server error: {response.status}")
+            else:
+                # Client error - don't retry
+                logger.error(f"Webhook got client error: {response.status}")
+                return False
 
     except asyncio.TimeoutError:
         logger.warning(f"Webhook timeout to {webhook_url}")
