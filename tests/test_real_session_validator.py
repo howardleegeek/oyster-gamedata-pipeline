@@ -347,22 +347,21 @@ class TestPipelineBlocked(unittest.TestCase):
         from contextlib import redirect_stdout
 
         f = io.StringIO()
-        with redirect_stdout(f):
-            with mock.patch.object(
-                sys,
-                "argv",
-                [
-                    "real_session_validator.py",
-                    "--sessions-root",
-                    str(self.root),
-                    "--keyfile",
-                    "/tmp/fake.key",
-                ],
-            ):
-                try:
-                    rsv.main()
-                except SystemExit as e:
-                    self.assertEqual(e.code, 1)  # exit 1 because there's a FAIL
+        with redirect_stdout(f), mock.patch.object(
+            sys,
+            "argv",
+            [
+                "real_session_validator.py",
+                "--sessions-root",
+                str(self.root),
+                "--keyfile",
+                "/tmp/fake.key",
+            ],
+        ):
+            try:
+                rsv.main()
+            except SystemExit as e:
+                self.assertEqual(e.code, 1)  # exit 1 because there's a FAIL
 
         output = f.getvalue()
         self.assertIn("FAIL:               1 (33%)", output)
@@ -420,23 +419,22 @@ class TestGateFailDegraded(unittest.TestCase):
         from contextlib import redirect_stdout
 
         f = io.StringIO()
-        with redirect_stdout(f):
-            with mock.patch.object(
-                sys,
-                "argv",
-                [
-                    "real_session_validator.py",
-                    "--sessions-root",
-                    str(self.root),
-                    "--keyfile",
-                    "/tmp/fake.key",
-                ],
-            ):
-                try:
-                    rsv.main()
-                except SystemExit as e:
-                    # DEGRADED is not FAIL, so exit 0
-                    self.assertEqual(e.code, 0)
+        with redirect_stdout(f), mock.patch.object(
+            sys,
+            "argv",
+            [
+                "real_session_validator.py",
+                "--sessions-root",
+                str(self.root),
+                "--keyfile",
+                "/tmp/fake.key",
+            ],
+        ):
+            try:
+                rsv.main()
+            except SystemExit as e:
+                # DEGRADED is not FAIL, so exit 0
+                self.assertEqual(e.code, 0)
 
         output = f.getvalue()
         self.assertIn("DEGRADED:           1 (33%)", output)
@@ -468,20 +466,19 @@ class TestEmptyDir(unittest.TestCase):
         from contextlib import redirect_stdout
 
         f = io.StringIO()
-        with redirect_stdout(f):
-            with mock.patch.object(
-                sys,
-                "argv",
-                [
-                    "real_session_validator.py",
-                    "--sessions-root",
-                    str(self.root),
-                ],
-            ):
-                try:
-                    rsv.main()
-                except SystemExit as e:
-                    self.assertEqual(e.code, 0)
+        with redirect_stdout(f), mock.patch.object(
+            sys,
+            "argv",
+            [
+                "real_session_validator.py",
+                "--sessions-root",
+                str(self.root),
+            ],
+        ):
+            try:
+                rsv.main()
+            except SystemExit as e:
+                self.assertEqual(e.code, 0)
 
         output = f.getvalue()
         self.assertIn("Found: 0 session dirs", output)
@@ -492,21 +489,20 @@ class TestEmptyDir(unittest.TestCase):
         from contextlib import redirect_stdout
 
         f = io.StringIO()
-        with redirect_stdout(f):
-            with mock.patch.object(
-                sys,
-                "argv",
-                [
-                    "real_session_validator.py",
-                    "--sessions-root",
-                    str(self.root),
-                    "--json",
-                ],
-            ):
-                try:
-                    rsv.main()
-                except SystemExit as e:
-                    self.assertEqual(e.code, 0)
+        with redirect_stdout(f), mock.patch.object(
+            sys,
+            "argv",
+            [
+                "real_session_validator.py",
+                "--sessions-root",
+                str(self.root),
+                "--json",
+            ],
+        ):
+            try:
+                rsv.main()
+            except SystemExit as e:
+                self.assertEqual(e.code, 0)
 
         output = f.getvalue()
         data = json.loads(output)
@@ -553,21 +549,20 @@ class TestNoKeyfile(unittest.TestCase):
         from contextlib import redirect_stdout
 
         f = io.StringIO()
-        with redirect_stdout(f):
-            with mock.patch.object(
-                sys,
-                "argv",
-                [
-                    "real_session_validator.py",
-                    "--sessions-root",
-                    str(self.root),
-                    # NO --keyfile
-                ],
-            ):
-                try:
-                    rsv.main()
-                except SystemExit as e:
-                    self.assertEqual(e.code, 0)
+        with redirect_stdout(f), mock.patch.object(
+            sys,
+            "argv",
+            [
+                "real_session_validator.py",
+                "--sessions-root",
+                str(self.root),
+                # NO --keyfile
+            ],
+        ):
+            try:
+                rsv.main()
+            except SystemExit as e:
+                self.assertEqual(e.code, 0)
 
         output = f.getvalue()
         self.assertIn("SKIPPED (no --keyfile)", output)
@@ -620,23 +615,22 @@ class TestJsonOutput(unittest.TestCase):
         from contextlib import redirect_stdout
 
         f = io.StringIO()
-        with redirect_stdout(f):
-            with mock.patch.object(
-                sys,
-                "argv",
-                [
-                    "real_session_validator.py",
-                    "--sessions-root",
-                    str(self.root),
-                    "--keyfile",
-                    "/tmp/fake.key",
-                    "--json",
-                ],
-            ):
-                try:
-                    rsv.main()
-                except SystemExit as e:
-                    self.assertEqual(e.code, 0)
+        with redirect_stdout(f), mock.patch.object(
+            sys,
+            "argv",
+            [
+                "real_session_validator.py",
+                "--sessions-root",
+                str(self.root),
+                "--keyfile",
+                "/tmp/fake.key",
+                "--json",
+            ],
+        ):
+            try:
+                rsv.main()
+            except SystemExit as e:
+                self.assertEqual(e.code, 0)
 
         output = f.getvalue()
         data = json.loads(output)
@@ -690,24 +684,23 @@ class TestCsvOutput(unittest.TestCase):
         from contextlib import redirect_stdout
 
         f = io.StringIO()
-        with redirect_stdout(f):
-            with mock.patch.object(
-                sys,
-                "argv",
-                [
-                    "real_session_validator.py",
-                    "--sessions-root",
-                    str(self.root),
-                    "--keyfile",
-                    "/tmp/fake.key",
-                    "--csv",
-                    str(self.csv_path),
-                ],
-            ):
-                try:
-                    rsv.main()
-                except SystemExit as e:
-                    self.assertEqual(e.code, 0)
+        with redirect_stdout(f), mock.patch.object(
+            sys,
+            "argv",
+            [
+                "real_session_validator.py",
+                "--sessions-root",
+                str(self.root),
+                "--keyfile",
+                "/tmp/fake.key",
+                "--csv",
+                str(self.csv_path),
+            ],
+        ):
+            try:
+                rsv.main()
+            except SystemExit as e:
+                self.assertEqual(e.code, 0)
 
         self.assertTrue(self.csv_path.exists())
         content = self.csv_path.read_text()
@@ -811,22 +804,21 @@ class TestLimit(unittest.TestCase):
         from contextlib import redirect_stdout
 
         f = io.StringIO()
-        with redirect_stdout(f):
-            with mock.patch.object(
-                sys,
-                "argv",
-                [
-                    "real_session_validator.py",
-                    "--sessions-root",
-                    str(self.root),
-                    "--limit",
-                    "2",
-                ],
-            ):
-                try:
-                    rsv.main()
-                except SystemExit:
-                    pass
+        with redirect_stdout(f), mock.patch.object(
+            sys,
+            "argv",
+            [
+                "real_session_validator.py",
+                "--sessions-root",
+                str(self.root),
+                "--limit",
+                "2",
+            ],
+        ):
+            try:
+                rsv.main()
+            except SystemExit:
+                pass
 
         output = f.getvalue()
         self.assertIn("Found: 5 session dirs", output)
