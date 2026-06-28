@@ -248,6 +248,25 @@ class MaterialAlbedoProvider:
         return stats
 
 def main(argv: Optional[List[str]] = None) -> int:
+    """Main entry point for the Material Albedo Provider CLI.
+
+    Parses command-line arguments and orchestrates material loading and G-buffer
+    generation. Supports loading materials from a directory structure or YAML
+    configuration, with options to list, validate, or generate G-buffers.
+
+    Args:
+        argv: Command-line arguments. If None, uses sys.argv. Useful for testing.
+
+    Returns:
+        Exit code: 0 on success, 1 on failure.
+
+    Examples:
+        >>> main(['--input-dir', '/path/to/materials', '--list'])
+        Loaded materials:
+          - stone
+          - wood
+          0
+    """
     parser = argparse.ArgumentParser(
         description='Material Albedo Provider - Generate G-buffers for Sora 2/Cosmos training data.'
     )
