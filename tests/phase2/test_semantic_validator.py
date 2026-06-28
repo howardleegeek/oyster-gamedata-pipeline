@@ -37,7 +37,7 @@ def test_passes_on_valid_records():
 
     assert result["iter_count"] == 100
     assert result["stationary_pct"] == 0.0  # No stationary frames
-    assert result["stationary_within_10pct"] == True
+    assert result["stationary_within_10pct"]
     # Check WASD distribution percentages
     w_pct = result["wasd_distribution"]["W"]
     a_pct = result["wasd_distribution"]["A"]
@@ -51,12 +51,12 @@ def test_passes_on_valid_records():
     assert 0.15 <= s_pct <= 0.25, f"S percentage {s_pct} not in expected range"
     assert 0.15 <= d_pct <= 0.25, f"D percentage {d_pct} not in expected range"
 
-    assert result["wasd_within_tolerance"] == True
-    assert result["frame_continuous"] == True
-    assert result["rotation_in_range"] == True
-    assert result["quaternion_unit_norm"] == True
-    assert result["fx_equals_fy"] == True
-    assert result["summary_pass"] == True
+    assert result["wasd_within_tolerance"]
+    assert result["frame_continuous"]
+    assert result["rotation_in_range"]
+    assert result["quaternion_unit_norm"]
+    assert result["fx_equals_fy"]
+    assert result["summary_pass"]
     assert len(result["issues"]) == 0
 
     print("✓ test_passes_on_valid_records passed")
@@ -76,8 +76,8 @@ def test_fails_on_too_many_stationary():
 
     assert result["iter_count"] == 100
     assert abs(result["stationary_pct"] - 50.0) < 1.0  # Approximately 50%
-    assert result["stationary_within_10pct"] == False
-    assert result["summary_pass"] == False
+    assert not result["stationary_within_10pct"]
+    assert not result["summary_pass"]
     assert any("Stationary percentage" in issue for issue in result["issues"])
 
     print("✓ test_fails_on_too_many_stationary passed")
@@ -99,8 +99,8 @@ def test_fails_on_skewed_wasd():
     assert result["wasd_distribution"]["A"] == 0.0
     assert result["wasd_distribution"]["S"] == 0.0
     assert result["wasd_distribution"]["D"] == 0.0
-    assert result["wasd_within_tolerance"] == False
-    assert result["summary_pass"] == False
+    assert not result["wasd_within_tolerance"]
+    assert not result["summary_pass"]
     assert any("WASD distribution out of tolerance" in issue for issue in result["issues"])
 
     print("✓ test_fails_on_skewed_wasd passed")
@@ -118,8 +118,8 @@ def test_fails_on_frame_gap():
     result = validate_action_camera_semantics(records)
 
     assert result["iter_count"] == 99
-    assert result["frame_continuous"] == False
-    assert result["summary_pass"] == False
+    assert not result["frame_continuous"]
+    assert not result["summary_pass"]
     assert any("Frame gap detected" in issue for issue in result["issues"])
 
     print("✓ test_fails_on_frame_gap passed")
@@ -137,8 +137,8 @@ def test_fails_on_bad_quaternion():
     result = validate_action_camera_semantics(records)
 
     assert result["iter_count"] == 100
-    assert result["quaternion_unit_norm"] == False
-    assert result["summary_pass"] == False
+    assert not result["quaternion_unit_norm"]
+    assert not result["summary_pass"]
     assert any("Quaternion norm" in issue for issue in result["issues"])
 
     print("✓ test_fails_on_bad_quaternion passed")
@@ -195,7 +195,7 @@ def test_edge_cases():
     # Empty records
     result = validate_action_camera_semantics([])
     assert result["iter_count"] == 0
-    assert result["summary_pass"] == False
+    assert not result["summary_pass"]
     assert "No records provided" in result["issues"]
 
     # Single record
@@ -222,8 +222,8 @@ def test_rotation_out_of_range():
 
     result = validate_action_camera_semantics(records)
 
-    assert result["rotation_in_range"] == False
-    assert result["summary_pass"] == False
+    assert not result["rotation_in_range"]
+    assert not result["summary_pass"]
     assert any("Rotation" in issue and "out of range" in issue for issue in result["issues"])
 
     print("✓ test_rotation_out_of_range passed")
@@ -240,8 +240,8 @@ def test_fx_not_equals_fy():
 
     result = validate_action_camera_semantics(records)
 
-    assert result["fx_equals_fy"] == False
-    assert result["summary_pass"] == False
+    assert not result["fx_equals_fy"]
+    assert not result["summary_pass"]
     assert any("Camera intrinsics fx" in issue for issue in result["issues"])
 
     print("✓ test_fx_not_equals_fy passed")
