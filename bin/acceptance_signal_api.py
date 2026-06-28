@@ -16,6 +16,10 @@ import urllib.request
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
+# HTTP status code constants
+HTTP_OK_MIN = 200
+HTTP_OK_MAX = 300
+
 
 def send_signal(
     url: str,
@@ -160,7 +164,7 @@ def main(argv: list[str] | None = None) -> int:
         except json.JSONDecodeError:
             print(f"Response: {body}")
 
-    if 200 <= status < 300:
+    if HTTP_OK_MIN <= status < HTTP_OK_MAX:
         return 0
     print(f"Request failed with status {status}", file=sys.stderr)
     return 1
