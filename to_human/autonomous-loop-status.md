@@ -1,5 +1,10 @@
 
 
+## Round 462 @ 2026-07-06T12:00:00Z
+
+- Picked: SIM117 nested with statements in tests/bin/test_recorder_window_capture_helper.py (lines 81-86 and 91-96) — combined into single with statements using pytest.raises() as context manager. Justification: measurable code smell (ruff SIM117), single-file scope, 9/9 tests pass.
+- Result: committed ac17bef3 (fix SIM117 in test_recorder_window_capture_helper.py); ruff check --select=SIM117 clean for this file; pytest tests/bin/test_recorder_window_capture_helper.py 9/9 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Combined nested with statements; preserved behavior; no silent error swallow; no false-success; no race; no off-by-one; no security impact; no test masking; no brand cross-reference.
+
 ## Round 461 @ 2026-07-03T18:00:00Z
 
 - Picked: SIM117 nested with statements in tests/bin/test_recorder_replay_mod_installer.py (lines 103-106) — combined into single with statement using parentheses. Justification: measurable code smell (ruff SIM117), single-file scope, 12/12 tests pass.
