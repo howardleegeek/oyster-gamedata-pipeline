@@ -1,3 +1,8 @@
+## Round 437 @ 2026-06-28T08:10:07Z
+
+- Picked: SIM114 combine if branches in server/marketplace_api.py:221-241 — combined 9 elif branches setting `match = False` into a single if with or operator. Justification: measurable code smell (ruff SIM114), single-file scope, targeted tests pass (38/38), clean syntax, follows established SIM cleanup pattern.
+- Result: committed dd5faa61 (combined if branches using or operator; ruff check --select=SIM114 clean; pytest tests/test_marketplace_api.py 38/38 passed; pushed to origin/fix/prd-test-action-per-second-ruff). Self-review: SIM114 fix only — combined 9 elif branches setting match=False into a single if with or operator. Added break for efficiency. No silent error swallow (logic preserved), no false-success (same match logic), no race, no off-by-one, no security impact, no test masking (38/38 pass), no brand cross-reference, no module-level side effect.
+
 ## Round 436 @ 2026-07-02T08:30:00Z
 
 - Picked: SIM105 try-except-pass in backend/codex_api.py:154-159 — replaced `try: proc.wait(timeout=10) except subprocess.TimeoutExpired: pass` with `with suppress(subprocess.TimeoutExpired): proc.wait(timeout=10)`. Justification: measurable code smell (ruff SIM105), single-file scope, clean syntax (py_compile passes), continuation of SIM cleanup pattern.
