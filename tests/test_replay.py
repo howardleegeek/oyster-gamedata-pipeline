@@ -89,8 +89,8 @@ def _make_bundle(
 
     with MinecraftStreamWriter(out_dir) as streams:
         with Path(result.trajectory_path).open(encoding="utf-8") as fh:
-            for ln in fh:
-                ln = ln.strip()
+            for raw_ln in fh:
+                ln = raw_ln.strip()
                 if not ln:
                     continue
                 payload = json.loads(ln)
