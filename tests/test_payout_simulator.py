@@ -338,8 +338,9 @@ class TestWorkerThread:
             rec = store.create("user-001", 50.0)
             assert rec.status == "queued"
 
-            # Wait for worker to advance it (>1s for safety)
-            time.sleep(1.5)
+            # Wait for worker to advance it to processing (1h simulated = 1s real)
+            # Need >1s to account for worker startup delay and tick interval
+            time.sleep(1.3)
 
             rec = store.get(rec.id)
             assert rec is not None
