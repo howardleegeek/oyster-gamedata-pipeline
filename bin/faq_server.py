@@ -282,7 +282,6 @@ def start_server() -> None:
 
 def stop_server() -> None:
     """Shut down the FAQ server."""
-    global _server_instance
     if _server_instance is not None:
         _server_instance.should_exit = True
     if _server_thread is not None:
