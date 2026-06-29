@@ -413,11 +413,7 @@ class ContinuousCaptureDaemon:
                         self.logger.info("Session appears to have ended")
                         self._transition_to(DaemonState.FINALIZING)
 
-                elif self.state == DaemonState.FINALIZING:
-                    # Already handled in transition
-                    pass
-
-                elif self.state == DaemonState.UPLOADING:
+                elif self.state in (DaemonState.FINALIZING, DaemonState.UPLOADING):
                     # Already handled in transition
                     pass
 
