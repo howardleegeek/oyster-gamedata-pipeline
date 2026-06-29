@@ -1,3 +1,8 @@
+## Round 505 @ 2026-08-04T06:00:00Z
+
+- Picked: SIM114 duplicate if branches in bin/autoresearch_lint_perf.py (lines 45-49) — combined with logical or operator. Justification: measurable code smell (ruff SIM114), single-file scope, import test passes, follows established SIM114 cleanup pattern.
+- Result: committed b259704f (fix(SIM114): combine if branches in autoresearch_lint_perf.py); ruff check --select=SIM114 clean for this file; python3 import test passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Combined duplicate if branches using logical or operator; preserved logic; no silent error swallow; no false-success; no race; no off-by-one; no security impact; no test masking; no brand cross-reference.
+
 ## Round 504 @ 2026-08-04T05:30:00Z
 
 - Picked: SIM105 try-except-pass in bin/diag_bundle_collector.py (2 instances at lines 101-104 and 109-112) — converted to contextlib.suppress(OSError). Justification: measurable code smell (ruff SIM105), single-file scope, file imports cleanly, follows established SIM cleanup pattern from previous rounds.
