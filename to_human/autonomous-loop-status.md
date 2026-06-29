@@ -110,3 +110,8 @@
 
 - Picked: Add test file for bin/edge_test_extra_unknown_fields.py (edge: vendor adds extra keys). Missing test coverage — validates that vendor-added extra keys to action_camera records generate warnings but are still accepted in non-strict mode (fail-open for vendor extensions).
 - Result: committed 7f297e5e. Tests pass (7/7), ruff clean. Self-review passed (checked silent error swallow, false-success, race conditions, off-by-one on test case count, security via subprocess args as list). Justification: PRD gap with clear acceptance criteria — ensures the schema validation layer handles vendor extensions correctly.
+
+## Round 570 @ 2026-07-14T04:00:00Z
+
+- Picked: Add test file for bin/edge_test_high_precision_floats.py (edge: 1e-300 JSON round-trip). Missing test coverage — validates that extremely small camera position values (subnormals, signed tiny) survive JSON encode/decode without precision loss in the camera calibration pipeline.
+- Result: committed 22cb345c. Tests pass (8/8), ruff clean. Self-review passed (checked silent error swallow via returncode+stderr asserts, false-success via multiple content assertions per test, race conditions via synchronous subprocess, off-by-one on position count matching script's len(test_positions)=5, security via subprocess args as list). Justification: PRD gap with clear acceptance criteria — ensures the ingest pipeline handles tiny-float edge cases correctly (PRD p4 §calibration).
