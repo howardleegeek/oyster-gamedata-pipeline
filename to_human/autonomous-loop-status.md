@@ -1,4 +1,18 @@
 
+## Round 493 @ 2026-08-04T03:40:00Z
+
+- Picked: PLW2901 with statement variable overwritten in tests/test_mod_build.py (lines 163, 231) — renamed `tmpdir` to `temp_path` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, has dedicated test (tests/test_mod_build.py 4/4 pass), follows established PLW2901 cleanup pattern from rounds 481-492.
+- Result: committed 080655c2 (fix PLW2901 in tests/test_mod_build.py); ruff check --select=PLW2901 clean for this file; pytest tests/test_mod_build.py 4/4 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed loop variable tmpdir->temp_path. Logic preserved (Path conversion still applied, all downstream operations use tmpdir). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
+## Round 492 @ 2026-08-04T03:20:00Z
+
+- Picked: PLW2901 loop variable overwritten in tests/test_server.py (line 252) — renamed `line` to `raw_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, has dedicated test (tests/test_server.py 16/16 pass), follows established PLW2901 cleanup pattern from rounds 481-491.
+- Result: committed bd927000 (fix PLW2901 in tests/test_server.py); ruff check --select=PLW2901 clean for this file; pytest tests/test_server.py 16/16 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed loop variable line->raw_line. Logic preserved (strip() still applied, JSON parsing intact). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
+## Round 491 @ 2026-08-04T03:00:00Z
+
+- Picked: (from previous round)
+
 ## Round 487 @ 2026-08-04T02:10:00Z
 
 - Picked: PLW2901 loop variable overwritten in bin/generate_manifest.py (line 325-326) — renamed `line` to `raw_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, has dedicated test (tests/bin/test_generate_manifest.py 19/19 pass), follows established PLW2901 cleanup pattern from rounds 481-486.
@@ -133,3 +147,8 @@ Result: committed f66be98a (fix PLW2901 in bin/scene_lighting_metadata.py); ruff
 
 - Picked: PLW2901 loop variable overwritten in tests/test_replay.py (line 92-93) — renamed `ln` to `raw_ln` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, has dedicated test suite (tests/test_replay.py 21/21 pass), follows established PLW2901 cleanup pattern from rounds 481-494.
 - Result: committed d3b16a0a (fix PLW2901 in tests/test_replay.py); ruff check --select=PLW2901 clean for this file; pytest tests/test_replay.py 21/21 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed for-loop variable ln -> raw_ln. Logic preserved (stripped line still stored in ln, used in subsequent if-not-empty guard and json.loads). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
+## Round 496 @ 2026-06-29T01:59:29Z
+
+- Picked: PLW2901 loop variable overwritten in patches/cluster-week1-2026-05-18/D2-zbuffer-exr/zbuffer_to_exr.py (lines 70, 98) — renamed `line` to `raw_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, has dedicated test (test_zbuffer_to_exr.py 14/14 pass), follows established PLW2901 cleanup pattern from rounds 481-493.
+- Result: committed 20919dce (fix PLW2901 in patches/cluster-week1-2026-05-18/D2-zbuffer-exr/zbuffer_to_exr.py); ruff check --select=PLW2901 clean for this file; ruff check default clean; pytest patches/cluster-week1-2026-05-18/D2-zbuffer-exr/test_zbuffer_to_exr.py 14/14 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed loop variable line->raw_line in load_tick_timestamps and load_camera_frames. Logic preserved (strip() still applied to the stripped line variable, JSON parsing intact, error handler still uses {line} for the stripped value). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
