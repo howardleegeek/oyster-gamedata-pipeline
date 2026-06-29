@@ -2,6 +2,10 @@
 
 - Picked: no good candidate found this round — exiting. Read pass 1: PRODUCTION_GAPS.md items 1-3 require Howard credentials (Vercel, Supabase, code-signing). Read pass 2: ruff check returns "All checks passed!", 3294 tests collected, working tree has only auto-appended test log (not user-edited code). Read pass 3: No failing tests, no clear-bounded single-file fix, TODOs/FIXMEs all intentional. Branch fix/prd-test-action-per-second-ruff at clean end-state. Justification: explicit iron rule "If you can't find a clear-bounded item in 3 read passes, write 'no good candidate found this round' to status file and finish."
 
+## Round 536 @ 2026-06-30T06:40:00Z
+
+- Picked: no good candidate found this round — exiting. Read pass 1: PRODUCTION_GAPS.md items 1-3 require Howard credentials (Vercel, Supabase, code-signing). Read pass 2: ruff check returns "All checks passed!", 3294 tests collected, working tree has only auto-appended test log (not user-edited code). Read pass 3: No failing tests, no clear-bounded single-file fix, TODOs/FIXMEs all intentional. Branch fix/prd-test-action-per-second-ruff at clean end-state. Justification: explicit iron rule "If you can't find a clear-bounded item in 3 read passes, write 'no good candidate found this round' to status file and finish."
+
 ## Round 534 @ 2026-06-30T06:10:00Z
 
 - Picked: no good candidate found this round — exiting. Read pass 1: PRODUCTION_GAPS.md items 1-3 require Howard credentials (Vercel, Supabase, code-signing). Read pass 2: ruff check passes, targeted tests (spec_lint, storage_backend, stripe_connect, iron_law_check) all pass. Read pass 3: No TODOs/FIXMEs that are bugs, no failing tests, no clear-bounded single-file fix. Working tree clean (log files stashed). Justification: explicit iron rule "If you can't find a clear-bounded item in 3 read passes, write 'no good candidate found this round' to status file and finish."
