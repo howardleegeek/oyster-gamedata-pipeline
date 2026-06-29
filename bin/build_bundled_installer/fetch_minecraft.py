@@ -55,6 +55,7 @@ import urllib.error
 import urllib.request
 import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -199,10 +200,8 @@ def _download_with_retries(url: str, dest: Path) -> int:
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             last_exc = exc
             if tmp.exists():
-                try:
+                with suppress(OSError):
                     tmp.unlink()
-                except OSError:
-                    pass
             if attempt < DOWNLOAD_RETRIES:
                 backoff = 2 ** (attempt - 1)
                 _log(
@@ -253,10 +252,8 @@ def _fetch_with_sha1_pin(
         if _sha1_file(dest).lower() == expected_sha1.lower():
             return 0  # cache hit
         # Stale / corrupt cache — re-download.
-        try:
+        with suppress(OSError):
             dest.unlink()
-        except OSError:
-            pass
 
     try:
         bytes_dl = _download_with_retries(url, dest)
