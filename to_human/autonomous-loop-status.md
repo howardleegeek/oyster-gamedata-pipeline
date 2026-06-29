@@ -1,5 +1,9 @@
-## Round 517 @ 2026-06-29T09:10:00Z
+## Round 522 @ 2026-06-29T09:45:00Z
+
+- Picked: no good candidate found this round — exiting. Branch fix/prd-test-action-per-second-ruff at end-state. Verified `ruff check .` returns "All checks passed!" (E/F/W/I active rule set). Working tree clean. Read pass 1: PRODUCTION_GAPS.md → items 1-3 need Howard credentials (Vercel, Supabase, code-signing), items 4+ are human decisions. Read pass 2: git log shows recent rounds logging "no good candidate", branch has 1130+ commits since main, no pending WIP. Read pass 3: cross-checked ruff with --no-respect-gitignore — 550 hits all E501 (422) + E402 (92) + W293 (36), exactly the three codes ignored by name in pyproject.toml. SIM/UP/B/N rules remain intentionally disabled per pyproject.toml comment. No scoped single-file fix available. Justification: explicit iron rule "If you can't find a clear-bounded item in 3 read passes, write 'no good candidate found this round — exiting' to status file and finish."
+
 ## Round 521 @ 2026-06-29T09:30:00Z
+## Round 517 @ 2026-06-29T09:10:00Z
 
 - Picked: no good candidate found this round — exiting. Branch fix/prd-test-action-per-second-ruff remains at end-state. Verified `ruff check .` returns "All checks passed!" (E/F/W/I active rule set). Working tree clean. Read pass 1: PRODUCTION_GAPS.md → items 1-3 need Howard credentials, items 4+ are human decisions; no autonomous-actionable gap. Read pass 2: git log + status → 1130 commits since main, no pending WIP. Read pass 3: cross-checked with `ruff check . --select E,F,W,I --no-respect-gitignore` — 550 hits, all E501 (422) + E402 (92) + W293 (36), exactly the three codes ignored by name in pyproject.toml [tool.ruff.lint] ignore list, so out of scope. SIM/UP/B/N (the 1100+ mechanical-fix set) remain intentionally disabled in pyproject.toml ("Re-add post-buyer-signoff."). No scoped single-file change available. Justification: explicit iron rule "If you can't find a clear-bounded item in 3 read passes, write 'no good candidate found this round — exiting' to status file and finish."
 
