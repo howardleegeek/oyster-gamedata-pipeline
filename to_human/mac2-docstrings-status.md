@@ -82,6 +82,11 @@
 - File: bin/inventory_voxel_capture.py::main
 - Added: docstring=Y, type-hints=N (a
 
+## Round @ 2026-06-21T14:00:00Z
+- File: bin/redteam_lint.py::attack_too_much_stationary
+- Added: docstring=Y, type-hints=Y
+- Commit: 46675765aeab8d751e034b4a11ac02a7c9a448cf
+
 ## Round @ 2026-06-28T10:45:00Z
 - File: bin/upload_resume_helper.py::do_upload
 - Added: docstring=N (already had docstring), type-hints=Y
