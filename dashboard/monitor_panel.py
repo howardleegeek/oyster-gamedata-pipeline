@@ -42,8 +42,8 @@ def load_metrics(hours: int = 24) -> list[dict]:
     metrics = []
 
     with open(METRICS_FILE, "r") as f:
-        for line in f:
-            line = line.strip()
+        for raw_line in f:
+            line = raw_line.strip()
             if not line:
                 continue
             try:
@@ -68,8 +68,8 @@ def load_alerts(hours: int = 24) -> list[dict]:
     alerts = []
 
     with open(ALERTS_FILE, "r") as f:
-        for line in f:
-            line = line.strip()
+        for raw_line in f:
+            line = raw_line.strip()
             if not line:
                 continue
             try:
