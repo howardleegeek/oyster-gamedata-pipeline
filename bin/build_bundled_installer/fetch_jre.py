@@ -33,6 +33,7 @@ Exit codes:
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
@@ -44,7 +45,6 @@ import urllib.request
 import zipfile
 from pathlib import Path
 from typing import Any
-import contextlib
 
 # ---------------------------------------------------------------------------
 # Repo layout
