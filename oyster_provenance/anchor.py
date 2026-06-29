@@ -87,7 +87,7 @@ def get_week_range(date: Optional[datetime] = None) -> Tuple[datetime, datetime]
         Tuple of (week_start, week_end)
     """
     if date is None:
-        date = datetime.utcnow()
+        date = datetime.now()  # Use local time for consistency with file mtime
 
     # Monday start
     week_start = date - timedelta(days=date.weekday())
@@ -172,18 +172,32 @@ def collect_week_manifests(
         if not os.path.exists(manifest_path):
             continue
 
+        with open(manifest_path, "r") as f:
+            try:
+                manifest = json.load(f)
+            except json.JSONDecodeError:
+                continue
+
         # Check if manifest is from this week
-        # Use file modification time as proxy for session time
-        mtime = os.path.getmtime(manifest_path)
-        manifest_time = datetime.fromtimestamp(mtime)
+        # Use manifest's consent_signed_at_utc timestamp, fall back to file mtime
+        consent_time_str = manifest.get("consent_signed_at_utc")
+        if consent_time_str:
+            try:
+                manifest_time = datetime.fromisoformat(consent_time_str.replace("Z", "+00:00"))
+                # Strip timezone info for comparison with week_start/week_end (naive)
+                if manifest_time.tzinfo is not None:
+                    manifest_time = manifest_time.replace(tzinfo=None)
+            except (ValueError, TypeError):
+                # Fall back to file mtime if timestamp parsing fails
+                mtime = os.path.getmtime(manifest_path)
+                manifest_time = datetime.fromtimestamp(mtime)
+        else:
+            # Fall back to file mtime if no consent_signed_at_utc
+            mtime = os.path.getmtime(manifest_path)
+            manifest_time = datetime.fromtimestamp(mtime)
 
         if week_start <= manifest_time <= week_end:
-            with open(manifest_path, "r") as f:
-                try:
-                    manifest = json.load(f)
-                    manifests.append(manifest)
-                except json.JSONDecodeError:
-                    pass
+            manifests.append(manifest)
 
     return manifests
 
