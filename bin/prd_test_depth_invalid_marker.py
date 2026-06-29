@@ -98,7 +98,12 @@ def read_exr(filepath: Path) -> np.ndarray | None:
 
 def verify_preservation(orig: np.ndarray, rest: np.ndarray, sentinel: str) -> dict[str, Any]:
     """Verify sentinel values preserved after roundtrip."""
-    is_invalid = (lambda d: d == 0.0) if sentinel == "zero" else (lambda d: np.isnan(d))
+
+    def is_invalid(d: np.ndarray) -> np.ndarray:
+        if sentinel == "zero":
+            return d == 0.0
+        return np.isnan(d)
+
     orig_mask = is_invalid(orig)
     rest_mask = is_invalid(rest)
     mismatch = np.sum(orig_mask != rest_mask)
