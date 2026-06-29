@@ -226,7 +226,17 @@ def attack_wasd_all_w(b: Path) -> None:
     p.write_text(json.dumps(arr))
 
 
-def attack_too_much_stationary(b: Path):
+def attack_too_much_stationary(b: Path) -> None:
+    """Zero out player_speed in >50% of action_camera frames.
+
+    This attack simulates a clip where the player is stationary for more
+    than half the recording, testing whether the lint catches excessive
+    idle time (quality check for action diversity).
+
+    Args:
+        b: Path to the unpacked buyer-spec bundle directory containing
+           action_camera.json.
+    """
     p = b / "action_camera.json"
     arr = json.loads(p.read_text())
     # zero out player_speed for >50% of frames
