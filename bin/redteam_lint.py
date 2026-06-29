@@ -264,7 +264,15 @@ def attack_duplicate_frame(b: Path) -> None:
     p.write_text(json.dumps(arr))
 
 
-def attack_bogus_keycode(b: Path):
+def attack_bogus_keycode(b: Path) -> None:
+    """Inject bogus keyCode values into action_camera.json.
+
+    This attack tests the linter's ability to detect invalid keyCode types.
+    Replaces the first 20 keyCode values with [9999, -1, "not_an_int"].
+
+    Args:
+        b: Path to the directory containing action_camera.json.
+    """
     p = b / "action_camera.json"
     arr = json.loads(p.read_text())
     for r in arr[:20]:
