@@ -1,3 +1,8 @@
+## Round 504 @ 2026-08-04T05:30:00Z
+
+- Picked: SIM105 try-except-pass in bin/diag_bundle_collector.py (2 instances at lines 101-104 and 109-112) — converted to contextlib.suppress(OSError). Justification: measurable code smell (ruff SIM105), single-file scope, file imports cleanly, follows established SIM cleanup pattern from previous rounds.
+- Result: committed ecbe426b (fix(SIM105): use contextlib.suppress in diag_bundle_collector.py); ruff check clean for this file; python import test passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Converted 2 SIM105 try/except OSError/pass blocks. Silent error swallow is intentional here (skip unreadable files during diagnostic collection). No false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
 ## Round 502 @ 2026-06-29T05:27:53Z
 
 - Picked: SIM105 try-except-pass in tests/test_real_session_validator_hardening.py (2 remaining blocks at lines 642-645 and 667-670) — converted to contextlib.suppress(SystemExit). Justification: measurable code smell (ruff SIM105), single-file scope, dedicated test file, completes the SIM105 cleanup pattern from round 499. Reverted unrelated in-progress noise (dashboard logs, pyproject.toml moto, stray "=5.0" pip-redirect artifact) to keep iron rule "one logical change, one file".
