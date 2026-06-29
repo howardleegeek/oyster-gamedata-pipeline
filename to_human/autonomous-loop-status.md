@@ -1,3 +1,8 @@
+## Round 567 @ 2026-07-14T01:00:00Z
+
+- Picked: Add test file for bin/edge_test_leap_second.py (edge: leap second 23:59:60). Missing test coverage — validates datetime adapter handles leap-second timestamps without crashing or silently dropping data.
+- Result: committed 49bdd42b. Tests pass (6/6), ruff clean. Self-review passed (checked silent error swallow, false-success, race conditions, off-by-one on scenario count, security via subprocess args as list). Justification: PRD gap with clear acceptance criteria — ensures the ingest pipeline handles leap-second boundary cases correctly.
+
 ## Round 566 @ 2026-07-14T00:00:00Z
 
 - Picked: Add test file for bin/edge_test_dst_clock_change.py (edge: DST clock transitions). Missing test coverage — validates UTC timestamps remain strictly monotonic across Daylight Saving Time transitions (spring-forward and fall-back).
