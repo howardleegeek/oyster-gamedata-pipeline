@@ -66,8 +66,8 @@ def load_tick_timestamps(game_state_path: Path) -> Dict[int, int]:
         return tick_timestamps
 
     with open(game_state_path, "r") as f:
-        for line in f:
-            line = line.strip()
+        for raw_line in f:
+            line = raw_line.strip()
             if not line:
                 continue
             try:
@@ -94,8 +94,8 @@ def load_camera_frames(session_dir: Path) -> List[Tuple[int, int]]:
 
     for camera_file in camera_files:
         with open(camera_file, "r") as f:
-            for line in f:
-                line = line.strip()
+            for raw_line in f:
+                line = raw_line.strip()
                 if not line:
                     continue
                 try:
