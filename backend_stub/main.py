@@ -27,6 +27,7 @@ import json
 import os
 import tempfile
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict
 from urllib.parse import quote
@@ -347,10 +348,39 @@ def _gcs_signed_put_url(bucket_name: str, key: str) -> str:
     return blob.generate_signed_url(**kwargs)
 
 
+@asynccontextmanager
+async def _payout_lifespan(app: FastAPI):
+    """Lifespan context manager for payout worker startup/shutdown."""
+    accelerate = float(getattr(app.state, "payout_accelerate", 1.0))
+    interval = float(getattr(app.state, "payout_interval", 300.0))
+    
+    # Startup: start payout worker if accelerated
+    if accelerate > 1.0 or interval < 300.0:
+        from backend_stub.payout import PayoutWorker
+
+        # Use the existing module-level store so worker sees same data as API routes
+        if app.state.payout_worker is None:
+            app.state.payout_worker = PayoutWorker(
+                store, accelerate=accelerate, interval=interval
+            )
+            app.state.payout_worker.start()
+    
+    yield
+    
+    # Shutdown: stop payout worker
+    if app.state.payout_worker is not None:
+        app.state.payout_worker.stop()
+        app.state.payout_worker = None
+
+
 def create_app(accelerate: float = 1.0, interval: float = 300.0) -> FastAPI:
     _configure_persistence()
     _validate_production_backend_config()
-    app = FastAPI(title="gamedata-pipeline backend stub", version="0.1.0")
+    app = FastAPI(
+        title="gamedata-pipeline backend stub",
+        version="0.1.0",
+        lifespan=_payout_lifespan,
+    )
     app.state.payout_accelerate = accelerate
     app.state.payout_interval = interval
     app.state.payout_routes_registered = False
