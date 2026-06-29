@@ -410,9 +410,26 @@ def _v2_parse_time(s):
     return _dt.strptime(s, "%Y-%m-%d %H:%M:%S.%f")
 
 
-def r20a_quat_norm_distribution(records, max_offset=1e-5, max_std=1e-4,
-                                min_frames=10):
-    """V₂ R20a: |μ_‖q‖−1.0|≤max_offset AND σ_‖q‖≤max_std."""
+def r20a_quat_norm_distribution(
+    records: list[Dict[str, Any]],
+    max_offset: float = 1e-5,
+    max_std: float = 1e-4,
+    min_frames: int = 10,
+) -> Dict[str, Any]:
+    """V₂ R20a: Verify quaternion norm distribution meets statistical thresholds.
+
+    Checks that the mean of quaternion norms is within max_offset of 1.0
+    and the standard deviation is below max_std.
+
+    Args:
+        records: List of record dictionaries containing camera_rotation_quaternion.
+        max_offset: Maximum allowed offset of mean norm from 1.0.
+        max_std: Maximum allowed standard deviation of norms.
+        min_frames: Minimum number of frames required for valid statistics.
+
+    Returns:
+        Dictionary with 'name', 'passed', 'residual', 'threshold', and 'note' keys.
+    """
     if not records:
         return _v2_drift_abstain("R20a", "empty_records", max_offset)
     if len(records) < min_frames:
