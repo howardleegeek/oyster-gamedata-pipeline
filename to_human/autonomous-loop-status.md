@@ -1,3 +1,8 @@
+## Round 507 @ 2026-08-04T06:15:00Z
+
+- Picked: SIM114 duplicate if branches in bin/continuous_capture_daemon.py (lines 416-422) — combined FINALIZING and UPLOADING branches with logical or operator. Justification: measurable code smell (ruff SIM114), single-file scope, file imports cleanly, follows established SIM114 cleanup pattern.
+- Result: committed c1baac25 (fix(SIM114): combine if branches in continuous_capture_daemon.py); ruff check --select=SIM114 clean for this file; python import test passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Combined duplicate if branches for FINALIZING and UPLOADING states using logical or operator. Preserved comment. No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
 ## Round 506 @ 2026-06-29T07:28:01Z
 
 - Picked: SIM102 nested if in bin/pii_auditor.py (lines 112-115) — combined into single `if A and B` to filter out test fixture names and deduplicate in one expression. Justification: measurable code smell (ruff SIM102), single-file scope, file has dedicated test (tests/test_pii_auditor.py 19/19 pass), preserves detection logic exactly.
