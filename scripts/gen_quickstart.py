@@ -62,8 +62,8 @@ def _extract_positional(help_text: str) -> list[dict]:
     # Look for the "positional arguments:" section
     pos_section = re.search(r"positional arguments:\s*\n((?:\s+.+\n)*)", help_text)
     if pos_section:
-        for line in pos_section.group(1).strip().split("\n"):
-            line = line.strip()
+        for raw_line in pos_section.group(1).strip().split("\n"):
+            line = raw_line.strip()
             if not line:
                 continue
             parts = line.split(None, 1)
