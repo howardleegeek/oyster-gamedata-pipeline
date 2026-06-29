@@ -115,3 +115,8 @@
 
 - Picked: Add test file for bin/edge_test_high_precision_floats.py (edge: 1e-300 JSON round-trip). Missing test coverage — validates that extremely small camera position values (subnormals, signed tiny) survive JSON encode/decode without precision loss in the camera calibration pipeline.
 - Result: committed 22cb345c. Tests pass (8/8), ruff clean. Self-review passed (checked silent error swallow via returncode+stderr asserts, false-success via multiple content assertions per test, race conditions via synchronous subprocess, off-by-one on position count matching script's len(test_positions)=5, security via subprocess args as list). Justification: PRD gap with clear acceptance criteria — ensures the ingest pipeline handles tiny-float edge cases correctly (PRD p4 §calibration).
+
+## Round 571 @ 2026-07-14T04:00:00Z
+
+- Picked: Add test file for bin/edge_test_gigantic_record_count.py (1M-record streaming). Missing test coverage — validates that the action_camera adapter streams records via JSON Lines in bounded chunks rather than materialising the entire file in memory (PRD-aligned memory-safety boundary).
+- Result: committed 4f600002. Tests pass (16/16), ruff clean. Self-review passed (checked silent error swallow, false-success, race conditions, off-by-one on chunk boundaries and record IDs, security via subprocess list-args, brand isolation). Justification: PRD gap with clear acceptance criteria — guards against silent memory blow-up on gigantic ingestion files.
