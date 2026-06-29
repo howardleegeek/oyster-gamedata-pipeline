@@ -56,8 +56,8 @@ class TestI18nCoverage(unittest.TestCase):
             lines = f.readlines()
 
         # Skip header lines
-        for line in lines[2:]:  # Skip title and separator
-            line = line.strip()
+        for raw_line in lines[2:]:  # Skip title and separator
+            line = raw_line.strip()
             if line.startswith("|") and line.endswith("|"):
                 parts = [p.strip() for p in line[1:-1].split("|")]
                 if len(parts) >= 3:
