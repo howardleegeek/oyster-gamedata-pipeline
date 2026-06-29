@@ -80,7 +80,12 @@
 
 ## Round @ 2026-06-21T13:35:00Z
 - File: bin/inventory_voxel_capture.py::main
-- Added: docstring=Y, type-hints=N (already had type hints)
+- Added: docstring=Y, type-hints=N (a
+
+## Round @ 2026-06-28T10:45:00Z
+- File: bin/upload_resume_helper.py::do_upload
+- Added: docstring=N (already had docstring), type-hints=Y
+- Commit: 23dd3782clready had type hints)
 - Commit: f8f4ac3d4
 
 ## Round @ 2026-06-21T14:15:00Z
