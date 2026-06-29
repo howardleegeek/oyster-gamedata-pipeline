@@ -26,9 +26,11 @@ def calculate_entropy(actions: List[str]) -> float:
 
 def read_actions(input_path: str) -> List[str]:
     """Read actions from file or stdin, skipping empty lines and comments."""
-    lines = sys.stdin if input_path == "-" else open(input_path, "r", encoding="utf-8")
-    with lines:
+    if input_path == "-":
+        lines = sys.stdin
         return [line.strip() for line in lines if line.strip() and not line.strip().startswith("#")]
+    with open(input_path, "r", encoding="utf-8") as f:
+        return [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]
 
 
 def analyze_actions(actions: List[str], threshold: Optional[float] = None) -> Dict:
