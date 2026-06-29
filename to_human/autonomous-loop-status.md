@@ -3,6 +3,11 @@
 - Picked: Add test file for bin/prd_test_action_per_second.py (PRD p6 #6). Found untracked test file tests/bin/test_prd_test_action_per_second.py in working tree — validates median actions-per-second in 0.5-5.0 range.
 - Result: committed 0e3b9109. Tests pass (18/18), ruff clean. Self-review passed. Justification: PRD gap with clear acceptance criteria — validates actions-per-second quality threshold.
 
+## Round 553 @ 2026-07-01T12:00:00Z
+
+- Picked: Add test file for bin/prd_test_30min_scene_cap.py (PRD p7 #3). Missing test coverage — validates max 30 minutes per scene.
+- Result: committed 910f52d6. Tests pass (14/14), ruff clean. Self-review passed. Justification: PRD gap with clear acceptance criteria — validates scene duration cap enforcement.
+
 ## Round 552 @ 2026-07-01T00:00:00Z
 
 - Picked: Add test file for bin/prd_test_240_clip_cap.py (PRD p7 #2). Missing test coverage — validates max 240 clips per scene.
