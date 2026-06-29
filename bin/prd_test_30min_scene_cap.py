@@ -9,7 +9,79 @@ import json
 import sys
 import time
 from datetime import datetime
-from typing import List
+from typing import Any, Dict, List
+
+
+def calculate_elapsed_minutes(start_time_iso: str, end_time_iso: str) -> float:
+    """Calculate elapsed minutes between two ISO timestamps.
+    
+    Args:
+        start_time_iso: Start time in ISO format
+        end_time_iso: End time in ISO format
+    
+    Returns:
+        Elapsed time in minutes
+    """
+    start = datetime.fromisoformat(start_time_iso)
+    end = datetime.fromisoformat(end_time_iso)
+    return (end - start).total_seconds() / 60.0
+
+
+def check_scene_duration(duration_minutes: float, threshold_minutes: float = 30.0) -> Dict[str, Any]:
+    """Check if scene duration exceeds threshold.
+    
+    Args:
+        duration_minutes: Actual scene duration in minutes
+        threshold_minutes: Maximum allowed duration in minutes
+    
+    Returns:
+        Dict with exceeded, warning, status, remaining_minutes, over_by_minutes
+    """
+    exceeded = duration_minutes > threshold_minutes
+    warning = duration_minutes > threshold_minutes * 0.8 and not exceeded
+    
+    return {
+        "exceeded": exceeded,
+        "warning": warning,
+        "status": "EXCEEDED" if exceeded else "WARNING" if warning else "OK",
+        "remaining_minutes": max(threshold_minutes - duration_minutes, 0),
+        "over_by_minutes": max(duration_minutes - threshold_minutes, 0),
+    }
+
+
+def create_scene_result(
+    scene_id: str,
+    duration_minutes: float,
+    threshold_minutes: float = 30.0,
+    start_time_iso: str = None,
+    end_time_iso: str = None,
+) -> Dict[str, Any]:
+    """Create a scene duration check result.
+    
+    Args:
+        scene_id: Scene identifier
+        duration_minutes: Actual duration in minutes
+        threshold_minutes: Maximum allowed duration in minutes
+        start_time_iso: Optional start time in ISO format
+        end_time_iso: Optional end time in ISO format
+    
+    Returns:
+        Complete result dict with all fields
+    """
+    check_result = check_scene_duration(duration_minutes, threshold_minutes)
+    
+    result = {
+        "scene_id": scene_id,
+        "duration_minutes": duration_minutes,
+        "threshold_minutes": threshold_minutes,
+        **check_result,
+    }
+    
+    if start_time_iso and end_time_iso:
+        result["start_time"] = start_time_iso
+        result["end_time"] = end_time_iso
+    
+    return result
 
 
 def main(argv: List[str]) -> int:
