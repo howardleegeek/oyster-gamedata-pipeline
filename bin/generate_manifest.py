@@ -269,7 +269,13 @@ def write_manifest_yaml(manifest: dict, out_path: str) -> None:
                 else:
                     lines.append(f"{prefix}{k}: {yaml_value(v)}")
         
-        def write_list(lst, indent=0):
+        def write_list(lst: list[Any], indent: int = 0) -> None:
+            """Recursively write a list as YAML sequence entries.
+
+            Args:
+                lst: List of items to write as YAML sequence.
+                indent: Current indentation level (number of 2-space increments).
+            """
             prefix = '  ' * indent
             for item in lst:
                 if isinstance(item, dict):
