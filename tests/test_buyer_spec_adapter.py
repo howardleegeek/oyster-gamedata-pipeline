@@ -21,8 +21,6 @@ import math
 from datetime import datetime, timezone
 
 UTC = timezone.utc
-
-UTC = UTC
 from pathlib import Path
 from typing import Any
 
