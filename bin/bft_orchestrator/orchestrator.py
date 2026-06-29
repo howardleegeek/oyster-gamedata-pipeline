@@ -449,9 +449,7 @@ def tally(votes: list[Vote]) -> dict[str, dict[str, Any]]:
             decision = "VIEW_CHANGE"
         elif p == fl and p >= 1 and ab > 0:
             decision = "INSUFFICIENT"
-        elif p >= 2 * f + 1 and p > fl:
-            decision = "COMMIT"
-        elif p > fl and p + fl >= f + 1:
+        elif (p >= 2 * f + 1 and p > fl) or (p > fl and p + fl >= f + 1):
             decision = "COMMIT"
         else:
             decision = "INSUFFICIENT"
