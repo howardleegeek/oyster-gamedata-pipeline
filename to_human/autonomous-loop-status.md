@@ -3,6 +3,10 @@
 - Picked: Fix payout worker store instance mismatch in lifespan handler
 - Result: committed d7ec5705
 
+## Round 525 @ 2026-06-30T00:35:00Z
+
+- Picked: no good candidate found this round — exiting. Ruff all-checks-pass, 538 bin tests pass, production gaps require Howard credentials (Vercel/Supabase/code-sign). Ruff findings (SIM115, PLW0603) lack test coverage or clear scope. Justification: explicit iron rule "If you can't find a clear-bounded item in 3 read passes, write 'no good candidate found this round' to status file and finish."
+
 ## Round 523 @ 2026-06-30T00:15:00Z
 
 - Picked: Fix race condition in test_worker_advances_queued_to_processing
