@@ -38,7 +38,7 @@ from fastapi.responses import JSONResponse, Response
 
 from backend_stub import appcast_server, crash_dump, sentry_compat, tester_invite
 from backend_stub.income_engine import calculate_daily_income
-from backend_stub.payout import PayoutStore, PayoutWorker
+from backend_stub.payout import PayoutStore
 
 # ---------------------------------------------------------------------------
 # In-memory stores
@@ -699,23 +699,14 @@ def register_routes(app: FastAPI) -> FastAPI:
         _require_admin(authorization)
         return [record.to_dict() for record in store.list_all()]
 
-    accelerate = float(getattr(app.state, "payout_accelerate", 1.0))
-    interval = float(getattr(app.state, "payout_interval", 300.0))
-    if accelerate > 1.0 or interval < 300.0:
-
-        @app.on_event("startup")
-        async def _start_payout_worker():
-            if app.state.payout_worker is None:
-                app.state.payout_worker = PayoutWorker(
-                    store, accelerate=accelerate, interval=interval
-                )
-                app.state.payout_worker.start()
-
-        @app.on_event("shutdown")
-        async def _stop_payout_worker():
-            if app.state.payout_worker is not None:
-                app.state.payout_worker.stop()
-                app.state.payout_worker = None
+    # Payout worker startup/shutdown is now handled by the FastAPI lifespan
+    # context manager (`_payout_lifespan`) set in `create_app`. The lifespan
+    # runs for the full process lifetime and uses the module-level `store`,
+    # which is what the API routes read from. Registering a second
+    # `@app.on_event` handler here would race the lifespan startup and
+    # (worse) instantiate a duplicate worker bound to whatever `store` value
+    # was rebound by tests via `main_mod.store = ...` — leading to worker /
+    # API reading different in-memory state. Removed in round 528.
 
     return app
 
