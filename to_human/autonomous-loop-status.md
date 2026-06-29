@@ -1,4 +1,19 @@
 
+## Round 496 @ 2026-08-04T04:10:00Z
+
+- Picked: SIM102 nested ifs and SIM118 dict.keys() in tests/test_i18n_coverage.py (4 issues) — combined nested ifs with `and`, removed unnecessary `.keys()`. Justification: measurable code smell (ruff SIM), single-file scope, has dedicated test (tests/test_i18n_coverage.py 8/8 pass), follows established SIM cleanup pattern.
+- Result: committed fd3b199e (fix SIM in test_i18n_coverage.py); ruff check --select=SIM clean for this file; pytest tests/test_i18n_coverage.py 8/8 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Fixed SIM102 nested ifs (3 instances) and SIM118 dict.keys() (1 instance). Logic preserved - combined conditions with 'and'. No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
+## Round 494 @ 2026-08-04T03:50:00Z
+
+- Picked: PLW2901 loop variable overwritten in patches/cluster-week1-2026-05-18/D2-zbuffer-exr/zbuffer_to_exr.NEW_DESIGN.py (lines 70, 98) — renamed `line` to `raw_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, has related test (tests/test_mod_build.py 4/4 pass), follows established PLW2901 cleanup pattern from rounds 481-493.
+- Result: committed ec634bd5 (fix PLW2901 in zbuffer_to_exr.NEW_DESIGN.py); ruff check --select=PLW2901 clean for patches/; pytest tests/test_mod_build.py 4/4 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed loop variable line->raw_line at 2 locations. Logic preserved (strip() still applied to raw_line, result stored in line). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
+## Round 495 @ 2026-08-04T04:00:00Z
+
+- Picked: Failing test test_create_weekly_anchor in tests/test_provenance.py — session_count was 0 instead of expected 3 due to time zone mismatch. Justification: failing test (highest priority), root cause was collect_week_manifests using file mtime instead of manifest's consent_signed_at_utc, and get_week_range using utcnow() instead of now() causing local/UTC mismatch.
+- Result: committed f9b8613e (fix: use manifest consent timestamp in collect_week_manifests); read timestamp from manifest JSON, fall back to file mtime if not present; changed get_week_range() to use datetime.now() for consistency; removed unused timezone import; pytest tests/test_provenance.py 25/25 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Fixed false-success bug where manifests created with local datetime.now() were not detected due to utcnow() vs now() mismatch. Used manifest's internal timestamp as primary source, file mtime as fallback. No security impact, no test masking, no brand cross-reference.
+
 ## Round 493 @ 2026-08-04T03:40:00Z
 
 - Picked: PLW2901 with statement variable overwritten in tests/test_mod_build.py (lines 163, 231) — renamed `tmpdir` to `temp_path` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, has dedicated test (tests/test_mod_build.py 4/4 pass), follows established PLW2901 cleanup pattern from rounds 481-492.
@@ -152,3 +167,7 @@ Result: committed f66be98a (fix PLW2901 in bin/scene_lighting_metadata.py); ruff
 
 - Picked: PLW2901 loop variable overwritten in patches/cluster-week1-2026-05-18/D2-zbuffer-exr/zbuffer_to_exr.py (lines 70, 98) — renamed `line` to `raw_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, has dedicated test (test_zbuffer_to_exr.py 14/14 pass), follows established PLW2901 cleanup pattern from rounds 481-493.
 - Result: committed 20919dce (fix PLW2901 in patches/cluster-week1-2026-05-18/D2-zbuffer-exr/zbuffer_to_exr.py); ruff check --select=PLW2901 clean for this file; ruff check default clean; pytest patches/cluster-week1-2026-05-18/D2-zbuffer-exr/test_zbuffer_to_exr.py 14/14 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed loop variable line->raw_line in load_tick_timestamps and load_camera_frames. Logic preserved (strip() still applied to the stripped line variable, JSON parsing intact, error handler still uses {line} for the stripped value). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
+## Round 496 @ 2026-08-04T04:10:00Z
+- Picked: PLW0602 unnecessary `global _server_instance` in bin/faq_server.py stop_server() — function only reads the module-level var, never assigns, so `global` is a no-op. Justification: measurable code smell (ruff PLW0602), single-file scope, has dedicated test (tests/test_faq_server.py 30/30 pass, covers start/stop lifecycle), follows established PLW cleanup pattern from rounds 481-495.
+- Result: committed 4641e811 (fix PLW0602 in bin/faq_server.py); ruff check --select=PLW0602 clean for this file; pytest tests/test_faq_server.py 30/30 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Removed `global _server_instance` line. Function reads _server_instance and _server_thread but never assigns. No logic change, no threading semantics change, no silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
