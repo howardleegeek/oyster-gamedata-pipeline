@@ -50,6 +50,8 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+from contextlib import suppress
+from contextlib import suppress
 from typing import Any
 
 # ---------------------------------------------------------------------------
@@ -179,10 +181,8 @@ def _download_with_retries(url: str, dest: Path) -> int:
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             last_exc = exc
             if tmp.exists():
-                try:
+                with suppress(OSError):
                     tmp.unlink()
-                except OSError:
-                    pass
             if attempt < DOWNLOAD_RETRIES:
                 backoff = 2 ** (attempt - 1)
                 _log(
@@ -266,10 +266,8 @@ def _fetch_with_sha1_pin(
     if dest.is_file():
         if _sha1_file(dest).lower() == expected_sha1.lower():
             return 0  # cache hit
-        try:
+        with suppress(OSError):
             dest.unlink()
-        except OSError:
-            pass
 
     try:
         bytes_dl = _download_with_retries(url, dest)
@@ -280,10 +278,8 @@ def _fetch_with_sha1_pin(
     got = _sha1_file(dest)
     if got.lower() != expected_sha1.lower():
         _err(f"{label}: SHA-1 mismatch — refusing to keep file. expected={expected_sha1} got={got}")
-        try:
+        with suppress(OSError):
             dest.unlink()
-        except OSError:
-            pass
         sys.exit(2)
 
     return bytes_dl
@@ -581,10 +577,8 @@ def _dir_size_bytes(root: Path) -> int:
     total = 0
     for dp, _dn, fn in os.walk(root):
         for name in fn:
-            try:
+            with suppress(OSError):
                 total += (Path(dp) / name).stat().st_size
-            except OSError:
-                pass
     return total
 
 
