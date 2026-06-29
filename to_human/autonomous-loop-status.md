@@ -1,5 +1,6 @@
 ## Round 541 @ 2026-06-29T15:16:00Z
 
+
 - Picked: no good candidate found this round — exiting. Read pass 1: PRODUCTION_GAPS.md items 1-3 require Howard credentials (Vercel, Supabase, code-signing). Read pass 2: ruff check returns "All checks passed!", 3294 tests collect cleanly, no failing tests. Read pass 3: working tree has only auto-appended log files (dashboard/merge_failures.log, dashboard/replay_attacks.json, tests/_payout_cron_test.log) from background processes — not user-edited code. No TODOs/FIXMEs that are bugs; remaining ones intentional (spec_lint rules, buyer-ships-later features). No clear-bounded single-file fix available. Justification: explicit iron rule "If you can't find a clear-bounded item in 3 read passes, write 'no good candidate found this round' to status file and finish."
 
 ## Round 542 @ 2026-06-30T12:30:00Z
