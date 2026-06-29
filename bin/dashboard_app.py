@@ -9,6 +9,7 @@ Read-only interface with HTMX for dynamic updates.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import csv
 import logging
 import sys
@@ -24,9 +25,9 @@ def _import_flask() -> Any:
     """Lazy-import Flask."""
     global _flask
     if _flask is None:
-        try:
+        with contextlib.suppress(ImportError):
             import flask as _flask
-        except ImportError:
+        if _flask is None:
             print("ERROR: Install Flask: pip install flask", file=sys.stderr)
             sys.exit(1)
     return _flask
@@ -36,10 +37,8 @@ def _import_openpyxl() -> Any:
     """Lazy-import openpyxl."""
     global _openpyxl
     if _openpyxl is None:
-        try:
+        with contextlib.suppress(ImportError):
             import openpyxl as _openpyxl
-        except ImportError:
-            pass
     return _openpyxl
 
 
