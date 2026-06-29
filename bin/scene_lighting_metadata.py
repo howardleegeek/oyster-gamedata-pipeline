@@ -160,8 +160,8 @@ def infer_weather_from_image(image_path: Path) -> WeatherState:
         from PIL import Image
 
         with Image.open(image_path) as img:
-            img = img.convert("L")
-            pixels = list(img.get_flattened_data())
+            gray_img = img.convert("L")
+            pixels = list(gray_img.get_flattened_data())
             avg_brightness = sum(pixels) / len(pixels) / 255.0
     except Exception:
         avg_brightness = 0.5
