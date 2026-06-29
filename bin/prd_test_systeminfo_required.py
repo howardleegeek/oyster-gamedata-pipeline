@@ -64,8 +64,13 @@ def load_systeminfo(path: Path) -> Dict[str, Any]:
     raise ValueError(f"Unsupported file extension: {suffix!r}")
 
 
-def validate_required_keys(data: Dict[str, Any]) -> List[str]:
-    """Return a list of required keys that are missing from *data*."""
+def validate_required_keys(data: Dict[str, Any] | None) -> List[str]:
+    """Return a list of required keys that are missing from *data*.
+
+    Returns all required keys if data is None or not a dict (fail-closed).
+    """
+    if data is None or not isinstance(data, dict):
+        return list(REQUIRED_KEYS)
     return [key for key in REQUIRED_KEYS if key not in data]
 
 
