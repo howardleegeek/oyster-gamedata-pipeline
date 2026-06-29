@@ -1,3 +1,13 @@
+## Round 569 @ 2026-07-14T03:00:00Z
+
+- Picked: Add test file for bin/edge_test_min_int_values.py (edge: int64 min for frame_id). Missing test coverage — validates int64 boundary handling for frame_id underflow in adapter math operations.
+- Result: committed 3e6d401c. Tests pass (7/7), ruff clean. Self-review passed (checked silent error swallow, false-success, race conditions, off-by-one on INT64 boundaries, security via subprocess args as list). Justification: PRD gap with clear acceptance criteria — ensures the ingest pipeline handles int64 boundary edge cases correctly.
+
+## Round 568 @ 2026-07-14T02:00:00Z
+
+- Picked: Add test file for bin/edge_test_max_int_values.py (edge: int64 max/min for frame_id). Missing test coverage — validates int64 boundary handling for frame_id overflow in adapter math operations.
+- Result: committed 32bd80bf. Tests pass (7/7), ruff clean. Self-review passed (checked silent error swallow, false-success, race conditions, off-by-one on INT64 boundaries, security via subprocess args as list). Justification: PRD gap with clear acceptance criteria — ensures the ingest pipeline handles int64 boundary edge cases correctly.
+
 ## Round 567 @ 2026-07-14T01:00:00Z
 
 - Picked: Add test file for bin/edge_test_leap_second.py (edge: leap second 23:59:60). Missing test coverage — validates datetime adapter handles leap-second timestamps without crashing or silently dropping data.
@@ -95,3 +105,8 @@
 
 - Picked: Commit untracked test file tests/bin/test_edge_test_empty_strings.py (PRD gap with clear acceptance criteria — validates empty-string rejection for required fields).
 - Result: committed 2c65bd9a. Tests pass (10/10), ruff clean. Self-review passed (checked for aliasing bugs, off-by-one, silent error swallow). Fix: removed unused pytest import, fixed import sorting.
+
+## Round 568 @ 2026-06-29T22:47:53Z
+
+- Picked: Add test file for bin/edge_test_extra_unknown_fields.py (edge: vendor adds extra keys). Missing test coverage — validates that vendor-added extra keys to action_camera records generate warnings but are still accepted in non-strict mode (fail-open for vendor extensions).
+- Result: committed 7f297e5e. Tests pass (7/7), ruff clean. Self-review passed (checked silent error swallow, false-success, race conditions, off-by-one on test case count, security via subprocess args as list). Justification: PRD gap with clear acceptance criteria — ensures the schema validation layer handles vendor extensions correctly.
