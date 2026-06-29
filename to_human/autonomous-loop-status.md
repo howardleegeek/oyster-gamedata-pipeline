@@ -1,4 +1,10 @@
 ## Round 517 @ 2026-06-29T09:10:00Z
+## Round 521 @ 2026-06-29T09:30:00Z
+
+- Picked: no good candidate found this round — exiting. Branch fix/prd-test-action-per-second-ruff remains at end-state. Verified `ruff check .` returns "All checks passed!" (E/F/W/I active rule set). Working tree clean. Read pass 1: PRODUCTION_GAPS.md → items 1-3 need Howard credentials, items 4+ are human decisions; no autonomous-actionable gap. Read pass 2: git log + status → 1130 commits since main, no pending WIP. Read pass 3: cross-checked with `ruff check . --select E,F,W,I --no-respect-gitignore` — 550 hits, all E501 (422) + E402 (92) + W293 (36), exactly the three codes ignored by name in pyproject.toml [tool.ruff.lint] ignore list, so out of scope. SIM/UP/B/N (the 1100+ mechanical-fix set) remain intentionally disabled in pyproject.toml ("Re-add post-buyer-signoff."). No scoped single-file change available. Justification: explicit iron rule "If you can't find a clear-bounded item in 3 read passes, write 'no good candidate found this round — exiting' to status file and finish."
+
+## Round 517 @ 2026-06-29T09:10:00Z
+
 
 
 - Picked: no good candidate found this round — exiting. Verified end-state of branch fix/prd-test-action-per-second-ruff: ruff check . returns "All checks passed!" (E/F/W/I rules clean). Targeted test pass (test_audit_artifact_honesty.py). PRODUCTION_GAPS.md items 1-3 require Howard credentials (Vercel, Supabase, code-signing). Branch is at end-state per R515/R516. No scoped single-file fix available. Justification: explicit iron rule "If you can't find a clear-bounded item in 3 read passes, write 'no good candidate found this round — exiting' to status file and finish."
