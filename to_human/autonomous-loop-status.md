@@ -1,4 +1,9 @@
 
+## Round 501 @ 2026-08-04T05:00:00Z
+
+- Picked: SIM114 duplicate if branches in bin/bft_orchestrator/orchestrator.py (lines 452-455, two branches both setting decision="COMMIT") — combined with logical or. Justification: measurable code smell (ruff SIM114), single-file scope, has dedicated test (tests/bin/test_bft_orchestrator.py 13/13 pass), follows established SIM cleanup pattern.
+- Result: committed 6999599e (fix SIM114: combine if branches in bft_orchestrator tally()); ruff check --select=SIM clean for this file; pytest tests/bin/test_bft_orchestrator.py 13/13 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Fixed SIM114 duplicate 'COMMIT' decision branches. Combined using 'or' - logic preserved (both branches set same decision). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
 ## Round 500 @ 2026-08-04T04:50:00Z
 
 - Picked: F811 duplicate import in bin/build_bundled_installer/fetch_fabric.py (suppress imported twice on lines 53-54). Justification: bug introduced in previous round (499), breaks ruff lint, single-file scope, has dedicated test (tests/bin/test_bundled_installer_contract.py 5/5 pass).
