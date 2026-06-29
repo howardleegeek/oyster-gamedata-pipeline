@@ -53,9 +53,9 @@ def _expand_keycode(record: Record, key: str = "keyCode") -> List[Record]:
     """
     val = record.get(key)
     if val is None:
-        return [record]
+        return [dict(record)]
     if isinstance(val, int):
-        return [record]
+        return [dict(record)]
     if isinstance(val, (list, tuple)):
         frames: List[Record] = []
         for idx, code in enumerate(val):
