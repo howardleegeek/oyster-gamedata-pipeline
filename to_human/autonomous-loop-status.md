@@ -1,4 +1,6 @@
+
 ## Round 557 @ 2026-06-29T19:17:37Z
+
 
 - Picked: Add test file for bin/prd_test_depth_invalid_marker.py (PRD p4 #6). Missing test coverage — validates zero/NaN sentinel pixel preservation through OpenEXR roundtrip.
 - Result: committed edc44257. Tests pass (22/22), ruff clean. Self-review passed (caught np.True_ vs True issue, fixed read_exr missing-file test to accept raise or None). Justification: PRD gap with clear acceptance criteria — validates invalid-pixel sentinel preservation through EXR encode/decode.
