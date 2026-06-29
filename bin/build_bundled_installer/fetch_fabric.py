@@ -49,9 +49,8 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from contextlib import suppress
 from pathlib import Path
-from contextlib import suppress
-from contextlib import suppress
 from typing import Any
 
 # ---------------------------------------------------------------------------
