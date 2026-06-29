@@ -20,6 +20,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+from contextlib import suppress
 from pathlib import Path
 from typing import List, Optional
 
@@ -98,18 +99,14 @@ def collect_bundle(log_dirs: List[str], manifest_dir: str, output: str) -> Path:
         logs_dir = col_dir / "logs"
         logs_dir.mkdir()
         for lf in find_log_files(log_dirs):
-            try:
+            with suppress(OSError):
                 shutil.copy2(lf, logs_dir / lf.name)
-            except OSError:
-                pass
         # Manifests
         man_dir = col_dir / "manifests"
         man_dir.mkdir()
         for mf in find_manifests(manifest_dir):
-            try:
+            with suppress(OSError):
                 shutil.copy2(mf, man_dir / mf.name)
-            except OSError:
-                pass
         # Diagnostic commands output
         with open(col_dir / "diagnostics.txt", "w") as f:
             f.write(f"Collected: {datetime.datetime.now().isoformat()}\n{'=' * 50}\n")
