@@ -179,6 +179,18 @@ def r01_quat_unit_norm(rec: dict, threshold: float = 1e-6) -> OracleResult:
 # ---------------------------------------------------------------------------
 
 def r08_intrinsics_symmetric(rec: dict, threshold: float = 1e-6) -> OracleResult:
+    """Check camera intrinsics satisfy fx == fy symmetry constraint.
+
+    Validates that horizontal (fx) and vertical (fy) focal lengths are equal,
+    which is required for square pixels in the camera sensor per PRD specs.
+
+    Args:
+        rec: Recording dict with optional 'camera_intrinsics': {'fx': float, 'fy': float}
+        threshold: Tolerance for fx/fy equality (default 1e-6)
+
+    Returns:
+        OracleResult with PASS/FAIL/ABSTAIN verdict and residual calculation.
+    """
     intr = rec.get("camera_intrinsics")
     if not isinstance(intr, dict):
         return OracleResult("R08", Verdict.ABSTAIN, None, None, math.nan, "missing intrinsics")
