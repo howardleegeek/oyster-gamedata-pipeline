@@ -202,9 +202,7 @@ def main():
 
     args = parser.parse_args()
 
-    if args.json:
-        print_json()
-    elif args.command == "json":
+    if args.json or args.command == "json":
         print_json()
     elif args.command == "detailed":
         print_detailed()
