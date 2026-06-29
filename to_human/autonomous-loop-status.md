@@ -324,3 +324,4 @@ Result: committed f66be98a (fix PLW2901 in bin/scene_lighting_metadata.py); ruff
 ## Round 520 @ 2026-06-29T09:30:00Z
 
 - Picked: no good candidate found this round — exiting. Read pass 1: PRODUCTION_GAPS.md items 1-3 require Howard credentials (Vercel, Supabase, code-signing). Read pass 2: git status clean, test_audit_artifact_honesty.py passes, ruff E/F/W/I clean (E501 ignored). Read pass 3: searched for TODOs/FIXMEs — all intentional (spec_lint.py checks for TODOs as part of spec validation; binary parser TODOs are future features; no clear-bounded single-file fix available). Branch remains at end-state per R515-R519. Justification: explicit iron rule "If you can't find a clear-bounded item in 3 read passes, write 'no good candidate found this round — exiting' to status file and finish."
+
