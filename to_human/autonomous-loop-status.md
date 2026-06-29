@@ -1,4 +1,14 @@
 
+## Round 498 @ 2026-08-04T04:30:00Z
+
+- Picked: SIM102 nested ifs in bin/audit_artifact_honesty.py (3 instances at lines 73-78, 93-100, 97-101) — combined nested ifs with `and`. Justification: measurable code smell (ruff SIM102), single-file scope, has dedicated test (tests/bin/test_audit_artifact_honesty.py 5/5 pass), follows established SIM cleanup pattern from previous rounds.
+- Result: committed 1d92b09e (fix SIM102 in bin/audit_artifact_honesty.py); ruff check --select=SIM clean for this file; pytest tests/bin/test_audit_artifact_honesty.py 5/5 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Fixed SIM102 nested ifs (3 instances). Combined conditions with 'and' - logic preserved, same boolean evaluation. No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
+## Round 497 @ 2026-08-04T04:20:00Z
+
+- Picked: SIM105 try-except-pass in tests/test_real_session_validator.py (line 818) — replaced with contextlib.suppress(SystemExit). Justification: measurable code smell (ruff SIM105), single-file scope, has dedicated test (tests/test_real_session_validator.py 24/24 pass), follows established SIM cleanup pattern from round 496.
+- Result: committed 3816c4c5 (fix(SIM): use contextlib.suppress in test_real_session_validator.py); ruff check --select=SIM clean for this file; pytest tests/test_real_session_validator.py 24/24 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Fixed SIM105 try-except-pass pattern (1 instance). Replaced with contextlib.suppress(SystemExit) - standard Python idiom. Logic preserved - SystemExit still suppressed. No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
 ## Round 496 @ 2026-08-04T04:10:00Z
 
 - Picked: SIM102 nested ifs and SIM118 dict.keys() in tests/test_i18n_coverage.py (4 issues) — combined nested ifs with `and`, removed unnecessary `.keys()`. Justification: measurable code smell (ruff SIM), single-file scope, has dedicated test (tests/test_i18n_coverage.py 8/8 pass), follows established SIM cleanup pattern.
