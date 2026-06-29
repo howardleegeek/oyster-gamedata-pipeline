@@ -3,6 +3,11 @@
 - Picked: SIM105 try-except-pass in tests/test_real_session_validator_hardening.py (2 remaining blocks at lines 642-645 and 667-670) — converted to contextlib.suppress(SystemExit). Justification: measurable code smell (ruff SIM105), single-file scope, dedicated test file, completes the SIM105 cleanup pattern from round 499. Reverted unrelated in-progress noise (dashboard logs, pyproject.toml moto, stray "=5.0" pip-redirect artifact) to keep iron rule "one logical change, one file".
 - Result: committed 04b4879f (fix(SIM105): use contextlib.suppress in test_real_session_validator_hardening.py); ruff check --select=SIM105 clean; pytest tests/test_real_session_validator_hardening.py 14/14 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Converted 2 SIM105 try/except SystemExit/pass. Other 4 except SystemExit as e: blocks preserved (need e.code for assertions). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
 
+## Round 503 @ 2026-08-04T05:15:00Z
+
+- Picked: SIM105 try-except-pass in bin/build_bundled_installer/fetch_minecraft.py (2 instances at lines 202-205 and 256-259) — converted to contextlib.suppress(OSError). Justification: measurable code smell (ruff SIM105), single-file scope, has test coverage (tests/bin/test_bundled_installer_contract.py 5/5 pass), follows established SIM cleanup pattern from previous rounds.
+- Result: committed 60165eef (fix(SIM105): use contextlib.suppress in fetch_minecraft.py); ruff check clean for this file; pytest tests/bin/test_bundled_installer_contract.py 5/5 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Converted 2 SIM105 try/except OSError/pass. Other 5 except OSError blocks preserved (need e for assertions or handle different error types). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
 
 ## Round 501 @ 2026-08-04T05:00:00Z
 
