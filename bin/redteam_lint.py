@@ -38,11 +38,11 @@ def lint_buyer_bundle(tarball_path: str):
     """Adapter: lint expects an unpacked dir, redteam works in tarballs."""
     import tarfile as _t
 
-    with tempfile.TemporaryDirectory() as td:
-        td = Path(td)
+    with tempfile.TemporaryDirectory() as _tmp:
+        tmp_path = Path(_tmp)
         with _t.open(tarball_path) as t:
-            t.extractall(td)
-        return _lint_dir(td)
+            t.extractall(tmp_path)
+        return _lint_dir(tmp_path)
 
 
 # --------------------------------------------------------------------------- helpers
@@ -185,10 +185,10 @@ ATTACKS = {
 # --------------------------------------------------------------------------- runner
 def run_attack(name: str, mutator) -> dict:
     """Build clean → mutate → repack → lint. Return result dict."""
-    with tempfile.TemporaryDirectory() as td:
-        td = Path(td)
+    with tempfile.TemporaryDirectory() as _tmp:
+        tmp_dir = Path(_tmp)
         try:
-            bundle = build_clean_bundle(td)
+            bundle = build_clean_bundle(tmp_dir)
         except Exception as e:
             return {"attack": name, "blue_team_caught": None, "error": f"setup-failed: {e}"}
         try:
