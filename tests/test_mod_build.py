@@ -160,8 +160,8 @@ def test_zbuffer_to_exr_processes_f32_files():
     print(f"Using script: {script_path}")
 
     # Create temporary directory structure
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmpdir = Path(tmpdir)
+    with tempfile.TemporaryDirectory() as temp_path:
+        tmpdir = Path(temp_path)
         active_session = tmpdir / "active_session"
         depth_raw = active_session / "depth_raw"
         depth_output = active_session / "depth"
@@ -228,8 +228,8 @@ def test_zbuffer_to_exr_source_marker():
         pytest.skip("zbuffer_to_exr.py not found")
 
     # Create temporary directory structure
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmpdir = Path(tmpdir)
+    with tempfile.TemporaryDirectory() as temp_path:
+        tmpdir = Path(temp_path)
         active_session = tmpdir / "active_session"
         depth_raw = active_session / "depth_raw"
         depth_output = active_session / "depth"
