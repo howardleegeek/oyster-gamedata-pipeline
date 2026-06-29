@@ -1,3 +1,13 @@
+## Round 510 @ 2026-08-04T07:10:00Z
+
+- Picked: SIM114 duplicate if branches in bin/input_latency_telemetry.py (lines 139-146) — combined is_press detection branches with logical or operator. Justification: measurable code smell (ruff SIM114), single-file scope, file imports cleanly, follows established SIM114 cleanup pattern.
+- Result: committed 7ec3018a (fix(SIM114): combine is_press detection in input_latency_telemetry.py); ruff check --select=SIM114 clean; python import test passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Combined duplicate if branches for is_press detection using logical or operator. Preserved exact behavior - is_press True under same conditions (pressed=True, action in press/down/1, or event_args[1]=True). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
+## Round 509 @ 2026-08-04T07:00:00Z
+
+- Picked: SIM114 duplicate if branches in bin/upload_status.py (lines 205-208) — combined args.json and args.command == "json" branches with logical or operator. Justification: measurable code smell (ruff SIM114), single-file scope, file imports cleanly, follows established SIM114 cleanup pattern.
+- Result: committed 7e988cf8 (fix(SIM114): combine if branches in upload_status.py); ruff check --select=SIM114 clean for this file; python import test passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Combined duplicate if branches for args.json and args.command == "json" using logical or operator. Preserved exact behavior - print_json() called identically in both cases. No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
 ## Round 508 @ 2026-08-04T06:30:00Z
 
 - Picked: SIM115 context manager in bin/autoresearch_action_entropy.py (line 29) — converted open() to context manager with proper stdin handling. Justification: measurable code smell (ruff SIM115), single-file scope, file imports cleanly, follows established SIM pattern.
@@ -245,3 +255,8 @@ Result: committed f66be98a (fix PLW2901 in bin/scene_lighting_metadata.py); ruff
 ## Round 504 @ 2026-06-28T23:05:00Z
 - Picked: SIM105 lint cleanup in bin/marketplace_sync.py (FilterParser value coercion, lines 80-87) — a prior round had left a broken WIP that used two back-to-back contextlib.suppress blocks, which silently converted ints to floats (e.g. int(42) → 42.0). Re-implemented with an isinstance(value, str) guard so float is only attempted when int conversion failed. Justification: measurable code smell (ruff SIM105) + recovery of broken prior-attempt WIP, single-file scope, semantics-preserving.
 - Result: committed 4cac57c6 (fix SIM105 in bin/marketplace_sync.py); ruff check --select=SIM105 clean; semantic tests (int, float, str, true, false, negint, multi-condition) all pass; pytest tests/test_marketplace_api.py 38/38 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Replaced nested try/except with contextlib.suppress plus isinstance guard; verified all value-type paths return identical results to the original (42 stays 42, not 42.0); no silent error swallow; no false-success; no race; no off-by-one; no security impact; no test masking; no brand cross-reference.
+
+## Round 511 @ 2026-08-04T07:20:00Z
+
+- Picked: E731 lambda assignment in bin/prd_test_depth_invalid_marker.py (line 101) — replaced conditional lambda with a named nested def that closes over sentinel. Justification: measurable code smell (ruff E731: do not assign a lambda expression), single-file scope, single 6-line diff, behavior-preserving.
+- Result: committed 1afd6f9f (fix(E731): replace lambda with named function in prd_test_depth_invalid_marker.py); ruff check clean for this file; python -m py_compile passes; semantic test on 4-element numpy arrays confirms identical outputs for both sentinel values; targeted tests (test_canonical_depth_postprocess, test_real_session_validator, test_real_session_validator_hardening) all pass 42/42; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Replaced conditional lambda with named def. Behavior identical: returns d == 0.0 when sentinel=="zero", np.isnan(d) otherwise. No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
