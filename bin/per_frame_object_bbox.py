@@ -71,6 +71,15 @@ class BBox2D:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "BBox2D":
+        """Construct a BBox2D instance from a dictionary.
+
+        Args:
+            d: Dictionary with keys: x, y, width, height, confidence, class_id,
+                track_id, occlusion, truncation.
+
+        Returns:
+            A BBox2D instance with parsed values.
+        """
         return cls(x=float(d.get("x", 0)), y=float(d.get("y", 0)),
                    width=float(d.get("width", 0)), height=float(d.get("height", 0)),
                    confidence=float(d.get("confidence", 1.0)),
