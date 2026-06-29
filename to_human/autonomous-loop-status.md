@@ -1,4 +1,14 @@
 
+## Round 500 @ 2026-08-04T04:50:00Z
+
+- Picked: F811 duplicate import in bin/build_bundled_installer/fetch_fabric.py (suppress imported twice on lines 53-54). Justification: bug introduced in previous round (499), breaks ruff lint, single-file scope, has dedicated test (tests/bin/test_bundled_installer_contract.py 5/5 pass).
+- Result: committed 85454952 (fix: remove duplicate import in fetch_fabric.py); ruff check clean for this file; pytest tests/bin/test_bundled_installer_contract.py 5/5 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Fixed F811 duplicate import. Used ruff --fix to also clean up I001 import ordering. No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking.
+
+## Round 499 @ 2026-08-04T04:40:00Z
+
+- Picked: SIM105 try-except-pass in bin/build_bundled_installer/fetch_fabric.py (4 instances at lines 182, 269, 283, 584) — replaced with contextlib.suppress(OSError). Justification: measurable code smell (ruff SIM105), single-file scope, has dedicated test (tests/bin/test_bundled_installer_contract.py 5/5 pass), follows established SIM cleanup pattern from previous rounds.
+- Result: committed 07a244cb (fix(SIM105): use contextlib.suppress in fetch_fabric.py); ruff check --select=SIM105 clean for this file; pytest tests/bin/test_bundled_installer_contract.py 5/5 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Fixed SIM105 try-except-pass (4 instances). Replaced with contextlib.suppress(OSError) - standard Python idiom. Logic preserved - OSError still suppressed. No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
 ## Round 498 @ 2026-08-04T04:30:00Z
 
 - Picked: SIM102 nested ifs in bin/audit_artifact_honesty.py (3 instances at lines 73-78, 93-100, 97-101) — combined nested ifs with `and`. Justification: measurable code smell (ruff SIM102), single-file scope, has dedicated test (tests/bin/test_audit_artifact_honesty.py 5/5 pass), follows established SIM cleanup pattern from previous rounds.
