@@ -264,10 +264,8 @@ def _fetch_with_sha1_pin(
     got = _sha1_file(dest)
     if got.lower() != expected_sha1.lower():
         _err(f"{label}: SHA-1 mismatch — refusing to keep file. expected={expected_sha1} got={got}")
-        try:
+        with suppress(OSError):
             dest.unlink()
-        except OSError:
-            pass
         sys.exit(2)
 
     if expected_size is not None and dest.stat().st_size != expected_size:
@@ -727,10 +725,8 @@ def _fetch_one_asset_object(
         if _sha1_file(dest).lower() == sha1.lower():
             return logical_name, sha1, 0, True
         # Stale / corrupt — re-download.
-        try:
+        with suppress(OSError):
             dest.unlink()
-        except OSError:
-            pass
 
     url = f"{ASSET_OBJECT_BASE_URL}/{sha1[:2]}/{sha1}"
     try:
@@ -740,20 +736,16 @@ def _fetch_one_asset_object(
 
     got = _sha1_file(dest)
     if got.lower() != sha1.lower():
-        try:
+        with suppress(OSError):
             dest.unlink()
-        except OSError:
-            pass
         raise RuntimeError(
             f"asset object {logical_name!r}: SHA-1 mismatch — expected={sha1} got={got}"
         )
 
     actual = dest.stat().st_size
     if actual != size:
-        try:
+        with suppress(OSError):
             dest.unlink()
-        except OSError:
-            pass
         raise RuntimeError(
             f"asset object {logical_name!r}: size mismatch — expected={size} got={actual}"
         )
@@ -882,10 +874,8 @@ def _dir_size_bytes(root: Path) -> int:
     total = 0
     for dp, _dn, fn in os.walk(root):
         for name in fn:
-            try:
+            with suppress(OSError):
                 total += (Path(dp) / name).stat().st_size
-            except OSError:
-                pass
     return total
 
 
