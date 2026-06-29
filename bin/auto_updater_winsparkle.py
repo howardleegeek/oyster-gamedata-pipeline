@@ -87,6 +87,12 @@ class AutoUpdater:
     """Main auto-updater implementing WinSparkle/Squirrel.Mac style updates."""
 
     def __init__(self, config: AppConfig) -> None:
+        """Initialize the auto-updater with the given configuration.
+
+        Args:
+            config: Application configuration containing app name, version,
+                update URL, and polling settings.
+        """
         self.config = config
         self.state = UpdateState()
         self._stop_event = threading.Event()
