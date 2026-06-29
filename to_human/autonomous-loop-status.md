@@ -1,3 +1,8 @@
+## Round 564 @ 2026-06-29T21:57:30Z
+
+- Picked: Add test file for bin/edge_test_unicode_filenames.py (edge: unicode filenames in tarballs). Missing test coverage — validates tarball create/extract round-trip preserves UTF-8 names (Chinese, Japanese, Korean, emoji, RTL, accented) and content.
+- Result: committed ee09a3ce. Tests pass (10/10), ruff clean. Self-review passed (checked silent error swallow, off-by-one on entry counts, race conditions, false-success on exit code only, security via subprocess args as list). Justification: PRD gap with clear acceptance criteria — ensures the recorder/ingest pipeline does not corrupt international filenames during tarball round-trip (PRD p4 §i18n).
+
 ## Round 563 @ 2026-06-29T21:49:15Z
 
 - Picked: Add test file for bin/edge_test_zero_records.py (edge: empty records fail-closed). Missing test coverage — validates that the adapter raises AdapterError for empty records list rather than silently passing or crashing.
