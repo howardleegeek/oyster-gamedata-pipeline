@@ -135,15 +135,12 @@ def compute_latencies(inputs_path, game_state_path):
 
         # Press detection: support `pressed: True` (post-denorm), `action: press`
         # (legacy), or `event_args[1]: True` (raw).
-        is_press = False
-        if event.get("pressed") is True:
-            is_press = True
-        elif event.get("action") in ("press", "down", 1):
-            is_press = True
-        else:
-            ea = event.get("event_args")
-            if isinstance(ea, list) and len(ea) >= 2 and ea[1] is True:
-                is_press = True
+        ea = event.get("event_args")
+        is_press = (
+            event.get("pressed") is True
+            or event.get("action") in ("press", "down", 1)
+            or (isinstance(ea, list) and len(ea) >= 2 and ea[1] is True)
+        )
         if not is_press:
             continue
 
