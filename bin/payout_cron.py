@@ -272,6 +272,15 @@ class SupabaseClient:
             return json.loads(raw) if raw else None
 
     def list_unpaid_balances(self) -> list[TesterBalance]:
+        """Fetch all testers with unpaid balances from Supabase.
+
+        Queries the `tester_unpaid_balance` view which aggregates accepted
+        session time minus already-paid amounts.
+
+        Returns:
+            List of TesterBalance dataclasses representing each tester
+            with their current unpaid balance information.
+        """
         rows = self._request("GET", "/rest/v1/tester_unpaid_balance?select=*")
         return [
             TesterBalance(
