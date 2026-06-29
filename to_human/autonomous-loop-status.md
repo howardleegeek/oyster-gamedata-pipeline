@@ -1,3 +1,7 @@
+## Round 534 @ 2026-06-30T06:10:00Z
+
+- Picked: no good candidate found this round — exiting. Read pass 1: PRODUCTION_GAPS.md items 1-3 require Howard credentials (Vercel, Supabase, code-signing). Read pass 2: ruff check passes, targeted tests (spec_lint, storage_backend, stripe_connect, iron_law_check) all pass. Read pass 3: No TODOs/FIXMEs that are bugs, no failing tests, no clear-bounded single-file fix. Working tree clean (log files stashed). Justification: explicit iron rule "If you can't find a clear-bounded item in 3 read passes, write 'no good candidate found this round' to status file and finish."
+
 ## Round 533 @ 2026-06-30T06:00:00Z
 
 - Picked: no good candidate found this round — exiting. Read pass 1: PRODUCTION_GAPS.md items 1-3 require Howard credentials (Vercel, Supabase, code-signing). Read pass 2: ruff check returns "All checks passed!", 538 bin tests pass. Working tree changes are auto-appended log files (dashboard/merge_failures.log, dashboard/replay_attempts.json, tests/_payout_cron_test.log). Read pass 3: No pending WIP, no TODOs/FIXMEs that are bugs. Previous rounds have already cleaned up SIM/UP lint fixes and payout race conditions. Justification: explicit iron rule "If you can't find a clear-bounded item in 3 read passes, write 'no good candidate found this round' to status file and finish."
