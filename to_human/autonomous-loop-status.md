@@ -16,7 +16,13 @@
 ## Round 491 @ 2026-08-04T03:00:00Z
 
 - Picked: PLW2901 with-statement variable overwritten in bin/scene_lighting_metadata.py (line 163) — renamed `img` to `gray_img` to avoid variable overwrite. Justification: measurable code smell (ruff PLW2901), single-file scope, function works correctly (manual verification), follows established PLW2901 cleanup pattern from rounds 481-490.
-- Result: committed f66be98a (fix PLW2901 in bin/scene_lighting_metadata.py); ruff check --select=PLW2901 clean for this file; function import and execution verified; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed img->gray_img. Logic preserved (convert() still applied, get_flattened_data() called on grayscale image). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+- Result: committed 06a0ebac (fix PLW2901 in bin/scene_lighting_metadata.py); ruff check --select=PLW2901 clean for this file; function verified manually; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed variable img->gray_img. Logic preserved (grayscale conversion intact). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
+## Round 492 @ 2026-08-04T03:10:00Z
+
+- Picked: PLW2901 loop variable overwritten in scripts/gen_quickstart.py (line 66) — renamed `line` to `raw_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, has dedicated test (tests/test_gen_quickstart.py 17/17 pass), follows established PLW2901 cleanup pattern from rounds 481-491.
+- Result: committed e62058e6 (fix PLW2901 in scripts/gen_quickstart.py); ruff check --select=PLW2901 clean for this file; pytest tests/test_gen_quickstart.py 17/17 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed loop variable line->raw_line. Logic preserved (strip() still applied, result stored in line). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+Result: committed f66be98a (fix PLW2901 in bin/scene_lighting_metadata.py); ruff check --select=PLW2901 clean for this file; function import and execution verified; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed img->gray_img. Logic preserved (convert() still applied, get_flattened_data() called on grayscale image). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
 
 ## Round 488 @ 2026-08-04T02:20:00Z
 
