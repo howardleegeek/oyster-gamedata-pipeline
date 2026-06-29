@@ -1,3 +1,8 @@
+## Round 508 @ 2026-08-04T06:30:00Z
+
+- Picked: SIM115 context manager in bin/autoresearch_action_entropy.py (line 29) — converted open() to context manager with proper stdin handling. Justification: measurable code smell (ruff SIM115), single-file scope, file imports cleanly, follows established SIM pattern.
+- Result: committed dff3f849 (fix(SIM115): use context manager in autoresearch_action_entropy.py); ruff check --select=SIM115 clean; python import test passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Converted open() to context manager; stdin branch handled separately. No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
 ## Round 507 @ 2026-08-04T06:15:00Z
 
 - Picked: SIM114 duplicate if branches in bin/continuous_capture_daemon.py (lines 416-422) — combined FINALIZING and UPLOADING branches with logical or operator. Justification: measurable code smell (ruff SIM114), single-file scope, file imports cleanly, follows established SIM114 cleanup pattern.
