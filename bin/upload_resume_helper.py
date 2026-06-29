@@ -204,7 +204,7 @@ def list_parts(bucket: str, key: str, upload_id: str) -> List[Dict[str, Any]]:
     return parts
 
 
-def do_upload(args) -> int:
+def do_upload(args: argparse.Namespace) -> int:
     """Execute upload command."""
     checkpoint = initiate_upload(
         args.bucket, args.key, args.file, args.part_size
