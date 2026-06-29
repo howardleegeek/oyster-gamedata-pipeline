@@ -1,3 +1,8 @@
+## Round 524 @ 2026-06-30T00:25:00Z
+
+- Picked: Fix payout worker store instance mismatch in lifespan handler
+- Result: committed d7ec5705
+
 ## Round 523 @ 2026-06-30T00:15:00Z
 
 - Picked: Fix race condition in test_worker_advances_queued_to_processing
