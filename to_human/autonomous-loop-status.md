@@ -1,3 +1,13 @@
+## Round 555 @ 2026-07-01T13:15:00Z
+
+- Picked: Add test file for bin/prd_test_camera_intrinsics_pinhole.py (PRD p3 #2). Missing test coverage — validates fov/aspect populated, pinhole model, no fisheye distortion.
+- Result: committed 49d092bd. Tests pass (15/15), ruff clean. Self-review passed. Justification: PRD gap with clear acceptance criteria — validates camera projection model quality threshold.
+
+## Round 554 @ 2026-07-01T13:00:00Z
+
+- Picked: Add test file for bin/prd_test_audio_continuity.py (PRD p4 #2). Missing test coverage — validates audio track is continuous (no gaps over 50ms).
+- Result: committed 40c20b5f. Tests pass (10/10), ruff clean. Self-review passed. Justification: PRD gap with clear acceptance criteria — validates audio continuity quality threshold.
+
 ## Round 551 @ 2026-06-30T12:52:00Z
 
 - Picked: Add test file for bin/prd_test_action_per_second.py (PRD p6 #6). Found untracked test file tests/bin/test_prd_test_action_per_second.py in working tree — validates median actions-per-second in 0.5-5.0 range.
@@ -146,3 +156,7 @@
 ## Round 549 @ 2026-06-29T16:50:53Z
 
 - Picked: no good candidate found this round — exiting. Read pass 1: PRODUCTION_GAPS.md items 1-3 still require Howard credentials (Vercel deploy tokens, Supabase migrations, Windows code-signing cert ~$200/yr). Read pass 2: `ruff check .` returns "All checks passed!"; 3294 tests collect cleanly; targeted tests test_iron_law_check (13) + test_spec_lint (8) all pass. Read pass 3: Working tree has only auto-appended log files (dashboard/merge_failures.log, dashboard/replay_attacks.json, tests/_payout_cron_test.log) from background cron processes — not user-edited code. 10 stashes in `git stash list` are all the same log-file auto-appends. No failing tests, no PRD gap with clear-bounded single-file acceptance in scope (Vercel body-cap #8 requires architectural split of /api/upload-tarball into sign/finalize + direct Supabase PUT, ~3h work, multi-file). No new SIM/PLW rules exposed. Branch fix/prd-test-action-per-second-ruff remains 1138+ commits ahead of origin/main (separate concern). Justification: explicit iron rule "If you can't find a clear-bounded item in 3 read passes, write 'no good candidate found this round' to status file and finish." Self-review: confirmed 22+ bare `except Exception` patterns in bin/ + src/ are intentional best-effort handlers (runner.py render/last_frame, gym_env stub-raise, beamng_drive, payout simulator, install_fabric_loader) per existing noqa BLE001 comments; no silent error swallow hiding a bug.
+
+## Round 555 @ 2026-07-01T14:00:00Z
+- Picked: Add test file for bin/prd_test_systeminfo_required.py (PRD p7 #1). Missing test coverage — validates required systeminfo keys (gpu, cpu, ram_gb, os, build).
+- Result: committed ae475e52. Tests pass (8/8), ruff clean. Self-review passed. Justification: PRD gap with clear acceptance criteria — validates systeminfo required keys enforcement. Also fixed a silent error swallow bug where validate_required_keys(None) crashed instead of failing-closed.
