@@ -311,6 +311,20 @@ def classify(log_text: str) -> tuple[list[Issue], list[str]]:
 # =============================================================================
 
 def main(argv: list[str] | None = None) -> int:
+    """Classify an OysterRecorder log file against known failure patterns.
+
+    Args:
+        argv: Command-line arguments. Defaults to sys.argv if None.
+            Expected: [<script>] <source>
+            source: Path to .log file, diagnostic .zip, or '-' for stdin.
+
+    Returns:
+        int: Exit code. 0 = no critical issues, 1 = critical issues found,
+             2 = file error (not found or empty).
+
+    Raises:
+        SystemExit: Propagated from argparse on --help.
+    """
     p = argparse.ArgumentParser(
         description="Classify OysterRecorder log against known failure patterns."
     )
