@@ -14,6 +14,7 @@ Environment variables:
 """
 
 import argparse
+import contextlib
 import json
 import os
 import sys
@@ -77,13 +78,11 @@ class FilterParser:
                     elif value.lower() == "false":
                         value = False
                     else:
-                        try:
+                        with contextlib.suppress(ValueError):
                             value = int(value)
-                        except ValueError:
-                            try:
+                        if isinstance(value, str):
+                            with contextlib.suppress(ValueError):
                                 value = float(value)
-                            except ValueError:
-                                pass  # Keep as string
 
                     # Map to API parameter names
                     if op == ">=":
