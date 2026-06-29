@@ -10,6 +10,7 @@ Covers:
 - Per-session duration_s tracking
 """
 
+import contextlib
 import json
 import pathlib
 import subprocess
@@ -285,10 +286,8 @@ class TestOutputJsonSchema(unittest.TestCase):
             ),
             mock.patch("subprocess.run", side_effect=mock_run),
         ):
-            try:
+            with contextlib.suppress(SystemExit):
                 rsv.main()
-            except SystemExit:
-                pass
 
         self.assertTrue(self.output_path.exists())
         data = json.loads(self.output_path.read_text())
@@ -357,10 +356,8 @@ class TestOutputJsonSchema(unittest.TestCase):
             ),
             mock.patch("subprocess.run", side_effect=mock_run),
         ):
-            try:
+            with contextlib.suppress(SystemExit):
                 rsv.main()
-            except SystemExit:
-                pass
 
         data = json.loads(self.output_path.read_text())
         # ISO8601 check: should contain 'T' and end with 'Z'
@@ -498,10 +495,8 @@ class TestSample(unittest.TestCase):
                 ),
                 mock.patch("subprocess.run", side_effect=mock_run),
             ):
-                try:
+                with contextlib.suppress(SystemExit):
                     rsv.main()
-                except SystemExit:
-                    pass
 
             output = f.getvalue()
             for i in range(1, 11):
@@ -598,10 +593,8 @@ class TestGateTimeout(unittest.TestCase):
             ),
             mock.patch("subprocess.run", side_effect=mock_run),
         ):
-            try:
+            with contextlib.suppress(SystemExit):
                 rsv.main()
-            except SystemExit:
-                pass
 
         data = json.loads(output_path.read_text())
         self.assertEqual(data["sessions_timeout"], 1)
@@ -645,10 +638,8 @@ class TestDurationTracking(unittest.TestCase):
             ),
             mock.patch("subprocess.run", side_effect=mock_run),
         ):
-            try:
+            with contextlib.suppress(SystemExit):
                 rsv.main()
-            except SystemExit:
-                pass
 
         # Verify duration_s appears in the text report
         f.getvalue()  # noqa: F841
@@ -671,10 +662,8 @@ class TestDurationTracking(unittest.TestCase):
             ),
             mock.patch("subprocess.run", side_effect=mock_run),
         ):
-            try:
+            with contextlib.suppress(SystemExit):
                 rsv.main()
-            except SystemExit:
-                pass
 
         data = json.loads(output_path.read_text())
         self.assertEqual(len(data["per_session"]), 1)
