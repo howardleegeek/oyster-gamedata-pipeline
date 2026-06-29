@@ -1,3 +1,8 @@
+## Round 556 @ 2026-07-01T13:30:00Z
+
+- Picked: Add test file for bin/prd_test_depth_6fps_alignment.py (PRD p4 #5). Missing test coverage — validates 5:1 frame ratio between 30fps video and 6fps depth EXR.
+- Result: committed 8607388e. Tests pass (16/16), ruff clean. Self-review passed. Justification: PRD gap with clear acceptance criteria — validates depth-video temporal alignment.
+
 ## Round 555 @ 2026-07-01T13:15:00Z
 
 - Picked: Add test file for bin/prd_test_camera_intrinsics_pinhole.py (PRD p3 #2). Missing test coverage — validates fov/aspect populated, pinhole model, no fisheye distortion.
