@@ -245,7 +245,18 @@ def attack_too_much_stationary(b: Path) -> None:
     p.write_text(json.dumps(arr))
 
 
-def attack_duplicate_frame(b: Path):
+def attack_duplicate_frame(b: Path) -> None:
+    """Red team attack: duplicate frame numbers in action_camera.json.
+
+    Creates a test case where the second frame has the same frame number
+    as the first frame, which can be used to test frame uniqueness validation.
+
+    Args:
+        b: Path to the test case directory containing action_camera.json
+
+    Returns:
+        None. Modifies action_camera.json in-place.
+    """
     p = b / "action_camera.json"
     arr = json.loads(p.read_text())
     if len(arr) >= 2:
