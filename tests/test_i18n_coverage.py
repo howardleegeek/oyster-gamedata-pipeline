@@ -110,7 +110,7 @@ class TestI18nCoverage(unittest.TestCase):
 
         errors = []
 
-        for key in self.en_data.keys():
+        for key in self.en_data:
             if key in self.zh_data:
                 en_ph = extract_placeholders(str(self.en_data[key]))
                 zh_ph = extract_placeholders(str(self.zh_data[key]))
@@ -146,8 +146,7 @@ class TestI18nCoverage(unittest.TestCase):
         # Check English terms in English docs (case-insensitive)
         for term_name, translations in key_terms.items():
             english_term = translations[0].lower()
-            if english_term and english_term not in ["", " ", "|", "-"]:
-                if english_term not in self.onboarding_en:
+            if english_term and english_term not in ["", " ", "|", "-"] and english_term not in self.onboarding_en:
                     # Try alternative forms
                     if term_name == "route_type":
                         if (
@@ -161,8 +160,7 @@ class TestI18nCoverage(unittest.TestCase):
         # Check Chinese terms in Chinese docs
         for term_name, translations in key_terms.items():
             chinese_term = translations[1]
-            if chinese_term and chinese_term not in ["", " ", "|", "-", "中文"]:
-                if chinese_term not in self.onboarding_zh:
+            if chinese_term and chinese_term not in ["", " ", "|", "-", "中文"] and chinese_term not in self.onboarding_zh:
                     errors.append(
                         f"Key term '{chinese_term}' (en: '{translations[0]}') "
                         f"not found in Chinese docs"
@@ -171,8 +169,7 @@ class TestI18nCoverage(unittest.TestCase):
         # Check Japanese terms in Japanese docs
         for term_name, translations in key_terms.items():
             japanese_term = translations[2]
-            if japanese_term and japanese_term not in ["", " ", "|", "-", "日本語"]:
-                if japanese_term not in self.onboarding_ja:
+            if japanese_term and japanese_term not in ["", " ", "|", "-", "日本語"] and japanese_term not in self.onboarding_ja:
                     errors.append(
                         f"Key term '{japanese_term}' (en: '{translations[0]}') "
                         f"not found in Japanese docs"
