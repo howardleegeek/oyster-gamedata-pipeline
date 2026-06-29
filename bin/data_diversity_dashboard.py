@@ -7,6 +7,7 @@ Generates route_type / biome / time-of-day / action-entropy histograms.
 """
 
 import argparse
+import contextlib
 import csv
 import datetime
 import json
@@ -105,10 +106,8 @@ def _histogram(values: List[Any], bins: Optional[List[str]] = None) -> Tuple[Lis
 def _tod_bucket(ts: Any) -> str:
     hour: Optional[int] = None
     if isinstance(ts, (int, float)):
-        try:
+        with contextlib.suppress(ValueError, OSError):
             hour = datetime.datetime.fromtimestamp(ts).hour
-        except (ValueError, OSError):
-            pass
     elif isinstance(ts, str):
         for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
             try:
