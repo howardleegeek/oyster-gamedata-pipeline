@@ -248,8 +248,8 @@ def _write_phase1_bundle(tmp_path: Path) -> Path:
     trajectory_path = Path(result.trajectory_path)
     with MinecraftStreamWriter(bundle_dir) as streams:
         with trajectory_path.open(encoding="utf-8") as fh:
-            for line in fh:
-                line = line.strip()
+            for raw_line in fh:
+                line = raw_line.strip()
                 if not line:
                     continue
                 payload = json.loads(line)
