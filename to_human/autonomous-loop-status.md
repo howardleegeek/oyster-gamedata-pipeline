@@ -1,3 +1,8 @@
+## Round 502 @ 2026-06-29T05:27:53Z
+
+- Picked: SIM105 try-except-pass in tests/test_real_session_validator_hardening.py (2 remaining blocks at lines 642-645 and 667-670) — converted to contextlib.suppress(SystemExit). Justification: measurable code smell (ruff SIM105), single-file scope, dedicated test file, completes the SIM105 cleanup pattern from round 499. Reverted unrelated in-progress noise (dashboard logs, pyproject.toml moto, stray "=5.0" pip-redirect artifact) to keep iron rule "one logical change, one file".
+- Result: committed 04b4879f (fix(SIM105): use contextlib.suppress in test_real_session_validator_hardening.py); ruff check --select=SIM105 clean; pytest tests/test_real_session_validator_hardening.py 14/14 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Converted 2 SIM105 try/except SystemExit/pass. Other 4 except SystemExit as e: blocks preserved (need e.code for assertions). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
 
 ## Round 501 @ 2026-08-04T05:00:00Z
 
@@ -201,3 +206,8 @@ Result: committed f66be98a (fix PLW2901 in bin/scene_lighting_metadata.py); ruff
 
 - Picked: SIM102 nested ifs in bin/auto_fix_ci_failures.py (3 instances at lines 435-446 — black_files, ruff_files, missing_imports) — combined nested ifs with `and`. Justification: measurable code smell (ruff SIM102), single-file scope, no dedicated test file but module parses, imports, and ruff clean. Follows established SIM cleanup pattern from previous rounds (496, 498).
 - Result: committed ac835855 (fix(autonomous): SIM102 nested ifs in bin/auto_fix_ci_failures.py); ruff check --select=SIM clean for this file; ruff check clean overall for this file; python3 ast.parse passes; module import test passes; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Fixed SIM102 nested ifs (3 instances). Combined conditions with 'and' — logic preserved exactly. Previously, apply_*_fix was called only when its container was truthy; now the same call is guarded by an `and` clause. No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
+
+## Round 503 @ 2026-08-04T05:30:00Z
+- Picked: SIM105 try-except-pass in bin/build_bundled_installer/fetch_jre.py (3 instances at lines 156-159, 179-182, 262-265) — converted to contextlib.suppress(OSError). Justification: measurable code smell (ruff SIM105), single-file scope, has dedicated test (tests/bin/test_bundled_installer_contract.py 5/5 pass), follows established SIM105 cleanup pattern from previous rounds.
+- Result: committed c3090e18 (fix(SIM105): use contextlib.suppress in fetch_jre.py); ruff check --select=SIM clean for this file; pytest tests/bin/test_bundled_installer_contract.py 5/5 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Converted 3 SIM105 try/except OSError/pass. Logic preserved (best-effort file cleanup on error paths). No silent error swallow (error was already being silently ignored intentionally), no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
