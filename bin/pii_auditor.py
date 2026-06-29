@@ -109,9 +109,8 @@ def scan_file_for_pii(filepath: Path) -> Dict[str, List[str]]:
     for match in PATTERNS["real_names"].finditer(content):
         name = match.group()
         # Filter out common non-names
-        if name not in ["Hello World", "Test User", "Default User"]:
-            if name not in flags["real_names_in_chat"]:
-                flags["real_names_in_chat"].append(name)
+        if name not in ["Hello World", "Test User", "Default User"] and name not in flags["real_names_in_chat"]:
+            flags["real_names_in_chat"].append(name)
 
     return flags
 
