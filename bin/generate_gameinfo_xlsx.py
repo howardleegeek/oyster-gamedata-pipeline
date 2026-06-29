@@ -461,11 +461,7 @@ def read_xlsx(path: str) -> Dict[str, Any]:
 
             # Extract text from <is><t>...</t></is> or direct value
             text_match = re.search(r"<t>(.*?)</t>", cell_content, re.DOTALL)
-            if text_match:
-                cell_value = text_match.group(1)
-            else:
-                # Numeric value
-                cell_value = cell_content.strip()
+            cell_value = text_match.group(1) if text_match else cell_content.strip()
 
             if row_num == 1:
                 keys.append(cell_value)
