@@ -13,6 +13,11 @@
 - Picked: PLW2901 loop variable overwritten in bin/prd_compliance_audit.py (lines 195, 1104) — renamed `line` to `raw_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, has dedicated test (tests/test_prd_audit_critical_score.py 6/6 pass), follows established PLW2901 cleanup pattern from rounds 481-489.
 - Result: committed 1a90bc59 (fix PLW2901 in bin/prd_compliance_audit.py); ruff check --select=PLW2901 clean for this file; pytest tests/test_prd_audit_critical_score.py 6/6 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed loop variable line->raw_line. Logic preserved (.strip() still applied, JSON parsing intact). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
 
+## Round 491 @ 2026-08-04T03:00:00Z
+
+- Picked: PLW2901 with-statement variable overwritten in bin/scene_lighting_metadata.py (line 163) — renamed `img` to `gray_img` to avoid variable overwrite. Justification: measurable code smell (ruff PLW2901), single-file scope, function works correctly (manual verification), follows established PLW2901 cleanup pattern from rounds 481-490.
+- Result: committed f66be98a (fix PLW2901 in bin/scene_lighting_metadata.py); ruff check --select=PLW2901 clean for this file; function import and execution verified; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed img->gray_img. Logic preserved (convert() still applied, get_flattened_data() called on grayscale image). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
 ## Round 488 @ 2026-08-04T02:20:00Z
 
 - Picked: PLW2901 loop variable overwritten in bin/input_latency_telemetry.py (line 80-81, read_jsonl_streaming) — renamed `line` to `stripped_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, has dedicated test (tests/test_input_latency_telemetry.py 10/10 pass), follows established PLW2901
@@ -97,4 +102,11 @@
 
 - Picked: PLW2901 loop variable overwritten in bin/lint_v3_prd_grounded.py (line 1142-1143) — renamed `ln` to `raw_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, python syntax verified, follows established PLW2901 cleanup pattern from rounds 481-490.
 - Result: committed e685b6c0 (fix PLW2901 in bin/lint_v3_prd_grounded.py); ruff check --select=PLW2901 clean for this file; python syntax verified; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed loop variable ln->raw_line. Logic preserved (strip() still applied, JSON parsing uses raw_line). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
+## Round 492 @ 2026-06-28T23:46:00Z
+
+- Picked: PLW2901 loop variable overwritten in bin/v2prime_glm_residuals/residuals.py (line 122-123, r13_keycode_replay) — renamed `line` to `raw_line` to avoid self-assignment. Justification: measurable code smell (ruff PLW2901), single-file scope, has dedicated test (tests/bin/test_v2prime_r18_r20_r21.py 13/13 + tests/bin/test_r13_keycode_replay.py + tests/bin/test_v2_minimax_r13_r18_r21.py 21/21 pass), follows established PLW2901 cleanup pattern from rounds 481-491.
+- Result: committed 57e7b462 (fix PLW2901 in v2prime_glm_residuals/residuals.py); ruff check --select=PLW2901 clean for this file; pytest tests/bin/test_v2prime_r18_r20_r21.py 13/13 + tests/bin/test_r13_keycode_replay.py + tests/bin/test_v2_minimax_r13_r18_r21.py 21/21 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Renamed loop variable line->raw_line. Logic preserved (strip() still applied, result stored in line, JSON parsing intact). No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
+
 
