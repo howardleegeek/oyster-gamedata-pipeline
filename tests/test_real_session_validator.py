@@ -815,10 +815,9 @@ class TestLimit(unittest.TestCase):
                 "2",
             ],
         ):
-            try:
+            import contextlib
+            with contextlib.suppress(SystemExit):
                 rsv.main()
-            except SystemExit:
-                pass
 
         output = f.getvalue()
         self.assertIn("Found: 5 session dirs", output)
