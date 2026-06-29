@@ -1,3 +1,8 @@
+## Round 523 @ 2026-06-30T00:15:00Z
+
+- Picked: Fix race condition in test_worker_advances_queued_to_processing
+- Result: committed 766e8ccf
+
 ## Round 522 @ 2026-06-29T09:45:00Z
 
 - Picked: no good candidate found this round — exiting. Branch fix/prd-test-action-per-second-ruff at end-state. Verified `ruff check .` returns "All checks passed!" (E/F/W/I active rule set). Working tree clean. Read pass 1: PRODUCTION_GAPS.md → items 1-3 need Howard credentials (Vercel, Supabase, code-signing), items 4+ are human decisions. Read pass 2: git log shows recent rounds logging "no good candidate", branch has 1130+ commits since main, no pending WIP. Read pass 3: cross-checked ruff with --no-respect-gitignore — 550 hits all E501 (422) + E402 (92) + W293 (36), exactly the three codes ignored by name in pyproject.toml. SIM/UP/B/N rules remain intentionally disabled per pyproject.toml comment. No scoped single-file fix available. Justification: explicit iron rule "If you can't find a clear-bounded item in 3 read passes, write 'no good candidate found this round — exiting' to status file and finish."
