@@ -1,3 +1,8 @@
+## Round 506 @ 2026-06-29T07:28:01Z
+
+- Picked: SIM102 nested if in bin/pii_auditor.py (lines 112-115) — combined into single `if A and B` to filter out test fixture names and deduplicate in one expression. Justification: measurable code smell (ruff SIM102), single-file scope, file has dedicated test (tests/test_pii_auditor.py 19/19 pass), preserves detection logic exactly.
+- Result: committed 387509e7 (fix(SIM102): combine nested if in bin/pii_auditor.py); ruff check --select=SIM102 clean; pytest tests/test_pii_auditor.py 19/19 passed; pushed to origin/fix/prd-test-action-per-second-ruff. Self-review: Combined nested if with and operator. Outer filter (test fixture names) and inner dedup against flags dict both preserved. No silent error swallow, no false-success, no race, no off-by-one, no security impact, no test masking, no brand cross-reference.
+
 ## Round 505 @ 2026-08-04T06:00:00Z
 
 - Picked: SIM114 duplicate if branches in bin/autoresearch_lint_perf.py (lines 45-49) — combined with logical or operator. Justification: measurable code smell (ruff SIM114), single-file scope, import test passes, follows established SIM114 cleanup pattern.
