@@ -44,6 +44,7 @@ import urllib.request
 import zipfile
 from pathlib import Path
 from typing import Any
+import contextlib
 
 # ---------------------------------------------------------------------------
 # Repo layout
@@ -153,10 +154,8 @@ def _download_with_retries(url: str, dest: Path) -> None:
             last_exc = exc
             _err(f"attempt {attempt} failed: {exc}")
             if tmp.exists():
-                try:
+                with contextlib.suppress(OSError):
                     tmp.unlink()
-                except OSError:
-                    pass
             if attempt < DOWNLOAD_RETRIES:
                 backoff = 2 ** (attempt - 1)
                 _log(f"retrying in {backoff}s")
@@ -176,10 +175,8 @@ def _verify_sha(path: Path, expected: str) -> None:
         )
         _err(f"  expected: {expected}")
         _err(f"  got:      {got}")
-        try:
+        with contextlib.suppress(OSError):
             path.unlink()  # don't leave a poisoned cache file behind
-        except OSError:
-            pass
         sys.exit(2)
     _log(f"SHA-256 OK: {got}")
 
@@ -259,10 +256,8 @@ def _dir_size_bytes(root: Path) -> int:
     total = 0
     for dp, _dn, fn in os.walk(root):
         for name in fn:
-            try:
+            with contextlib.suppress(OSError):
                 total += (Path(dp) / name).stat().st_size
-            except OSError:
-                pass
     return total
 
 
