@@ -1,3 +1,25 @@
+## Round 562 @ 2026-07-13T20:00:00Z
+
+- Picked: Fix aliasing bug in _expand_keycode (PRD page 11 keyCode normalizer). The function was returning original record objects instead of copies when keyCode was missing or scalar, causing aliasing bugs.
+- Result: committed a9e4a6df. Tests pass (29/29), ruff clean. Self-review passed (checked for aliasing bugs, off-by-one, silent error swallow). Fix: return dict(record) instead of record directly for None/scalar keyCode cases.
+
+## Round 561 @ 2026-07-13T18:00:00Z
+
+- Picked: Add test file for bin/prd_test_wasd_balance.py (PRD p6 #4). Missing test coverage — validates no single WASD key exceeds 60% usage in long captures.
+- Result: committed 5ab50e48. Tests pass (16/16), ruff clean. Self-review passed (tested boundary at 60%, off-by-one at 59.99%, edge cases for empty input, custom threshold, stats order). Justification: PRD gap with clear acceptance criteria — validates WASD key balance threshold.
+
+
+## Round 560 @ 2026-07-01T14:30:00Z
+
+- Picked: Add test file for bin/prd_test_route_type_distribution.py (PRD p5 #2). Missing test coverage — validates route_type field contains at least 5 distinct types across 240 clips.
+- Result: committed f1f15c0c. Tests pass (18/18), ruff clean. Self-review passed (tested off-by-one at 90% boundary 216/240, edge cases for empty input, missing fields, distribution details computation). Justification: PRD gap with clear acceptance criteria — validates route_type distribution requirements.
+
+
+## Round 559 @ 2026-06-29T19:58:58Z
+
+- Picked: Add test file for bin/prd_test_speed_units_mps.py (PRD p3 #6). Missing test coverage — validates linear_velocity m/s unit bounds for walk/run/sprint movement.
+- Result: committed f9177bd8. Tests pass (35/35), ruff clean. Self-review passed (caught off-by-one at 2.0/6.0 inclusive boundaries — WALK claims 2.0, RUN claims 6.0; documented quirk in test comments). Justification: PRD gap with clear acceptance criteria — validates m/s unit classification for movement speeds.
+
 ## Round 558 @ 2026-07-01T14:00:00Z
 
 - Picked: Add test file for bin/prd_test_stationary_threshold.py (PRD p6 #5). Missing test coverage — validates 5-second stationary frame detection triggers clip stop.
