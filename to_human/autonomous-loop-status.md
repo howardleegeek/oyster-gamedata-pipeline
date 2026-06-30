@@ -1,8 +1,19 @@
 
+
+## Round 592 @ 2026-06-30T09:20:00Z
+
+- Picked: Fix consent_log_signed.py — read-only commands (list, verify) now require existing log file, failing fast with clear error instead of misleading empty output.
+- Result: committed 3a61d9d9, pushed to fix/prd-test-action-per-second-ruff. Tests pass (30/30), ruff clean. Self-review passed (checked error message on missing file, exit code 1, stderr output, no silent error swallow, no false-success, no race conditions, no skip/xfail markers, brand isolation clean). Justification: Clear-bounded — single file fix, existing test already covers missing log file scenario.
+
 ## Round 590 @ 2026-06-30T09:00:00Z
 
 - Picked: Commit untracked test file tests/bin/test_structured_logger.py — missing test coverage for G030 structured JSON-line logger (LogLevel enum, StructuredLogger with correlation IDs, all 5 log methods, level filtering, extras merging, timestamp toggle, CLI parser with --extra KEY=VAL).
 - Result: committed f9f177b7, pushed to fix/prd-test-action-per-second-ruff. Tests pass (28/28), ruff clean. Self-review passed (checked LogLevel numeric values match stdlib logging, all 5 log methods emit valid JSON with vendor/clip/step correlation IDs, level filtering drops records below min_level, extras merged via kwargs and --extra KEY=VAL parsed correctly, timestamp present when enabled absent when disabled, CLI exit codes 0/1/2 for success/bad-extra/missing-arg, no silent error swallow, no false-success, no race conditions, no skip/xfail markers, brand isolation clean). Justification: Clear-bounded — untracked test file with passing tests, validates bin/structured_logger.py which has production code for G030 JSON-line logger with correlation IDs used by pipeline tracing.
+
+## Round 591 @ 2026-06-30T09:10:00Z
+
+- Picked: Commit untracked test file tests/bin/test_error_severity_classifier.py — missing test coverage for G031 error severity classifier (Severity constants, RuleEngine classify, override-path handling, parse_args, main CLI).
+- Result: committed 2c736160, pushed to fix/prd-test-action-per-second-ruff. Tests pass (49/49), ruff clean. Self-review passed (checked Severity constants match expected 5 levels, DESCRIPTIONS non-empty, PRIORITY ordering correct, is_valid works; RuleEngine.classify() matches all 16 DEFAULT_RULES patterns, case-insensitive, override-path handling (valid JSON, missing file, malformed JSON, empty JSON, unknown extension, no rules key), returns Severity enum; parse_args required flags validated, defaults match, exit codes correct; silent-error-swallow contract: malformed override falls through to DEFAULT_RULES rather than crash; no skip/xfail markers; brand isolation clean). Justification: Clear-bounded — untracked test file with passing tests, validates bin/error_severity_classifier.py which has production code for G031 error severity classification.
 
 ## Round 589 @ 2026-06-30T08:50:00Z
 
@@ -280,3 +291,13 @@
 
 - Picked: Remove duplicate test_gameinfo_xlsx_validator.py — pytest collection failed due to module name collision between tests/utilities/ and tests/bin/ versions.
 - Result: committed 86c34a9d, pushed to fix/prd-test-action-per-second-ruff. Tests pass (4703 collected), ruff clean. Self-review passed (checked — duplicate filename causes module import collision; removed older utilities/ copy with 6 tests, kept bin/ version with 10 tests; no silent error swallow, no false-success, no skip/xfail markers). Justification: Clear-bounded bug fix — pytest collection was globally broken due to duplicate module name. This is a prerequisite for any further work.
+
+## Round 594 @ 2026-06-30T09:30:00Z
+
+- Picked: Commit untracked test file tests/bin/test_consent_log_signed.py — missing test coverage for G221 signed consent log (ConsentEntry serialization, ConsentLogSigned key management, HMAC-SHA256 signature/verification, CLI add/verify/list commands, error handling for invalid key length and corrupted log file).
+- Result: committed 91072b51, pushed to fix/prd-test-action-per-second-ruff. Tests pass (30/30), ruff clean (after auto-fix). Self-review passed (checked ConsentEntry to_dict/from_dict, ConsentLogSigned key validation/load/save, HMAC-SHA256 signature computation and verification, add_entry/verify_entry/verify_all methods, CLI commands with proper exit codes, error handling for invalid key length and corrupted log file, no silent error swallow, no false-success, no race conditions, no skip/xfail markers, brand isolation clean). Justification: Clear-bounded — untracked test file with passing tests, validates bin/consent_log_signed.py which has production code for G221 legally-binding signed consent log with HMAC for GDPR/CCPA/COPPA compliance.
+
+## Round 593 @ 2026-06-30T14:26:45Z
+
+- Picked: Fix tests/bin/test_recorder_close_confirm.py — the _patch_tkinter_messagebox helper now imports tkinter.messagebox fresh to avoid pollution from other tests that may have stubbed sys.modules with a fake namespace.
+- Result: committed b4f58431, pushed to fix/prd-test-action-per-second-ruff. Tests pass (13/13), ruff clean. Self-review passed (checked for silent error swallow, false-success, race conditions, off-by-one, security, skip/xfail markers, brand isolation). Justification: Clear-bounded — single test file fix addressing test isolation issue with sys.modules pollution.
