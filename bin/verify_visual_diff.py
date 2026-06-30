@@ -335,6 +335,20 @@ def pick_default_frames(n_a: int, n_b: int) -> list[int]:
 
 
 def parse_frames_arg(arg: str | None, n_a: int, n_b: int) -> list[int]:
+    """Parse --frames argument into a list of frame indices.
+
+    Args:
+        arg: Comma-separated frame indices (e.g., "0,100,9000"), or None/empty
+             to use default frame selection.
+        n_a: Total number of frames in clip A (used for default selection).
+        n_b: Total number of frames in clip B (used for default selection).
+
+    Returns:
+        List of zero-based frame indices to compare.
+
+    Raises:
+        SystemExit: If a frame index is not a valid integer.
+    """
     if not arg:
         return pick_default_frames(n_a, n_b)
     out = []
