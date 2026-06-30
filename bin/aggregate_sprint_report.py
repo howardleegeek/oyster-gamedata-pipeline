@@ -50,14 +50,16 @@ def aggregate(log_dir: str, output_md: str) -> dict:
     for v in total_seconds:
         bucket_counts[v] = bucket_counts.get(v, 0) + 1
 
-    # Drift check: bucket means for quartiles
+    # Drift check: bucket means for quartiles (only if enough data for 4+ quartiles)
     quartile_size = iter_count // 4
     drift_buckets = {}
-    for i, label in enumerate(["1-25", "26-50", "51-75", "76-100"]):
-        start = i * quartile_size
-        end = start + quartile_size
-        chunk = total_seconds[start:end]
-        drift_buckets[label] = statistics.mean(chunk)
+    if quartile_size > 0:
+        for i, label in enumerate(["1-25", "26-50", "51-75", "76-100"]):
+            start = i * quartile_size
+            end = start + quartile_size
+            chunk = total_seconds[start:end]
+            if chunk:  # Guard against empty chunk
+                drift_buckets[label] = statistics.mean(chunk)
 
     # Build markdown
     lines = []
@@ -83,7 +85,10 @@ def aggregate(log_dir: str, output_md: str) -> dict:
     lines.append("\n## Distribution histogram (1s buckets)\n")
     max_count = max(bucket_counts.values())
     bar_width = 50
-    for sec in range(ts_min, ts_max + 1):
+    # Convert to int for range(), clamp to reasonable bounds
+    ts_min_int = max(0, int(ts_min))
+    ts_max_int = int(ts_max)
+    for sec in range(ts_min_int, ts_max_int + 1):
         cnt = bucket_counts.get(sec, 0)
         bar_len = int(cnt / max_count * bar_width) if max_count else 0
         bar = "█" * bar_len
