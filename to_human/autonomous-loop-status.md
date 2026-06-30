@@ -127,3 +127,8 @@
 
 - Picked: Add test file for bin/edge_test_gigantic_record_count.py (1M-record streaming). Missing test coverage — validates that the action_camera adapter streams records via JSON Lines in bounded chunks rather than materialising the entire file in memory (PRD-aligned memory-safety boundary).
 - Result: committed 4f600002. Tests pass (16/16), ruff clean. Self-review passed (checked silent error swallow, false-success, race conditions, off-by-one on chunk boundaries and record IDs, security via subprocess list-args, brand isolation). Justification: PRD gap with clear acceptance criteria — guards against silent memory blow-up on gigantic ingestion files.
+
+## Round 573 @ 2026-07-14T05:00:00Z
+
+- Picked: Fix broken test file tests/bin/test_alert_dispatcher.py (3/15 tests failing due to shared persistent state). The test file was untracked from a prior round; AlertStateManager reads from production ~/.oyster/monitor_alerts.jsonl, so sequential evaluate_*_ok tests fired "cleared" alerts on previously-firing alert IDs.
+- Result: committed 7871958a, pushed to fix/prd-test-action-per-second-ruff. Tests pass (15/15), ruff clean. Fix: added `isolated_config` pytest fixture that supplies a unique temp alerts_file per test. Self-review passed (checked silent error swallow, false-success, race conditions, off-by-one, security via NamedTemporaryFile). Justification: PRD gap with clear acceptance — the test file was untracked, broken, and the file under test (bin/alert_dispatcher.py) had no committed test coverage.
