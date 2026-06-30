@@ -147,20 +147,23 @@ class TestMain:
     def test_main_missing_depth_raw_dir(self):
         """Test main exits when depth_raw directory is missing."""
         from bin.zbuffer_to_exr import main
-        
+
         # Mock Path.exists to return True for active_session, False for depth_raw
+        # Must use precise path matching to avoid false positives (e.g., "depth" matching "depth_raw")
         def mock_exists(self):
             path_str = str(self)
-            if "active_session" in path_str:
+            # Check for exact path components, not substrings
+            if path_str == "active_session":
                 return True
-            if "depth_raw" in path_str:
+            if path_str.endswith("active_session/depth_raw"):
                 return False
+            if path_str.endswith("active_session/depth"):
+                return True  # output dir exists
             return False
-        
+
         with patch("pathlib.Path.exists", mock_exists):
-            # The actual behavior is to print a warning and exit 0
-            # when depth_raw doesn't exist but active_session does
+            # The actual behavior is to exit with code 1 (error) when depth_raw is missing
             with pytest.raises(SystemExit) as exc_info:
                 main()
-            # Current code exits with 0 (warning only)
-            assert exc_info.value.code == 0
+            # Code exits with 1 (error) when depth_raw doesn't exist
+            assert exc_info.value.code == 1
