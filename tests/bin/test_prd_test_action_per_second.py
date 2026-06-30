@@ -16,6 +16,7 @@ from bin.prd_test_action_per_second import (
     calculate_median_actions_per_second,
     is_quality_acceptable,
     load_actions_from_file,
+    main,
 )
 
 
@@ -178,3 +179,101 @@ class TestLoadActionsFromFile:
                 load_actions_from_file(filepath)
         finally:
             filepath.unlink()
+
+
+class TestMain:
+    """Tests for main() CLI entry point.
+
+    Covers exit code paths (0 acceptable, 1 low-quality, 2 error),
+    JSON output, text output, --actions and --input flag paths, and
+    the "no actions provided" error path.
+    """
+
+    def test_main_acceptable_text_output(self, capsys):
+        """main() exits 0 with text output for acceptable actions."""
+        exit_code = main(["-a", "1.0", "2.0", "3.0"])
+        assert exit_code == 0
+        captured = capsys.readouterr()
+        assert "Median APS:" in captured.out
+        assert "Quality: acceptable" in captured.out
+
+    def test_main_low_quality_exit_code(self, capsys):
+        """main() exits 1 for low-quality actions (median below 0.5)."""
+        exit_code = main(["-a", "0.1", "0.2", "0.3"])
+        assert exit_code == 1
+        captured = capsys.readouterr()
+        assert "Quality: low-quality" in captured.out
+
+    def test_main_high_actions_low_quality(self, capsys):
+        """main() exits 1 for actions above 5.0 (low-quality)."""
+        exit_code = main(["-a", "6.0", "7.0", "8.0"])
+        assert exit_code == 1
+        captured = capsys.readouterr()
+        assert "Quality: low-quality" in captured.out
+
+    def test_main_json_output(self, capsys):
+        """main() with --json-output emits valid JSON to stdout."""
+        exit_code = main(["-a", "1.0", "2.0", "3.0", "-j"])
+        assert exit_code == 0
+        captured = capsys.readouterr()
+        parsed = json.loads(captured.out)
+        assert parsed["median_actions_per_second"] == 2.0
+        assert parsed["sample_count"] == 3
+        assert parsed["in_range"] is True
+        assert parsed["quality_status"] == "acceptable"
+
+    def test_main_json_low_quality(self, capsys):
+        """main() with --json-output marks low-quality correctly."""
+        exit_code = main(["-a", "0.1", "0.2", "-j"])
+        assert exit_code == 1
+        captured = capsys.readouterr()
+        parsed = json.loads(captured.out)
+        assert parsed["in_range"] is False
+        assert parsed["quality_status"] == "low-quality"
+
+    def test_main_input_file_path(self, capsys):
+        """main() reads actions from --input JSON file."""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False
+        ) as f:
+            json.dump([1.0, 2.0, 3.0], f)
+            filepath = Path(f.name)
+
+        try:
+            exit_code = main(["-i", str(filepath)])
+            assert exit_code == 0
+            captured = capsys.readouterr()
+            assert "Median APS: 2.0" in captured.out
+        finally:
+            filepath.unlink()
+
+    def test_main_missing_input_file_exits_2(self, capsys):
+        """main() returns exit 2 when input file does not exist."""
+        exit_code = main(["-i", "/nonexistent/path/to/file.json"])
+        assert exit_code == 2
+        captured = capsys.readouterr()
+        assert "Error:" in captured.err
+
+    def test_main_no_args_exits_2(self, capsys):
+        """main() returns exit 2 when neither --input nor --actions given."""
+        # argparse calls SystemExit(2) via parser.error() for missing required args
+        with pytest.raises(SystemExit) as exc_info:
+            main([])
+        assert exc_info.value.code == 2
+
+    def test_main_text_file_input(self, capsys):
+        """main() reads actions from a plain text file (one per line)."""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False
+        ) as f:
+            f.write("1.0\n2.0\n3.0\n")
+            filepath = Path(f.name)
+
+        try:
+            exit_code = main(["-i", str(filepath)])
+            assert exit_code == 0
+            captured = capsys.readouterr()
+            assert "Median APS: 2.0" in captured.out
+        finally:
+            filepath.unlink()
+
