@@ -53,13 +53,13 @@ def build_test_cases(max_year: int) -> List[Dict[str, Any]]:
             "expected_year": max_year,
         },
         {
-            "label": "year 2099 (in range)",
-            "input": datetime.datetime(2099, 6, 15),
-            "expected_year": 2099,
+            "label": f"year {max_year - 1} (in range)",
+            "input": datetime.datetime(max_year - 1, 6, 15),
+            "expected_year": max_year - 1,
         },
         {
-            "label": "year 2101 (just over)",
-            "input": datetime.datetime(2101, 3, 1),
+            "label": f"year {max_year + 1} (just over)",
+            "input": datetime.datetime(max_year + 1, 3, 1),
             "expected_year": max_year,
         },
         {
