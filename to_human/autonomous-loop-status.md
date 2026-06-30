@@ -1,5 +1,10 @@
 
 
+## Round 593 @ 2026-06-30T09:30:00Z
+
+- Picked: Commit untracked test file tests/bin/test_auto_install_error_handler.py — missing test coverage for G234 global Python error-handler bootstrap (temp dir, exception formatter, install/uninstall idempotency, sys.excepthook restore, CLI --check/--install/--uninstall/default).
+- Result: committed <pending>, pushed to fix/prd-test-action-per-second-ruff. Tests pass (16/16), ruff clean. Self-review passed (checked prefix g234_errors_ matches source, mkdtemp creates dir so exists()/is_dir() are true, format_exception returns non-empty traceback, install returns True first time then False (idempotent), uninstall returns False when not installed True after install, sys.excepthook restored from _g234_original_excepthook on uninstall, --check prints installed: bool and returns 1 when not 0 when installed, --install prints "installed"/"already installed" and returns 0, --uninstall prints "uninstalled"/"were not installed" and returns 0, default no-args falls through to install and prints "default mode" and returns 0, no silent error swallow, no false-success, no race conditions, no skip/xfail markers, brand isolation clean). Justification: Clear-bounded — untracked test file with passing tests, validates bin/auto_install_error_handler.py which has production code for G234 global error-handling bootstrap.
+
 ## Round 592 @ 2026-06-30T09:20:00Z
 
 - Picked: Fix consent_log_signed.py — read-only commands (list, verify) now require existing log file, failing fast with clear error instead of misleading empty output.
