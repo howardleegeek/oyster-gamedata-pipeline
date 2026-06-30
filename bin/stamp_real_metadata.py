@@ -88,6 +88,15 @@ def stamp_video(video_path: Path, *, recorder_version: str = "lite-v0.24.0") -> 
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI entry-point for stamping video metadata.
+
+    Args:
+        argv: Command-line arguments. If None, uses sys.argv.
+
+    Returns:
+        Exit code: 0 on success, 2 if video file not found,
+        3 on other errors.
+    """
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("video", type=Path)
     p.add_argument("--recorder-version", type=str, default="lite-v0.24.0")
