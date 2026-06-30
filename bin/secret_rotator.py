@@ -63,6 +63,20 @@ class Config:
             state_file=Path(os.environ["STATE_FILE"]) if os.environ.get("STATE_FILE") else None, **kw)
     @classmethod
     def from_yaml(cls, path: Path, **kw: Any) -> "Config":
+        """Create Config from a YAML file.
+
+        Reads AWS credentials and configuration from a YAML file.
+
+        Args:
+            path: Path to the YAML configuration file.
+            **kw: Additional keyword arguments passed to Config constructor.
+
+        Returns:
+            Config: A new Config instance populated from the YAML file.
+
+        Raises:
+            FileNotFoundError: If the specified path does not exist.
+        """
         y = _lazy_yaml()
         with open(path) as fh: data = y.safe_load(fh) or {}
         return cls(aws_access_key_id=data.get("aws_access_key_id"),
