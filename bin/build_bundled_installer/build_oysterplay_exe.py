@@ -216,6 +216,27 @@ def build(
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Build OysterPlay.exe using PyInstaller.
+
+    Parses CLI arguments and orchestrates the build process to create
+    a bundled installer executable. Supports both single-file and directory
+    output modes, custom icon, and additional data bundling.
+
+    Args:
+        argv: Command-line arguments. If None, uses sys.argv.
+              Supported flags:
+              - --onefile: Create single-file .exe (default)
+              - --onedir: Create multi-file distribution
+              - --name: Output binary name (default: OysterPlay)
+              - --icon: Optional .ico file path
+              - --clean: Wipe dist/ and build/ before building
+              - --check-only: Verify sources + PyInstaller only
+              - --add-data: Extra files to bundle (repeatable, SRC=DEST)
+
+    Returns:
+        Exit code: 0 on success, 2 on bad source, 4 if PyInstaller missing,
+                  5 on build failure, 6 on verify failure.
+    """
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--onefile", action="store_true", default=True,
                         help="Single-file .exe (default).")
