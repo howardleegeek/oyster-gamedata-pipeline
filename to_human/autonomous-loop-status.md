@@ -15,7 +15,12 @@
 ## Round 572 @ 2026-07-14T04:00:00Z
 
 - Picked: Add main() CLI test coverage to tests/bin/test_prd_test_action_per_second.py. Coverage gap — the only public function without tests was main() (the argparse-driven CLI entry point with three exit code paths and JSON/text output modes).
-- Result: committed e5ad3b88, pushed to fix/prd-test-action-per-second-ruff. Tests pass (27/27, 9 new for main()), ruff clean. Self-review passed (checked silent error swallow on the except branch, false-success via exact exit code assertions, off-by-one on medians, tempfile handle cleanup, no shell injection risk). Justification: PRD gap with clear acceptance — bin/prd_test_action_per_second.py is on the current branch (fix/prd-test-action-per-second-ruff) and main() is the only uncovered function.
+- Result: committed e5ad3b88, pushed to fix/prd-test-action-per-second-ruff. Tests pass (27/27, 9 new for main()), ruff clean. Self-review passed (checked silent error swallow on the except branch, false-success via exact exit code assertions, off-by-one on medians, tempfile handle cleanup, n
+
+## Round 576 @ 2026-07-14T05:00:00Z
+
+- Picked: Add test file for bin/acceptance_signal_api.py (G013 webhook API). Missing test coverage — validates send_signal (valid requests, invalid signal, invalid URL, HTTP errors, connection errors), parse_args (valid args, missing required, optional), and main() CLI entry point with success/failure/error paths.
+- Result: committed 50a24401, pushed to fix/prd-test-action-per-second-ruff. Tests pass (22/22), ruff clean. Self-review passed (checked silent error swallow on HTTPError handling - tests verify error_body decoding works correctly; false-success via exact status code and exit code assertions; off-by-one N/A; race conditions N/A - pure functions with mocking; security via mock for urllib.request.urlopen; test isolation via separate test classes). Justification: PRD gap with clear acceptance criteria — bin/acceptance_signal_api.py is a webhook API module with zero test coverage.o shell injection risk). Justification: PRD gap with clear acceptance — bin/prd_test_action_per_second.py is on the current branch (fix/prd-test-action-per-second-ruff) and main() is the only uncovered function.
 
 
 
@@ -144,3 +149,8 @@
 
 - Picked: Fix broken test file tests/bin/test_alert_dispatcher.py (3/15 tests failing due to shared persistent state). The test file was untracked from a prior round; AlertStateManager reads from production ~/.oyster/monitor_alerts.jsonl, so sequential evaluate_*_ok tests fired "cleared" alerts on previously-firing alert IDs.
 - Result: committed 7871958a, pushed to fix/prd-test-action-per-second-ruff. Tests pass (15/15), ruff clean. Fix: added `isolated_config` pytest fixture that supplies a unique temp alerts_file per test. Self-review passed (checked silent error swallow, false-success, race conditions, off-by-one, security via NamedTemporaryFile). Justification: PRD gap with clear acceptance — the test file was untracked, broken, and the file under test (bin/alert_dispatcher.py) had no committed test coverage.
+
+## Round 576 @ 2026-06-30T01:48:36Z
+
+- Picked: Add test file for bin/clip_uuid.py (G280/C6 ingest dedup UUID). Missing test coverage — stdlib-only module with public API new_clip_uuid() (32-hex, no dashes, uniqueness) and inject_uuid() (systeminfo stamp + side-channel marker file), plus the _cli() argparse entry point with "new" / "inject" subcommands.
+- Result: committed 10140100, pushed to fix/prd-test-action-per-second-ruff. Tests pass (18/18), ruff clean. Self-review passed (checked silent error swallow — none in SUT public API; pinned via FileNotFoundError/NotADirectoryError tests; false-success via exact 32-hex regex assertions + exact rc==2 for missing/non-dict inputs; off-by-one on MARKER_PREFIX concat pinned via literal marker.name assertion; race conditions N/A; security: JSON parse of attacker-controlled file is the SUT's documented behavior, tests pin both paths; test isolation via per-test tmp_path fixtures). Justification: PRD gap with clear acceptance criteria — bin/clip_uuid.py is a 149-line stdlib-only helper closing audit gap G280/C6 with zero test coverage on a hot ingest-dedup path.
