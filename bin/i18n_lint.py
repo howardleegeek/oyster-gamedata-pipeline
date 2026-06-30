@@ -67,15 +67,15 @@ def lint_translations(i18n_dir: Path) -> bool:
 
     # Check 2: No empty strings
     for key, value in en_data.items():
-        if not value and value != "":
+        if value == "":
             warnings.append(f"Empty string in en.json: '{key}'")
 
     for key, value in zh_data.items():
-        if not value and value != "":
+        if value == "":
             warnings.append(f"Empty string in zh-CN.json: '{key}'")
 
     for key, value in ja_data.items():
-        if not value and value != "":
+        if value == "":
             warnings.append(f"Empty string in ja-JP.json: '{key}'")
 
     # Check 3: Placeholder consistency
