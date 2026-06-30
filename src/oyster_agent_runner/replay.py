@@ -126,6 +126,11 @@ class ReplayDriftReport:
 
     @property
     def ok(self) -> bool:
+        """Check if the replay was successful.
+
+        Returns:
+            True if no steps diverged and no error occurred, False otherwise.
+        """
         return not self.steps_diverged and self.error_message is None
 
 
