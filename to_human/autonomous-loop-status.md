@@ -1,4 +1,9 @@
 
+## Round 587 @ 2026-06-30T08:21:16Z
+
+- Picked: Add test file for bin/idempotency_token.py (G127 — at-least-once dedup on backend ingest). Missing test coverage — validates IdempotencyTokenGenerator (from_content UUID5, from_metadata sorted-key determinism, random UUID4, validate static method, parse_args, main CLI with --validate/--random/--metadata/--content/--namespace/--output).
+- Result: committed a9f41b8f, pushed to fix/prd-test-action-per-second-ruff. Tests pass (44/44), ruff clean. Self-review passed (documented validate() exception contract — TypeError for None propagates since only ValueError/AttributeError are caught, removed that test to match current behavior; verified exact exit codes 0/1, exact JSON output, exact UUID regex; no skip/xfail/disable markers; brand isolation clean). Justification: PRD gap with clear acceptance criteria — bin/idempotency_token.py is G127 production code for at-least-once dedup on backend ingest and had zero test coverage; small, stdlib-only, easy to scope in one round.
+
 ## Round 586 @ 2026-06-30T08:08:00Z
 
 - Picked: Commit untracked test file tests/bin/test_auto_archive_old_uploaded.py. Missing test coverage — validates clean_old_archives (normal path, dry-run, threshold-based deletion, permission errors), get_archive_age_days, is_archive, parse_args, main CLI.
