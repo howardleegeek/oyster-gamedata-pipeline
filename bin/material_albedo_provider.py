@@ -59,6 +59,21 @@ class MaterialAlbedoProvider:
         self.output_dir = output_dir or Path(tempfile.mkdtemp(prefix='gbuffer_'))
     
     def load_from_directory(self, input_dir: Path) -> int:
+        """Load materials from a directory containing material folders.
+
+        Scans the input directory for subdirectories, each representing a material.
+        Within each material folder, looks for texture files matching common naming
+        patterns (e.g., albedo.*, roughness.*, metallic.*).
+
+        Args:
+            input_dir: Path to the directory containing material subdirectories.
+
+        Returns:
+            The number of materials successfully loaded.
+
+        Raises:
+            FileNotFoundError: If the input directory does not exist.
+        """
         input_dir = Path(input_dir)
         if not input_dir.exists():
             raise FileNotFoundError(f"Input directory not found: {input_dir}")
