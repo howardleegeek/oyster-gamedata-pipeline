@@ -1,6 +1,16 @@
 
 
 
+## Round 601 @ 2026-07-14T07:45:00Z
+
+- Picked: Fix E501 line length in bin/aggregate_sprint_report.py — line 136 exceeded 100 chars.
+- Result: committed f540a68f, pushed to fix/prd-test-action-per-second-ruff. Tests pass (7/7), ruff clean. Self-review: checked line 136, split long print statement across two lines, single file change, no skip/xfail markers.
+
+## Round 600 @ 2026-07-14T07:30:00Z
+
+- Picked: no candidate — sampled tests pass (test_cli.py, test_consent_log_signed.py, test_eula_consent.py, test_audit_artifact_honesty.py, test_consent_dialog_cli.py all 100%), ruff clean (E501 line length only), no staged changes, no clear PRD gaps, no clear test coverage gaps identified in this tick.
+- Result: skipped (no good candidate)
+
 ## Round 598 @ 2026-07-14T07:15:00Z
 
 - Picked: no candidate — all tests pass (2143/2143 + 6 skipped), ruff clean, no untracked test files, no staged code changes, no clear PRD gaps in this tick.
