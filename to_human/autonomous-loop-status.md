@@ -1,5 +1,12 @@
 ## Round 569 @ 2026-07-14T03:00:00Z
 
+## Round 572 @ 2026-07-14T04:00:00Z
+
+- Picked: Add main() CLI test coverage to tests/bin/test_prd_test_action_per_second.py. Coverage gap — the only public function without tests was main() (the argparse-driven CLI entry point with three exit code paths and JSON/text output modes).
+- Result: committed e5ad3b88, pushed to fix/prd-test-action-per-second-ruff. Tests pass (27/27, 9 new for main()), ruff clean. Self-review passed (checked silent error swallow on the except branch, false-success via exact exit code assertions, off-by-one on medians, tempfile handle cleanup, no shell injection risk). Justification: PRD gap with clear acceptance — bin/prd_test_action_per_second.py is on the current branch (fix/prd-test-action-per-second-ruff) and main() is the only uncovered function.
+
+
+
 - Picked: Add test file for bin/edge_test_min_int_values.py (edge: int64 min for frame_id). Missing test coverage — validates int64 boundary handling for frame_id underflow in adapter math operations.
 - Result: committed 3e6d401c. Tests pass (7/7), ruff clean. Self-review passed (checked silent error swallow, false-success, race conditions, off-by-one on INT64 boundaries, security via subprocess args as list). Justification: PRD gap with clear acceptance criteria — ensures the ingest pipeline handles int64 boundary edge cases correctly.
 
