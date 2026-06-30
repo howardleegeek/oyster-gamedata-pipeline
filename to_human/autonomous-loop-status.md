@@ -1,4 +1,9 @@
 
+## Round 589 @ 2026-06-30T08:50:00Z
+
+- Picked: Commit untracked test file tests/bin/test_audio_event_track.py — missing test coverage for G282 audio analysis (load_wav, load_with_numpy, compute_peak/rms/zcr/spectral_centroid, segment_frames, classify_frame, process_audio, build_parser, main).
+- Result: committed db7342fd, pushed to fix/prd-test-action-per-second-ruff. Tests pass (40/40), ruff clean. Self-review passed (checked test correctness — exact return values for peak/rms/zcr/spectral_centroid with known inputs, WAV parsing via real wave module, parser defaults match CLI, exit codes 0/1/2), edge cases (empty audio, single sample, stereo mix-down), error handling (missing file raises, invalid WAV raises), no silent error swallow, no false-success, no race conditions, no skip/xfail markers, brand isolation clean. Justification: Clear-bounded — untracked test file with passing tests, validates bin/audio_event_track.py which has production code for per-frame audio peak + event-classifier.
+
 ## Round 588 @ 2026-06-30T08:35:00Z
 
 - Picked: Fix tests/bin/test_depth_exr_validator.py — failing due to missing mock for OpenEXR structural check. Tests were writing fake EXR bytes but not mocking check_structural, so OpenEXR validation failed on non-real EXR files.
