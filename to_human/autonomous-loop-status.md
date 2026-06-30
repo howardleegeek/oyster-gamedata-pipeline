@@ -1,6 +1,11 @@
 
 
 
+## Round 603 @ 2026-07-14T08:15:00Z
+
+- Picked: no candidate — ruff clean, no staged code changes, no clear PRD gaps in PRODUCTION_GAPS.md (all require Howard credentials), no test coverage gaps identified, no clear bounded item found in 3 passes.
+- Result: skipped (no good candidate)
+
 ## Round 602 @ 2026-07-14T08:00:00Z
 
 - Picked: no candidate — sampled tests pass (test_aggregate_sprint_report.py 4/4, test_audit_artifact_honesty.py 26/26, test_anti_replay_check.py 31/31), ruff clean (All checks passed), no staged code changes, no clear PRD gaps, no clear test coverage gaps identified in this tick.
