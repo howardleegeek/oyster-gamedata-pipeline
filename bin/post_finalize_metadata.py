@@ -197,6 +197,17 @@ def write_manifest(session: Path) -> dict:
 
 
 def main(argv: list[str]) -> int:
+    """Generate metadata.json and MANIFEST.json for a session directory.
+
+    Args:
+        argv: Command-line arguments. Expects argv[1] to be a session directory path.
+
+    Returns:
+        0 on success, 2 on usage error or invalid directory.
+
+    Raises:
+        SystemExit: Does not raise; errors are logged and returned as exit codes.
+    """
     if len(argv) < 2:
         print("usage: post_finalize_metadata.py <session_dir>", file=sys.stderr)
         return 2
