@@ -81,6 +81,9 @@ def _patch_tkinter_messagebox(askyesno_return=None, askyesno_side_effect=None):
     1. Ensures tkinter is importable (it normally is on macOS/Linux test envs).
     2. Swaps tkinter.messagebox.askyesno for a MagicMock returning/raising
        the supplied value.
+
+    Note: We always import fresh to avoid pollution from other tests that may
+    have stubbed sys.modules['tkinter.messagebox'] with a fake namespace.
     """
     fake = mock.MagicMock(name="askyesno_mock")
     if askyesno_side_effect is not None:
@@ -88,18 +91,27 @@ def _patch_tkinter_messagebox(askyesno_return=None, askyesno_side_effect=None):
     else:
         fake.return_value = askyesno_return
 
-    real_messagebox = sys.modules.get("tkinter.messagebox")
-    if real_messagebox is None:
-        # tkinter.messagebox not yet imported — try to import it.
+    # Always import fresh to avoid polluted sys.modules stubs from other tests.
+    try:
+        import tkinter.messagebox as _mb  # type: ignore[import-not-found]
+    except Exception:
+        # Truly headless: skip the test by returning a no-op patch.
+        return None, mock.patch("sys.modules", sys.modules)
+
+    # Verify we got a real module with askyesno (not a polluted stub).
+    if not hasattr(_mb, "askyesno"):
+        # Polluted stub in sys.modules — force re-import by clearing the cache.
+        if "tkinter.messagebox" in sys.modules:
+            del sys.modules["tkinter.messagebox"]
         try:
             import tkinter.messagebox as _mb  # type: ignore[import-not-found]
         except Exception:
-            # Truly headless: skip the test by returning a no-op patch.
             return None, mock.patch("sys.modules", sys.modules)
-        real_messagebox = _mb
-        sys.modules["tkinter.messagebox"] = real_messagebox
+        if not hasattr(_mb, "askyesno"):
+            # Still no askyesno — truly headless, skip.
+            return None, mock.patch("sys.modules", sys.modules)
 
-    return fake, mock.patch.object(real_messagebox, "askyesno", fake)
+    return fake, mock.patch.object(_mb, "askyesno", fake)
 
 
 class TestConfirmCloseWithTk:
