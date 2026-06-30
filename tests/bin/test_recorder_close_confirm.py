@@ -1,243 +1,271 @@
 #!/usr/bin/env python3
-"""Tests for bin/recorder_close_confirm.py — G278 mid-record close confirmation.
+"""
+Tests for bin/recorder_close_confirm.py — Mid-record close confirmation dialog (G278, E5).
 
-Covers:
-- Module constants: DEFAULT_TITLE / DEFAULT_MESSAGE are the verbatim spec
-  Chinese strings ("正在录制中" / "正在录制中，确认丢弃？").
-- confirm_close_while_recording: when tkinter is missing → returns False
-  (ImportError path, errs on side of not losing data);
-  when askyesno returns True/False → returns bool(result);
-  when askyesno raises an exception → returns False;
-  caller-supplied title/message/parent are forwarded to askyesno.
-- attach_to_root: when is_armed_callable returns False → on_close_confirmed
-  is invoked directly (no dialog); when armed=True and dialog returns True
-  → on_close_confirmed invoked; when armed=True and dialog returns False
-  → on_close_confirmed NOT invoked; protocol("WM_DELETE_WINDOW", _handler)
-  is wired on the root.
+Purpose:
+When the tester closes the recorder window while ``_record_armed`` is true,
+the recorder calls :func:`confirm_close_while_recording` before destroying
+the Tk root. The user gets a Yes/No prompt; "No" cancels the close. This
+guards against accidental window close discarding the in-flight clip
+without warning.
+
+Test coverage:
+- DEFAULT_TITLE / DEFAULT_MESSAGE constants
+- confirm_close_while_recording (Yes -> True, No -> False, ImportError -> False,
+  messagebox.askyesno exception -> False, custom title/message propagation,
+  parent argument forwarding)
+- attach_to_root (gates destruction when armed, passes through when unarmed,
+  registers WM_DELETE_WINDOW handler, only invokes on_close_confirmed after
+  user confirmation, no dialog when unarmed, calls confirm with root as parent)
 """
 
 from __future__ import annotations
 
-import builtins
 import sys
+import types
 from pathlib import Path
-from unittest import mock
+from typing import Any
+from unittest.mock import MagicMock
 
-import pytest
+# Import the module under test
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from bin.recorder_close_confirm import (
+    DEFAULT_MESSAGE,
+    DEFAULT_TITLE,
+    attach_to_root,
+    confirm_close_while_recording,
+)
 
-# Make bin/ importable as a top-level name (mirrors sibling tests).
-_BIN_DIR = Path(__file__).parent.parent.parent / "bin"
-sys.path.insert(0, str(_BIN_DIR))
 
-import recorder_close_confirm as m  # noqa: E402
+def _install_messagebox_stub(askyesno: Any) -> None:
+    """Install a stub tkinter.messagebox into sys.modules so the lazy import
+    inside confirm_close_while_recording resolves to a controllable object.
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
+    ``askyesno`` is the function object the dialog will call.
+    """
+    tk = types.ModuleType("tkinter")
+    messagebox = types.ModuleType("tkinter.messagebox")
+    messagebox.askyesno = askyesno  # type: ignore[attr-defined]
+    sys.modules["tkinter"] = tk
+    sys.modules["tkinter.messagebox"] = messagebox
+
+
+def _remove_messagebox_stub() -> None:
+    """Remove the stub so subsequent tests see the real (or absent) tkinter."""
+    sys.modules.pop("tkinter", None)
+    sys.modules.pop("tkinter.messagebox", None)
 
 
 class TestConstants:
-    """Spec-verbatim Chinese strings must not drift."""
+    """Tests for module-level default strings (Chinese copy is locked)."""
 
-    def test_default_title_is_chinese(self) -> None:
-        assert m.DEFAULT_TITLE == "正在录制中"
+    def test_default_title_is_locked_chinese(self):
+        assert DEFAULT_TITLE == "正在录制中"
 
-    def test_default_message_is_chinese(self) -> None:
-        assert m.DEFAULT_MESSAGE == "正在录制中，确认丢弃？"
-
-
-# ---------------------------------------------------------------------------
-# confirm_close_while_recording — ImportError path
-# ---------------------------------------------------------------------------
+    def test_default_message_is_locked_chinese(self):
+        assert DEFAULT_MESSAGE == "正在录制中，确认丢弃？"
 
 
-class TestConfirmCloseImportError:
-    """When tkinter is unavailable, must return False (don't lose data)."""
+class TestConfirmCloseWhileRecording:
+    """Tests for confirm_close_while_recording (the dialog logic)."""
 
-    def test_import_error_returns_false(self) -> None:
-        # The function does ``from tkinter import messagebox`` inside the
-        # try block. We simulate the failure by patching builtins.__import__
-        # to raise ImportError for "tkinter".
-        real_import = builtins.__import__
-
-        def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
-            if name == "tkinter" or name.startswith("tkinter."):
-                raise ImportError("simulated headless")
-            return real_import(name, globals, locals, fromlist, level)
-
-        with mock.patch("builtins.__import__", side_effect=fake_import):
-            assert m.confirm_close_while_recording() is False
-
-
-# ---------------------------------------------------------------------------
-# confirm_close_while_recording — happy / exception paths via tkinter patch
-# ---------------------------------------------------------------------------
-
-
-def _patch_tkinter_messagebox(askyesno_return=None, askyesno_side_effect=None):
-    """Patch the live tkinter.messagebox module's askyesno attribute.
-
-    Returns a context manager that:
-    1. Ensures tkinter is importable (it normally is on macOS/Linux test envs).
-    2. Swaps tkinter.messagebox.askyesno for a MagicMock returning/raising
-       the supplied value.
-
-    Note: We always import fresh to avoid pollution from other tests that may
-    have stubbed sys.modules['tkinter.messagebox'] with a fake namespace.
-    """
-    fake = mock.MagicMock(name="askyesno_mock")
-    if askyesno_side_effect is not None:
-        fake.side_effect = askyesno_side_effect
-    else:
-        fake.return_value = askyesno_return
-
-    # Always import fresh to avoid polluted sys.modules stubs from other tests.
-    try:
-        import tkinter.messagebox as _mb  # type: ignore[import-not-found]
-    except Exception:
-        # Truly headless: skip the test by returning a no-op patch.
-        return None, mock.patch("sys.modules", sys.modules)
-
-    # Verify we got a real module with askyesno (not a polluted stub).
-    if not hasattr(_mb, "askyesno"):
-        # Polluted stub in sys.modules — force re-import by clearing the cache.
-        if "tkinter.messagebox" in sys.modules:
-            del sys.modules["tkinter.messagebox"]
+    def test_yes_returns_true(self):
+        """User clicks Yes -> True (discard clip, allow close)."""
+        sentinel = MagicMock(return_value=True)
+        _install_messagebox_stub(sentinel)
         try:
-            import tkinter.messagebox as _mb  # type: ignore[import-not-found]
-        except Exception:
-            return None, mock.patch("sys.modules", sys.modules)
-        if not hasattr(_mb, "askyesno"):
-            # Still no askyesno — truly headless, skip.
-            return None, mock.patch("sys.modules", sys.modules)
+            assert confirm_close_while_recording() is True
+        finally:
+            _remove_messagebox_stub()
 
-    return fake, mock.patch.object(_mb, "askyesno", fake)
+    def test_no_returns_false(self):
+        """User clicks No -> False (cancel close, keep clip)."""
+        sentinel = MagicMock(return_value=False)
+        _install_messagebox_stub(sentinel)
+        try:
+            assert confirm_close_while_recording() is False
+        finally:
+            _remove_messagebox_stub()
 
+    def test_returns_false_when_tkinter_unavailable(self):
+        """If tkinter cannot be imported, fall back to False (don't lose data)."""
+        # Force the import to fail by hiding tkinter behind None
+        saved_tk = sys.modules.pop("tkinter", None)
+        saved_mb = sys.modules.pop("tkinter.messagebox", None)
+        sys.modules["tkinter"] = None  # type: ignore[assignment]
+        sys.modules["tkinter.messagebox"] = None  # type: ignore[assignment]
+        try:
+            result = confirm_close_while_recording()
+        finally:
+            # restore (or remove the None sentinels)
+            sys.modules.pop("tkinter", None)
+            sys.modules.pop("tkinter.messagebox", None)
+            if saved_tk is not None:
+                sys.modules["tkinter"] = saved_tk
+            if saved_mb is not None:
+                sys.modules["tkinter.messagebox"] = saved_mb
+        assert result is False
 
-class TestConfirmCloseWithTk:
-    """Headless mock of tkinter.messagebox.askyesno."""
+    def test_exception_during_askyesno_returns_false(self):
+        """If askyesno raises (no display, X server gone), fail safe -> False."""
+        def boom(*_a, **_kw):
+            raise RuntimeError("no display")
+        _install_messagebox_stub(boom)
+        try:
+            assert confirm_close_while_recording() is False
+        finally:
+            _remove_messagebox_stub()
 
-    def test_askyesno_true_returns_true(self) -> None:
-        fake, patcher = _patch_tkinter_messagebox(askyesno_return=True)
-        if fake is None:
-            pytest.skip("tkinter.messagebox unavailable")
-        with patcher:
-            assert m.confirm_close_while_recording() is True
-        assert fake.call_count == 1
-
-    def test_askyesno_false_returns_false(self) -> None:
-        fake, patcher = _patch_tkinter_messagebox(askyesno_return=False)
-        if fake is None:
-            pytest.skip("tkinter.messagebox unavailable")
-        with patcher:
-            assert m.confirm_close_while_recording() is False
-        assert fake.call_count == 1
-
-    def test_askyesno_exception_returns_false(self) -> None:
-        fake, patcher = _patch_tkinter_messagebox(
-            askyesno_side_effect=RuntimeError("display gone")
+    def test_custom_title_and_message_forwarded(self):
+        """Custom title/message override the defaults and reach messagebox.askyesno."""
+        sentinel = MagicMock(return_value=True)
+        _install_messagebox_stub(sentinel)
+        try:
+            confirm_close_while_recording(title="Recording in progress", message="Discard?")
+        finally:
+            _remove_messagebox_stub()
+        sentinel.assert_called_once_with(
+            "Recording in progress", "Discard?", parent=None
         )
-        if fake is None:
-            pytest.skip("tkinter.messagebox unavailable")
-        with patcher:
-            assert m.confirm_close_while_recording() is False
 
-    def test_forwards_title_message_parent(self) -> None:
-        fake, patcher = _patch_tkinter_messagebox(askyesno_return=True)
-        if fake is None:
-            pytest.skip("tkinter.messagebox unavailable")
-        parent = mock.MagicMock(name="parent_root")
-        with patcher:
-            result = m.confirm_close_while_recording(
-                parent=parent, title="t", message="m"
-            )
-        assert result is True
-        args, kwargs = fake.call_args
-        assert args[0] == "t"
-        assert args[1] == "m"
+    def test_parent_argument_forwarded(self):
+        """If a parent widget is supplied, it's passed through to messagebox."""
+        sentinel = MagicMock(return_value=True)
+        _install_messagebox_stub(sentinel)
+        parent = MagicMock(name="root_window")
+        try:
+            confirm_close_while_recording(parent=parent)
+        finally:
+            _remove_messagebox_stub()
+        _, kwargs = sentinel.call_args
         assert kwargs.get("parent") is parent
 
-    def test_default_args_match_constants(self) -> None:
-        fake, patcher = _patch_tkinter_messagebox(askyesno_return=True)
-        if fake is None:
-            pytest.skip("tkinter.messagebox unavailable")
-        with patcher:
-            m.confirm_close_while_recording()
-        args, _ = fake.call_args
-        assert args[0] == m.DEFAULT_TITLE
-        assert args[1] == m.DEFAULT_MESSAGE
-
-    def test_returns_exact_bool_from_askyesno(self) -> None:
-        fake, patcher = _patch_tkinter_messagebox(askyesno_return=1)
-        if fake is None:
-            pytest.skip("tkinter.messagebox unavailable")
-        with patcher:
-            result = m.confirm_close_while_recording()
+    def test_result_coerced_to_bool(self):
+        """Non-bool truthy return from askyesno is coerced to bool (defensive)."""
+        # truthy int, not bool
+        sentinel = MagicMock(return_value=1)
+        _install_messagebox_stub(sentinel)
+        try:
+            result = confirm_close_while_recording()
+        finally:
+            _remove_messagebox_stub()
         assert result is True
         assert isinstance(result, bool)
 
 
-# ---------------------------------------------------------------------------
-# attach_to_root
-# ---------------------------------------------------------------------------
-
-
 class TestAttachToRoot:
-    """WM_DELETE_WINDOW wiring — dialog gates destruction."""
+    """Tests for attach_to_root (Wires WM_DELETE_WINDOW handler)."""
 
-    def test_wires_protocol(self) -> None:
-        """protocol("WM_DELETE_WINDOW", handler) is called on the root."""
-        root = mock.MagicMock()
-        is_armed = mock.MagicMock(return_value=False)
-        on_close = mock.MagicMock()
-        m.attach_to_root(root, is_armed, on_close)
-        assert root.protocol.call_count == 1
+    def test_registers_wm_delete_window_protocol(self):
+        """The handler must be registered on the root via protocol()."""
+        root = MagicMock(name="root")
+        attach_to_root(root, is_armed_callable=lambda: False, on_close_confirmed=MagicMock())
+        root.protocol.assert_called_once()
         args, _ = root.protocol.call_args
         assert args[0] == "WM_DELETE_WINDOW"
-        # The handler we passed should be the one registered.
-        handler = args[1]
-        assert callable(handler)
+        # second arg must be a callable
+        assert callable(args[1])
 
-    def test_not_armed_skips_dialog_and_calls_on_close(self) -> None:
-        """When is_armed is False, on_close_confirmed is invoked directly."""
-        root = mock.MagicMock()
-        is_armed = mock.MagicMock(return_value=False)
-        on_close = mock.MagicMock()
-        m.attach_to_root(root, is_armed, on_close)
-        # Pull the handler back out and invoke it.
-        handler = root.protocol.call_args[0][1]
-        handler()
-        # No dialog should have been opened.
-        on_close.assert_called_once_with()
-
-    def test_armed_confirm_true_calls_on_close(self) -> None:
-        """When armed and the user confirms, on_close_confirmed is called."""
-        root = mock.MagicMock()
-        is_armed = mock.MagicMock(return_value=True)
-        on_close = mock.MagicMock()
-
-        with mock.patch.object(
-            m, "confirm_close_while_recording", return_value=True
-        ) as confirm:
-            m.attach_to_root(root, is_armed, on_close)
+    def test_unarmed_calls_on_close_confirmed_directly(self):
+        """When not armed, the dialog is skipped and close proceeds."""
+        root = MagicMock(name="root")
+        on_close = MagicMock(name="on_close_confirmed")
+        confirm_mock = MagicMock(return_value=True)
+        _install_messagebox_stub(confirm_mock)
+        try:
+            attach_to_root(root, is_armed_callable=lambda: False, on_close_confirmed=on_close)
+            # Pull the registered handler and invoke it (simulates window close)
             handler = root.protocol.call_args[0][1]
             handler()
-        confirm.assert_called_once()
-        # Parent kwarg should be the root we passed.
-        _, kwargs = confirm.call_args
+        finally:
+            _remove_messagebox_stub()
+        # confirm must NOT have been called when unarmed
+        confirm_mock.assert_not_called()
+        on_close.assert_called_once_with()
+
+    def test_armed_and_user_says_yes_proceeds_with_close(self):
+        """When armed and user confirms Yes, on_close_confirmed is invoked."""
+        root = MagicMock(name="root")
+        on_close = MagicMock(name="on_close_confirmed")
+        confirm_mock = MagicMock(return_value=True)
+        _install_messagebox_stub(confirm_mock)
+        try:
+            attach_to_root(root, is_armed_callable=lambda: True, on_close_confirmed=on_close)
+            handler = root.protocol.call_args[0][1]
+            handler()
+        finally:
+            _remove_messagebox_stub()
+        on_close.assert_called_once_with()
+
+    def test_armed_and_user_says_no_blocks_close(self):
+        """When armed and user picks No, on_close_confirmed is NOT called."""
+        root = MagicMock(name="root")
+        on_close = MagicMock(name="on_close_confirmed")
+        confirm_mock = MagicMock(return_value=False)
+        _install_messagebox_stub(confirm_mock)
+        try:
+            attach_to_root(root, is_armed_callable=lambda: True, on_close_confirmed=on_close)
+            handler = root.protocol.call_args[0][1]
+            handler()
+        finally:
+            _remove_messagebox_stub()
+        on_close.assert_not_called()
+
+    def test_armed_passes_root_as_parent_to_confirm(self):
+        """When armed, root is passed as the parent to the confirm dialog."""
+        root = MagicMock(name="root")
+        on_close = MagicMock(name="on_close_confirmed")
+        confirm_mock = MagicMock(return_value=True)
+        _install_messagebox_stub(confirm_mock)
+        try:
+            attach_to_root(root, is_armed_callable=lambda: True, on_close_confirmed=on_close)
+            handler = root.protocol.call_args[0][1]
+            handler()
+        finally:
+            _remove_messagebox_stub()
+        confirm_mock.assert_called_once()
+        _, kwargs = confirm_mock.call_args
         assert kwargs.get("parent") is root
-        on_close.assert_called_once_with()
 
-    def test_armed_confirm_false_blocks_on_close(self) -> None:
-        """When armed and the user cancels, on_close_confirmed is NOT called."""
-        root = mock.MagicMock()
-        is_armed = mock.MagicMock(return_value=True)
-        on_close = mock.MagicMock()
-
-        with mock.patch.object(
-            m, "confirm_close_while_recording", return_value=False
-        ):
-            m.attach_to_root(root, is_armed, on_close)
+    def test_is_armed_callable_invoked_each_close(self):
+        """The is_armed_callable is consulted on every close attempt (state may change)."""
+        root = MagicMock(name="root")
+        on_close = MagicMock(name="on_close_confirmed")
+        is_armed = MagicMock(name="is_armed_callable", return_value=False)
+        confirm_mock = MagicMock(return_value=True)
+        _install_messagebox_stub(confirm_mock)
+        try:
+            attach_to_root(root, is_armed_callable=is_armed, on_close_confirmed=on_close)
             handler = root.protocol.call_args[0][1]
             handler()
+            handler()
+            handler()
+        finally:
+            _remove_messagebox_stub()
+        assert is_armed.call_count == 3
+        assert on_close.call_count == 3
+
+    def test_armed_but_tkinter_unavailable_blocks_close(self):
+        """If confirm falls back to False (no Tk), on_close_confirmed is NOT called.
+
+        This protects headless testers: with no display, the dialog can't render,
+        so the safe-fallback (False) prevents data loss.
+        """
+        root = MagicMock(name="root")
+        on_close = MagicMock(name="on_close_confirmed")
+        saved_tk = sys.modules.pop("tkinter", None)
+        saved_mb = sys.modules.pop("tkinter.messagebox", None)
+        sys.modules["tkinter"] = None  # type: ignore[assignment]
+        sys.modules["tkinter.messagebox"] = None  # type: ignore[assignment]
+        try:
+            attach_to_root(root, is_armed_callable=lambda: True, on_close_confirmed=on_close)
+            handler = root.protocol.call_args[0][1]
+            handler()
+        finally:
+            sys.modules.pop("tkinter", None)
+            sys.modules.pop("tkinter.messagebox", None)
+            if saved_tk is not None:
+                sys.modules["tkinter"] = saved_tk
+            if saved_mb is not None:
+                sys.modules["tkinter.messagebox"] = saved_mb
         on_close.assert_not_called()
