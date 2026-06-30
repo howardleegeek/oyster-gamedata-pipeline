@@ -1,3 +1,15 @@
+
+## Round 575 @ 2026-06-30T01:39:51Z
+
+- Picked: Add test file for bin/cost_estimator.py (S3 cost reporting). Missing test coverage — validates tiered egress pricing (5 tiers, including free first 1 GB), storage class cost (all 6 enum members), lifecycle stage projection (30/90/180-day strict-greater-than boundary), composite cost report structure, text/JSON print_report output, argparse choices enforcement, and main() CLI entry point.
+- Result: committed 8c1809b7, pushed to fix/prd-test-action-per-second-ruff. Tests pass (42/42), ruff clean. Self-review passed (checked silent error swallow on negative-egress → 0.0 documented in dedicated test NOT introduced; false-success via exact numeric cost assertions + SystemExit code 2 for missing arg; off-by-one on lifecycle thresholds 30/90/180 strict-greater-than boundary pinned; race conditions N/A pure functions; security via monkeypatch.setattr for argv test; test isolation via idempotent sys.path insert verified by re-collecting sibling test file). Justification: PRD gap with clear acceptance criteria — bin/cost_estimator.py is a daily S3 cost report tool with zero test coverage, and the tiered egress math is the kind of thing that quietly breaks with a one-line policy change.
+
+
+## Round 574 @ 2026-06-30T01:29:20Z
+
+- Picked: Add test file for bin/tarball_diff.py (PRD: buyer-spec diff gate). Missing test coverage — validates tarball extraction, metric counting (action_camera records, video duration, depth files), duration formatting (seconds vs minutes boundary at 60s), and the main() CLI entry point with valid/missing tarballs.
+- Result: committed 57ca4fa2, pushed to fix/prd-test-action-per-second-ruff. Tests pass (19/19), ruff clean. Self-review passed (checked silent error swallow on JSONDecodeError/IOError in the SUT's counting functions — documented via dedicated tests, NOT introduced; false-success via exact rc assertions; off-by-one on format_duration 59.999 vs 60.0 boundary confirmed against actual SUT behavior; race conditions avoided via separate tempdirs per tarball and sys.argv save/restore in finally blocks; no shell injection via subprocess list args; tempfile cleanup via context managers + explicit rmtree for paths the SUT returns). Justification: PRD gap with clear acceptance criteria — bin/tarball_diff.py is a buyer-facing diff tool on the current branch and had zero test coverage.
+
 ## Round 569 @ 2026-07-14T03:00:00Z
 
 ## Round 572 @ 2026-07-14T04:00:00Z
