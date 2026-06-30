@@ -46,7 +46,7 @@ class RconClient:
         self.sock.settimeout(self.timeout)
         self.sock.connect((self.host, self.port))
         
-    def close(self):
+    def close(self) -> None:
         """Close the connection."""
         if self.sock:
             self.sock.close()
