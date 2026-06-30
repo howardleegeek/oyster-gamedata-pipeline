@@ -80,7 +80,13 @@
 
 ## Round @ 2026-06-21T13:35:00Z
 - File: bin/inventory_voxel_capture.py::main
-- Added: docstring=Y, type-hints=N (a
+- Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: d28b33735
+
+## Round @ 2026-06-22T14:00:00Z
+- File: bin/spectator_follow.py::RconClient.close
+- Added: docstring=N (already had docstring), type-hints=Y
+- Commit: 2fa0a382c
 
 ## Round @ 2026-06-30T01:32:34Z
 - File: bin/payout_cron.py::StripeClient.create_transfer
