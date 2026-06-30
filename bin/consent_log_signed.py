@@ -187,6 +187,14 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     args = parser.parse_args(argv)
 
+    # Read-only commands require an existing log file; only `add` may create one.
+    if args.command in ("list", "verify") and not Path(args.log_file).exists():
+        print(
+            f"Error: log file '{args.log_file}' does not exist; use 'add' to create it",
+            file=sys.stderr,
+        )
+        return 1
+
     try:
         log = ConsentLogSigned(log_file=args.log_file, key_file=getattr(args, "key_file", None))
 
