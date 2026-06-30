@@ -301,3 +301,7 @@
 
 - Picked: Fix tests/bin/test_recorder_close_confirm.py — the _patch_tkinter_messagebox helper now imports tkinter.messagebox fresh to avoid pollution from other tests that may have stubbed sys.modules with a fake namespace.
 - Result: committed b4f58431, pushed to fix/prd-test-action-per-second-ruff. Tests pass (13/13), ruff clean. Self-review passed (checked for silent error swallow, false-success, race conditions, off-by-one, security, skip/xfail markers, brand isolation). Justification: Clear-bounded — single test file fix addressing test isolation issue with sys.modules pollution.
+
+## Round 594 @ 2026-06-30T08:00:00Z
+- Picked: Commit untracked test file tests/bin/test_zbuffer_to_exr.py — missing test coverage for G221 depth buffer to EXR conversion (read_f32_file, write_exr_file with/without OpenEXR fallback, create_source_marker, main with missing active_session / missing depth_raw).
+- Result: committed 89d7d1b5, pushed to fix/prd-test-action-per-second-ruff. Tests pass (8/8), ruff clean (fixed 2 unused imports: struct, Path). Self-review passed (checked for silent error swallow — none, false-success — none, race conditions — none, off-by-one — read_f32 count uses len//4 which is correct, security — no untrusted input, broken tests masked as passing — no skip/xfail decorators, importorskip only used when OpenEXR genuinely missing, brand isolation clean). Justification: Clear-bounded — single untracked test file, validates bin/zbuffer_to_exr.py which has production code for G221 Z-buffer linearization to view-space meters.
