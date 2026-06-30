@@ -1,6 +1,16 @@
 
 
 
+## Round 608 @ 2026-07-14T09:30:00Z
+
+- Picked: Add bin/release_notes_from_git.py script with comprehensive tests — script extracts conventional commits (feat/fix/docs/test) between refs and formats as release notes; adds 33 tests covering parse_commits, group_commits, format_release_notes, run_git_log, main. Also added sys.exit(0) to main() to ensure proper exit code on success.
+- Result: committed 6f2252b3, pushed to fix/prd-test-action-per-second-ruff. Tests pass (2176 passed, 6 skipped), ruff clean. Self-review: verified no silent error swallow, no false-success, no race conditions, no off-by-one, no security issues. Single logical change: new feature addition.
+
+## Round 609 @ 2026-07-14T10:00:00Z
+
+- Picked: Fix dead-code bug in bin/i18n_lint.py — check for empty strings was `if not value and value != ""` which always evaluates to False (value cannot be both falsy and equal to ""). Added comprehensive tests in tests/bin/test_i18n_lint.py covering extract_placeholders, load_json_file, lint_translations, main CLI.
+- Result: committed 6ae6402a, pushed to fix/prd-test-action-per-second-ruff. Tests pass (24 passed), ruff clean. Self-review: verified no silent error swallow, no false-success, no race conditions, no off-by-one, no security issues. Single logical change.
+
 ## Round 604 @ 2026-06-30T19:20:52Z
 
 - Picked: Untrack three runtime log files (dashboard/merge_failures.log, dashboard/replay_attacks.json, tests/_payout_cron_test.log) — added to .gitignore and git rm --cached. They are appended to at runtime by production scripts (bin/auto_merge_script.py, bin/anti_replay_check.py, bin/payout_cron.py) and have been showing up as modified on every tick for weeks.
