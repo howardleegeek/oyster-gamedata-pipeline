@@ -1,3 +1,19 @@
+## Round 581 @ 2026-06-30T05:58:26Z
+
+- Picked: Commit untracked test file tests/bin/test_anomaly_detector_clip_quality.py. Missing test coverage — validates the production clip-quality anomaly detector (47 tests covering _entropy, _variance, _norm_trajectory, _hash_trajectory, analyze_clip, detect_farming, load_clips, parse_args, main CLI).
+- Result: committed af4d0d2e, pushed to fix/prd-test-action-per-second-ruff. Tests pass (47/47), ruff clean. Self-review passed (checked silent error swallow via anomalies list assertion, false-success via exact entropy/variance values not just >0, race conditions N/A pure functions, off-by-one via bin count 10 → log2(10) ≈ 3.32, no skip/xfail/disable markers). Justification: PRD gap with clear acceptance criteria — bin/anomaly_detector_clip_quality.py is production code that flags AFK/farming patterns and had zero test coverage.
+
+## Round 580 @ 2026-07-01T12:00:00Z
+
+- Picked: Add test file for bin/recorder_disk_guard.py (G272, W31 — pre-flight disk space check). Missing test coverage — validates documents_dir, free_bytes, ensure_disk_space (above/below threshold, exact threshold boundary, custom thresholds), and _main CLI (exit codes, stderr output).
+- Result: committed b41d9178, pushed to fix/prd-test-action-per-second-ruff. Tests pass (14/14), ruff clean. Self-review passed (checked silent error swallow - DiskGuardError correctly raised on insufficient space; false-success via exact assertions on threshold boundary; off-by-one verified < not <=; race conditions N/A - pure functions + mocks; no skip/xfail/disable markers). Justification: PRD gap with clear acceptance criteria — bin/recorder_disk_guard.py is production code used by recorder_consumer_lite.py to prevent ffmpeg silent truncation and has zero test coverage.
+
+
+
+## Round 579 @ 2026-06-30T05:29:49Z
+
+- Picked: Add test file for bin/mock_game_detector.py (fake game-detection for local smoke/CI). Missing test coverage — validates detect_game() (default values, override parameter), and main() CLI (exit code, valid JSON output, default values, newline formatting).
+- Result: committed 1f5563f0, pushed to fix/prd-test-action-per-second-ruff. Tests pass (12/12), ruff clean. Self-review passed (checked no silent error swallow - simple function with no exception paths; no false-success via exact value assertions; no race conditions - pure function; off-by-one N/A; no skip/xfail/disable markers). Justification: PRD gap with clear acceptance criteria — bin/mock_game_detector.py is used by recorder_local_smoke.py in production and has zero test coverage.
 
 ## Round 578 @ 2026-07-01T00:00:00Z
 
