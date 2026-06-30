@@ -99,3 +99,9 @@ bundle/
 # Test outputs — generated at test runtime, never commit
 tests/dashboard/
 active_session/
+
+# Runtime log files — written by production scripts at fixed paths, never commit.
+# Each is appended to by the live system; checking them in just creates noise.
+dashboard/merge_failures.log
+dashboard/replay_attacks.json
+tests/_payout_cron_test.log
