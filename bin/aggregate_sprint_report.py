@@ -133,7 +133,8 @@ if __name__ == "__main__":
     result = aggregate(args.log_dir, args.output)
     print(f"Report written to {args.output}")
     print(
-        f"  Iterations: {result['iter_count']}, Pass: {result['pass_count']}, Fail: {result['fail_count']}"
+        f"  Iterations: {result['iter_count']}, "
+        f"Pass: {result['pass_count']}, Fail: {result['fail_count']}"
     )
     print(f"  Mean total_seconds: {result['total_seconds_mean']:.1f}s")
     print(f"  Cumulative compute: {result['cumulative_compute_minutes']:.1f} min")
