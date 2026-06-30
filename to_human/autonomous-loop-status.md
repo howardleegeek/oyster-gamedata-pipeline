@@ -1,6 +1,11 @@
 
 
 
+## Round 604 @ 2026-06-30T19:20:52Z
+
+- Picked: Untrack three runtime log files (dashboard/merge_failures.log, dashboard/replay_attacks.json, tests/_payout_cron_test.log) — added to .gitignore and git rm --cached. They are appended to at runtime by production scripts (bin/auto_merge_script.py, bin/anti_replay_check.py, bin/payout_cron.py) and have been showing up as modified on every tick for weeks.
+- Result: committed f9cc78a0, pushed to fix/prd-test-action-per-second-ruff. Tests pass (50/50 — anti_replay_check + auto_merge_script), ruff clean. Self-review: verified each path is a deliberate runtime output (REPLAY_LOG_PATH, failure_log, PAYOUT_CRON_LOG_PATH), no silent error swallow, no false success, no race conditions, no security issue, single logical change.
+
 ## Round 603 @ 2026-07-14T08:15:00Z
 
 - Picked: no candidate — ruff clean, no staged code changes, no clear PRD gaps in PRODUCTION_GAPS.md (all require Howard credentials), no test coverage gaps identified, no clear bounded item found in 3 passes.
