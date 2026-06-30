@@ -1,3 +1,13 @@
+## Round 585 @ 2026-06-30T06:45:00Z
+
+- Picked: Commit untracked test file tests/bin/test_disk_full_guard.py (R044 — disk space monitor, QA audit BLOCKER). Missing test coverage — validates get_free_gb (normal path, path not found, permission error, generic OSError), watch_loop (above-threshold no-kill, below-threshold SIGTERM, ProcessLookupError, PermissionError, KeyboardInterrupt), and main CLI (--path/--min-gb/--parent-pid/--check-interval, exit codes).
+- Result: committed a84c8e24, pushed to fix/prd-test-action-per-second-ruff. Tests pass (22/22), ruff clean. Self-review passed (checked silent error swallow - exceptions re-raise via pytest.raises; false-success via exact GB values, exact return codes 0/1, exact SIGTERM signal arg; race conditions - time.sleep mocked, KeyboardInterrupt breaks infinite loop deterministically; off-by-one - threshold uses < consistent with source; security - no subprocess, os.kill mocked; zero skip/xfail markers; brand isolation clean). Justification: PRD gap with clear acceptance — R044 disk_full_guard.py is a QA audit BLOCKER (per source header) that prevents silently-truncated tarballs and had zero test coverage; the test file was already drafted and untracked from a prior round.
+
+## Round 584 @ 2026-06-30T06:20:00Z
+
+- Picked: Add test file for bin/diag_bundle_collector.py (G138 — diagnostic bundle collector for support tickets). Missing test coverage — validates get_system_info, find_log_files, find_manifests, run_cmd_safe, collect_bundle, and main CLI.
+- Result: committed 4e42465d, pushed to fix/prd-test-action-per-second-ruff. Tests pass (21/21), ruff clean. Self-review passed (checked silent error swallow - run_cmd_safe returns None on error not swallowed; false-success via exact assertions on system_info keys and tarball content; race conditions N/A pure functions; off-by-one N/A; no skip/xfail/disable markers). Justification: PRD gap with clear acceptance criteria — bin/diag_bundle_collector.py is production code used for customer support tickets and had zero test coverage.
+
 ## Round 581 @ 2026-06-30T05:58:26Z
 
 - Picked: Commit untracked test file tests/bin/test_anomaly_detector_clip_quality.py. Missing test coverage — validates the production clip-quality anomaly detector (47 tests covering _entropy, _variance, _norm_trajectory, _hash_trajectory, analyze_clip, detect_farming, load_clips, parse_args, main CLI).
