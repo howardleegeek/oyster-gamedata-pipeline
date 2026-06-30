@@ -115,6 +115,8 @@ def main():
     else:
         print(release_notes)
 
+    sys.exit(0)
+
 
 if __name__ == "__main__":
     main()
