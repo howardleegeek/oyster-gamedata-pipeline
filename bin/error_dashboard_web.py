@@ -571,6 +571,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     print(f"Dashboard available at http://{args.host}:{args.port}/admin/errors")
 
     def handler_factory(*args: Any, **kwargs: Any) -> ErrorDashboardHandler:
+        """Factory function to create ErrorStoreHandler with injected store.
+
+        Args:
+            *args: Positional arguments passed to handler constructor.
+            **kwargs: Keyword arguments passed to handler constructor.
+
+        Returns:
+            ErrorStoreHandler instance configured with the error store.
+        """
         return ErrorStoreHandler(store, *args, **kwargs)
 
     class ErrorStoreHandler(ErrorDashboardHandler):
