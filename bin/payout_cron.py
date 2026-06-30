@@ -136,6 +136,21 @@ class StripeClient:
         description: str | None = None,
         metadata: dict[str, str] | None = None,
     ) -> dict[str, Any]:
+        """Create a Stripe Connect transfer to a destination account.
+
+        Args:
+            amount_cents: Transfer amount in US cents.
+            destination_account_id: Stripe Connect account ID (acct_...).
+            idempotency_key: Unique key for idempotent request retry safety.
+            description: Optional human-readable description for the transfer.
+            metadata: Optional key-value metadata dict for Stripe.
+
+        Returns:
+            Stripe API response dict containing transfer details.
+
+        Raises:
+            StripeError: On HTTP error from Stripe API.
+        """
         body: dict[str, str] = {
             "amount": str(amount_cents),
             "currency": "usd",
