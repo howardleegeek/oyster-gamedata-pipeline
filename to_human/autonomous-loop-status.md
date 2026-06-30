@@ -1,4 +1,9 @@
 
+## Round 588 @ 2026-06-30T08:35:00Z
+
+- Picked: Fix tests/bin/test_depth_exr_validator.py — failing due to missing mock for OpenEXR structural check. Tests were writing fake EXR bytes but not mocking check_structural, so OpenEXR validation failed on non-real EXR files.
+- Result: committed 5332f8b7, pushed to fix/prd-test-action-per-second-ruff. Tests pass (16/16), ruff clean (fixed import sorting, removed unused MagicMock). Self-review passed (checked mock usage — patch.object correctly mocks check_structural to avoid OpenEXR dependency; test logic correctness — validates total/valid counts, exit codes, invalid_files list; edge cases — empty dir, nonexistent dir, subdirectory traversal, structural failure; error handling — exception cases tested via pytest.raises; no silent error swallow, no false-success, no race conditions, brand isolation clean). Justification: Clear-bounded fix — test file was untracked with failing tests; the issue was that OpenEXR is available on the test machine but tests wrote fake bytes that fail structural validation; added @patch.object to mock the structural check for tests that only care about magic byte validation.
+
 ## Round 587 @ 2026-06-30T08:21:16Z
 
 - Picked: Add test file for bin/idempotency_token.py (G127 — at-least-once dedup on backend ingest). Missing test coverage — validates IdempotencyTokenGenerator (from_content UUID5, from_metadata sorted-key determinism, random UUID4, validate static method, parse_args, main CLI with --validate/--random/--metadata/--content/--namespace/--output).
