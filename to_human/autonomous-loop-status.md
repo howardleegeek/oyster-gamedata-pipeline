@@ -11,6 +11,11 @@
 - Picked: no candidate — all tests pass (sampled: anti_replay_check 55/55, auto_merge_script, iron_law 29/29, game_registry+provenance+replay 70/70), ruff clean, no staged code changes, no clear PRD gaps in PRODUCTION_GAPS.md (all require Howard credentials), no clear test coverage gaps, no clear bounded item found in 3 passes.
 - Result: skipped (no good candidate)
 
+## Round 606 @ 2026-07-14T08:45:00Z
+
+- Picked: Ignore 70+ diag_bundle_*.tar.gz runtime artifacts in .gitignore — these harness/qa diagnostic files were showing as untracked and creating noise, similar to the log files handled in Round 604.
+- Result: committed 4f1c3464, pushed to fix/prd-test-action-per-second-ruff. Ruff clean. Self-review: verified each path is a runtime diagnostic output (harness/qa system), no source code, no silent error swallow, no false success, no race conditions, no security issue, single logical change.
+
 ## Round 603 @ 2026-07-14T08:15:00Z
 
 - Picked: no candidate — ruff clean, no staged code changes, no clear PRD gaps in PRODUCTION_GAPS.md (all require Howard credentials), no test coverage gaps identified, no clear bounded item found in 3 passes.
