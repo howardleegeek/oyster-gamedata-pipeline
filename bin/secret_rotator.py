@@ -109,7 +109,13 @@ class RotationState:
         with open(tmp, "w") as fh: json.dump(self.state, fh, indent=2, default=str)
         tmp.replace(self.state_file); tmp.parent.rmdir()
     @property
-    def active_key_id(self) -> Optional[str]: return self.state.get("active_key_id")
+    def active_key_id(self) -> Optional[str]:
+        """Return the currently-active primary key ID, if any.
+
+        Returns:
+            The active key ID string, or None if no active key is set.
+        """
+        return self.state.get("active_key_id")
 
     @property
     def secondary_key_id(self) -> Optional[str]:
