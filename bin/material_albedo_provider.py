@@ -180,6 +180,18 @@ class MaterialAlbedoProvider:
             return None
     
     def generate_gbuffer(self, material_name: str) -> Optional[Path]:
+        """Generate a G-buffer numpy array for a single material.
+
+        Combines albedo, roughness, and metallic texture data into a single
+        5-channel numpy array (RGB + roughness + metallic) suitable for
+        Sora 2 / Cosmos training pipelines.
+
+        Args:
+            material_name: Name of the material to generate G-buffer for.
+
+        Returns:
+            Path to the saved .npy file, or None if generation failed.
+        """
         if material_name not in self.materials:
             logger.error(f"Material not found: {material_name}")
             return None
