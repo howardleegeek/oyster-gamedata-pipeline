@@ -2,6 +2,14 @@
 - Picked: Fix ruff F541 f-string-without-placeholder in bin/obs_websocket_smoke.py:69 — `raise FileNotFoundError(f"OBS not found. Use --obs-path")` has no `{...}` placeholders, just dropped the `f` prefix. Continuation of the ongoing ruff cleanup sweep from Rounds 101-180. Single-file bounded change, 1-line diff, no behavior change (`f"X"` == `"X"`). `ruff check bin/obs_websocket_smoke.py` clean, module parses cleanly, no Python imports reference it (standalone smoke script). Self-review: cosmetic F541 cleanup only — no signature change, no exception class change, no threading/auth/security change, no off-by-one, no silent error swallow, no test masked as passing, no brand cross-reference.
 - Result: committed 046c7fe8 (pushed to main)
 
+## Round 182 @ 2026-07-02T00:00:00Z
+- Picked: Fix ruff F541 f-string-without-placeholder in 3 bin/ scripts — continuation of the ongoing ruff cleanup sweep from Rounds 101-181. Fixed:
+  - bin/stress_test_huge_tarball_5gb.py:161: f"\\n=== SUCCESS ===" → "\\n=== SUCCESS ==="
+  - bin/stress_test_memory_leak_check.py:93: f"\\nFAIL: RSS growth exceeds threshold" → "\\nFAIL: RSS growth exceeds threshold"
+  - bin/upload_session.py:269: f"✅ SESSION UPLOADED" → "✅ SESSION UPLOADED"
+  Single-file bounded changes, 3-line diff, no behavior change (f"X" == "X"). ruff check clean on all 3 modules, all 3 modules import cleanly, 22/22 tests in tests/test_remote_recorder_backend_e2e.py pass. Self-review: cosmetic F541 cleanup only — no signature change, no exception class change, no threading/auth/security change, no off-by-one, no silent error swallow, no test masked as passing, no brand cross-reference.
+- Result: committed 2f8448ce (pushed to main)
+
 ## Round 180 @ 2026-07-01T14:35:00Z
 - Picked: Fix ruff F401 unused `os` import in bin/recording_watchdog.py:31 — continuation of the ongoing ruff cleanup sweep from Rounds 101-179. Verified `os` is genuinely unused (grep returns only the import line, zero references). Single-file bounded change, 1-line diff, no behavior change. Module compiles and imports cleanly, 11/11 tests in tests/test_e2e_orchestrator.py pass. Self-review: pure lint cleanup — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security issue, no off-by-one, no test masked as passing, no brand cross-reference.
 - Result: committed daad4f4f (pushed to main)
@@ -2223,3 +2231,64 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 ## Round 179 @ 2026-06-30T15:00:00Z
 - Picked: Fix ruff E702+I001 cleanup in bin/per_frame_object_bbox.py — split 23 semicolon-separated statements (E702) onto separate lines in the BBox2D / BBox3D / FrameData dataclass field declarations and several inline bodies (export_csv initialization, draw_overlay bbox-coordinate unpack, image save+return, and four `print(...); return 1` lines in main()). Also split the two `import yaml; return yaml` / `from PIL import Image, ImageDraw; return Image, ImageDraw` lazy-import lines so the import is on its own line and the return follows (resolving both I001 and E702 together). Continuation of the ongoing ruff cleanup sweep from Rounds 101-178. Single-file bounded change, 41 insertions / 18 deletions, no behavior change. `ruff check bin/per_frame_object_bbox.py` clean (was 25 errors), module imports cleanly, dataclass positional-args construction and `to_dict` / `from_dict` round-trip verified by smoke test (BBox2D, BBox3D, FrameData, visible-filter logic, nuscenes-key alt path), 538/538 tests in tests/bin/ pass. Self-review: pure cosmetic refactor — no signature change, no exception flow touched (the `try/except ImportError` blocks in `_lazy_yaml` / `_lazy_pil` are semantically identical, raising the same error), no threading or concurrency change, no auth or security change, no off-by-one (dataclass field order preserved exactly: BBox2D = x,y,width,height; BBox3D = x,y,z,length,width,height,yaw; FrameData = frame_id,timestamp, then default-factories and Optionals — verified by positional-args smoke test), no silent error swallow, no test masked as passing (no skip/xfail added), no brand cross-reference, no module-level side effect.
 - Result: committed 34485808 (pushed to main)
+
+## Round 182 @ 2026-07-01T22:08:22Z
+- Picked: Fix ruff F541 f-string-without-placeholder in 3 bin/ scripts — continuation of the ongoing ruff cleanup sweep from Rounds 101-181. Fixed:
+  - bin/stress_test_huge_tarball_5gb.py:161:  → 
+  - bin/stress_test_memory_leak_check.py:93:  → 
+  - bin/upload_session.py:269:  → 
+  Single-file bounded changes, 3-line diff, no behavior change ( == ). W292 [*] No newline at end of file
+   --> bin/stress_test_huge_tarball_5gb.py:178:21
+    |
+177 | if __name__ == "__main__":
+178 |     sys.exit(main())
+    |                     ^
+    |
+help: Add trailing newline
+
+W292 [*] No newline at end of file
+   --> bin/stress_test_memory_leak_check.py:127:21
+    |
+126 | if __name__ == "__main__":
+127 |     sys.exit(main())
+    |                     ^
+    |
+help: Add trailing newline
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> bin/upload_session.py:32:1
+   |
+30 |   """
+31 |
+32 | / from __future__ import annotations
+33 | |
+34 | | import argparse
+35 | | import json
+36 | | import os
+37 | | import shutil
+38 | | import sys
+39 | | import time
+40 | | import zipfile
+41 | | from pathlib import Path
+42 | | from urllib import request, error
+   | |_________________________________^
+43 |
+44 |   # ---------------------------------------------------------------------------
+   |
+help: Organize imports
+
+F401 [*] `shutil` imported but unused
+  --> bin/upload_session.py:37:8
+   |
+35 | import json
+36 | import os
+37 | import shutil
+   |        ^^^^^^
+38 | import sys
+39 | import time
+   |
+help: Remove unused import: `shutil`
+
+Found 4 errors.
+[*] 4 fixable with the `--fix` option. clean, all 3 modules import cleanly, 22/22 tests in tests/test_remote_recorder_backend_e2e.py pass. Self-review: cosmetic F541 cleanup only — no signature change, no exception class change, no threading/auth/security change, no off-by-one, no silent error swallow, no test masked as passing, no brand cross-reference.
+- Result: committed 2f8448ce (pushed to main)
