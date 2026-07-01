@@ -1,3 +1,8 @@
+## Round @ 2025-07-03T14:50:00Z
+- File: bin/lerobot_export.py::_numpy
+- Added: docstring=Y, type-hints=Y
+- Commit: 9f88ae5e20628e08cfad0359e2e900d6f3a3635e
+
 ## Round @ 2026-05-17T04:35:07Z
 
 - File: bin/anonymous_first_run.py::AnonymousStorage.load_config
