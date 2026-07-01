@@ -1,6 +1,11 @@
 
 
 
+## Round 631 @ 2026-07-01T04:28:33-07:00
+
+- Picked: Add 34 tests for bin/red_team_oversized_json.py — tests generate_record (schema, deterministic id), generate_oversized_json (file creation, record count, size, JSON validity), stream_records (yields dicts, count, empty cases), test_memory_usage (small file passes, bug fix for peak_memory not being updated, tracemalloc cleanup), main CLI (--help, --size-mb, --output-dir, --keep-file, --max-memory-mb), subprocess end-to-end. Also fixed silent bug where peak_memory was never updated in the loop, causing false pass even with max_mb=0.
+- Result: committed e882202d, pushed. Tests pass (34/34), ruff clean. Self-review: verified no silent error swallow (tracemalloc always stopped in finally block, peak_memory bug fixed), no false-success (return codes 0/1/2 asserted for all paths), no race conditions (synchronous, per-test tmp_path), no off-by-one (record counts checked correctly), no security issues (no shell=True, all file ops scoped to tmp_path), no skip/xfail/disable markers. Justification: Clear-bounded — uncovered red team tool with zero test coverage; fixed silent bug where peak_memory was never updated in the loop, causing false pass even with max_mb=0.
+
 ## Round 630 @ 2026-07-01T10:30:00Z
 
 - Picked: Add 29 tests for bin/red_team_mixed_vector_format.py — tests parse_vector3_dict, parse_vector3_list, vector3_to_dict, vector3_to_list, validate_format_consistency, analyze_file, and CLI. Also fixed analyze_file bug where it validated hardcoded SAMPLE_POSITIONS instead of extracting positions from the actual file's AST.
