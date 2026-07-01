@@ -1,3 +1,7 @@
+## Round 180 @ 2026-07-01T14:35:00Z
+- Picked: Fix ruff F401 unused `os` import in bin/recording_watchdog.py:31 — continuation of the ongoing ruff cleanup sweep from Rounds 101-179. Verified `os` is genuinely unused (grep returns only the import line, zero references). Single-file bounded change, 1-line diff, no behavior change. Module compiles and imports cleanly, 11/11 tests in tests/test_e2e_orchestrator.py pass. Self-review: pure lint cleanup — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security issue, no off-by-one, no test masked as passing, no brand cross-reference.
+- Result: committed daad4f4f (pushed to main)
+
 ## Round 175 @ 2026-06-23T12:00:00Z
 
 
