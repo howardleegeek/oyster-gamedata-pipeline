@@ -455,7 +455,11 @@ def r20a_quat_norm_distribution(
             "note": f"mu={mu:.3e} sigma={sigma:.3e}"}
 
 
-def r20b_mouse_dx_cumulative(records, tolerance=1e-3, min_frames=10):
+def r20b_mouse_dx_cumulative(
+    records: list[Dict[str, Any]],
+    tolerance: float = 1e-3,
+    min_frames: int = 10,
+) -> Dict[str, Any]:
     """V₂ R20b: |Σ mouse_dx − (mouse_x[N-1]−mouse_x[0])| ≤ tolerance."""
     if not records:
         return _v2_drift_abstain("R20b", "empty_records", tolerance)
