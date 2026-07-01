@@ -336,6 +336,20 @@ class SupabaseClient:
         stripe_transfer_id: str | None,
         failure_reason: str | None,
     ) -> dict[str, Any] | None:
+        """Insert a payout record into the Supabase database.
+
+        Args:
+            tester_id: Unique identifier for the tester receiving payout.
+            amount_cents: Payout amount in cents.
+            idempotency_key: Unique key to prevent duplicate payouts.
+            status: Payout status (e.g., "paid", "failed").
+            stripe_transfer_id: Stripe transfer ID if successful.
+            failure_reason: Reason for failure if status indicates failure.
+
+        Returns:
+            The inserted payout record as a dict, or None if a duplicate
+            idempotency_key was detected (409 conflict).
+        """
         body = {
             "tester_id": tester_id,
             "amount_cents": amount_cents,
