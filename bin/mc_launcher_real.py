@@ -61,37 +61,33 @@ def find_minecraft_launcher() -> str:
     Raises:
         RuntimeError: If no launcher can be found
     """
-    try:
-        # Try to import minecraft-launcher-lib
-        import minecraft_launcher_lib
-
-        # Use the library's command
+    # Check if minecraft-launcher-lib is available
+    if "minecraft_launcher_lib" in sys.modules:
         return "minecraft-launcher-lib"
-    except ImportError:
-        # Fallback to system binary
-        import shutil
 
-        # Check for 'minecraft-launcher' in PATH
-        launcher_path = shutil.which("minecraft-launcher")
-        if launcher_path:
-            return launcher_path
+    import shutil
 
-        # Check common locations
-        common_paths = [
-            "/usr/bin/minecraft-launcher",
-            "/usr/local/bin/minecraft-launcher",
-            "/opt/minecraft-launcher/minecraft-launcher",
-            os.path.expanduser("~/.local/bin/minecraft-launcher"),
-        ]
+    # Check for 'minecraft-launcher' in PATH
+    launcher_path = shutil.which("minecraft-launcher")
+    if launcher_path:
+        return launcher_path
 
-        for path in common_paths:
-            if os.path.exists(path) and os.access(path, os.X_OK):
-                return path
+    # Check common locations
+    common_paths = [
+        "/usr/bin/minecraft-launcher",
+        "/usr/local/bin/minecraft-launcher",
+        "/opt/minecraft-launcher/minecraft-launcher",
+        os.path.expanduser("~/.local/bin/minecraft-launcher"),
+    ]
 
-        raise RuntimeError(
-            "No Minecraft launcher found. Install minecraft-launcher-lib "
-            "or ensure 'minecraft-launcher' binary is in PATH."
-        )
+    for path in common_paths:
+        if os.path.exists(path) and os.access(path, os.X_OK):
+            return path
+
+    raise RuntimeError(
+        "No Minecraft launcher found. Install minecraft-launcher-lib "
+        "or ensure 'minecraft-launcher' binary is in PATH."
+    )
 
 
 def launch_minecraft(
@@ -471,7 +467,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         latest_log = log_files[0]
 
         # Wait for join
-        print(f"Waiting for client to join (timeout: 60s)...")
+        print("Waiting for client to join (timeout: 60s)...", end=" ")
         if wait_for_join(str(latest_log), args.username, timeout_sec=60.0):
             print("Client joined successfully")
 
