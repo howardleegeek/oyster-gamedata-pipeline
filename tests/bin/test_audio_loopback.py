@@ -174,7 +174,7 @@ class TestPlanAudioCapture:
     @mock.patch("bin.audio_loopback._ffmpeg_supports_wasapi")
     def test_prefer_wasapi_false_skips_wasapi_probe(self, mock_wasapi, mock_run_ffmpeg):
         mock_wasapi.return_value = True  # should NOT be called
-        plan = plan_audio_capture(prefer_wasapi=False)
+        plan_audio_capture(prefer_wasapi=False)
         mock_wasapi.assert_not_called()
 
 

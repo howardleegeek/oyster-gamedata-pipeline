@@ -124,11 +124,11 @@ class TestCompressWithZstd:
         """Verify successful compression returns new path."""
         test_file = tmp_path / "test.txt"
         test_file.write_text("test content")
-        
+
         # Create a mock compressed file
         compressed_file = tmp_path / "test.txt.zst"
         compressed_file.write_text("compressed")
-        
+
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stderr="")
             with patch("pathlib.Path.exists", return_value=True):

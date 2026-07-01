@@ -139,7 +139,7 @@ class TestCheckFrameDrops:
         """Returns PASS when no frame drops detected."""
         # Create mock frame data with sequential indices (no drops)
         import tempfile
-        
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
             for i in range(300):
                 f.write(json.dumps({"idx": i}) + "\n")
@@ -147,7 +147,7 @@ class TestCheckFrameDrops:
 
         session = MockSession(frames_jsonl_path=temp_path)
         result = check_frame_drops(session)
-        
+
         os.unlink(temp_path)
 
         assert result["id"] == "QM2"
@@ -158,7 +158,7 @@ class TestCheckFrameDrops:
         """Returns FAIL when frame drops detected."""
         # Create mock frame data with a gap (dropped frame indices)
         import tempfile
-        
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
             for i in range(50):
                 f.write(json.dumps({"idx": i}) + "\n")
@@ -169,7 +169,7 @@ class TestCheckFrameDrops:
 
         session = MockSession(frames_jsonl_path=temp_path)
         result = check_frame_drops(session)
-        
+
         os.unlink(temp_path)
 
         assert result["id"] == "QM2"

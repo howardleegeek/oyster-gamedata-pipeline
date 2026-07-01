@@ -342,7 +342,7 @@ class TestMain:
             mock_urlopen.return_value.__enter__.return_value = mock_response
 
             # Patch stderr to capture error output
-            with mock.patch("sys.stderr", new_callable=StringIO) as mock_stderr:
+            with mock.patch("sys.stderr", new_callable=StringIO) as _:
                 result = acceptance_signal_api.main(
                     ["--url", "https://vendor.example/webhook", "accept", "TXN-12345"]
                 )

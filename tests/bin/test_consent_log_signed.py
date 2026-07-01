@@ -175,7 +175,7 @@ class TestConsentLogSignedLogFile:
         """Log file is created with proper structure."""
         with tempfile.TemporaryDirectory() as tmpdir:
             log_file = Path(tmpdir) / "log.json"
-            log = ConsentLogSigned(log_file=log_file)
+            ConsentLogSigned(log_file=log_file)
             assert log_file.exists()
             data = json.loads(log_file.read_text())
             assert data["version"] == "1.0"
@@ -186,7 +186,7 @@ class TestConsentLogSignedLogFile:
         """Parent directories are created if they don't exist."""
         with tempfile.TemporaryDirectory() as tmpdir:
             log_file = Path(tmpdir) / "subdir" / "nested" / "log.json"
-            log = ConsentLogSigned(log_file=log_file)
+            ConsentLogSigned(log_file=log_file)
             assert log_file.exists()
 
 

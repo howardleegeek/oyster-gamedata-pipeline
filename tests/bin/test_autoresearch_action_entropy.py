@@ -284,7 +284,7 @@ class TestMain:
         action_file = tmp_path / "actions.txt"
         action_file.write_text("move\njump\nmove\nattack\n")
 
-        rc = main([str(action_file), "--verbose"])
+        main([str(action_file), "--verbose"])
 
         captured = capsys.readouterr()
         assert "Top actions:" in captured.out
