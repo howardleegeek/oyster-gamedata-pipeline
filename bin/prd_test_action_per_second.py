@@ -16,7 +16,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-
 MIN_ACTIONS_PER_SECOND = 0.5
 MAX_ACTIONS_PER_SECOND = 5.0
 
