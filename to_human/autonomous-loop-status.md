@@ -2303,3 +2303,11 @@ help: Remove unused import: `shutil`
 Found 4 errors.
 [*] 4 fixable with the `--fix` option. clean, all 3 modules import cleanly, 22/22 tests in tests/test_remote_recorder_backend_e2e.py pass. Self-review: cosmetic F541 cleanup only — no signature change, no exception class change, no threading/auth/security change, no off-by-one, no silent error swallow, no test masked as passing, no brand cross-reference.
 - Result: committed 2f8448ce (pushed to main)
+
+## Round 184 @ 2026-07-02T02:00:00Z
+- Picked: Complete Round 182 ruff cleanup — fix remaining lint errors in 3 files. Fixed:
+  - bin/upload_session.py: removed unused shutil import (F401), sorted imports (I001)
+  - bin/stress_test_huge_tarball_5gb.py: added trailing newline (W292)
+  - bin/stress_test_memory_leak_check.py: added trailing newline (W292)
+  Single-file bounded changes, 3 files, 3-line diff, no behavior change. All 3 modules import cleanly, ruff check clean. Self-review: cosmetic lint cleanup only — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing, no brand cross-reference, no module-level side effect.
+- Result: committed aa710de9 (pushed to main)
