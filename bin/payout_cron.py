@@ -411,6 +411,15 @@ class MockSupabaseClient:
         ]
 
     def list_unpaid_balances(self) -> list[TesterBalance]:
+        """Fetch unpaid tester balances from mock data.
+
+        Returns the pre-configured balance list for testing or development
+        when a real Supabase connection is unavailable.
+
+        Returns:
+            List of TesterBalance dataclasses representing mock testers
+            with their current unpaid balance information.
+        """
         return list(self.balances)
 
     def insert_payout(
