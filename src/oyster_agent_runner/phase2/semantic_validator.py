@@ -201,8 +201,22 @@ def validate_action_camera_semantics(records: list[dict]) -> dict:
     }
 
 
-def main():
-    """CLI entry point."""
+def main() -> None:
+    """CLI entry point for the semantic validator.
+
+    Parses command-line arguments, loads JSON file, validates action camera
+    records, and prints validation results.
+
+    Args:
+        None. Reads input file path from sys.argv[1].
+
+    Returns:
+        None. Exits with code 0 on success, 1 on validation failure.
+
+    Raises:
+        FileNotFoundError: If input file doesn't exist.
+        json.JSONDecodeError: If input file is not valid JSON.
+    """
     if len(sys.argv) != 2:
         print(f"Usage: {sys.argv[0]} <action_camera.json>")
         sys.exit(1)
