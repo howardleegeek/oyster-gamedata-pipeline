@@ -200,6 +200,24 @@ class MockStripeClient:
         description: str | None = None,
         metadata: dict[str, str] | None = None,
     ) -> dict[str, Any]:
+        """Create a Stripe transfer to a connected account.
+
+        Implements idempotent transfers using an in-memory dict. If the same
+        idempotency_key is provided, returns the cached transfer without creating
+        a new one.
+
+        Args:
+            amount_cents: Amount to transfer in US cents.
+            destination_account_id: Stripe connected account ID (acct_xxx).
+            idempotency_key: Unique key for idempotency (re-submit same key
+                returns cached result).
+            description: Optional description for the transfer.
+            metadata: Optional key-value metadata dict.
+
+        Returns:
+            Transfer dict with keys: id, object, amount, currency, destination,
+            created, description, metadata.
+        """
         if idempotency_key in self.transfers_by_key:
             return self.transfers_by_key[idempotency_key]
         self.counter += 1
