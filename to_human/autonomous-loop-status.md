@@ -21,6 +21,10 @@
   Single-file bounded change, 17 insertions, 7 deletions. Module imports cleanly, no tests reference it (standalone red-team tool). Self-review: cosmetic lint cleanup — no signature change, no exception class change, no threading/auth/security change, no off-by-one, no silent error swallow, no test masked as passing, no brand cross-reference.
 - Result: committed 5348cb6d (pushed to main)
 
+## Round 184 @ 2026-07-02T02:30:00Z
+- Picked: Fix ruff F401 unused `ast` import in bin/red_team_nan_coordinates.py:11 — continuation of the ongoing ruff cleanup sweep from Rounds 101-183. Verified `ast` is genuinely unused (grep 'ast\.' returns empty, only the import line). Single-file bounded change, 1-line diff, no behavior change. Module compiles and imports cleanly, no tests reference it (standalone red-team tool). Self-review: cosmetic F401 cleanup only — no signature change, no exception class change, no threading/auth/security change, no off-by-one, no silent error swallow, no test masked as passing, no brand cross-reference.
+- Result: committed ad0b45a0 (pushed to main)
+
 ## Round 180 @ 2026-07-01T14:35:00Z
 - Picked: Fix ruff F401 unused `os` import in bin/recording_watchdog.py:31 — continuation of the ongoing ruff cleanup sweep from Rounds 101-179. Verified `os` is genuinely unused (grep returns only the import line, zero references). Single-file bounded change, 1-line diff, no behavior change. Module compiles and imports cleanly, 11/11 tests in tests/test_e2e_orchestrator.py pass. Self-review: pure lint cleanup — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security issue, no off-by-one, no test masked as passing, no brand cross-reference.
 - Result: committed daad4f4f (pushed to main)
@@ -2311,3 +2315,10 @@ Found 4 errors.
   - bin/stress_test_memory_leak_check.py: added trailing newline (W292)
   Single-file bounded changes, 3 files, 3-line diff, no behavior change. All 3 modules import cleanly, ruff check clean. Self-review: cosmetic lint cleanup only — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing, no brand cross-reference, no module-level side effect.
 - Result: committed aa710de9 (pushed to main)
+
+## Round 184 @ 2026-07-02T02:30:00Z
+- Picked: Fix ruff W292 missing trailing newline in 2 PRD test scripts — continuation of ongoing ruff cleanup. Fixed:
+  - bin/prd_test_left_hand_coordinates.py
+  - bin/prd_test_speed_units_mps.py
+  Single-file bounded changes, 2-line diff, no behavior change. ruff check clean on both modules, both modules import and parse cleanly. Self-review: cosmetic only — no logic change, no test impact, no brand cross-reference.
+- Result: committed 5f68b1f1 (pushed to main)
