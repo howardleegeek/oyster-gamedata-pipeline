@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
 """Tests for bin/batch_quality_aggregate.py."""
 
-import json
 import os
 import tempfile
-from pathlib import Path
-from typing import Any, Dict, List
 
-import pytest
 import yaml
 
 from bin import batch_quality_aggregate as bqa
