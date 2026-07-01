@@ -19,8 +19,19 @@ logger = logging.getLogger(__name__)
 
 # -- lazy imports for heavy optional deps -----------------------------------
 
-def _numpy():
-    import numpy as np; return np  # noqa: F401
+def _numpy() -> Any:
+    """Lazily import numpy, returning the module.
+
+    This is a lazy import to avoid heavy dependency at module load time.
+
+    Returns:
+        The numpy module.
+
+    Raises:
+        ImportError: If numpy is not installed.
+    """
+    import numpy as np  # noqa: F401
+    return np
 
 def _pil_image():
     from PIL import Image; return Image  # noqa: F401
