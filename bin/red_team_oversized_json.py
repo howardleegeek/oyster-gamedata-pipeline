@@ -71,7 +71,8 @@ def test_memory_usage(json_path: Path, max_mb: int = 50) -> tuple[bool, str, int
         for _ in stream_records(json_path):
             record_count += 1
             _, peak = tracemalloc.get_traced_memory()
-            peak_mb = peak_memory / BYTES_PER_MB
+            peak_memory = peak
+        peak_mb = peak_memory / BYTES_PER_MB
         if peak_mb > max_mb:
             return False, f"Memory {peak_mb:.1f}MB exceeds limit {max_mb}MB", peak_memory
         return True, f"Processed {record_count} records, peak {peak_mb:.1f}MB", peak_memory
