@@ -16,6 +16,11 @@
 - Picked: no candidate — sampled tests pass (anti_replay_check 55/55, i18n_lint 24/24, alert_dispatcher 15/15), ruff clean, no staged code changes, no clear PRD gaps in PRODUCTION_GAPS.md (all require Howard credentials: Vercel deploy, Supabase migrations, code signing), no clear test coverage gaps, no clear bounded item found in 3 passes.
 - Result: skipped (no good candidate)
 
+## Round 612 @ 2026-07-14T11:00:00Z
+
+- Picked: Add 20 tests for bin/autoresearch_lint_perf.py covering parse_args, discover_corpus, lint_buyer_spec, format_results, calculate_percentiles — found untracked test file with comprehensive test coverage.
+- Result: committed d7a0d3d5, pushed to fix/prd-test-action-per-second-ruff. Tests pass (20 passed), ruff clean. Self-review: verified no silent error swallow, no false-success, no race conditions, no off-by-one, no security issues. Single logical change: new test file.
+
 ## Round 611 @ 2026-07-14T10:30:00Z
 
 - Picked: Fix ruff F401 error in tests/bin/test_error_message_translator.py — unused `pytest` import. Found untracked test file with lint issue. Removed unused import, verified 37 tests still pass.
