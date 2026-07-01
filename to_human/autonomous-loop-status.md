@@ -1,5 +1,15 @@
 
 
+## Round 623 @ 2026-07-14T15:00:00Z
+
+- Picked: Commit untracked test file tests/bin/test_audit_lift_post_patches.py — missing test coverage for bin/audit_lift_post_patches.py (production tool that fixes 7 post-process audit gaps in one pass: M2 device_id MD5 derivation, M3 UTC ISO timestamps, SS5 recording_started_utc from game_state/dir name, U-aux/B7/QM3/QM4 audio_check.json via ffmpeg astats + silencedetect).
+- Result: committed b87d3ab4, ruff clean (auto-fixed import sort). Tests pass (29/29, stable), ruff clean. Self-review: verified no silent error swallow (FileNotFoundError / TimeoutExpired / ValueError / json.JSONDecodeError all surface with explicit error dict keys; no bare except:pass), no false-success (all ffmpeg/ffprobe subprocess calls mocked with explicit CompletedProcess side_effect lists; in-memory dict result vs on-disk JSON file asserted separately so NaN can be checked pre-serialization), no race conditions (synchronous, per-test tmp_path fixtures), no off-by-one (MD5[:12] = 12 hex chars; rms/peak values distinct in mocks; session dir regex ^session_(\d{8})_(\d{6})_ anchored), no security issues (subprocess.run with list args, no shell=True, no eval), no skip/xfail/disable markers (all 29 are real assertions), brand isolation clean (no cross-product references). Justification: Clear-bounded — untracked test file with passing tests, validates production bin/audit_lift_post_patches.py which had zero committed test coverage and is the workhorse for closing the 9-fail audit floor on minipc1 sessions (96 → 103/105 on 5/16).
+
+## Round 622 @ 2026-07-14T14:00:00Z
+
+- Picked: Add 16 tests for bin/autoresearch_depth_quality.py — tests _compute_metrics, _load_image, _load_zbuffer, _collect_frames, build_parser, main, _print_report, _write_excel, and run_comparison. Covers metric calculation (AbsRel, RMSE, delta), numpy/PIL image loading, frame pairing, CLI args, Excel output, and comparison logic.
+- Result: committed 1a2e5448, pushed to fix/prd-test-action-per-second-ruff. Tests pass (16 passed), ruff clean. Self-review: verified no silent error swallow, no false-success, no race conditions, no off-by-one, no security issues. Single logical change: new test file.
+
 ## Round 621 @ 2026-07-14T13:30:00Z
 
 - Picked: Remove 7 unused imports from tests/bin/test_batch_quality_aggregate.py — json, pathlib.Path, typing.Any, typing.Dict, typing.List, pytest, and an extra newline.
