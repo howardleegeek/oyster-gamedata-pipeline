@@ -1,4 +1,5 @@
 ## Round 181 @ 2026-07-01T21:37:11Z
+
 - Picked: Fix ruff F541 f-string-without-placeholder in bin/obs_websocket_smoke.py:69 — `raise FileNotFoundError(f"OBS not found. Use --obs-path")` has no `{...}` placeholders, just dropped the `f` prefix. Continuation of the ongoing ruff cleanup sweep from Rounds 101-180. Single-file bounded change, 1-line diff, no behavior change (`f"X"` == `"X"`). `ruff check bin/obs_websocket_smoke.py` clean, module parses cleanly, no Python imports reference it (standalone smoke script). Self-review: cosmetic F541 cleanup only — no signature change, no exception class change, no threading/auth/security change, no off-by-one, no silent error swallow, no test masked as passing, no brand cross-reference.
 - Result: committed 046c7fe8 (pushed to main)
 
