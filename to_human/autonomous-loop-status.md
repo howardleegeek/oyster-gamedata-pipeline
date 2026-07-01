@@ -1,6 +1,7 @@
 ## Round 175 @ 2026-06-23T12:00:00Z
 
 
+
 - Picked: Fix ruff I001+E302+E303+E701+E702+W291+W293 cleanup in bin/inventory_voxel_capture.py — picked up the in-progress working-tree change that had been left uncommitted from an earlier round. Alphabetized the import block (stdlib: argparse, json, logging, os, struct, sys, tempfile; from-imports: dataclasses, typing). Added blank lines around top-level function/class defs (E302, E303). Split semicolon-separated statements onto separate lines (E701, E702) — e.g. `slot: int; item_id: int; count: int; damage: int = 0; nbt_hash: str = ""` → 5 separate lines on the InventorySlot dataclass. Stripped trailing whitespace on continuation lines (W291). Continuation of the ongoing ruff cleanup sweep from Rounds 101-174. Single-file bounded change in bin/, 100 insertions / 41 deletions, no behavior change. `ruff check bin/inventory_voxel_capture.py` clean, module imports cleanly, `FrameCapture(frame_index=1).to_dict()` round-trips correctly, 538/538 tests in tests/bin/ pass. Self-review: pure import + whitespace + statement-splitting cleanup — no signature change, no exception flow touched, no threading or concurrency change, no auth or security change, no off-by-one, no silent error swallow, no test masked as passing (no skip/xfail added), no brand cross-reference, no module-level side effect. The companion uncommitted `tests/_payout_cron_test.log` change was an auto-generated test artifact, not source — `git checkout --` discarded it.
 - Result: committed 64dbb7b7 (pushed to main)
 
