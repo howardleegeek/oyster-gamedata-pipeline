@@ -12,7 +12,12 @@ Usage:
 """
 from __future__ import annotations
 
-import argparse, os, subprocess, sys, tempfile, time
+import argparse
+import os
+import subprocess
+import sys
+import tempfile
+import time
 from pathlib import Path
 from typing import Sequence
 
@@ -57,13 +62,16 @@ def _run_sigkill_trial(
     chunks_seen = 0
     try:
         while chunks_seen < kill_after_chunks:
-            if not os.read(r_fd, 1): break
+            if not os.read(r_fd, 1):
+                break
             chunks_seen += 1
-    except OSError: pass
+    except OSError:
+        pass
     os.close(r_fd)
     time.sleep(0.05)
     if proc.poll() is None:
-        proc.kill(); proc.wait(timeout=5)
+        proc.kill()
+        proc.wait(timeout=5)
     tmp_files = list(work_dir.glob(".action_camera_*.tmp"))
     final_files = list(work_dir.glob("action_camera.dat"))
     return {
@@ -89,7 +97,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     with tempfile.TemporaryDirectory(prefix="redteam_sigkill_") as tmpdir:
         work_dir = Path(tmpdir)
         total_chunks = payload_size // chunk_size
-        print(f"[red-team] SIGKILL mid-write test")
+        print("[red-team] SIGKILL mid-write test")
         print(f"  payload={args.payload_kb}KB  chunk={args.chunk_kb}KB  "
               f"sleep={args.delay_ms}ms/chunk  iterations={args.iterations}\n")
         partial_count = final_count = 0
@@ -98,8 +106,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             result = _run_sigkill_trial(
                 work_dir, payload_size, chunk_size, sleep_per_chunk, kill_at)
             status = "PARTIAL-FILE" if result["partial_found"] else "CLEAN"
-            if result["partial_found"]: partial_count += 1
-            if result["final_found"]: final_count += 1
+            if result["partial_found"]:
+                partial_count += 1
+            if result["final_found"]:
+                final_count += 1
             print(f"  trial {i:2d}: kill_after={kill_at} chunks  "
                   f"written={result['chunks_written']}  status={status}")
         print()
