@@ -266,7 +266,7 @@ def main(argv: list[str] | None = None) -> int:
 
         print()
         print("━" * 50)
-        print(f"✅ SESSION UPLOADED")
+        print("✅ SESSION UPLOADED")
         print(f"   key: {s3_key}")
         print(f"   size: {zip_size / 1024 / 1024:.1f} MB")
         print(f"   dashboard: {DASHBOARD_BASE}/sessions/{s3_key}")

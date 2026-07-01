@@ -158,7 +158,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         if not args.keep_temp:
             print("6. Cleaning up...")
         
-        print(f"\n=== SUCCESS ===")
+        print("\n=== SUCCESS ===")
         print(f"Size: {stats['gb']:.2f} GB")
         print(f"Frames: {frames:,}")
         print(f"Output: {args.output}")
