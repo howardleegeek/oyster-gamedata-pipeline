@@ -8,7 +8,6 @@ rather than silently propagating NaN through the system.
 """
 
 import argparse
-import ast
 import sys
 import tempfile
 from pathlib import Path
