@@ -34,12 +34,11 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import shutil
 import sys
 import time
 import zipfile
 from pathlib import Path
-from urllib import request, error
+from urllib import error, request
 
 # ---------------------------------------------------------------------------
 
