@@ -21,14 +21,16 @@ from typing import Any, Dict, List, Optional
 
 def _lazy_yaml():
     try:
-        import yaml; return yaml
+        import yaml
+        return yaml
     except ImportError:
         raise ImportError("PyYAML required: pip install pyyaml")
 
 
 def _lazy_pil():
     try:
-        from PIL import Image, ImageDraw; return Image, ImageDraw
+        from PIL import Image, ImageDraw
+        return Image, ImageDraw
     except ImportError:
         raise ImportError("Pillow required: pip install pillow")
 
@@ -38,10 +40,15 @@ def _lazy_pil():
 @dataclass
 class BBox2D:
     """2D bounding box in image pixel coordinates."""
-    x: float; y: float; width: float; height: float
-    confidence: float = 1.0; class_id: str = "unknown"
+    x: float
+    y: float
+    width: float
+    height: float
+    confidence: float = 1.0
+    class_id: str = "unknown"
     track_id: Optional[str] = None
-    occlusion: float = 0.0; truncation: float = 0.0
+    occlusion: float = 0.0
+    truncation: float = 0.0
 
     def is_visible(self, oc: float = 0.5, tr: float = 0.5) -> bool:
         return self.occlusion <= oc and self.truncation <= tr
@@ -66,9 +73,15 @@ class BBox2D:
 @dataclass
 class BBox3D:
     """3D bounding box in world / ego coordinates."""
-    x: float; y: float; z: float
-    length: float; width: float; height: float; yaw: float
-    confidence: float = 1.0; class_id: str = "unknown"
+    x: float
+    y: float
+    z: float
+    length: float
+    width: float
+    height: float
+    yaw: float
+    confidence: float = 1.0
+    class_id: str = "unknown"
     track_id: Optional[str] = None
 
     def to_carla_dict(self) -> Dict[str, Any]:
@@ -110,10 +123,12 @@ class BBox3D:
 @dataclass
 class FrameData:
     """Bounding boxes for a single frame."""
-    frame_id: str; timestamp: float
+    frame_id: str
+    timestamp: float
     bboxes_2d: List[BBox2D] = field(default_factory=list)
     bboxes_3d: List[BBox3D] = field(default_factory=list)
-    camera_name: Optional[str] = None; scene_id: Optional[str] = None
+    camera_name: Optional[str] = None
+    scene_id: Optional[str] = None
 
     def get_visible_2d(self, oc: float = 0.5, tr: float = 0.5) -> List[BBox2D]:
         return [b for b in self.bboxes_2d if b.is_visible(oc, tr)]
@@ -179,9 +194,11 @@ def export_csv(frames: List[FrameData], oc: float, tr: float) -> str:
             "class_id","track_id","confidence","x","y","width","height",
             "x_3d","y_3d","z_3d","length","width_3d","height_3d","yaw",
             "occlusion","truncation"]
-    w = csv.DictWriter(buf, fieldnames=cols); w.writeheader()
+    w = csv.DictWriter(buf, fieldnames=cols)
+    w.writeheader()
     for fr in frames:
-        v2 = fr.get_visible_2d(oc, tr); v3 = fr.get_visible_3d(oc, tr)
+        v2 = fr.get_visible_2d(oc, tr)
+        v3 = fr.get_visible_3d(oc, tr)
         m3 = {b.track_id: b for b in v3 if b.track_id}
         for b2 in v2:
             b3 = m3.get(b2.track_id) if b2.track_id else None
@@ -232,12 +249,14 @@ def draw_overlay(image_path: Path, frame: FrameData,
     colors = {"vehicle": (255,0,0,128), "pedestrian": (0,255,0,128),
               "bicycle": (0,0,255,128), "unknown": (255,255,0,128)}
     for b in frame.get_visible_2d(oc, tr):
-        x0, y0 = int(b.x), int(b.y); x1, y1 = x0+int(b.width), y0+int(b.height)
+        x0, y0 = int(b.x), int(b.y)
+        x1, y1 = x0+int(b.width), y0+int(b.height)
         c = colors.get(b.class_id.lower(), colors["unknown"])
         draw.rectangle([x0, y0, x1, y1], outline=c[:3], width=2)
         draw.text((x0, y0-14), f"{b.class_id} ({b.confidence:.2f})", fill=c[:3])
     out.parent.mkdir(parents=True, exist_ok=True)
-    img.save(str(out)); return out
+    img.save(str(out))
+    return out
 
 
 # -- CLI --------------------------------------------------------------------
@@ -270,11 +289,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     """Entry point. Returns 0 on success, non-zero on error."""
     args = build_parser().parse_args(argv)
     if not args.input.exists():
-        print(f"Error: input not found: {args.input}", file=sys.stderr); return 1
+        print(f"Error: input not found: {args.input}", file=sys.stderr)
+        return 1
     try:
         frames = load_frames(args.input, args.format)
     except (json.JSONDecodeError, ValueError) as exc:
-        print(f"Error parsing input: {exc}", file=sys.stderr); return 1
+        print(f"Error parsing input: {exc}", file=sys.stderr)
+        return 1
     if not frames:
         print("Warning: no frames found.", file=sys.stderr)
 
@@ -283,7 +304,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         output_str = exporters[args.output_format](
             frames, args.occlusion_thresh, args.truncation_thresh)
     except ImportError as exc:
-        print(f"Error: {exc}", file=sys.stderr); return 1
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
 
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -294,7 +316,8 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.image:
         if not args.image.exists():
-            print(f"Error: image not found: {args.image}", file=sys.stderr); return 1
+            print(f"Error: image not found: {args.image}", file=sys.stderr)
+            return 1
         img_out = args.image_output or (
             args.output.with_suffix(".png") if args.output
             else Path(tempfile.mkdtemp()) / "overlay.png")
