@@ -33,7 +33,12 @@ def _install_tk_stubs() -> None:
         (),
         {"__init__": lambda self, value=False: None, "get": lambda self: False},
     )
-    tk.messagebox = types.SimpleNamespace(showerror=lambda *a, **kw: None)
+    # Use ModuleType instead of SimpleNamespace so that mock.patch() works correctly
+    # SimpleNamespace doesn't support attribute assignment which mock.patch needs
+    messagebox = types.ModuleType("tkinter.messagebox")
+    messagebox.showerror = lambda *a, **kw: None
+    messagebox.askyesno = lambda title, message, parent=None: False
+    tk.messagebox = messagebox
 
     ttk = types.ModuleType("tkinter.ttk")
     ttk.Progressbar = _Widget
@@ -41,7 +46,7 @@ def _install_tk_stubs() -> None:
 
     sys.modules["tkinter"] = tk
     sys.modules["tkinter.ttk"] = ttk
-    sys.modules["tkinter.messagebox"] = types.SimpleNamespace(showerror=lambda *a, **kw: None)
+    sys.modules["tkinter.messagebox"] = messagebox
 
 
 def _import_recorder_module() -> Any:
