@@ -46,8 +46,8 @@ def write_exr(filepath: Path, depth: np.ndarray) -> bool:
         pass
 
     try:
-        import OpenEXR
         import Imath
+        import OpenEXR
         header = OpenEXR.Header(depth.shape[1], depth.shape[0])
         header["channels"] = {"Z": Imath.Channel(Imath.PixelType(Imath.PixelType.FLOAT))}
         exr = OpenEXR.OutputFile(str(filepath), header)
@@ -75,8 +75,8 @@ def read_exr(filepath: Path) -> np.ndarray | None:
         pass
 
     try:
-        import OpenEXR
         import Imath
+        import OpenEXR
         exr = OpenEXR.InputFile(str(filepath))
         dw = exr.header()["dataWindow"]
         w, h = dw.max.x - dw.min.x + 1, dw.max.y - dw.min.y + 1
