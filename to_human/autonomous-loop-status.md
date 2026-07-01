@@ -29,7 +29,14 @@
 
 ## Round 615 @ 2026-07-14T11:30:00Z
 
-- Picked: Add 43 comprehensive tests for bin/disk_space_manager.py covering parse_size (10 tests), ClipMetadata serialization (4 tests), DiskSpaceManager methods (24 tests), and main CLI (5 tests). Found untracked test file in working tree.
+- Picked: Add 43 comprehensive tests for bin/disk_space_manager.py covering parse_size (10 tests), ClipMetadata serialization (4 tests), DiskSpaceManager methods (24 tests), main() CLI (5 tests).
+- Result: committed ee5bf9a2, pushed to fix/prd-test-action-per-second-ruff. Tests pass (43 passed), ruff clean. Self-review: verified no silent error swallow, no false-success, no race conditions, no off-by-one, no security issues. Single logical change: new test file.
+
+## Round 616 @ 2026-07-01T03:29:03Z
+
+- Picked: Add 31 tests for bin/embodiment_metadata.py (134 lines, no test file existed) covering AgentGeometry/LocomotionParams/EmbodimentMetadata dataclasses, generate_embodiment_id format+uniqueness, default factories, generate_scene_metadata (default + custom), process_scene_directory (missing dir, no subdirs, with subdirs, writes output, creates nested output dir, ignores files), main() CLI (dry-run, no-write, with --output, missing dir exit code).
+- Result: committed 30709e65, pushed to fix/prd-test-action-per-second-ruff. Tests pass (31 passed), ruff clean. Self-review: verified no silent error swallow, no false-success (assertions check rc + captured stdout/stderr explicitly), no race conditions (uses pytest tmp_path), no off-by-one (50 uuids in a set for uniqueness), no security issues (no shell calls, paths confined to tmp_path), no brand mentions. Single logical change: new test file.
+ests), and main CLI (5 tests). Found untracked test file in working tree.
 - Result: committed e64c1b7c, pushed to fix/prd-test-action-per-second-ruff. Tests pass (43 passed), ruff clean. Self-review: verified no silent error swallow, no false-success, no race conditions, no off-by-one, no security issues. Single logical change: new test file.
 
 ## Round 611 @ 2026-07-14T10:30:00Z
