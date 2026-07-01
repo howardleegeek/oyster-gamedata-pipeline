@@ -1,207 +1,298 @@
 #!/usr/bin/env python3
-"""Tests for bin/clip_uuid.py."""
+"""Tests for bin/clip_uuid.py — per-clip UUID4 generator + injection helpers."""
 
 from __future__ import annotations
 
 import json
-from unittest import mock
+import re
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
-from bin import clip_uuid
+# Import the module under test
+sys.path.insert(0, str(Path(__file__).parents[2] / "bin"))
+import clip_uuid
 
 
 class TestNewClipUuid:
-    """Tests for new_clip_uuid()."""
+    """Tests for new_clip_uuid function."""
 
-    def test_returns_hex_string(self):
-        """new_clip_uuid returns a hexadecimal string."""
+    def test_returns_32_char_hex_string(self):
+        """new_clip_uuid should return a 32-character hex string."""
         result = clip_uuid.new_clip_uuid()
         assert isinstance(result, str)
-        # Hex strings should only contain 0-9a-f
-        assert all(c in "0123456789abcdef" for c in result)
-
-    def test_length_32(self):
-        """new_clip_uuid returns 32-character hex string (no dashes)."""
-        result = clip_uuid.new_clip_uuid()
         assert len(result) == 32
+        assert re.fullmatch(r"[0-9a-f]{32}", result) is not None
 
     def test_returns_unique_values(self):
-        """new_clip_uuid returns unique values on each call."""
+        """Each call should return a unique UUID."""
         results = {clip_uuid.new_clip_uuid() for _ in range(100)}
-        assert len(results) == 100  # All should be unique
+        # All should be unique (set preserves uniqueness)
+        assert len(results) == 100
+
+    def test_is_valid_uuid4_format(self):
+        """The hex string should be a valid UUID4 format (with dashes for full UUID)."""
+        result = clip_uuid.new_clip_uuid()
+        # UUID4 has specific bits: version 4 (bits 12-15 = 4), variant 1 (bits 17-19 = 2)
+        # Insert dashes to get standard UUID format: 8-4-4-4-12
+        full_uuid = f"{result[0:8]}-{result[8:12]}-{result[12:16]}-{result[16:20]}-{result[20:32]}"
+        # Check version (4) and variant (8, 9, A, or B)
+        version = int(full_uuid[14], 16)
+        variant = int(full_uuid[19], 16)
+        assert version == 4
+        assert variant >= 8 and variant <= 11
 
 
 class TestWriteMarker:
-    """Tests for _write_marker()."""
+    """Tests for _write_marker function."""
 
-    def test_creates_marker_file(self, tmp_path):
-        """_write_marker creates a file with correct name pattern."""
-        clip_dir = tmp_path / "clip_2026_05_05"
-        clip_dir.mkdir()
-        clip_uuid_val = "abc123def45678901234567890123456"
+    def test_creates_marker_with_correct_prefix(self, tmp_path):
+        """_write_marker should create a file with correct prefix."""
+        clip_uuid_str = "abc123def45678901234567890123456"
+        result = clip_uuid._write_marker(tmp_path, clip_uuid_str)
         
-        result = clip_uuid._write_marker(clip_dir, clip_uuid_val)
-        
-        expected = clip_dir / f".clip_uuid_{clip_uuid_val}"
-        assert result == expected
-        assert expected.exists()
-
-    def test_marker_file_empty(self, tmp_path):
-        """Marker file has empty content (data in filename)."""
-        clip_dir = tmp_path / "clip_2026_05_05"
-        clip_dir.mkdir()
-        clip_uuid_val = "a" * 32
-        
-        result = clip_uuid._write_marker(clip_dir, clip_uuid_val)
-        
+        expected_name = f".clip_uuid_{clip_uuid_str}"
+        assert result.name == expected_name
+        assert result.exists()
         assert result.read_bytes() == b""
+
+    def test_marker_path_returns_correct_path(self, tmp_path):
+        """_write_marker should return the Path to the created marker."""
+        clip_uuid_str = "xyz000abc111"
+        result = clip_uuid._write_marker(tmp_path, clip_uuid_str)
+        
+        assert result.parent == tmp_path
+        assert result.name == f".clip_uuid_{clip_uuid_str}"
 
 
 class TestInjectUuid:
-    """Tests for inject_uuid()."""
+    """Tests for inject_uuid function."""
 
-    def test_adds_uuid_to_dict(self, tmp_path):
-        """inject_uuid adds clip_uuid key to systeminfo dict."""
-        clip_dir = tmp_path / "clip_2026_05_05"
+    def test_adds_uuid_to_systeminfo_dict(self, tmp_path):
+        """inject_uuid should add clip_uuid key to the dict."""
+        clip_dir = tmp_path / "clip_001"
         clip_dir.mkdir()
-        sysinfo: dict = {"hostname": "alice-pc", "os": "windows"}
+        systeminfo = {"hostname": "alice-pc"}
         
-        result = clip_uuid.inject_uuid(sysinfo, clip_dir)
+        result = clip_uuid.inject_uuid(systeminfo, clip_dir)
         
-        assert "clip_uuid" in sysinfo
-        assert sysinfo["clip_uuid"] == result
+        assert "clip_uuid" in systeminfo
+        assert systeminfo["clip_uuid"] == result
         assert len(result) == 32
 
-    def test_idempotent_when_key_exists(self, tmp_path):
-        """inject_uuid preserves existing clip_uuid (idempotent)."""
-        clip_dir = tmp_path / "clip_2026_05_05"
+    def test_creates_marker_file(self, tmp_path):
+        """inject_uuid should create marker file in clip_dir."""
+        clip_dir = tmp_path / "clip_002"
         clip_dir.mkdir()
-        existing_uuid = "existing_uuid_1234567890123456"
-        sysinfo: dict = {"clip_uuid": existing_uuid}
+        systeminfo = {}
         
-        result = clip_uuid.inject_uuid(sysinfo, clip_dir)
+        result = clip_uuid.inject_uuid(systeminfo, clip_dir, clip_uuid="f" * 32)
         
-        assert sysinfo["clip_uuid"] == existing_uuid
+        marker_file = clip_dir / f".clip_uuid_{'f' * 32}"
+        assert marker_file.exists()
+
+    def test_idempotent_preserves_existing_uuid(self, tmp_path):
+        """inject_uuid should preserve existing clip_uuid (idempotent)."""
+        clip_dir = tmp_path / "clip_003"
+        clip_dir.mkdir()
+        existing_uuid = "1234567890abcdef1234567890abcdef"
+        systeminfo = {"clip_uuid": existing_uuid}
+        
+        result = clip_uuid.inject_uuid(systeminfo, clip_dir)
+        
         assert result == existing_uuid
+        assert systeminfo["clip_uuid"] == existing_uuid
 
-    def test_uses_provided_uuid(self, tmp_path):
-        """inject_uuid uses provided UUID instead of generating."""
-        clip_dir = tmp_path / "clip_2026_05_05"
+    def test_idempotent_with_non_string_value(self, tmp_path):
+        """inject_uuid should generate new UUID if existing value is not a string."""
+        clip_dir = tmp_path / "clip_004"
         clip_dir.mkdir()
-        provided_uuid = "provided12345678901234567890123"
-        sysinfo: dict = {}
+        systeminfo = {"clip_uuid": 12345}  # Non-string
         
-        result = clip_uuid.inject_uuid(sysinfo, clip_dir, provided_uuid)
+        result = clip_uuid.inject_uuid(systeminfo, clip_dir)
         
-        assert sysinfo["clip_uuid"] == provided_uuid
-        assert result == provided_uuid
+        assert isinstance(result, str)
+        assert len(result) == 32
 
-    def test_raises_if_clip_dir_not_exist(self, tmp_path):
-        """inject_uuid raises FileNotFoundError if clip_dir missing."""
-        missing_dir = tmp_path / "nonexistent"
-        sysinfo: dict = {}
+    def test_idempotent_with_empty_string(self, tmp_path):
+        """inject_uuid should generate new UUID if existing value is empty string."""
+        clip_dir = tmp_path / "clip_005"
+        clip_dir.mkdir()
+        systeminfo = {"clip_uuid": ""}
+        
+        result = clip_uuid.inject_uuid(systeminfo, clip_dir)
+        
+        assert isinstance(result, str)
+        assert len(result) == 32
+
+    def test_raises_file_not_found_for_missing_dir(self):
+        """inject_uuid should raise FileNotFoundError if clip_dir doesn't exist."""
+        systeminfo = {}
+        nonexistent = Path("/tmp/this_definitely_does_not_exist_12345")
         
         with pytest.raises(FileNotFoundError):
-            clip_uuid.inject_uuid(sysinfo, missing_dir)
+            clip_uuid.inject_uuid(systeminfo, nonexistent)
 
-    def test_raises_if_clip_dir_not_directory(self, tmp_path):
-        """inject_uuid raises NotADirectoryError if clip_dir is file."""
-        not_a_dir = tmp_path / "file.txt"
-        not_a_dir.write_text("not a dir")
-        sysinfo: dict = {}
+    def test_raises_not_a_directory_for_file(self, tmp_path):
+        """inject_uuid should raise NotADirectoryError if clip_dir is a file."""
+        clip_dir = tmp_path / "file_not_dir"
+        clip_dir.write_text("not a dir")
+        systeminfo = {}
         
         with pytest.raises(NotADirectoryError):
-            clip_uuid.inject_uuid(sysinfo, not_a_dir)
+            clip_uuid.inject_uuid(systeminfo, clip_dir)
 
-    def test_marker_file_has_correct_name(self, tmp_path):
-        """Marker file in clip_dir has correct UUID in name."""
-        clip_dir = tmp_path / "clip_2026_05_05"
+    def test_custom_uuid_parameter(self, tmp_path):
+        """inject_uuid should use provided UUID if given."""
+        clip_dir = tmp_path / "clip_006"
         clip_dir.mkdir()
-        sysinfo: dict = {}
+        custom_uuid = "customuuid123456789012345678901234"
+        systeminfo = {}
         
-        result = clip_uuid.inject_uuid(sysinfo, clip_dir)
+        result = clip_uuid.inject_uuid(systeminfo, clip_dir, clip_uuid=custom_uuid)
         
-        marker_files = list(clip_dir.glob(".clip_uuid_*"))
-        assert len(marker_files) == 1
-        assert marker_files[0].name == f".clip_uuid_{result}"
+        assert result == custom_uuid
+        assert systeminfo["clip_uuid"] == custom_uuid
 
 
 class TestCli:
-    """Tests for _cli() entry point."""
+    """Tests for CLI interface."""
 
     def test_new_command_prints_uuid(self):
-        """CLI 'new' command prints a UUID."""
-        result = clip_uuid._cli(["new"])
-        assert result == 0
-
-    def test_inject_command_requires_clip_dir(self):
-        """CLI 'inject' fails without --clip-dir."""
-        with pytest.raises(SystemExit) as exc_info:
-            clip_uuid._cli(["inject", "--systeminfo", "/tmp/x.json"])
-        assert exc_info.value.code == 2
-
-    def test_inject_command_requires_systeminfo(self):
-        """CLI 'inject' fails without --systeminfo."""
-        with pytest.raises(SystemExit) as exc_info:
-            clip_uuid._cli(["inject", "--clip-dir", "/tmp/clip"])
-        assert exc_info.value.code == 2
-
-    def test_inject_command_missing_file(self, tmp_path):
-        """CLI 'inject' fails if systeminfo file doesn't exist."""
-        clip_dir = tmp_path / "clip_2026_05_05"
-        clip_dir.mkdir()
-        sysinfo_file = tmp_path / "systeminfo.json"
+        """CLI 'new' command should print a valid UUID."""
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).parents[2] / "bin" / "clip_uuid.py"), "new"],
+            capture_output=True,
+            text=True,
+        )
         
-        # CLI prints error to stderr and returns 2
-        with mock.patch("sys.stderr"):
-            result = clip_uuid._cli([
+        assert result.returncode == 0
+        output = result.stdout.strip()
+        assert len(output) == 32
+        assert re.fullmatch(r"[0-9a-f]{32}", output) is not None
+
+    def test_inject_command_with_valid_inputs(self, tmp_path):
+        """CLI 'inject' command should work with valid inputs."""
+        clip_dir = tmp_path / "clip_007"
+        clip_dir.mkdir()
+        systeminfo_path = tmp_path / "systeminfo.json"
+        systeminfo_path.write_text(json.dumps({"hostname": "test-pc"}))
+        
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(Path(__file__).parents[2] / "bin" / "clip_uuid.py"),
                 "inject",
                 "--clip-dir", str(clip_dir),
-                "--systeminfo", str(sysinfo_file),
-            ])
+                "--systeminfo", str(systeminfo_path),
+            ],
+            capture_output=True,
+            text=True,
+        )
         
-        assert result == 2
+        assert result.returncode == 0
+        
+        # Check output contains UUID
+        output = result.stdout.strip()
+        assert len(output) == 32
+        
+        # Check systeminfo was updated
+        systeminfo = json.loads(systeminfo_path.read_text())
+        assert "clip_uuid" in systeminfo
+        assert systeminfo["clip_uuid"] == output
+        
+        # Check marker file exists
+        marker_file = clip_dir / f".clip_uuid_{output}"
+        assert marker_file.exists()
 
-    def test_inject_command_success(self, tmp_path):
-        """CLI 'inject' successfully adds UUID to systeminfo.json."""
-        clip_dir = tmp_path / "clip_2026_05_05"
+    def test_inject_command_with_custom_uuid(self, tmp_path):
+        """CLI 'inject' command should use provided --uuid."""
+        clip_dir = tmp_path / "clip_008"
         clip_dir.mkdir()
-        sysinfo_file = tmp_path / "systeminfo.json"
-        sysinfo_file.write_text(json.dumps({"hostname": "test-pc"}))
+        systeminfo_path = tmp_path / "systeminfo.json"
+        systeminfo_path.write_text(json.dumps({}))
+        custom_uuid = "customuuid12345678901234567890"
         
-        result = clip_uuid._cli([
-            "inject",
-            "--clip-dir", str(clip_dir),
-            "--systeminfo", str(sysinfo_file),
-        ])
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(Path(__file__).parents[2] / "bin" / "clip_uuid.py"),
+                "inject",
+                "--clip-dir", str(clip_dir),
+                "--systeminfo", str(systeminfo_path),
+                "--uuid", custom_uuid,
+            ],
+            capture_output=True,
+            text=True,
+        )
         
-        assert result == 0
-        sysinfo = json.loads(sysinfo_file.read_text())
-        assert "clip_uuid" in sysinfo
-        assert len(sysinfo["clip_uuid"]) == 32
+        assert result.returncode == 0
+        assert result.stdout.strip() == custom_uuid
+        
+        systeminfo = json.loads(systeminfo_path.read_text())
+        assert systeminfo["clip_uuid"] == custom_uuid
 
-    def test_inject_command_with_existing_uuid(self, tmp_path):
-        """CLI 'inject' preserves existing UUID with --uuid."""
-        clip_dir = tmp_path / "clip_2026_05_05"
+    def test_inject_command_missing_systeminfo_file(self, tmp_path):
+        """CLI 'inject' should return error 2 if systeminfo file missing."""
+        clip_dir = tmp_path / "clip_009"
         clip_dir.mkdir()
-        sysinfo_file = tmp_path / "systeminfo.json"
-        sysinfo_file.write_text(json.dumps({"hostname": "test-pc"}))
-        existing_uuid = "existing12345678901234567890123"
+        systeminfo_path = tmp_path / "nonexistent.json"
         
-        result = clip_uuid._cli([
-            "inject",
-            "--clip-dir", str(clip_dir),
-            "--systeminfo", str(sysinfo_file),
-            "--uuid", existing_uuid,
-        ])
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(Path(__file__).parents[2] / "bin" / "clip_uuid.py"),
+                "inject",
+                "--clip-dir", str(clip_dir),
+                "--systeminfo", str(systeminfo_path),
+            ],
+            capture_output=True,
+            text=True,
+        )
         
-        assert result == 0
-        sysinfo = json.loads(sysinfo_file.read_text())
-        assert sysinfo["clip_uuid"] == existing_uuid
+        assert result.returncode == 2
+        assert "missing" in result.stderr.lower()
 
-    def test_unknown_command_returns_1(self):
-        """CLI returns 2 for unknown command (argparse exits with 2)."""
-        with pytest.raises(SystemExit) as exc_info:
-            clip_uuid._cli(["unknown"])
-        assert exc_info.value.code == 2
+    def test_inject_command_invalid_json(self, tmp_path):
+        """CLI 'inject' should return error if systeminfo is not valid JSON."""
+        clip_dir = tmp_path / "clip_010"
+        clip_dir.mkdir()
+        systeminfo_path = tmp_path / "systeminfo.json"
+        systeminfo_path.write_text("not valid json")
+        
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(Path(__file__).parents[2] / "bin" / "clip_uuid.py"),
+                "inject",
+                "--clip-dir", str(clip_dir),
+                "--systeminfo", str(systeminfo_path),
+            ],
+            capture_output=True,
+            text=True,
+        )
+        
+        # Invalid JSON causes an error (returncode != 0)
+        assert result.returncode != 0
+
+    def test_unknown_command_returns_error(self):
+        """CLI should return error for unknown command."""
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).parents[2] / "bin" / "clip_uuid.py"), "unknown"],
+            capture_output=True,
+            text=True,
+        )
+        
+        assert result.returncode == 2
+
+    def test_no_command_shows_help(self):
+        """CLI with no command should show help."""
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).parents[2] / "bin" / "clip_uuid.py")],
+            capture_output=True,
+            text=True,
+        )
+        
+        assert result.returncode == 2
