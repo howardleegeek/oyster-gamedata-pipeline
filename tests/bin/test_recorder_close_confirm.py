@@ -56,25 +56,25 @@ class TestConfirmCloseWhileRecording:
 
     def test_returns_true_when_user_confirms_close(self):
         """User clicking Yes (True) should return True."""
-        sys.modules["tkinter.messagebox"].askyesno = MagicMock(return_value=True)
-        result = rcc.confirm_close_while_recording()
-        assert result is True
-        sys.modules["tkinter.messagebox"].askyesno.assert_called_once()
+        # Patch at the tkinter.messagebox module level (imported inside function)
+        with patch("tkinter.messagebox.askyesno", return_value=True):
+            result = rcc.confirm_close_while_recording()
+            assert result is True
 
     def test_returns_false_when_user_cancels_close(self):
         """User clicking No (False) should return False."""
-        sys.modules["tkinter.messagebox"].askyesno = MagicMock(return_value=False)
-        result = rcc.confirm_close_while_recording()
-        assert result is False
-        sys.modules["tkinter.messagebox"].askyesno.assert_called_once()
+        with patch("tkinter.messagebox.askyesno", return_value=False):
+            result = rcc.confirm_close_while_recording()
+            assert result is False
 
     def test_returns_false_on_messagebox_exception(self):
         """Any exception from messagebox should return False (safe default)."""
-        sys.modules["tkinter.messagebox"].askyesno = MagicMock(
-            side_effect=Exception("Display error")
-        )
-        result = rcc.confirm_close_while_recording()
-        assert result is False
+        with patch(
+            "tkinter.messagebox.askyesno",
+            side_effect=Exception("Display error"),
+        ):
+            result = rcc.confirm_close_while_recording()
+            assert result is False
 
     def test_custom_title_and_message(self):
         """Custom title and message should be passed to askyesno."""
