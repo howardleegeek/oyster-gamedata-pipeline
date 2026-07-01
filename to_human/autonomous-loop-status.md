@@ -1,3 +1,7 @@
+## Round 181 @ 2026-07-01T21:37:11Z
+- Picked: Fix ruff F541 f-string-without-placeholder in bin/obs_websocket_smoke.py:69 — `raise FileNotFoundError(f"OBS not found. Use --obs-path")` has no `{...}` placeholders, just dropped the `f` prefix. Continuation of the ongoing ruff cleanup sweep from Rounds 101-180. Single-file bounded change, 1-line diff, no behavior change (`f"X"` == `"X"`). `ruff check bin/obs_websocket_smoke.py` clean, module parses cleanly, no Python imports reference it (standalone smoke script). Self-review: cosmetic F541 cleanup only — no signature change, no exception class change, no threading/auth/security change, no off-by-one, no silent error swallow, no test masked as passing, no brand cross-reference.
+- Result: committed 046c7fe8 (pushed to main)
+
 ## Round 180 @ 2026-07-01T14:35:00Z
 - Picked: Fix ruff F401 unused `os` import in bin/recording_watchdog.py:31 — continuation of the ongoing ruff cleanup sweep from Rounds 101-179. Verified `os` is genuinely unused (grep returns only the import line, zero references). Single-file bounded change, 1-line diff, no behavior change. Module compiles and imports cleanly, 11/11 tests in tests/test_e2e_orchestrator.py pass. Self-review: pure lint cleanup — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security issue, no off-by-one, no test masked as passing, no brand cross-reference.
 - Result: committed daad4f4f (pushed to main)
