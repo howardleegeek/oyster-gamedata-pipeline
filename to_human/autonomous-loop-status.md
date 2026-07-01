@@ -2,6 +2,11 @@
 
 
 
+## Round 638 @ 2026-07-02T07:00:00-07:00
+
+- Picked: Add 14 tests for bin/backend_stub.py — tests health endpoint, session CRUD (create with/without ID, list, get), metadata JSON parsing, video upload, invalid metadata error, 404 handling, reset store, and CLI arguments.
+- Result: committed c9cf0ed5, pushed. Tests pass (14/14), ruff clean. Self-review: verified no silent error swallow (exceptions propagate), no false-success (all return values asserted), no race conditions (synchronous test client), no off-by-one (loops/bounds checked), no security issues (no shell=True), no skip/xfail/disable markers. Justification: Clear-bounded — uncovered G013 backend stub with zero test coverage.
+
 ## Round 637 @ 2026-07-02T06:30:00-07:00
 
 - Picked: Add 11 tests for bin/recorder_close_confirm.py — tests confirm_close_while_recording (Yes/No returns, exception handling, custom title/message/parent), attach_to_root (protocol wiring, armed state, user cancel), and constants (Chinese title/message per G278 spec).
@@ -105,3 +110,8 @@
 
 - Picked: Add 26 tests for bin/autoresearch_recovery_time.py — tests find_adapter_pid (success/empty/nonzero/OSError/ValueError), kill_adapter (SIGKILL, ProcessLookupError, OSError), start_adapter (Popen success, OSError), wait_for_first_clip (new clip appears, timeout, non-clip extensions, missing dir, all video extensions), run_single_trial (no pid+start fail, kill fail, success, timeout+terminate), main (missing dir rc=1, no-successful-trials rc=1, JSON output with aggregates, default args, --help, --adapter-name passthrough), and module sanity.
 - Result: committed 0f181191, pushed. Tests pass (26/26), ruff clean. Self-review: verified no silent error swallow (asserted return values on all error paths), no false-success (every test asserts rc/state), no race conditions (time.time/time.sleep mocked), no off-by-one (controlled glob() sequences), no security issues (no shell=True, subprocess mocked), no skip/xfail/disable markers, no cross-brand references. Justification: Clear-bounded — uncovered G119 crash-recovery measurement with zero test coverage.
+
+## Round 639 @ 2026-07-02T07:30:00-07:00
+
+- Picked: Recover orphan test file tests/bin/test_audio_track_extractor.py — 30 tests for bin/audio_track_extractor.py (audio extraction + QC reporting). Tests module constants (MAX_GAP_MS, DEFAULT_SAMPLE_RATE, DEFAULT_CHANNELS, SILENCE_THRESHOLD_DB, DISTORTION_CLIP_RATIO), _get_numpy, _ensure_ffmpeg (success/FileNotFoundError/CalledProcessError/ffprobe-missing), _run_ffprobe, _get_audio_info, _decode_to_wav, _detect_gaps, _analyze_volume_and_distortion, _read_pcm_samples, extract_and_validate, main CLI (missing args SystemExit, ffmpeg unavailable returns 1), and module surface. Picked because it was an untracked test file from a prior round that never got committed, and it covers an untested PRD module with zero test coverage.
+- Result: committed 9005c05a, pushed. Tests pass (30/30), ruff clean. Self-review: verified no silent error swallow (FileNotFoundError and CalledProcessError paths explicitly tested returning False safe default), no false-success (all return values and call counts asserted concretely), no race conditions (synchronous, subprocess.run mocked), no off-by-one, no security issues (no shell=True in any test), no skip/xfail/disable markers. Justification: Clear-bounded — orphan test file from a prior round that was never committed; tests audio extraction pipeline with zero prior coverage.
