@@ -27,6 +27,11 @@
 - Picked: Add 20 tests for bin/autoresearch_lint_perf.py covering parse_args, discover_corpus, lint_buyer_spec, format_results, calculate_percentiles — found untracked test file with comprehensive test coverage.
 - Result: committed d7a0d3d5, pushed to fix/prd-test-action-per-second-ruff. Tests pass (20 passed), ruff clean. Self-review: verified no silent error swallow, no false-success, no race conditions, no off-by-one, no security issues. Single logical change: new test file.
 
+## Round 615 @ 2026-07-14T11:30:00Z
+
+- Picked: Add 43 comprehensive tests for bin/disk_space_manager.py covering parse_size (10 tests), ClipMetadata serialization (4 tests), DiskSpaceManager methods (24 tests), and main CLI (5 tests). Found untracked test file in working tree.
+- Result: committed e64c1b7c, pushed to fix/prd-test-action-per-second-ruff. Tests pass (43 passed), ruff clean. Self-review: verified no silent error swallow, no false-success, no race conditions, no off-by-one, no security issues. Single logical change: new test file.
+
 ## Round 611 @ 2026-07-14T10:30:00Z
 
 - Picked: Fix ruff F401 error in tests/bin/test_error_message_translator.py — unused `pytest` import. Found untracked test file with lint issue. Removed unused import, verified 37 tests still pass.
@@ -98,6 +103,7 @@
 - Result: committed <pending>, pushed to fix/prd-test-action-per-second-ruff. Tests pass (16/16), ruff clean. Self-review passed (checked prefix g234_errors_ matches source, mkdtemp creates dir so exists()/is_dir() are true, format_exception returns non-empty traceback, install returns True first time then False (idempotent), uninstall returns False when not installed True after install, sys.excepthook restored from _g234_original_excepthook on uninstall, --check prints installed: bool and returns 1 when not 0 when installed, --install prints "installed"/"already installed" and returns 0, --uninstall prints "uninstalled"/"were not installed" and returns 0, default no-args falls through to install and prints "default mode" and returns 0, no silent error swallow, no false-success, no race conditions, no skip/xfail markers, brand isolation clean). Justification: Clear-bounded — untracked test file with passing tests, validates bin/auto_install_error_handler.py which has production code for G234 global error-handling bootstrap.
 
 ## Round 592 @ 2026-06-30T09:20:00Z
+
 
 - Picked: Fix consent_log_signed.py — read-only commands (list, verify) now require existing log file, failing fast with clear error instead of misleading empty output.
 - Result: committed 3a61d9d9, pushed to fix/prd-test-action-per-second-ruff. Tests pass (30/30), ruff clean. Self-review passed (checked error message on missing file, exit code 1, stderr output, no silent error swallow, no false-success, no race conditions, no skip/xfail markers, brand isolation clean). Justification: Clear-bounded — single file fix, existing test already covers missing log file scenario.
