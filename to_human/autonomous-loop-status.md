@@ -1,5 +1,10 @@
 
 
+## Round 629 @ 2026-07-01T10:15:00Z
+
+- Picked: Add 18 tests for bin/red_team_disk_full.py — tests CLI parsing (--help, --size, --payload, --verbose), _run() exception handling, _simulate_enospc() ENOSPC detection, _fill_disk() chunked write behavior, _cleanup() error resilience, subprocess end-to-end.
+- Result: committed 3209a852, pushed. Tests pass (18/18), ruff clean. Self-review: verified no silent error swallow (all OSError paths propagate or are explicitly tested), no false-success (return codes 0/1 asserted for all paths), no race conditions (synchronous, per-test tmp_path), no off-by-one (errno values checked correctly), no security issues (no shell=True, all filesystem ops scoped to tmp_path), no skip/xfail/disable markers. Justification: Clear-bounded — uncovered red team tool with zero test coverage; validates ENOSPC simulation for disk-full failure testing.
+
 ## Round 628 @ 2026-07-01T09:40:18Z
 
 - Picked: Add 35 tests for bin/red_team_concurrent_writers.py — tests _make_payloads (count, non-zero size, naming convention, determinism for same seed, seed sensitivity, n=0 edge case, parent dir constraint, size range bounds 512–8192), _tar_bytes (bytes type, non-empty, round-trip names, sha256 content preservation, empty source produces valid empty tarball, subdirectory recursion), _verify (success, missing tarball, corrupt content, missing member, truncated gzip stream), run_concurrent_test (default 2-worker, single worker, 4-worker contention, info dict schema, results tuple schema, small/larger file counts, seed independence), main CLI (--help exits 0, default --verbose prints structured output, no-verbose PASS line, --workers 1, -v short flag, unknown arg SystemExit, subprocess --help, subprocess end-to-end).
