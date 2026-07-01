@@ -90,13 +90,45 @@ def analyze_file(filepath: Path) -> int:
     """Analyze a Python file for Vector3 format consistency."""
     try:
         source = filepath.read_text()
-        ast.parse(source)
+        tree = ast.parse(source)
     except (SyntaxError, OSError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 
+    # Extract 'positions' variable from the AST
+    positions: list[dict[str, Vector3]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == "positions":
+                    if isinstance(node.value, ast.List):
+                        for elt in node.value.elts:
+                            if isinstance(elt, ast.Dict):
+                                entry: dict[str, Vector3] = {}
+                                for key, value in zip(elt.keys, elt.values):
+                                    if isinstance(key, ast.Constant) and key.value == "position":
+                                        # Try to extract the position value
+                                        if isinstance(value, ast.Dict):
+                                            pos_dict: Vector3Dict = {}
+                                            for k, v in zip(value.keys, value.values):
+                                                if isinstance(k, ast.Constant) and isinstance(v, (ast.Constant, ast.Num)):
+                                                    pos_dict[k.value if isinstance(k, ast.Constant) else (k.n if hasattr(k, 'n') else str(k))] = v.value if isinstance(v, ast.Constant) else (v.n if hasattr(v, 'n') else 0.0)
+                                            entry["position"] = pos_dict
+                                        elif isinstance(value, (ast.List, ast.Tuple)):
+                                            pos_list: Vector3List = []
+                                            for v in value.elts:
+                                                if isinstance(v, (ast.Constant, ast.Num)):
+                                                    pos_list.append(v.value if isinstance(v, ast.Constant) else (v.n if hasattr(v, 'n') else 0.0))
+                                            entry["position"] = pos_list
+                                if entry:
+                                    positions.append(entry)
+
+    if not positions:
+        print(f"Warning: No 'positions' variable found in {filepath}", file=sys.stderr)
+        return 1
+
     print(f"Analyzing {filepath}...")
-    is_valid, errors = validate_format_consistency(SAMPLE_POSITIONS)
+    is_valid, errors = validate_format_consistency(positions)
 
     if is_valid:
         print("✓ Format is consistent")
