@@ -203,7 +203,25 @@ class StructuralReport:
     drift_sample_count_per_field: dict[str, int] = field(default_factory=dict)
 
 
-def compute_structural_report(records_a: list[dict], records_b: list[dict]) -> StructuralReport:
+def compute_structural_report(
+    records_a: list[dict],
+    records_b: list[dict],
+) -> StructuralReport:
+    """Compute a structural comparison report between two record collections.
+
+    Analyzes field-level differences between two lists of dictionaries (e.g.,
+    gameinfo records from different clips). Computes:
+    - Field set difference (only in A, only in B, shared)
+    - Percentage of paired records (by index) with identical field sets
+    - Mean absolute drift for shared numeric fields (recursively)
+
+    Args:
+        records_a: First list of record dictionaries.
+        records_b: Second list of record dictionaries.
+
+    Returns:
+        StructuralReport with field differences and drift statistics.
+    """
     fd = compute_field_set_diff(records_a, records_b)
 
     # % of paired records (by index) that share the exact same set of keys.
