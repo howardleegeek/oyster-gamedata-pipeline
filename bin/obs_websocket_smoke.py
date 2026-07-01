@@ -66,7 +66,7 @@ class OBSSmokeTest:
         for p in candidates:
             if Path(p).exists():
                 return p
-        raise FileNotFoundError(f"OBS not found. Use --obs-path")
+        raise FileNotFoundError("OBS not found. Use --obs-path")
 
     def start_obs(self) -> None:
         """Start OBS Studio as subprocess."""
