@@ -212,8 +212,19 @@ def do_upload(args: argparse.Namespace) -> int:
     return do_resume_internal(checkpoint)
 
 
-def do_resume(args) -> int:
-    """Resume an interrupted upload from checkpoint."""
+def do_resume(args: argparse.Namespace) -> int:
+    """Resume an interrupted upload from checkpoint.
+
+    Loads checkpoint state from disk and resumes the multipart upload
+    from where it left off, skipping already-uploaded parts.
+
+    Args:
+        args: Command-line arguments with 'checkpoint' attribute pointing
+            to the checkpoint file path.
+
+    Returns:
+        Exit code: 0 on success, 1 on error.
+    """
     checkpoint = CheckpointState.load(args.checkpoint)
     return do_resume_internal(checkpoint)
 
