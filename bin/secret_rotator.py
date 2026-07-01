@@ -95,6 +95,14 @@ class RotationState:
             except (json.JSONDecodeError, OSError) as exc:
                 log.warning("Corrupt state %s: %s", state_file, exc)
     def save(self) -> None:
+        """Save the rotation state to disk atomically.
+
+        Writes to a temporary directory first, then atomically replaces the
+        state file to avoid partial writes on crash.
+
+        Raises:
+            OSError: If the directory cannot be created or the file cannot be written.
+        """
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
         tmp_dir = tempfile.mkdtemp(dir=self.state_file.parent)
         tmp = Path(tmp_dir, "tmp.json")
