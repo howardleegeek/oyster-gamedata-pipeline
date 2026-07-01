@@ -420,3 +420,7 @@
 
 - Picked: Fix latent test bug in tests/bin/test_zbuffer_to_exr.py — test_main_missing_depth_raw_dir used imprecise substring matching (`if "depth_raw" in path_str`) causing "active_session/depth" to match incorrectly. Also fixed incorrect expected exit code (code exits with 1, not 0, when depth_raw is missing).
 - Result: committed 390e13b6, pushed to fix/prd-test-action-per-second-ruff. Tests pass (8/8), ruff clean. Self-review: verified no silent error swallow, no false-success, no race conditions, no off-by-one, no security issues. Single logical change: test bug fix.
+## Round 613 @ 2026-07-14T11:30:00Z
+
+- Picked: no candidate — sampled tests pass (anti_replay_check 26/26, i18n_lint 24/24, game_registry 24/24, zbuffer_metric 36/36, buyer_spec 4/34), ruff clean, no staged code changes, no clear PRD gaps in PRODUCTION_GAPS.md (all require Howard credentials: Vercel deploy, Supabase migrations, code signing), no clear test coverage gaps, no clear bounded item found in 3 passes.
+- Result: skipped (no good candidate)
