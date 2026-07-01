@@ -110,8 +110,11 @@ class RotationState:
         tmp.replace(self.state_file); tmp.parent.rmdir()
     @property
     def active_key_id(self) -> Optional[str]: return self.state.get("active_key_id")
+
     @property
-    def secondary_key_id(self) -> Optional[str]: return self.state.get("secondary_key_id")
+    def secondary_key_id(self) -> Optional[str]:
+        """Return the currently-active secondary key ID, if any."""
+        return self.state.get("secondary_key_id")
     @property
     def secondary_created(self) -> Optional[datetime.datetime]:
         raw = self.state.get("secondary_created_at")
