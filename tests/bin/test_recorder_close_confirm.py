@@ -31,9 +31,11 @@ def _install_tk_stubs() -> None:
         (),
         {"__init__": lambda self, value=False: None, "get": lambda self: False},
     )
-    tk.messagebox = types.SimpleNamespace(
-        askyesno=lambda title, message, parent=None: True
-    )
+    # Use ModuleType instead of SimpleNamespace so that patch() works correctly
+    # SimpleNamespace doesn't support attribute assignment which mock.patch needs
+    messagebox = types.ModuleType("tkinter.messagebox")
+    messagebox.askyesno = lambda title, message, parent=None: True
+    tk.messagebox = messagebox
 
     ttk = types.ModuleType("tkinter.ttk")
     ttk.Progressbar = _Widget
