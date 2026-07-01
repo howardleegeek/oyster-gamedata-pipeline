@@ -82,14 +82,14 @@ def check_dpi() -> dict:
             text=True,
             timeout=10
         )
-        
+
         # Parse DPI from xrandr output
         # Look for lines like: "HDMI-1 connected primary 1920x1080+0+0 (normal left inverted right) 0mm x 0mm"
         # DPI can be calculated from physical size and resolution
-        
+
         dpi_value = None
         scaling_factor = EXPECTED_DPI  # Default to expected (1.0)
-        
+
         for line in result.stdout.splitlines():
             if "connected" in line.lower():
                 # Try to parse physical size
@@ -113,7 +113,7 @@ def check_dpi() -> dict:
                                     break
                         except (ValueError, IndexError):
                             pass
-        
+
         # If physical size is 0mm x 0mm, we can't determine DPI from xrandr
         # Check for scaling via X resources or gsettings
         if dpi_value is None or dpi_value == 0:
@@ -128,7 +128,7 @@ def check_dpi() -> dict:
                     scaling_factor = int(result.stdout.strip())
             except Exception:
                 pass
-            
+
             # Also check Xft.dpi
             try:
                 result = subprocess.run(
@@ -144,7 +144,7 @@ def check_dpi() -> dict:
                         break
             except Exception:
                 pass
-        
+
         ok = abs(scaling_factor - EXPECTED_DPI) < 0.1
         return {
             "name": "dpi",
@@ -171,7 +171,7 @@ def check_minecraft_window() -> dict:
             text=True,
             timeout=10
         )
-        
+
         if result.returncode != 0 or not result.stdout.strip():
             # Try alternative window names
             for name in ["Java", "javaw", "Minecraft*Java Edition*"]:
@@ -183,10 +183,10 @@ def check_minecraft_window() -> dict:
                 )
                 if result.returncode == 0 and result.stdout.strip():
                     break
-        
+
         if result.returncode == 0 and result.stdout.strip():
             window_id = result.stdout.strip().split()[0]
-            
+
             # Get window geometry
             geo_result = subprocess.run(
                 ["xdotool", "getwindowgeometry", window_id],
@@ -194,7 +194,7 @@ def check_minecraft_window() -> dict:
                 text=True,
                 timeout=5
             )
-            
+
             # Parse geometry
             width, height, x, y = 0, 0, 0, 0
             for line in geo_result.stdout.splitlines():
@@ -206,12 +206,12 @@ def check_minecraft_window() -> dict:
                     parts = line.split(":")[1].strip().split("x")
                     if len(parts) == 2:
                         width, height = int(parts[0]), int(parts[1])
-            
+
             # Check if fullscreen and covers full screen
-            is_fullscreen = (width == EXPECTED_RESOLUTION[0] and 
+            is_fullscreen = (width == EXPECTED_RESOLUTION[0] and
                            height == EXPECTED_RESOLUTION[1] and
                            x == 0 and y == 0)
-            
+
             # Check if foreground
             fg_result = subprocess.run(
                 ["xdotool", "getactivewindow"],
@@ -220,7 +220,7 @@ def check_minecraft_window() -> dict:
                 timeout=5
             )
             is_foreground = (fg_result.stdout.strip() == window_id)
-            
+
             ok = is_fullscreen and is_foreground
             return {
                 "name": "minecraft_window",
@@ -262,9 +262,9 @@ def check_overlapping_windows() -> dict:
         "NVIDIA",
         "RTSS"
     ]
-    
+
     found_overlapping = []
-    
+
     try:
         # Get all visible windows
         result = subprocess.run(
@@ -273,10 +273,10 @@ def check_overlapping_windows() -> dict:
             text=True,
             timeout=10
         )
-        
+
         if result.returncode == 0:
             window_ids = result.stdout.strip().splitlines()
-            
+
             for wid in window_ids:
                 # Get window name
                 name_result = subprocess.run(
@@ -290,7 +290,7 @@ def check_overlapping_windows() -> dict:
                     for app in overlapping_apps:
                         if app.lower() in window_name:
                             found_overlapping.append(f"{app}: {name_result.stdout.strip()}")
-        
+
         ok = len(found_overlapping) == 0
         return {
             "name": "overlapping_windows",
@@ -319,7 +319,7 @@ def check_audio_device() -> dict:
     try:
         # Check for audio devices using pactl (PulseAudio) or amixer
         audio_devices = []
-        
+
         # Try PulseAudio
         result = subprocess.run(
             ["pactl", "list", "short", "sinks"],
@@ -327,13 +327,13 @@ def check_audio_device() -> dict:
             text=True,
             timeout=10
         )
-        
+
         if result.returncode == 0:
             for line in result.stdout.splitlines():
                 parts = line.split()
                 if parts:
                     audio_devices.append(parts[1] if len(parts) > 1 else parts[0])
-        
+
         # Try ALSA
         if not audio_devices:
             result = subprocess.run(
@@ -346,7 +346,7 @@ def check_audio_device() -> dict:
                 for line in result.stdout.splitlines():
                     if "card" in line.lower():
                         audio_devices.append(line.strip())
-        
+
         # Check for loopback/virtual device (for game audio capture)
         loopback_found = False
         result = subprocess.run(
@@ -355,13 +355,13 @@ def check_audio_device() -> dict:
             text=True,
             timeout=10
         )
-        
+
         if result.returncode == 0:
             for line in result.stdout.splitlines():
                 if "module-loopback" in line.lower() or "module-null-sink" in line.lower():
                     loopback_found = True
                     break
-        
+
         ok = len(audio_devices) > 0
         return {
             "name": "audio_device",
@@ -392,7 +392,7 @@ def check_fps() -> dict:
     """Check FPS counter shows >= 28 fps in MC menu."""
     # This is challenging to check programmatically without injecting into Minecraft
     # We'll check system resources that would affect FPS
-    
+
     try:
         # Check GPU info
         gpu_ok = False
@@ -404,7 +404,7 @@ def check_fps() -> dict:
         )
         if result.returncode == 0:
             gpu_ok = True
-        
+
         # Check for compositing/VSync that might limit FPS
         compositing_off = True
         result = subprocess.run(
@@ -415,11 +415,11 @@ def check_fps() -> dict:
         )
         if result.returncode == 0 and result.stdout.strip().lower() == "true":
             compositing_off = False
-        
+
         # Check for low FPS indicators in system
         # This is a proxy - real FPS check would require Minecraft integration
         # For now, we check that the system is capable
-        
+
         # Check for low resource warnings
         cpu_load_ok = True
         try:
@@ -444,11 +444,11 @@ def check_fps() -> dict:
                             pass
         except Exception:
             pass
-        
+
         # For Phase 1, we report as OK if system appears capable
         # Real FPS check would need Minecraft client integration
         ok = gpu_ok and cpu_load_ok
-        
+
         return {
             "name": "fps_capability",
             "ok": ok,
@@ -478,7 +478,7 @@ def check_disk_space() -> dict:
             text=True,
             timeout=10
         )
-        
+
         if result.returncode == 0:
             lines = result.stdout.splitlines()
             if len(lines) > 1:
@@ -493,7 +493,7 @@ def check_disk_space() -> dict:
                         "value": f"{available_gb}GB free",
                         "expected": f">= {MIN_DISK_GB}GB"
                     }
-        
+
         return {
             "name": "disk_space",
             "ok": False,
@@ -519,13 +519,13 @@ def check_oyster_recorder() -> dict:
         Path("/usr/local/bin/OysterRecorder.exe"),
         Path("/opt/OysterRecorder/OysterRecorder.exe"),
     ]
-    
+
     found = None
     for path in possible_paths:
         if path.exists():
             found = str(path)
             break
-    
+
     # Also check if process is running
     process_running = False
     try:
@@ -539,7 +539,7 @@ def check_oyster_recorder() -> dict:
             process_running = True
     except Exception:
         pass
-    
+
     ok = found is not None
     return {
         "name": "oyster_recorder",
@@ -564,11 +564,11 @@ def check_active_session() -> dict:
                 "value": "empty",
                 "note": "active_session directory does not exist"
             }
-        
+
         # Check if directory is empty
         files = list(ACTIVE_SESSION_DIR.iterdir())
         ok = len(files) == 0
-        
+
         return {
             "name": "active_session",
             "ok": ok,
@@ -601,7 +601,7 @@ def check_network_tailscale() -> dict:
         pass
     except Exception:
         pass
-    
+
     # Try to ping mac1 (assuming it's on Tailscale network)
     mac1_reachable = False
     if tailscale_running:
@@ -617,7 +617,7 @@ def check_network_tailscale() -> dict:
                 mac1_reachable = True
         except Exception:
             pass
-        
+
         # Try alternative hostnames
         if not mac1_reachable:
             for host in ["mac1", "100.100.100.1", "mac1.local"]:
@@ -633,7 +633,7 @@ def check_network_tailscale() -> dict:
                         break
                 except Exception:
                     pass
-    
+
     # For Phase 1, network is optional (noted as "for future upload")
     ok = True  # Don't block on network for now
     return {
@@ -662,9 +662,9 @@ def run_all_checks() -> dict:
         check_active_session(),
         check_network_tailscale(),
     ]
-    
+
     all_pass = all(check["ok"] for check in checks)
-    
+
     return {
         "ran_at": get_timestamp(),
         "all_pass": all_pass,
@@ -679,17 +679,17 @@ def main():
     print("=" * 60)
     print(f"Running preflight checks at {get_timestamp()}")
     print()
-    
+
     # Run all checks
     report = run_all_checks()
-    
+
     # Write report to file
     with open(REPORT_PATH, "w") as f:
         json.dump(report, f, indent=2)
-    
+
     print(f"Report written to: {REPORT_PATH}")
     print()
-    
+
     # Print summary
     print("CHECK RESULTS:")
     print("-" * 40)
@@ -700,7 +700,7 @@ def main():
             print(f"         {check.get('value', check.get('error', 'failed'))}")
     print("-" * 40)
     print()
-    
+
     if report["all_pass"]:
         print("✓ ALL CHECKS PASSED")
         return 0
