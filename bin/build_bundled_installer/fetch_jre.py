@@ -319,6 +319,21 @@ def _write_runtime_manifest(
 
 
 def main() -> int:
+    """Download, verify, and extract the pinned JRE bundle.
+
+    Reads the build-time pin manifest to obtain the JRE source URL, expected
+    SHA-256 hash, file size, and required post-extraction files. Attempts
+    to reuse a cached download if it already passes the size and SHA-256
+    verification. Downloads the JRE if needed, verifies the SHA-256 hash
+    hard-fail on mismatch, extracts the archive to the bundle directory,
+    verifies required files exist (e.g., javaw.exe), and writes a runtime
+    provenance manifest.
+
+    Returns:
+        Exit code: 0 on success, 2 on SHA mismatch, 3 on post-extract
+        verification failure, 4 on download/network failure, 5 on extraction
+        failure, 6 on pin manifest invalid/unreadable.
+    """
     pin = _load_pin()
     src = pin["source"]
     url: str = src["url"]
