@@ -2,6 +2,11 @@
 
 
 
+## Round 637 @ 2026-07-02T06:30:00-07:00
+
+- Picked: Add 11 tests for bin/recorder_close_confirm.py — tests confirm_close_while_recording (Yes/No returns, exception handling, custom title/message/parent), attach_to_root (protocol wiring, armed state, user cancel), and constants (Chinese title/message per G278 spec).
+- Result: committed 38c8ec3b, pushed. Tests pass (11/11), ruff clean. Self-review: verified no silent error swallow (exceptions return False safe default), no false-success (all return values asserted), no race conditions (synchronous), no off-by-one (loops/bounds checked), no security issues (no shell=True), no skip/xfail/disable markers. Justification: Clear-bounded — uncovered G278 recorder close dialog with zero test coverage.
+
 ## Round 636 @ 2026-07-02T06:00:00-07:00
 
 - Picked: Add 28 tests for bin/auto_updater_winsparkle.py — tests UpdateStatus enum, UpdateInfo dataclass (creation, to_dict), UpdateChecker (check_for_updates, download_update, install_update), AppCastParser (parse_xml, parse_item, extract_enclosure), Downloader (download_file, verify_checksum), main CLI (--help, --check, --download, --install, --appcast, --version), and error handling.
