@@ -14,7 +14,6 @@ Usage:
 """
 
 import argparse
-import json
 import os
 import sys
 import hashlib
@@ -27,9 +26,9 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from oyster_provenance.manifest import SessionManifest, load_manifest
-from oyster_provenance.merkle import compute_file_hashes, build_merkle_root_from_files
-from oyster_provenance.sign import load_public_key, verify_json_signature, get_public_key_info
-from oyster_provenance.anchor import AnchorChain, load_weekly_anchor, get_week_range, format_week_id
+from oyster_provenance.merkle import compute_file_hashes
+from oyster_provenance.sign import verify_json_signature
+from oyster_provenance.anchor import load_weekly_anchor, get_week_range, format_week_id
 
 
 # ANSI colors
@@ -339,7 +338,7 @@ def print_verification_result(result: VerificationResult, verbose: bool = False)
             print(f"  Consent: {manifest.consent_doc_url}")
             print(f"  Signed: {manifest.consent_signed_at_utc}")
             print(f"  Frame count: {manifest.frame_count}")
-            print(f"  Biometric flags:")
+            print("  Biometric flags:")
             for k, v in manifest.biometric_flags.items():
                 print(f"    {k}: {v}")
         except Exception:
@@ -353,7 +352,7 @@ def print_verification_result(result: VerificationResult, verbose: bool = False)
     else:
         print(f"{RED}{BOLD}LEGAL STATUS: VERIFICATION FAILED{RESET}")
         if result.errors:
-            print(f"\nErrors:")
+            print("\nErrors:")
             for error in result.errors:
                 print(f"  - {error}")
         return 1
