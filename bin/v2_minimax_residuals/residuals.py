@@ -489,9 +489,23 @@ def r20b_mouse_dx_cumulative(
             "note": f"sum={s:.3e} delta_x={delta_x:.3e}"}
 
 
-def r20c_fps_jitter(records, max_offset_ms=0.1, max_std_ms=5.0,
-                    min_frames=10):
-    """V₂ R20c: |μ_dt − 1/fps| ≤ max_offset_ms AND σ_dt ≤ max_std_ms."""
+def r20c_fps_jitter(
+    records: list[dict[str, Any]],
+    max_offset_ms: float = 0.1,
+    max_std_ms: float = 5.0,
+    min_frames: int = 10,
+) -> dict[str, Any]:
+    """V₂ R20c: |μ_dt − 1/fps| ≤ max_offset_ms AND σ_dt ≤ max_std_ms.
+
+    Args:
+        records: List of trajectory records with 'fps' and 'time' fields.
+        max_offset_ms: Maximum allowed mean frame time offset from target (ms).
+        max_std_ms: Maximum allowed standard deviation of frame times (ms).
+        min_frames: Minimum number of frames required for valid check.
+
+    Returns:
+        Dict with keys: name, passed, residual, threshold, note.
+    """
     if not records:
         return _v2_drift_abstain("R20c", "empty_records", max_offset_ms)
     if len(records) < min_frames:
