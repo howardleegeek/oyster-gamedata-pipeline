@@ -7,6 +7,10 @@
 - Picked: no good candidate found — verified ruff clean on CI-covered paths (src/ tests/ = 0 errors), ruff errors in patches/ are excluded from CI lint, verified provenance tests (55/55 pass), core tests pass, 3294 tests collect successfully, no failing tests, no clear-bounded PRD gaps in main codebase. Patches folder has 5 ruff errors (W291/W292/F401) but CI explicitly excludes patches/ from lint checks.
 - Result: skipped (no candidate)
 
+## Round 207 @ 2026-07-02T09:00:00Z
+- Picked: Fix ruff F841 unused variable in bin/inventory_voxel_capture.py — config assigned but never used after loading from YAML. Changed to `_ = yaml.safe_load(f) or {}` with comment for future use.
+- Result: committed e9c764f7 (pushed to main)
+
 ## Round 201 @ 2026-07-02T07:30:00Z
 - Picked: no good candidate found — reran ruff check (0 errors), verified provenance tests (55/55 pass), scanned bin/ and oyster_provenance/ for TODOs/FIXMEs (only documented feature markers), checked for silent error swallows (found 10 bare except Exception but all are documented fallback patterns). No clear-bounded PRD gap or failing test in main codebase.
 - Result: skipped (no candidate)
