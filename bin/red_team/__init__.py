@@ -11,9 +11,9 @@ Buckets:
   D — replay/temporal attacks (this module: D-01..D-05)
 """
 from .attackers import (
-    AttackResult,
-    AttackCase,
     ATTACK_CATALOG,
+    AttackCase,
+    AttackResult,
     bucket_b_attacks,
     bucket_c_attacks,
     bucket_d_attacks,
