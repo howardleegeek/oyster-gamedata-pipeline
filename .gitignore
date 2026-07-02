@@ -98,4 +98,7 @@ bundle/
 
 # Test outputs — generated at test runtime, never commit
 tests/dashboard/
+dashboard/merge_failures.log
+dashboard/replay_attacks.json
+tests/_payout_cron_test.log
 active_session/
