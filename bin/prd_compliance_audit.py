@@ -665,6 +665,17 @@ def heal_action_camera(session: Path) -> dict:
 
 
 def main(argv: list[str]) -> int:
+    """Run PRD compliance audit on a session directory.
+
+    Args:
+        argv: Command-line arguments. Expected: <session_dir> [--json|--markdown] [--fix]
+
+    Returns:
+        0 if all checks pass, 1 if any checks fail, 2 for usage errors.
+
+    Raises:
+        FileNotFoundError: If session directory does not exist.
+    """
     if len(argv) < 2:
         print("usage: prd_compliance_audit.py <session_dir> [--json|--markdown] [--fix]", file=sys.stderr)
         return 2
