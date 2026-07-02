@@ -200,7 +200,11 @@ _VIDEO_EXTS = {".mp4", ".avi", ".mov", ".mkv", ".webm", ".flv"}
 _IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".webp"}
 
 
-def process_single(input_path: str, sample_frames: int = 32, ocr_threshold: float = 0.3) -> Dict[str, Any]:
+def process_single(
+    input_path: str,
+    sample_frames: int = 32,
+    ocr_threshold: float = 0.3,
+) -> Dict[str, Any]:
     """Score a single video file or image directory."""
     p = Path(input_path)
     if p.is_file() and p.suffix.lower() in _VIDEO_EXTS:
@@ -216,7 +220,11 @@ def process_single(input_path: str, sample_frames: int = 32, ocr_threshold: floa
     return result
 
 
-def process_batch(input_dir: str, sample_frames: int = 32, ocr_threshold: float = 0.3) -> List[Dict[str, Any]]:
+def process_batch(
+    input_dir: str,
+    sample_frames: int = 32,
+    ocr_threshold: float = 0.3,
+) -> List[Dict[str, Any]]:
     """Score every video / image-set under *input_dir*."""
     root = Path(input_dir)
     results: List[Dict[str, Any]] = []
@@ -289,12 +297,30 @@ def build_parser() -> argparse.ArgumentParser:
         description="G159 — per-clip aesthetic / motion / OCR / jitter scorer",
     )
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--input", "-i", type=str, help="Single video file or image directory")
-    group.add_argument("--batch", "-b", type=str, help="Directory for batch scoring")
-    parser.add_argument("--output", "-o", type=str, required=True, help="Output file (.json or .csv)")
-    parser.add_argument("--sample-frames", type=int, default=32, help="Frames per clip (default: 32)")
-    parser.add_argument("--ocr-threshold", type=float, default=0.3, help="OCR edge-density threshold")
-    parser.add_argument("--verbose", "-v", action="store_true", help="Enable debug logging")
+    group.add_argument(
+        "--input", "-i", type=str, help="Single video file or image directory"
+    )
+    group.add_argument(
+        "--batch", "-b", type=str, help="Directory for batch scoring"
+    )
+    parser.add_argument(
+        "--output", "-o", type=str, required=True, help="Output file (.json or .csv)"
+    )
+    parser.add_argument(
+        "--sample-frames",
+        type=int,
+        default=32,
+        help="Frames per clip (default: 32)",
+    )
+    parser.add_argument(
+        "--ocr-threshold",
+        type=float,
+        default=0.3,
+        help="OCR edge-density threshold",
+    )
+    parser.add_argument(
+        "--verbose", "-v", action="store_true", help="Enable debug logging"
+    )
     return parser
 
 
