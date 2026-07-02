@@ -123,6 +123,12 @@ class RotationState:
         return self.state.get("secondary_key_id")
     @property
     def secondary_created(self) -> Optional[datetime.datetime]:
+        """Return the timestamp when the secondary key was created.
+
+        Returns:
+            datetime.datetime: ISO-formatted creation timestamp of the secondary
+            key, or None if the secondary key has not been created yet.
+        """
         raw = self.state.get("secondary_created_at")
         return datetime.datetime.fromisoformat(raw) if raw else None
     @property
