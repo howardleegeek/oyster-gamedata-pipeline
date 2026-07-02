@@ -998,6 +998,7 @@ E702 Multiple statements on one line (semicolon)
 216 |     if args.frame_range: frames = range(args.frame_range[0], args.frame_range[1] + 1); is_single = False
     |                                                                                      ^
 217 |     else: frames = [args.frame]; is_single = True
+
 218 |     captures = []
     |
 
