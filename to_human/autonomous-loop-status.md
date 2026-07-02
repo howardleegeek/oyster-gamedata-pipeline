@@ -1,3 +1,10 @@
+## Round 236 @ 2026-07-02T23:28:36Z
+- Picked: Fix silent error swallow in bin/prd_test_video_no_ui.py _extract_frames() — replaced `except Exception: pass` (which silently dropped PIL image-open failures) with split OSError + Exception handlers that log WARNING with the underlying error, then continue to ffmpeg fallback (no behavior change on success path). Found via uncommitted-WIP from prior round.
+- Result: committed 4aedf322, pushed to origin/main
+
+## Round 235 @ 2026-07-03T01:00:00Z
+- Picked: Fix ruff F841 unused variable in bin/red_team_oversized_json.py — removed unused `file_mb` variable in test_memory_usage() (assigned but never referenced)
+- Result: committed 71263e4b
 ## Round 235 @ 2026-07-03T01:00:00Z
 - Picked: Fix ruff F841 unused variable in bin/red_team_oversized_json.py — removed unused `file_mb` variable in test_memory_usage() (assigned but never referenced)
 - Result: committed 71263e4b
