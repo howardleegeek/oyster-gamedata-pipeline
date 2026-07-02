@@ -289,7 +289,7 @@ def main():
     parser = argparse.ArgumentParser(description='Convert zbuffer .bin files to OpenEXR depth maps')
     parser.add_argument('session_dir', type=str, help='Session directory path')
     parser.add_argument('--max-gap-ms', type=int, default=50, help='Maximum alignment gap in milliseconds')
-    parser.add_argument('--fallback-on-miss', type=str, default='true', 
+    parser.add_argument('--fallback-on-miss', type=str, default='true',
                        choices=['true', 'false'], help='Whether to fallback to DA-V2 for missed frames')
     
     args = parser.parse_args()
