@@ -82,7 +82,6 @@ class NetworkThrottleAware:
             from ctypes import wintypes
 
             # NetworkCostType enum values
-            NETWORK_COST_TYPE_UNKNOWN = 0
             NETWORK_COST_TYPE_UNRESTRICTED = 1
             NETWORK_COST_TYPE_FIXED = 2
             NETWORK_COST_TYPE_VARIABLE = 3
