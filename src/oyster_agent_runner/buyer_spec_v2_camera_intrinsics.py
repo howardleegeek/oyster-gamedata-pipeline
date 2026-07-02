@@ -211,8 +211,11 @@ def main(argv: list[str] | None = None) -> int:
                     data = json.load(f)
                 spec = CameraIntrinsicsSpec.from_dict(data)
                 specs_data.append(spec.to_dict())
-            except Exception:
-                pass
+            except (OSError, ValueError) as exc:
+                print(
+                    f"[WARN] skipping {filepath} for --output: {exc}",
+                    file=sys.stderr,
+                )
 
     if args.output and specs_data:
         with open(args.output, "w", encoding="utf-8") as f:
