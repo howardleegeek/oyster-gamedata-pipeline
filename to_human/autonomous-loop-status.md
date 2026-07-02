@@ -1,3 +1,7 @@
+## Round 230 @ 2026-07-02T21:30:00Z
+- Picked: Remove unused NETWORK_COST_TYPE_UNKNOWN constant from bin/network_throttle_aware.py — verified constant not used anywhere in codebase, import test passes
+- Result: committed 133c68b6
+
 ## Round 228 @ 2026-07-02T18:00:00Z
 - Picked: no good candidate found — verified ruff clean (0 errors on bin/ src/), pytest collection (3294 tests), iron-law tests (38/38 pass), auto_tag_bot tests (19/20 pass, 1 pre-existing skip), no failing tests, no clear-bounded PRD gaps in main codebase
 - Result: skipped (no candidate)
