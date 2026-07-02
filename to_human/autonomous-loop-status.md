@@ -1,3 +1,7 @@
+## Round 227 @ 2026-07-02T17:50:00Z
+- Picked: Fix silent error swallow in buyer_spec_v2_camera_intrinsics.py main() — `--output` loop had `except Exception: pass` that swallowed JSON parse / I/O errors silently, so users wouldn't know why their output JSON had fewer entries than the input file list. Replaced with explicit (OSError, ValueError) handler that prints a [WARN] line to stderr.
+- Result: committed b5b3cf43
+
 ## Round 225 @ 2026-07-02T17:22:19Z
 
 
