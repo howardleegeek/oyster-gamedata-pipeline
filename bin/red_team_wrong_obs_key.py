@@ -1,6 +1,16 @@
 #!/usr/bin/env python3
 """G093 · Red Team: WebSocket Auth with Wrong Observation Key"""
-import argparse, base64, hashlib, json, logging, os, socket, ssl, sys, tempfile, uuid
+import argparse
+import base64
+import hashlib
+import json
+import logging
+import os
+import socket
+import ssl
+import sys
+import tempfile
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -33,7 +43,7 @@ def parse_response(raw: bytes) -> tuple[int, dict[str, str]]:
             headers[k.strip().lower()] = v.strip()
     return status_code, headers
 
-def attempt_auth(host: str, port: int, obs_key: str, use_tls: bool = False, 
+def attempt_auth(host: str, port: int, obs_key: str, use_tls: bool = False,
                  timeout: float = 10.0, path: str = "/") -> dict:
     """Attempt WebSocket handshake with incorrect observation key."""
     request = build_handshake(host, port, obs_key, path)
@@ -79,7 +89,7 @@ def attempt_auth(host: str, port: int, obs_key: str, use_tls: bool = False,
                 pass
     return result
 
-def write_audit_entry(audit_path: Path, host: str, port: int, 
+def write_audit_entry(audit_path: Path, host: str, port: int,
                       obs_key_hash: str, result: dict, attempt_id: str) -> None:
     """Append structured audit entry to log file."""
     entry = {
@@ -89,7 +99,7 @@ def write_audit_entry(audit_path: Path, host: str, port: int,
         "version": __version__,
         "target": {"host": host, "port": port},
         "obs_key_sha256": obs_key_hash,
-        "outcome": {"status_code": result["status_code"], "refused": result["refused"], 
+        "outcome": {"status_code": result["status_code"], "refused": result["refused"],
                    "error": result["error"]}
     }
     audit_path.parent.mkdir(parents=True, exist_ok=True)
@@ -127,10 +137,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     
     attempt_id = str(uuid.uuid4())
     obs_key_hash = hashlib.sha256(args.obs_key.encode("utf-8")).hexdigest()
-    logger.info("Red-team attempt %s — target %s:%d (key hash: %s…)", 
+    logger.info("Red-team attempt %s — target %s:%d (key hash: %s…)",
                 attempt_id, args.host, args.port, obs_key_hash[:12])
-    
-    result = attempt_auth(args.host, args.port, args.obs_key, 
+
+    result = attempt_auth(args.host, args.port, args.obs_key,
                           args.tls, args.timeout, args.path)
     
     audit_path = resolve_audit_log(args.audit_log)
