@@ -104,7 +104,7 @@ class RAFTModel:
     def _load_model(self) -> Any:
         if self._model is not None:
             return self._model
-        torch = _get_torch()
+        _get_torch()  # Ensure torch is loaded
         logger.info("Loading RAFT model...")
         self._model = self._create_model()
         self._model.to(self.device)
