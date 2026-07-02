@@ -231,6 +231,16 @@ KNOWN_VK_CODES: frozenset[int] = frozenset({
 
 
 def r09_keycode_vk_known(rec: dict) -> OracleResult:
+    """Verify all keyCode values are known Windows virtual-key codes.
+
+    Args:
+        rec: Recording dictionary containing optional "keyCode" field.
+
+    Returns:
+        PASS if all keyCode values are recognized VK codes.
+        FAIL if any unknown VK codes are found (residual = count of unknown).
+        ABSTAIN if keyCode is missing or not a list.
+    """
     kc = rec.get("keyCode")
     if not isinstance(kc, list):
         return OracleResult("R09", Verdict.ABSTAIN, None, None, math.nan,
