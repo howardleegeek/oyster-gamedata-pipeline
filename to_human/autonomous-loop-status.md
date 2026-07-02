@@ -2409,3 +2409,7 @@ Found 4 errors.
 
 ## Round 194 @ 2026-07-02T03:50:00Z
 - Picked:
+
+## Round 196 @ 2026-07-02T04:48:12Z
+- Picked: Fix ruff I001 import sorting in bin/v1_claude_residuals/__init__.py — continuation of the ongoing ruff cleanup sweep from Rounds 101-195. Moved `from .residuals import ResidualResult` from the top of the import block to the bottom so ruff isort sorts the block by name (all rXX_* functions first, then the .residuals.ResidualResult dataclass). Single-file bounded change, 1 insertion/1 deletion, no behavior change. `ruff check bin/v1_claude_residuals/__init__.py` clean (0 errors), module imports cleanly (verified `from bin.v1_claude_residuals import ResidualResult, DriftResult, r13_…r23_video_codec` all resolve), 54/54 tests across tests/bin/test_r13..r23_*.py pass, 13/13 tests/bin/test_bft_orchestrator.py pass. Self-review: cosmetic I001 cleanup only — no signature change, no exception class change, no threading/auth/security change, no off-by-one (every __all__ entry still imported and exported), no silent error swallow, no test masked as passing, no brand cross-reference, no module-level side effect, no circular import (verified with direct import).
+- Result: committed 452e927b (pushed to main)
