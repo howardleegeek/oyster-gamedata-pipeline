@@ -1,4 +1,12 @@
 
+## Round 211 @ 2026-07-02T09:30:00Z
+- Picked: no good candidate found — verified ruff clean on src/ tests/ bin/ oyster_provenance/ patches/ (all 0 errors), verified provenance tests (55/55 pass), iron-law tests (13/13 pass), spec-lint tests (8/8 pass), storage+stripe tests (75/75 pass), 3294 tests collect successfully, no failing tests, no clear-bounded PRD gaps in main codebase
+- Result: skipped (no candidate)
+
+## Round 210 @ 2026-07-02T09:00:00Z
+- Picked: no good candidate found — verified ruff clean on CI-covered paths (src/ tests/ = 0 errors), ruff errors in patches/ are excluded from CI lint, verified provenance tests (55/55 pass), core tests pass, 3294 tests collect successfully, no failing tests, no clear-bounded PRD gaps in main codebase
+- Result: skipped (no candidate)
+
 ## Round 200 @ 2026-07-02T07:00:00Z
 - Picked: no good candidate found — ruff clean (0 errors), core tests pass (55/55 provenance), no clear-bounded PRD gaps in main codebase
 - Result: skipped (no candidate)
