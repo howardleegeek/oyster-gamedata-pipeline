@@ -3,14 +3,14 @@ Streamlit frontend for Oyster Dashboard.
 Provides buyer and contributor views for session management.
 """
 
-import streamlit as st
-import requests
+import os
+
+import jwt
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime
-import os
-import jwt
+import requests
+import streamlit as st
 
 # Configuration
 API_BASE = os.getenv("API_BASE", "http://localhost:8000")
@@ -285,7 +285,7 @@ def render_verify_page():
     st.title("🔍 Verify Provenance")
     
     st.markdown("""
-    Verify the cryptographic provenance of any session. 
+    Verify the cryptographic provenance of any session.
     The system checks the hash chain integrity and validates against the stored provenance record.
     """)
     
@@ -303,10 +303,10 @@ def render_verify_page():
         if result:
             if result["valid"]:
                 st.success("✅ Provenance Verified")
-                st.markdown(f'<span class="verify-valid">Valid Hash Chain</span>', unsafe_allow_html=True)
+                st.markdown('<span class="verify-valid">Valid Hash Chain</span>', unsafe_allow_html=True)
             else:
                 st.error("❌ Provenance Verification Failed")
-                st.markdown(f'<span class="verify-invalid">Invalid Hash Chain</span>', unsafe_allow_html=True)
+                st.markdown('<span class="verify-invalid">Invalid Hash Chain</span>', unsafe_allow_html=True)
             
             # Details
             col1, col2, col3 = st.columns(3)

@@ -11,17 +11,14 @@ Adds a "System Health" page showing:
 
 import json
 import os
-import glob
 import time
-from datetime import datetime, timezone, timedelta
-from typing import Any, Optional
+from datetime import datetime, timedelta, timezone
 
-import streamlit as st
-import pandas as pd
 import matplotlib
+import streamlit as st
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 
 # ---------------------------------------------------------------------------
 # Paths

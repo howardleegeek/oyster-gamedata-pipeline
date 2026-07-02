@@ -3,18 +3,14 @@ FastAPI backend for Oyster Dashboard.
 Provides REST API for session management, provenance verification, and payouts.
 """
 
-from fastapi import FastAPI, HTTPException, Query, Header, Response, Depends
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
-from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
-from datetime import datetime
-import jwt
-import os
-import json
 import hashlib
-import io
-import asyncio
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import jwt
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 # Import provenance verification (mock for now, real import when available)
 try:
@@ -39,7 +35,7 @@ app.add_middleware(
 )
 
 # JWT Configuration (imported from oauth.py)
-from oauth import JWT_SECRET, JWT_ALGORITHM
+from oauth import JWT_ALGORITHM, JWT_SECRET
 
 # Mock database
 MOCK_SESSIONS = {}
