@@ -5,7 +5,15 @@
 IRON LAW IL3 enforced (no V₁/producer imports).
 """
 from .residuals import (
-    r01_quat_norm, r02_euler_quat_consistency, r03_kinematics,
-    r04_mouse_dx_diff, r05_dt, r06_angle_range, r07_mouse_range,
-    r08_fx_eq_fy, r09_keycode_vk, r10_speed_max, r12_fps_range,
+    r01_quat_norm as r01_quat_norm,
+    r02_euler_quat_consistency as r02_euler_quat_consistency,
+    r03_kinematics as r03_kinematics,
+    r04_mouse_dx_diff as r04_mouse_dx_diff,
+    r05_dt as r05_dt,
+    r06_angle_range as r06_angle_range,
+    r07_mouse_range as r07_mouse_range,
+    r08_fx_eq_fy as r08_fx_eq_fy,
+    r09_keycode_vk as r09_keycode_vk,
+    r10_speed_max as r10_speed_max,
+    r12_fps_range as r12_fps_range,
 )
