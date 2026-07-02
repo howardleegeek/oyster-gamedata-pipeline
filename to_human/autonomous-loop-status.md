@@ -2322,3 +2322,18 @@ Found 4 errors.
   - bin/prd_test_speed_units_mps.py
   Single-file bounded changes, 2-line diff, no behavior change. ruff check clean on both modules, both modules import and parse cleanly. Self-review: cosmetic only — no logic change, no test impact, no brand cross-reference.
 - Result: committed 5f68b1f1 (pushed to main)
+
+## Round 185 @ 2026-07-02T03:00:00Z
+- Picked: Fix ruff W292 missing trailing newlines + I001 import sorting in 3 bin/ scripts — continuation of ongoing ruff cleanup from Rounds 101-184. Fixed:
+  - bin/prd_test_wasd_balance.py: added missing trailing newline (W292)
+  - bin/recorder_consent.py: added missing trailing newline (W292)
+  - bin/qa_validator_gui.py: sorted imports per PEP 8 (I001)
+  Single-file bounded changes, 3 files, 4 insertions / 6 deletions, no behavior change. ruff check clean on all 3 modules, all 3 modules import cleanly, 528/528 tests in tests/bin/ pass. Self-review: cosmetic lint cleanup only — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing, no brand cross-reference, no module-level side effect.
+- Result: committed 683003dd (pushed to main)
+
+## Round 186 @ 2026-07-02T00:17:08Z
+- Picked: Fix ruff W292+W291 in bin/rlds_export.py — continuation of ongoing ruff cleanup from Rounds 101-185. Fixed:
+  - Line 298: added missing trailing newline (W292)
+  - Line 76: removed trailing whitespace (W291)
+  Single-file bounded change, 2 insertions/2 deletions, no behavior change. Module imports cleanly, ruff check clean. Self-review: cosmetic lint cleanup only — no signature change, no exception change, no threading/auth/security change, no off-by-one, no silent error swallow, no test masked as passing, no brand cross-reference.
+- Result: committed 3eea4e65 (pushed to main)
