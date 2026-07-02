@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""codex_api — HTTP wrapper for OpenAI Codex CLI (dispatch + parallel).
+r"""codex_api — HTTP wrapper for OpenAI Codex CLI (dispatch + parallel).
 
 Run on mac1 to expose Codex CLI as an HTTP service. Used to dispatch
 parallel code-writing tasks to Codex without spawning shell subprocesses
@@ -45,9 +45,8 @@ try:
     from fastapi import FastAPI, HTTPException
     from pydantic import BaseModel, Field
 except ImportError as e:
-    raise SystemExit(
-        "missing deps: pip install fastapi uvicorn pydantic"
-    ) from e
+    msg = "missing deps: pip install fastapi uvicorn pydantic"
+    raise SystemExit(msg) from e
 
 # ---------------------------------------------------------------------------
 # Config
