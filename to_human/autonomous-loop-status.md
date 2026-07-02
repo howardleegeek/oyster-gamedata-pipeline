@@ -89,3 +89,9 @@ Self-review: verified no silent error swallow, no false-success, no race, no off
 ## Round 223 @ 2026-07-02T15:15:26Z
 - Picked: no good candidate found — verified iron-law + spec-lint tests (33/33 pass), pytest collection (3294 tests in 5.69s), no failing tests, no real code TODOs in src/tests/oyster_provenance/patches/ (all TODO hits are test fixture strings testing for what to reject), git status only modified by test artifacts (dashboard/merge_failures.log, dashboard/replay_attacks.json, tests/_payout_cron_test.log — expected outputs from cron runs), PRODUCTION_GAPS.md only contains Howard-credential items (Vercel/Supabase/codesign certs), no PRD-ACCEPTANCE-REPORT.md exists, 1 commit (Round 222 log) ahead of origin/main
 - Result: skipped (no candidate)
+
+## Round 237 @ 2026-07-02T23:41:55Z
+- Picked: Remove unused `patterns` dict in `bin/sprint_dashboard.py` `count_files_by_dir()` — defined at line 65 but never referenced (actual file-type detection uses hardcoded endswith() calls); ruff reports F841
+- Result: committed 3908675c, pushed to origin/main
+
+Self-review: verified no silent error swallow, no false-success, no race, no off-by-one, no security issue, no cross-brand reference, no broken-tests-masked-as-passing — change is a single dead-variable removal.
