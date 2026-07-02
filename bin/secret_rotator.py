@@ -136,6 +136,11 @@ class RotationState:
         raw = self.state.get("primary_deactivated_at")
         return datetime.datetime.fromisoformat(raw) if raw else None
     def set_secondary(self, kid: str) -> None:
+        """Set the secondary key ID and record its creation timestamp.
+
+        Args:
+            kid: The AWS access key ID to set as the secondary key.
+        """
         self.state["secondary_key_id"] = kid
         self.state["secondary_created_at"] = datetime.datetime.utcnow().isoformat()
     def deactivate_primary(self) -> None:
