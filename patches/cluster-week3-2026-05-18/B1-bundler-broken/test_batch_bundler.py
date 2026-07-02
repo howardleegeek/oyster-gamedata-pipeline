@@ -9,7 +9,6 @@ import json
 import hashlib
 import tarfile
 import tempfile
-import shutil
 from pathlib import Path
 import pytest
 
@@ -119,7 +118,7 @@ def test_process_session():
         
         # Check session SHA256
         concat_hashes = ''.join(sorted(
-            hashlib.sha256(content).hexdigest() 
+            hashlib.sha256(content).hexdigest()
             for content in files.values()
         ))
         expected_session_hash = hashlib.sha256(concat_hashes.encode('utf-8')).hexdigest()
