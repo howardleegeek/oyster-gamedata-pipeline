@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """Compare two buyer-spec tarballs and print a markdown diff table."""
 
-import argparse, json, os, tarfile, tempfile, shutil
+import argparse
+import json
+import os
+import shutil
+import tarfile
+import tempfile
 
 
 def extract_tarball(tar_path):
