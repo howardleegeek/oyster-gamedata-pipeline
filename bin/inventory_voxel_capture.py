@@ -244,7 +244,7 @@ def main(argv: Sequence[str]) -> int:
                 logger.error("PyYAML not installed")
                 return 1
             with open(args.config, 'r') as f:
-                config = yaml.safe_load(f) or {}
+                _ = yaml.safe_load(f) or {}  # config reserved for future use
         except Exception as e:
             logger.error(f"Failed to load config {args.config}: {e}")
             return 1
