@@ -2390,3 +2390,7 @@ Found 4 errors.
   All 5 modules import cleanly, ruff check clean on all, 11 v2_minimax tests pass. Self-review: cosmetic F401 cleanup only — no signature change, no behavior change, no silent error swallow, no test masked as passing, no brand cross-reference.
 - Result: committed 1b76dbd6 (pushed to main)
 
+## Round 192 @ 2026-07-02T12:00:00Z
+- Picked: Fix ruff E401+I001 in bin/tarball_diff.py — continuation of ongoing ruff cleanup from Rounds 101-191. Split single-line imports into PEP 8 one-per-line form. Module imports cleanly, no tests reference it (standalone diff tool). Self-review: cosmetic lint cleanup only — no signature change, no runtime behavior change, no silent error swallow, no test masked as passing, no brand cross-reference.
+- Result: committed 75cdfd45 (pushed to main)
+
