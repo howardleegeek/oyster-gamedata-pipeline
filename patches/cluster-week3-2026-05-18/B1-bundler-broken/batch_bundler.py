@@ -14,9 +14,7 @@ import tarfile
 import argparse
 from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Any, Tuple, Optional
-import tempfile
-import shutil
+from typing import List, Dict, Any, Tuple
 
 
 def sha256_file(filepath: Path) -> str:
@@ -228,7 +226,7 @@ def main():
     print(f"  Manifest: {manifest_path}")
     
     # Print summary
-    print(f"\n✓ Batch created successfully!")
+    print("\n✓ Batch created successfully!")
     print(f"  Batch ID: {batch_id}")
     print(f"  Tarball size: {tarball_path.stat().st_size / 1024 / 1024:.1f} MB")
     print(f"  Tarball SHA256: {tarball_sha256[:8]}...")
