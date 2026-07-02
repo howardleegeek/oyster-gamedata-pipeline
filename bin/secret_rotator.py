@@ -133,6 +133,12 @@ class RotationState:
         return datetime.datetime.fromisoformat(raw) if raw else None
     @property
     def primary_deactivated_at(self) -> Optional[datetime.datetime]:
+        """Return the timestamp when the primary key was deactivated.
+
+        Returns:
+            datetime.datetime: ISO-formatted deactivation timestamp of the primary
+            key, or None if the primary key has not been deactivated yet.
+        """
         raw = self.state.get("primary_deactivated_at")
         return datetime.datetime.fromisoformat(raw) if raw else None
     def set_secondary(self, kid: str) -> None:
