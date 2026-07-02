@@ -26,16 +26,16 @@ class CircuitState(Enum):
 @dataclass
 class CircuitBreaker:
     """Circuit breaker for S3 operations - trips after N consecutive failures."""
-    
+
     failure_threshold: int = 5
     recovery_timeout: float = 60.0
     state_file: Optional[Path] = None
     alert_callback: Optional[Callable[[str], None]] = None
-    
+
     _state: CircuitState = field(default=CircuitState.CLOSED, init=False)
     _failure_count: int = field(default=0, init=False)
     _trip_time: Optional[float] = field(default=None, init=False)
-    
+
     def __post_init__(self) -> None:
         """Load persisted state if available."""
         if self.state_file and self.state_file.exists():
@@ -46,7 +46,7 @@ class CircuitBreaker:
                 self._trip_time = data.get("trip_time")
             except (json.JSONDecodeError, KeyError, ValueError):
                 logging.warning("Failed to load state, using defaults")
-    
+
     def _save_state(self) -> None:
         """Persist circuit breaker state to file."""
         if self.state_file:
@@ -55,7 +55,7 @@ class CircuitBreaker:
                 "failure_count": self._failure_count,
                 "trip_time": self._trip_time,
             }))
-    
+
     def is_allowed(self) -> bool:
         """Check if operations are allowed based on current state."""
         if self._state == CircuitState.CLOSED:
@@ -67,7 +67,7 @@ class CircuitBreaker:
                 return True
             return False
         return True  # HALF_OPEN
-    
+
     def record_success(self) -> None:
         """Record a successful operation, resetting failure count."""
         self._failure_count = 0
@@ -75,7 +75,7 @@ class CircuitBreaker:
             self._state = CircuitState.CLOSED
             logging.info("Circuit breaker recovered - state CLOSED")
         self._save_state()
-    
+
     def record_failure(self, error_msg: str = "") -> None:
         """Record a failure, potentially tripping the circuit breaker."""
         self._failure_count += 1
@@ -83,7 +83,7 @@ class CircuitBreaker:
         if self._failure_count >= self.failure_threshold and self._state != CircuitState.OPEN:
             self._trip()
         self._save_state()
-    
+
     def _trip(self) -> None:
         """Trip the circuit breaker, halting operations."""
         self._state = CircuitState.OPEN
@@ -96,7 +96,7 @@ class CircuitBreaker:
             except Exception as e:
                 logging.error(f"Alert callback failed: {e}")
         self._save_state()
-    
+
     def reset(self) -> None:
         """Manually reset the circuit breaker."""
         self._state = CircuitState.CLOSED
@@ -104,7 +104,7 @@ class CircuitBreaker:
         self._trip_time = None
         logging.info("Circuit breaker manually reset")
         self._save_state()
-    
+
     def status(self) -> dict:
         """Return current status as a dictionary."""
         return {
@@ -127,18 +127,18 @@ def main(argv: Optional[list] = None) -> int:
     parser.add_argument("--reset", action="store_true", help="Reset to CLOSED state")
     parser.add_argument("--test-failure", action="store_true", help="Simulate a failure")
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logging")
-    
+
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
                         format="%(asctime)s - %(levelname)s - %(message)s")
-    
+
     cb = CircuitBreaker(
         failure_threshold=args.threshold,
         recovery_timeout=args.timeout,
         state_file=args.state_file,
         alert_callback=lambda m: logging.critical(f"ALERT: {m}"),
     )
-    
+
     if args.status:
         print(json.dumps(cb.status(), indent=2))
         return 0
@@ -150,7 +150,7 @@ def main(argv: Optional[list] = None) -> int:
         cb.record_failure("Simulated failure")
         print(f"State: {cb._state.value}")
         return 0
-    
+
     if cb.is_allowed():
         print(f"Circuit breaker: {cb._state.value} - operations ALLOWED")
         return 0
