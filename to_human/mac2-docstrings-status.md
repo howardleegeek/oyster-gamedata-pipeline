@@ -81,7 +81,12 @@
 
 ## Round @ 2026-05-17T12:45:00Z
 - File: bin/check_fabric_yarn_versions.py::get_latest_yarn
-- Added: docstring=N (already had docstring), type-hints=Y
+- Added: docstring=N (already had do
+
+## Round @ 2026-05-18T03:00:00Z
+- File: bin/secret_rotator.py::RotationState.secondary_created
+- Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: 0375118eecstring), type-hints=Y
 - Commit: 87694dfb0
 
 ## Round @ 2026-06-21T13:35:00Z
@@ -527,7 +532,7 @@ Note: Also added docstring to reset_vendor in same commit (minor spec deviation 
 - Commit: 8839725bf
 
 
-## Round @ 2026-07-02T07:12:50Z
-- File: bin/secret_rotator.py::RotationState.set_secondary
+## Round @ 2026-07-01T20:00:00Z
+- File: bin/secret_rotator.py::RotationState.secondary_created
 - Added: docstring=Y, type-hints=N (already had type hints)
-- Commit: 9d30ab82b
+- Commit: 0375118ee
