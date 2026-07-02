@@ -5,12 +5,11 @@ Tests for zbuffer_to_exr.py
 
 import json
 import numpy as np
-import os
 import struct
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch, MagicMock, mock_open
+from unittest.mock import patch
 
 # Add local directory to path for the zbuffer_to_exr module
 import sys
@@ -43,7 +42,7 @@ class TestZBufferToEXR(unittest.TestCase):
         import shutil
         shutil.rmtree(self.temp_dir)
     
-    def create_test_bin_file(self, tick_id: int, width: int = 8, height: int = 8, 
+    def create_test_bin_file(self, tick_id: int, width: int = 8, height: int = 8,
                             fill_value: float = 1.0) -> Path:
         """Create a test zbuffer .bin file."""
         bin_path = self.session_dir / 'zbuffer' / f'tick_{tick_id:06d}.bin'
