@@ -23,8 +23,8 @@ import uuid
 import hashlib
 import time
 from pathlib import Path
-from typing import Optional, Dict, Any, Union
-from dataclasses import dataclass, asdict, field
+from typing import Optional, Dict, Union
+from dataclasses import dataclass, asdict
 
 from .merkle import MerkleTree, compute_file_hashes, build_merkle_root_from_files
 from .sign import SigningKey, load_or_create_keypair, verify_json_signature

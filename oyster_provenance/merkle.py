@@ -6,7 +6,6 @@ frame against the root without downloading all frames.
 """
 
 import hashlib
-import json
 from typing import List, Tuple, Optional
 from dataclasses import dataclass
 
