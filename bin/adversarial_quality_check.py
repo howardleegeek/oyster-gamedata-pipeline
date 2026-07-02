@@ -294,7 +294,10 @@ def check_cross_source_duration(sess: pathlib.Path, mp4_dur: float, ac_span: flo
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     ap.add_argument("session_dir")
     args = ap.parse_args()
     sess = pathlib.Path(args.session_dir).resolve()
@@ -332,15 +335,24 @@ def main() -> int:
     if c2.get("ok") and not c2.get("monotonic_timestamps"):
         issues.append("game_state.jsonl: NON-MONOTONIC timestamps (suspicious)")
     if c2.get("ok") and c2.get("bbox_diagonal_m", 0) < 5:
-        issues.append(f"game_state.jsonl: bbox {c2['bbox_diagonal_m']}m < 5m (player barely moved — fake?)")
+        issues.append(
+            f"game_state.jsonl: bbox {c2['bbox_diagonal_m']}m < 5m "
+            "(player barely moved — fake?)"
+        )
     if c3.get("ok") and c3.get("mouse_x_in_unit") is False:
         issues.append("action_camera.json: mouse_x out of [0,1] (PRD violation)")
     if c4.get("ok") and not c4.get("monotonic_timestamps"):
         issues.append("inputs.jsonl: NON-MONOTONIC timestamps (suspicious)")
     if c4.get("ok") and c4.get("wasd_press_events", 0) < 5:
-        issues.append(f"inputs.jsonl: only {c4['wasd_press_events']} WASD presses (player not actively moving)")
+        issues.append(
+            f"inputs.jsonl: only {c4['wasd_press_events']} WASD presses "
+            "(player not actively moving)"
+        )
     if c4.get("ok") and c4.get("distinct_event_types", 0) < 5:
-        issues.append(f"inputs.jsonl: only {c4['distinct_event_types']} distinct event types (low diversity)")
+        issues.append(
+            f"inputs.jsonl: only {c4['distinct_event_types']} distinct event types "
+            "(low diversity)"
+        )
     if c5.get("ok") and c5.get("mismatches", 0) > 0:
         issues.append(f"MANIFEST: {c5['mismatches']} sha256 mismatches (TAMPER OR STALE)")
     if c6.get("ok"):
