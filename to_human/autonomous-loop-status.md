@@ -23,6 +23,11 @@
 
 ## Round 184 @ 2026-07-02T02:30:00Z
 - Picked: Fix ruff F401 unused `ast` import in bin/red_team_nan_coordinates.py:11 — continuation of the ongoing ruff cleanup sweep from Rounds 101-183. Verified `ast` is genuinely unused (grep 'ast\.' returns empty, only the import line). Single-file bounded change, 1-line diff, no behavior change. Module compiles and imports cleanly, no tests reference it (standalone red-team tool). Self-review: cosmetic F401 cleanup only — no signature change, no exception class change, no threading/auth/security change, no off-by-one, no silent error swallow, no test masked as passing, no brand cross-reference.
+- Result: committed 046c7fe8 (pushed to main)
+
+## Round 185 @ 2026-07-02T03:00:00Z
+- Picked: Fix ruff F401 unused imports in bin/upload_resume_helper.py — continuation of the ongoing ruff cleanup sweep from Rounds 101-184. Removed unused `hashlib` (line 17) and `pathlib.Path` (line 25). Also fixed import ordering (I001). Single-file bounded change, no behavior change. Module compiles and imports cleanly, no tests reference it (standalone S3 upload helper). Self-review: cosmetic F401+I001 cleanup — no signature change, no exception class change, no threading/auth/security change, no off-by-one, no silent error swallow, no test masked as passing, no brand cross-reference.
+- Result: committed b504e99d (pushed to main)nce it (standalone red-team tool). Self-review: cosmetic F401 cleanup only — no signature change, no exception class change, no threading/auth/security change, no off-by-one, no silent error swallow, no test masked as passing, no brand cross-reference.
 - Result: committed ad0b45a0 (pushed to main)
 
 ## Round 180 @ 2026-07-01T14:35:00Z
