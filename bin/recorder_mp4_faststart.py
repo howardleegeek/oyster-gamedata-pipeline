@@ -12,9 +12,9 @@ playback and resilience against recording interruptions.
 
 import argparse
 import os
-import sys
-import subprocess
 import shlex
+import subprocess
+import sys
 from typing import List
 
 
