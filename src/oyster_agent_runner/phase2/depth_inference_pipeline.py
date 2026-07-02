@@ -62,7 +62,7 @@ def extract_frames(video_path: str, output_dir: str, fps: float = 6.0) -> list[s
     ]
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        subprocess.run(cmd, capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError as e:
         raise DepthInferenceError(f"ffmpeg failed with code {e.returncode}: {e.stderr}") from e
     except FileNotFoundError as e:
