@@ -91,8 +91,10 @@ def _extract_frames(video_path: str, num_frames: int) -> Iterable:
             yield vid.copy()
         vid.close()
         return
-    except Exception:
-        pass
+    except OSError as e:
+        logger.warning("PIL cannot open %s: %s; will try ffmpeg fallback", video_path, e)
+    except Exception as e:
+        logger.warning("PIL failed to extract frames from %s: %s; will try ffmpeg fallback", video_path, e)
 
     tmpdir = tempfile.mkdtemp(prefix="g069_frames_")
     pattern = os.path.join(tmpdir, "frame_%04d.png")
