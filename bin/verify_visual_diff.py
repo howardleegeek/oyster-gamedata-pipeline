@@ -515,6 +515,19 @@ def render_html(
     records_b: list[dict],
     structural: StructuralReport,
 ) -> str:
+    """Render a side-by-side HTML diff of two action_camera.json files.
+
+    Args:
+        clip_a: Path to the first clip directory.
+        clip_b: Path to the second clip directory.
+        frames: List of frame indices to include in the detailed diff.
+        records_a: List of action camera records from clip_a.
+        records_b: List of action camera records from clip_b.
+        structural: StructuralReport containing field-level divergence analysis.
+
+    Returns:
+        A complete HTML document as a string containing the visual diff.
+    """
     e = html_lib.escape
 
     def cell(v: Any) -> str:
