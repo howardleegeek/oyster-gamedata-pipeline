@@ -84,7 +84,7 @@ class HealthChecker:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "error": None,
             }
-        except requests.exceptions.ConnectionError as e:
+        except requests.exceptions.ConnectionError:
             return {
                 "name": name,
                 "url": url,
@@ -94,7 +94,7 @@ class HealthChecker:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "error": f"ConnectionError on {url}",
             }
-        except requests.exceptions.Timeout as e:
+        except requests.exceptions.Timeout:
             return {
                 "name": name,
                 "url": url,
