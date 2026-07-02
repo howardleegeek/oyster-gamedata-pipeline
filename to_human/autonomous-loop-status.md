@@ -2345,3 +2345,27 @@ Found 4 errors.
 ## Round 188 @ 2026-07-02T04:00:00Z
 - Picked: Fix ruff F401 unused imports in bin/server_ingest.py — removed unused `os`, `shutil`, `typing.Any`, `typing.Optional`. Continuation of ongoing ruff cleanup sweep from Rounds 101-187. Single-file bounded change, 3-line diff, no behavior change. `ruff check bin/server_ingest.py` clean, module imports cleanly, no tests reference it (standalone ingest worker). Self-review: cosmetic lint cleanup only — no signature change, no runtime behavior change, no silent error swallow, no test masked as passing, no brand cross-reference.
 - Result: committed 881ab30a (pushed to main)
+
+## Round 186 @ 2026-07-02T03:30:00Z
+- Picked: Fix ruff W292 missing trailing newline in bin/recorder_rate_limiter.py — continuation of ongoing ruff cleanup from Rounds 101-185. Single-file bounded change, 1-line diff, no behavior change. Module imports cleanly, ruff check clean, 22/22 tests in tests/test_remote_recorder_backend_e2e.py pass. Self-review: cosmetic W292 fix only — no logic change, no test impact, no brand cross-reference.
+- Result: committed c1619b2e (pushed to main)
+
+## Round 189 @ 2026-07-02T00:59:50Z
+- Picked: Fix ruff E401+I001+W291+W292 in bin/red_team_wrong_obs_key.py — continuation of ongoing ruff cleanup sweep from Rounds 101-188. Fixed:
+  - Line 3: split 11 comma-separated stdlib imports to PEP 8 one-per-line form (E401)
+  - Line 3: same fix automatically sorts imports alphabetically (I001)
+  - Lines 46, 92, 102, 140, 143: removed trailing whitespace (W291, 5 sites)
+  - End of file: added missing trailing newline (W292)
+  Single-file bounded change, 18 insertions, 8 deletions, no behavior change. All 11 imports verified used via AST walk (no F401). Module parses cleanly, ruff check clean on the file, 538/538 tests in tests/bin/ pass. Self-review: cosmetic lint cleanup only — no signature change, no exception class change, no threading/auth/security change, no off-by-one, no silent error swallow, no test masked as passing, no brand cross-reference, no module-level side effect (shebang preserved on line 1, docstring on line 2, imports start at line 3).
+- Result: committed 28883afa (pushed to main)
+
+## Round 190 @ 2026-07-02T05:00:00Z
+- Picked: Fix ruff F401 unused imports in 2 bin/ scripts — continuation of ongoing ruff cleanup sweep from Rounds 101-189. Fixed:
+  - bin/red_team/attackers.py: removed unused `field` (dataclasses) and `Any` (typing)
+  - bin/red_team_path_traversal.py: removed unused `os`
+  Single-file bounded changes, 2 files, 2-line diff total, no behavior change. Modules import cleanly, no tests reference them. Self-review: cosmetic F401 cleanup only — no signature change, no exception class change, no threading/auth/security change, no off-by-one, no silent error swallow, no test masked as passing, no brand cross-reference.
+- Result: committed c551ad2b (pushed to main)
+
+## Round 191 @ 2026-07-02T05:30:00Z
+- Picked: Fix ruff F401 unused `os` import in bin/uninstall_clean.py — continuation of ongoing ruff cleanup sweep from Rounds 101-190. Verified `os` is genuinely unused (no `os.` calls in module). Single-file bounded change, 1-line diff, no behavior change. Module imports cleanly. Self-review: cosmetic F401 cleanup only — no signature change, no exception class change, no threading/auth/security change, no off-by-one, no silent error swallow, no test masked as passing, no brand cross-reference.
+- Result: committed 69e2c73a (pushed to main)
