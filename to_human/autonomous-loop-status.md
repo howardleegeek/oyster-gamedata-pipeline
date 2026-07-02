@@ -1,3 +1,8 @@
+## Round 224 @ 2026-07-02T15:30:00Z
+
+- Picked: Add test artifact files (dashboard/merge_failures.log, dashboard/replay_attacks.json, tests/_payout_cron_test.log) to .gitignore — these keep appearing in git status across rounds but aren't code issues, just test outputs that should be ignored
+- Result: committed 3ea4d1f5
+
 ## Round 222 @ 2026-07-02T14:30:00Z
 - Picked: no good candidate found — verified ruff clean (0 errors on src/ tests/), pytest collection (3294 tests), iron-law tests (38/38 pass), provenance tests (25/25 pass), auto_tag_bot tests (19/20 pass, 1 pre-existing skip), no failing tests, no clear-bounded PRD gaps in main codebase, modified files in git status are test artifacts (dashboard/merge_failures.log, dashboard/replay_attacks.json, tests/_payout_cron_test.log — expected outputs from test runs, not code issues)
 - Result: skipped (no candidate)
