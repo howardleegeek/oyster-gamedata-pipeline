@@ -67,7 +67,6 @@ def _read_proc_uptime(pid: Optional[int] = None) -> float:
         # Field 22 (0-indexed 21) is starttime in clock ticks.
         clk_tck = os.sysconf(os.sysconf_names.get("SC_CLK_TCK", 2))
         starttime_ticks = int(parts[21])
-        boot_time = time.time() - (os.times().elapsed or time.time())
         # Approximate: use process start time from /proc/uptime
         with open("/proc/uptime", "r", encoding="utf-8") as fh:
             system_uptime = float(fh.read().split()[0])
