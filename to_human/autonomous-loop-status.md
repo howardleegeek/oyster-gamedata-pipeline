@@ -2433,3 +2433,192 @@ Found 4 errors.
 ## Round 198 @ 2026-07-02T05:57:52Z
 - Picked: Fix ruff F401 (3 unused cross-module imports) + F541 (2 f-strings with no placeholders) in oyster_provenance/verify.py — continuation of ongoing ruff cleanup sweep from Rounds 101-197. Verified all 5 removed names are genuinely unreferenced (grep `json\.`, `build_merkle_root_from_files`, `load_public_key`, `AnchorChain`, `get_public_key_info` all return empty in code). `from __future__ import annotations` and `sys.path.insert` line preserved. Single-file bounded change, 5 insertions/6 deletions, no behavior change. `ruff check oyster_provenance/verify.py` clean, 45/45 tests in tests/test_provenance.py + tests/test_provenance_offline_bundle.py pass. Self-review: cosmetic F401+F541 cleanup — no signature change, no exception class change, no threading/auth/security change, no off-by-one, no silent error swallow (removed imports are dead, not error-handling code), no test masked as passing (no skip/xfail added, no test disabled), no race condition, no brand cross-reference, no module-level side effect added (pre-existing `sys.path.insert` is unchanged).
 - Result: pending commit
+
+## Round 201 @ 2026-07-03T01:00:00Z
+- Picked: Fix ruff W292 missing trailing newlines in 3 files — continuation of ongoing ruff cleanup sweep from Rounds 101-200. Fixed trailing newlines in docs/examples/obs_capture_example.py, sdk/python/oyster_buyer_sdk/__init__.py, and server/__init__.py. Single-file bounded changes in 3 files, 3 insertions, no behavior change. F401 [*] `os` imported but unused
+  --> patches/cluster-week1-2026-05-18/D2-zbuffer-exr/test_zbuffer_to_exr.py:8:8
+   |
+ 6 | import json
+ 7 | import numpy as np
+ 8 | import os
+   |        ^^
+ 9 | import struct
+10 | import tempfile
+   |
+help: Remove unused import: `os`
+
+F401 [*] `unittest.mock.MagicMock` imported but unused
+  --> patches/cluster-week1-2026-05-18/D2-zbuffer-exr/test_zbuffer_to_exr.py:13:34
+   |
+11 | import unittest
+12 | from pathlib import Path
+13 | from unittest.mock import patch, MagicMock, mock_open
+   |                                  ^^^^^^^^^
+14 |
+15 | # Add local directory to path for the zbuffer_to_exr module
+   |
+help: Remove unused import
+
+F401 [*] `unittest.mock.mock_open` imported but unused
+  --> patches/cluster-week1-2026-05-18/D2-zbuffer-exr/test_zbuffer_to_exr.py:13:45
+   |
+11 | import unittest
+12 | from pathlib import Path
+13 | from unittest.mock import patch, MagicMock, mock_open
+   |                                             ^^^^^^^^^
+14 |
+15 | # Add local directory to path for the zbuffer_to_exr module
+   |
+help: Remove unused import
+
+W291 [*] Trailing whitespace
+  --> patches/cluster-week1-2026-05-18/D2-zbuffer-exr/test_zbuffer_to_exr.py:46:82
+   |
+44 |         shutil.rmtree(self.temp_dir)
+45 |     
+46 |     def create_test_bin_file(self, tick_id: int, width: int = 8, height: int = 8, 
+   |                                                                                  ^
+47 |                             fill_value: float = 1.0) -> Path:
+48 |         """Create a test zbuffer .bin file."""
+   |
+help: Remove trailing whitespace
+
+W292 [*] No newline at end of file
+   --> patches/cluster-week1-2026-05-18/D2-zbuffer-exr/test_zbuffer_to_exr.py:350:20
+    |
+349 | if __name__ == '__main__':
+350 |     unittest.main()
+    |                    ^
+    |
+help: Add trailing newline
+
+W291 [*] Trailing whitespace
+   --> patches/cluster-week1-2026-05-18/D2-zbuffer-exr/zbuffer_to_exr.NEW_DESIGN.py:292:72
+    |
+290 |     parser.add_argument('session_dir', type=str, help='Session directory path')
+291 |     parser.add_argument('--max-gap-ms', type=int, default=50, help='Maximum alignment gap in milliseconds')
+292 |     parser.add_argument('--fallback-on-miss', type=str, default='true', 
+    |                                                                        ^
+293 |                        choices=['true', 'false'], help='Whether to fallback to DA-V2 for missed frames')
+    |
+help: Remove trailing whitespace
+
+W292 [*] No newline at end of file
+   --> patches/cluster-week1-2026-05-18/D2-zbuffer-exr/zbuffer_to_exr.NEW_DESIGN.py:309:11
+    |
+308 | if __name__ == '__main__':
+309 |     main()
+    |           ^
+    |
+help: Add trailing newline
+
+W291 [*] Trailing whitespace
+   --> patches/cluster-week1-2026-05-18/D2-zbuffer-exr/zbuffer_to_exr.py:292:72
+    |
+290 |     parser.add_argument('session_dir', type=str, help='Session directory path')
+291 |     parser.add_argument('--max-gap-ms', type=int, default=50, help='Maximum alignment gap in milliseconds')
+292 |     parser.add_argument('--fallback-on-miss', type=str, default='true', 
+    |                                                                        ^
+293 |                        choices=['true', 'false'], help='Whether to fallback to DA-V2 for missed frames')
+    |
+help: Remove trailing whitespace
+
+W292 [*] No newline at end of file
+   --> patches/cluster-week1-2026-05-18/D2-zbuffer-exr/zbuffer_to_exr.py:309:11
+    |
+308 | if __name__ == '__main__':
+309 |     main()
+    |           ^
+    |
+help: Add trailing newline
+
+F401 [*] `typing.Optional` imported but unused
+  --> patches/cluster-week3-2026-05-18/B1-bundler-broken/batch_bundler.py:17:44
+   |
+15 | from pathlib import Path
+16 | from datetime import datetime
+17 | from typing import List, Dict, Any, Tuple, Optional
+   |                                            ^^^^^^^^
+18 | import tempfile
+19 | import shutil
+   |
+help: Remove unused import: `typing.Optional`
+
+F401 [*] `tempfile` imported but unused
+  --> patches/cluster-week3-2026-05-18/B1-bundler-broken/batch_bundler.py:18:8
+   |
+16 | from datetime import datetime
+17 | from typing import List, Dict, Any, Tuple, Optional
+18 | import tempfile
+   |        ^^^^^^^^
+19 | import shutil
+   |
+help: Remove unused import: `tempfile`
+
+F401 [*] `shutil` imported but unused
+  --> patches/cluster-week3-2026-05-18/B1-bundler-broken/batch_bundler.py:19:8
+   |
+17 | from typing import List, Dict, Any, Tuple, Optional
+18 | import tempfile
+19 | import shutil
+   |        ^^^^^^
+   |
+help: Remove unused import: `shutil`
+
+F541 [*] f-string without any placeholders
+   --> patches/cluster-week3-2026-05-18/B1-bundler-broken/batch_bundler.py:231:11
+    |
+230 |     # Print summary
+231 |     print(f"
+✓ Batch created successfully!")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+232 |     print(f"  Batch ID: {batch_id}")
+233 |     print(f"  Tarball size: {tarball_path.stat().st_size / 1024 / 1024:.1f} MB")
+    |
+help: Remove extraneous `f` prefix
+
+W292 [*] No newline at end of file
+   --> patches/cluster-week3-2026-05-18/B1-bundler-broken/batch_bundler.py:238:11
+    |
+237 | if __name__ == "__main__":
+238 |     main()
+    |           ^
+    |
+help: Add trailing newline
+
+F401 [*] `shutil` imported but unused
+  --> patches/cluster-week3-2026-05-18/B1-bundler-broken/test_batch_bundler.py:12:8
+   |
+10 | import tarfile
+11 | import tempfile
+12 | import shutil
+   |        ^^^^^^
+13 | from pathlib import Path
+14 | import pytest
+   |
+help: Remove unused import: `shutil`
+
+W291 [*] Trailing whitespace
+   --> patches/cluster-week3-2026-05-18/B1-bundler-broken/test_batch_bundler.py:122:48
+    |
+120 |         # Check session SHA256
+121 |         concat_hashes = ''.join(sorted(
+122 |             hashlib.sha256(content).hexdigest() 
+    |                                                ^
+123 |             for content in files.values()
+124 |         ))
+    |
+help: Remove trailing whitespace
+
+W292 [*] No newline at end of file
+   --> patches/cluster-week3-2026-05-18/B1-bundler-broken/test_batch_bundler.py:325:34
+    |
+324 | if __name__ == "__main__":
+325 |     pytest.main([__file__, "-v"])
+    |                                  ^
+    |
+help: Add trailing newline
+
+Found 17 errors.
+[*] 17 fixable with the `--fix` option. (excluding patches/) now clean (0 errors). 55/55 tests in test_provenance.py + test_provenance_offline_bundle.py + test_provenance_sign_verify.py pass. Self-review: cosmetic W292 fix — no code logic change, no signature change, no exception class change, no threading/auth/security change, no off-by-one, no silent error swallow, no test disabled, no race condition, no brand cross-reference.
+- Result: committed 35bf960a (pushed to main)
