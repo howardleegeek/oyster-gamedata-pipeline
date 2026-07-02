@@ -73,7 +73,7 @@ class TarballParser:
         self.extract_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Extracting {self.tarball_path} to {self.extract_dir}")
         with tarfile.open(self.tarball_path, "r:*") as tar:
-            members = [m for m in tar.getmembers() 
+            members = [m for m in tar.getmembers()
                        if not m.name.startswith("/") and ".." not in m.name]
             tar.extractall(path=self.extract_dir, members=members)
         self._extracted = True
