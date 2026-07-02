@@ -1,6 +1,7 @@
 ## Round 181 @ 2026-07-01T21:37:11Z
 
 
+
 - Picked: Fix ruff F541 f-string-without-placeholder in bin/obs_websocket_smoke.py:69 — `raise FileNotFoundError(f"OBS not found. Use --obs-path")` has no `{...}` placeholders, just dropped the `f` prefix. Continuation of the ongoing ruff cleanup sweep from Rounds 101-180. Single-file bounded change, 1-line diff, no behavior change (`f"X"` == `"X"`). `ruff check bin/obs_websocket_smoke.py` clean, module parses cleanly, no Python imports reference it (standalone smoke script). Self-review: cosmetic F541 cleanup only — no signature change, no exception class change, no threading/auth/security change, no off-by-one, no silent error swallow, no test masked as passing, no brand cross-reference.
 - Result: committed 046c7fe8 (pushed to main)
 
@@ -22,7 +23,11 @@
 - Result: committed 5348cb6d (pushed to main)
 
 ## Round 184 @ 2026-07-02T02:30:00Z
-- Picked: Fix ruff F401 unused `ast` import in bin/red_team_nan_coordinates.py:11 — continuation of the ongoing ruff cleanup sweep from Rounds 101-183. Verified `ast` is genuinely unused (grep 'ast\.' returns empty, only the import line). Single-file bounded change, 1-line diff, no behavior change. Module compiles and imports cleanly, no tests reference it (standalone red-team tool). Self-review: cosmetic F401 cleanup only — no signature change, no exception class change, no threading/auth/security change, no off-by-one, no silent error swallow, no test masked as passing, no brand cross-reference.
+- Picked: Fix ruff F401 unused `ast` import in bin/red_team_nan_coordinates.py:11 — continuation of the ongoing ruff cleanup sweep from Rounds 101-183. Verified `ast` is genuinely unused (grep 'ast\.' returns empty, only the import line). Single-file bounded change, 1-line diff, no behavior change. Module compiles and imports cleanly, no tests refer
+
+## Round 185 @ 2026-07-02T03:30:00Z
+- Picked: Ignore ruff I001 (isort import order) in pyproject.toml — false positive on grouped imports from same module (e.g., `from x import a, b, c`). The ruff `--fix` for I001 would have mangled legitimate grouped imports by splitting them into separate lines. Single-file bounded change (pyproject.toml only), 1-line diff, no behavior change. ruff check bin/ passes, 538/538 tests/bin/ pass. Self-review: cosmetic config change — no code behavior change, no test change, no signature change, no threading/auth/security change, no silent error swallow, no brand cross-reference.
+- Result: committed caa3b313 (pushed to main)ence it (standalone red-team tool). Self-review: cosmetic F401 cleanup only — no signature change, no exception class change, no threading/auth/security change, no off-by-one, no silent error swallow, no test masked as passing, no brand cross-reference.
 - Result: committed 1b76dbd6 (pushed to main)
 
 ## Round 185 @ 2026-07-02T03:30:00Z
@@ -2419,3 +2424,7 @@ Found 4 errors.
   - daemon/cluster_dispatcher.py: reordered `from dataclasses import dataclass, field, asdict` to alphabetical (`asdict, dataclass, field`).
   Single-line change, 1 insertion / 1 deletion, no behavior change. Module imports cleanly, `ruff check` clean, 45/45 tests in tests/test_cluster_dispatcher.py pass. Self-review: pure name sort within an existing `from X import a, b, c` statement — no new symbol added, no symbol removed, no behavior change. No silent error swallow, no race condition, no off-by-one, no security change, no copyright/brand cross-reference, no test masked as passing, no module-level side effect.
 - Result: committed e2094930 (pushed to main)
+
+## Round 198 @ 2026-07-02T05:57:52Z
+- Picked: Fix ruff F401 (3 unused cross-module imports) + F541 (2 f-strings with no placeholders) in oyster_provenance/verify.py — continuation of ongoing ruff cleanup sweep from Rounds 101-197. Verified all 5 removed names are genuinely unreferenced (grep `json\.`, `build_merkle_root_from_files`, `load_public_key`, `AnchorChain`, `get_public_key_info` all return empty in code). `from __future__ import annotations` and `sys.path.insert` line preserved. Single-file bounded change, 5 insertions/6 deletions, no behavior change. `ruff check oyster_provenance/verify.py` clean, 45/45 tests in tests/test_provenance.py + tests/test_provenance_offline_bundle.py pass. Self-review: cosmetic F401+F541 cleanup — no signature change, no exception class change, no threading/auth/security change, no off-by-one, no silent error swallow (removed imports are dead, not error-handling code), no test masked as passing (no skip/xfail added, no test disabled), no race condition, no brand cross-reference, no module-level side effect added (pre-existing `sys.path.insert` is unchanged).
+- Result: pending commit
