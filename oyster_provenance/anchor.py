@@ -11,9 +11,7 @@ Cost target: ≤ $1/week (Bitcoin OP_RETURN is $0.50-2 typically)
 import json
 import os
 import time
-import hashlib
-from pathlib import Path
-from typing import List, Dict, Optional, Tuple
+from typing import List, Optional, Tuple
 from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta
 from enum import Enum
