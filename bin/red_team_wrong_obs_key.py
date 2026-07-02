@@ -20,9 +20,11 @@ def parse_response(raw: bytes) -> tuple[int, dict[str, str]]:
     """Parse HTTP response; return (status_code, headers)."""
     text = raw.decode("utf-8", errors="replace")
     hdr_end = text.find("\r\n\r\n")
-    if hdr_end == -1: hdr_end = len(text)
+    if hdr_end == -1:
+        hdr_end = len(text)
     lines = text[:hdr_end].split("\r\n")
-    if not lines: return 0, {}
+    if not lines:
+        return 0, {}
     status_code = int(lines[0].split(" ", 2)[1]) if len(lines[0].split()) >= 2 else 0
     headers = {}
     for line in lines[1:]:
@@ -49,7 +51,8 @@ def attempt_auth(host: str, port: int, obs_key: str, use_tls: bool = False,
         sock.settimeout(timeout)
         while b"\r\n\r\n" not in response:
             chunk = sock.recv(4096)
-            if not chunk: break
+            if not chunk:
+                break
             response += chunk
         if response:
             status_code, headers = parse_response(response)
@@ -70,8 +73,10 @@ def attempt_auth(host: str, port: int, obs_key: str, use_tls: bool = False,
         result["refused"] = True
     finally:
         if sock:
-            try: sock.close()
-            except OSError: pass
+            try:
+                sock.close()
+            except OSError:
+                pass
     return result
 
 def write_audit_entry(audit_path: Path, host: str, port: int, 
@@ -94,7 +99,8 @@ def write_audit_entry(audit_path: Path, host: str, port: int,
 
 def resolve_audit_log(path: Optional[str]) -> Path:
     """Resolve audit log path; create temp file if None."""
-    if path: return Path(path)
+    if path:
+        return Path(path)
     temp_dir = tempfile.mkdtemp(prefix="redteam_audit_")
     return Path(temp_dir) / "audit_log.jsonl"
 

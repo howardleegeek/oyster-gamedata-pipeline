@@ -56,7 +56,8 @@ def _baseline_frame() -> tuple[dict, dict]:
     B-05 / D-04) leave this field intact ⇒ R18 PASSES.
     """
     half = math.radians(90.0) * 0.5
-    qy = math.sin(half); qw = math.cos(half)
+    qy = math.sin(half)
+    qw = math.cos(half)
     n = {
         "frame": 0, "time": "2026-05-05 19:30:00.000", "fps": 30.0, "route_type": 1,
         "session_id": _CANONICAL_SESSION_ID,

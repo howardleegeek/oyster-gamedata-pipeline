@@ -82,7 +82,8 @@ def _fix_source(source: str) -> str:
                     if ('"""' in ln or "'''" in ln) and ln.count('"""') < 2 and ln.count("'''") < 2:
                         for j in range(i + 1, len(lines)):
                             if '"""' in lines[j] or "'''" in lines[j]:
-                                idx = j + 1; break
+                                idx = j + 1
+                                break
                     continue
                 if ln.strip():
                     break
