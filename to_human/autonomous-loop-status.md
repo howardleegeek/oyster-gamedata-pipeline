@@ -2337,3 +2337,11 @@ Found 4 errors.
   - Line 76: removed trailing whitespace (W291)
   Single-file bounded change, 2 insertions/2 deletions, no behavior change. Module imports cleanly, ruff check clean. Self-review: cosmetic lint cleanup only — no signature change, no exception change, no threading/auth/security change, no off-by-one, no silent error swallow, no test masked as passing, no brand cross-reference.
 - Result: committed 3eea4e65 (pushed to main)
+
+## Round 187 @ 2026-07-02T03:00:00Z
+- Picked: Fix ruff I001+W292 in bin/recorder_mp4_faststart.py — continuation of the ongoing ruff cleanup sweep from Rounds 101-186. Fixed: import sorting (I001) — reordered subprocess, sys alphabetically; added missing trailing newline (W292). Single-file bounded change, 3-line diff, no behavior change. `ruff check bin/recorder_mp4_faststart.py` clean, module imports cleanly, 538/538 tests in tests/bin/ pass. Self-review: cosmetic lint cleanup only — no signature/exception/threading/auth change, no silent error swallow, no race condition, no security change, no off-by-one, no test masked as passing, no brand cross-reference, no module-level side effect.
+- Result: committed 51f38eac (pushed to main)
+
+## Round 188 @ 2026-07-02T04:00:00Z
+- Picked: Fix ruff F401 unused imports in bin/server_ingest.py — removed unused `os`, `shutil`, `typing.Any`, `typing.Optional`. Continuation of ongoing ruff cleanup sweep from Rounds 101-187. Single-file bounded change, 3-line diff, no behavior change. `ruff check bin/server_ingest.py` clean, module imports cleanly, no tests reference it (standalone ingest worker). Self-review: cosmetic lint cleanup only — no signature change, no runtime behavior change, no silent error swallow, no test masked as passing, no brand cross-reference.
+- Result: committed 881ab30a (pushed to main)
