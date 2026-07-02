@@ -110,6 +110,21 @@ class MaterialAlbedoProvider:
         return count
     
     def load_from_yaml(self, yaml_path: Path) -> int:
+        """Load materials from a YAML configuration file.
+
+        Parses a YAML file containing material definitions with paths to texture
+        images. Each material entry should have a 'name' and optional paths to
+        albedo, roughness, and metallic texture files.
+
+        Args:
+            yaml_path: Path to the YAML configuration file.
+
+        Returns:
+            The number of materials successfully loaded.
+
+        Raises:
+            FileNotFoundError: If the YAML file does not exist.
+        """
         yaml_path = Path(yaml_path)
         if not yaml_path.exists():
             raise FileNotFoundError(f"YAML file not found: {yaml_path}")
