@@ -140,6 +140,11 @@ class PostgresAuditor:
             cur.close()
 
     def close(self) -> None:
+        """Close the database connection if open.
+
+        Idempotent: safely does nothing if connection is already closed
+        or was never opened.
+        """
         if self._conn and not self._conn.closed:
             self._conn.close()
 
