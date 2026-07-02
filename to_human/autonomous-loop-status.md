@@ -1,3 +1,8 @@
+## Round 225 @ 2026-07-02T17:22:19Z
+
+- Picked: Fix ruff E501 line-too-long errors in bin/adversarial_quality_check.py — found 3 lines > 100 chars and wrapped them
+- Result: committed f2612f4d
+
 ## Round 224 @ 2026-07-02T15:30:00Z
 
 - Picked: Add test artifact files (dashboard/merge_failures.log, dashboard/replay_attacks.json, tests/_payout_cron_test.log) to .gitignore — these keep appearing in git status across rounds but aren't code issues, just test outputs that should be ignored
