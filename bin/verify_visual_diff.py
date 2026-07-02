@@ -664,6 +664,27 @@ def render_json(
     records_b: list[dict],
     structural: StructuralReport,
 ) -> str:
+    """Render a JSON diff of two action_camera.json clip directories.
+
+    Generates a JSON-formatted diff containing structural metadata divergence
+    (record count, field set differences, numerical drift) and per-frame
+    field-level comparisons.
+
+    Args:
+        clip_a: Path to the first clip directory containing action_camera.json.
+        clip_b: Path to the second clip directory containing action_camera.json.
+        frames: List of frame indices to include in the per-frame diff section.
+        records_a: List of action records from clip_a's action_camera.json.
+        records_b: List of action records from clip_b's action_camera.json.
+        structural: Pre-computed structural report from compute_structural_report().
+
+    Returns:
+        A JSON string containing the structural diff and per-frame field comparisons.
+
+    Example:
+        >>> report = compute_structural_report(records_a, records_b)
+        >>> json_output = render_json(clip_a, clip_b, [0, 100], records_a, records_b, report)
+    """
     fd = structural.field_diff
     payload: dict[str, Any] = {
         "clip_a": str(clip_a),
