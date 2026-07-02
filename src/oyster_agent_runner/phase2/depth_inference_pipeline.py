@@ -19,6 +19,10 @@ import subprocess
 from pathlib import Path
 
 
+class DepthInferenceError(Exception):
+    """Raised when the depth inference pipeline fails (ffmpeg, model load, etc.)."""
+
+
 def extract_frames(video_path: str, output_dir: str, fps: float = 6.0) -> list[str]:
     """
     Extract frames from a video file using ffmpeg.
@@ -60,9 +64,9 @@ def extract_frames(video_path: str, output_dir: str, fps: float = 6.0) -> list[s
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"ffmpeg failed with code {e.returncode}: {e.stderr}") from e
+        raise DepthInferenceError(f"ffmpeg failed with code {e.returncode}: {e.stderr}") from e
     except FileNotFoundError as e:
-        raise RuntimeError(
+        raise DepthInferenceError(
             "ffmpeg not found. Please install ffmpeg and ensure it's in your PATH."
         ) from e
 

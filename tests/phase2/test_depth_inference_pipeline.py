@@ -25,7 +25,7 @@ class TestExtractFrames:
         # Track subprocess.run calls
         run_calls = []
 
-        def mock_run(cmd, capture_output=False, text=False):
+        def mock_run(cmd, capture_output=False, text=False, check=False, **kwargs):
             run_calls.append(cmd)
             # Create fake frame files
             os.makedirs(output_dir, exist_ok=True)
@@ -58,8 +58,10 @@ class TestExtractFrames:
 
         Path(video_path).touch()
 
-        def mock_run(cmd, capture_output=False, text=False):
-            return MagicMock(returncode=1, stderr="ffmpeg error: invalid codec", stdout="")
+        def mock_run(cmd, capture_output=False, text=False, check=False, **kwargs):
+            if check:
+                raise subprocess.CalledProcessError(1, cmd, "ffmpeg error", "")
+            return MagicMock(returncode=0, stderr="", stdout="")
 
         monkeypatch.setattr(subprocess, "run", mock_run)
 
