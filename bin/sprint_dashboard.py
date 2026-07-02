@@ -60,14 +60,7 @@ def count_files_by_dir(repo_root: str) -> dict[str, dict[str, int]]:
     """
     repo_path = Path(repo_root)
     counts = {}
-    
-    # Define patterns for each file type
-    patterns = {
-        'py': '*.py',
-        'sh': '*.sh',
-        'md': '*.md'
-    }
-    
+
     # Walk through directories
     for dirpath, dirnames, filenames in os.walk(repo_path):
         # Skip hidden directories
