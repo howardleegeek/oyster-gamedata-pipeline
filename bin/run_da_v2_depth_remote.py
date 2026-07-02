@@ -12,12 +12,13 @@ fall back to local ONNX without silently accepting missing depth.
 """
 
 import argparse
+import glob
+import io
 import os
 import subprocess
 import tarfile
-import io
 import time
-import glob
+
 import requests
 
 
