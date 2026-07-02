@@ -1,4 +1,8 @@
 
+## Round 200 @ 2026-07-02T07:00:00Z
+- Picked: no good candidate found — ruff clean (0 errors), core tests pass (55/55 provenance), no clear-bounded PRD gaps in main codebase
+- Result: skipped (no candidate)
+
 ## Round 199 @ 2026-07-02T06:09:19Z
 - Picked: Fix ruff F401 (3 unused imports) in oyster_provenance/anchor.py — continuation of ongoing ruff cleanup sweep from Rounds 101-198. Removed `import hashlib`, `from pathlib import Path`, and `Dict,` from `from typing import List, Dict, Optional, Tuple`. Verified all 3 names are genuinely unreferenced (grep \bhashlib\b, \bPath\b, \bDict\b return only the import line and one docstring mention "Path to session directory" which is prose, not code). `List`, `Optional`, `Tuple` are still used (anchored via type hints at lines 56, 78, 106, 146, 192, 276, 290). Single-file bounded change, 1 insertion/3 deletions, no behavior change. `ruff check oyster_provenance/anchor.py` now clean (0 errors on this file), module imports cleanly via .venv, 25/25 tests in tests/test_provenance.py pass, 30/30 tests in tests/test_provenance_offline_bundle.py + tests/test_provenance_sign_verify.py pass (anchor.py is transitively imported via .merkle). Self-review: cosmetic F401 cleanup only — no signature change, no exception class change, no threading/auth/security change, no off-by-one (verified typing imports reduced correctly with all 3 remaining names still used), no silent error swallow (these were dead imports, not error handling), no test masked as passing (no skip/xfail added, no test disabled), no race condition, no brand cross-reference, no module-level side effect added.
 - Result: committed 7f2f5b0f (pushed to main)
