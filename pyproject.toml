@@ -98,6 +98,7 @@ ignore = [
     "E501",  # line length — black handles it
     "E402",  # module-level imports not at top — intentional for sys.path setup in tests/scripts
     "E712",  # comparison-to-True/False — explicit is fine for predicate filters
+    "I001",  # isort import order — false positive on grouped same-source imports
     "W293",  # blank line whitespace — cosmetic
     "F841",  # unused local — sometimes intentional for exception capture
 ]
