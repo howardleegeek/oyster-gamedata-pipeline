@@ -23,6 +23,11 @@
 
 ## Round 184 @ 2026-07-02T02:30:00Z
 - Picked: Fix ruff F401 unused `ast` import in bin/red_team_nan_coordinates.py:11 — continuation of the ongoing ruff cleanup sweep from Rounds 101-183. Verified `ast` is genuinely unused (grep 'ast\.' returns empty, only the import line). Single-file bounded change, 1-line diff, no behavior change. Module compiles and imports cleanly, no tests reference it (standalone red-team tool). Self-review: cosmetic F401 cleanup only — no signature change, no exception class change, no threading/auth/security change, no off-by-one, no silent error swallow, no test masked as passing, no brand cross-reference.
+- Result: committed 1b76dbd6 (pushed to main)
+
+## Round 185 @ 2026-07-02T03:30:00Z
+- Picked: Fix ruff E401 multi-imports on one line in bin/stress_test_50_concurrent_lints.py — continuation of the ongoing ruff cleanup sweep from Rounds 101-184. Split 2 lines with multiple imports into separate import lines. Single-file bounded change, 10 insertions, 2 deletions, no behavior change. Module compiles and imports cleanly, no tests reference it (standalone stress test tool). Self-review: cosmetic E401 cleanup — no signature change, no exception class change, no threading/auth/security change, no off-by-one, no silent error swallow, no test masked as passing, no brand cross-reference.
+- Result: committed d9d8db14 (pushed to main)nce it (standalone red-team tool). Self-review: cosmetic F401 cleanup only — no signature change, no exception class change, no threading/auth/security change, no off-by-one, no silent error swallow, no test masked as passing, no brand cross-reference.
 - Result: committed 046c7fe8 (pushed to main)
 
 ## Round 185 @ 2026-07-02T03:00:00Z
@@ -2374,3 +2379,14 @@ Found 4 errors.
 ## Round 191 @ 2026-07-02T05:30:00Z
 - Picked: Fix ruff F401 unused `os` import in bin/uninstall_clean.py — continuation of ongoing ruff cleanup sweep from Rounds 101-190. Verified `os` is genuinely unused (no `os.` calls in module). Single-file bounded change, 1-line diff, no behavior change. Module imports cleanly. Self-review: cosmetic F401 cleanup only — no signature change, no exception class change, no threading/auth/security change, no off-by-one, no silent error swallow, no test masked as passing, no brand cross-reference.
 - Result: committed 69e2c73a (pushed to main)
+
+## Round 191 @ 2026-07-02T06:00:00Z
+- Picked: Fix ruff F401 unused imports in 5 bin/ scripts — continuation of ongoing ruff cleanup sweep from Rounds 101-190. Fixed:
+  - bin/server_ingest_worker.py: remove unused `time` import
+  - bin/synthesize_real_depth.py: remove unused `tempfile` import
+  - bin/update_server_endpoint.py: remove unused `os` import
+  - bin/v1_claude_residuals/residuals.py: remove unused `Sequence` import
+  - bin/v2_minimax_residuals/__init__.py: add explicit re-exports to satisfy F401
+  All 5 modules import cleanly, ruff check clean on all, 11 v2_minimax tests pass. Self-review: cosmetic F401 cleanup only — no signature change, no behavior change, no silent error swallow, no test masked as passing, no brand cross-reference.
+- Result: committed 1b76dbd6 (pushed to main)
+
