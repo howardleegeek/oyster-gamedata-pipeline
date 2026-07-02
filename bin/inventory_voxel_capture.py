@@ -236,7 +236,6 @@ def main(argv: Sequence[str]) -> int:
     if not os.path.isdir(args.world):
         logger.error(f"World directory does not exist: {args.world}")
         return 1
-    config = {}
     if args.config:
         try:
             yaml = _yaml_mod()
