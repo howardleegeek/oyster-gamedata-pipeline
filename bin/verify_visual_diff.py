@@ -408,6 +408,23 @@ def render_terminal(
     structural: StructuralReport,
     use_color: bool,
 ) -> str:
+    """Render a side-by-side terminal diff of two action_camera.json clip directories.
+
+    Generates a human-readable diff showing structural differences (record count,
+    field set divergence, numerical drift) and per-frame field-level comparisons.
+
+    Args:
+        clip_a: Path to the first clip directory containing action_camera.json.
+        clip_b: Path to the second clip directory containing action_camera.json.
+        frames: List of frame indices to display in the per-frame diff section.
+        records_a: List of action records from clip_a's action_camera.json.
+        records_b: List of action records from clip_b's action_camera.json.
+        structural: Pre-computed structural report from compute_structural_report().
+        use_color: If True, use ANSI color codes for terminal output.
+
+    Returns:
+        Multi-line string containing the formatted diff output.
+    """
     def c(text: str, code: str) -> str:
         if not use_color:
             return text
