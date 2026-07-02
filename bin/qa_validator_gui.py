@@ -254,6 +254,17 @@ def _emergency_error_box(exc: BaseException) -> None:
 
 
 def main() -> int:
+    """Run the QA Validator GUI application.
+
+    Creates and runs the Tkinter-based validator application. Blocks until
+    the user closes the window.
+
+    Returns:
+        Exit code: 0 on normal window close, 2 on error.
+
+    Raises:
+        SystemExit: Propagated from Tkinter mainloop.
+    """
     try:
         app = ValidatorApp()
         app.mainloop()
