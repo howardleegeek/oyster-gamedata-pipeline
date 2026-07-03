@@ -7,12 +7,16 @@ Compare H.264 vs H.265 vs AV1 sizes on same scene — recommend codec.
 
 import argparse
 import json
+import logging
 import subprocess
 import sys
 import tempfile
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
 
 CODEC_SETTINGS = {
     "h264": ("libx264", "medium", "23"),
@@ -39,8 +43,8 @@ def get_video_info(video_path: Path) -> Optional[Dict]:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         if result.returncode == 0:
             return json.loads(result.stdout)
-    except (subprocess.SubprocessError, json.JSONDecodeError, OSError):
-        pass
+    except (subprocess.SubprocessError, json.JSONDecodeError, OSError) as e:
+        logger.warning("Failed to get video info for %s: %s", video_path, e)
     return None
 
 

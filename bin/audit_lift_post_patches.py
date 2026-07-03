@@ -26,10 +26,14 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import logging
 import re
 import subprocess
 import sys
 from pathlib import Path
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+log = logging.getLogger("audit_lift_post_patches")
 
 # ---------------------------------------------------------------------------
 # Patch 1+2+3: metadata.json — device_id, UTC timestamps, recording_started_utc
@@ -69,8 +73,8 @@ def patch_metadata(session: Path, dry_run: bool = False) -> dict:
                 ts_ms = first.get("timestamp_ms")
                 if ts_ms:
                     started_dt = dt.datetime.fromtimestamp(ts_ms / 1000.0, dt.timezone.utc)
-        except (json.JSONDecodeError, OSError, KeyError, TypeError):
-            pass
+        except (json.JSONDecodeError, OSError, KeyError, TypeError) as e:
+            log.warning("Failed to parse game_state.jsonl for timestamp: %s", e)
 
     if started_dt is None:
         m = re.match(r"^session_(\d{8})_(\d{6})_", session.name)
@@ -80,8 +84,8 @@ def patch_metadata(session: Path, dry_run: bool = False) -> dict:
                 started_dt = dt.datetime.strptime(
                     date_part + time_part, "%Y%m%d%H%M%S",
                 ).replace(tzinfo=dt.timezone.utc)
-            except ValueError:
-                pass
+            except ValueError as e:
+                log.warning("Failed to parse session dir name for timestamp: %s", e)
 
     if started_dt is None:
         mp4 = session / "recording.mp4"

@@ -10,9 +10,13 @@ import argparse
 import csv
 import datetime
 import json
+import logging
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+log = logging.getLogger("data_diversity_dashboard")
 
 try:
     import numpy as np
@@ -107,8 +111,8 @@ def _tod_bucket(ts: Any) -> str:
     if isinstance(ts, (int, float)):
         try:
             hour = datetime.datetime.fromtimestamp(ts).hour
-        except (ValueError, OSError):
-            pass
+        except (ValueError, OSError) as e:
+            log.warning("Failed to parse timestamp %r: %s", ts, e)
     elif isinstance(ts, str):
         for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
             try:
