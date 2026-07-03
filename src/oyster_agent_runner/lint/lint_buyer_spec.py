@@ -789,8 +789,8 @@ def _check_action_camera_record(
             try:
                 datetime.fromisoformat(t.replace("Z", "+00:00"))
                 parsed_ok = True
-            except ValueError:
-                pass
+            except ValueError as exc:
+                logger.debug("datetime.fromisoformat failed for %r: %s", t, exc)
         if not parsed_ok:
             _add(
                 issues,
