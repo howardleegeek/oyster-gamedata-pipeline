@@ -1,3 +1,7 @@
+## Round 257 @ 2026-07-03T13:57:11Z
+- Picked: Continue in-progress silent-error-swallow fix on src/oyster_agent_runner/cs2/cs2_demo_parser.py (carried in working tree from prior round) — replaced 2x `except Exception: pass` in _select_target_player (steam-id filter + non-bot filter) with logger.warning including exception type/detail and the steam id context, plus a hint that the non-bot fallback may select a bot if `is_bot` is missing. Control flow unchanged (still returns the fallback steam id). 15/15 tests pass; ruff clean.
+- Result: committed 1c507bc7, pushed to origin/main
+
 ## Round 256 @ 2026-07-03T13:19:04Z
 - Picked: Surface silent error swallows in bin/games/vrchat_adapter.py — 4 sites (log_dir.glob, log read_text, proc.exe(), proc.name()) returned empty/None/fallback with no log; replaced with logger.warning including path/pid and exception text. Control flow unchanged; tests/test_vrchat_adapter.py (56) still pass; ruff clean.
 - Result: committed 41cea995, pushed to origin/main
