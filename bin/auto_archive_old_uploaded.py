@@ -4,11 +4,14 @@ Cron job: archive sessions older than 14 days that have been confirmed uploaded.
 """
 
 import json
+import logging
 import shutil
 import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, Optional
+
+logger = logging.getLogger(__name__)
 
 # Default configuration
 SESSION_DIR = Path.home() / "Documents" / "OysterClips"
@@ -60,8 +63,8 @@ def get_old_uploaded_files(days_old: int) -> List[Path]:
                         old_files.append(item)
                 except (OSError, AttributeError):
                     continue
-    except (OSError, FileNotFoundError):
-        pass
+    except (OSError, FileNotFoundError) as exc:
+        logger.debug("Failed to list session directory %s: %s", SESSION_DIR, exc)
 
     return old_files
 
