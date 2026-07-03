@@ -1,3 +1,7 @@
+## Round 254 @ 2026-07-03T12:18:50Z
+- Picked: Fix silent error swallow in src/oyster_agent_runner/phase2/depth_anything_v2.py — replaced bare `except Exception: return False` in infer_depth() with logger.exception including rgb/out paths so OpenEXR write / model load failures are surfaced in trajectory logs
+- Result: committed 7d92a715, pushed to origin/main
+
 ## Round 253 @ 2026-07-03T12:02:08Z
 - Picked: No candidate found — verified ruff clean (0 errors), pytest collection (3322 tests), bin tests (562 passed), iron-law tests (21 passed), no silent error swallows in production code after rounds 238-252 fixes, PRD gaps require Howard credentials not code changes
 - Result: skipped (no candidate)
