@@ -124,18 +124,35 @@ class LintResult:
 
     @property
     def errors(self) -> list[LintIssue]:
+        """Return all issues with severity 'error'."""
         return [i for i in self.issues if i.severity == "error"]
 
     @property
     def warnings(self) -> list[LintIssue]:
+        """Return all issues with severity 'warning'."""
         return [i for i in self.issues if i.severity == "warning"]
 
     def ok(self, *, strict: bool = False) -> bool:
+        """Check if the lint result passes validation.
+
+        Args:
+            strict: If True, warnings also cause failure. If False, only
+                errors cause failure.
+
+        Returns:
+            True if validation passes, False otherwise.
+        """
         if self.errors:
             return False
         return not (strict and self.warnings)
 
     def to_dict(self) -> dict[str, Any]:
+        """Convert lint result to a dictionary for serialization.
+
+        Returns:
+            Dictionary containing all lint result data including status,
+            bundle info, and collected issues.
+        """
         return {
             "ok_strict": self.ok(strict=True),
             "ok_lenient": self.ok(strict=False),
