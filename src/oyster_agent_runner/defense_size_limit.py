@@ -12,9 +12,12 @@ Provides CLI and programmatic API for file size validation.
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from pathlib import Path
 from typing import NamedTuple
+
+_logger = logging.getLogger(__name__)
 
 # Size limits in bytes
 SIZE_LIMITS: dict[str, int] = {
@@ -79,7 +82,19 @@ def scan_directory(
         if path.is_file():
             try:
                 results.append(check_file_size(path, limit_name))
-            except (FileNotFoundError, PermissionError):
+            except FileNotFoundError as exc:
+                _logger.debug(
+                    "defense_size_limit: skipping vanished file %s: %s",
+                    path,
+                    exc,
+                )
+                continue
+            except PermissionError as exc:
+                _logger.warning(
+                    "defense_size_limit: skipping unreadable file %s: %s",
+                    path,
+                    exc,
+                )
                 continue
     return results
 
