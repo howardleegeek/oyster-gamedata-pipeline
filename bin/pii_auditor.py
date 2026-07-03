@@ -6,10 +6,13 @@ Outputs pii_audit.json with verdict and recommendations.
 """
 
 import json
+import logging
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 # Regex patterns for PII detection
 PATTERNS = {
@@ -73,7 +76,12 @@ def scan_file_for_pii(filepath: Path) -> Dict[str, List[str]]:
     try:
         with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
             content = f.read()
-    except Exception:
+    except (OSError, UnicodeDecodeError, ValueError) as exc:
+        # File unreadable, permission denied, or encoding unrecoverable.
+        # We surface the failure in logs so the auditor never silently
+        # reports "no PII" on a corrupted session, but still return empty
+        # flags so the caller can continue scanning other files.
+        logger.warning("pii_auditor: failed to read %s: %s", filepath, exc)
         return flags
     
     # Check for emails
@@ -146,8 +154,11 @@ def scan_session(session_dir: Path) -> Dict[str, Any]:
                                 all_flags['player_username'] = player.get('username') or player.get('name')
                     except json.JSONDecodeError:
                         continue
-        except Exception:
-            pass
+        except (OSError, UnicodeDecodeError, ValueError) as exc:
+            # game_state.jsonl unreadable — surface the failure in logs
+            # rather than silently skipping (which would make a corrupted
+            # session falsely appear to have no player-username PII).
+            logger.warning("pii_auditor: failed to read %s: %s", game_state_file, exc)
     
     # Scan inputs.jsonl for chat messages
     inputs_file = session_dir / 'inputs.jsonl'

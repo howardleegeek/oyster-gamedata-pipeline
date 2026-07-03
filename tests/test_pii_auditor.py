@@ -20,6 +20,7 @@ from pii_auditor import (
     is_private_ip,
     luhn_check,
     scan_file_for_pii,
+    scan_session,
 )
 from pii_redactor import mask_ip, pseudonymize_username, redact_file_content, redact_session, sha8
 from right_to_delete import (
@@ -164,6 +165,98 @@ class TestPIIAuditor:
         # Emails, phones are medium risk - verdict is PASS with warnings
         assert verdict == "PASS"
         assert len(recommendations) > 0  # Has recommendations
+
+
+class TestPIIAuditorErrorHandling:
+    """Regression tests: PII auditor must surface read failures, not silently
+    report 'no PII' on a corrupted/unreadable session."""
+
+    def test_scan_file_for_pii_missing_file_logs_and_returns_empty(self, caplog):
+        """A missing file must log a WARNING and return empty flags (not raise)."""
+        missing = Path("/tmp/definitely_does_not_exist_pii_auditor_test_xyz123.jsonl")
+        if missing.exists():
+            missing.unlink()
+
+        with caplog.at_level("WARNING", logger="pii_auditor"):
+            flags = scan_file_for_pii(missing)
+
+        # Empty flags returned (caller can continue scanning other files)
+        assert flags == {
+            "real_names_in_chat": [],
+            "emails": [],
+            "credit_cards": [],
+            "ip_addresses": [],
+            "ssns": [],
+            "phones": [],
+        }
+        # And the failure was surfaced via a WARNING log
+        assert any("failed to read" in rec.message for rec in caplog.records), \
+            f"expected a WARNING mentioning the failed read, got: {[r.message for r in caplog.records]}"
+
+    def test_scan_file_for_pii_unreadable_file_logs_and_returns_empty(self, tmp_path, caplog):
+        """A chmod-000 file must log a WARNING and return empty flags, not raise."""
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            pytest.skip("root bypasses chmod 000, cannot test unreadable file")
+
+        unreadable = tmp_path / "unreadable.jsonl"
+        unreadable.write_text("hello world\n")
+        unreadable.chmod(0o000)
+        try:
+            with caplog.at_level("WARNING", logger="pii_auditor"):
+                flags = scan_file_for_pii(unreadable)
+        finally:
+            unreadable.chmod(0o644)  # restore so tmp_path cleanup works
+
+        assert flags == {
+            "real_names_in_chat": [],
+            "emails": [],
+            "credit_cards": [],
+            "ip_addresses": [],
+            "ssns": [],
+            "phones": [],
+        }
+        assert any("failed to read" in rec.message for rec in caplog.records)
+
+    def test_scan_session_unreadable_game_state_logs_and_keeps_going(self, tmp_path, caplog):
+        """An unreadable game_state.jsonl must log a WARNING; scan_session
+        must not raise and must still process the other files."""
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            pytest.skip("root bypasses chmod 000, cannot test unreadable file")
+
+        session_dir = tmp_path / "session"
+        session_dir.mkdir()
+
+        # game_state.jsonl is unreadable
+        gs = session_dir / "game_state.jsonl"
+        gs.write_text("placeholder\n")
+        gs.chmod(0o000)
+        try:
+            # inputs.jsonl is readable and has PII
+            inputs = session_dir / "inputs.jsonl"
+            inputs.write_text("email: leak@example.com\n")
+
+            with caplog.at_level("WARNING", logger="pii_auditor"):
+                flags = scan_session(session_dir)
+        finally:
+            gs.chmod(0o644)
+
+        # The readable file was still scanned
+        assert "leak@example.com" in flags["emails"]
+        # The unreadable file was surfaced in logs
+        assert any("failed to read" in rec.message for rec in caplog.records), \
+            f"expected a WARNING for the unreadable game_state, got: {[r.message for r in caplog.records]}"
+
+    def test_bare_except_exception_removed_from_pii_auditor(self):
+        """Static guard: the bare 'except Exception:' (silent swallow) must
+        no longer appear in bin/pii_auditor.py — we now log WARNINGs."""
+        src = Path("bin/pii_auditor.py").read_text()
+        # The original lines were:
+        #   except Exception:
+        #   except Exception:
+        # both bare (no `as exc`). Allow `except Exception as exc:` if it
+        # ever shows up, but the bare form is what silently swallowed.
+        assert "except Exception:\n" not in src, \
+            "bin/pii_auditor.py still has a bare 'except Exception:' — that is a silent error swallow"
 
 
 class TestPIIRedactor:
