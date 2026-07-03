@@ -218,14 +218,27 @@ def layer3_behavioral(records: list[dict]) -> dict:
                        records[-1].get("camera_rotation_oula"))
         yaw_total = e_last[1] - e_first[1]
     # Frame timestamp continuity
+    # Records may use a "time" (string, "%Y-%m-%d %H:%M:%S.%f" prefix) or
+    # "timestamp" (float seconds) field. Anything that can't be parsed is
+    # surfaced as an issue rather than silently dropped — the operator
+    # needs to know which frames are broken, not get a vacuous "all pass".
     times = []
-    for r in records[:1000]:
+    bad_time_frames = 0
+    bad_time_reasons: dict[str, int] = {}
+    from datetime import datetime  # local import keeps top-level lean
+    for i, r in enumerate(records[:1000]):
+        raw = r.get("time")
+        if raw is None:
+            bad_time_reasons["missing_field"] = bad_time_reasons.get("missing_field", 0) + 1
+            bad_time_frames += 1
+            continue
         try:
-            from datetime import datetime
-            t = datetime.strptime(r["time"][:23], "%Y-%m-%d %H:%M:%S.%f")
-            times.append(t)
-        except Exception:
-            pass
+            t = datetime.strptime(raw[:23], "%Y-%m-%d %H:%M:%S.%f")
+        except (TypeError, ValueError):
+            bad_time_reasons["unparseable"] = bad_time_reasons.get("unparseable", 0) + 1
+            bad_time_frames += 1
+            continue
+        times.append(t)
     gaps = []
     for a, b in zip(times, times[1:]):
         gap_ms = (b - a).total_seconds() * 1000
@@ -233,6 +246,12 @@ def layer3_behavioral(records: list[dict]) -> dict:
             gaps.append(gap_ms)
     if gaps:
         issues.append(f"{len(gaps)} frame gaps != 33.33ms (samples: {gaps[:3]})")
+    if bad_time_frames:
+        reasons = ", ".join(f"{k}={v}" for k, v in sorted(bad_time_reasons.items()))
+        issues.append(
+            f"{bad_time_frames} frames had unparseable 'time' field ({reasons}) — "
+            f"gap check ran on {len(times)} of {min(len(records), 1000)} frames"
+        )
 
     return {
         "layer": 3,
@@ -243,6 +262,8 @@ def layer3_behavioral(records: list[dict]) -> dict:
         "stats": {
             "cumulative_mouse_dx": round(cum_dx, 4),
             "total_yaw_delta_deg": round(yaw_total, 2),
+            "timestamps_parsed": len(times),
+            "timestamps_bad": bad_time_frames,
         },
         "first_issues": issues[:3],
     }
