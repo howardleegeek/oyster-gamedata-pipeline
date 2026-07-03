@@ -178,6 +178,12 @@ class IAMRotator:
     def delete_key(self, kid: str) -> None:
         self._iam.delete_access_key(UserName=self.cfg.iam_user, AccessKeyId=kid)
     def list_keys(self) -> List[Dict[str, Any]]:
+        """List all access keys for the IAM user.
+
+        Returns:
+            List[Dict[str, Any]]: List of access key metadata, each containing
+                AccessKeyId, Status, CreateDate, and UserName fields.
+        """
         return self._iam.list_access_keys(UserName=self.cfg.iam_user).get("AccessKeyMetadata", [])
     def rotate(self, state: RotationState) -> None:
         """Execute one rotation step: create → wait → deactivate → delete & promote."""
