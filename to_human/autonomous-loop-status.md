@@ -95,3 +95,12 @@
 - Picked: no good candidate found — verified ruff clean (0 errors), pytest collection works (3300+ tests), sample tests pass, PRD gaps are Howard-required credentials/payments not code issues, no silent error swallows in production code (rounds 238-248 covered this thoroughly). State unchanged from round 242.
 - Result: skipped (no candidate)
 
+## Round 259 @ 2026-07-13T21:30:00Z
+- Picked: Complete silent-error-swallow fix on src/oyster_agent_runner/hmac_machine_id.py (carried in working tree from prior round) — replaced bare except in _collect_raw_identifiers with logger.debug including candidate path and exception text. Control flow unchanged (best-effort identifier collection continues). py_compile clean; ruff clean.
+- Result: committed 18765c83, pushed to origin/main
+
+
+
+## Round 260 @ 2026-07-03T16:00:33Z
+- Picked: Surface silent error swallow in src/oyster_agent_runner/hmac_machine_id.py _rotation_sequence() — bound the exception in the bare `except (OSError, ValueError): return 0` and added a module-level logger.debug line that includes the marker path and exception text. Hoisted `import logging` + `_logger = logging.getLogger(__name__)` to module scope (previously re-imported inside _collect_raw_identifiers; the new module-level logger is now reused by both functions). Control flow unchanged (still returns 0 on missing/invalid marker). Verified by direct call: missing file -> 0 with debug log, garbage content -> 0 with debug log, valid content -> int with no log. pytest collection 3322 clean, tests/test_telemetry_optin.py 34/34 pass, ruff clean on the file.
+- Result: committed 43fcd928, pushed to origin/main
