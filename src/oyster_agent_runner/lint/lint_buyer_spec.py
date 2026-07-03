@@ -1481,6 +1481,20 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """
+    Entry point for lint_buyer_spec CLI.
+
+    Validates a game data bundle directory against the buyer spec schema.
+    Checks for required files (video.mp4, action_camera.bin, gameinfo.xlsx)
+    and validates their contents (FPS, resolution, intrinsics, etc.).
+
+    Args:
+        argv: Command-line arguments. If None, uses sys.argv.
+              Supports --bundle-dir, --strict, --emit-json, --allow-null-engine-fields.
+
+    Returns:
+        Exit code: 0 if lint passes, 1 if failures found, 2 if bundle_dir missing.
+    """
     args = _build_parser().parse_args(argv)
     bundle_dir: Path = args.bundle_dir
     if not bundle_dir.exists():
