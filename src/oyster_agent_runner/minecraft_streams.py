@@ -130,6 +130,15 @@ class MinecraftStreamWriter:
         self.close()
 
     def open(self) -> None:
+        """Open output files for writing.
+
+        Creates the output directory and line-buffered file handles
+        for CoT, metadata, and inputs streams. Idempotent: subsequent
+        calls after the first are no-ops.
+
+        Raises:
+            OSError: If directory creation fails.
+        """
         if self._open_called:
             return
         self._open_called = True
