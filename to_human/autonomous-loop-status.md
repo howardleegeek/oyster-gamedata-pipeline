@@ -37,3 +37,4 @@
 ## Round 247 @ 2026-07-03T05:36:47Z
 - Picked: Finish in-progress WIP — fix two bare `except Exception: pass` silent error swallows in bin/pii_auditor.py (scan_file_for_pii and scan_session's game_state loop). Replaced with `except (OSError, UnicodeDecodeError, ValueError) as exc:` + `logger.warning(...)` so corrupted/unreadable session files are surfaced in logs. Added 4 regression tests (missing file, chmod-000 unreadable, scan_session with one bad file, static guard that `except Exception:\n` is gone).
 - Result: committed 048f9130, pushed to origin/main
+
