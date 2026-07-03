@@ -113,6 +113,12 @@ class BBox3D:
                 "confidence": self.confidence}
 
     def to_dict(self) -> Dict[str, Any]:
+        """Convert 3D bounding box to a dictionary representation.
+
+        Returns:
+            A dictionary containing all 3D bbox fields: x, y, z, length,
+            width, height, yaw, confidence, class_id, and track_id.
+        """
         return dict(x=self.x, y=self.y, z=self.z, length=self.length,
                     width=self.width, height=self.height, yaw=self.yaw,
                     confidence=self.confidence, class_id=self.class_id,
