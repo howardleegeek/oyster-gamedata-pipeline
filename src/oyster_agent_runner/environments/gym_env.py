@@ -18,9 +18,12 @@ Production deployments should `pip install "gymnasium[classic-control]"`
 from __future__ import annotations
 
 import io
+import logging
 from typing import Any
 
 from oyster_agent_runner.environments.base import Action, Environment, Observation
+
+logger = logging.getLogger(__name__)
 
 # Lazy-import gymnasium — failing to import is NOT an error, it just means
 # callers get the scaffold stub. The real wrapper is constructed below when
@@ -54,8 +57,8 @@ def _observation_to_dict(obs: Any) -> Observation:
     if callable(tolist):
         try:
             return {"array": tolist()}
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("tolist() failed on observation: %s", exc)
     if isinstance(obs, (list, tuple)):
         return {"values": list(obs)}
     if isinstance(obs, (int, float, bool, str)) or obs is None:
