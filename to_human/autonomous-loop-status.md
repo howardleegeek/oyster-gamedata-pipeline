@@ -1,3 +1,7 @@
+## Round 247 @ 2026-07-06T04:10:00Z
+- Picked: Fix silent error swallows in bin/stress_test_memory_leak_check.py — replaced `except Exception: pass` in get_rss_mb() with logger.warning including error details
+- Result: committed 81aa830e, pushed to origin/main
+
 ## Round 246 @ 2026-07-06T04:00:00Z
 - Picked: Fix silent error swallows in bin/recorder_watchdog.py — replaced `except ...: pass` in read_last_position() and read_mc_log_tail() with explicit logging (log.warning with error details)
 - Result: committed 6e35ef02, pushed to origin/main
