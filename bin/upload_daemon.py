@@ -382,7 +382,6 @@ class UploadDaemon:
 
         # Upload chunks
         parts = []
-        start_time = time.time()
         total_bytes = 0
 
         for chunk in session.chunks:
