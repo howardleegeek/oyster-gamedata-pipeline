@@ -727,6 +727,19 @@ def render_json(
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run visual diff between two clip directory action_camera.json files.
+
+    Args:
+        argv: Command-line arguments (default: sys.argv). If provided,
+            must be a list of strings like ["clip_a", "clip_b", "--json"].
+
+    Returns:
+        Exit code: 0 if files structurally identical, 1 if any divergence,
+        99 on I/O error.
+
+    Raises:
+        SystemExit: With code 99 on invalid arguments or file I/O errors.
+    """
     p = argparse.ArgumentParser(
         description="Side-by-side visual diff of two action_camera.json files."
     )
