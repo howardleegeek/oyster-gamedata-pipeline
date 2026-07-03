@@ -3,10 +3,14 @@
 
 import argparse
 import json
+import logging
 import os
 import shutil
 import tarfile
 import tempfile
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 
 def extract_tarball(tar_path):
@@ -26,8 +30,8 @@ def count_action_camera_records(directory):
                         data = json.load(fp)
                         items = data if isinstance(data, list) else [data]
                         count += sum(1 for i in items if isinstance(i, dict) and i.get("source") == "action_camera")
-                except (json.JSONDecodeError, IOError):
-                    pass
+                except (json.JSONDecodeError, IOError) as e:
+                    logger.warning("Failed to parse JSON in %s: %s", f, e)
     return count
 
 
@@ -41,8 +45,8 @@ def get_video_duration(directory):
                         data = json.load(fp)
                         items = data if isinstance(data, list) else [data]
                         total += sum(i.get("duration", 0) for i in items if isinstance(i, dict))
-                except (json.JSONDecodeError, IOError):
-                    pass
+                except (json.JSONDecodeError, IOError) as e:
+                    logger.warning("Failed to parse JSON in %s: %s", f, e)
     return total
 
 
