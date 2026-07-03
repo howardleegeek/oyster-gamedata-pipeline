@@ -109,8 +109,11 @@ def _parse_db_value(text: str, key: str) -> Optional[float]:
         if key in line and "db" in line:
             try:
                 return float(line.split(":")[1].strip().replace("db", "").strip())
-            except ValueError:
-                pass
+            except ValueError as exc:
+                logger.debug(
+                    "could not parse dB value for key %r on line %r: %s",
+                    key, line, exc,
+                )
     return None
 
 
