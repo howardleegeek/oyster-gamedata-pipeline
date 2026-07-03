@@ -8,6 +8,7 @@ processes attempt to read/write tarball files simultaneously.
 
 import argparse
 import fcntl
+import logging
 import os
 import sys
 import tempfile
@@ -16,6 +17,8 @@ from contextlib import contextmanager
 from enum import Enum
 from types import TracebackType
 from typing import IO
+
+logger = logging.getLogger(__name__)
 
 
 class LockType(Enum):
@@ -87,8 +90,15 @@ class FileLock:
             if self._lock_acquired:
                 try:
                     fcntl.flock(self._file_handle.fileno(), fcntl.LOCK_UN)
-                except OSError:
-                    pass
+                except OSError as exc:
+                    # Unlock failure is non-fatal — kernel releases the lock
+                    # when the FD closes — but log at DEBUG for diagnostics
+                    # (e.g. NFS stale-lock issues, FD already invalidated).
+                    logger.debug(
+                        "fcntl.flock LOCK_UN failed on %s: %s",
+                        self.file_path,
+                        exc,
+                    )
             self._file_handle.close()
             self._file_handle = None
             self._lock_acquired = False
