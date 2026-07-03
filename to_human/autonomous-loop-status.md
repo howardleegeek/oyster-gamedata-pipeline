@@ -1,3 +1,7 @@
+## Round 237 @ 2026-07-03T01:30:00Z
+- Picked: Fix silent error swallow in bin/verify_action_camera.py layer3_behavioral() — replaced `except Exception: pass` (which silently dropped bad/missing timestamps) with explicit handlers that track missing_field and unparseable counts, report them in issues, and add timestamps_parsed/timestamps_bad to stats. Also added 4 regression tests covering good/missing/unparseable/mixed timestamp cases.
+- Result: committed 1de6d95d, pushed to origin/main
+
 ## Round 236 @ 2026-07-02T23:28:36Z
 - Picked: Fix silent error swallow in bin/prd_test_video_no_ui.py _extract_frames() — replaced `except Exception: pass` (which silently dropped PIL image-open failures) with split OSError + Exception handlers that log WARNING with the underlying error, then continue to ffmpeg fallback (no behavior change on success path). Found via uncommitted-WIP from prior round.
 - Result: committed 4aedf322, pushed to origin/main
@@ -95,3 +99,6 @@ Self-review: verified no silent error swallow, no false-success, no race, no off
 - Result: committed 3908675c, pushed to origin/main
 
 Self-review: verified no silent error swallow, no false-success, no race, no off-by-one, no security issue, no cross-brand reference, no broken-tests-masked-as-passing — change is a single dead-variable removal.
+## Round 237 @ 2026-07-03T02:00:00Z
+- Picked: Fix ruff F841 unused variable in bin/recorder_watchdog.py — removed unused `f` variable in file truncation (line 628: `with open(events_path, "w") as f: pass` → `open(events_path, "w").close()`)
+- Result: committed 9aded8af, pushed to origin/main
