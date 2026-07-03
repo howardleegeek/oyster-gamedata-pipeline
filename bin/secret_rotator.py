@@ -160,9 +160,17 @@ class RotationState:
         """
         self.state["primary_deactivated_at"] = datetime.datetime.utcnow().isoformat()
     def promote_secondary(self) -> None:
+        """Promote the secondary key to active status.
+
+        Moves the secondary key ID to active, then clears the secondary
+        creation timestamp and primary deactivation timestamp.
+        """
         self.state["active_key_id"] = self.state.pop("secondary_key_id", None)
         self.state.pop("secondary_created_at", None); self.state.pop("primary_deactivated_at", None)
-    def reset(self) -> None: self.state.clear()
+
+    def reset(self) -> None:
+        """Clear all rotation state."""
+        self.state.clear()
 class IAMRotator:
     """Thin boto3 IAM wrapper for key lifecycle."""
     def __init__(self, cfg: Config) -> None:
