@@ -1,3 +1,7 @@
+## Round 264 @ 2026-07-03T19:00:00Z
+- Picked: Complete in-progress silent error swallow fixes — staged gym_env.py changes (2x bare except Exception: pass in render_frame and _array_to_png) + unstaged clip_validator_strict.py change (bare except in _get_video_info). All replaced with logger that binds exception. Control flow unchanged. py_compile clean; ruff clean; tests/test_environments*.py (18 passed, 1 skipped).
+- Result: committed 2f1b7df8 (gym_env.py) + e57467d3 (clip_validator_strict.py), pushed to origin/main
+
 ## Round 263 @ 2026-07-03T18:00:00Z
 - Picked: Surface silent OSError swallows in src/oyster_agent_runner/defense_atomic_write.py — replaced 2x bare `except OSError: pass` (os.chmod permission failure + os.unlink cleanup failure) with `logger.debug(...)` binding the exception and including the file path. Added module-level logger. Control flow unchanged (both failures remain non-fatal). py_compile clean; ruff clean; tests/test_defense_atomic_write.py (1 passed).
 - Result: committed b2c90ac2, pushed to origin/main
