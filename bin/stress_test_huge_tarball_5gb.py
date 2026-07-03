@@ -142,7 +142,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         
         # Generate data
         print("3. Generating data...")
-        meta = create_capture(capture, secs, frames, bpf, args.sample)
+        create_capture(capture, secs, frames, bpf, args.sample)
         
         # Create tarball
         stats = create_tarball(capture, args.output)

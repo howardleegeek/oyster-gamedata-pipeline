@@ -292,7 +292,7 @@ def test_main_argparse() -> None:
                     mock_file.__gt__ = mock.MagicMock(return_value=True)  # For sorting
                     mock_glob.return_value = [mock_file]
 
-                    result = mc_launcher_real.main([])
+                    mc_launcher_real.main([])
 
     # Test with custom arguments
     test_args = [
@@ -324,7 +324,7 @@ def test_main_argparse() -> None:
             mock_launch.return_value = mock_process
 
             with mock.patch("mc_launcher_real.wait_for_join", return_value=True):
-                with mock.patch("mc_launcher_real.send_rcon_command") as mock_rcon:
+                with mock.patch("mc_launcher_real.send_rcon_command") as _mock_rcon:
                     # Mock log file finding
                     with mock.patch("pathlib.Path.glob") as mock_glob:
                         mock_file = mock.MagicMock()
@@ -332,7 +332,7 @@ def test_main_argparse() -> None:
                         mock_glob.return_value = [mock_file]
 
                         with mock.patch("mc_launcher_real.offline_uuid", return_value="test-uuid"):
-                            result = mc_launcher_real.main(test_args)
+                            mc_launcher_real.main(test_args)
 
 
 def test_launch_minecraft_fallback() -> None:
@@ -355,7 +355,7 @@ def test_launch_minecraft_fallback() -> None:
                     with mock.patch("pathlib.Path.mkdir"):
                         # Mock open for log file
                         with mock.patch("builtins.open", mock.mock_open()):
-                            process = mc_launcher_real.launch_minecraft()
+                            mc_launcher_real.launch_minecraft()
 
                             # Should have called Popen with Java command
                             mock_popen.assert_called_once()
@@ -383,7 +383,7 @@ def test_launch_minecraft_with_minecraft_launcher_lib() -> None:
                 with mock.patch("threading.Thread"):
                     with mock.patch("pathlib.Path.mkdir"):
                         with mock.patch("builtins.open", mock.mock_open()):
-                            process = mc_launcher_real.launch_minecraft()
+                            mc_launcher_real.launch_minecraft()
 
                             # Should have used the library
                             mock_lib.command.get_minecraft_command.assert_called_once()
@@ -402,7 +402,7 @@ def test_launch_minecraft_with_system_launcher() -> None:
 
             with mock.patch("threading.Thread"), mock.patch("pathlib.Path.mkdir"):
                 with mock.patch("builtins.open", mock.mock_open()):
-                    process = mc_launcher_real.launch_minecraft()
+                    mc_launcher_real.launch_minecraft()
 
                     # Should have called Popen with system launcher
                     mock_popen.assert_called_once()
@@ -465,7 +465,7 @@ def test_main_with_rcon_commands() -> None:
                         mock_rcon.return_value = "OK"
 
                         with mock.patch("time.sleep"):
-                            result = mc_launcher_real.main(
+                            mc_launcher_real.main(
                                 ["--rcon-password", "testpass", "--duration", "10"]
                             )
 
