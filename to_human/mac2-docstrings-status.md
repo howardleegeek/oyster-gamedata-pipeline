@@ -81,7 +81,12 @@
 
 ## Round @ 2026-05-17T12:45:00Z
 - File: bin/check_fabric_yarn_versions.py::get_latest_yarn
-- Added: docstring=N (already had docstring), type-hints=Y
+- Added: docstring=N (already had do
+
+## Round @ 2026-05-17T13:00:00Z
+- File: bin/secret_rotator.py::RotationState.deactivate_primary
+- Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: 2850744bd82f35baeb8d3d9cd066a95981b9e6eacstring), type-hints=Y
 - Commit: 2d6028ac5c984bc8b405d1ad0b007b4546874c08
 
 ## Round @ 2026-05-18T02:00:00Z
