@@ -1,9 +1,12 @@
+import logging
 import queue
 import sys
 import threading
 import time
 from pathlib import Path
 from typing import Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 try:
     import mss
@@ -167,8 +170,8 @@ def record_screen_region(
     try:
         from bin.stamp_real_metadata import stamp_video  # noqa: PLC0415
         stamp_video(output_path, recorder_version="screen-capture-recorder-v1")
-    except Exception:
-        pass  # non-fatal
+    except Exception as exc:
+        logger.debug("metadata stamp failed (non-fatal): %s", exc)
 
     return {
         "frames_captured": frames_captured,
