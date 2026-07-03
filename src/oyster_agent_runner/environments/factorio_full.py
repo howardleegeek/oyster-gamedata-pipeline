@@ -309,8 +309,8 @@ class FactorioObserver:
         try:
             tick_response = self.rcon.execute("/c rcon.print(game.tick)")
             tick = int(tick_response.strip()) if tick_response.strip() else 0
-        except (ValueError, RuntimeError):
-            pass
+        except (ValueError, RuntimeError) as e:
+            logger.warning("Failed to get Factorio tick: %s", e)
 
         return GameObservation(
             tick=tick,
