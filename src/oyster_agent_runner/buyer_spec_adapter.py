@@ -125,11 +125,14 @@ identical (within float64 precision) regardless of which path is taken.
 from __future__ import annotations
 
 import json
+import logging
 import math
 import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # --- Engineer C8 import with graceful stdlib fallback ----------------------
 
@@ -443,12 +446,14 @@ def _yaw_pitch_from_obs(obs: dict[str, Any]) -> tuple[float, float] | None:
     if isinstance(bot, dict) and "yaw" in bot and "pitch" in bot:
         try:
             return float(bot["yaw"]), float(bot["pitch"])
-        except (TypeError, ValueError):
+        except (TypeError, ValueError) as exc:
+            logger.debug("Failed to convert bot yaw/pitch to float: %s", exc)
             pass
     if "yaw" in obs and "pitch" in obs:
         try:
             return float(obs["yaw"]), float(obs["pitch"])
-        except (TypeError, ValueError):
+        except (TypeError, ValueError) as exc:
+            logger.debug("Failed to convert obs yaw/pitch to float: %s", exc)
             return None
     return None
 
