@@ -129,13 +129,15 @@ def _extract_world_id_from_logs(log_dir: Path) -> dict[str, str]:
             key=lambda p: p.stat().st_mtime,
             reverse=True,
         )
-    except OSError:
+    except OSError as exc:
+        logger.warning("VRChat log_dir.glob failed for %s: %s", log_dir, exc)
         return {"world_id": world_id, "instance_id": instance_id}
 
     for log_file in log_files[:5]:  # check the 5 most recent logs
         try:
             content = log_file.read_text(encoding="utf-8", errors="ignore")
-        except OSError:
+        except OSError as exc:
+            logger.warning("VRChat log read failed for %s: %s", log_file, exc)
             continue
 
         m_world = _WORLD_ID_RE.search(content)
@@ -202,14 +204,16 @@ class VRChatAdapter(GameAdapter, BaseAdapter):
 
         try:
             exe_path = proc.exe() or ""
-        except Exception:
+        except Exception as exc:
+            logger.warning("VRChat proc.exe() failed for pid=%s: %s", proc.pid, exc)
             return None
         if not isinstance(exe_path, str):
             return None
 
         try:
             window_title = proc.name() or "VRChat"
-        except Exception:
+        except Exception as exc:
+            logger.warning("VRChat proc.name() failed for pid=%s: %s", proc.pid, exc)
             window_title = "VRChat"
         if not isinstance(window_title, str):
             window_title = "VRChat"
