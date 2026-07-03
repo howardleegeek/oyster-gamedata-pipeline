@@ -25,6 +25,7 @@ The heuristic is calibrated against Engineer Y's $13 / 50-step claim in
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -56,6 +57,12 @@ from oyster_agent_runner.schema import AgentTask
 #     within rounding.
 BASE_INPUT_TOKENS: int = 4_000
 BASE_OUTPUT_TOKENS: int = 800
+
+# Module logger — used to surface non-fatal fall-throughs in this file
+# (e.g. task JSON read failures) at DEBUG so production diagnostics can
+# distinguish "thinking_budget = 0 because the provider doesn't support
+# thinking" from "thinking_budget = 0 because the task file is busted".
+_logger = logging.getLogger(__name__)
 
 # Replay (--re-execute) re-issues the *recorded* actions against a fresh
 # environment to detect drift — no fresh LLM call per step, so the
@@ -242,10 +249,18 @@ def derive_thinking_budget(
         from_task = raw.get("thinking_budget_tokens")
         if isinstance(from_task, int) and from_task >= 0:
             return from_task
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError) as exc:
         # Fall through; load_task() will raise the canonical error if
-        # the file is unreadable.
-        pass
+        # the file is unreadable. Log at DEBUG so operators can
+        # distinguish "default because provider doesn't support
+        # thinking" from "default because task JSON couldn't be read".
+        _logger.debug(
+            "could not read thinking_budget_tokens from %s (%s: %s); "
+            "falling back to default",
+            task_path,
+            type(exc).__name__,
+            exc,
+        )
     return 16_000 if pricing.supports_thinking else 0
 
 
