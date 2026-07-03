@@ -98,6 +98,21 @@ class BBox3D:
     track_id: Optional[str] = None
 
     def to_carla_dict(self) -> Dict[str, Any]:
+        """Convert 3D bounding box to CARLA sensor format.
+
+        CARLA uses a coordinate system where x=forward, y=left, z=up.
+        This method converts the bounding box to CARLA's location/extent
+        representation used by their bounding box sensor.
+
+        Returns:
+            Dict with keys:
+                - location: dict with x, y, z keys
+                - extent: dict with x, y, z (half-extents)
+                - rotation: dict with yaw, pitch, roll in degrees
+                - class: class_id string
+                - track_id: track identifier or None
+                - confidence: detection confidence
+        """
         return {"location": {"x": self.x, "y": self.y, "z": self.z},
                 "extent": {"x": self.length/2, "y": self.width/2, "z": self.height/2},
                 "rotation": {"yaw": math.degrees(self.yaw), "pitch": 0.0, "roll": 0.0},
