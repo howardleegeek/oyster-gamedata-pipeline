@@ -1,3 +1,7 @@
+## Round 251 @ 2026-07-13T04:00:00Z
+- Picked: Fix silent error swallow in src/oyster_agent_runner/environments/factorio_full.py — replaced `except (ValueError, RuntimeError): pass` in get_game_observation() tick parsing with logger.warning including error details
+- Result: committed 884f1cad, pushed to origin/main
+
 ## Round 250 @ 2026-07-06T04:40:00Z
 - Picked: Fix silent error swallows in 3 bin scripts — autoresearch_compression_ratio.py (get_video_info), audit_lift_post_patches.py (patch_metadata), data_diversity_dashboard.py (_tod_bucket) — replaced `except ...: pass` with logger.warning including error details
 - Result: committed 6380dd58, pushed to origin/main
