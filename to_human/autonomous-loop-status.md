@@ -1,3 +1,7 @@
+## Round 248 @ 2026-07-06T04:20:00Z
+- Picked: Fix silent error swallows in bin/extract_audio_event_track.py — replaced `except (ValueError, IndexError): pass` and `except (subprocess.TimeoutExpired, FileNotFoundError): pass` in detect_voice_present() with logger.warning
+- Result: committed 677474ed, pushed to origin/main
+
 ## Round 247 @ 2026-07-06T04:10:00Z
 - Picked: Fix silent error swallows in bin/stress_test_memory_leak_check.py — replaced `except Exception: pass` in get_rss_mb() with logger.warning including error details
 - Result: committed 81aa830e, pushed to origin/main
