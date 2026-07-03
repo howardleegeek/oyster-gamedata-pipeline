@@ -18,11 +18,14 @@ from __future__ import annotations
 
 import contextlib
 import json
+import logging
 import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from oyster_agent_runner.environments.base import (
     Action,
@@ -416,7 +419,8 @@ class AgentRunner:
         """Never let render_frame errors kill a run."""
         try:
             return env.render_frame()
-        except Exception:
+        except Exception as e:
+            logger.warning("render_frame() failed: %s", e)
             return None
 
 
@@ -427,7 +431,8 @@ def _safe_last_frame(env: Environment) -> bytes | None:
         return None
     try:
         return getter()
-    except Exception:
+    except Exception as e:
+        logger.warning("last_frame() failed: %s", e)
         return None
 
 
