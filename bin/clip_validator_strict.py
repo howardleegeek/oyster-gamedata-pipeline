@@ -181,8 +181,8 @@ def _get_video_info(video_path: str) -> Dict[str, Any]:
                 "fps": fps,
                 "duration": float(s.get("duration", 0)),
             }
-    except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError):
-        pass
+    except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError) as exc:
+        logger.warning("ffprobe failed for %s: %s", video_path, exc)
     return {}
 
 
