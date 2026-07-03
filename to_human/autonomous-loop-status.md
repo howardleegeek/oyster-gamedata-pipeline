@@ -1,3 +1,11 @@
+## Round 250 @ 2026-07-06T04:40:00Z
+- Picked: Fix silent error swallows in 3 bin scripts — autoresearch_compression_ratio.py (get_video_info), audit_lift_post_patches.py (patch_metadata), data_diversity_dashboard.py (_tod_bucket) — replaced `except ...: pass` with logger.warning including error details
+- Result: committed 6380dd58, pushed to origin/main
+
+## Round 249 @ 2026-07-06T04:30:00Z
+- Picked: No candidate found — ruff clean (F errors 0), E402 warnings are intentional late imports, no failing tests, no silent error swallows in production code after rounds 245-248 fixes
+- Result: skipped (no candidate)
+
 ## Round 248 @ 2026-07-06T04:20:00Z
 - Picked: Fix silent error swallows in bin/extract_audio_event_track.py — replaced `except (ValueError, IndexError): pass` and `except (subprocess.TimeoutExpired, FileNotFoundError): pass` in detect_voice_present() with logger.warning
 - Result: committed 677474ed, pushed to origin/main
