@@ -291,8 +291,8 @@ class BeamNGDriveExtractor:
         if self.beamng:
             try:
                 self.beamng.close()
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception as exc:
+                logger.debug("cleanup: beamng.close() failed", exc_info=exc)
 
     def __enter__(self):
         self.connect()
