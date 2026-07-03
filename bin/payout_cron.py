@@ -431,6 +431,22 @@ class MockSupabaseClient:
         stripe_transfer_id: str | None,
         failure_reason: str | None,
     ) -> dict[str, Any] | None:
+        """Insert a payout record into the mock database.
+
+        Simulates inserting a payout record, checking for duplicates based on
+        the idempotency key.
+
+        Args:
+            tester_id: Unique identifier for the tester.
+            amount_cents: Payout amount in cents.
+            idempotency_key: Unique key to prevent duplicate payouts.
+            status: Status of the payout ("paid" or "failed").
+            stripe_transfer_id: Stripe transfer ID if successful.
+            failure_reason: Reason for failure if status is "failed".
+
+        Returns:
+            The inserted row as a dictionary, or None if duplicate.
+        """
         for prev in self.payouts_inserted:
             if prev["idempotency_key"] == idempotency_key:
                 return None  # duplicate — pretend the unique index caught it
