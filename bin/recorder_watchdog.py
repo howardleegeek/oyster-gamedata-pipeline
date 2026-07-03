@@ -625,8 +625,7 @@ class Watchdog:
 
         # Clear previous events file
         events_path = self.config["watchdog_events_path"]
-        with open(events_path, "w") as f:
-            pass  # truncate
+        open(events_path, "w").close()  # truncate
 
         try:
             while self.running:
