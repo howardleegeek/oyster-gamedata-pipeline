@@ -241,7 +241,7 @@ def run_e2e(backend_url: str) -> int:
         step_healthz(client, backend_url)
 
         # Step 2: apply as tester
-        tester_id = step_apply_tester(client, backend_url)
+        _tester_id = step_apply_tester(client, backend_url)
 
         # Step 3: mock OAuth exchange
         access_token = step_oauth_exchange(client, backend_url)
@@ -256,7 +256,7 @@ def run_e2e(backend_url: str) -> int:
         step_verify_session(client, backend_url, access_token, session_id)
 
         # Step 7: fetch income today
-        income_data = step_fetch_income(client, backend_url, access_token)
+        _income_data = step_fetch_income(client, backend_url, access_token)
 
     logger.info("=" * 60)
     logger.info("All 7 steps passed ✓")
