@@ -143,8 +143,6 @@ def detect_temporal_artifacts(
     List of tuples ``(frame_a_idx, frame_b_idx, flow_a, flow_b)`` where
     the relative change exceeds *threshold*.
     """
-    np = _get_numpy()
-
     # Collect and sort frame paths
     candidates = sorted(
         p for p in frame_dir.iterdir()
