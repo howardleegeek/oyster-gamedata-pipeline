@@ -102,7 +102,7 @@ def _run_test() -> int:
     try:
         tf.close()
     except Exception:
-        pass
+        logger.debug("Could not close test tarball %r", tf, exc_info=True)
     return 0
 
 
