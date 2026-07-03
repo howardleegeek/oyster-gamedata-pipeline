@@ -33,3 +33,7 @@
 ## Round 246 @ 2026-07-03T04:30:00Z
 - Picked: no good candidate found — verified ruff clean (0 errors on bin/ src/ tests/), pytest collection (3306 tests), critical test suites (iron-law 21, spec-lint 13, storage 29, stripe 21, deploy 11, auto_tag_bot 19 all pass), no silent error swallows in production code, no lint issues, no failing tests, no PRD code gaps. Same state as prior rounds.
 - Result: skipped (no candidate)
+
+## Round 247 @ 2026-07-03T05:36:47Z
+- Picked: Finish in-progress WIP — fix two bare `except Exception: pass` silent error swallows in bin/pii_auditor.py (scan_file_for_pii and scan_session's game_state loop). Replaced with `except (OSError, UnicodeDecodeError, ValueError) as exc:` + `logger.warning(...)` so corrupted/unreadable session files are surfaced in logs. Added 4 regression tests (missing file, chmod-000 unreadable, scan_session with one bad file, static guard that `except Exception:\n` is gone).
+- Result: committed 048f9130, pushed to origin/main
