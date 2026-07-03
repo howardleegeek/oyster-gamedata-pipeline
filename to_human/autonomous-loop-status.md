@@ -1,3 +1,7 @@
+## Round 246 @ 2026-07-06T04:00:00Z
+- Picked: Fix silent error swallows in bin/recorder_watchdog.py — replaced `except ...: pass` in read_last_position() and read_mc_log_tail() with explicit logging (log.warning with error details)
+- Result: committed 6e35ef02, pushed to origin/main
+
 ## Round 245 @ 2026-07-03T04:00:00Z
 - Picked: Fix F841 unused variables in bin/stress_test_huge_tarball_5gb.py and tests/bin/test_mc_launcher_real.py — removed unused `meta`, `result`, `process` variables and prefixed unused mock with underscore
 - Result: committed 85aa8ec1, pushed to origin/main
