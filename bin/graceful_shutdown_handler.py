@@ -145,17 +145,18 @@ class GracefulShutdownHandler:
                 try:
                     old.unlink()
                 except OSError:
-                    pass
-        except Exception:
-            pass
+                    logger.warning("Failed to remove old checkpoint %s", old, exc_info=True)
+        except OSError:
+            logger.warning("Failed to enumerate checkpoints in %s", self.state_dir, exc_info=True)
     
     def _load_queue(self):
         try:
             if self.queue_file.exists():
                 with open(self.queue_file, 'r') as f:
                     self._queue = json.load(f)
-        except Exception:
-            pass
+                logger.info("Queue loaded from %s (%d items)", self.queue_file, len(self._queue.get("items", [])))
+        except (OSError, ValueError):
+            logger.warning("Failed to load queue from %s — falling back to empty queue", self.queue_file, exc_info=True)
     
     def _atexit(self):
         if not self._shutdown.is_set():
