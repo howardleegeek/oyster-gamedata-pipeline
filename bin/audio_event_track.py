@@ -75,6 +75,17 @@ def load_wav(path: str) -> Tuple[List[float], int]:
     return samples, sr
 
 
+_logger: Any = None
+
+
+def _get_logger():
+    global _logger
+    if _logger is None:
+        import logging
+        _logger = logging.getLogger(__name__)
+    return _logger
+
+
 def load_with_numpy(path: str) -> Tuple[List[float], int]:
     """Load audio using numpy/scipy if available, else WAV fallback."""
     np = _get_numpy()
@@ -87,8 +98,8 @@ def load_with_numpy(path: str) -> Tuple[List[float], int]:
                 s = s.mean(axis=1)
             mx = np.iinfo(data.dtype).max if np.issubdtype(data.dtype, np.integer) else 1.0
             return (s / mx).tolist(), int(sr)
-        except ImportError:
-            pass
+        except ImportError as exc:
+            _get_logger().debug("scipy.io.wavfile import failed, falling back: %s", exc)
     return load_wav(path)
 
 
