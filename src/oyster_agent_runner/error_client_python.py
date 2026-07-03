@@ -15,6 +15,7 @@ import asyncio
 import atexit
 import datetime
 import json
+import logging
 import os
 import re
 import sys
@@ -25,6 +26,8 @@ import urllib.error
 import urllib.request
 import uuid
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 __version__ = "1.0.0"
 DEFAULT_ENDPOINT = "http://localhost:8081/api/v1/errors"
@@ -168,15 +171,24 @@ class ErrorReporter:
         if len(json_data) > self.max_payload_size:
             json_data = self._truncate(json_data)
 
+        last_error: Exception | None = None
         for attempt in range(self.max_retries):
             try:
                 self._send(json_data)
                 return True
-            except Exception:
+            except Exception as exc:
+                last_error = exc
                 if attempt < self.max_retries - 1:
                     import time
 
                     time.sleep(RETRY_DELAY_BASE * (2**attempt))
+        # All retries exhausted — log before giving up so silent failure is visible.
+        logger.warning(
+            "ErrorClient failed to send after %d attempts (last error: %s: %s)",
+            self.max_retries,
+            type(last_error).__name__ if last_error else "unknown",
+            last_error,
+        )
         return False
 
     def _send(self, json_data: str) -> None:
@@ -202,7 +214,12 @@ class ErrorReporter:
             if len(tb) > 5000:
                 data["traceback"] = tb[:5000] + "\n... [truncated]"
             return json.dumps(data, ensure_ascii=False)
-        except Exception:
+        except Exception as exc:
+            logger.warning(
+                "Failed to parse JSON for truncation, falling back to blind slice: %s: %s",
+                type(exc).__name__,
+                exc,
+            )
             return json_data[: self.max_payload_size] + "..."
 
     def shutdown(self) -> None:
