@@ -569,7 +569,13 @@ Note: Also added docstring to reset_vendor in same commit (minor spec deviation 
 - File: bin/qa_validator_gui.py::main
 - Added: docstring=Y, type-hints=N (already had type hints)
 - Commit: 2b6f6351521cefcc13e323649ccc29158f7da787
+
 ## Round @ 2026-07-03T03:54:36Z
 - File: bin/verify_visual_diff.py::main
 - Added: docstring=Y, type-hints=N (already had type hints)
 - Commit: d1de32fc5
+
+## Round @ 2026-07-03T10:52:29Z
+- File: bin/per_frame_object_bbox.py::BBox3D.to_nuscenes_dict
+- Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: e40ce1baed03a2724184de21c8c854b532cc17c9
