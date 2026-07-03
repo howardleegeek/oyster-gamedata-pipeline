@@ -153,3 +153,7 @@
 ## Round 265 @ 2026-07-03T21:48:49Z
 - Picked: Surface silent error swallows in src/oyster_agent_runner/trajectory_packager.py — TrajectoryPackager._git_sha had 2x silent falls-back-to-"unknown" (FileNotFoundError/TimeoutExpired + non-zero returncode) and _package_version had 1x silent swallow (PackageNotFoundError). Replaced all three with `logger.debug(...)` calls binding the exception and including the failure mode. Added module-level `logger = logging.getLogger(__name__)`. Control flow unchanged (all three branches still return "unknown"). py_compile clean; ruff clean; tests/test_trajectory_packager.py (19 passed) including the existing test_provenance_git_sha_falls_back_when_git_missing which mocks subprocess.run to raise FileNotFoundError and asserts the fallback value.
 - Result: committed 8d4f34cd, pushed to origin/main
+
+## Round 267 @ 2026-07-03T22:29:09Z
+- Picked: Continue in-progress WIP from prior tick — surface 3x silent `except (...): pass` blocks in bin/audit_lift_post_patches.py patch_audio_check (astats float parse, ffprobe duration, ffmpeg silencedetect). Bound each to `exc` and emit log.debug so ffprobe-missing and astats-coercion-failure paths are visible. Added regression test tests/bin/test_audit_lift_post_patches_silent_error.py (3 checks: static guard, astats parse branch, ffprobe-missing branch). Self-review: no false-success (return values unchanged), no race (sequential), no PII at DEBUG, ruff clean, tests/bin/ 565/565 pass.
+- Result: committed 881ca431 (fix) + 968fef97 (test), pushed to origin/main
