@@ -120,6 +120,13 @@ class BBox3D:
                 "confidence": self.confidence}
 
     def to_nuscenes_dict(self) -> Dict[str, Any]:
+        """Convert 3D bounding box to nuScenes dataset format.
+
+        Returns:
+            Dict with nuScenes-format keys: translation (list of [x, y, z]),
+            size (list of [length, width, height]), rotation (quaternion),
+            detection_name, track_id, and confidence.
+        """
         h = self.yaw / 2.0
         return {"translation": [self.x, self.y, self.z],
                 "size": [self.length, self.width, self.height],
