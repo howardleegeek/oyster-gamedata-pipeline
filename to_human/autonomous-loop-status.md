@@ -1,3 +1,7 @@
+## Round 238 @ 2026-07-03T02:00:00Z
+- Picked: Fix ruff F841 unused variables in bin/sample_tarball_builder.py — removed unused SCREEN_W and DEG_TO_PIXEL constants (assigned but never used)
+- Result: committed e429669f, pushed to origin/main
+
 ## Round 237 @ 2026-07-03T01:30:00Z
 - Picked: Fix silent error swallow in bin/verify_action_camera.py layer3_behavioral() — replaced `except Exception: pass` (which silently dropped bad/missing timestamps) with explicit handlers that track missing_field and unparseable counts, report them in issues, and add timestamps_parsed/timestamps_bad to stats. Also added 4 regression tests covering good/missing/unparseable/mixed timestamp cases.
 - Result: committed 1de6d95d, pushed to origin/main
