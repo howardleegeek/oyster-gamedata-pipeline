@@ -8,7 +8,11 @@ on RGB images, saving results as OpenEXR files.
 
 from __future__ import annotations
 
+import logging
+
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 # Lazy imports for optional dependencies
 _torch = None
@@ -121,4 +125,9 @@ def infer_depth(
         return True
 
     except Exception:
+        logger.exception(
+            "infer_depth failed for rgb=%s out=%s",
+            rgb_frame_path,
+            output_exr_path,
+        )
         return False
