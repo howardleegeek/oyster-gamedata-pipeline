@@ -106,3 +106,7 @@ Self-review: verified no silent error swallow, no false-success, no race, no off
 ## Round 237 @ 2026-07-03T02:00:00Z
 - Picked: Fix ruff F841 unused variable in bin/recorder_watchdog.py — removed unused `f` variable in file truncation (line 628: `with open(events_path, "w") as f: pass` → `open(events_path, "w").close()`)
 - Result: committed 9aded8af, pushed to origin/main
+
+## Round 239 @ 2026-07-03T02:30:00Z
+- Picked: Fix silent error swallow in bin/graceful_shutdown.py _run_test() — replaced bare `except Exception: pass` (line 104) with `logger.debug("Could not close test tarball %r", tf, exc_info=True)`, matching the existing logging pattern in _handler(). Also deleted stale tests/bin/__pycache__/test_graceful_shutdown.* pycache (test file no longer exists).
+- Result: committed 8d9d2cc3, pushed to origin/main
