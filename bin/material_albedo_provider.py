@@ -274,6 +274,19 @@ class MaterialAlbedoProvider:
         return results
     
     def validate_material(self, material_name: str) -> Tuple[bool, List[str]]:
+        """Validate that a material has all required texture data.
+
+        Checks that the material exists in the provider and that its albedo
+        texture has a valid shape (3D with 3 or 4 channels for RGB/RGBA).
+
+        Args:
+            material_name: Name of the material to validate.
+
+        Returns:
+            A tuple of (is_valid, issues) where is_valid is True if the material
+            passes all validation checks, and issues is a list of strings
+            describing any validation failures.
+        """
         if material_name not in self.materials:
             return False, [f"Material not found: {material_name}"]
         
