@@ -19,11 +19,14 @@ Writes audio_check.json with:
 
 import argparse
 import json
+import logging
 import math
 import os
 import subprocess
 import sys
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def parse_args():
@@ -241,11 +244,11 @@ def detect_voice_present(voice_flac_path):
                     try:
                         rms = float(line.split(":")[1].strip())
                         return rms > 0.001
-                    except (ValueError, IndexError):
-                        pass
+                    except (ValueError, IndexError) as e:
+                        logger.warning("Failed to parse RMS amplitude: %s", e)
             return True  # File exists, assume voice present
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        pass
+    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+        logger.warning("Failed to check voice.flac with sox: %s", e)
 
     return False
 
