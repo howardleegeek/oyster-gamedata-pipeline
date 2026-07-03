@@ -213,7 +213,7 @@ def test_engine_zbuffer():
     audit = MockH8Audit()
     result = audit.run_audit()
 
-    return result == "PASS"
+    assert result == "PASS", f"Expected PASS, got {result}"
 
 
 def test_monocular_da_v2():
@@ -245,7 +245,7 @@ def test_monocular_da_v2():
     audit = MockH8Audit()
     result = audit.run_audit()
 
-    return result == "SKIP"
+    assert result == "SKIP", f"Expected SKIP, got {result}"
 
 
 def test_no_depth():
@@ -265,7 +265,7 @@ def test_no_depth():
     audit = MockH8Audit()
     result = audit.run_audit()
 
-    return result == "FAIL"
+    assert result == "FAIL", f"Expected FAIL, got {result}"
 
 
 def test_buyer_pdf_requirements():
@@ -319,39 +319,34 @@ def test_buyer_pdf_requirements():
         print("✓ Source: GL/engine Z-buffer")
     else:
         print("✗ Source: Not engine Z-buffer")
-        return False
+        assert False, "Source is not engine_zbuffer"
 
     # 2. Check units are meters
     if source_info["units"] == "meters":
         print("✓ Units: meters")
     else:
         print(f"✗ Units: {source_info['units']} (not meters)")
-        return False
+        assert False, f"Units is {source_info['units']}, expected meters"
 
     # 3. Check coordinate system is view-space
     if source_info["coordinate_system"] == "view_space":
         print("✓ Coordinate system: view-space")
     else:
         print(f"✗ Coordinate system: {source_info.get('coordinate_system')}")
-        return False
+        assert False, f"Coordinate system is {source_info.get('coordinate_system')}, expected view_space"
 
     # 4. Check linearized
     if source_info.get("linearized", False):
         print("✓ Linearized: true")
     else:
         print("✗ Linearized: false")
-        return False
+        assert False, "linearized should be True"
 
     # 5. Simulate H8 audit
     audit = MockH8Audit()
     result = audit.run_audit()
 
-    if result == "PASS":
-        print("✓ H8 audit: PASS")
-        return True
-    else:
-        print(f"✗ H8 audit: {result} (expected PASS)")
-        return False
+    assert result == "PASS", f"H8 audit returned {result}, expected PASS"
 
 
 if __name__ == "__main__":
