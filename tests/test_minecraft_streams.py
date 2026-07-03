@@ -202,6 +202,51 @@ def test_writer_raises_when_used_without_open(tmp_path: Path) -> None:
         w.write(TrajectoryEvent(timestamp=0.0, event_type=EVENT_START, event_args={}))
 
 
+def test_writer_close_swallows_handle_errors_via_logger(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """close() must not raise even if flush()/close() on a file handle does.
+
+    Regression guard for the silent `except Exception: pass` in
+    MinecraftStreamWriter.close: a failing terminal-path flush/close
+    should be surfaced via the module logger (DEBUG level) so operators
+    can correlate missing-tail-bytes reports with the underlying cause,
+    but the public close() contract — return None, set the writer to
+    closed — must still hold.
+    """
+    import logging as _logging
+
+    w = MinecraftStreamWriter(tmp_path)
+    w.open()
+    # Sabotage one of the handles: subsequent flush()/close() will raise
+    # ValueError ("I/O operation on closed file") once we close it once
+    # before close() runs the loop a second time. Easier and equivalent:
+    # replace .flush with a function that raises.
+    boom = RuntimeError("synthetic flush failure")
+    w._cot_fh.flush = lambda: (_ for _ in ()).throw(boom)  # type: ignore[assignment]
+    # close() must not raise even when one of the three handles fails.
+    with caplog.at_level(_logging.DEBUG, logger="oyster_agent_runner.minecraft_streams"):
+        w.close()  # must NOT raise
+    # The exception is surfaced at DEBUG with the synthetic class name.
+    matching = [r for r in caplog.records if "RuntimeError" in r.getMessage()]
+    assert matching, f"expected DEBUG log mentioning RuntimeError, got: {[r.getMessage() for r in caplog.records]}"
+    # And the close() idempotency contract still holds: _closed=True, handles=None.
+    assert w._closed is True
+    assert w._cot_fh is None
+    assert w._metadata_fh is None
+    assert w._inputs_fh is None
+    # Calling close() again is a no-op.
+    w.close()
+
+
+def test_writer_close_is_idempotent(tmp_path: Path) -> None:
+    """close() called twice must not raise and must not re-flush."""
+    w = MinecraftStreamWriter(tmp_path)
+    w.open()
+    w.close()
+    w.close()  # must be a no-op
+
+
 # --- run-mc CLI integration -------------------------------------------------
 
 

@@ -34,6 +34,7 @@ Used by `cli.py`'s `run-mc` command. Pure-Python, no test dependencies.
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone
 
 UTC = timezone.utc
@@ -58,6 +59,8 @@ COT_FILENAME = "cot.jsonl"
 METADATA_FILENAME = "metadata.jsonl"
 INPUTS_FILENAME = "inputs.jsonl"
 MANIFEST_FILENAME = "manifest.json"
+
+_logger = logging.getLogger(__name__)
 
 # Event types that flow into each stream.
 COT_EVENT_TYPES = frozenset(
@@ -148,9 +151,17 @@ class MinecraftStreamWriter:
                 try:
                     fh.flush()
                     fh.close()
-                except Exception:
-                    # Already-closed handles raise; ignore on the terminal path.
-                    pass
+                except Exception as exc:
+                    # Already-closed handles raise; ignore on the terminal path
+                    # but surface the failure at DEBUG so operators can
+                    # correlate "missing tail bytes" reports with the cause.
+                    _logger.debug(
+                        "minecraft_streams: ignoring %s on terminal-path "
+                        "close (handle=%r): %s",
+                        type(exc).__name__,
+                        fh,
+                        exc,
+                    )
         self._cot_fh = None
         self._metadata_fh = None
         self._inputs_fh = None
