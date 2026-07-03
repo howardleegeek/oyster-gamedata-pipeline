@@ -248,6 +248,22 @@ class MaterialAlbedoProvider:
             return None
     
     def generate_all_gbuffers(self) -> Dict[str, Path]:
+        """Generate G-buffer outputs for all loaded materials.
+
+        Iterates through all materials in the provider and generates
+        per-pixel albedo, roughness, and metallic G-buffer data.
+
+        Returns:
+            Dict[str, Path]: Mapping of material names to their output
+                G-buffer file paths.
+
+        Example:
+            >>> provider = MaterialAlbedoProvider()
+            >>> provider.load_from_directory(Path("./materials"))
+            >>> results = provider.generate_all_gbuffers()
+            >>> for name, path in results.items():
+            ...     print(f"Generated {name} -> {path}")
+        """
         results = {}
         for material_name in self.materials:
             output_path = self.generate_gbuffer(material_name)
