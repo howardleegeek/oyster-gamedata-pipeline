@@ -198,8 +198,8 @@ class NamedPipeTransport:
         if self._pipe_fd is not None:
             try:
                 os.close(self._pipe_fd)
-            except OSError:
-                pass
+            except OSError as e:
+                logger.warning(f"Failed to close pipe fd {self._pipe_fd}: {e}")
             self._pipe_fd = None
             logger.info("Disconnected from pipe")
 
