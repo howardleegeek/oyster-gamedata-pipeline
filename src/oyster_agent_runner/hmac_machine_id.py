@@ -51,14 +51,17 @@ def _collect_raw_identifiers() -> bytes:
     parts: list[bytes] = []
 
     # DMI product UUID (Linux)
+    import logging
+
+    _logger = logging.getLogger(__name__)
     for candidate in (
         Path("/sys/class/dmi/id/product_uuid"),
         Path("/etc/machine-id"),
     ):
         try:
             parts.append(candidate.read_bytes().strip())
-        except (OSError, PermissionError):
-            pass
+        except (OSError, PermissionError) as exc:
+            _logger.debug("Could not read %s: %s", candidate, exc)
 
     parts.append(os.uname().nodename.encode())
     parts.append(str(os.cpu_count() or 0).encode())
