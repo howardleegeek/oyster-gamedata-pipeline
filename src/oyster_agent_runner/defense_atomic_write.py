@@ -2,10 +2,13 @@
 """Atomic file write helper using tempfile + os.replace."""
 
 import argparse
+import logging
 import os
 import sys
 import tempfile
 from pathlib import Path
+
+_logger = logging.getLogger(__name__)
 
 
 def write_atomic(
@@ -50,8 +53,8 @@ def write_atomic(
         if preserve_permissions and path.exists():
             try:
                 os.chmod(temp_path, path.stat().st_mode)
-            except OSError:
-                pass  # Ignore permission errors
+            except OSError as exc:
+                _logger.debug("os.chmod failed on %s: %s", temp_path, exc)
 
         # Atomic replace
         os.replace(temp_path, path)
@@ -61,8 +64,8 @@ def write_atomic(
         if temp_path and os.path.exists(temp_path):
             try:
                 os.unlink(temp_path)
-            except OSError:
-                pass
+            except OSError as exc:
+                _logger.debug("os.unlink failed on %s: %s", temp_path, exc)
         raise
 
 
