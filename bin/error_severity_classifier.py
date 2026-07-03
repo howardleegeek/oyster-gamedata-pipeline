@@ -12,10 +12,13 @@ Version: 1.0.0
 
 import argparse
 import json
+import logging
 import re
 import sys
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 # Lazy imports for optional dependencies
 try:
@@ -125,9 +128,39 @@ class RuleEngine:
             if overrides and "rules" in overrides:
                 # Prepend override rules (higher priority)
                 self.rules = overrides["rules"] + self.rules
-        except Exception:
-            # Silently ignore override load errors in production
-            pass
+        except FileNotFoundError:
+            # Override file was removed between exists() and open() — fall back to defaults.
+            logger.debug("Override file disappeared before load: %s", override_path)
+        except (OSError, ValueError, TypeError) as exc:
+            # I/O, value, or YAML-decode errors are operator-actionable: log WARNING
+            # with the underlying error so the operator can fix the file, then fall
+            # back to default rules. (json.JSONDecodeError is a subclass of ValueError.)
+            # Pass exc_info=True so the full traceback is attached for diagnostics.
+            logger.warning(
+                "Failed to load override file %s (%s); using default rules",
+                override_path, exc,
+                exc_info=True,
+            )
+        except Exception as exc:
+            # Last-resort safety net: yaml.YAMLError (a yaml.parser.ParserError for
+            # malformed YAML) does NOT inherit from ValueError, so it slipped past
+            # the narrow except above. Catch any remaining error type here, log it,
+            # and fall back to defaults so the classifier stays available. This is
+            # strictly safer than the original bare `except Exception: pass` because
+            # the underlying error is now visible to operators.
+            if YAML_AVAILABLE and isinstance(exc, yaml.YAMLError):
+                logger.warning(
+                    "Failed to parse YAML override file %s (%s); using default rules",
+                    override_path, exc,
+                    exc_info=True,
+                )
+            else:
+                logger.warning(
+                    "Unexpected error loading override file %s (%s); "
+                    "using default rules",
+                    override_path, exc,
+                    exc_info=True,
+                )
 
     def classify(
         self,
