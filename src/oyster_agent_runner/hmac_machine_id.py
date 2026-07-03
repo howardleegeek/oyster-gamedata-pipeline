@@ -14,10 +14,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import hmac as _hmac
+import logging
 import os
 import sys
 import uuid
 from pathlib import Path
+
+_logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -51,9 +54,6 @@ def _collect_raw_identifiers() -> bytes:
     parts: list[bytes] = []
 
     # DMI product UUID (Linux)
-    import logging
-
-    _logger = logging.getLogger(__name__)
     for candidate in (
         Path("/sys/class/dmi/id/product_uuid"),
         Path("/etc/machine-id"),
@@ -102,7 +102,8 @@ def _rotation_sequence() -> int:
     """Return the current key-rotation counter (monotonically increasing)."""
     try:
         return int(_ROTATION_MARKER.read_text().strip())
-    except (OSError, ValueError):
+    except (OSError, ValueError) as exc:
+        _logger.debug("Could not read rotation marker %s: %s", _ROTATION_MARKER, exc)
         return 0
 
 
