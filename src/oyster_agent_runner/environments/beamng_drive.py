@@ -17,6 +17,8 @@ from typing import Any, Dict, List, Literal, Optional, Union
 
 from oyster_agent_runner.environments.base import Action, Environment, Observation
 
+logger = logging.getLogger(__name__)
+
 # Lazy imports
 try:
     import numpy as np
@@ -76,15 +78,15 @@ def _json_safe(value: Any) -> Any:
     if callable(item):
         try:
             return _json_safe(item())
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("beamng_drive: item() failed on %r: %s", type(value).__name__, exc)
 
     tolist = getattr(value, "tolist", None)
     if callable(tolist):
         try:
             return _json_safe(tolist())
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("beamng_drive: tolist() failed on %r: %s", type(value).__name__, exc)
 
     return str(value)
 
