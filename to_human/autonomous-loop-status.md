@@ -1,4 +1,9 @@
+## Round 261 @ 2026-07-03T16:27:50Z
+- Picked: Continue in-progress silent-error-swallow fix on src/oyster_agent_runner/environments/beamng_drive.py (carried in working tree from prior round) — replaced 2x `except Exception: pass` in _json_safe (item() branch + tolist() branch) with `except Exception as exc: logger.debug(...)` binding the exception and including the type(value) name for context. Control flow unchanged (both branches still fall through to the final `return str(value)` fallback). Used DEBUG level because these branches are called for every value during JSON coercion of observation payloads; most call sites pass simple types and never hit the except. py_compile clean; ruff clean; tests/test_beamng_drive_env.py (7) + tests/test_beamng_adapter.py (35) all pass; behavior verified by direct call: str/int/list return as-is, broken callable / broken tolist return `str(value)` with debug log emitted.
+- Result: committed f72aa4fa, pushed to origin/main
+
 ## Round 258 @ 2026-07-03T15:25:31Z
+
 - Picked: Continue in-progress silent-error-swallow fix on bin/clip_validator_strict.py (carried in working tree from prior round) — replaced `except ValueError: pass` in _parse_db_value with `except ValueError as exc: logger.debug(...)` binding the exception and including key/line context. Control flow unchanged (loop still continues; function still returns None when no key matches). Used DEBUG level so normal INFO runs aren't flooded by ffprobe stderr lines that legitimately don't parse. py_compile clean; ruff clean; pytest collection (3322) clean; behavior verified by direct call: parseable `-30.5 db` → -30.5, unparseable `notadigit db` → None with debug log emitted, missing key → None.
 - Result: committed b2cea759, pushed to origin/main
 
