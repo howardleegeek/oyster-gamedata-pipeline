@@ -158,8 +158,8 @@ def patch_audio_check(session: Path, dry_run: bool = False) -> dict:
             key, val = m.group(1), m.group(2)
             try:
                 parsed[key.replace(" ", "_").lower()] = float(val)
-            except (ValueError, TypeError):
-                pass
+            except (ValueError, TypeError) as exc:
+                log.debug("Failed to parse astats key %r: %s", key, exc)
 
     # Compute SNR (peak - rms = approximate dynamic range)
     rms_db = parsed.get("rms_level_db")
@@ -179,8 +179,8 @@ def patch_audio_check(session: Path, dry_run: bool = False) -> dict:
             capture_output=True, text=True, timeout=30, check=False,
         )
         dur_sec = float(r.stdout.strip()) if r.stdout.strip() else 0.0
-    except (subprocess.TimeoutExpired, FileNotFoundError, ValueError):
-        pass
+    except (subprocess.TimeoutExpired, FileNotFoundError, ValueError) as exc:
+        log.debug("Failed to get audio duration via ffprobe: %s", exc)
 
     # B7: audio continuity — measure max silence gap via ffmpeg silencedetect
     max_silence_gap_s = 0.0
@@ -197,8 +197,8 @@ def patch_audio_check(session: Path, dry_run: bool = False) -> dict:
             if m:
                 durs.append(float(m.group(1)))
         max_silence_gap_s = max(durs) if durs else 0.0
-    except (subprocess.TimeoutExpired, FileNotFoundError, ValueError):
-        pass
+    except (subprocess.TimeoutExpired, FileNotFoundError, ValueError) as exc:
+        log.debug("Failed to detect silence gaps via ffmpeg: %s", exc)
 
     audio_check = {
         "checked_at": dt.datetime.now(dt.timezone.utc).isoformat(),
