@@ -73,6 +73,8 @@ from typing import Any
 
 # Optional rich rendering — same fallback pattern as bin/lint_bundle.py so the
 # linter still runs in a stripped buyer environment.
+import logging
+
 try:
     from rich.console import Console
     from rich.table import Table
@@ -80,6 +82,8 @@ try:
     _RICH = True
 except ImportError:  # pragma: no cover - exercised only on stripped envs
     _RICH = False
+
+logger = logging.getLogger(__name__)
 
 
 # --------------------------------------------------------------------------- types
@@ -1196,8 +1200,8 @@ def _read_exr_lazy(path: Path) -> tuple[bool, str]:
             try:
                 if int(ptype) == 2:
                     is_float = True
-            except (TypeError, ValueError):
-                pass
+            except (TypeError, ValueError) as exc:
+                logger.debug("Failed to convert ptype=%r to int: %s", ptype, exc)
 
         # 3) Direct equality to the FLOAT sentinel from either library.
         if not is_float:
@@ -1206,16 +1210,16 @@ def _read_exr_lazy(path: Path) -> tuple[bool, str]:
                 try:
                     if ptype == ekey:
                         is_float = True
-                except (AttributeError, TypeError):
-                    pass
+                except (AttributeError, TypeError) as exc:
+                    logger.debug("OpenEXR FLOAT equality check failed: %s", exc)
         if not is_float and Imath is not None:
             ikey = getattr(getattr(Imath, "PixelType", None), "FLOAT", None)
             if ikey is not None:
                 try:
                     if ptype == ikey:
                         is_float = True
-                except (AttributeError, TypeError):
-                    pass
+                except (AttributeError, TypeError) as exc:
+                    logger.debug("Imath FLOAT equality check failed: %s", exc)
 
         # 4) Last resort: name-based identification.
         if not is_float and "FLOAT" in repr(ptype).upper():
