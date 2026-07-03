@@ -1,3 +1,7 @@
+## Round 252 @ 2026-07-14T04:00:00Z
+- Picked: No candidate found — verified ruff clean (0 errors), pytest collection (3322 tests), bin tests (562 passed), no silent error swallows in production code after rounds 245-251 fixes, PRD gaps require Howard credentials not code changes
+- Result: skipped (no candidate)
+
 ## Round 251 @ 2026-07-13T04:00:00Z
 - Picked: Fix silent error swallow in src/oyster_agent_runner/environments/factorio_full.py — replaced `except (ValueError, RuntimeError): pass` in get_game_observation() tick parsing with logger.warning including error details
 - Result: committed 884f1cad, pushed to origin/main
