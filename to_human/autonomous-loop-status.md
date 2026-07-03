@@ -1,3 +1,7 @@
+## Round 255 @ 2026-07-03T12:30:00Z
+- Picked: Continue in-progress silent-error-swallow fix on src/oyster_agent_runner/environments/gym_env.py (carried in working tree from prior round) — replaced `except Exception: pass` in _observation_to_dict tolist() branch with logger.warning including exception detail; control flow unchanged (still falls through to isinstance checks)
+- Result: committed 1ab56c3f, pushed to origin/main
+
 ## Round 254 @ 2026-07-03T12:18:50Z
 - Picked: Fix silent error swallow in src/oyster_agent_runner/phase2/depth_anything_v2.py — replaced bare `except Exception: return False` in infer_depth() with logger.exception including rgb/out paths so OpenEXR write / model load failures are surfaced in trajectory logs
 - Result: committed 7d92a715, pushed to origin/main
