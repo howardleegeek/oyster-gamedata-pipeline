@@ -257,6 +257,16 @@ def r09_keycode_vk_known(rec: dict) -> OracleResult:
 # ---------------------------------------------------------------------------
 
 def r12_fps_fixed_30(rec: dict, tolerance: float = 0.5) -> OracleResult:
+    """Verify fps equals 30.0 within tolerance.
+
+    Args:
+        rec: Frame record containing fps field.
+        tolerance: Allowed deviation from 30.0 in fps (default 0.5).
+
+    Returns:
+        OracleResult with PASS if |fps - 30.0| <= tolerance,
+        FAIL if outside tolerance, ABSTAIN if fps missing.
+    """
     fps = rec.get("fps")
     if fps is None:
         return OracleResult("R12", Verdict.ABSTAIN, 30.0, None, math.nan, "missing fps")
