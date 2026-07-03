@@ -1,3 +1,7 @@
+## Round 265 @ 2026-07-04T00:00:00Z
+- Picked: Surface silent ImportError in bin/audio_event_track.py:91 — replaced bare `except ImportError: pass` in load_with_numpy() with logger.debug() binding the exception. Control flow unchanged (still falls back to load_wav). py_compile clean; ruff clean; tests/test_audio_event_track.py (14 passed).
+- Result: committed c583adc0, pushed to origin/main
+
 ## Round 264 @ 2026-07-03T19:00:00Z
 - Picked: Complete in-progress silent error swallow fixes — staged gym_env.py changes (2x bare except Exception: pass in render_frame and _array_to_png) + unstaged clip_validator_strict.py change (bare except in _get_video_info). All replaced with logger that binds exception. Control flow unchanged. py_compile clean; ruff clean; tests/test_environments*.py (18 passed, 1 skipped).
 - Result: committed 2f1b7df8 (gym_env.py) + e57467d3 (clip_validator_strict.py), pushed to origin/main
