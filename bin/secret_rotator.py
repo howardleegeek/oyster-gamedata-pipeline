@@ -150,6 +150,14 @@ class RotationState:
         self.state["secondary_key_id"] = kid
         self.state["secondary_created_at"] = datetime.datetime.utcnow().isoformat()
     def deactivate_primary(self) -> None:
+        """Record the timestamp when the primary key was deactivated.
+
+        This marks the end of the overlap period. After this call, the primary
+        key is inactive but still present in AWS IAM until explicitly deleted.
+
+        The timestamp is stored in ISO format and can be retrieved via
+        `primary_deactivated_at` property.
+        """
         self.state["primary_deactivated_at"] = datetime.datetime.utcnow().isoformat()
     def promote_secondary(self) -> None:
         self.state["active_key_id"] = self.state.pop("secondary_key_id", None)
