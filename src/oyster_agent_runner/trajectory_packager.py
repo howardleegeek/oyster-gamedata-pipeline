@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import subprocess
 import zipfile
 from datetime import datetime, timezone
@@ -42,6 +43,8 @@ UTC = UTC
 from importlib import metadata as importlib_metadata
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from oyster_agent_runner.minecraft_streams import (
     COT_FILENAME,
@@ -358,9 +361,11 @@ class TrajectoryPackager:
                 check=False,
                 timeout=2.0,
             )
-        except (FileNotFoundError, subprocess.TimeoutExpired):
+        except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+            logger.debug("git_sha: falling back to 'unknown' (subprocess failed: %s: %s)", type(exc).__name__, exc)
             return "unknown"
         if result.returncode != 0:
+            logger.debug("git_sha: falling back to 'unknown' (git returned rc=%s)", result.returncode)
             return "unknown"
         sha = result.stdout.strip()
         return sha or "unknown"
@@ -370,7 +375,8 @@ class TrajectoryPackager:
         """Return the installed ``oyster-agent-runner`` version, or ``"unknown"``."""
         try:
             return importlib_metadata.version("oyster-agent-runner")
-        except importlib_metadata.PackageNotFoundError:
+        except importlib_metadata.PackageNotFoundError as exc:
+            logger.debug("package_version: falling back to 'unknown' (metadata lookup failed: %s: %s)", type(exc).__name__, exc)
             return "unknown"
 
 
