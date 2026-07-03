@@ -142,7 +142,8 @@ class GymEnvironment(Environment):
             return None
         try:
             frame = self._env.render()
-        except Exception:
+        except Exception as exc:
+            logger.debug("render_frame: gym render() failed: %s", exc)
             return None
         if frame is None:
             return None
@@ -182,7 +183,8 @@ def _array_to_png(arr: Any) -> bytes | None:
         return buf.getvalue()
     except ImportError:
         return None
-    except Exception:
+    except Exception as exc:
+        logger.debug("_array_to_png failed: %s", exc)
         return None
 
 
