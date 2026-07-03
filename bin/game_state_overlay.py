@@ -19,9 +19,12 @@ Schema reference (mod side: GameStateSample.toJsonLine):
 from __future__ import annotations
 
 import json
+import logging
 import math
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 def jsonl_path() -> Path:
@@ -57,6 +60,7 @@ def load(jsonl: Path | None = None) -> list[dict[str, Any]] | None:
         samples.sort(key=lambda s: s.get("timestamp_ms", 0))
         return samples
     except Exception:
+        logger.warning("Failed to load game_state.jsonl", exc_info=True)
         return None
 
 
