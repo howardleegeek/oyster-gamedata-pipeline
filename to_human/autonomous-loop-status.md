@@ -1,3 +1,7 @@
+## Round 258 @ 2026-07-03T15:25:31Z
+- Picked: Continue in-progress silent-error-swallow fix on bin/clip_validator_strict.py (carried in working tree from prior round) — replaced `except ValueError: pass` in _parse_db_value with `except ValueError as exc: logger.debug(...)` binding the exception and including key/line context. Control flow unchanged (loop still continues; function still returns None when no key matches). Used DEBUG level so normal INFO runs aren't flooded by ffprobe stderr lines that legitimately don't parse. py_compile clean; ruff clean; pytest collection (3322) clean; behavior verified by direct call: parseable `-30.5 db` → -30.5, unparseable `notadigit db` → None with debug log emitted, missing key → None.
+- Result: committed b2cea759, pushed to origin/main
+
 ## Round 257 @ 2026-07-03T13:57:11Z
 - Picked: Continue in-progress silent-error-swallow fix on src/oyster_agent_runner/cs2/cs2_demo_parser.py (carried in working tree from prior round) — replaced 2x `except Exception: pass` in _select_target_player (steam-id filter + non-bot filter) with logger.warning including exception type/detail and the steam id context, plus a hint that the non-bot fallback may select a bot if `is_bot` is missing. Control flow unchanged (still returns the fallback steam id). 15/15 tests pass; ruff clean.
 - Result: committed 1c507bc7, pushed to origin/main
