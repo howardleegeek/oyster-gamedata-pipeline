@@ -362,7 +362,8 @@ class AgentRunner:
         try:
             json.dumps(result)
             safe_result = result
-        except (TypeError, ValueError):
+        except (TypeError, ValueError) as exc:
+            logger.debug("tool result not JSON-native, falling back to repr: %s", exc)
             safe_result = repr(result)
         logger.write_event(
             TrajectoryEvent(
@@ -383,7 +384,8 @@ class AgentRunner:
             return f"[tool:{tool_name}] error: {error}"
         try:
             body = json.dumps(result, sort_keys=True, default=str)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError) as exc:
+            logger.debug("tool result not JSON-native in format, falling back to repr: %s", exc)
             body = repr(result)
         return f"[tool:{tool_name}] result: {body}"
 
