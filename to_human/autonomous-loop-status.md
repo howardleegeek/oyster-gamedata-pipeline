@@ -122,3 +122,7 @@ Self-review: verified no silent error swallow, no false-success, no race, no off
 ## Round 239 @ 2026-07-03T02:30:00Z
 - Picked: Fix silent error swallow in bin/graceful_shutdown.py _run_test() — replaced bare `except Exception: pass` (line 104) with `logger.debug("Could not close test tarball %r", tf, exc_info=True)`, matching the existing logging pattern in _handler(). Also deleted stale tests/bin/__pycache__/test_graceful_shutdown.* pycache (test file no longer exists).
 - Result: committed 8d9d2cc3, pushed to origin/main
+
+## Round 243 @ 2026-07-03T03:30:00Z
+- Picked: Finish in-progress WIP — remove F841 unused `np = _get_numpy()` in bin/temporal_consistency_lint.py detect_temporal_artifacts(). Variable was assigned at function top but never referenced afterward; the function only uses pre-loaded `frames[i]` arrays and calls _compute_flow_magnitude/_mean_flow which each handle their own np lookup. Verified 550/550 tests in tests/bin/ pass, ruff clean on the file, function still detects discontinuities correctly.
+- Result: committed c9dca1d3, pushed to origin/main
