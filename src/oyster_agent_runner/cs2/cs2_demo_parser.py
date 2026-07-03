@@ -78,10 +78,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import math
 import sys
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -195,15 +198,27 @@ def _select_target_player(parser: Any, requested_steam_id: str | None) -> str | 
             match = info.filter(info["steamid"] == int(requested_steam_id))
             if len(match):
                 return str(match["steamid"][0])
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "cs2_demo_parser: steam-id filter failed for requested_steam_id=%r; "
+                "falling back to non-bot scan: %s: %s",
+                requested_steam_id,
+                type(exc).__name__,
+                exc,
+            )
     # Default: first non-bot player.
     try:
         humans = info.filter(~info["is_bot"])
         if len(humans):
             return str(humans["steamid"][0])
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning(
+            "cs2_demo_parser: non-bot filter failed; falling back to first steamid "
+            "(may be a bot if the demo's is_bot column is missing or all players are bots): "
+            "%s: %s",
+            type(exc).__name__,
+            exc,
+        )
     return str(info["steamid"][0])
 
 
