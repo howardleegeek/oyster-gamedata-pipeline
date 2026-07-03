@@ -255,8 +255,8 @@ def read_last_position(game_state_path: str) -> Optional[Dict[str, float]]:
                     "y": float(pos.get("y", 0)),
                     "z": float(pos.get("z", 0)),
                 }
-    except (json.JSONDecodeError, ValueError, KeyError, TypeError):
-        pass
+    except (json.JSONDecodeError, ValueError, KeyError, TypeError) as e:
+        log.warning("Failed to parse game_state.jsonl line: %s", e)
     return None
 
 
@@ -269,7 +269,8 @@ def read_mc_log_tail(mc_log_path: str, n_lines: int = 100) -> List[str]:
         with open(path, "r") as f:
             lines = f.readlines()
             return lines[-n_lines:]
-    except Exception:
+    except Exception as e:
+        log.warning("Failed to read MC log %s: %s", mc_log_path, e)
         return []
 
 
