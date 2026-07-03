@@ -13,6 +13,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import subprocess
 import sys
@@ -21,9 +22,13 @@ import time
 from pathlib import Path
 from typing import Sequence
 
+logging.basicConfig(level=logging.WARNING, format='%(levelname)s: %(message)s')
+
 _CHILD_SCRIPT = """\
 import os, sys, time, tempfile
 from pathlib import Path
+import logging
+logging.basicConfig(level=logging.WARNING, format='%(message)s')
 target_dir, sig_fd = sys.argv[1], int(sys.argv[2])
 payload_size, chunk_size, sleep_t = {payload_size}, {chunk_size}, {sleep_per_chunk}
 payload = b"\\x00" * payload_size
@@ -34,10 +39,12 @@ try:
         for i in range(0, len(payload), chunk_size):
             f.write(payload[i:i+chunk_size]); f.flush()
             try: os.write(sig_fd, b"1")
-            except OSError: pass
+            except OSError as e:
+                logging.warning("Child: failed to signal parent: %s", e)
             time.sleep(sleep_t)
     os.rename(tmp_path, final_path)
-except OSError: pass
+except OSError as e:
+    logging.warning("Child: write/rename failed: %s", e)
 """
 
 
@@ -65,8 +72,8 @@ def _run_sigkill_trial(
             if not os.read(r_fd, 1):
                 break
             chunks_seen += 1
-    except OSError:
-        pass
+    except OSError as e:
+        logging.warning("Parent: failed to read signal from child: %s", e)
     os.close(r_fd)
     time.sleep(0.05)
     if proc.poll() is None:
