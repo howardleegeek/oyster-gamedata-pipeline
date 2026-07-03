@@ -20,6 +20,8 @@ from typing import List
 
 def get_rss_mb() -> float:
     """Return current process RSS in megabytes."""
+    import logging
+    logger = logging.getLogger(__name__)
     pid = os.getpid()
     # Linux: read /proc/[pid]/status
     try:
@@ -27,8 +29,8 @@ def get_rss_mb() -> float:
             for line in fh:
                 if line.startswith("VmRSS:"):
                     return int(line.split()[1]) / 1024.0  # kB → MB
-    except (FileNotFoundError, IndexError, ValueError, OSError):
-        pass
+    except (FileNotFoundError, IndexError, ValueError, OSError) as e:
+        logger.warning("Failed to read /proc/%d/status: %s", pid, e)
     # macOS / BSD: parse `ps -o rss= -p <pid>` (RSS in kB)
     try:
         result = subprocess.run(
@@ -37,8 +39,8 @@ def get_rss_mb() -> float:
         )
         if result.returncode == 0:
             return int(result.stdout.strip()) / 1024.0
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to run ps command for PID %d: %s", pid, e)
     return 0.0
 
 
