@@ -1,3 +1,7 @@
+## Round 256 @ 2026-07-03T13:19:04Z
+- Picked: Surface silent error swallows in bin/games/vrchat_adapter.py — 4 sites (log_dir.glob, log read_text, proc.exe(), proc.name()) returned empty/None/fallback with no log; replaced with logger.warning including path/pid and exception text. Control flow unchanged; tests/test_vrchat_adapter.py (56) still pass; ruff clean.
+- Result: committed 41cea995, pushed to origin/main
+
 ## Round 255 @ 2026-07-03T12:30:00Z
 - Picked: Continue in-progress silent-error-swallow fix on src/oyster_agent_runner/environments/gym_env.py (carried in working tree from prior round) — replaced `except Exception: pass` in _observation_to_dict tolist() branch with logger.warning including exception detail; control flow unchanged (still falls through to isinstance checks)
 - Result: committed 1ab56c3f, pushed to origin/main
