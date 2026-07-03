@@ -10,10 +10,14 @@ Covers tray menu, splash, privacy dashboard, error messages.
 import argparse
 import gettext
 import json
+import logging
 import os
+import struct
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Union
+
+logger = logging.getLogger(__name__)
 
 
 class I18NStringLoader:
@@ -103,8 +107,11 @@ class I18NStringLoader:
                 try:
                     with open(mo_file, 'rb') as f:
                         self.translations[locale] = gettext.GNUTranslations(f)
-                except Exception:
-                    pass
+                except (OSError, ValueError, struct.error) as exc:
+                    logger.debug(
+                        "Skipping unparseable .mo translation file %s: %s",
+                        mo_file, exc, exc_info=True,
+                    )
     
     def set_locale(self, locale: str) -> bool:
         """Set current locale. Returns True if successful."""
