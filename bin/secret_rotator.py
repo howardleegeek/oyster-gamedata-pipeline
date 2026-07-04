@@ -180,6 +180,20 @@ class IAMRotator:
         if cfg.aws_secret_access_key: kw["aws_secret_access_key"] = cfg.aws_secret_access_key
         self._iam = _lazy_boto3().client("iam", **kw)
     def create_access_key(self) -> Dict[str, Any]:
+        """Create a new IAM access key for the configured user.
+
+        Creates a new access key and secret for the IAM user, enabling
+        key rotation with zero downtime by providing a secondary key
+        before deactivating the primary.
+
+        Returns:
+            Dict[str, Any]: Access key metadata including AccessKeyId,
+                SecretAccessKey, Status, UserName, and CreateDate.
+
+        Example:
+            >>> key = rotator.create_access_key()
+            >>> new_key_id = key["AccessKeyId"]
+        """
         return self._iam.create_access_key(UserName=self.cfg.iam_user)["AccessKey"]
     def deactivate_key(self, kid: str) -> None:
         self._iam.update_access_key(UserName=self.cfg.iam_user, AccessKeyId=kid, Status="Inactive")
