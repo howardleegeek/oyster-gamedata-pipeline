@@ -1,3 +1,7 @@
+## Round 268 @ 2026-07-04T03:00:00Z
+- Picked: no good candidate found this round — exiting
+- Result: skipped (find_silent.py returns 17 SUSPECT items, all verified as proper error handling with return/continue/error_message set; targeted tests pass)
+
 ## Round 267 @ 2026-07-04T02:00:00Z
 - Picked: no good candidate found this round — exiting
 - Result: skipped (find_silent.py returns 17 SUSPECT items, all verified as false positives with proper error handling; targeted tests pass)
@@ -165,3 +169,11 @@
 ## Round 267 @ 2026-07-03T22:29:09Z
 - Picked: Continue in-progress WIP from prior tick — surface 3x silent `except (...): pass` blocks in bin/audit_lift_post_patches.py patch_audio_check (astats float parse, ffprobe duration, ffmpeg silencedetect). Bound each to `exc` and emit log.debug so ffprobe-missing and astats-coercion-failure paths are visible. Added regression test tests/bin/test_audit_lift_post_patches_silent_error.py (3 checks: static guard, astats parse branch, ffprobe-missing branch). Self-review: no false-success (return values unchanged), no race (sequential), no PII at DEBUG, ruff clean, tests/bin/ 565/565 pass.
 - Result: committed 881ca431 (fix) + 968fef97 (test), pushed to origin/main
+
+## Round 268 @ 2026-07-04T03:00:00Z
+- Picked: no good candidate found this round — exiting
+- Result: skipped (find_silent.py returns 17 SUSPECT items, all verified as proper error handling with return/continue/error_message set; targeted tests pass)
+
+## Round 269 @ 2026-07-04T04:00:00Z
+- Picked: Surface silent ctypes failure in bin/oyster_launch_mc.py:619 — replaced bare `except Exception: pass` in _show_messagebox() with `logger.debug()` binding the exception. Control flow unchanged (still falls back to stderr write). py_compile clean; ruff clean; tests/bin/test_oyster_launch_mc.py (21 passed).
+- Result: committed 0152c0cd, pushed to origin/main
