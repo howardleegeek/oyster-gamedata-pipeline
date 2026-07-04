@@ -212,6 +212,18 @@ class IAMRotator:
         """
         self._iam.update_access_key(UserName=self.cfg.iam_user, AccessKeyId=kid, Status="Inactive")
     def delete_key(self, kid: str) -> None:
+        """Delete an access key for the IAM user.
+
+        Permanently removes an access key from the IAM user. This operation
+        is irreversible - the key cannot be recovered once deleted.
+
+        Args:
+            kid: The AccessKeyId to delete.
+
+        Note:
+            Typically called after deactivation overlap period to complete
+            the key rotation cycle.
+        """
         self._iam.delete_access_key(UserName=self.cfg.iam_user, AccessKeyId=kid)
     def list_keys(self) -> List[Dict[str, Any]]:
         """List all access keys for the IAM user.
