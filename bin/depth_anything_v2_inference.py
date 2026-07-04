@@ -17,12 +17,15 @@ Implementation history:
 from __future__ import annotations
 
 import hashlib
+import logging
 import shutil
 from pathlib import Path
 from typing import Any, Callable, Optional
 
 import imageio.v2 as iio
 import numpy as np
+
+_LOG = logging.getLogger(__name__)
 
 _PIPELINE: Any = None  # cached HF pipeline
 
@@ -137,8 +140,13 @@ def _video_total_frames(video_path: Path) -> int:
         fps = meta.get("fps")
         if duration and fps:
             return int(round(float(duration) * float(fps)))
-    except Exception:
-        pass
+    except Exception as e:  # noqa: BLE001
+        # A missing/wrong count is non-fatal — the UI just shows '?' — but
+        # we still surface the real failure reason at DEBUG so an
+        # uninstalled/broken ffmpeg or unreadable container is diagnosable
+        # from the operator's log tail without re-running the job.
+        _LOG.debug("_video_total_frames(%r) probe failed; returning 0: %s",
+                   video_path, e, exc_info=True)
     return 0
 
 
