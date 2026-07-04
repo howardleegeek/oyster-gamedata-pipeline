@@ -101,3 +101,7 @@
 ## Round 283 @ 2026-07-04T13:56:07Z
 - Picked: Surface silent error in bin/scene_diversity_scorer.py analyze_video cleanup — replaced 2x bare `except Exception: pass` (per-frame unlink + dir rmdir) with `_log.debug(...)` binding the exception. Control flow unchanged (cleanup still best-effort). Added regression test with static guards (no bare pass, must call _log.debug) and behavioral guard (PermissionError during unlink emits DEBUG line, function still returns score dict). ruff clean; tests/bin/test_scene_diversity_scorer_silent_error.py (3 passed).
 - Result: committed 72551942, pushed to origin/main
+
+## Round 285 @ 2026-07-04T19:00:00Z
+- Picked: Surface silent ImportError in bin/epal_payout_passthrough.py yaml optional-import probe — replaced bare `except ImportError: pass` with `except ImportError as e:` + logger.debug() binding the exception. Control flow unchanged (still sets YAML_AVAILABLE = False on missing PyYAML). Added regression test (static guard + behavioural guard + happy-path guard). py_compile clean; ruff clean; tests/bin/test_epal_payout_passthrough_yaml_silent_error.py (4 passed).
+- Result: committed 0e195cca, pushed to origin/main
