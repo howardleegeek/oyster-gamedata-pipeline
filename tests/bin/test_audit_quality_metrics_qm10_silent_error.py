@@ -18,7 +18,6 @@ module-level logger was added in the same change.
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 import sys
