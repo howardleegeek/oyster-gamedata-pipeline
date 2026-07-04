@@ -11,7 +11,10 @@ clip without warning.
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
 
 # Default Chinese title/body matching the spec verbatim. English fallback
 # used when the spec asks for a localized variant.
@@ -38,7 +41,16 @@ def confirm_close_while_recording(
 
     try:
         result = messagebox.askyesno(title, message, parent=parent)
-    except Exception:
+    except Exception as e:
+        # Tk dialogs can raise a variety of runtime errors when the display
+        # is unavailable, the parent has been destroyed, or the toolkit is
+        # half-initialised. We err on the side of NOT losing data by
+        # returning False, but log the underlying error at debug level so
+        # operators can diagnose the headless / uninitialised-Tk case.
+        logger.debug(
+            "messagebox.askyesno failed in confirm_close_while_recording: %s",
+            e, exc_info=True,
+        )
         return False
     return bool(result)
 
