@@ -60,8 +60,8 @@ def load(jsonl: Path | None = None) -> list[dict[str, Any]] | None:
             return None
         samples.sort(key=lambda s: s.get("timestamp_ms", 0))
         return samples
-    except Exception:
-        logger.warning("Failed to load game_state.jsonl", exc_info=True)
+    except Exception as e:
+        logger.warning("Failed to load game_state.jsonl: %s", e, exc_info=True)
         return None
 
 
