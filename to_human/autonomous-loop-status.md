@@ -93,3 +93,7 @@
 ## Round 282 @ 2026-07-04T12:07:51Z
 - Picked: Surface silent error in bin/pii_redactor.py redact_jsonl_file() — the `except json.JSONDecodeError: pass` at line 342 silently dropped malformed JSONL line skips. Replaced with `logger.debug(..., exc_info=True)` binding the exception. Control flow unchanged (line is still left as-is and the loop continues). Added regression test (3 cases: static guard against bare `pass`, static guard that `logger.debug` is present, behavioural test that logs DEBUG and preserves malformed line). py_compile clean; ruff clean; tests/test_pii_redactor.py (28 passed) + tests/bin/test_pii_redactor_silent_error.py (3 passed) = 31 passed.
 - Result: committed debfd03f, pushed to origin/main
+
+## Round 283 @ 2026-07-04T13:56:07Z
+- Picked: Surface silent error in bin/scene_diversity_scorer.py analyze_video cleanup — replaced 2x bare `except Exception: pass` (per-frame unlink + dir rmdir) with `_log.debug(...)` binding the exception. Control flow unchanged (cleanup still best-effort). Added regression test with static guards (no bare pass, must call _log.debug) and behavioral guard (PermissionError during unlink emits DEBUG line, function still returns score dict). ruff clean; tests/bin/test_scene_diversity_scorer_silent_error.py (3 passed).
+- Result: committed 72551942, pushed to origin/main
