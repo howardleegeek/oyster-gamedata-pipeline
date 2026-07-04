@@ -117,6 +117,14 @@ def hashing_embedder(dim: int = 64) -> Embedder:
     """
 
     def embed(text: str) -> list[float]:
+        """Hash a string into a deterministic embedding vector.
+
+        Args:
+            text: Input string to embed.
+
+        Returns:
+            A normalized list of floats representing the text's embedding.
+        """
         buckets = [0.0] * dim
         for token in text.lower().split():
             h = int.from_bytes(hashlib.sha1(token.encode("utf-8")).digest()[:8], "big")
