@@ -389,7 +389,8 @@ class S3StorageBackend(StorageBackend):
         try:
             resp = self.client.get_object(Bucket=self.bucket, Key=self._meta_key(asset_name))
             return json.loads(resp["Body"].read().decode("utf-8"))
-        except Exception:
+        except Exception as e:
+            logger.debug("_get_metadata(%r) failed: %s", asset_name, e, exc_info=True)
             return None
 
     def list_assets(self) -> list[dict[str, Any]]:
