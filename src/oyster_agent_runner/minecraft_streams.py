@@ -149,6 +149,14 @@ class MinecraftStreamWriter:
         self._inputs_fh = self.inputs_path.open("w", encoding="utf-8", buffering=1)
 
     def close(self) -> None:
+        """Close all output file handles and mark the writer as closed.
+
+        Safely handles already-closed file handles by catching exceptions.
+        After closing, all internal file handle references are set to None.
+
+        Returns:
+            None.
+        """
         if self._closed:
             return
         self._closed = True
