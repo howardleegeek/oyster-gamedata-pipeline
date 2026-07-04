@@ -8,12 +8,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sys
 import threading
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_STATE_FILE = "rate_limiter_state.json"
 DEFAULT_DAILY_BUDGET = 1000
@@ -82,8 +85,9 @@ class VendorRateLimiter:
                 with self._lock:
                     for vid, bd in data.get("buckets", {}).items():
                         self._buckets[vid] = TokenBucket.from_dict(bd)
-            except (json.JSONDecodeError, KeyError):
-                pass
+            except (json.JSONDecodeError, KeyError) as e:
+                logger.debug("rate_limiter: corrupt state file %s, starting fresh: %s",
+                             self.state_file, e)
 
     def save_state(self) -> None:
         with self._lock:
