@@ -1,3 +1,10 @@
+## Round 286 @ 2026-07-04T20:18:00Z
+- Picked: Surface silent error in bin/recorder_close_confirm.py `confirm_close_while_recording` messagebox call — replaced bare `except Exception: return False` with `except Exception as e` + `logger.debug(..., exc_info=True)`. Added module-level `logger`. Control flow unchanged (still returns False on any error, data-safe default for in-flight recordings preserved). Added regression test: tests/bin/test_recorder_close_confirm_silent_error.py (4 passed: AST no-bare-except check, logger import check, RuntimeError on askyesno surfaces via debug log + returns False, ImportError path still returns False). py_compile clean; ruff clean on both files.
+- Result: committed 1500361c, pushed to origin/main
+
+## Round 285 @ 2026-07-04T19:00:00Z
+- Picked: Surface silent error in bin/game_state_overlay.py load() — replaced bare `except Exception:` with `except Exception as e:` and added exception message to log. Control flow unchanged (still returns None on error). Tests: tests/test_game_state_overlay_contract.py (4 passed). py_compile clean; ruff clean.
+- Result: committed 145d2c42, pushed to origin/main
 ## Round 285 @ 2026-07-04T19:00:00Z
 - Picked: Surface silent error in bin/game_state_overlay.py load() — replaced bare `except Exception:` with `except Exception as e:` and added exception message to log. Control flow unchanged (still returns None on error). Tests: tests/test_game_state_overlay_contract.py (4 passed). py_compile clean; ruff clean.
 - Result: committed 145d2c42, pushed to origin/main
