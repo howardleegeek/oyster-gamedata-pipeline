@@ -25,12 +25,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
 
 CONSENT_TERMS = (
     "Oyster Recorder collects gameplay video, controller inputs, and depth "
@@ -157,7 +160,12 @@ def show_dialog(parent: Optional[Any] = None,
     if root is not None:
         try:
             root.mainloop()
-        except Exception:
+        except Exception as e:  # noqa: BLE001
+            logger.debug(
+                "EULA dialog mainloop crashed; treating as declined: %s",
+                e,
+                exc_info=True,
+            )
             return False
 
     return bool(decision["accepted"])
