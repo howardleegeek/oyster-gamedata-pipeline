@@ -301,6 +301,18 @@ class MaterialAlbedoProvider:
         return len(issues) == 0, issues
     
     def get_stats(self) -> Dict[str, Any]:
+        """Get statistics about loaded materials.
+
+        Returns a dictionary containing counts of materials with each
+        texture type loaded (albedo, roughness, metallic).
+
+        Returns:
+            Dict with keys:
+                - total_materials: Total number of materials loaded
+                - materials_with_albedo: Count of materials with albedo texture
+                - materials_with_roughness: Count of materials with roughness texture
+                - materials_with_metallic: Count of materials with metallic texture
+        """
         stats = {
             'total_materials': len(self.materials),
             'materials_with_albedo': 0,
