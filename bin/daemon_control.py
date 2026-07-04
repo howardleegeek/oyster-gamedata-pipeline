@@ -3,11 +3,14 @@
 
 import argparse
 import json
+import logging
 import os
 import signal
 import subprocess
 import sys
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 class DaemonControl:
@@ -80,7 +83,8 @@ class DaemonControl:
                             disk_free = data.get('disk_free_gb', 0)
                             
                             print(f"  {timestamp}: {state} | Sessions: {sessions} | Uploads: {uploads} | Disk: {disk_free:.1f} GB")
-                        except Exception:
+                        except Exception as e:
+                            logger.debug("Failed to parse heartbeat line: %s", e)
                             print(f"  {line.strip()}")
                 else:
                     print("\nNo heartbeat data yet")
