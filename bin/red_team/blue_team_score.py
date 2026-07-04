@@ -503,6 +503,15 @@ def _detect_count(
 
 
 def main() -> int:
+    """Run the Red-Team / Blue-Team scorecard for BFT adversarial stress testing.
+
+    Executes the full attack catalog against BFT verifiers (V1-V4), measures
+    detection rates, and reports architectural gaps in critical/high severity
+    attack coverage.
+
+    Returns:
+        Exit code (0 for success).
+    """
     print("=" * 78)
     print("RED-TEAM / BLUE-TEAM SCORECARD — BFT N=4 Adversarial Stress Test")
     print("=" * 78)
