@@ -13,11 +13,14 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
+import logging
 import math
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+logger = logging.getLogger(__name__)
 
 _yaml = None  # Lazy load PyYAML
 
@@ -129,7 +132,8 @@ def infer_weather_from_image(image_path: Path) -> WeatherState:
             img = img.convert("L")
             pixels = list(img.get_flattened_data())
             avg_brightness = sum(pixels) / len(pixels) / 255.0
-    except Exception:
+    except Exception as e:
+        logger.debug("infer_weather_from_image(%r) failed; using default: %s", image_path, e, exc_info=True)
         avg_brightness = 0.5
     if avg_brightness > 0.7:
         return WeatherState(condition="clear", cloud_cover=0.1, visibility_km=15.0)
