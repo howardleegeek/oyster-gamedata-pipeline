@@ -83,10 +83,12 @@ def _lint_source(source: str, filepath: str) -> List[str]:
     try:
         compile(source, filepath, "exec")
     except (SyntaxError, Exception) as exc:
+        logger.debug("Compile error in %r: %s", filepath, exc)
         return [_classify_compile_error(exc)]
     try:
         tree = ast.parse(source, filename=filepath)
-    except Exception:
+    except Exception as e:
+        logger.debug("AST parse error in %r: %s", filepath, e)
         return ["syntax_error"]
     if _RE_STAR.search(source):
         modes.append("star_import")
@@ -139,7 +141,8 @@ def _extract_and_lint(tarball_path: str, tmpdir: str) -> List[str]:
             try:
                 with open(fpath, "r", encoding="utf-8", errors="replace") as fh:
                     source = fh.read()
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed to read %r: %s", fpath, e)
                 continue
             modes.extend(_lint_source(source, fpath))
     return modes
