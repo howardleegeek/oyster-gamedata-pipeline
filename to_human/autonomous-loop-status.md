@@ -1,3 +1,7 @@
+## Round 271 @ 2026-07-04T05:00:00Z
+- Picked: Surface silent worker death in bin/screen_capture_recorder.py — the outer except Exception in capture_worker had no logging, causing daemon thread deaths to go unnoticed. Added logger.exception() to record traceback. Control flow unchanged (error still appended to capture_errors and stop_event.set() called). Also added regression test. py_compile clean; ruff clean; tests/bin/test_screen_capture_recorder_silent_error.py (2 passed, 1 skipped).
+- Result: committed 02f62fc8, pushed to origin/main
+
 ## Round 270 @ 2026-07-04T04:00:00Z
 - Picked: no good candidate found this round — exiting
 - Result: skipped (find_silent.py returns 17 SUSPECT items, all verified as proper error handling with logger/return/report additions; targeted tests pass; ruff clean)
