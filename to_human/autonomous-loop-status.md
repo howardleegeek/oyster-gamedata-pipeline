@@ -1,3 +1,7 @@
+## Round 272 @ 2026-07-04T06:00:00Z
+- Picked: Surface silent error swallows in bin/audit_quality_metrics.py QM10 (check_recording_continuity) — replaced 3x bare `except (...): pass` with logger.debug() binding the exception. Control flow unchanged (still returns None/SKIP). Added regression test. py_compile clean; ruff clean; tests/bin/test_audit_quality_metrics_qm10_silent_error.py (3 passed).
+- Result: committed efd485fe, pushed to origin/main
+
 ## Round 271 @ 2026-07-04T05:00:00Z
 - Picked: Surface silent worker death in bin/screen_capture_recorder.py — the outer except Exception in capture_worker had no logging, causing daemon thread deaths to go unnoticed. Added logger.exception() to record traceback. Control flow unchanged (error still appended to capture_errors and stop_event.set() called). Also added regression test. py_compile clean; ruff clean; tests/bin/test_screen_capture_recorder_silent_error.py (2 passed, 1 skipped).
 - Result: committed 02f62fc8, pushed to origin/main
@@ -193,3 +197,7 @@
 ## Round 272 @ 2026-07-04T06:00:00Z
 - Picked: Surface silent error swallows in bin/health_check_endpoint.py — get_last_clip_at had bare `except (json.JSONDecodeError, OSError): return None` and get_queue_depth had `except OSError: return 0`. Both silently masked real production health-check failures. Replaced with `logger.warning(...)` binding exception type/name/message. Added module-level logger. Control flow unchanged (fallback values still returned). Added regression test covering corrupt JSON, unreadable file, iterdir failure, and the missing-file/dir paths (which must remain silent).
 - Result: committed 234a9edf, pushed to origin/main
+
+## Round 273 @ 2026-07-04T07:00:00Z
+- Picked: Surface silent OSError in bin/storage_backend.py GitHubReleaseStorageBackend.upload — two `except OSError: pass` blocks in finally clauses silently swallowed shutil.rmtree(tmp_dir) and shutil.rmtree(meta_dir) cleanup failures, hiding both the failure and the leaked tempdir path. Replaced with `logger.debug("...%s", path, exc_info=True)` binding the tempdir path and OSError traceback. Control flow unchanged (rmtree is best-effort cleanup in finally; failure still does not propagate). Module-level logger already exists. Added regression test monkeypatching shutil.rmtree to raise, asserting both log records have message+exc_info, plus a happy-path sanity test. py_compile clean; ruff clean; tests/test_storage_backend.py (19 passed); tests/bin/test_storage_backend_silent_rmtree.py (2 passed).
+- Result: committed ff51f37e, pushed to origin/main
