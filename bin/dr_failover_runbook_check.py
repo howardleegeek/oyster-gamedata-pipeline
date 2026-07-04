@@ -111,7 +111,11 @@ class DRFailoverValidator:
                 'host': p.hostname, 'port': p.port or (443 if p.scheme == 'https' else 80),
                 'scheme': p.scheme or 'https'
             }
-        except Exception:
+        except Exception as e:
+            logger.debug(
+                "_parse_url(%r) failed; treating URL as invalid: %s",
+                url, e, exc_info=True,
+            )
             return None
     
     def _check_endpoint(self, url: str, timeout: int = 10) -> Tuple[bool, str]:
