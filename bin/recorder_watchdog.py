@@ -148,7 +148,7 @@ def find_mc_hwnd() -> Optional[int]:
         if results:
             return results[0][0]
     except ImportError:
-        pass
+        log.debug("win32gui/win32process not available: %s", exc_info=True)
     return None
 
 
