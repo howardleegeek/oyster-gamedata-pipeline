@@ -211,8 +211,8 @@ class AlertStateManager:
                             aid = entry.get("alert_id")
                             if aid:
                                 self.state[aid] = entry
-            except (json.JSONDecodeError, IOError):
-                pass
+            except (json.JSONDecodeError, IOError) as e:
+                log.debug("Failed to parse alerts state file: %s", e)
 
     def _save_state(self, alert_id: str, entry: dict):
         """Append state entry to alerts file."""
@@ -303,7 +303,8 @@ class WebhookSender:
             try:
                 with open(self.queue_file, "r") as f:
                     self.offline_queue = json.load(f)
-            except (json.JSONDecodeError, IOError):
+            except (json.JSONDecodeError, IOError) as e:
+                log.debug("Failed to parse alerts queue file: %s", e)
                 self.offline_queue = []
 
     def _save_queue(self):
@@ -402,8 +403,8 @@ class WebhookSender:
                     if resp.status_code in (200, 204):
                         log.info("Flushed queued Discord alert")
                         continue
-            except requests.exceptions.RequestException:
-                pass
+            except requests.exceptions.RequestException as e:
+                log.debug("Failed to flush queued alert: %s", e)
             remaining.append(item)
 
         self.offline_queue = remaining
@@ -731,8 +732,8 @@ def main():
                             metrics = json.loads(line)
                             alerts = dispatcher.process_metrics(metrics)
                             log.info(f"Processed metrics, {len(alerts)} alert(s) fired")
-                        except json.JSONDecodeError:
-                            pass
+                        except json.JSONDecodeError as e:
+                            log.debug("Failed to parse metrics line: %s", e)
         else:
             log.error(f"Metrics file not found: {metrics_file}")
             sys.exit(1)
@@ -745,8 +746,8 @@ def main():
                     metrics = json.loads(line)
                     alerts = dispatcher.process_metrics(metrics)
                     log.info(f"Processed metrics, {len(alerts)} alert(s) fired")
-                except json.JSONDecodeError:
-                    pass
+                except json.JSONDecodeError as e:
+                    log.debug("Failed to parse stdin metrics line: %s", e)
 
 
 if __name__ == "__main__":
