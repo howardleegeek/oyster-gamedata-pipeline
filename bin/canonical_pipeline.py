@@ -24,6 +24,7 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import logging
 import os
 import pathlib
 import subprocess
@@ -31,6 +32,8 @@ import sys
 import urllib.error
 import urllib.request
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 # BUG-1 fix (v0.12.2): self-locating, supports both layouts
 #   1. Git-clone dev:    <repo>/bin/canonical_pipeline.py → siblings in <repo>/bin/
@@ -74,8 +77,11 @@ def detect_best_backend() -> str:
             providers = ort.get_available_providers()
             if "DmlExecutionProvider" in providers:
                 return "local-onnx-directml"
-        except ImportError:
-            pass
+        except ImportError as e:
+            # Optional backend not installed. Surface the reason at DEBUG
+            # so operators can diagnose "why didn't DirectML get picked?"
+            # without affecting control flow (still falls through to skip).
+            logger.debug("onnxruntime not available for DirectML probe: %s", e)
 
     # Check macOS with MPS
     if system == "Darwin":
@@ -84,8 +90,11 @@ def detect_best_backend() -> str:
 
             if torch.backends.mps.is_available():
                 return "local-mps"
-        except ImportError:
-            pass
+        except ImportError as e:
+            # Optional backend not installed. Surface the reason at DEBUG
+            # so operators can diagnose "why didn't MPS get picked?"
+            # without affecting control flow (still falls through to skip).
+            logger.debug("torch not available for MPS probe: %s", e)
 
     # No suitable backend found
     return "skip"
@@ -352,7 +361,8 @@ def step3_extract_audio(sess: pathlib.Path) -> None:
     # FLAC matching the video duration so downstream audio steps still run.
     try:
         _frames, dur = ffprobe_frames(src)
-    except Exception:
+    except Exception as e:
+        logger.debug("ffprobe_frames(%r) failed; using default duration: %s", src, e)
         dur = 0.0
     dur = dur if dur and dur > 0 else 1.0
     run(
@@ -705,7 +715,8 @@ def step11_input_latency(sess: pathlib.Path) -> None:
                 print(f"  input_latency.json: {len(lat)} samples")
             else:
                 print("  input_latency.json: 0 samples (no W-press → velocity match)")
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to parse input_latency.json: %s", e)
             print("  input_latency.json: written but unreadable")
     else:
         print(f"  FAIL: input_latency.json not produced. stderr: {r.stderr[-200:]}")
