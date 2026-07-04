@@ -93,8 +93,13 @@ class ContinuousCaptureDaemon:
             try:
                 with open(self.state_file, 'r') as f:
                     return json.load(f)
-            except (json.JSONDecodeError, IOError):
-                pass
+            except (json.JSONDecodeError, IOError) as e:
+                # Use module-level logger: _load_state() is called from
+                # __init__ BEFORE _setup_logging() runs, so self.logger
+                # is not yet bound. logging.getLogger is always safe.
+                logging.getLogger("oyster_daemon").debug(
+                    "corrupt daemon state file %s: %s", self.state_file, e
+                )
         return {}
     
     def _save_state(self):
