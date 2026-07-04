@@ -82,8 +82,8 @@ def _read_telemetry() -> dict[str, Any]:
         try:
             with open(TELEMETRY_FILE, "r") as f:
                 return json.load(f)
-        except (json.JSONDecodeError, OSError):
-            pass
+        except (json.JSONDecodeError, OSError) as exc:
+            log.debug("Failed to read telemetry file %s: %s", TELEMETRY_FILE, exc)
     return {}
 
 
