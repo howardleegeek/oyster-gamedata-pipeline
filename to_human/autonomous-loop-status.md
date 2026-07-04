@@ -1,3 +1,7 @@
+## Round 277 @ 2026-07-04T11:00:00Z
+- Picked: Surface silent error in bin/audio_event_track.py compute_spectral_centroid() — replaced bare `except Exception:` at line 139 with logger.debug() binding the exception. Control flow unchanged (still returns 0.0 on error). py_compile clean; ruff clean; tests/test_audio_event_track.py (14 passed).
+- Result: committed 9f96ddbb, pushed to origin/main
+
 ## Round 276 @ 2026-07-04T10:00:00Z
 - Picked: Surface silent error in bin/rate_limiter.py _load_state — replaced bare `except (json.JSONDecodeError, KeyError): pass` with `logger.debug()` binding the exception. Control flow unchanged (still starts with fresh buckets on corrupt file). Added regression test. py_compile clean; ruff clean; tests/bin/test_rate_limiter_silent_error.py (2 passed).
 - Result: committed 17229a33, pushed to origin/main
