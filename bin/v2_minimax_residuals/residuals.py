@@ -536,9 +536,29 @@ def r20c_fps_jitter(
                      f"sigma={sigma:.3f}ms")}
 
 
-def r20d_speed_profile(records, max_outlier_pct=0.10, max_mean_speed=15.0,
-                       high_speed_threshold=30.0, min_frames=10):
-    """V₂ R20d: ratio(‖speed‖>30)≤10% AND μ_‖speed‖≤15 m/s."""
+def r20d_speed_profile(
+    records: list[Dict[str, Any]],
+    max_outlier_pct: float = 0.10,
+    max_mean_speed: float = 15.0,
+    high_speed_threshold: float = 30.0,
+    min_frames: int = 10,
+) -> Dict[str, Any]:
+    """V₂ R20d: Verify speed profile meets statistical thresholds.
+
+    Checks that the ratio of frames with speed magnitude exceeding
+    high_speed_threshold is below max_outlier_pct AND the mean speed
+    magnitude is below max_mean_speed.
+
+    Args:
+        records: List of record dictionaries containing camera_speed field.
+        max_outlier_pct: Maximum allowed ratio of high-speed frames.
+        max_mean_speed: Maximum allowed mean speed magnitude in m/s.
+        high_speed_threshold: Speed threshold in m/s to flag as outlier.
+        min_frames: Minimum number of frames required for valid statistics.
+
+    Returns:
+        Dictionary with 'name', 'passed', 'residual', 'threshold', and 'note' keys.
+    """
     if not records:
         return _v2_drift_abstain("R20d", "empty_records", max_outlier_pct)
     if len(records) < min_frames:
