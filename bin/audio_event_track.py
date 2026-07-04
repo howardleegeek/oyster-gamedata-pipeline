@@ -136,7 +136,8 @@ def compute_spectral_centroid(samples: Sequence[float]) -> float:
         if spectrum.sum() == 0:
             return 0.0
         return float(np.sum(freqs * spectrum) / np.sum(spectrum))
-    except Exception:
+    except Exception as e:
+        _get_logger().debug("audio_event_track: spectral_centroid failed: %s", e)
         return 0.0
 
 
