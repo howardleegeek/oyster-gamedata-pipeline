@@ -8,6 +8,7 @@ Process RGB frames with DepthAnything V2 Small and output OpenEXR float32 depth 
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 import time
 from pathlib import Path
@@ -15,6 +16,8 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 def lazy_load_depth_pipeline(
@@ -53,8 +56,8 @@ def select_device() -> str:
             return "cuda"
         if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
             return "mps"
-    except Exception:
-        pass
+    except Exception as e:  # noqa: BLE001
+        logger.debug("torch device probe failed; falling back to cpu: %s", e, exc_info=True)
     return "cpu"
 
 
@@ -66,7 +69,8 @@ def _get_torch_dtype(device: str) -> Any:
         if device in ("cuda", "mps"):
             return torch.float16
         return torch.float32
-    except Exception:
+    except Exception as e:  # noqa: BLE001
+        logger.debug("torch dtype probe failed; returning None: %s", e, exc_info=True)
         return None
 
 
@@ -138,7 +142,8 @@ def _verify_exr_channel(path: str) -> bool:
         exr_file = OpenEXR.InputFile(path)
         channels = exr_file.header()["channels"]
         return "Z" in channels
-    except Exception:
+    except Exception as e:  # noqa: BLE001
+        logger.debug("EXR channel probe failed for %s; returning False: %s", path, e, exc_info=True)
         return False
 
 
