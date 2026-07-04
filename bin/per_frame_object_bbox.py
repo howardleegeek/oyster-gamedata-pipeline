@@ -148,6 +148,20 @@ class BBox3D:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "BBox3D":
+        """Construct a BBox3D instance from a dictionary.
+
+        Args:
+            d: Dictionary with keys: x, y, z, length, width, height, yaw,
+                confidence, class_id, track_id. Supports alternative key names:
+                - cx/cy/cz for x/y/z
+                - l/w/h for length/width/height
+                - dx/dy/dz for length/width/height
+                - rotation_z/heading for yaw
+                - class/detection_name for class_id
+
+        Returns:
+            A BBox3D instance with parsed values.
+        """
         return cls(x=float(d.get("x", d.get("cx", 0))),
                    y=float(d.get("y", d.get("cy", 0))),
                    z=float(d.get("z", d.get("cz", 0))),
