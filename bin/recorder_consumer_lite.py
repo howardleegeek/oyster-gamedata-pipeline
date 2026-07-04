@@ -1189,7 +1189,8 @@ def _read_session_id_marker(active_dir: Path) -> dict[str, Any]:
     try:
         data = json.loads(marker.read_text(encoding="utf-8"))
         return data if isinstance(data, dict) else {}
-    except Exception:
+    except Exception as exc:
+        _trace(f"read_session_id_marker failed: {type(exc).__name__}: {exc}")
         return {}
 
 
