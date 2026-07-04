@@ -5,12 +5,15 @@ Implements 10 quality dimensions for data collection quality assessment.
 """
 
 import json
+import logging
 import math
 import os
 import statistics
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
+
+logger = logging.getLogger(__name__)
 
 
 def audit_group_quality(session) -> List[Dict[str, Any]]:
@@ -622,8 +625,11 @@ def check_recording_continuity(session) -> Dict[str, Any]:
                     metadata_duration = float(metadata['duration'])
                 elif 'recording_duration' in metadata:
                     metadata_duration = float(metadata['recording_duration'])
-            except (json.JSONDecodeError, KeyError, ValueError):
-                pass
+            except (json.JSONDecodeError, KeyError, ValueError) as exc:
+                logger.debug(
+                    "QM10: failed to parse metadata duration from %s: %s",
+                    metadata_path, exc,
+                )
 
         # Get video duration via ffprobe
         video_duration = None
@@ -639,8 +645,11 @@ def check_recording_continuity(session) -> Dict[str, Any]:
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
                 if result.returncode == 0:
                     video_duration = float(result.stdout.strip())
-            except (subprocess.CalledProcessError, ValueError, FileNotFoundError):
-                pass
+            except (subprocess.CalledProcessError, ValueError, FileNotFoundError) as exc:
+                logger.debug(
+                    "QM10: ffprobe duration probe failed for %s: %s",
+                    video_path, exc,
+                )
 
         # Get frames count duration
         frames_duration = None
@@ -656,8 +665,11 @@ def check_recording_continuity(session) -> Dict[str, Any]:
                 # Estimate duration from frame count (assuming ~30 FPS)
                 if frame_count > 0:
                     frames_duration = frame_count / 30.0  # Approximate
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(
+                    "QM10: failed to estimate frames duration from %s: %s",
+                    frames_path, exc,
+                )
 
         # Collect available durations
         durations = []
