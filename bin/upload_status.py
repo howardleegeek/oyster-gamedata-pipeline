@@ -5,9 +5,12 @@ CLI tool to query upload daemon state.
 
 import argparse
 import json
+import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict
+
+logger = logging.getLogger(__name__)
 
 STATE_FILE = Path.home() / ".oyster" / "upload_state.json"
 
@@ -78,9 +81,12 @@ def get_status() -> Dict[str, Any]:
                 if dt >= cutoff:
                     last_24h_count += 1
                     last_24h_size += session.get("file_size", 0)
-            except Exception:
-                pass
-    
+            except Exception as e:
+                logger.debug(
+                    "upload_status: failed to parse completed_at=%r for session: %s",
+                    completed_at, e, exc_info=True,
+                )
+
     for session in failed:
         created_at = session.get("created_at")
         if created_at:
@@ -88,8 +94,11 @@ def get_status() -> Dict[str, Any]:
                 dt = datetime.fromisoformat(created_at)
                 if dt >= cutoff:
                     last_24h_failures += 1
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(
+                    "upload_status: failed to parse created_at=%r for failed session: %s",
+                    created_at, e, exc_info=True,
+                )
     
     return {
         "pending": pending,
