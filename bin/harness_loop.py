@@ -456,7 +456,8 @@ def _now_iso() -> str:
 def _parse_iso(s: str) -> float:
     try:
         return time.mktime(time.strptime(s, "%Y-%m-%dT%H:%M:%SZ"))
-    except Exception:
+    except Exception as e:
+        log.debug("Failed to parse ISO timestamp %r: %s", s, e)
         return 0.0
 
 
