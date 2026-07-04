@@ -1,3 +1,7 @@
+## Round 284 @ 2026-07-04T18:00:00Z
+- Picked: Surface silent error in bin/storage_backend.py S3StorageBackend.delete head_object — bound bare `except Exception:` as `except Exception as e` and added `logger.debug("s3 head_object failed for %r: %s", asset_name, e, exc_info=True)`. Control flow unchanged (still returns False on any error). Added regression test covering Exception, ClientError 404, and success paths. py_compile clean; ruff clean; tests/bin/test_storage_backend_s3_delete_silent_error.py + tests/test_storage_backend.py + tests/bin/test_storage_backend_silent_rmtree.py (24 passed).
+- Result: committed b1448b7d, pushed to origin/main
+
 ## Round 280 @ 2026-07-04T14:00:00Z
 - Picked: Surface silent error in bin/recorder_consumer_lite.py _read_session_id_marker — replaced bare `except Exception:` with `_trace()` binding the exception. Control flow unchanged (still returns {} on error). Added regression test. ruff clean; tests/bin/test_recorder_consumer_lite_session_id_marker_silent_error.py (4 passed).
 - Result: committed 0b251efb, pushed to origin/main
