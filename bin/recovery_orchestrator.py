@@ -52,7 +52,11 @@ def is_corrupted(filepath: Path) -> bool:
         with tarfile.open(filepath, "r:*") as tar:
             tar.next()
         return False
-    except Exception:
+    except Exception as e:
+        logger.debug(
+            "is_corrupted(%r) failed; treating as corrupted: %s",
+            filepath, e, exc_info=True,
+        )
         return True
 
 
