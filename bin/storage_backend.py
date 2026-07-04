@@ -419,7 +419,8 @@ class S3StorageBackend(StorageBackend):
         try:
             self.client.head_object(Bucket=self.bucket, Key=asset_name)
             existed = True
-        except Exception:
+        except Exception as e:
+            logger.debug("s3 head_object failed for %r: %s", asset_name, e, exc_info=True)
             existed = False
         self.client.delete_object(Bucket=self.bucket, Key=asset_name)
         self.client.delete_object(Bucket=self.bucket, Key=self._meta_key(asset_name))
