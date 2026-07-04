@@ -339,7 +339,15 @@ def redact_jsonl_file(
                         data["messages"] = ["[redacted]" for _ in data["messages"]]
                         line = json.dumps(data) + "\n"
                 except json.JSONDecodeError:
-                    pass
+                    # Malformed JSONL line — log at debug level so operators
+                    # tailing logs can see the skip. Control flow unchanged:
+                    # we still leave `line` as-is and continue.
+                    logger.debug(
+                        "Skipping malformed JSONL line in %s: %s",
+                        filepath,
+                        line.rstrip("\n"),
+                        exc_info=True,
+                    )
 
                 if line != original_line:
                     redacted_count += 1
