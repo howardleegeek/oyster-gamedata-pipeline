@@ -60,15 +60,17 @@ def fetch_tarball_from_s3(bucket: str, key: str, local_dir: Path) -> Path:
     return local_path
 
 
-def lint_one(tarball_path: Path) -> dict:
-    """
-    Run lint_buyer_spec on a tarball.
+def lint_one(tarball_path: Path) -> dict[str, Any]:
+    """Run lint_buyer_spec on a tarball.
 
     Args:
-        tarball_path: Path to the tarball
+        tarball_path: Path to the tarball file to lint.
 
     Returns:
-        Dict with keys: ok (bool), issue_count (int), summary (str)
+        Dict with keys: ok (bool), issue_count (int), summary (str).
+        - ok: True if lint passed, False otherwise.
+        - issue_count: Number of issues found.
+        - summary: Human-readable summary of lint results.
     """
     # Import lint_buyer_spec lazily
     try:
