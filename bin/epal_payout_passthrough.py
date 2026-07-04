@@ -32,8 +32,9 @@ YAML_AVAILABLE = False
 try:
     import yaml
     YAML_AVAILABLE = True
-except ImportError:
-    pass
+except ImportError as e:
+    _yaml_logger = logging.getLogger(__name__)
+    _yaml_logger.debug("PyYAML not available; YAML inputs/outputs disabled: %s", e)
 
 
 class EPALPayoutError(Exception):
