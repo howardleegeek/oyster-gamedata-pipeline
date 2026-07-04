@@ -47,6 +47,13 @@ DEFAULT_RATE_PER_HOUR_CENTS = int(os.environ.get("GAMEDATA_RATE_PER_HOUR_CENTS",
 DEFAULT_MIN_PAYOUT_CENTS = int(os.environ.get("GAMEDATA_MIN_PAYOUT_CENTS", "2000"))
 STRIPE_API_BASE = "https://api.stripe.com/v1"
 
+# Module-level logger so best-effort fallthroughs (e.g. Slack webhook,
+# Stripe error-body parse) can surface failures at DEBUG without coupling
+# to configure_logger()'s handler-attach side effect. The CLI entry point
+# in main() calls configure_logger() to attach the file/stderr handlers
+# before emitting anything above DEBUG.
+logger = logging.getLogger("payout_cron")
+
 
 # =====================================================================
 # Logging
@@ -155,7 +162,18 @@ class StripeClient:
         except urllib.error.HTTPError as e:
             try:
                 payload = json.loads(e.read().decode("utf-8"))
-            except Exception:
+            except Exception as exc:
+                # Stripe error body wasn't valid JSON (rare — happens with
+                # proxy / WAF / Stripe-internal 5xx). Log the parse error at
+                # DEBUG with exc_info so operators can correlate with the
+                # subsequent StripeError, then fall back to a minimal payload
+                # so the raised error still carries the HTTP status + reason.
+                logger.debug(
+                    "Stripe HTTP %s error body was not valid JSON; using fallback payload: %s",
+                    e.code,
+                    exc,
+                    exc_info=True,
+                )
                 payload = {"error": {"message": str(e)}}
             raise StripeError(
                 f"Stripe HTTP {e.code}: {payload.get('error', {}).get('message', e.reason)}"
@@ -394,7 +412,18 @@ def post_slack(message: str, webhook_url: str | None = None) -> bool:
         )
         with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
             return 200 <= resp.status < 300
-    except Exception:
+    except Exception as e:
+        # Best-effort: Slack pings are non-critical, so we still return False
+        # to the caller, but log the real cause (DNS, timeout, HTTP 5xx, etc.)
+        # at DEBUG so operators tailing the log can see why the alert did not
+        # land. The webhook URL is not a secret (it's published in env config
+        # for ops), so it is safe to include in the log.
+        logger.debug(
+            "post_slack to %s failed: %s",
+            webhook_url,
+            e,
+            exc_info=True,
+        )
         return False
 
 
