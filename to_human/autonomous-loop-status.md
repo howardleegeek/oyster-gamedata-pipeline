@@ -1,3 +1,7 @@
+## Round 287 @ 2026-07-04T21:00:00Z
+- Picked: Surface silent errors in bin/network_throttle_aware.py — replaced 4 bare `except Exception:` blocks in _load_config, _detect_windows, _detect_macos, and check_and_update with `except Exception as e` + logger.debug(..., exc_info=True). Control flow unchanged (still returns fallback values). Added regression test: tests/bin/test_network_throttle_aware_silent_error.py (5 passed). py_compile clean; ruff clean; git add both files; committed c15f7315 and pushed.
+- Result: committed c15f7315, pushed to origin/main
+
 ## Round 286 @ 2026-07-04T20:18:00Z
 - Picked: Surface silent error in bin/recorder_close_confirm.py `confirm_close_while_recording` messagebox call — replaced bare `except Exception: return False` with `except Exception as e` + `logger.debug(..., exc_info=True)`. Added module-level `logger`. Control flow unchanged (still returns False on any error, data-safe default for in-flight recordings preserved). Added regression test: tests/bin/test_recorder_close_confirm_silent_error.py (4 passed: AST no-bare-except check, logger import check, RuntimeError on askyesno surfaces via debug log + returns False, ImportError path still returns False). py_compile clean; ruff clean on both files.
 - Result: committed 1500361c, pushed to origin/main
