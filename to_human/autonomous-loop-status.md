@@ -73,3 +73,7 @@
 ## Round 278 @ 2026-07-04T08:38:43Z
 - Picked: Surface silent corrupt-state swallow in bin/continuous_capture_daemon.py _load_state — replaced bare `except (json.JSONDecodeError, IOError): pass` with `logging.getLogger("oyster_daemon").debug(...)` binding the exception. Control flow unchanged (still returns {} on corrupt state). Used module-level logger (not self.logger) because _load_state() is invoked from __init__ BEFORE _setup_logging() binds self.logger — using self.logger.debug() there would AttributeError and mask the original corrupt-state error. Added regression test (3 tests: AST-guard against bare pass, AST-guard for debug-call, behavioural guard that corrupt file at construction logs at DEBUG and still returns {}). py_compile clean; ruff clean; tests/bin/test_continuous_capture_daemon_silent_error.py (3 passed); broader tests/bin/ (604 passed, 1 pre-existing skip).
 - Result: committed 1fef5f75, pushed to origin/main
+
+## Round 280 @ 2026-07-04T14:00:00Z
+- Picked: Surface silent error in bin/crash_reporter.py _read_telemetry — replaced bare `except (json.JSONDecodeError, OSError): pass` with `log.debug()` binding the exception. Control flow unchanged (still returns {} on corrupt/unreadable file). Added regression test. py_compile clean; ruff clean; tests/test_crash_reporter.py (37 passed) + tests/bin/test_crash_reporter_silent_error.py (2 passed) = 39 total.
+- Result: committed 6b4070be, pushed to origin/main
