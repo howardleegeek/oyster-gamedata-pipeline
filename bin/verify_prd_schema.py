@@ -45,12 +45,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import math
 import re
 import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # Tolerances for semantic checks (match verify_action_camera.py conventions)
 QUATERNION_NORM_EPS = 0.01  # ‖q‖ within ±1%
@@ -282,8 +285,11 @@ def _check_time(name: str, value: Any) -> list[str]:
         try:
             datetime.fromisoformat(value.replace("Z", "+00:00"))
             parsed = True
-        except ValueError:
-            pass
+        except ValueError as exc:
+            logger.debug(
+                "verify_prd_schema: ISO 8601 fallback failed for %r: %s",
+                value, exc,
+            )
     if not parsed:
         issues.append(
             f"{name}: unrecognized datetime format {value!r} "
