@@ -18,12 +18,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional, Sequence
+
+_log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     import numpy as np
@@ -185,12 +188,18 @@ def analyze_video(video_path: str, threshold: float = 0.35,
         for f in Path(output_dir).glob("frame_*.jpg"):
             try:
                 f.unlink()
-            except Exception:
-                pass
+            except Exception as exc:
+                _log.debug(
+                    "scene_diversity_scorer: failed to remove frame %s: %s",
+                    f, exc, exc_info=True,
+                )
         try:
             os.rmdir(output_dir)
-        except Exception:
-            pass
+        except Exception as exc:
+            _log.debug(
+                "scene_diversity_scorer: failed to remove dir %s: %s",
+                output_dir, exc, exc_info=True,
+            )
 
 
 def analyze_frames_dir(frames_dir: str, threshold: float = 0.35,
