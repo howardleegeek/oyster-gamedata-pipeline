@@ -52,8 +52,9 @@ def load(jsonl: Path | None = None) -> list[dict[str, Any]] | None:
                     continue
                 try:
                     samples.append(json.loads(line))
-                except json.JSONDecodeError:
+                except json.JSONDecodeError as e:
                     # tolerate trailing partial line if MC crashed mid-write
+                    logger.debug("Failed to parse JSONL line: %s", e)
                     continue
         if not samples:
             return None
