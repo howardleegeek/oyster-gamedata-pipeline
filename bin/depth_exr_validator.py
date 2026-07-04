@@ -2,8 +2,11 @@
 """Validate depth/*.exr files by checking magic bytes and structural integrity."""
 
 import argparse
+import logging
 import sys
 from pathlib import Path
+
+_LOG = logging.getLogger(__name__)
 
 
 def check_magic_byte(filepath):
@@ -11,7 +14,8 @@ def check_magic_byte(filepath):
     try:
         with open(filepath, 'rb') as f:
             return f.read(4) == b'\x76\x2f\x31\x01'
-    except Exception:
+    except Exception as _exc:
+        _LOG.debug("check_magic_byte: failed to read %r: %s", filepath, _exc, exc_info=True)
         return False
 
 
@@ -26,7 +30,8 @@ def check_structural(filepath):
         return True
     except ImportError:
         return True  # OpenEXR not available, skip structural check
-    except Exception:
+    except Exception as _exc:
+        _LOG.debug("check_structural: failed to inspect %r: %s", filepath, _exc, exc_info=True)
         return False
 
 
