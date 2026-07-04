@@ -225,6 +225,24 @@ class LocalFileStorageBackend(StorageBackend):
         return self.root / asset_name
 
     def upload(self, path: Path, metadata: TarballMetadata) -> UploadResult:
+        """Upload a tarball to local storage.
+
+        Copies the tarball to the configured local root directory along with
+        a sidecar JSON file containing the metadata. Supports idempotent
+        re-uploads: if a file with the same SHA256 already exists, returns
+        early with idempotent_skip=True.
+
+        Args:
+            path: Path to the tarball file to upload.
+            metadata: Metadata including tester_id, sha256, d5_verdict, etc.
+
+        Returns:
+            UploadResult with storage_url, signed_url, metadata, asset_name,
+                backend, and idempotent_skip flag.
+
+        Raises:
+            FileNotFoundError: If the tarball path does not exist or is not a file.
+        """
         if not path.is_file():
             raise FileNotFoundError(f"tarball not found: {path}")
         asset_name = derive_asset_name(path, metadata)
