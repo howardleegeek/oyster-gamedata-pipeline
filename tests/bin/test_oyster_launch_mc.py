@@ -304,3 +304,71 @@ def test_cli_dry_run_prints_knotclient(fake_install: Path, capsys) -> None:
     assert "-DFabricMcEmu=net.minecraft.client.main.Main" in out
     # Vanilla's wrong main class must NOT appear as the resolved main.
     assert "main_class    : net.minecraft.client.main.Main" not in out
+
+
+# ---------------------------------------------------------------------------
+# _show_messagebox — exercise the ctypes-failure fallback path
+# ---------------------------------------------------------------------------
+
+
+def test_show_messagebox_windows_fallback_on_ctypes_failure(
+    monkeypatch, caplog, capsys
+) -> None:
+    """When ctypes/windll raises (e.g. WSL, missing user32), the function
+    must fall through to the stderr path and surface the failure via
+    logger.debug — never swallow it silently."""
+    monkeypatch.setattr(m.os, "name", "nt")
+
+    def _boom(*_a, **_kw):
+        raise OSError("user32.dll not available")
+
+    fake_ctypes = type("FakeCtypes", (), {"windll": type("WD", (), {"user32": type("U", (), {"MessageBoxW": staticmethod(_boom)})()})()})
+    monkeypatch.setitem(sys.modules, "ctypes", fake_ctypes)
+
+    with caplog.at_level("DEBUG", logger="oyster_launch_mc"):
+        m._show_messagebox("TestTitle", "TestBody")
+
+    err = capsys.readouterr().err
+    assert "[TestTitle] TestBody" in err
+    # The debug log must bind the exception text, not be silent.
+    assert any(
+        "MessageBoxW unavailable" in rec.message and "user32.dll not available" in rec.message
+        for rec in caplog.records
+    ), f"expected debug log binding the exception, got: {[r.message for r in caplog.records]}"
+
+
+def test_show_messagebox_windows_success_returns_early(
+    monkeypatch, caplog, capsys
+) -> None:
+    """When ctypes succeeds, the function must return early and skip the
+    stderr fallback (so a real Windows MessageBoxW is not duplicated)."""
+    monkeypatch.setattr(m.os, "name", "nt")
+
+    calls = {"n": 0}
+
+    def _ok(*_a, **_kw):
+        calls["n"] += 1
+        return 1  # IDOK
+
+    fake_ctypes = type("FakeCtypes", (), {"windll": type("WD", (), {"user32": type("U", (), {"MessageBoxW": staticmethod(_ok)})()})()})
+    monkeypatch.setitem(sys.modules, "ctypes", fake_ctypes)
+
+    m._show_messagebox("TestTitle", "TestBody")
+
+    assert calls["n"] == 1
+    assert capsys.readouterr().err == ""
+    # No debug log on success path
+    assert not any(
+        "MessageBoxW unavailable" in rec.message for rec in caplog.records
+    )
+
+
+def test_show_messagebox_posix_writes_stderr(monkeypatch, capsys) -> None:
+    """On non-Windows, the function writes to stderr directly with no ctypes import."""
+    monkeypatch.setattr(m.os, "name", "posix")
+
+    m._show_messagebox("TestTitle", "TestBody")
+
+    err = capsys.readouterr().err
+    assert "[TestTitle] TestBody" in err
+

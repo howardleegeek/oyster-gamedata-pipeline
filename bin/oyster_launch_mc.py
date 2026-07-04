@@ -619,8 +619,8 @@ def _show_messagebox(title: str, body: str) -> None:
             MB_ICONERROR = 0x10
             ctypes.windll.user32.MessageBoxW(0, body, title, MB_ICONERROR)
             return
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001 - ctypes/windll can fail on WSL/missing DLLs
+            logger.debug("Windows MessageBoxW unavailable, falling back to stderr: %s", exc)
     sys.stderr.write(f"\n[{title}] {body}\n")
     sys.stderr.flush()
 
