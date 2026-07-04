@@ -615,3 +615,8 @@ Note: Also added docstring to reset_vendor in same commit (minor spec deviation 
 - File: bin/secret_rotator.py::SecretRotator.delete_key
 - Added: docstring=Y, type-hints=N (already had type hints)
 - Commit: 736faafe24546177c32f71e400f89f2f6236ea16
+
+## Round @ 2026-05-17T12:55:00Z
+- File: bin/per_frame_object_bbox.py::BBox3D.from_dict
+- Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: 6014523155d579f4a20a9c3dc38668f632330a01
