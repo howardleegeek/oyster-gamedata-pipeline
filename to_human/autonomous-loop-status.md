@@ -77,3 +77,7 @@
 ## Round 280 @ 2026-07-04T14:00:00Z
 - Picked: Surface silent error in bin/crash_reporter.py _read_telemetry — replaced bare `except (json.JSONDecodeError, OSError): pass` with `log.debug()` binding the exception. Control flow unchanged (still returns {} on corrupt/unreadable file). Added regression test. py_compile clean; ruff clean; tests/test_crash_reporter.py (37 passed) + tests/bin/test_crash_reporter_silent_error.py (2 passed) = 39 total.
 - Result: committed 6b4070be, pushed to origin/main
+
+## Round 280 @ 2026-07-04T14:00:00Z
+- Picked: Surface silent error in bin/tarball_authenticity_check.py _classify_video frame-sampling — replaced bare `except Exception: pass` with `logger.debug(..., exc)` binding the exception. Control flow unchanged (still falls through to `return REAL, "encoder=…, multi-frame variation OK"`). Fixed the in-progress test from the prior tick that was patched to monkey-patch all of subprocess.run (which made ffprobe fail first, returning UNKNOWN before reaching the frame-sampling block); now the test stubs ffprobe to return a valid empty JSON envelope and forces only the ffmpeg frame-sampling call to raise, so the inner `except Exception` arm is actually exercised. py_compile clean; ruff clean; tests/bin/test_tarball_authenticity_check_silent_error.py (2 passed).
+- Result: committed (this round), pushed to origin/main

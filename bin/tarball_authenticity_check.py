@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 import shutil
 import subprocess
 import sys
@@ -25,6 +26,8 @@ import tarfile
 import tempfile
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 REAL = "REAL"
@@ -92,8 +95,11 @@ def _classify_video(p: Path) -> tuple[str, str]:
                         "real-static or synthetic; need oyster-recorder "
                         "metadata stamp (D15) to disambiguate"
                     )
-    except Exception:
-        pass  # frame-sampling is best-effort
+    except Exception as exc:
+        # frame-sampling is best-effort — but we should still surface the
+        # failure so a missing/corrupt ffmpeg install is diagnosable from
+        # operator logs rather than only visible by absence of frames.
+        logger.debug("frame-sampling best-effort failed for %s: %s", p, exc)
 
     return REAL, f"encoder={encoder.strip()}, multi-frame variation OK"
 
