@@ -1,3 +1,7 @@
+## Round 294 @ 2026-07-05T04:00:00Z
+- Picked: Surface silent error in bin/autoresearch_failure_modes.py — replaced bare `except Exception:` in `_lint_source()` AST parse with `except Exception as e:` + logger.debug() with filepath, and in `_lint_directory()` file read with logger.debug() with fpath. Control flow unchanged (still returns ["syntax_error"] on parse failure, continues on file read failure). Added regression test: tests/bin/test_autoresearch_failure_modes_silent_error.py (4 passed: AST no-bare-except, logger import check, AST parse error logs at DEBUG, file read error logs at DEBUG). py_compile clean; ruff clean; git add both files; committed dac2141c and pushed.
+- Result: committed dac2141c, pushed to origin/main
+
 ## Round 293 @ 2026-07-05T03:00:00Z
 - Picked: Surface silent error in bin/depth_anything_v2_inference.py _video_total_frames() — replaced bare `except Exception:` with `except Exception as e:` + _LOG.debug() with exc_info=True. Control flow unchanged (still returns 0 on failure so UI shows '?'). Added regression test: tests/bin/test_depth_anything_v2_inference_silent_error.py (3 passed: AST no-bare-except, logger present, returns 0 + logs). py_compile clean; ruff clean; git add both files; committed 6bd15f14 and pushed.
 - Result: committed 6bd15f14, pushed to origin/main
