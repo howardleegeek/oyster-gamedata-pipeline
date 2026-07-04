@@ -9,6 +9,7 @@ and macOS NWPath; provides upload throttling on metered connections.
 from __future__ import annotations
 
 import argparse
+import logging
 import platform
 import sys
 import threading
@@ -22,6 +23,8 @@ try:
     YAML_AVAILABLE = True
 except ImportError:
     YAML_AVAILABLE = False
+
+logger = logging.getLogger(__name__)
 
 
 class NetworkType:
@@ -61,8 +64,8 @@ class NetworkThrottleAware:
             with open(self._config_path, "r", encoding="utf-8") as f:
                 user_config = yaml.safe_load(f) or {}
             default_config.update(user_config)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("failed to load config from %r: %s", self._config_path, e)
         return default_config
 
     def detect_network_type(self) -> str:
@@ -104,8 +107,8 @@ class NetworkThrottleAware:
                         return NetworkType.UNMETERED
                     elif cost_value in (NETWORK_COST_TYPE_FIXED, NETWORK_COST_TYPE_VARIABLE):
                         return NetworkType.METERED
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("_detect_windows failed: %s", e)
         return NetworkType.UNKNOWN
 
     def _detect_macos(self) -> str:
@@ -129,8 +132,8 @@ class NetworkThrottleAware:
             # Check for WiFi interface
             if "en0" in output or "en1" in output:
                 return NetworkType.UNMETERED
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("_detect_macos failed: %s", e)
         return NetworkType.UNKNOWN
 
     def check_and_update(self) -> bool:
@@ -182,8 +185,8 @@ class NetworkThrottleAware:
                 self._config_path.parent.mkdir(parents=True, exist_ok=True)
                 with open(self._config_path, "w", encoding="utf-8") as f:
                     yaml.safe_dump(self._config, f, default_flow_style=False)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("_save_config failed: %s", e)
 
 
 def run_monitor(interval: int = 30) -> None:
