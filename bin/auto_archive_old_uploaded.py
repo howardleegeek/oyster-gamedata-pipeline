@@ -97,8 +97,8 @@ def compress_with_zstd(file_path: Path) -> Optional[Path]:
             # Remove original file after successful compression
             file_path.unlink()
             return compressed_path
-    except (subprocess.SubprocessError, FileNotFoundError, OSError):
-        pass
+    except (subprocess.SubprocessError, FileNotFoundError, OSError) as exc:
+        logger.debug("zstd compression failed for %s: %s", file_path, exc)
 
     return None
 
@@ -165,8 +165,8 @@ def archive_old_files() -> dict:
                             stats["deleted"] += 1
                     except (OSError, AttributeError):
                         continue
-        except (OSError, FileNotFoundError):
-            pass
+        except (OSError, FileNotFoundError) as exc:
+            logger.debug("Failed to iterate archive dir %s: %s", ARCHIVE_DIR, exc)
 
     return stats
 
@@ -193,8 +193,8 @@ def cleanup_old_session_dirs() -> dict:
                             dir_size = 0
                             try:
                                 dir_size = sum(f.stat().st_size for f in item.rglob('*') if f.is_file())
-                            except (OSError, AttributeError):
-                                pass
+                            except (OSError, AttributeError) as exc:
+                                logger.debug("Failed to compute size of %s: %s", item, exc)
 
                             # Remove directory
                             shutil.rmtree(item)
@@ -202,8 +202,8 @@ def cleanup_old_session_dirs() -> dict:
                             stats["total_space_freed_gb"] += dir_size / 1e9
                     except (OSError, AttributeError):
                         continue
-    except (OSError, FileNotFoundError):
-        pass
+    except (OSError, FileNotFoundError) as exc:
+        logger.debug("Failed to iterate session dir %s for cleanup: %s", SESSION_DIR, exc)
 
     return stats
 
