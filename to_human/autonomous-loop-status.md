@@ -205,3 +205,7 @@
 ## Round 273 @ 2026-07-04T04:18:54Z
 - Picked: Continue in-progress silent-error-swallow fix from previous round — bin/auto_archive_old_uploaded.py had 4x bare `except (...): pass` blocks uncommitted (the source change and a new test file were left staged/untracked). Replaced all 4 with logger.debug() binding the exception. Control flow unchanged (still returns None / empty stats / continues iteration). Also fixed one test in the new test file (test_dir_size_failure_logs_at_debug) that needed to backdate the .uploaded mtime for the cleanup branch to fire. py_compile clean; ruff clean; tests/bin/test_auto_archive_old_uploaded_silent_error.py (5 passed); full tests/bin/ (586 passed, 1 skipped unrelated).
 - Result: committed e7f92c06, pushed to origin/main
+
+## Round 274 @ 2026-07-04T05:20:38Z
+- Picked: Remove unused json import in tests/bin/test_audit_quality_metrics_qm10_silent_error.py (minor cleanup found during git status check). py_compile clean; ruff clean; tests pass.
+- Result: committed 2faba072, pushed to origin/main
