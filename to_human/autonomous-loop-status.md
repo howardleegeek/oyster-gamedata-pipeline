@@ -1,3 +1,7 @@
+## Round 280 @ 2026-07-04T14:00:00Z
+- Picked: Surface silent error in bin/recorder_consumer_lite.py _read_session_id_marker — replaced bare `except Exception:` with `_trace()` binding the exception. Control flow unchanged (still returns {} on error). Added regression test. ruff clean; tests/bin/test_recorder_consumer_lite_session_id_marker_silent_error.py (4 passed).
+- Result: committed 0b251efb, pushed to origin/main
+
 ## Round 279 @ 2026-07-04T13:00:00Z
 - Picked: Surface silent JSON parse error in bin/game_state_overlay.py — replaced bare `except json.JSONDecodeError:` with `logger.debug()` binding the exception. Control flow unchanged (still skips malformed lines). py_compile clean; ruff clean; tests/test_game_state_overlay_contract.py + tests/test_d20_overlay_e2e.py (8 passed).
 - Result: committed 2d540b5c, pushed to origin/main
