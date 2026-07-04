@@ -296,8 +296,9 @@ class UploadDaemon:
                 return True
             # Default to WiFi-only if we can't determine
             return True
-        except Exception:
+        except Exception as e:
             # Default to WiFi-only
+            logger.debug("WiFi check failed; defaulting to WiFi-only: %s", e)
             return True
 
     def _scan_for_sessions(self) -> List[Path]:
@@ -572,8 +573,8 @@ class UploadDaemon:
                     if dt >= cutoff:
                         last_24h_count += 1
                         last_24h_size += file_size
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to parse completed_at %r: %s", completed_at, e)
 
         for session in failed:
             if isinstance(session, UploadSession):
@@ -586,8 +587,8 @@ class UploadDaemon:
                     dt = datetime.fromisoformat(created_at)
                     if dt >= cutoff:
                         last_24h_failures += 1
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to parse created_at %r: %s", created_at, e)
 
         return {
             "pending": pending,
