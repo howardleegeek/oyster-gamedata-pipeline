@@ -10,12 +10,15 @@ import ast
 import importlib
 import inspect
 import json
+import logging
 import os
 import sys
 import time
 import traceback
 from datetime import datetime
 from typing import Any, Dict, List
+
+logger = logging.getLogger(__name__)
 
 
 class TestHarness:
@@ -53,8 +56,8 @@ class TestHarness:
                 try:
                     importlib.import_module(lib)
                     found.append(f"{lib}_envs")
-                except ImportError:
-                    pass
+                except ImportError as e:
+                    logger.debug("Optional library %s not available: %s", lib, e)
         
         return found
     
