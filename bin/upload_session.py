@@ -46,6 +46,10 @@ DEFAULT_BACKEND = "http://136.109.41.170:8081"
 REQUIRED_FILES = ("recording.mp4", "game_state.jsonl", "inputs.jsonl", "metadata.json")
 DASHBOARD_BASE = "https://oysterrecorder.com/dashboard"  # placeholder
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 # ---------------------------------------------------------------------------
 # token discovery
 # ---------------------------------------------------------------------------
@@ -248,7 +252,8 @@ def main(argv: list[str] | None = None) -> int:
         meta_path = session / "metadata.json"
         try:
             meta = json.loads(meta_path.read_text())
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to parse metadata.json; using defaults: %s", e)
             meta = {}
         finalize = http_post_json(
             f"{args.backend}/api/v1/sessions",
