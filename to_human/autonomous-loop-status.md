@@ -1,3 +1,11 @@
+## Round 289 @ 2026-07-04T23:00:00Z
+- Picked: Surface silent error in bin/recovery_orchestrator.py is_corrupted() — replaced bare `except Exception:` with `except Exception as e:` and added `logger.debug("is_corrupted(%r) failed; treating as corrupted: %s", filepath, e, exc_info=True)`. Control flow unchanged (still returns True to keep quarantine-routing semantics). Module-level `logger` was already present. Added regression test: tests/bin/test_recovery_orchestrator_silent_error.py (4 passed: AST no-bare-except-in-is_corrupted, is_corrupted on garbage file still returns True and emits DEBUG log, DEBUG log content check, valid tarball still returns False — no regression on happy path). py_compile clean; ruff clean. Self-review: silent-swallow fixed, control flow preserved, no race/sync issues, no off-by-one, no new attack surface (broad except is intentional for the corruption detector), 4 distinct assertions none masked as passing.
+- Result: committed c8ace686, pushed to origin/main
+
+## Round 288 @ 2026-07-04T22:00:00Z
+- Picked: Surface silent error in bin/daemon_control.py heartbeat parsing loop — replaced bare `except Exception:` with `except Exception as e` + `logger.debug()` binding the exception. Control flow unchanged (still prints raw line as fallback). Regression test: tests/bin/test_daemon_control_silent_error.py (2 passed). py_compile clean; ruff clean; git add both files; committed 27b0e411 and pushed.
+- Result: committed 27b0e411, pushed to origin/main
+
 ## Round 287 @ 2026-07-04T21:00:00Z
 - Picked: Surface silent errors in bin/network_throttle_aware.py — replaced 4 bare `except Exception:` blocks in _load_config, _detect_windows, _detect_macos, and check_and_update with `except Exception as e` + logger.debug(..., exc_info=True). Control flow unchanged (still returns fallback values). Added regression test: tests/bin/test_network_throttle_aware_silent_error.py (5 passed). py_compile clean; ruff clean; git add both files; committed c15f7315 and pushed.
 - Result: committed c15f7315, pushed to origin/main
