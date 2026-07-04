@@ -85,3 +85,7 @@
 ## Round 281 @ 2026-07-04T10:57:04Z
 - Picked: Surface silent error in bin/sprint_dashboard.py build_dashboard() — the `except Exception: pass` at line 146 swallowed read/parse failures on pytest_output.txt. Replaced with `logger.debug(..., exc_info=True)`. Control flow unchanged (still falls back to 0/0). Added 2 regression tests: one asserts debug log fires when open() raises; one asserts no log when file is simply absent (expected path). py_compile clean; ruff clean; tests/bin/test_sprint_dashboard.py (14 passed).
 - Result: committed 87ec3bd8, pushed to origin/main
+
+## Round 282 @ 2026-07-04T12:07:51Z
+- Picked: Surface silent error in bin/pii_redactor.py redact_jsonl_file() — the `except json.JSONDecodeError: pass` at line 342 silently dropped malformed JSONL line skips. Replaced with `logger.debug(..., exc_info=True)` binding the exception. Control flow unchanged (line is still left as-is and the loop continues). Added regression test (3 cases: static guard against bare `pass`, static guard that `logger.debug` is present, behavioural test that logs DEBUG and preserves malformed line). py_compile clean; ruff clean; tests/test_pii_redactor.py (28 passed) + tests/bin/test_pii_redactor_silent_error.py (3 passed) = 31 passed.
+- Result: committed debfd03f, pushed to origin/main
