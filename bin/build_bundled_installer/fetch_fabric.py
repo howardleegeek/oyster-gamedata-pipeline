@@ -661,8 +661,22 @@ def _write_runtime_manifest(
 # Main
 # ---------------------------------------------------------------------------
 
-
 def main() -> int:
+    """Download, verify, and install Fabric loader with libraries and fabric-api.
+
+    This is the main entry point for the Fabric loader installation process.
+    It performs the following stages:
+      1. Load version pins from manifest.json
+      2. Fetch and parse the Fabric profile JSON
+      3. Download all required Fabric libraries
+      4. Fetch fabric-api from Modrinth
+      5. Verify post-fetch requirements and write runtime manifest
+
+    Returns:
+        Exit code: 0 on success, 2 on SHA mismatch, 3 on verification failure,
+                  4 on network failure, 5 on IO error, 6 on invalid manifest,
+                  7 on invalid profile JSON.
+    """
     pin = _load_pin()
     loader_version: str = pin["loader_version"]
     mc_version: str = pin["minecraft_version"]
