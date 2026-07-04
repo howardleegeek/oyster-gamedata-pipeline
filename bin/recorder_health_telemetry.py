@@ -264,7 +264,10 @@ def main(argv: Optional[list[str]] = None) -> int:
             pid=args.recorder_pid,
         )
     except KeyboardInterrupt:
-        pass
+        # Operator-driven shutdown (Ctrl+C / SIGINT surfaced as KeyboardInterrupt
+        # in the main thread). Log it so operators can distinguish a clean stop
+        # from a hung process, then return 0 (clean exit).
+        logger.info("Telemetry loop interrupted by operator (KeyboardInterrupt); exiting cleanly")
     except Exception as exc:
         logger.exception("Fatal error in telemetry loop: %s", exc)
         return 1
