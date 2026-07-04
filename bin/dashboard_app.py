@@ -37,8 +37,8 @@ def _import_openpyxl() -> Any:
     if _openpyxl is None:
         try:
             import openpyxl as _openpyxl
-        except ImportError:
-            pass
+        except ImportError as e:
+            logger.debug("openpyxl unavailable; Excel support disabled: %s", e)
     return _openpyxl
 
 
