@@ -196,6 +196,20 @@ class IAMRotator:
         """
         return self._iam.create_access_key(UserName=self.cfg.iam_user)["AccessKey"]
     def deactivate_key(self, kid: str) -> None:
+        """Deactivate an IAM access key by setting its status to Inactive.
+
+        Does NOT delete the key — this preserves the key for audit purposes
+        while preventing its use for new requests.
+
+        Args:
+            kid: The AccessKeyId of the key to deactivate.
+
+        Returns:
+            None
+
+        Example:
+            >>> rotator.deactivate_key("AKIAIOSFODNN7EXAMPLE")
+        """
         self._iam.update_access_key(UserName=self.cfg.iam_user, AccessKeyId=kid, Status="Inactive")
     def delete_key(self, kid: str) -> None:
         self._iam.delete_access_key(UserName=self.cfg.iam_user, AccessKeyId=kid)
