@@ -80,8 +80,8 @@ def _wait_for_backend(timeout: float = HEALTH_TIMEOUT) -> bool:
             if resp.status_code == 200:
                 logger.info("Backend is ready (healthz 200)")
                 return True
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Backend healthz probe failed; retrying: %s", e)
         time.sleep(0.25)
     logger.error("Backend did not become ready within %.1f s", timeout)
     return False
@@ -96,8 +96,8 @@ def _count_backend_sessions() -> int:
         if resp.status_code == 200:
             data = resp.json()
             return len(data) if isinstance(data, list) else 0
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to count backend sessions; defaulting to 0: %s", e)
     return 0
 
 
@@ -184,8 +184,8 @@ def step_gate_smoke() -> Dict[str, Any]:
     try:
         data = json.loads(result.stdout.strip())
         verdict = data.get("summary", {}).get("verdict")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to parse gate smoke stdout as JSON; verdict=None: %s", e)
     return {
         "returncode": result.returncode,
         "stdout": result.stdout.strip(),
@@ -256,8 +256,8 @@ def step_shutdown_backend(proc: subprocess.Popen) -> None:
         try:
             proc.kill()
             proc.wait(timeout=5)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Backend SIGKILL cleanup failed: %s", e)
 
 
 # ---------------------------------------------------------------------------
