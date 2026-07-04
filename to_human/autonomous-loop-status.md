@@ -189,3 +189,7 @@
 ## Round 269 @ 2026-07-04T04:00:00Z
 - Picked: Surface silent ctypes failure in bin/oyster_launch_mc.py:619 — replaced bare `except Exception: pass` in _show_messagebox() with `logger.debug()` binding the exception. Control flow unchanged (still falls back to stderr write). py_compile clean; ruff clean; tests/bin/test_oyster_launch_mc.py (21 passed).
 - Result: committed 0152c0cd, pushed to origin/main
+
+## Round 272 @ 2026-07-04T06:00:00Z
+- Picked: Surface silent error swallows in bin/health_check_endpoint.py — get_last_clip_at had bare `except (json.JSONDecodeError, OSError): return None` and get_queue_depth had `except OSError: return 0`. Both silently masked real production health-check failures. Replaced with `logger.warning(...)` binding exception type/name/message. Added module-level logger. Control flow unchanged (fallback values still returned). Added regression test covering corrupt JSON, unreadable file, iterdir failure, and the missing-file/dir paths (which must remain silent).
+- Result: committed 234a9edf, pushed to origin/main
