@@ -25,6 +25,7 @@ Module entry point: :func:`ensure_installed`.
 """
 from __future__ import annotations
 
+import logging
 import os
 import platform
 import re
@@ -38,6 +39,8 @@ from pathlib import Path
 MC_VERSION = "1.21.4"
 FABRIC_LOADER_VERSION = "0.16.9"
 MOD_JAR_PREFIX = "oyster-recorder-mod-"
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -151,6 +154,7 @@ def install_fabric_loader(mc_dir: Path, fabric_installer_jar: Path,
     except subprocess.TimeoutExpired:
         return False, "fabric installer timed out (>120 s)"
     except Exception as e:  # noqa: BLE001 — keep installer fail-soft
+        logger.debug("fabric installer crashed: %s", e, exc_info=True)
         return False, f"fabric installer crashed: {e}"
     if proc.returncode != 0:
         return False, (
