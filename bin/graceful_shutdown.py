@@ -47,8 +47,8 @@ class GracefulShutdown:
         for tf in self._tarballs:
             try:
                 tf.close()
-            except Exception:
-                logger.debug("Could not close tarball %r", tf, exc_info=True)
+            except Exception as e:
+                logger.debug("Could not close tarball %r: %s", tf, e, exc_info=True)
         if self._original_handler is not None:
             signal.signal(signal.SIGTERM, self._original_handler)
         os.kill(os.getpid(), signal.SIGTERM)
@@ -101,8 +101,8 @@ def _run_test() -> int:
     os.kill(os.getpid(), signal.SIGTERM)
     try:
         tf.close()
-    except Exception:
-        logger.debug("Could not close test tarball %r", tf, exc_info=True)
+    except Exception as e:
+        logger.debug("Could not close test tarball %r: %s", tf, e, exc_info=True)
     return 0
 
 
