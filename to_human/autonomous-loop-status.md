@@ -1,3 +1,7 @@
+## Round 293 @ 2026-07-05T03:00:00Z
+- Picked: Surface silent error in bin/depth_anything_v2_inference.py _video_total_frames() — replaced bare `except Exception:` with `except Exception as e:` + _LOG.debug() with exc_info=True. Control flow unchanged (still returns 0 on failure so UI shows '?'). Added regression test: tests/bin/test_depth_anything_v2_inference_silent_error.py (3 passed: AST no-bare-except, logger present, returns 0 + logs). py_compile clean; ruff clean; git add both files; committed 6bd15f14 and pushed.
+- Result: committed 6bd15f14, pushed to origin/main
+
 ## Round 292 @ 2026-07-05T02:00:00Z
 - Picked: Surface silent error in bin/canonical_pipeline.py — replaced bare `except Exception:` in detect_best_backend() ImportError probes with `except Exception as e:` + logger.debug(), in step3_extract_audio() ffprobe_frames call with logger.debug(), and in step11_input_latency() JSON parse with logger.debug(). Control flow preserved (falls through to defaults). Added regression test: tests/bin/test_canonical_pipeline_silent_error.py (3 passed: AST no-bare-except, logger import check, logger.debug present). py_compile clean; ruff clean; git add both files; committed 43298af2 and pushed.
 - Result: committed 43298af2, pushed to origin/main
