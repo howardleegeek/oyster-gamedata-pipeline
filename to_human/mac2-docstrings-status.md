@@ -610,3 +610,8 @@ Note: Also added docstring to reset_vendor in same commit (minor spec deviation 
 - File: src/oyster_agent_runner/memory.py::hashing_embedder.embed
 - Added: docstring=Y, type-hints=N (already had type hints)
 - Commit: 39917ef710909c6ecf8cb0bbf8be85ef0168a78d
+
+## Round @ 2026-05-17T13:00:00Z
+- File: bin/secret_rotator.py::SecretRotator.delete_key
+- Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: 736faafe24546177c32f71e400f89f2f6236ea16
