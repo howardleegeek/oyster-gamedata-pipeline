@@ -92,6 +92,11 @@ def record_screen_region(
                         time.sleep(0.001)
 
         except Exception as e:
+            # Worker-thread outer guard. The main thread reads capture_errors
+            # and raises after the loop, so the error reaches the caller, but
+            # the daemon worker itself dies silently without this log. Use
+            # logger.exception so the traceback is recorded for diagnostics.
+            logger.exception("screen_capture_recorder worker died: %s", e)
             if not capture_errors:
                 capture_errors.append(str(e))
             stop_event.set()
