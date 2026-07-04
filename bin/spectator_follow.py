@@ -14,6 +14,8 @@ import time
 from enum import IntEnum
 from typing import Optional
 
+logger = logging.getLogger(__name__)
+
 
 class PacketType(IntEnum):
     """RCON packet types."""
@@ -106,9 +108,18 @@ class RconClient:
             # Also receive the empty command response
             try:
                 self._receive_packet()
-            except Exception:
-                pass
-                
+            except Exception as e:
+                # Best-effort drain of the trailing empty response — preserve
+                # original semantics (fall through to response_id check) so
+                # auth still succeeds/fails by the first response. We just
+                # log the swallow so future protocol drift is visible.
+                logger.debug(
+                    "authenticate: trailing _receive_packet() failed; "
+                    "falling through to response_id check: %s",
+                    e,
+                    exc_info=True,
+                )
+
             # Auth succeeds if response ID matches our packet ID
             # Auth fails if response ID is -1
             return response_id == packet_id
