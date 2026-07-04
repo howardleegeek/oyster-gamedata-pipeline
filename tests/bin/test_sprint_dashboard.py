@@ -299,5 +299,66 @@ def test_main_error_writing_file():
         assert exit_code == 1
 
 
+def test_build_dashboard_logs_debug_on_unreadable_pytest_output(caplog):
+    """Surface silent error: when pytest_output.txt can't be read/parsed,
+    build_dashboard should log at DEBUG level (was: bare `pass`)."""
+    import logging
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        os.makedirs(os.path.join(tmpdir, ".git"))
+
+        with patch("subprocess.run") as mock_run:
+            mock_result = MagicMock()
+            mock_result.stdout = ""
+            mock_result.returncode = 0
+            mock_run.return_value = mock_result
+
+            # Create a pytest output file with garbage that will fail to parse
+            pytest_file = os.path.join(tmpdir, "pytest_output.txt")
+            with open(pytest_file, "w") as f:
+                f.write("this is not valid pytest output at all")
+
+            # Force open() to raise so the except branch fires
+            with patch("builtins.open", side_effect=OSError("simulated read failure")):
+                with caplog.at_level(logging.DEBUG, logger="bin.sprint_dashboard"):
+                    dashboard = build_dashboard(
+                        repo_root=tmpdir, since="1 day ago", sprint_name="Test"
+                    )
+
+            # Control flow: dashboard still builds, with 0/0 tests
+            assert "**Tests**: 0 passed / 0 failed" in dashboard
+            # And the silent error is now surfaced
+            assert any(
+                "pytest output" in rec.message.lower()
+                for rec in caplog.records
+                if rec.levelno == logging.DEBUG
+            ), "Expected a DEBUG log record naming the pytest output file"
+
+
+def test_build_dashboard_falls_back_silently_when_pytest_output_missing(caplog):
+    """When pytest_output.txt doesn't exist at all, no log is needed
+    (file absence is the expected path, not an error)."""
+    import logging
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        os.makedirs(os.path.join(tmpdir, ".git"))
+
+        with patch("subprocess.run") as mock_run:
+            mock_result = MagicMock()
+            mock_result.stdout = ""
+            mock_result.returncode = 0
+            mock_run.return_value = mock_result
+
+            with caplog.at_level(logging.DEBUG, logger="bin.sprint_dashboard"):
+                dashboard = build_dashboard(repo_root=tmpdir, sprint_name="Test")
+
+            assert "**Tests**: 0 passed / 0 failed" in dashboard
+            # No debug record should fire — file just doesn't exist (expected).
+            assert not any(
+                "pytest output" in rec.message.lower()
+                for rec in caplog.records
+            ), "No log expected when pytest_output.txt is simply absent"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

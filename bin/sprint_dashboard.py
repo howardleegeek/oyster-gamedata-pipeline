@@ -4,6 +4,7 @@ R008 · bin/sprint_dashboard.py — 100-iter sprint progress dashboard
 """
 
 import argparse
+import logging
 import os
 import re
 import subprocess
@@ -11,6 +12,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 def get_git_log_summary(since: str = "1 day ago") -> list[dict]:
@@ -143,7 +146,13 @@ def build_dashboard(
                 pytest_output = f.read()
                 test_passed, test_failed, test_pass_pct = parse_test_pass_rate(pytest_output)
         except Exception:
-            pass  # Silently skip if we can't read/parse
+            # Silently fall back to zero test counts, but log at debug level
+            # so the failure is visible to operators tailing logs.
+            logger.debug(
+                "Could not read or parse pytest output %r; falling back to 0/0",
+                pytest_output_file,
+                exc_info=True,
+            )
     
     # Calculate total files changed (estimate from commits)
     files_changed = len(commits) * 3  # Rough estimate
