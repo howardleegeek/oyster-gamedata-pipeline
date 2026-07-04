@@ -7,12 +7,15 @@ according to SUBMISSION_FORMAT.md §4.1 schema.
 
 import hashlib
 import json
+import logging
 import os
 import re
 import sys
 import tarfile
 from datetime import datetime, timezone
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def compute_sha256(path: str, chunk_size: int = 65536) -> str:
@@ -68,8 +71,8 @@ def extract_clip_metadata(tarball_path: str) -> dict:
                     result['duration_sec'] = float(data.get('duration_sec', 0))
                     result['frame_count'] = int(data.get('frame_count', 0))
                     result['route_type'] = int(data.get('route_type', 0))
-            except (json.JSONDecodeError, ValueError, KeyError):
-                pass
+            except (json.JSONDecodeError, ValueError, KeyError) as e:
+                logger.debug("Failed to parse action_camera.json from %s: %s", tarball_path, e)
         
         # Extract gameinfo.xlsx for scene and operator_id
         if gameinfo_member:
@@ -97,9 +100,9 @@ def extract_clip_metadata(tarball_path: str) -> dict:
                     wb.close()
             except ImportError:
                 # openpyxl not available, return empty scene/operator_id
-                pass
-            except Exception:
-                pass
+                logger.debug("openpyxl not available for extracting scene/operator_id from %s", tarball_path)
+            except Exception as e:
+                logger.debug("Failed to extract scene/operator_id from %s: %s", tarball_path, e, exc_info=True)
     
     return result
 

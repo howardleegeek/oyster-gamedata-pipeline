@@ -80,9 +80,10 @@ def _trace(step: str) -> None:
     try:
         with _STARTUP_LOG.open("a", encoding="utf-8") as fh:
             fh.write(f"{datetime.now().isoformat(timespec='seconds')} {step}\n")
-    except Exception:
+    except Exception as e:
         # Even logging failed — nothing more we can do this early.
-        pass
+        # Fallback to stderr so we at least see the error during debugging.
+        print(f"[_trace] Failed to write to {_STARTUP_LOG}: {e}", file=sys.stderr)
 
 
 _trace("=== OysterRecorder boot ===")
