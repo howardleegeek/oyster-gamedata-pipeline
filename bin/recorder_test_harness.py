@@ -42,6 +42,7 @@ These two functions are what the test suite drives.
 from __future__ import annotations
 
 import json
+import logging
 import math
 import shutil
 import sys
@@ -52,6 +53,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
 
 # Make sibling modules importable when this harness is invoked directly
 # (``python3 bin/recorder_test_harness.py``) and via tests that use
@@ -387,7 +390,8 @@ def package_tarball(
         sys_info["recordedAt"] = clip_ts
         sys_info["recorderVersion"] = "test-harness"
         sys_info["_real_window_geometry"] = bool(mc_window_rect)
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to parse window rect: %s", e)
         sys_info = {
             "gameProcessName": rect.get("title", "Minecraft"),
             "x": rect.get("x", 0),
@@ -441,7 +445,8 @@ def package_tarball(
             notes=f"recorder_test_harness clip @ {clip_ts}",
         )
         ggx.write_xlsx(game_info, str(gameinfo_path))
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to write gameinfo.xlsx: %s", e)
         # Minimal valid OOXML so structural checks pass.
         _write_minimal_xlsx_stub(gameinfo_path)
 
@@ -469,7 +474,8 @@ def package_tarball(
         intrinsics_path.write_text(
             yaml.safe_dump(intrinsics, sort_keys=False), encoding="utf-8"
         )
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to write intrinsics.yaml with YAML: %s", e)
         intrinsics_path.write_text(
             "\n".join(f"{k}: {v}" for k, v in intrinsics.items()),
             encoding="utf-8",
