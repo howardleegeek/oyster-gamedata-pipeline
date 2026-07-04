@@ -538,7 +538,7 @@ class GitHubReleaseStorageBackend(StorageBackend):
             try:
                 shutil.rmtree(tmp_dir)
             except OSError:
-                pass
+                logger.debug("github: could not rmtree temp upload dir %s", tmp_dir, exc_info=True)
 
         # Optional sidecar metadata as a separate asset (lets list_assets work
         # without HEAD-ing the tarball).
@@ -554,7 +554,7 @@ class GitHubReleaseStorageBackend(StorageBackend):
             try:
                 shutil.rmtree(meta_dir)
             except OSError:
-                pass
+                logger.debug("github: could not rmtree temp meta dir %s", meta_dir, exc_info=True)
 
         # Rotate buffer: keep newest N tarballs, never delete protected ones.
         self._prune_old_assets()
