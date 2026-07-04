@@ -109,3 +109,7 @@
 ## Round 285 @ 2026-07-04T19:00:00Z
 - Picked: Surface silent ImportError in bin/epal_payout_passthrough.py yaml optional-import probe — replaced bare `except ImportError: pass` with `except ImportError as e:` + logger.debug() binding the exception. Control flow unchanged (still sets YAML_AVAILABLE = False on missing PyYAML). Added regression test (static guard + behavioural guard + happy-path guard). py_compile clean; ruff clean; tests/bin/test_epal_payout_passthrough_yaml_silent_error.py (4 passed).
 - Result: committed 0e195cca, pushed to origin/main
+
+## Round 286 @ 2026-07-04T16:08:29Z
+- Picked: Surface silent error in bin/depth_exr_validator.py — bound bare `except Exception:` in check_magic_byte and check_structural to `_exc` and added `_LOG.debug(..., exc_info=True)`. Control flow unchanged (both helpers still return False on error). ImportError short-circuit in check_structural preserved (still returns True when OpenEXR is not installed). Added regression test covering OSError on missing file, unexpected RuntimeError, happy EXR magic byte, wrong magic byte, OpenEXR RuntimeError, and ImportError skip-path. py_compile clean; ruff clean; tests/bin/test_depth_exr_validator_silent_error.py (6 passed); sibling tests/bin/test_real_depth_filler.py + tests/bin/test_r16_depth_count.py + tests/bin/test_r22_depth_hash.py (23 passed).
+- Result: committed 39296d4a, pushed to origin/main
