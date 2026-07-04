@@ -8,12 +8,15 @@ Designed for operational monitoring and health checks.
 
 import argparse
 import json
+import logging
 import sys
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from shutil import disk_usage
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 # Module-level constants
 DEFAULT_HOST = "0.0.0.0"
@@ -29,7 +32,13 @@ def get_last_clip_at(state_file: Path) -> Optional[float]:
     try:
         data = json.loads(state_file.read_text())
         return data.get("last_clip_at")
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning(
+            "health_check: failed to read state file %s: %s: %s",
+            state_file,
+            type(exc).__name__,
+            exc,
+        )
         return None
 
 
@@ -44,7 +53,13 @@ def get_queue_depth(queue_dir: Path) -> int:
         return 0
     try:
         return sum(1 for f in queue_dir.iterdir() if f.is_file() and not f.name.startswith("."))
-    except OSError:
+    except OSError as exc:
+        logger.warning(
+            "health_check: failed to read queue dir %s: %s: %s",
+            queue_dir,
+            type(exc).__name__,
+            exc,
+        )
         return 0
 
 
