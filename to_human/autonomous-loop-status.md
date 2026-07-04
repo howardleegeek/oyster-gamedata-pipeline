@@ -81,3 +81,7 @@
 ## Round 280 @ 2026-07-04T14:00:00Z
 - Picked: Surface silent error in bin/tarball_authenticity_check.py _classify_video frame-sampling — replaced bare `except Exception: pass` with `logger.debug(..., exc)` binding the exception. Control flow unchanged (still falls through to `return REAL, "encoder=…, multi-frame variation OK"`). Fixed the in-progress test from the prior tick that was patched to monkey-patch all of subprocess.run (which made ffprobe fail first, returning UNKNOWN before reaching the frame-sampling block); now the test stubs ffprobe to return a valid empty JSON envelope and forces only the ffmpeg frame-sampling call to raise, so the inner `except Exception` arm is actually exercised. py_compile clean; ruff clean; tests/bin/test_tarball_authenticity_check_silent_error.py (2 passed).
 - Result: committed (this round), pushed to origin/main
+
+## Round 281 @ 2026-07-04T10:57:04Z
+- Picked: Surface silent error in bin/sprint_dashboard.py build_dashboard() — the `except Exception: pass` at line 146 swallowed read/parse failures on pytest_output.txt. Replaced with `logger.debug(..., exc_info=True)`. Control flow unchanged (still falls back to 0/0). Added 2 regression tests: one asserts debug log fires when open() raises; one asserts no log when file is simply absent (expected path). py_compile clean; ruff clean; tests/bin/test_sprint_dashboard.py (14 passed).
+- Result: committed 87ec3bd8, pushed to origin/main
