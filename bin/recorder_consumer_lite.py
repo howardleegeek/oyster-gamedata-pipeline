@@ -2520,12 +2520,13 @@ def _start_obs_capture_layer(
         _obs_configure_recording_profile(client, out_path.parent)
         chosen_encoder = _obs_selected_encoder_from_profile(client)
         client.request("StartRecord")
-    except Exception:
+    except Exception as exc:
+        logger.debug("_start_obs_capture_layer: OBS init failed: %s", exc)
         if client is not None:
             try:
                 client.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("_start_obs_capture_layer: failed to close OBS client: %s", e)
         _terminate_obs_process(proc)
         raise
 
@@ -3286,8 +3287,8 @@ def _stop_video_capture_handle(
     if capture_control is not None:
         try:
             capture_control.stop()
-        except Exception:
-            pass
+        except Exception as exc:
+            _trace(f"video_capture: capture_control.stop() failed: {exc}")
 
     if handle.thread is not None and handle.thread.is_alive():
         handle.thread.join(timeout=2.0)
@@ -3304,8 +3305,8 @@ def _stop_video_capture_handle(
                 if proc.stdin:
                     proc.stdin.write(b"q\n")
                     proc.stdin.flush()
-            except Exception:
-                pass
+            except Exception as exc:
+                _trace(f"video_capture: stdin write/flush failed: {exc}")
         elif handle.stdin_kind == "rawvideo":
             _join_rawvideo_frame_writer(handle)
         try:
@@ -4891,7 +4892,8 @@ def _list_windows_processes() -> set[str]:
             timeout=5,
             creationflags=0x08000000,  # CREATE_NO_WINDOW
         )
-    except Exception:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001
+        logger.debug("_list_windows_processes: tasklist failed: %s", e)
         return set()
     names = set()
     for line in out.splitlines():
@@ -4899,7 +4901,8 @@ def _list_windows_processes() -> set[str]:
         if line.startswith('"'):
             try:
                 names.add(line.split('","', 1)[0].lstrip('"'))
-            except Exception:
+            except Exception as e:
+                logger.debug("_list_windows_processes: CSV parse failed for line: %s", e)
                 continue
     return names
 
