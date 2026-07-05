@@ -1356,7 +1356,11 @@ def _check_stream_v_additions(d: Path, rpt: LintReport) -> None:
     if inputs_files:
         try:
             line_count = sum(1 for _ in open(inputs_files[0]))
-        except Exception:
+        except Exception as e:
+            logger.debug(
+                "inputs.jsonl line count failed for %s: %s",
+                inputs_files[0], e,
+            )
             line_count = 0
         rpt.add(LintResult(
             27, "Inputs Log Present", line_count > 0,

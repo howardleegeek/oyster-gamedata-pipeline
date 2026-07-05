@@ -129,3 +129,50 @@ class TestLintV3PrdGroundedSilentError:
             )
         finally:
             Path(tmp_path).unlink(missing_ok=True)
+
+    def test_inputs_jsonl_line_count_no_bare_except(self):
+        """The inputs.jsonl line-count handler in criterion #27 must bind
+        the exception (no bare ``except Exception:``)."""
+        source = self._read_source()
+        tree = ast.parse(source)
+        # Find the try block whose body is `line_count = sum(1 for _ in open(...))`
+        bare_lines = []
+        bound_lines = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Try):
+                for handler in node.handlers:
+                    if handler.type is None:
+                        continue
+                    type_src = ast.unparse(handler.type)
+                    if "Exception" not in type_src:
+                        continue
+                    # Check if handler body touches line_count
+                    body_src = ast.unparse(handler)
+                    if "line_count" in body_src:
+                        if handler.name is None:
+                            bare_lines.append(handler.lineno)
+                        else:
+                            bound_lines.append(handler.lineno)
+        assert bare_lines == [], (
+            f"inputs.jsonl handler still bare at lines {bare_lines}; "
+            f"bind the exception and log it."
+        )
+        assert bound_lines, (
+            "Could not find a bound 'except Exception as ...' for the "
+            "inputs.jsonl line-count open()."
+        )
+
+    def test_inputs_jsonl_line_count_logs_at_debug(self):
+        """The inputs.jsonl open() failure must emit a logger.debug(...) call
+        that includes the file path and the exception."""
+        source = self._read_source()
+        assert "inputs.jsonl line count failed" in source
+        # logger.debug must be present near the line_count fallback
+        assert "logger.debug" in source
+
+    def test_inputs_jsonl_line_count_preserves_fallback(self):
+        """The control flow must still set ``line_count = 0`` after the bound
+        except so the LintResult still reports 0 events (not raise)."""
+        source = self._read_source()
+        # Sanity: the literal `line_count = 0` fallback still exists
+        assert "line_count = 0" in source
