@@ -172,7 +172,9 @@ def upload(
         # to surface for diagnostics.
         try:
             detail = resp.json()
-        except Exception:  # pragma: no cover - defensive
+        except Exception as e:  # pragma: no cover - defensive
+            LOG.debug("upload_to_web_tester: failed to parse error JSON (status=%s): %s",
+                      resp.status_code, e)
             detail = {"raw": resp.text[:500]}
         raise SystemExit(
             json.dumps(
