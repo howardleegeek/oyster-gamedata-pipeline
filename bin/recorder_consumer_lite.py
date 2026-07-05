@@ -2472,8 +2472,8 @@ def _wait_for_obs_websocket(
             last_error = exc
             try:
                 client.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to close OBS client during retry: %s", e)
             time.sleep(0.25)
     raise ObsWebSocketError(f"OBS websocket unreachable: {last_error}")
 
