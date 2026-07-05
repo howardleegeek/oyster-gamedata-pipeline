@@ -8,10 +8,13 @@ given an empty records list.
 
 import argparse
 import json
+import logging
 import os
 import sys
 import tempfile
 from typing import Any, Dict, List, Optional
+
+_LOG = logging.getLogger(__name__)
 
 
 class AdapterError(Exception):
@@ -55,7 +58,8 @@ def create_test_file(records: List[Dict[str, Any]]) -> str:
         data = {'source': 'action_camera', 'timestamp': '2024-01-01T00:00:00Z', 'records': records}
         with os.fdopen(fd, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2)
-    except Exception:
+    except Exception as e:
+        _LOG.debug("create_test_file: failed to write %s: %s", path, e)
         os.close(fd)
         raise
     return path
