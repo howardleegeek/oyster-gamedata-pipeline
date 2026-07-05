@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import sys
 import time
@@ -48,6 +49,8 @@ from pathlib import Path
 from typing import Any, Iterator, Optional, Tuple
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_FPS = 6
 DEFAULT_MODEL_REPO = "depth-anything/Depth-Anything-V2-Small"
@@ -111,9 +114,17 @@ def ensure_model(
         return Path(local)
     except ImportError:
         pass
-    except Exception:
+    except Exception as e:
         # Fall through to urllib fallback rather than aborting hard.
-        pass
+        # Surface the failure at DEBUG so operators can diagnose why
+        # huggingface_hub was unusable (auth, network, corrupt cache)
+        # without aborting the depth pipeline.
+        logger.debug(
+            "huggingface_hub download failed for %s/%s (%s); "
+            "falling back to urllib",
+            repo, filename, e,
+            exc_info=True,
+        )
 
     url = _hf_url(repo, filename)
     tmp = target.with_suffix(target.suffix + ".part")
@@ -200,7 +211,16 @@ def _load_model(model_path: Path) -> Any:
             str(model_path),
             providers=["CPUExecutionProvider"],
         )
-    except Exception:
+    except Exception as e:
+        # InferenceSession can fail for many reasons (missing/corrupt ONNX,
+        # unsupported operator, missing EP). Log at DEBUG so a stale model
+        # file is diagnosable from the log tail; the caller treats None
+        # as "model unavailable" and exits with code 2.
+        logger.debug(
+            "ONNX InferenceSession load failed for %s (%s)",
+            model_path, e,
+            exc_info=True,
+        )
         return None
 
 
