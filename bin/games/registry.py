@@ -8,12 +8,15 @@ from __future__ import annotations
 
 import importlib
 import inspect
+import logging
 import pkgutil
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional, Type
 
 if TYPE_CHECKING:
     from bin.games.base_adapter import BaseAdapter
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Auto-discovery
@@ -45,8 +48,11 @@ def _discover_adapters() -> List[Type["BaseAdapter"]]:
 
         try:
             module = importlib.import_module(f"bin.games.{modname}")
-        except Exception:
-            # Skip modules that fail to import (missing deps, etc.)
+        except Exception as exc:
+            # Skip modules that fail to import (missing deps, etc.).
+            # Log at DEBUG so adapter import failures are observable
+            # but do not change control flow.
+            logger.debug("Skipping adapter module %s (import failed): %s", modname, exc)
             continue
 
         # Find all classes in the module that subclass BaseAdapter
@@ -112,12 +118,21 @@ def detect_running_game(psutil_process_iter=None) -> Optional["BaseAdapter"]:
                 return instance
         except TypeError:
             continue
-        except Exception:
+        except Exception as exc:
+            # Adapter detect() raised; try the next adapter. Log at DEBUG
+            # so a misbehaving adapter is observable without changing
+            # control flow (this is best-effort game detection).
+            logger.debug(
+                "Adapter %s.detect() raised: %s", adapter_cls.__name__, exc
+            )
             continue
 
     try:
         processes = list(psutil_process_iter(["name", "exe"]))
-    except Exception:
+    except Exception as exc:
+        # psutil probe failed; we cannot enumerate processes. Return None
+        # (the existing contract) but surface the failure in the log.
+        logger.debug("psutil process iteration failed: %s", exc)
         return None
 
     for adapter_cls in registry:
@@ -128,7 +143,15 @@ def detect_running_game(psutil_process_iter=None) -> Optional["BaseAdapter"]:
                 detect_fn = getattr(adapter_cls, "detect_by_process", adapter_cls.detect)
                 if detect_fn(name, exe):
                     return adapter_cls()
-            except Exception:
+            except Exception as exc:
+                # Per-process probe may raise (access denied, vanished PID,
+                # etc.). Skip and try the next process/adapter; log at DEBUG.
+                logger.debug(
+                    "Adapter %s probe on pid=%s raised: %s",
+                    adapter_cls.__name__,
+                    getattr(proc, "pid", "?"),
+                    exc,
+                )
                 continue
 
     return None
