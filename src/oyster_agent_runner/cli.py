@@ -9,6 +9,7 @@ depend on local packages and game installs.
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -39,6 +40,7 @@ app = typer.Typer(
     add_completion=False,
 )
 console = Console()
+log = logging.getLogger(__name__)
 
 
 # --- Registries --------------------------------------------------------------
@@ -515,7 +517,7 @@ def run_mc_cmd(
 
     with MinecraftStreamWriter(output_dir) as streams:
         with trajectory_path.open(encoding="utf-8") as fh:
-            for ln in fh:
+            for line_no, ln in enumerate(fh, start=1):
                 ln = ln.strip()
                 if not ln:
                     continue
@@ -525,7 +527,13 @@ def run_mc_cmd(
                     continue
                 try:
                     event = TrajectoryEvent.model_validate(payload)
-                except Exception:  # noqa: BLE001 — be permissive on a logged file
+                except Exception as exc:  # noqa: BLE001 — be permissive on a logged file
+                    log.warning(
+                        "Skipping malformed trajectory event in %s at line %d: %s",
+                        trajectory_path,
+                        line_no,
+                        exc,
+                    )
                     continue
                 streams.write(event)
 
