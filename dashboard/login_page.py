@@ -1,5 +1,6 @@
 """Streamlit login UI with Google + Discord OAuth buttons."""
 
+import logging
 import os
 from datetime import datetime
 from typing import Optional
@@ -7,6 +8,10 @@ from typing import Optional
 import httpx
 import jwt
 import streamlit as st
+
+# Configure logger for silent error diagnostics
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 # Configuration
 API_BASE_URL = os.environ.get("OYSTER_API_URL", "http://localhost:8000")
@@ -209,8 +214,8 @@ def logout():
                 json={"refresh_token": st.session_state["refresh_token"]},
                 timeout=5.0
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Logout request failed: %s", e)
     
     # Clear session state
     for key in ["access_token", "refresh_token", "user"]:
@@ -259,8 +264,8 @@ def refresh_token() -> bool:
             st.session_state["refresh_token"] = data["refresh_token"]
             return True
         
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Token refresh failed: %s", e)
     
     return False
 
