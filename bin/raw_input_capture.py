@@ -8,11 +8,14 @@ relative deltas without relying on the OS cursor position.
 from __future__ import annotations
 
 import ctypes
+import logging
 import os
 import threading
 import time
 from ctypes import POINTER, Structure, byref, c_int, c_uint, c_void_p, sizeof, wintypes
 from typing import Any, Callable, Optional
+
+logger = logging.getLogger(__name__)
 
 windll = getattr(ctypes, "windll", None)
 
@@ -198,8 +201,8 @@ class RawInputCapture:
                 user32 = self._user32()
                 if user32 is not None:
                     user32.PostThreadMessageW(thread_id, WM_QUIT, 0, 0)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("PostThreadMessageW(thread_id=%s) failed: %s", thread_id, e)
         if self.thread is not None and self.thread.is_alive():
             self.thread.join(timeout=timeout)
 
@@ -243,8 +246,8 @@ class RawInputCapture:
             if msg == WM_DESTROY:
                 try:
                     user32.PostQuitMessage(0)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("PostQuitMessage failed: %s", e)
                 return 0
             try:
                 return int(user32.DefWindowProcW(hwnd, msg, wparam, lparam))
@@ -308,17 +311,17 @@ class RawInputCapture:
         finally:
             try:
                 self._unregister_raw_input()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Unregister raw input devices failed: %s", e)
             try:
                 if self._hwnd:
                     user32.DestroyWindow(self._hwnd)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("DestroyWindow(hwnd=%s) failed: %s", self._hwnd, e)
             try:
                 user32.UnregisterClassW(self._class_name, hinstance)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("UnregisterClassW(%s) failed: %s", self._class_name, e)
             self._thread_id = None
             self._hwnd = None
 
@@ -387,8 +390,10 @@ class RawInputCapture:
         def _set(func: Any, attr: str, value: Any) -> None:
             try:
                 setattr(func, attr, value)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(
+                    "Setattr(%s, %s=%r) failed: %s", func, attr, value, e
+                )
 
         _set(kernel32.GetModuleHandleW, "argtypes", [wintypes.LPCWSTR])
         _set(kernel32.GetModuleHandleW, "restype", _WIN_HMODULE)
