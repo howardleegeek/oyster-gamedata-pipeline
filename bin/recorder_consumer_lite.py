@@ -4397,13 +4397,15 @@ def _windows_process_name_for_pid(pid: int) -> Optional[str]:
             timeout=5,
             creationflags=0x08000000,  # CREATE_NO_WINDOW
         )
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        _trace(f"_windows_process_name_for_pid: tasklist failed: {exc}")
         return None
     for line in out.splitlines():
         if line.startswith('"'):
             try:
                 return line.split('","', 1)[0].lstrip('"')
-            except Exception:
+            except Exception as exc_inner:
+                _trace(f"_windows_process_name_for_pid: parse line failed: {exc_inner}")
                 return None
     return None
 

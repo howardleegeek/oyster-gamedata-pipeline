@@ -9,6 +9,7 @@ Cost target: ≤ $1/week (Bitcoin OP_RETURN is $0.50-2 typically)
 """
 
 import json
+import logging
 import os
 import time
 from typing import List, Optional, Tuple
@@ -17,6 +18,8 @@ from datetime import datetime, timedelta
 from enum import Enum
 
 from .merkle import hash_node, sha256
+
+logger = logging.getLogger(__name__)
 
 
 class AnchorChain(Enum):
@@ -314,7 +317,11 @@ def get_anchor_for_session(
         session_date = datetime.fromisoformat(consent_time.replace('Z', '+00:00'))
         week_start, _ = get_week_range(session_date)
         week_start_str = format_week_id(week_start)
-    except Exception:
+    except Exception as exc:
+        logger.debug(
+            "Failed to parse consent_signed_at_utc=%r for session_dir=%s: %s",
+            consent_time, session_dir, exc,
+        )
         return None
     
     # Load anchor
