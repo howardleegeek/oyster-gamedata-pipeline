@@ -1,5 +1,6 @@
 """JWT verification middleware for protected routes."""
 
+import logging
 from typing import Optional
 
 from fastapi import Depends, HTTPException, Request
@@ -7,6 +8,8 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from server.oauth import verify_jwt_token
+
+logger = logging.getLogger(__name__)
 
 security = HTTPBearer()
 
@@ -59,7 +62,8 @@ async def get_current_user_optional(request: Request) -> Optional[dict]:
     token = auth_header.split(" ")[1]
     try:
         return verify_jwt_token(token)
-    except Exception:
+    except Exception as exc:
+        logger.debug("Optional auth verification failed: %s", exc)
         return None
 
 
