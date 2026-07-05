@@ -15,6 +15,7 @@ import copy
 import hashlib
 import hmac
 import json
+import logging
 import math
 import sys
 import tempfile
@@ -24,6 +25,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from bin.red_team.attackers import ATTACK_CATALOG, AttackResult
+
+_LOG = logging.getLogger(__name__)
 
 # Canonical session UUID stamped onto every baseline frame + manifest.
 # B-05 / D-04 attackers mutate the frame's session_id to a *different*
@@ -258,7 +261,8 @@ def _vote_v1(fn, *args) -> bool:
     try:
         r = fn(*args)
         return not r.passed
-    except Exception:
+    except Exception as e:
+        _LOG.debug("V1 residual raised; treating as detection: %s", e)
         return True  # exception = detection
 
 
@@ -266,7 +270,8 @@ def _vote_v2(fn, *args) -> bool:
     try:
         r = fn(*args)
         return not r["passed"]
-    except Exception:
+    except Exception as e:
+        _LOG.debug("V2 residual raised; treating as detection: %s", e)
         return True
 
 
@@ -275,7 +280,8 @@ def _vote_v3(fn, *args) -> bool:
         r = fn(*args)
         from bin.v3_physics_oracle.residuals import Verdict
         return r.verdict == Verdict.FAIL
-    except Exception:
+    except Exception as e:
+        _LOG.debug("V3 residual raised; treating as detection: %s", e)
         return True
 
 
@@ -369,7 +375,8 @@ def _detect_count(
             add("R21", 1 if not r21.passed and not (
                 isinstance(r21.residual, float) and r21.residual != r21.residual
             ) else 0)
-        except Exception:
+        except Exception as e:
+            _LOG.debug("R21 monotonic_frame raised; treating as detection: %s", e)
             add("R21", 1)
 
     # R24 — V₄ buyer-signed reference diff. Only fires on the Bucket B
@@ -405,8 +412,9 @@ def _detect_count(
                     isinstance(r24.residual, float) and math.isnan(r24.residual)
                 )
                 add("R24", 1 if (not r24.passed and not is_abstain) else 0)
-            except Exception:
+            except Exception as e:
                 # Treat exceptions as detection (matches R18/R21/R22 contract).
+                _LOG.debug("R24 buyer_reference_diff raised; treating as detection: %s", e)
                 add("R24", 1)
 
     # R18 session-manifest binding — closes B-05 (Frankenstein replay
@@ -420,8 +428,9 @@ def _detect_count(
             r18 = r18_session_manifest(rec, nbr, manifest_path)
             is_abstain = isinstance(r18.residual, float) and math.isnan(r18.residual)
             add("R18", 1 if (not r18.passed and not is_abstain) else 0)
-        except Exception:
+        except Exception as e:
             # Treat raw exceptions as detection (matches R21 contract).
+            _LOG.debug("R18 session_manifest raised; treating as detection: %s", e)
             add("R18", 1)
 
     # R20a..R20e — distribution-level drift detectors. Fire only on Bucket
@@ -451,7 +460,8 @@ def _detect_count(
                     isinstance(r.sample_stat, float) and math.isnan(r.sample_stat)
                 )
                 add(slot, 1 if (not r.passed and not is_abstain) else 0)
-            except Exception:
+            except Exception as e:
+                _LOG.debug("%s drift residual raised; treating as detection: %s", slot, e)
                 add(slot, 1)
 
     # R22 — depth-content SHA-256 manifest binding. Only D-04 attacks
@@ -465,7 +475,8 @@ def _detect_count(
                                  manifest_path=manifest)
             is_abstain = isinstance(r22.residual, float) and math.isnan(r22.residual)
             add("R22", 1 if (not r22.passed and not is_abstain) else 0)
-        except Exception:
+        except Exception as e:
+            _LOG.debug("R22 depth_hash raised; treating as detection: %s", e)
             add("R22", 1)
 
     # R23 — video codec/format. Only D-05 attacks transcode. ffprobe is
@@ -498,7 +509,8 @@ def _detect_count(
                 r23 = r23_video_codec(rec, nbr, video_path=video)
                 is_abstain = isinstance(r23.residual, float) and math.isnan(r23.residual)
                 add("R23", 1 if (not r23.passed and not is_abstain) else 0)
-            except Exception:
+            except Exception as e:
+                _LOG.debug("R23 video_codec raised; treating as detection: %s", e)
                 add("R23", 1)
     return counts
 
