@@ -7370,8 +7370,8 @@ def _emergency_error_box(exc: BaseException) -> None:
     remote_url = None
     try:
         remote_url = _upload_log_remote()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("emergency_error_box: remote log upload failed: %s", e)
 
     try:
         root = tk.Tk()
@@ -7389,12 +7389,17 @@ def _emergency_error_box(exc: BaseException) -> None:
             message=msg,
         )
         root.destroy()
-    except Exception:
+    except Exception as e:
+        logger.debug(
+            "emergency_error_box: tkinter error dialog failed: %s", e
+        )
         log = Path.home() / "OysterRecorder-error.log"
         try:
             log.write_text(f"=== startup error ===\n{traceback.format_exc()}\n")
-        except Exception:
-            pass
+        except Exception as log_err:
+            logger.debug(
+                "emergency_error_box: local fallback log write failed: %s", log_err
+            )
 
 
 def _try_install_mod_first_launch() -> None:
