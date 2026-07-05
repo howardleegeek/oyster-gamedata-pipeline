@@ -21,6 +21,7 @@ Backed by bin/lint_v3_prd_grounded.py (G165 — 24-criteria PRD-grounded lint).
 """
 from __future__ import annotations
 
+import logging
 import sys
 import tarfile
 import tempfile
@@ -29,6 +30,8 @@ import tkinter as tk
 import traceback
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext
+
+logger = logging.getLogger(__name__)
 
 # When PyInstaller-frozen, bundled modules live in sys._MEIPASS. When run from
 # source, the bin/ dir holds lint_v3_prd_grounded.py next to this file.
@@ -242,13 +245,14 @@ def _emergency_error_box(exc: BaseException) -> None:
             ),
         )
         root.destroy()
-    except Exception:
+    except Exception as e:
+        logger.debug("emergency_error_box: failed to show Tk error dialog: %s", e)
         log = Path.home() / "OysterClipValidator-error.log"
         try:
             with log.open("a", encoding="utf-8") as fh:
                 fh.write(f"\n=== startup error ===\n{traceback.format_exc()}\n")
-        except Exception:
-            pass
+        except Exception as e2:
+            logger.debug("emergency_error_box: also failed to write error log: %s", e2)
 
 
 def main() -> int:
