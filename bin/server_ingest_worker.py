@@ -239,7 +239,8 @@ def process_message(
         sqs.delete(message["receipt_handle"])
         logger.info("Successfully processed %s", s3_key)
         return True
-    except Exception:
+    except Exception as exc:
+        logger.debug("process_message exception details: s3_key=%s, error=%r", s3_key, exc)
         logger.exception("Failed to process message %s", message["message_id"])
         return False
     finally:
