@@ -59,13 +59,14 @@ def write_atomic(
         # Atomic replace
         os.replace(temp_path, path)
 
-    except Exception:
+    except Exception as exc:
         # Clean up temp file on any error
+        _logger.debug("write_atomic failed for %s: %s", path, exc)
         if temp_path and os.path.exists(temp_path):
             try:
                 os.unlink(temp_path)
-            except OSError as exc:
-                _logger.debug("os.unlink failed on %s: %s", temp_path, exc)
+            except OSError as unlink_exc:
+                _logger.debug("os.unlink failed on %s: %s", temp_path, unlink_exc)
         raise
 
 
