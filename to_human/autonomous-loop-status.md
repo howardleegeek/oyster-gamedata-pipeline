@@ -61,3 +61,7 @@
 ## Round 297 @ 2026-07-05T07:00:00Z
 - Picked: Surface silent errors in bin/canonical_pipeline.py G3/G5 handlers — bound exceptions in input_latency.json and action_camera.json parse blocks with logger.debug. Control flow unchanged (still appends "malformed" to blocked list). Added 2 regression tests (test_input_latency_json_failure_logs_at_debug, test_action_camera_json_failure_logs_at_debug). All 5 tests pass. py_compile clean; ruff clean; git add both files; committed b749544a and pushed.
 - Result: committed b749544a, pushed to origin/main
+
+## Round 303 @ 2026-07-05T08:00:00Z
+- Picked: Surface silent errors in bin/end_to_end_gate_smoke.py — bound exception 'exc' and added logger.debug() in 3 swallow sites (_detect_h8_real: H8 marker read/parse failure; _detect_h8_real: H8 EXR rglob failure; _detect_video_non_integer_duration: ffprobe subprocess failure). Control flow preserved (all 3 still return False on failure). Regression test tests/bin/test_end_to_end_gate_smoke_silent_error.py (6 passed: no bare except, logger imported, 3 specific log strings, module compiles). Also removed stale untracked .bak file from prior round. py_compile clean; ruff clean; git add 2 specific files; committed 1b60b567 and pushed to origin/main.
+- Result: committed 1b60b567, pushed to origin/main
