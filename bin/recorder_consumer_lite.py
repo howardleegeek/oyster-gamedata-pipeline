@@ -67,6 +67,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Mapping, Optional, Sequence
 
+import logging
+
 # ---- Startup tracing (runs BEFORE any heavyweight import) -----------------
 # Howard tester 2026-05-05: "反馈过来一点就闪退" — v0.1.0 silently crashed
 # on launch with --windowed (which swallows stderr). To diagnose, every
@@ -84,6 +86,9 @@ def _trace(step: str) -> None:
         # Even logging failed — nothing more we can do this early.
         # Fallback to stderr so we at least see the error during debugging.
         print(f"[_trace] Failed to write to {_STARTUP_LOG}: {e}", file=sys.stderr)
+
+
+logger = logging.getLogger(__name__)
 
 
 _trace("=== OysterRecorder boot ===")
@@ -2000,14 +2005,15 @@ def _find_bundled_obs_exe(bundle_root: Optional[Path] = None) -> Optional[Path]:
     try:
         exe_parent = Path(sys.executable).resolve().parent
         roots.extend([exe_parent, exe_parent / "_internal"])
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"failed to resolve exe_parent: {e}")
 
     seen: set[Path] = set()
     for root in roots:
         try:
             resolved_root = root.resolve()
-        except Exception:
+        except Exception as e:
+            logger.debug(f"failed to resolve root {root}: {e}")
             resolved_root = root
         if resolved_root in seen:
             continue
