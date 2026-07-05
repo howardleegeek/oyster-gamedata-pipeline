@@ -69,11 +69,14 @@ from __future__ import annotations
 import argparse
 import contextlib
 import json
+import logging
 import math
 import sys
 import time
 from pathlib import Path
 from typing import Any
+
+_LOG = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Lazy BeamNGpy import — keep CLI usable (incl. ``--help``) without the dep.
@@ -339,7 +342,8 @@ def _disconnect(beamng: Any) -> None:
     """
     try:
         beamng.close()
-    except Exception:  # noqa: BLE001 - intentional best-effort
+    except Exception as exc:  # noqa: BLE001 - intentional best-effort
+        _LOG.debug("BeamNGpy close() failed during best-effort disconnect: %s", exc)
         return
 
 
@@ -460,7 +464,13 @@ def _maybe_write_screenshot(sensors: Any, screenshots_dir: Path, frame_index: in
         return
     try:
         img.save(screenshots_dir / f"frame_{frame_index:06d}.png")
-    except Exception:  # noqa: BLE001 - best-effort, telemetry must keep going
+    except Exception as exc:  # noqa: BLE001 - best-effort, telemetry must keep going
+        _LOG.debug(
+            "Failed to save BeamNG screenshot frame=%d dir=%s: %s",
+            frame_index,
+            screenshots_dir,
+            exc,
+        )
         return
 
 
