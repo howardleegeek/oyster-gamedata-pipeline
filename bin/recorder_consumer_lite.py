@@ -5494,7 +5494,8 @@ class RecorderApp(tk.Tk):
             return  # finalizer has taken over
         try:
             elapsed = max(0.0, time.time() - self._record_started_at)
-        except Exception:
+        except Exception as e:
+            logger.debug("_tick_recording_status: elapsed calc failed: %s", e)
             elapsed = 0.0
         # Format mm:ss
         mm = int(elapsed // 60)
@@ -5505,8 +5506,12 @@ class RecorderApp(tk.Tk):
             if video_alive and self._video_path and self._video_path.exists():
                 mb = self._video_path.stat().st_size / (1024 * 1024)
                 size_str = f"{mb:.1f} MB"
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(
+                "_tick_recording_status: video file size stat failed for %s: %s",
+                getattr(self, "_video_path", None),
+                e,
+            )
         # v0.22.0: real-time data quality (Howard '录的时候确保数据的精确度')
         # Lightweight check on the live event buffer — if anything looks off,
         # surface it NOW so the tester aborts and re-records instead of
@@ -5528,15 +5533,19 @@ class RecorderApp(tk.Tk):
                     if rt["last_event_age_ms"] > 5000:
                         issues.append(f"事件停顿 {rt['last_event_age_ms']/1000:.1f}s")
                     quality_line = f"\n⚠️ 数据精度: {', '.join(issues)}"
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(
+                "_tick_recording_status: realtime_check failed: %s", e
+            )
         try:
             self._subtitle.config(
                 text=f"⏱  {mm}分{ss:02d}秒\n📦 视频文件 {size_str}{quality_line}",
                 fg=RED if video_alive else ORANGE,
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(
+                "_tick_recording_status: subtitle config update failed: %s", e
+            )
         # Schedule next tick.
         self.after(1000, self._tick_recording_status)
 
