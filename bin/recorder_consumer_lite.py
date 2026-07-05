@@ -5757,15 +5757,15 @@ class RecorderApp(tk.Tk):
                 try:
                     if hasattr(w, "destroy"):
                         w.destroy()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("depth_progress: widget destroy failed: %s", e)
             # Re-add the arm + upload buttons so the tester can record
             # again without restarting the .exe. Order matches _build_ui.
             try:
                 self._arm_btn.pack(pady=(16, 4))
                 self._upload_btn.pack(pady=(0, 6))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("depth_progress: button re-pack failed: %s", e)
             _trace("depth_progress: UI restored to ready state")
 
         try:
