@@ -12,11 +12,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import re
 import subprocess
 from dataclasses import dataclass
 from datetime import date
 from typing import Optional
+
+_LOG = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Data models
@@ -180,8 +183,8 @@ def _pr_url(number: int) -> str:
         m = re.search(r"[:/]([^/]+/[^/]+?)(?:\.git)?$", remote_url)
         if m:
             return f"https://github.com/{m.group(1)}/pull/{number}"
-    except Exception:
-        pass
+    except Exception as e:
+        _LOG.debug("Could not derive PR URL from git remote for #%s: %s", number, e)
     return f"https://github.com/OWNER/REPO/pull/{number}"
 
 
@@ -308,8 +311,8 @@ def _find_last_tag() -> str:
         result = _run(["git", "describe", "--tags", "--abbrev=0"], check=False)
         if result.returncode == 0:
             return result.stdout.strip()
-    except Exception:
-        pass
+    except Exception as e:
+        _LOG.debug("Could not determine last git tag: %s", e)
     return "HEAD"
 
 
