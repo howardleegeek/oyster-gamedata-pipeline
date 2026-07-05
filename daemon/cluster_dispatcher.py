@@ -117,7 +117,8 @@ def _parse_spec_header(path: Path) -> dict[str, str]:
     header: dict[str, str] = {}
     try:
         text = path.read_text()
-    except Exception:
+    except Exception as exc:
+        logger.debug("_parse_spec_header: failed to read %s: %s", path, exc)
         return header
 
     in_header = False
@@ -316,7 +317,10 @@ def create_pr(
         if diff_result.returncode == 0:
             # No changes
             return True, ""
-    except Exception:
+    except Exception as exc:
+        logger.debug(
+            "create_pr: git diff --quiet failed in %s: %s", working_dir, exc
+        )
         pass
 
     pr_title = f"[cluster] {task_id}: {title}"
