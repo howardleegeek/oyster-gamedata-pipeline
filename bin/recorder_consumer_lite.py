@@ -2402,7 +2402,8 @@ def _obs_get_profile_parameter(client: Any, category: str, parameter: str) -> Op
                 "parameterName": parameter,
             },
         )
-    except Exception:
+    except Exception as e:
+        logger.debug("OBS GetProfileParameter failed for %s/%s: %s", category, parameter, e)
         return None
     data = response.get("responseData", {}) if isinstance(response, dict) else {}
     if not isinstance(data, dict):
