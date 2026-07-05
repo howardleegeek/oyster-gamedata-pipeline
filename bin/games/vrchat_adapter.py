@@ -97,8 +97,8 @@ def _find_vrchat_process() -> Optional[psutil.Process]:
                     return proc
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                 continue
-    except Exception:
-        logger.debug("Failed to iterate processes", exc_info=True)
+    except Exception as e:
+        logger.debug("Failed to iterate processes: %s", e, exc_info=True)
     return None
 
 
