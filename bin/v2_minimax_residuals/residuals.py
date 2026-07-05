@@ -1,6 +1,9 @@
+import json
 import math
+import os
 import unittest
-from typing import Any, Dict, List
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
 
 def r01_quat_norm(rec: Dict[str, Any]) -> Dict[str, Any]:
@@ -648,7 +651,12 @@ def _v2_sha256_file(path):
     return h.hexdigest()
 
 
-def r22_depth_hash(rec, neighbor=None, depth_dir=None, manifest_path=None):
+def r22_depth_hash(
+    rec: Dict[str, Any],
+    neighbor: Optional[Dict[str, Any]] = None,
+    depth_dir: Optional[Union[Path, str]] = None,
+    manifest_path: Optional[Union[Path, str]] = None,
+) -> Dict[str, Any]:
     """V₂ R22: every file in depth_manifest.json hashes to recorded SHA-256."""
     threshold = 0.0
     base = {"name": "r22_depth_hash", "threshold": threshold}
