@@ -200,12 +200,14 @@ def _ffprobe_video_stream(video: Path) -> Optional[Dict[str, Any]]:
                 den_f = float(den)
                 if den_f > 0:
                     fps = float(num) / den_f
-            except Exception:
+            except Exception as e:  # noqa: BLE001
+                logger.debug("fps parse failed for r_frame_rate=%s: %s", rfr, e)
                 fps = 0.0
         duration = 0.0
         try:
             duration = float(s.get("duration", 0) or 0)
-        except Exception:
+        except Exception as e:  # noqa: BLE001
+            logger.debug("duration parse failed: %s", e)
             duration = 0.0
         return {
             "codec_name": s.get("codec_name", ""),
@@ -231,7 +233,8 @@ def _ffprobe_format_duration(video: Path) -> float:
             capture_output=True, text=True, timeout=60, check=False,
         )
         return float((out.stdout or "0").strip() or 0)
-    except Exception:
+    except Exception as e:  # noqa: BLE001
+        logger.debug("ffprobe format duration failed for %s: %s", video, e)
         return 0.0
 
 
@@ -256,15 +259,18 @@ def _ffprobe_audio_stream(video: Path) -> Optional[Dict[str, Any]]:
         s = streams[0]
         try:
             sr = int(s.get("sample_rate") or 0)
-        except Exception:
+        except Exception as e:  # noqa: BLE001
+            logger.debug("audio sample_rate parse failed: %s", e)
             sr = 0
         try:
             ch = int(s.get("channels") or 0)
-        except Exception:
+        except Exception as e:  # noqa: BLE001
+            logger.debug("audio channels parse failed: %s", e)
             ch = 0
         try:
             dur = float(s.get("duration") or 0)
-        except Exception:
+        except Exception as e:  # noqa: BLE001
+            logger.debug("audio duration parse failed: %s", e)
             dur = 0.0
         return {
             "codec_name": s.get("codec_name", ""),
@@ -407,7 +413,8 @@ def _check_image_specs(d: Path, rpt: LintReport) -> None:
             with Image.open(p) as im:
                 if im.size != (1920, 1080):
                     invalid.append((p.name, im.size))
-        except Exception:
+        except Exception as e:  # noqa: BLE001
+            logger.debug("image open failed for %s: %s", p, e)
             pass
     rpt.add(LintResult(
         5, "Image Resolution", not invalid,
@@ -907,7 +914,8 @@ def _check_keycode(d: Path, rpt: LintReport) -> None:
                 if (isinstance(data, dict) and "keyCode" in data
                         and not isinstance(data["keyCode"], int)):
                     issues.append(jf.name)
-        except Exception:
+        except Exception as e:  # noqa: BLE001
+            logger.debug("keycode json parse failed for %s: %s", jf, e)
             pass
     for yf in list(d.glob("**/*.yaml"))[:20]:
         try:
@@ -916,7 +924,8 @@ def _check_keycode(d: Path, rpt: LintReport) -> None:
                 if (isinstance(data, dict) and "keyCode" in data
                         and not isinstance(data["keyCode"], int)):
                     issues.append(yf.name)
-        except Exception:
+        except Exception as e:  # noqa: BLE001
+            logger.debug("keycode yaml parse failed for %s: %s", yf, e)
             pass
     rpt.add(LintResult(17, "keyCode Integer Format", not issues,
                        "All keyCode int" if not issues
@@ -940,7 +949,8 @@ def _check_keycode(d: Path, rpt: LintReport) -> None:
                                 break
                     if sampled > 500:
                         break
-        except Exception:
+        except Exception as e:  # noqa: BLE001
+            logger.debug("keycode range json parse failed for %s: %s", jf, e)
             pass
     for jl in list(d.glob("**/inputs.jsonl"))[:3]:
         try:
@@ -951,7 +961,8 @@ def _check_keycode(d: Path, rpt: LintReport) -> None:
                         continue
                     try:
                         e = json.loads(ln)
-                    except Exception:
+                    except Exception as ex:  # noqa: BLE001
+                        logger.debug("inputs.jsonl line parse failed: %s", ex)
                         continue
                     kc = e.get("keyCode")
                     if isinstance(kc, int) and not (0 <= kc <= 255):
@@ -959,7 +970,8 @@ def _check_keycode(d: Path, rpt: LintReport) -> None:
                     sampled += 1
                     if sampled > 5000:
                         break
-        except Exception:
+        except Exception as e:  # noqa: BLE001
+            logger.debug("inputs.jsonl open/read failed for %s: %s", jl, e)
             pass
     rpt.add(LintResult(
         18, "KeyCode Validation",
@@ -1179,7 +1191,8 @@ def _probe_video_frame_count(video: Path) -> int:
         n = int((out.stdout or "0").strip() or 0)
         if n > 0:
             return n
-    except Exception:
+    except Exception as e:  # noqa: BLE001
+        logger.debug("ffprobe nb_frames fast probe failed for %s: %s", video, e)
         pass
     # Slow fallback: decode-count, generous timeout.
     try:
@@ -1190,7 +1203,8 @@ def _probe_video_frame_count(video: Path) -> int:
             capture_output=True, text=True, timeout=180, check=False,
         )
         return int((out.stdout or "0").strip() or 0)
-    except Exception:
+    except Exception as e:  # noqa: BLE001
+        logger.debug("ffprobe nb_read_frames fallback failed for %s: %s", video, e)
         return 0
 
 
@@ -1205,7 +1219,8 @@ def _signalstats_for_frame(video: Path, frame_n: int,
              "-vframes", "2", "-f", "null", "-"],
             capture_output=True, text=True, timeout=60, check=False,
         )
-    except Exception:
+    except Exception as e:  # noqa: BLE001
+        logger.debug("signalstats frame %d of %s failed: %s", frame_n, video, e)
         return None
     yavg = ydif = yhigh = None
     for line in proc.stdout.splitlines():
@@ -1315,7 +1330,8 @@ def _check_stream_v_additions(d: Path, rpt: LintReport) -> None:
                 meta = json.load(f)
             if isinstance(meta, dict):
                 meta_frame_count = meta.get("frame_count")
-        except Exception:
+        except Exception as e:  # noqa: BLE001
+            logger.debug("metadata json parse failed for %s: %s", mf, e)
             pass
     if frame_count_ac == 0:
         rpt.add(LintResult(26, "Action-Camera Frame Count", False,
