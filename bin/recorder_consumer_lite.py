@@ -2072,8 +2072,8 @@ def _obs_popen_kwargs() -> dict[str, Any]:
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             startupinfo.wShowWindow = 7  # SW_SHOWMINNOACTIVE
             kwargs["startupinfo"] = startupinfo
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("_obs_popen_kwargs STARTUPINFO failed: %s", e)
     return kwargs
 
 
@@ -2435,17 +2435,19 @@ def _terminate_obs_process(proc: Any) -> None:
     try:
         if proc is None or proc.poll() is not None:
             return
-    except Exception:
+    except Exception as e:
+        logger.debug("_terminate_obs_process poll check failed: %s", e)
         return
     try:
         proc.terminate()
         proc.wait(timeout=8.0)
-    except Exception:
+    except Exception as e:
+        logger.debug("_terminate_obs_process terminate failed: %s", e)
         try:
             proc.kill()
             proc.wait(timeout=3.0)
-        except Exception:
-            pass
+        except Exception as e2:
+            logger.debug("_terminate_obs_process kill failed: %s", e2)
 
 
 def _wait_for_obs_websocket(
