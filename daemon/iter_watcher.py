@@ -441,7 +441,8 @@ def run_daemon(*, dry_run: bool = False, interval: int = 3600) -> None:
     while True:
         try:
             run_once(dry_run=dry_run)
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
+            log.debug("run_once() raised: %s", exc)
             log.exception("Cycle failed — will retry after sleep")
         log.info("Sleeping %d seconds …", interval)
         time.sleep(interval)
