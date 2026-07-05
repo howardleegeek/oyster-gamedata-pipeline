@@ -16,12 +16,15 @@ PASS_DEGRADED → overall PASS_DEGRADED (unless any FAIL/ERROR).
 
 import argparse
 import json
+import logging
 import os
 import subprocess
 import sys
 import tempfile
 import time
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Gate definitions — each maps to a CLI entry-point under bin/
@@ -242,7 +245,8 @@ def _detect_h8_real(session_dir: Path) -> bool:
 
     try:
         source = json.loads(marker.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.debug("H8 marker read/parse failed: marker=%s exc=%s", marker, exc)
         return False
 
     if source.get("kind") != "engine_zbuffer":
@@ -250,7 +254,8 @@ def _detect_h8_real(session_dir: Path) -> bool:
 
     try:
         total_exr_bytes = sum(path.stat().st_size for path in depth_dir.rglob("*.exr"))
-    except OSError:
+    except OSError as exc:
+        logger.debug("H8 EXR rglob failed: depth_dir=%s exc=%s", depth_dir, exc)
         return False
     return total_exr_bytes > 1_000_000
 
@@ -279,7 +284,8 @@ def _detect_video_non_integer_duration(session_dir: Path) -> bool:
             text=True,
             timeout=GATE_TIMEOUT,
         )
-    except Exception:
+    except Exception as exc:
+        logger.debug("ffprobe failed: video_path=%s exc=%s", video_path, exc)
         return False
 
     if result.returncode != 0:
