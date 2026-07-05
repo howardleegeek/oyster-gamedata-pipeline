@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import json
+import logging
 import os
 import tempfile
 import uuid
@@ -38,6 +39,8 @@ from fastapi.responses import JSONResponse, Response
 from backend_stub import appcast_server, crash_dump, sentry_compat, tester_invite
 from backend_stub.income_engine import calculate_daily_income
 from backend_stub.payout import PayoutStore, PayoutWorker
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # In-memory stores
@@ -342,8 +345,12 @@ def _gcs_signed_put_url(bucket_name: str, key: str) -> str:
             creds.refresh(ga_requests.Request())
             kwargs["service_account_email"] = creds.service_account_email
             kwargs["access_token"] = creds.token
-    except Exception:
-        pass  # local dev: key file / emulator can sign without signBlob
+    except Exception as exc:
+        # local dev: key file / emulator can sign without signBlob.
+        # Surface the error at DEBUG so operators can diagnose signBlob
+        # auth issues without changing the public contract (still falls
+        # back to generate_signed_url() with kwargs as-is).
+        logger.debug("GCS signed-url creds enrichment skipped: %s", exc)
     return blob.generate_signed_url(**kwargs)
 
 
