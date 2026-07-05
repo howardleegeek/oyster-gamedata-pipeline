@@ -142,8 +142,12 @@ try:  # pragma: no cover - import-resolution branch
     )
 
     _C8_AVAILABLE = True
-except Exception:  # noqa: BLE001 — any import failure → use fallback
+except Exception as _c8_import_err:  # noqa: BLE001 — any import failure → use fallback
     _C8_AVAILABLE = False
+    logger.debug(
+        "oyster_enrichment.quaternion_utils unavailable; using stdlib fallback: %s",
+        _c8_import_err,
+    )
 
 # --- Buyer-spec field list (canonical order) -------------------------------
 #
