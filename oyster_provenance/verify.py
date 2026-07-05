@@ -14,6 +14,7 @@ Usage:
 """
 
 import argparse
+import logging
 import os
 import sys
 import hashlib
@@ -24,6 +25,10 @@ from datetime import datetime
 
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Module-level logger for silent-error surfacing (debug-level only;
+# public CLI output is governed by print_check/print_info helpers).
+logger = logging.getLogger(__name__)
 
 from oyster_provenance.manifest import SessionManifest, load_manifest
 from oyster_provenance.merkle import compute_file_hashes
@@ -197,7 +202,8 @@ def verify_anchor(manifest: SessionManifest, anchors_dir: str) -> Tuple[bool, bo
         session_date = datetime.fromisoformat(consent_time.replace('Z', '+00:00'))
         week_start, _ = get_week_range(session_date)
         week_start_str = format_week_id(week_start)
-    except Exception:
+    except Exception as e:
+        logger.debug("verify_anchor: could not derive week_id from consent_time=%r: %s", consent_time, e)
         return False, True
     
     # Load anchor
@@ -341,8 +347,8 @@ def print_verification_result(result: VerificationResult, verbose: bool = False)
             print("  Biometric flags:")
             for k, v in manifest.biometric_flags.items():
                 print(f"    {k}: {v}")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("verify_session: could not print session info for %r: %s", result.session_dir, e)
     
     # Final status
     print()
