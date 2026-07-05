@@ -1519,8 +1519,10 @@ def _check_mouse_camera_alignment(d: Path, rpt: LintReport) -> None:
                     pairs.append((float(prev_dx), dyaw))
                     if len(pairs) >= 50:
                         break
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(
+                    "Mouse/camera alignment pair parse failed: %s", e
+                )
         if isinstance(q, list) and len(q) == 4:
             prev_q = q
         if isinstance(dx, (int, float)):

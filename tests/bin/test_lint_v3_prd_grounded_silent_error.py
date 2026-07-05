@@ -38,6 +38,7 @@ class TestLintV3PrdGroundedSilentError:
             "_ffprobe_audio_stream",
             "_check_image_specs",
             "_check_keycode",
+            "_check_mouse_camera_alignment",
         }
         bare_lines = []
         for fn_name in targeted:
@@ -102,6 +103,11 @@ class TestLintV3PrdGroundedSilentError:
         source = self._read_source()
         assert 'keycode json parse failed' in source
 
+    def test_mouse_camera_alignment_pair_logs_at_debug(self):
+        """_check_mouse_camera_alignment pair-parse failure should log at DEBUG."""
+        source = self._read_source()
+        assert 'Mouse/camera alignment pair parse failed' in source
+
     def test_targeted_functions_compile(self):
         """The targeted functions must still parse cleanly with the new debug calls."""
         source = self._read_source()
@@ -112,6 +118,7 @@ class TestLintV3PrdGroundedSilentError:
             "_ffprobe_audio_stream",
             "_check_image_specs",
             "_check_keycode",
+            "_check_mouse_camera_alignment",
         ):
             self._find_function(tree, fn)
 
