@@ -1824,7 +1824,8 @@ class ObsWebSocketClient:
                 if op == self.OP_EVENT:
                     continue
                 raise ObsWebSocketError(f"OBS identify failed: {message}")
-        except Exception:
+        except Exception as exc:
+            logger.debug("OBS identify failed with exception: %s", exc)
             try:
                 sock.close()
             finally:
