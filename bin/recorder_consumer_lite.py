@@ -1285,7 +1285,8 @@ def _package_orphaned_active_session(
             _fsync_file(tmp_tar)
             os.replace(tmp_tar, out_tar)
             _fsync_dir(out_tar.parent)
-        except Exception:
+        except Exception as e:
+            logger.debug("orphan package tarfile failed: %s", e)
             try:
                 tmp_tar.unlink()
             except OSError:
@@ -2169,7 +2170,8 @@ def _obs_place_display_behind_game(client: Any) -> None:
     for item in items.values():
         try:
             indices.append(int(item.get("sceneItemIndex", 0)))
-        except Exception:
+        except Exception as e:
+            logger.debug("failed to parse sceneItemIndex for %s: %s", item, e)
             continue
     top_index = max(max(indices) if indices else 0, len(items) - 1, 1)
     _obs_request_optional(
