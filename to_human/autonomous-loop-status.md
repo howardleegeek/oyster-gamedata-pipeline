@@ -1,3 +1,7 @@
+## Round 302 @ 2026-07-05T07:00:00Z
+- Picked: Surface silent errors in bin/error_storage_postgres.py — added logger and bound exception 'e' in insert_error() and purge_old_errors() with debug logging. Control flow preserved (both still rollback and re-raise). Added regression test tests/bin/test_error_storage_postgres_silent_error.py (5 passed: no bare except, logger imported, insert_error debug log, purge_old_errors debug log, module compiles). py_compile clean; ruff clean; git add both files; committed 0ca19978 and pushed.
+- Result: committed 0ca19978, pushed to origin/main
+
 ## Round 294 @ 2026-07-05T04:00:00Z
 - Picked: Surface silent error in bin/autoresearch_failure_modes.py — replaced bare `except Exception:` in `_lint_source()` AST parse with `except Exception as e:` + logger.debug() with filepath, and in `_lint_directory()` file read with logger.debug() with fpath. Control flow unchanged (still returns ["syntax_error"] on parse failure, continues on file read failure). Added regression test: tests/bin/test_autoresearch_failure_modes_silent_error.py (4 passed: AST no-bare-except, logger import check, AST parse error logs at DEBUG, file read error logs at DEBUG). py_compile clean; ruff clean; git add both files; committed dac2141c and pushed.
 - Result: committed dac2141c, pushed to origin/main
