@@ -98,6 +98,7 @@
 
 ## Round @ 2026-07-03T08:33:23Z
 - File: bin/secret_rotator.py::IAMRotator.list_keys
+
 - Added: docstring=Y, type-hints=N (already had type hints)
 - Commit: 41e738b81cstring), type-hints=Y
 - Commit: 9a2b5f1c2
@@ -636,3 +637,13 @@ Note: Also added docstring to reset_vendor in same commit (minor spec deviation 
 - File: bin/graceful_shutdown_handler.py::handler
 - Added: docstring=Y, type-hints=N (already had type hints)
 - Commit: 9e3fcdcd8
+
+## Round @ 2026-05-17T13:30:00Z
+- File: bin/per_frame_object_bbox.py::FrameData.to_dict
+- Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: 65d90072ff03335bda2c56815ef7cfac2a20f29b
+
+## Round @ 2026-07-05T15:32:59Z
+- File: bin/storage_backend.py::LocalFileStorageBackend.get_signed_url
+- Added: docstring=Y, type-hints=N (already had type hints)
+- Commit: 3bd9251d0
