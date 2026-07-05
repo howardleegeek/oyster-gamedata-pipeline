@@ -584,9 +584,25 @@ def r20d_speed_profile(
             "note": f"mu_speed={mu:.3f}m/s ratio_high={ratio:.3f}"}
 
 
-def r20e_yaw_turn_rate(records, max_rate_deg_per_sec=720.0,
-                       max_outlier_pct=0.05, min_frames=10):
-    """V₂ R20e: ratio(|Δyaw|/dt > 720°/s) ≤ 5% over adjacent pairs."""
+def r20e_yaw_turn_rate(
+    records: List[Dict[str, Any]],
+    max_rate_deg_per_sec: float = 720.0,
+    max_outlier_pct: float = 0.05,
+    min_frames: int = 10,
+) -> Dict[str, Any]:
+    """V₂ R20e: ratio(|Δyaw|/dt > 720°/s) ≤ 5% over adjacent pairs.
+
+    Args:
+        records: List of record dicts with 'camera_rotation_oula' (list of floats)
+            and 'time' (str in format "YYYY-MM-DD HH:MM:SS.ffffff").
+        max_rate_deg_per_sec: Maximum allowed yaw rate in degrees per second.
+        max_outlier_pct: Maximum allowed fraction of frames exceeding max_rate.
+        min_frames: Minimum number of records required for validation.
+
+    Returns:
+        Dict with keys: name (str), passed (bool), residual (float),
+            threshold (float), note (str).
+    """
     if not records:
         return _v2_drift_abstain("R20e", "empty_records", max_outlier_pct)
     if len(records) < min_frames:
