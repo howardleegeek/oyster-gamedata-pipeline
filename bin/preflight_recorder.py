@@ -6,10 +6,13 @@ Fails fast if the system can't produce a buyer-acceptable session.
 """
 
 import json
+import logging
 import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # Configuration
 OUTPUT_DIR = Path("/private/tmp/cluster-2026-05-17-preflight08")
@@ -126,8 +129,8 @@ def check_dpi() -> dict:
                 )
                 if result.returncode == 0 and result.stdout.strip():
                     scaling_factor = int(result.stdout.strip())
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("gsettings scaling-factor query failed: %s", e)
 
             # Also check Xft.dpi
             try:
@@ -142,8 +145,8 @@ def check_dpi() -> dict:
                         dpi = float(line.split()[1])
                         scaling_factor = dpi / 96.0
                         break
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("xrdb Xft.dpi query failed: %s", e)
 
         ok = abs(scaling_factor - EXPECTED_DPI) < 0.1
         return {
@@ -442,8 +445,8 @@ def check_fps() -> dict:
                             cpu_load_ok = load_avg < 4.0
                         except ValueError:
                             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("fps_capability check failed: %s", e)
 
         # For Phase 1, we report as OK if system appears capable
         # Real FPS check would need Minecraft client integration
@@ -537,8 +540,8 @@ def check_oyster_recorder() -> dict:
         )
         if "OysterRecorder" in result.stdout:
             process_running = True
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("tasklist check failed: %s", e)
 
     ok = found is not None
     return {
@@ -598,9 +601,9 @@ def check_network_tailscale() -> dict:
         if result.returncode == 0:
             tailscale_running = True
     except FileNotFoundError:
-        pass
-    except Exception:
-        pass
+        logger.debug("tailscale binary not found")
+    except Exception as e:
+        logger.debug("tailscale status check failed: %s", e)
 
     # Try to ping mac1 (assuming it's on Tailscale network)
     mac1_reachable = False
@@ -615,8 +618,8 @@ def check_network_tailscale() -> dict:
             )
             if result.returncode == 0:
                 mac1_reachable = True
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("ping mac1.tailscale failed: %s", e)
 
         # Try alternative hostnames
         if not mac1_reachable:
@@ -631,8 +634,8 @@ def check_network_tailscale() -> dict:
                     if result.returncode == 0:
                         mac1_reachable = True
                         break
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("ping %s failed: %s", host, e)
 
     # For Phase 1, network is optional (noted as "for future upload")
     ok = True  # Don't block on network for now

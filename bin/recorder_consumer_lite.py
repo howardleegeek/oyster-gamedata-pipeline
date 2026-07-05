@@ -422,8 +422,8 @@ def _upload_log_remote() -> Optional[str]:
             try:
                 with _STARTUP_LOG.open("a", encoding="utf-8") as fh:
                     fh.write(f"{datetime.now().isoformat()} REMOTE_LOG_URL={url}\n")
-            except Exception:
-                pass
+            except Exception as e:
+                _trace(f"upload_log: failed to write log file: {e}")
             return url
         _trace(f"upload_log: server returned non-URL response: {url[:200]}")
     except Exception as exc:
@@ -440,8 +440,8 @@ def _upload_log_in_background(callback=None) -> None:
         if callback is not None:
             try:
                 callback(url)
-            except Exception:
-                pass
+            except Exception as e:
+                _trace(f"upload_log: callback raised: {e}")
 
     threading.Thread(target=_go, daemon=True).start()
 
@@ -1227,8 +1227,8 @@ def _package_orphaned_active_session(
                 loaded = json.loads(metadata_path.read_text(encoding="utf-8"))
                 if isinstance(loaded, dict):
                     metadata.update(loaded)
-            except Exception:
-                pass
+            except Exception as e:
+                _trace(f"session_recovery: failed to parse {metadata_path}: {e}")
         attempts = metadata.get("video_capture", {}).get("attempts_failed", [])
         if not isinstance(attempts, list):
             attempts = []
