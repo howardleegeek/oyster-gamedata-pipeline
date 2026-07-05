@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import logging
 import sys
 import tempfile
 from dataclasses import asdict, dataclass, field
@@ -28,6 +29,9 @@ from typing import Any, Dict, List, Optional, Sequence
 # ---------------------------------------------------------------------------
 # Data Models
 # ---------------------------------------------------------------------------
+
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class ClipEntry:
@@ -171,8 +175,11 @@ def aggregate_user_stats(clips: List[ClipEntry], user_id: str) -> UserStats:
             if week_start <= created < week_end:
                 clips_this_week += 1
                 bonus_this_week += clip.bonus_amount
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(
+                "Skipping clip %s for user %s: datetime parse/compare failed: %s",
+                clip.clip_id, user_id, exc,
+            )
 
     return UserStats(
         user_id=user_id,
