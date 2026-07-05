@@ -161,3 +161,7 @@
 ## Round 324 @ 2026-07-05T17:18:56Z
 - Picked: Surface silent error in recorder_consumer_lite.py _stop_obs_capture_handle() finally block — bound bare `except Exception: pass` in client.close() cleanup to `except Exception as exc:` + `logger.debug("_stop_obs_capture_handle: client.close() failed: %s", exc)`. Control flow preserved (still terminates process after close attempt). Added regression test tests/bin/test_recorder_consumer_lite_finalize_silent_error.py (3 passed: AST no-bare-except, runtime client.close() failure logged, module compiles). py_compile clean; ruff clean; git add both files; committed 04115fad and pushed to origin/main.
 - Result: committed 04115fad, pushed to origin/main
+
+## Round 326 @ 2026-07-05T15:30:00Z
+- Picked: Surface silent errors in recorder_consumer_lite.py — bound exceptions + logger in _start_obs_capture_layer (OBS init fallback), _stop_video_capture_handle (capture_control.stop and stdin write), _list_windows_processes (tasklist call and CSV parse), _join_rawvideo_frame_writer (stdin.close). Control flow preserved (all still return/raise as before). Added regression tests: test_recorder_consumer_lite_join_rawvideo_silent_error.py (5 passed), test_recorder_consumer_lite_process_list_silent_error.py (4 passed), test_recorder_consumer_lite_rawvideo_writer_silent_error.py (3 passed). py_compile clean; ruff clean; git add 4 specific files; committed 89541e93 and pushed to origin/main.
+- Result: committed 89541e93, pushed to origin/main
