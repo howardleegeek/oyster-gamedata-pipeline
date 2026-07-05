@@ -3,6 +3,8 @@ Regression tests for silent error swallows in bin/canonical_pipeline.py.
 
 These tests verify that failed ffprobe_frames() calls are logged at
 debug level (binding the exception) rather than silently swallowed.
+Also tests G3 (input_latency.json) and G5 (action_camera.json) parse
+failures are logged.
 """
 
 import ast
@@ -63,4 +65,18 @@ class TestCanonicalPipelineSilentError:
         # in the source near an except block
         assert "logger.debug" in source, (
             "logger.debug should be used to log ffprobe_frames failure"
+        )
+
+    def test_input_latency_json_failure_logs_at_debug(self):
+        """G3: When input_latency.json parse fails, log at DEBUG with the exception."""
+        source = self._read_source()
+        assert "Failed to parse input_latency.json" in source, (
+            "input_latency.json parse failure should log at debug level"
+        )
+
+    def test_action_camera_json_failure_logs_at_debug(self):
+        """G5: When action_camera.json parse fails, log at DEBUG with the exception."""
+        source = self._read_source()
+        assert "Failed to parse action_camera.json" in source, (
+            "action_camera.json parse failure should log at debug level"
         )

@@ -775,7 +775,8 @@ def step12_upload_gate_strict(sess: pathlib.Path) -> tuple[bool, list[str]]:
                 blocked.append(
                     "G3: input_latency.json has 0 samples (no W-press → velocity matches)"
                 )
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to parse input_latency.json: %s", e)
             blocked.append("G3: input_latency.json malformed")
 
     # G4: audio non-silent (file > 50 KB for a 5-min session)
@@ -799,7 +800,8 @@ def step12_upload_gate_strict(sess: pathlib.Path) -> tuple[bool, list[str]]:
             n = len(d) if isinstance(d, list) else 0
             if not (8990 <= n <= 9010):
                 blocked.append(f"G5: action_camera.json has {n} rows (need 8990-9010)")
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to parse action_camera.json: %s", e)
             blocked.append("G5: action_camera.json malformed")
 
     # G6: MANIFEST sha256 chain
