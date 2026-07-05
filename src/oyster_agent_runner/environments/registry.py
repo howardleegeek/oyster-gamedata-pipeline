@@ -139,7 +139,8 @@ class EnvironmentRegistry:
 
                 count += 1
                 logger.info("Loaded environment plugin: %s", py_file.name)
-            except Exception:
+            except Exception as exc:
+                logger.debug("Failed to load plugin module %s: %s", py_file.name, exc)
                 logger.exception("Failed to load plugin module: %s", py_file.name)
 
         self._discovered = True
