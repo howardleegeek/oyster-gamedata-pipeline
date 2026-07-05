@@ -293,6 +293,21 @@ class LocalFileStorageBackend(StorageBackend):
         return out
 
     def get_signed_url(self, asset_name: str, ttl_seconds: int = DEFAULT_SIGNED_URL_TTL_SECONDS) -> str:
+        """Generate a signed URL for accessing an asset.
+
+        Note: file:// URLs don't actually expire in the traditional sense;
+        this method synthesizes an expiration fragment for parity with
+        cloud backends so tests can assert TTL propagation.
+
+        Args:
+            asset_name: The name/key of the asset to generate a URL for.
+            ttl_seconds: Time-to-live for the signed URL in seconds.
+                Defaults to DEFAULT_SIGNED_URL_TTL_SECONDS (24h).
+
+        Returns:
+            A file:// URL with an expiration fragment in the format
+            `file://{base_url}/{asset_name}#expires={unix_timestamp}`.
+        """
         # file:// URLs don't actually expire; we synthesize a fragment for parity
         # with cloud backends so tests can assert ttl propagation.
         expires_at = int(time.time()) + ttl_seconds
