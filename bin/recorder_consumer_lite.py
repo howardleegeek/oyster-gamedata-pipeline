@@ -1876,12 +1876,12 @@ class ObsWebSocketClient:
             return
         try:
             self._send_frame(b"", opcode=0x8, sock=sock)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("WebSocket close: send frame failed: %s", e)
         try:
             sock.close()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("WebSocket close: socket close failed: %s", e)
 
     @staticmethod
     def _recv_http_response(sock: socket.socket) -> str:
