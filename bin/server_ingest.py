@@ -77,7 +77,16 @@ def lint_one(tarball_path: Path) -> dict[str, Any]:
         from oyster_agent_runner.lint.lint_buyer_spec import lint_tarball
     except ImportError:
         # Fallback: simple tarball validation
-        def lint_tarball(path: str):
+        def lint_tarball(path: str) -> tuple[bool, list[str]]:
+            """Validate tarball contains required files.
+
+            Args:
+                path: Path to the tarball file.
+
+            Returns:
+                Tuple of (ok, messages) where ok is True if all required
+                files are present, and messages contains any error strings.
+            """
             messages = []
             p = Path(path)
             if not p.exists():
