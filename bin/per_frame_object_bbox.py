@@ -214,6 +214,16 @@ class FrameData:
         return [b for b in self.bboxes_3d if b.track_id is None or b.track_id in ids]
 
     def to_dict(self, oc: float = 0.5, tr: float = 0.5) -> Dict[str, Any]:
+        """Convert frame data to a dictionary representation.
+
+        Args:
+            oc: Maximum occlusion ratio for filtering 2D/3D boxes (default 0.5).
+            tr: Maximum truncation ratio for filtering 2D/3D boxes (default 0.5).
+
+        Returns:
+            Dictionary containing frame_id, timestamp, camera_name, scene_id,
+            bboxes_2d (filtered by visibility), and bboxes_3d (filtered by visibility).
+        """
         return {"frame_id": self.frame_id, "timestamp": self.timestamp,
                 "camera_name": self.camera_name, "scene_id": self.scene_id,
                 "bboxes_2d": [b.to_dict() for b in self.get_visible_2d(oc, tr)],
