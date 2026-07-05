@@ -3338,12 +3338,14 @@ def _get_windows_monitor_bounds() -> list[MonitorBounds]:
     try:
         import ctypes
         import ctypes.wintypes as wt
-    except Exception:
+    except Exception as exc:
+        logger.debug("_get_windows_monitor_bounds: ctypes import failed: %s", exc)
         return []
 
     try:
         user32 = ctypes.windll.user32
-    except Exception:
+    except Exception as exc:
+        logger.debug("_get_windows_monitor_bounds: windll.user32 load failed: %s", exc)
         return []
     monitors: list[MonitorBounds] = []
 
