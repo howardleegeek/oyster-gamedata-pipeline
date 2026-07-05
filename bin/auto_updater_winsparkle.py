@@ -106,7 +106,8 @@ class AutoUpdater:
         for cb in self._callbacks.get(event, []):
             try:
                 cb(*args, **kwargs)
-            except Exception:  # noqa: BLE001
+            except Exception as e:
+                logger.debug("Callback error for event=%s: %s", event, repr(e))
                 logger.exception("Callback error for event=%s", event)
 
     @staticmethod
@@ -309,7 +310,8 @@ class AutoUpdater:
                             logger.info("Critical update auto-installed")
                         else:
                             self.prompt_restart()
-            except Exception:  # noqa: BLE001
+            except Exception as e:
+                logger.debug("Daemon loop error: %s", repr(e))
                 logger.exception("Daemon loop error")
             self._stop_event.wait(interval)
 
