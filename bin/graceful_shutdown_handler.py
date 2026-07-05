@@ -52,6 +52,23 @@ class GracefulShutdownHandler:
                 from ctypes import wintypes
                 PHANDLER_ROUTINE = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.DWORD)
                 def handler(ctrl_type: int) -> bool:
+                    """Handle Windows console control events.
+
+                    Called by Windows kernel when a console event occurs (Ctrl+C,
+                    Ctrl+Break, etc.). Maps specific event types to SIGTERM to
+                    trigger graceful shutdown.
+
+                    Args:
+                        ctrl_type: Console event type code.
+                            0 = CTRL_C_EVENT (Ctrl+C)
+                            1 = CTRL_BREAK_EVENT (Ctrl+Break)
+                            2 = CTRL_CLOSE_EVENT (console close)
+                            5 = CTRL_LOGOFF_EVENT
+                            6 = CTRL_SHUTDOWN_EVENT
+
+                    Returns:
+                        True if the event was handled, False otherwise.
+                    """
                     if ctrl_type in (0, 1, 2, 5, 6):
                         self._handle_signal(signal.SIGTERM, None)
                         return True
