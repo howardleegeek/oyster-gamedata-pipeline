@@ -18,9 +18,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 import sys
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Sequence
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_RETENTION_DAYS: int = 90
 VALID_SOURCES: List[str] = ["recorder", "cli", "test", "cluster"]
@@ -143,8 +146,9 @@ def insert_error(db_url: str, severity: str, source: str, error_class: str,
         sess.add(rec)
         sess.commit()
         return rec.id  # type: ignore[return-value]
-    except Exception:
+    except Exception as e:
         sess.rollback()
+        logger.debug("insert_error: db_url=%s, error_class=%s, exception=%r", db_url, error_class, e)
         raise
     finally:
         sess.close()
@@ -183,8 +187,9 @@ def purge_old_errors(db_url: str,
         deleted = sess.query(Error).filter(Error.timestamp < cutoff).delete()
         sess.commit()
         return deleted  # type: ignore[return-value]
-    except Exception:
+    except Exception as e:
         sess.rollback()
+        logger.debug("purge_old_errors: db_url=%s, retention_days=%s, exception=%r", db_url, retention_days, e)
         raise
     finally:
         sess.close()
