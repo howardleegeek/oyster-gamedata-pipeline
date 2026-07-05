@@ -5,6 +5,7 @@ Uses ed25519 (NOT RSA — smaller, modern) for signing session manifests.
 """
 
 import json
+import logging
 import time
 from pathlib import Path
 from typing import Optional, Tuple, Union
@@ -14,6 +15,8 @@ from dataclasses import dataclass
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
+
+logger = logging.getLogger(__name__)
 
 
 # Default paths
@@ -146,7 +149,8 @@ def verify_signature(data: bytes, signature_hex: str, public_key_path: Path = DE
     try:
         public_key.verify(signature, data)
         return True
-    except Exception:
+    except Exception as e:
+        logger.debug("Signature verification failed: %s", e)
         return False
 
 
