@@ -145,12 +145,13 @@ def build_dashboard(
             with open(pytest_output_file, 'r') as f:
                 pytest_output = f.read()
                 test_passed, test_failed, test_pass_pct = parse_test_pass_rate(pytest_output)
-        except Exception:
-            # Silently fall back to zero test counts, but log at debug level
+        except Exception as e:
+            # Fall back to zero test counts, but log at debug level
             # so the failure is visible to operators tailing logs.
             logger.debug(
-                "Could not read or parse pytest output %r; falling back to 0/0",
+                "Could not read or parse pytest output %r; falling back to 0/0: %s",
                 pytest_output_file,
+                e,
                 exc_info=True,
             )
     
