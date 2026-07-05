@@ -3206,8 +3206,8 @@ def _start_rawvideo_frame_writer(
                 try:
                     if stdin is not None:
                         stdin.close()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("_start_rawvideo_frame_writer: stdin.close() failed: %s", exc)
 
         handle.writer_thread = threading.Thread(
             target=_write_frames,
@@ -3251,8 +3251,8 @@ def _join_rawvideo_frame_writer(handle: VideoCaptureHandle, timeout: float = 2.0
     try:
         if proc is not None and proc.stdin:
             proc.stdin.close()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("_join_rawvideo_frame_writer: stdin.close() failed for pid=%s: %s", proc.pid if proc else None, e)
 
 
 def _wait_for_video_layer_init(handle: VideoCaptureHandle, timeout_sec: float) -> None:
@@ -4212,7 +4212,8 @@ def _detect_gpu_available() -> bool:
         return True
     try:
         import ctypes  # noqa: PLC0415
-    except Exception:
+    except Exception as exc:
+        logger.debug("_detect_gpu_available: ctypes import failed: %s", exc)
         return False
     # 1. NVIDIA path
     try:
@@ -4225,12 +4226,14 @@ def _detect_gpu_available() -> bool:
                 rc = int(cu_init(0))
                 if rc == 0:
                     return True
-            except Exception:
+            except Exception as e:
+                logger.debug("_detect_gpu_available: cuInit call failed: %s", e)
                 pass
     except OSError:
         # nvcuda.dll not present at all — no NVIDIA driver installed.
         pass
-    except Exception:
+    except Exception as exc:
+        logger.debug("_detect_gpu_available: NVIDIA CUDA path failed: %s", exc)
         pass
     # 2. DirectML path — only meaningful if torch-directml made it into the
     # bundle. Pure dxgi.dll presence isn't sufficient (every Win10+ has it).
@@ -4239,7 +4242,8 @@ def _detect_gpu_available() -> bool:
 
         if importlib.util.find_spec("torch_directml") is not None:
             return True
-    except Exception:
+    except Exception as exc:
+        logger.debug("_detect_gpu_available: DirectML path failed: %s", exc)
         pass
     return False
 
