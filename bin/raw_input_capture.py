@@ -232,7 +232,8 @@ class RawInputCapture:
         hinstance = kernel32.GetModuleHandleW(None)
         try:
             self._thread_id = int(kernel32.GetCurrentThreadId())
-        except Exception:
+        except Exception as e:
+            logger.debug("GetCurrentThreadId failed: %s", e)
             self._thread_id = None
 
         @WNDPROC
@@ -241,7 +242,8 @@ class RawInputCapture:
                 self._handle_wm_input(lparam)
                 try:
                     return int(user32.DefWindowProcW(hwnd, msg, wparam, lparam))
-                except Exception:
+                except Exception as e:
+                    logger.debug("DefWindowProcW failed in wndproc: %s", e)
                     return 0
             if msg == WM_DESTROY:
                 try:
@@ -251,7 +253,8 @@ class RawInputCapture:
                 return 0
             try:
                 return int(user32.DefWindowProcW(hwnd, msg, wparam, lparam))
-            except Exception:
+            except Exception as e:
+                logger.debug("DefWindowProcW failed in outer handler: %s", e)
                 return 0
 
         self._wndproc = wndproc
@@ -378,7 +381,8 @@ class RawInputCapture:
         timestamp_ms = int((self._clock() - self._start_time) * 1000)
         try:
             self.on_mouse_delta(int(mouse.lLastX), int(mouse.lLastY), timestamp_ms)
-        except Exception:
+        except Exception as e:
+            logger.debug("on_mouse_delta failed: %s", e)
             self.failures += 1
             return
 

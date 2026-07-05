@@ -61,8 +61,8 @@ def _find_roblox_process() -> Optional[psutil.Process]:
                     return proc
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                 continue
-    except Exception:
-        logger.debug("Failed to iterate processes", exc_info=True)
+    except Exception as exc:
+        logger.debug("Failed to iterate processes: %s", exc)
     return None
 
 
@@ -145,14 +145,16 @@ class RobloxAdapter(GameAdapter, BaseAdapter):
 
         try:
             exe_path = proc.exe() or ""
-        except Exception:
+        except Exception as exc:
+            logger.debug("Failed to get exe path for Roblox process %s: %s", proc.pid, exc)
             return None
         if not isinstance(exe_path, str):
             return None
 
         try:
             window_title = proc.name() or "Roblox"
-        except Exception:
+        except Exception as exc:
+            logger.debug("Failed to get window title for Roblox process %s: %s", proc.pid, exc)
             window_title = "Roblox"
         if not isinstance(window_title, str):
             window_title = "Roblox"
