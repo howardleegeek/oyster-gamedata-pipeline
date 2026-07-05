@@ -715,7 +715,11 @@ def _v2_codec_abstain(reason):
             "note": f"ABSTAIN:{reason}"}
 
 
-def r23_video_codec(rec, neighbor=None, video_path=None):
+def r23_video_codec(
+    rec: Dict[str, Any],
+    neighbor: Optional[Dict[str, Any]] = None,
+    video_path: Optional[Union[Path, str]] = None,
+) -> Dict[str, Any]:
     """V₂ R23: video.mp4 is H.265 / 1920x1080 per PRD.
 
     IL10 ABSTAIN gates: every artifact-absent / probe-failed branch routes
