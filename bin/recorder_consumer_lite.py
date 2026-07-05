@@ -1085,11 +1085,12 @@ def _atomic_write_text(path: Path, data: str, *, encoding: str = "utf-8") -> Non
             os.fsync(fh.fileno())
         os.replace(tmp_path, path)
         _fsync_dir(path.parent)
-    except Exception:
+    except Exception as e:
         try:
             tmp_path.unlink()
         except OSError:
             pass
+        logger.debug("atomic_write_text failed for %s: %s", path, e)
         raise
 
 
