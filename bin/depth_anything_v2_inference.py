@@ -216,9 +216,9 @@ def infer_depth_for_video(
             return
         try:
             progress_callback(done, total)
-        except Exception:
-            # UI exceptions must never break inference. Swallow.
-            pass
+        except Exception as e:
+            # UI exceptions must never break inference. Log and swallow.
+            _LOG.debug("progress callback failed: %s", e)
 
     # Initial 0/total so the UI flips straight from "loading model…" to
     # the progress bar without a blank gap.
@@ -241,9 +241,9 @@ def infer_depth_for_video(
                     if should_skip():
                         skipped = True
                         break
-                except Exception:
-                    # A misbehaving skip-check shouldn't crash inference.
-                    pass
+                except Exception as e:
+                    # A misbehaving skip-check shouldn't crash inference. Log and continue.
+                    _LOG.debug("skip check failed: %s", e)
 
             try:
                 pil = Image.fromarray(frame.astype(np.uint8))
@@ -269,8 +269,8 @@ def infer_depth_for_video(
 
         try:
             reader.close()
-        except Exception:
-            pass
+        except Exception as e:
+            _LOG.debug("reader.close() failed: %s", e)
 
         # Final progress tick so the UI bar lands on 100% (or the partial
         # value at skip time) rather than the last N-aligned tick.
@@ -279,11 +279,12 @@ def infer_depth_for_video(
         if not manifest and not skipped:
             raise RuntimeError(f"no frames produced from {video_path}")
 
-    except Exception:
+    except Exception as e:
         # Clean up partial output on any failure — IL10 (no partial fakes).
         # NB: a clean ``should_skip`` early-return is NOT an exception, so
         # partial EXR files are PRESERVED in that path (caller decides
         # whether to keep or drop them).
+        _LOG.debug("inference failed: %s", e)
         if output_dir.exists():
             shutil.rmtree(output_dir, ignore_errors=True)
         raise
