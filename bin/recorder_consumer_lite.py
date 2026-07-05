@@ -2680,8 +2680,8 @@ def _stop_obs_capture_handle(handle: ObsCaptureHandle) -> None:
     finally:
         try:
             handle.client.close()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("_stop_obs_capture_handle: client.close() failed: %s", exc)
         _terminate_obs_process(handle.proc)
 
 
