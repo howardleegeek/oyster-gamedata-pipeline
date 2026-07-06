@@ -124,7 +124,8 @@ def is_process_alive(pid: int) -> bool:
         try:
             os.kill(pid, 0)
             return True
-        except OSError:
+        except OSError as exc:
+            log.debug("_is_pid_alive: pid %s check failed: %s", pid, exc)
             return False
 
 
