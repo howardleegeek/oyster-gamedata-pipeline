@@ -740,8 +740,15 @@ def verify_sequence(frames: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return summary
 
 
-def main():
-    """CLI entry point: python3 v2prime_verifier.py <action_camera.json>"""
+def main() -> int:
+    """CLI entry point for V2-prime residual verifier.
+
+    Args:
+        argv: Command-line arguments (sys.argv), expects JSON file path as first arg.
+
+    Returns:
+        0 if all checks passed, 1 otherwise.
+    """
     if len(sys.argv) < 2:
         print("Usage: python3 v2prime_verifier.py <action_camera.json>")
         print("  Reads JSON (single object or array of frame objects).")
