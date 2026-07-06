@@ -3582,8 +3582,8 @@ def _start_windows_capture_layer(
         if handle.stop_event.is_set():
             try:
                 capture_control.stop()
-            except Exception:
-                pass
+            except Exception as e:
+                _trace(f"on_frame_arrived: capture_control.stop() failed: {e}")
             return
         try:
             # windows-capture Frame exposes pixels via .frame_buffer (BGRA ndarray);
@@ -3970,7 +3970,16 @@ def _windows_supports_application_audio_capture() -> bool:
         return False
     try:
         return int(getwindowsversion().build) >= 19041
-    except Exception:
+    except Exception as exc:
+        # sys.getwindowsversion() is documented as removable in any future
+        # Python release; on a non-Windows interpreter it raises OSError/AttributeError.
+        # Surface the underlying failure at DEBUG so operators can diagnose why
+        # application-audio capture is reported as unsupported, then keep the
+        # conservative "no" answer (False) so callers fall back to mic capture.
+        logger.debug(
+            "_windows_supports_application_audio_capture: getwindowsversion() failed: %s",
+            exc,
+        )
         return False
 
 
