@@ -98,14 +98,15 @@ def _validate_clip(clip_path: Path) -> Dict[str, Any]:
             n_frames = getattr(img, "n_frames", 1)
             fps = getattr(img, "fps", 25.0)
             checks.append(f"duration={n_frames / fps:.2f}s (est)")
-    except Exception as exc:
+    except Exception as e:
         # PIL is optional: any failure (import error, missing decoder, corrupt
         # file) means we can't compute duration. Log at debug so operators
         # tailing logs can see the cause, then keep going — this is a
         # best-effort probe and must not block validation.
         logger.debug(
-            "PIL duration probe failed for %r; recording duration=skipped",
+            "PIL duration probe failed for %r; recording duration=skipped: %s",
             clip_path,
+            e,
             exc_info=True,
         )
         checks.append("duration=skipped (no decoder)")
