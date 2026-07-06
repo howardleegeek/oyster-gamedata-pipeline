@@ -6774,8 +6774,14 @@ class RecorderApp(tk.Tk):
                 yaml.safe_dump(intrinsics, sort_keys=False),
                 encoding="utf-8",
             )
-        except Exception:
-            # Fall back to a plain text file in YAML-ish format.
+        except Exception as _yaml_dump_exc:  # noqa: BLE001 — fallback to plain text below
+            # yaml.safe_dump may raise if `intrinsics` contains a non-serializable
+            # value, or yaml import can fail in slim envs. Log the cause for ops
+            # visibility, then fall back to a plain text file in YAML-ish format.
+            logger.debug(
+                "intrinsics.yaml: yaml.safe_dump failed (%s); falling back to plain text",
+                _yaml_dump_exc,
+            )
             _atomic_write_text(
                 clip_dir / "intrinsics.yaml",
                 "\n".join(f"{k}: {v}" for k, v in intrinsics.items()),
