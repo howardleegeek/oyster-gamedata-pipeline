@@ -82,6 +82,12 @@
 ## Round @ 2026-05-17T12:45:00Z
 - File: bin/check_fabric_yarn_versions.py::get_latest_yarn
 - Added: docstring=N (already had docstring), type-hints=Y
+- Commit: 95f68eeab
+
+## Round @ 2026-05-17T13:00:00Z
+- File: bin/upload_resume_helper.py::do_abort/do_list_parts
+- Added: docstring=Y, type-hints=Y
+- Commit: df584f4108abee2f8acc99490e687dfca41fae3dcstring), type-hints=Y
 - Commit: 8a2e9c153
 
 ## Round @ 2026-05-17T13:00:00Z
