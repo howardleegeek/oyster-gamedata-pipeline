@@ -7469,8 +7469,9 @@ def _try_install_mod_first_launch() -> None:
     except Exception as e:  # noqa: BLE001 — never crash recorder
         try:
             _trace(f"mod-install failed (non-fatal): {e}")
-        except Exception:
-            pass
+        except Exception as inner_exc:  # noqa: BLE001
+            import sys
+            print(f"[WARN] mod-install logging failed: {inner_exc}", file=sys.stderr)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
