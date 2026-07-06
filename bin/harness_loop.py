@@ -483,6 +483,13 @@ HOSTNAME = _socket.gethostname()
 
 
 def _now_iso() -> str:
+    """Return current UTC time as ISO 8601 string.
+
+    Returns
+    -------
+    str
+        Current UTC time in format ``YYYY-MM-DDTHH:MM:SZ``.
+    """
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
