@@ -7321,8 +7321,11 @@ class RecorderApp(tk.Tk):
             if proc.stdin:
                 proc.stdin.write(b"q\n")
                 proc.stdin.flush()
-        except Exception:
-            pass
+        except Exception as _ffmpeg_quit_exc:
+            _trace(
+                f"ffmpeg: failed to send 'q' to stdin (non-fatal, will fall through to terminate): "
+                f"{type(_ffmpeg_quit_exc).__name__}: {_ffmpeg_quit_exc}"
+            )
         try:
             proc.wait(timeout=_FFMPEG_CLEAN_QUIT_TIMEOUT_SEC)
         except subprocess.TimeoutExpired:
