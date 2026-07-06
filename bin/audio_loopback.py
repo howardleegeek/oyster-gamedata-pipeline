@@ -32,11 +32,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
 from typing import List, Optional, Sequence
+
+logger = logging.getLogger(__name__)
 
 
 class AudioCaptureMode:
@@ -82,7 +85,8 @@ def _run_ffmpeg(args: Sequence[str], timeout: float = 8.0) -> str:
             timeout=timeout,
             check=False,
         )
-    except (OSError, subprocess.TimeoutExpired):
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        logger.debug("ffmpeg run failed: %s", exc)
         return ""
     return (proc.stdout or "") + (proc.stderr or "")
 
