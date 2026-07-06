@@ -124,7 +124,7 @@ def infer_depth(
         out.close()
         return True
 
-    except Exception:
+    except Exception as exc:
         logger.exception(
             "infer_depth failed for rgb=%s out=%s",
             rgb_frame_path,
