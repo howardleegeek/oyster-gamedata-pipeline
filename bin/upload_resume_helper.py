@@ -259,14 +259,28 @@ def do_resume_internal(checkpoint: CheckpointState) -> int:
     return 0
 
 
-def do_abort(args) -> int:
-    """Abort an upload."""
+def do_abort(args: argparse.Namespace) -> int:
+    """Abort an upload by upload ID.
+
+    Args:
+        args: Argument namespace with bucket, key, and upload_id attributes.
+
+    Returns:
+        Exit code (0 for success).
+    """
     abort_upload(args.bucket, args.key, args.upload_id)
     return 0
 
 
-def do_list_parts(args) -> int:
-    """List parts of an upload."""
+def do_list_parts(args: argparse.Namespace) -> int:
+    """List parts of an upload by upload ID.
+
+    Args:
+        args: Argument namespace with bucket, key, and upload_id attributes.
+
+    Returns:
+        Exit code (0 for success).
+    """
     parts = list_parts(args.bucket, args.key, args.upload_id)
     for p in parts:
         print(f"Part {p['PartNumber']}: etag={p['ETag']}, size={p['Size']}")
