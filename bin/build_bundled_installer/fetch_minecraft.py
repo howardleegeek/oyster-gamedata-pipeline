@@ -970,6 +970,25 @@ def _write_runtime_manifest(
 
 
 def main() -> int:
+    """Download and verify vanilla Minecraft client bundle.
+
+    This is the main entry point for the Minecraft bundler. It downloads:
+        - Per-version manifest and client.jar
+        - Platform-specific libraries with native DLLs
+        - Asset index and asset objects (~4035 files)
+
+    The function reads pinned version info from the manifest, verifies
+    all SHA-1 hashes after download, and writes a runtime manifest.
+
+    Returns:
+        0 on success. Non-zero exit codes indicate specific failures:
+        - 2: SHA-1/SHA-256 mismatch (corrupt download or tampering)
+        - 3: Post-fetch verification failed (missing required files)
+        - 4: Network failure after retries
+        - 5: Filesystem/IO error
+        - 6: Pin manifest invalid
+        - 7: Mojang version manifest invalid
+    """
     pin = _load_pin()
     version_id: str = pin["version_id"]
     asset_index_id: str = pin["asset_index_id"]
