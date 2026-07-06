@@ -79,7 +79,8 @@ def _read_consent(path: Optional[Path] = None) -> Dict[str, Any]:
     try:
         text = target.read_text(encoding="utf-8")
         return json.loads(text)
-    except (FileNotFoundError, OSError, json.JSONDecodeError):
+    except (FileNotFoundError, OSError, json.JSONDecodeError) as exc:
+        logger.debug("consent read failed for %s: %s", target, exc)
         return {}
 
 
@@ -125,7 +126,8 @@ def _read_counter_file(path: Path) -> int:
     """Read an integer counter from a single-line file. Returns 0 on error."""
     try:
         return int(path.read_text(encoding="utf-8").strip())
-    except (FileNotFoundError, OSError, ValueError):
+    except (FileNotFoundError, OSError, ValueError) as exc:
+        logger.debug("counter read failed for %s: %s", path, exc)
         return 0
 
 
@@ -134,7 +136,8 @@ def _write_counter_file(path: Path, value: int) -> None:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(str(value), encoding="utf-8")
-    except OSError:
+    except OSError as exc:
+        logger.debug("counter write failed for %s: %s", path, exc)
         pass  # best-effort
 
 
@@ -217,7 +220,8 @@ def _has_uploaded_today() -> bool:
         marker = LAST_UPLOAD_MARKER.read_text(encoding="utf-8").strip()
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         return marker == today
-    except (FileNotFoundError, OSError):
+    except (FileNotFoundError, OSError) as exc:
+        logger.debug("last-upload marker read failed: %s", exc)
         return False
 
 
@@ -229,7 +233,8 @@ def _mark_uploaded_today() -> None:
             datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             encoding="utf-8",
         )
-    except OSError:
+    except OSError as exc:
+        logger.debug("last-upload marker write failed: %s", exc)
         pass
 
 
