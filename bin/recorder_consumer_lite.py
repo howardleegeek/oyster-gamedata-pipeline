@@ -3646,7 +3646,8 @@ def _start_windows_capture_layer(
     thread.start()
     try:
         _wait_for_video_layer_init(handle, init_timeout_sec)
-    except Exception:
+    except Exception as exc:
+        logger.debug("video layer init failed (windows-capture): %s", exc)
         _stop_video_capture_handle(handle, clean_timeout=0.5, force_timeout=0.5)
         raise
     return handle
@@ -3740,7 +3741,8 @@ def _start_mss_layer(
     thread.start()
     try:
         _wait_for_video_layer_init(handle, init_timeout_sec)
-    except Exception:
+    except Exception as exc:
+        logger.debug("video layer init failed (mss): %s", exc)
         _stop_video_capture_handle(handle, clean_timeout=0.5, force_timeout=0.5)
         raise
     return handle
