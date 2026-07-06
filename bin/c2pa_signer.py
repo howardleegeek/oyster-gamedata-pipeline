@@ -9,11 +9,15 @@ as required by EU AI Act (Aug 2026) and California AB 2013 (Jan 2026).
 import argparse
 import hashlib
 import json
+import logging
 import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+# Module-level logger so silent error handlers can surface failures at DEBUG.
+logger = logging.getLogger("c2pa_signer")
 
 # Lazy imports for optional dependencies
 try:
@@ -125,6 +129,7 @@ class C2PASigner:
                 json.dump(manifest, f, indent=2)
             return True
         except Exception as e:
+            logger.debug("Failed to embed C2PA manifest to %s: %s", output_path, e)
             print(f"Error embedding manifest: {e}", file=sys.stderr)
             return False
 
@@ -153,8 +158,8 @@ def parse_params(params_str: str) -> Dict[str, Any]:
     """Parse generation parameters from string."""
     try:
         return json.loads(params_str)
-    except json.JSONDecodeError:
-        pass
+    except json.JSONDecodeError as e:
+        logger.debug("Failed to parse params as JSON, falling back to comma-split: %s", e)
     params = {}
     for pair in params_str.split(","):
         if "=" in pair:
