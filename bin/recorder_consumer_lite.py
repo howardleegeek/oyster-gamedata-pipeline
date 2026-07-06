@@ -6701,7 +6701,8 @@ class RecorderApp(tk.Tk):
                     try:
                         if depth_dir.exists():
                             shutil.rmtree(depth_dir, ignore_errors=True)
-                    except Exception:
+                    except Exception as _depth_rm_exc:  # noqa: BLE001
+                        _trace(f"depth: rmtree failed during user skip (non-fatal): {_depth_rm_exc}")
                         pass
                     _trace("package: depth skipped by user — partial tarball")
                     self._set(
