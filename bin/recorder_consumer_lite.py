@@ -7472,8 +7472,13 @@ def _try_install_mod_first_launch() -> None:
         try:
             _trace(f"mod-install failed (non-fatal): {e}")
         except Exception as inner_exc:  # noqa: BLE001
-            import sys
-            print(f"[WARN] mod-install logging failed: {inner_exc}", file=sys.stderr)
+            # `sys` is module-level imported; do NOT re-import it here or
+            # Python treats the name as function-local and `hasattr(sys, ...)`
+            # at line ~7455 raises F823 (referenced before assignment).
+            print(
+                f"[WARN] mod-install logging failed: {inner_exc}",
+                file=sys.stderr,
+            )
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
