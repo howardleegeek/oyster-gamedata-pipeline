@@ -235,8 +235,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             for f in tmp.iterdir():
                 f.unlink()
             tmp.rmdir()
-        except OSError:
-            pass
+        except OSError as exc:
+            logger.debug("Temp dir cleanup skipped for %s: %s", tmp, exc)
 
 
 if __name__ == "__main__":
