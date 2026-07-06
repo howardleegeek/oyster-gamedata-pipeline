@@ -4444,7 +4444,8 @@ def _get_minecraft_window_rect() -> Optional[dict[str, Any]]:
     try:
         import ctypes
         import ctypes.wintypes as wt
-    except Exception:
+    except Exception as e:
+        logger.debug("_get_minecraft_window_rect: ctypes import failed: %s", e)
         return None
 
     user32 = ctypes.windll.user32
@@ -4518,7 +4519,8 @@ def _get_minecraft_window_rect() -> Optional[dict[str, Any]]:
     if GetDpiForWindow is not None:
         try:
             dpi = int(GetDpiForWindow(found_hwnd[0])) or 96
-        except Exception:
+        except Exception as e:
+            logger.debug("GetDpiForWindow failed for hwnd=%s: %s", found_hwnd[0], e)
             dpi = 96
 
     return {
@@ -4766,7 +4768,8 @@ class InputCapture:
                     name = getattr(key, "name", None)
                     if name:
                         kc = hash(name) & 0xFFFF
-        except Exception:
+        except Exception as e:
+            logger.debug("_record_key failed to map key %r to keyCode: %s", key, e)
             kc = -1
         with self._lock:
             self.events.append(
@@ -4847,14 +4850,14 @@ class InputCapture:
         if self._raw_input_capture is not None:
             try:
                 self._raw_input_capture.stop()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("InputCapture._raw_input_capture.stop() failed: %s", exc)
         for L in (self._kbd_listener, self._mouse_listener):
             try:
                 if L is not None:
                     L.stop()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("InputCapture listener.stop() failed: %s", exc)
         with self._lock:
             indexed = list(enumerate(self.events))
         return [
