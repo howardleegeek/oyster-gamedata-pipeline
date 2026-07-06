@@ -61,7 +61,8 @@ def analyze_ci_logs(log_dir: Path, days: int) -> Dict[str, Any]:
         try:
             if datetime.fromtimestamp(fp.stat().st_mtime) < cutoff:
                 continue
-        except OSError:
+        except OSError as exc:
+            logger.debug("ci_health_check: stat failed for %s: %s", fp, exc)
             continue
         m["total_runs"] += 1
         name = fp.name.lower()
