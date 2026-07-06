@@ -4541,7 +4541,8 @@ def _restore_minecraft_window_for_capture(rect: Optional[dict[str, Any]]) -> Non
         return
     try:
         hwnd = int(rect.get("hwnd") or 0)
-    except Exception:
+    except Exception as _restore_hwnd_exc:  # noqa: BLE001 - best-effort restore
+        _trace(f"_restore_minecraft_window_for_capture: int(hwnd) failed: {_restore_hwnd_exc}")
         hwnd = 0
     if hwnd <= 0:
         return
