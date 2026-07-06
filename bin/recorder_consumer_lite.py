@@ -1049,17 +1049,18 @@ def _fsync_dir(path: Path) -> None:
 
     try:
         fd = os.open(str(path), os.O_RDONLY)
-    except OSError:
+    except OSError as exc:
+        _trace(f"_fsync_dir: os.open failed: {exc}")
         return
     try:
         os.fsync(fd)
-    except OSError:
-        pass
+    except OSError as exc:
+        _trace(f"_fsync_dir: os.fsync failed: {exc}")
     finally:
         try:
             os.close(fd)
-        except OSError:
-            pass
+        except OSError as exc:
+            _trace(f"_fsync_dir: os.close failed: {exc}")
 
 
 def _fsync_file(path: Path) -> None:
