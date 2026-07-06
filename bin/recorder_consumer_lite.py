@@ -5867,8 +5867,15 @@ class RecorderApp(tk.Tk):
                 activebackground="#1565c0",
             )
             _trace("button reset for next session")
-        except Exception:
-            pass
+        except Exception as _arm_btn_reset_exc:
+            # Non-fatal: a future session can still be armed; we just won't
+            # have reset the prior button label/color. Surface the reason
+            # in the operator trace so the tester isn't left wondering why
+            # the button still shows "停止录制" / a non-default color.
+            _trace(
+                f"reset_arm_button: button reset failed (non-fatal) "
+                f"[{type(_arm_btn_reset_exc).__name__}]: {_arm_btn_reset_exc}"
+            )
 
     def _recover_orphaned_active_session_on_boot(self) -> None:
         """Package stale mod output from a previous crash before recording again."""
