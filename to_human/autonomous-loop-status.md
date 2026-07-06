@@ -14,6 +14,10 @@
 - Picked: Surface silent errors in bin/games/registry.py — replaced 4 bare `except Exception:` blocks with `except Exception as exc:` + `logger.debug(...)` (in _discover_adapters() module import, detect_running_game() adapter detect, psutil process iteration, and per-process probe). Control flow unchanged (still skips failed adapters and returns None on failure). Added regression test tests/bin/test_games_registry_silent_error.py (8 passed: logger imported, no bare except pass, all except blocks bound, debug logs present, module compiles). py_compile clean; ruff clean; git add both files; committed da21b584 and pushed.
 - Result: committed da21b584, pushed to origin/main
 
+## Round 305 @ 2026-07-05T10:00:00Z
+- Picked: Fix broken regression test tests/server/test_auth_middleware_silent_error.py — the test tried to dynamically load the module via spec.loader.exec_module() which failed because server.oauth wasn't available. Replaced with AST-based analysis matching the pattern used by other silent_error tests. Tests verify: logger imported, no bare except, exception bound, logger.debug present, returns None on exception. 6 tests passed. py_compile clean; ruff clean; git add single file; committed bcc183c2 and pushed.
+- Result: committed bcc183c2, pushed to origin/main
+
 ## Round 304 @ 2026-07-05T09:00:00Z
 - Picked: Surface silent errors in bin/raw_input_capture.py — replaced 4 bare `except Exception:` blocks with `except Exception as e:` + `logger.debug()` in GetCurrentThreadId, DefWindowProcW (inner handler), DefWindowProcW (outer handler), and on_mouse_delta. Control flow unchanged (thread_id still defaults to None, DefWindowProcW still returns 0 on failure, on_mouse_delta still increments failures counter). Added regression test tests/bin/test_raw_input_capture_silent_error.py (4 passed: no bare except binding, logger imported, debug logs present, module compiles). py_compile clean; ruff clean; git add both files; committed 69a120a8 and pushed.
 - Result: committed 69a120a8, pushed to origin/main
