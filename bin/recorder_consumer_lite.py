@@ -4735,7 +4735,8 @@ class InputCapture:
     def _record_raw_mouse_delta(self, dx: int, dy: int, timestamp_ms: int) -> None:
         try:
             ts = max(0, int(timestamp_ms))
-        except Exception:
+        except Exception as e:
+            logger.debug("timestamp_ms parse failed: %s", e)
             ts = self._now_ms()
         with self._lock:
             self.events.append(
