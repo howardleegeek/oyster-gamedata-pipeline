@@ -7363,8 +7363,8 @@ class RecorderApp(tk.Tk):
         # Synchronous-ish but capped to 15s by urlopen timeout.
         try:
             _upload_log_remote()
-        except Exception:
-            pass
+        except Exception as _upload_exc:
+            _trace(f"on_close: log upload failed (non-fatal): {_upload_exc}")
         self.destroy()
 
     # ---- UI updates (thread-safe via after) -----------------------------
