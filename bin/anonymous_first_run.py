@@ -116,8 +116,16 @@ class AnonymousStorage:
                 fh.flush()
                 os.fsync(fh.fileno())
             os.replace(tmp_name, str(path))
-        except BaseException:
-            os.unlink(tmp_name)
+        except BaseException as exc:
+            try:
+                os.unlink(tmp_name)
+            except OSError as unlink_exc:
+                logger.debug(
+                    "anonymous_first_run: failed to unlink temp %s after write error %s: %s",
+                    tmp_name,
+                    exc,
+                    unlink_exc,
+                )
             raise
 
     def is_initialized(self) -> bool:
