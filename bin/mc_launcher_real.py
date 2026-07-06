@@ -233,7 +233,8 @@ def launch_minecraft(
         )
 
         # Start thread to capture output
-        def capture_output():
+        def capture_output() -> None:
+            """Write subprocess stdout to log file in real-time."""
             for line in process.stdout:
                 f.write(line)
                 f.flush()
