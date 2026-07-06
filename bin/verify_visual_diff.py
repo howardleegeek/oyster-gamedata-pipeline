@@ -385,6 +385,17 @@ def parse_frames_arg(arg: str | None, n_a: int, n_b: int) -> list[int]:
 
 
 def _fmt_value(v: Any) -> str:
+    """Format a value for terminal display.
+
+    Converts various types to human-readable strings, handling sentinel values,
+    floats (with compact formatting), dicts, lists, and JSON-encodable types.
+
+    Args:
+        v: The value to format.
+
+    Returns:
+        A string representation suitable for terminal output.
+    """
     if v is SENTINEL_MISSING:
         return "<missing>"
     if isinstance(v, float):
