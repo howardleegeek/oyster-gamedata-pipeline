@@ -5603,8 +5603,8 @@ class RecorderApp(tk.Tk):
         try:
             self._arm_btn.pack_forget()
             self._upload_btn.pack_forget()
-        except Exception:
-            pass
+        except Exception as _btn_hide_exc:
+            _trace(f"depth_progress: button hide failed (non-fatal): {type(_btn_hide_exc).__name__}: {_btn_hide_exc}")
 
         # Top-level status text — replaces the verdict banner.
         self._set(
@@ -6465,7 +6465,8 @@ class RecorderApp(tk.Tk):
                 candidate = Path(_gs_jsonl_path())
                 if candidate.exists():
                     gs_source = candidate
-            except Exception:
+            except Exception as _gs_path_exc:
+                _trace(f"game_state: _gs_jsonl_path() failed: {_gs_path_exc}")
                 gs_source = None
 
         _gs_samples = _gs_load(gs_source) if (_gs_load and gs_source) else None
@@ -7012,7 +7013,8 @@ class RecorderApp(tk.Tk):
             _fsync_file(tmp_tar)
             os.replace(tmp_tar, out_tar)
             _fsync_dir(out_tar.parent)
-        except Exception:
+        except Exception as _tar_exc:
+            logger.debug("package: tarball write failed: %s", _tar_exc)
             try:
                 tmp_tar.unlink()
             except OSError:
@@ -7024,8 +7026,8 @@ class RecorderApp(tk.Tk):
         # Cleanup tmp dir.
         try:
             shutil.rmtree(self._tmp_dir, ignore_errors=True)
-        except Exception:
-            pass
+        except Exception as _tmp_rm_exc:
+            logger.debug("package: tmp_dir cleanup failed: %s", _tmp_rm_exc)
         return out_tar
 
     def _start_video_capture(self, out_path: Path) -> None:
