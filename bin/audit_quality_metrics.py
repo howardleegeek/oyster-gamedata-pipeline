@@ -150,7 +150,8 @@ def check_frame_drops(session) -> Dict[str, Any]:
                         if key in data:
                             frame_indices.append(data[key])
                             break
-                except json.JSONDecodeError:
+                except json.JSONDecodeError as exc:
+                    logger.debug("QM2: skipping malformed JSON line in frames.jsonl: %s", exc)
                     continue
 
         if not frame_indices:
@@ -434,7 +435,8 @@ def check_action_diversity(session) -> Dict[str, Any]:
                         event_types.add(data['action'])
                     elif 'key' in data:
                         event_types.add(data['key'])
-                except json.JSONDecodeError:
+                except json.JSONDecodeError as exc:
+                    logger.debug("QM7: skipping malformed JSON line in inputs.jsonl: %s", exc)
                     continue
 
         # Count distinct types
@@ -488,7 +490,10 @@ def check_world_coverage(session) -> Dict[str, Any]:
                     if chunk_x is not None and chunk_z is not None:
                         chunks.add((chunk_x, chunk_z))
 
-                except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+                except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+                    logger.debug(
+                        "QM8: skipping malformed game_state entry: %s", exc
+                    )
                     continue
 
         unique_chunks = len(chunks)
@@ -536,19 +541,31 @@ def check_camera_position_range(session) -> Dict[str, Any]:
                                 rows = doc
                             elif isinstance(doc, dict):
                                 rows = [doc]
-                        except json.JSONDecodeError:
+                        except json.JSONDecodeError as exc:
+                            logger.debug(
+                                "QM9: %s not valid JSON, falling back to JSONL: %s",
+                                path, exc,
+                            )
                             # Maybe it's actually JSONL despite the .json name; re-open
                             f.seek(0)
                             for ln in f:
                                 try:
                                     rows.append(json.loads(ln.strip()))
-                                except json.JSONDecodeError:
+                                except json.JSONDecodeError as ln_exc:
+                                    logger.debug(
+                                        "QM9: skipping malformed JSONL line in %s: %s",
+                                        path, ln_exc,
+                                    )
                                     continue
                     else:
                         for ln in f:
                             try:
                                 rows.append(json.loads(ln.strip()))
-                            except json.JSONDecodeError:
+                            except json.JSONDecodeError as exc:
+                                logger.debug(
+                                    "QM9: skipping malformed JSONL line in %s: %s",
+                                    path, exc,
+                                )
                                 continue
 
                 for data in rows:
@@ -576,7 +593,11 @@ def check_camera_position_range(session) -> Dict[str, Any]:
                             if pos:
                                 camera_data.append(pos)
 
-                        except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+                        except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+                            logger.debug(
+                                "QM9: skipping camera_position entry (parse/lookup error): %s",
+                                exc,
+                            )
                             continue
 
         if not camera_data:
