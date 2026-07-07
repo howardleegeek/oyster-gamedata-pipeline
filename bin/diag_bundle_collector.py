@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
+import logging
 import os
 import platform
 import shutil
@@ -22,6 +23,8 @@ import tarfile
 import tempfile
 from pathlib import Path
 from typing import List, Optional
+
+logger = logging.getLogger(__name__)
 
 MODULE_VERSION = "1.0.0"
 DEFAULT_LOG_DIRS = ["/var/log", "./logs"]
@@ -46,8 +49,8 @@ def get_system_info() -> dict:
         if platform.system() == "Linux":
             with open("/proc/meminfo") as f:
                 info["memory"] = [line.strip() for line in f.readlines()[:5]]
-    except OSError:
-        pass
+    except OSError as exc:
+        logger.debug("diag_bundle_collector: cannot read /proc/meminfo: %s", exc)
     return info
 
 
@@ -82,7 +85,8 @@ def run_cmd_safe(cmd: List[str], timeout: int = 30) -> Optional[str]:
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         return r.stdout.strip() if r.returncode == 0 else None
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
+        logger.debug("diag_bundle_collector: run_cmd_safe %s failed: %s", cmd, exc)
         return None
 
 
@@ -100,16 +104,16 @@ def collect_bundle(log_dirs: List[str], manifest_dir: str, output: str) -> Path:
         for lf in find_log_files(log_dirs):
             try:
                 shutil.copy2(lf, logs_dir / lf.name)
-            except OSError:
-                pass
+            except OSError as exc:
+                logger.debug("diag_bundle_collector: cannot copy log %s: %s", lf, exc)
         # Manifests
         man_dir = col_dir / "manifests"
         man_dir.mkdir()
         for mf in find_manifests(manifest_dir):
             try:
                 shutil.copy2(mf, man_dir / mf.name)
-            except OSError:
-                pass
+            except OSError as exc:
+                logger.debug("diag_bundle_collector: cannot copy manifest %s: %s", mf, exc)
         # Diagnostic commands output
         with open(col_dir / "diagnostics.txt", "w") as f:
             f.write(f"Collected: {datetime.datetime.now().isoformat()}\n{'='*50}\n")
