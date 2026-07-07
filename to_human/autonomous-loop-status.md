@@ -7,6 +7,10 @@
 - Picked: Surface silent errors in bin/oyster_monitor.py — WIP from previous tick (already had changes to UploadBacklogChecker and ErrorRateChecker swallow sites, plus untracked regression test). Fixed test bugs: _find_except_in_method returns (lineno, handler) tuples not just handler, and ErrorRateChecker has both inner and outer except handlers so need to filter by line number. Tests pass (5 passed). Ruff clean; git add both files; committed e69fc525 and pushed.
 - Result: committed e69fc525, pushed to origin/main
 
+## Round 356 @ 2026-07-07T04:00:00Z
+- Picked: Surface silent errors in bin/anti_replay_check.py and bin/generate_systeminfo_json.py — found WIP edits from previous tick with regression tests. Fixed test logic bug in test_anti_replay_check_silent_error.py (was looking for json.load inside except body instead of in the Try body context). Tests pass (8 passed). Ruff clean; git add 4 files; committed cb7670c1 and pushed.
+- Result: committed cb7670c1, pushed to origin/main
+
 ## Round 351 @ 2026-07-06T17:57:00Z
 - Picked: Resume in-progress silent-error sweep from previous tick (bin/alert_dispatcher.py::_time_ago ValueError/TypeError swallow + bin/recorder_consumer_lite.py::_fsync_file OSError swallow). Both files had WIP edits with regression tests already prepared and untracked. Verified py_compile clean, ruff clean, both regression tests pass (8 passed total). Committed as two single-file commits to keep one logical change per commit: 98ade1dc (alert_dispatcher) and 5b355293 (recorder_consumer_lite). Both pushed to origin/main. Self-review: silent error fixed, control flow preserved (returns "unknown" / returns None), exception name bound in both, no race/security/off-by-one, no false-success, no tests masked (regression tests check AST pattern: handler.name is not None + log.debug in unparsed body).
 - Result: committed 98ade1dc and 5b355293, pushed to origin/main
