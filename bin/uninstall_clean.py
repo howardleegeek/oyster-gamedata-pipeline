@@ -10,11 +10,14 @@ Usage:
 """
 
 import argparse
+import logging
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 from typing import List
+
+logger = logging.getLogger(__name__)
 
 APP_NAME = "g137"
 
@@ -29,8 +32,8 @@ def find_app_paths() -> List[Path]:
                 for item in base.iterdir():
                     if APP_NAME.lower() in item.name.lower():
                         paths.append(item)
-            except PermissionError:
-                pass
+            except PermissionError as exc:
+                logger.debug("uninstall_clean: iterdir permission denied for %s: %s", base, exc)
     return paths
 
 
@@ -45,8 +48,8 @@ def find_launchd_plists() -> List[Path]:
                 for p in loc.iterdir():
                     if APP_NAME.lower() in p.name.lower() and p.suffix == ".plist":
                         plists.append(p)
-            except PermissionError:
-                pass
+            except PermissionError as exc:
+                logger.debug("uninstall_clean: iterdir permission denied for %s: %s", loc, exc)
     return plists
 
 
@@ -60,8 +63,8 @@ def unload_service(plist: Path, dry_run: bool) -> None:
         else:
             subprocess.run(["launchctl", "unload", str(plist)], check=True)
             print(f"Unloaded: {name}")
-    except subprocess.CalledProcessError:
-        pass
+    except subprocess.CalledProcessError as exc:
+        logger.debug("uninstall_clean: launchctl unload failed for %s: %s", plist, exc)
 
 
 def remove_path(path: Path, dry_run: bool) -> bool:
