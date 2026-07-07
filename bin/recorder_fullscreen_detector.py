@@ -32,9 +32,12 @@ Usage
 from __future__ import annotations
 
 import ctypes
+import logging
 import sys
 from dataclasses import dataclass
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 WINDOW_TITLE_KEYWORDS = ("minecraft",)
 SM_CXSCREEN = 0
@@ -102,6 +105,7 @@ def detect_exclusive_fullscreen() -> DetectionResult:
         try:
             return _windows_detect()
         except Exception as exc:  # noqa: BLE001 — never crash the recorder
+            logger.debug("exclusive-fullscreen detect failed", exc_info=True)
             return DetectionResult(False, None, None, None, "win32", f"detect error: {exc}")
     return DetectionResult(
         is_exclusive_fullscreen=False,
