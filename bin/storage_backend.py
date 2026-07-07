@@ -741,6 +741,23 @@ class GitHubReleaseStorageBackend(StorageBackend):
             self.delete(f"{old_name}.metadata.json")
 
     def list_assets(self) -> list[dict[str, Any]]:
+        """List all tarball assets in the GitHub release.
+
+        Queries the GitHub release via `gh release view` and returns metadata
+        for each .tar.gz asset sorted by upload time (newest first).
+
+        Returns:
+            List of asset dictionaries with keys:
+                - asset_name: Name of the tarball asset
+                - size_bytes: File size in bytes
+                - uploaded_at: ISO timestamp from GitHub
+                - url: Direct download URL
+                - sha8: First 8 chars of sha256 (extracted from filename)
+
+        Note:
+            Does not fetch sidecar metadata files (requires additional auth).
+            The sha8 prefix in the asset name provides sufficient idempotency.
+        """
         assets = self._list_release_assets()
         out: list[dict[str, Any]] = []
         for a in assets:
