@@ -1,3 +1,4 @@
+
 ## Round 351 @ 2026-07-06T17:57:00Z
 - Picked: Resume in-progress silent-error sweep from previous tick (bin/alert_dispatcher.py::_time_ago ValueError/TypeError swallow + bin/recorder_consumer_lite.py::_fsync_file OSError swallow). Both files had WIP edits with regression tests already prepared and untracked. Verified py_compile clean, ruff clean, both regression tests pass (8 passed total). Committed as two single-file commits to keep one logical change per commit: 98ade1dc (alert_dispatcher) and 5b355293 (recorder_consumer_lite). Both pushed to origin/main. Self-review: silent error fixed, control flow preserved (returns "unknown" / returns None), exception name bound in both, no race/security/off-by-one, no false-success, no tests masked (regression tests check AST pattern: handler.name is not None + log.debug in unparsed body).
 - Result: committed 98ade1dc and 5b355293, pushed to origin/main
