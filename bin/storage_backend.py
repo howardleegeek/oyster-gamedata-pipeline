@@ -512,6 +512,22 @@ class S3StorageBackend(StorageBackend):
         return out
 
     def get_signed_url(self, asset_name: str, ttl_seconds: int = DEFAULT_SIGNED_URL_TTL_SECONDS) -> str:
+        """Generate a presigned URL for downloading an asset.
+
+        Creates a time-limited URL that allows temporary access to download
+        the specified asset from S3 without authentication credentials.
+
+        Args:
+            asset_name: The key/name of the asset in the S3 bucket.
+            ttl_seconds: Time-to-live for the signed URL in seconds.
+                Defaults to 24 hours (DEFAULT_SIGNED_URL_TTL_SECONDS).
+
+        Returns:
+            A presigned URL string that can be used to download the asset.
+
+        Raises:
+            ClientError: If the asset doesn't exist or access is denied.
+        """
         return self.client.generate_presigned_url(
             ClientMethod="get_object",
             Params={"Bucket": self.bucket, "Key": asset_name},
