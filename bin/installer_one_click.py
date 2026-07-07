@@ -10,6 +10,7 @@ Usage:
 """
 
 import argparse
+import logging
 import platform
 import shutil
 import subprocess
@@ -17,6 +18,8 @@ import sys
 import tempfile
 from pathlib import Path
 from typing import List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 def os_info() -> Tuple[str, str]:
@@ -110,8 +113,8 @@ def setup_path(vendor_dir: str) -> Tuple[bool, str]:
                 if str(vpath) not in text:
                     cfg.write_text(text + export_line)
                     updated.append(cfg_name)
-            except OSError:
-                pass
+            except OSError as exc:
+                logger.debug("Failed to update %s: %s", cfg_name, exc)
     if updated:
         return True, f"Updated: {', '.join(updated)}"
     try:
