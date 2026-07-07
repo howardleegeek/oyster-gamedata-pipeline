@@ -339,6 +339,17 @@ class LocalFileStorageBackend(StorageBackend):
         return f"{self.base_url}/{asset_name}#expires={expires_at}"
 
     def delete(self, asset_name: str) -> bool:
+        """Delete an asset from local storage.
+
+        Removes both the asset file and its metadata sidecar file.
+
+        Args:
+            asset_name: The name/key of the asset to delete.
+
+        Returns:
+            True if either the asset or metadata file existed before deletion,
+            False if neither existed.
+        """
         target = self._asset_path(asset_name)
         meta_path = self._meta_path(asset_name)
         existed = target.exists() or meta_path.exists()
