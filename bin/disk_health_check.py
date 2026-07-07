@@ -4,10 +4,13 @@ Standalone CLI for disk health check.
 """
 
 import json
+import logging
 import shutil
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # Import functions from recorder_rate_limiter
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -56,10 +59,11 @@ except ImportError:
                             count += 1
                     except (OSError, AttributeError):
                         continue
-        except (OSError, FileNotFoundError):
+        except (OSError, FileNotFoundError) as exc:
+            logger.debug("count_sessions_today: iterdir(%s) failed (non-fatal, returning 0): %s", SESSION_DIR, exc)
             pass
         return count
-    
+
     def sum_pending_uploads_gb():
         total_bytes = 0
         try:
@@ -69,7 +73,8 @@ except ImportError:
                         total_bytes += item.stat().st_size
                     except (OSError, AttributeError):
                         continue
-        except (OSError, FileNotFoundError):
+        except (OSError, FileNotFoundError) as exc:
+            logger.debug("sum_pending_uploads_gb: iterdir(%s) failed (non-fatal, returning 0): %s", SESSION_DIR, exc)
             pass
         return total_bytes / 1e9
     
@@ -155,7 +160,8 @@ def main():
             print("Archive:")
             print(f"  Size: {archive_gb:.1f} GB")
             print(f"  Files: {archive_count}")
-        except (OSError, AttributeError):
+        except (OSError, AttributeError) as exc:
+            logger.debug("disk_health_check: archive rglob/scan of %s failed (non-fatal): %s", archive_dir, exc)
             pass
     
     # Return exit code based on health status
