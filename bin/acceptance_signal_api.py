@@ -9,12 +9,15 @@ transaction ID, timestamp, and optional metadata.
 
 import argparse
 import json
+import logging
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 def send_signal(
@@ -157,7 +160,8 @@ def main(argv: list[str] | None = None) -> int:
         try:
             resp_json = json.loads(body)
             print(f"Response: {json.dumps(resp_json, indent=2)}")
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
+            logger.debug("Failed to parse JSON response: %s", e)
             print(f"Response: {body}")
 
     if 200 <= status < 300:
