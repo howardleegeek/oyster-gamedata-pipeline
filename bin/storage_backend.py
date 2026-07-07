@@ -280,6 +280,19 @@ class LocalFileStorageBackend(StorageBackend):
         )
 
     def list_assets(self) -> list[dict[str, Any]]:
+        """List all uploaded assets in local storage.
+
+        Reads all *.metadata.json files under the root directory and returns
+        a list of asset metadata dictionaries sorted by upload time (newest first).
+
+        Returns:
+            List of dictionaries, each containing asset metadata including
+            'asset_name', 'tester_id', 'sha256', 'd5_verdict', 'size_bytes',
+            and 'uploaded_at' fields.
+
+        Raises:
+            OSError: If the root directory cannot be accessed.
+        """
         out: list[dict[str, Any]] = []
         for meta_path in self.root.rglob("*.metadata.json"):
             try:
