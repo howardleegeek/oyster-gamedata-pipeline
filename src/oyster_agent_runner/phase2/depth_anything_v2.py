@@ -125,9 +125,12 @@ def infer_depth(
         return True
 
     except Exception as exc:
+        # Bind ``exc`` so the exception name appears in the log message in
+        # addition to the traceback that ``logger.exception`` always emits.
         logger.exception(
-            "infer_depth failed for rgb=%s out=%s",
+            "infer_depth failed for rgb=%s out=%s: %s",
             rgb_frame_path,
             output_exr_path,
+            exc,
         )
         return False
