@@ -129,6 +129,13 @@ class UploadResult:
     idempotent_skip: bool = False  # True if same sha256 was already uploaded
 
     def to_dict(self) -> dict[str, Any]:
+        """Convert UploadResult to a dictionary.
+
+        Returns:
+            Dictionary representation of this upload result, including
+            storage_url, signed_url, metadata, asset_name, backend,
+            and idempotent_skip fields.
+        """
         return {
             "storage_url": self.storage_url,
             "signed_url": self.signed_url,
