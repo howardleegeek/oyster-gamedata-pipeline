@@ -68,7 +68,8 @@ def count_audio_events(path):
                 try:
                     json.loads(line)
                     count += 1
-                except json.JSONDecodeError:
+                except json.JSONDecodeError as exc:
+                    logger.debug("count_audio_events: skipped malformed line: %s", exc)
                     continue
     return count
 
@@ -127,7 +128,8 @@ def run_sox_silence(audio_path):
             timeout=60,
         )
         return result.stderr
-    except (subprocess.TimeoutExpired, FileNotFoundError):
+    except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
+        logger.debug("run_sox_silence: sox invocation failed: %s", exc)
         return None
 
 
@@ -150,7 +152,8 @@ def compute_snr_from_events(events_path):
                     event = json.loads(line)
                     vol = event.get("volume", 0)
                     volumes.append(vol)
-                except json.JSONDecodeError:
+                except json.JSONDecodeError as exc:
+                    logger.debug("compute_snr_from_events: skipped malformed line: %s", exc)
                     continue
 
     if not volumes:
@@ -220,7 +223,8 @@ def detect_voice_present(voice_flac_path):
                 consent = json.load(f)
             if consent.get("consent") != "granted":
                 return False
-        except (json.JSONDecodeError, IOError):
+        except (json.JSONDecodeError, IOError) as exc:
+            logger.debug("detect_voice_present: failed to read consent %s: %s", consent_path, exc)
             return False
 
     # Check if voice.flac has content
