@@ -324,6 +324,20 @@ def send_rcon_command(host: str, port: int, password: str, command: str) -> str:
 
         # Helper function to send packet
         def send_packet(request_id: int, packet_type: int, payload: str) -> None:
+            """Send an RCON packet over the socket.
+
+            Args:
+                request_id: Unique identifier for this request (server echoes it back).
+                packet_type: RCON packet type (3=AUTH, 2=EXECCOMMAND).
+                payload: String payload to send (null-terminated internally).
+
+            Returns:
+                None. Sends data directly to the socket.
+
+            Note:
+                RCON protocol uses little-endian struct: <iii (length, request_id, packet_type)
+                followed by payload + 2 null bytes.
+            """
             payload_bytes = payload.encode("utf-8") + b"\x00\x00"
             length = len(payload_bytes) + 10  # 4 + 4 + 2
             packet = struct.pack("<iii", length, request_id, packet_type)
