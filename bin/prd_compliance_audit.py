@@ -11,10 +11,13 @@ Output: 83-item ✅/❌ matrix with per-item evidence.
 from __future__ import annotations
 
 import json
+import logging
 import math
 import os
 import sys
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # Required action_camera.json fields per PRD §5 (20 literal names)
 PRD_FIELDS_20 = [
@@ -264,13 +267,13 @@ def _evaluate_h8(session: Path) -> dict:
             elif key == "frame_count":
                 try:
                     frame_count = int(val)
-                except ValueError:
-                    pass
+                except ValueError as e:
+                    logger.debug("H8 fallback: failed to parse frame_count %r: %s", val, e)
             elif key == "gap_miss_ratio":
                 try:
                     gap_miss_ratio = float(val)
-                except ValueError:
-                    pass
+                except ValueError as e:
+                    logger.debug("H8 fallback: failed to parse gap_miss_ratio %r: %s", val, e)
 
     if kind is None or kind == "unknown":
         return _result("H8", False, f"depth source unknown: {kind!r} (mark with depth/.source)")
