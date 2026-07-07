@@ -38,9 +38,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import pathlib
 import statistics
 import sys
+
+logger = logging.getLogger(__name__)
 
 
 def load_jsonl(path: pathlib.Path) -> list:
@@ -61,8 +64,8 @@ def load_action_camera(path: pathlib.Path) -> list:
             d = json.load(f)
             if isinstance(d, list):
                 return d
-    except json.JSONDecodeError:
-        pass
+    except json.JSONDecodeError as exc:
+        logger.debug("Failed to parse %s as JSON array, falling back to JSONL: %s", path, exc)
     return load_jsonl(path)
 
 
