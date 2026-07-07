@@ -481,6 +481,23 @@ class S3StorageBackend(StorageBackend):
             return None
 
     def list_assets(self) -> list[dict[str, Any]]:
+        """List all assets in the S3 bucket.
+
+        Scans the bucket for .metadata.json sidecar files and returns
+        metadata for each asset sorted by uploaded_at (newest first).
+
+        Returns:
+            List of asset dictionaries with keys:
+                - asset_name: Name of the tarball
+                - uploaded_at: ISO timestamp
+                - size_bytes: File size
+                - tester_id: Tester identifier
+                - sha256: File hash
+                - d5_verdict: D5 classification
+
+        Raises:
+            ClientError: If S3 list_objects_v2 fails.
+        """
         out: list[dict[str, Any]] = []
         paginator = self.client.get_paginator("list_objects_v2")
         for page in paginator.paginate(Bucket=self.bucket):
