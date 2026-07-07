@@ -4,10 +4,13 @@ Recorder rate limiter - prevents continuous-capture daemon from filling disk.
 """
 
 import json
+import logging
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Tuple
+
+logger = logging.getLogger(__name__)
 
 # Default configuration
 SESSION_DIR = Path.home() / "Documents" / "OysterClips"
@@ -44,7 +47,8 @@ def load_config() -> dict:
             if key not in config:
                 config[key] = value
         return config
-    except (json.JSONDecodeError, IOError):
+    except (json.JSONDecodeError, IOError) as exc:
+        logger.debug("Failed to read config %s: %s", CONFIG_FILE, exc)
         return DEFAULT_THRESHOLDS.copy()
 
 
@@ -67,9 +71,9 @@ def count_sessions_today() -> int:
                 saved_date = datetime.fromisoformat(saved_state["date"]).date()
                 if saved_date == today_utc:
                     counter_state["count"] = saved_state["count"]
-        except (json.JSONDecodeError, KeyError, ValueError):
-            pass
-    
+        except (json.JSONDecodeError, KeyError, ValueError) as exc:
+            logger.debug("Failed to load daily counter %s: %s", DAILY_COUNTER_FILE, exc)
+
     # Count actual sessions in directory (as backup/verification)
     session_count = 0
     try:
@@ -80,22 +84,23 @@ def count_sessions_today() -> int:
                     mtime = datetime.fromtimestamp(item.stat().st_mtime, tz=timezone.utc)
                     if mtime.date() == today_utc:
                         session_count += 1
-                except (OSError, AttributeError):
+                except (OSError, AttributeError) as exc:
+                    logger.debug("Failed to stat session item %s: %s", item, exc)
                     continue
-    except (OSError, FileNotFoundError):
-        pass
-    
+    except (OSError, FileNotFoundError) as exc:
+        logger.debug("Failed to list session dir %s: %s", SESSION_DIR, exc)
+
     # Use the larger of persisted count or actual count
     final_count = max(counter_state["count"], session_count)
-    
+
     # Save updated count
     counter_state["count"] = final_count
     try:
         with open(DAILY_COUNTER_FILE, 'w') as f:
             json.dump(counter_state, f, indent=2)
-    except IOError:
-        pass
-    
+    except IOError as exc:
+        logger.debug("Failed to persist daily counter %s: %s", DAILY_COUNTER_FILE, exc)
+
     return final_count
 
 
@@ -104,12 +109,12 @@ def increment_daily_counter() -> None:
     count = count_sessions_today()
     today_utc = datetime.now(timezone.utc).date()
     counter_state = {"date": str(today_utc), "count": count + 1}
-    
+
     try:
         with open(DAILY_COUNTER_FILE, 'w') as f:
             json.dump(counter_state, f, indent=2)
-    except IOError:
-        pass
+    except IOError as exc:
+        logger.debug("Failed to persist daily counter %s: %s", DAILY_COUNTER_FILE, exc)
 
 
 def sum_pending_uploads_gb() -> float:
@@ -125,9 +130,10 @@ def sum_pending_uploads_gb() -> float:
             if item.is_file() and item.name.endswith(".uploaded.tar.gz"):
                 try:
                     total_bytes += item.stat().st_size
-                except (OSError, AttributeError):
+                except (OSError, AttributeError) as exc:
+                    logger.debug("Failed to stat upload %s: %s", item, exc)
                     continue
-        
+
         # Also check for session directories that might not be compressed yet
         for item in SESSION_DIR.iterdir():
             if item.is_dir() and item.name.startswith("clip-"):
@@ -136,11 +142,12 @@ def sum_pending_uploads_gb() -> float:
                 if uploaded_marker.exists():
                     try:
                         total_bytes += sum(f.stat().st_size for f in item.rglob('*') if f.is_file())
-                    except (OSError, AttributeError):
+                    except (OSError, AttributeError) as exc:
+                        logger.debug("Failed to walk session dir %s: %s", item, exc)
                         continue
-    except (OSError, FileNotFoundError):
-        pass
-    
+    except (OSError, FileNotFoundError) as exc:
+        logger.debug("Failed to enumerate session dir %s: %s", SESSION_DIR, exc)
+
     return total_bytes / 1e9  # Convert to GB
 
 
@@ -150,14 +157,15 @@ def can_record_now() -> Tuple[bool, str]:
     """
     # Load config
     config = load_config()
-    
+
     # 1. Disk space check
     try:
         free_bytes = shutil.disk_usage(SESSION_DIR).free
         free_gb = free_bytes / 1e9
         if free_gb < config["min_free_gb"]:
             return False, f"disk free {free_gb:.1f}GB < {config['min_free_gb']}GB threshold"
-    except (OSError, FileNotFoundError):
+    except (OSError, FileNotFoundError) as exc:
+        logger.debug("disk_usage(%s) failed: %s", SESSION_DIR, exc)
         return False, "cannot check disk space"
     
     # 2. Daily session quota
@@ -181,8 +189,8 @@ def reset_daily_counter() -> None:
     try:
         with open(DAILY_COUNTER_FILE, 'w') as f:
             json.dump(counter_state, f, indent=2)
-    except IOError:
-        pass
+    except IOError as exc:
+        logger.debug("Failed to reset daily counter %s: %s", DAILY_COUNTER_FILE, exc)
 
 
 if __name__ == "__main__":
