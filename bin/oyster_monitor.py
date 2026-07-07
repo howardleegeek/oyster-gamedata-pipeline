@@ -173,8 +173,8 @@ class UploadBacklogChecker:
                     try:
                         total_bytes += os.path.getsize(fp)
                         file_count += 1
-                    except OSError:
-                        pass
+                    except OSError as exc:
+                        log.debug("oyster_monitor: skipping unreadable backlog file %s: %s", fp, exc)
 
         backlog_gb = total_bytes / (1024 ** 3)
         return {
@@ -222,8 +222,8 @@ class ErrorRateChecker:
                             else:
                                 # No timestamp, count it
                                 error_count += 1
-            except (OSError, IOError):
-                pass
+            except (OSError, IOError) as exc:
+                log.debug("oyster_monitor: skipping unreadable error log %s: %s", log_file, exc)
 
         error_rate_per_min = error_count / max(self.window_minutes, 1)
         return {
