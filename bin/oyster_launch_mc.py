@@ -691,7 +691,8 @@ def wait_for_mc_ready(
             try:
                 # We re-read — file is small and grows monotonically.
                 text = log_path.read_text(encoding="utf-8", errors="replace")
-            except OSError:
+            except OSError as e:
+                logger.debug("Failed to read %s: %s", log_path, e)
                 text = ""
             for marker in MC_READY_MARKERS:
                 if marker in text:
