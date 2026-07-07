@@ -8,6 +8,7 @@ import asyncio
 import base64
 import hashlib
 import json
+import logging
 import os
 import secrets
 import sys
@@ -15,6 +16,9 @@ import webbrowser
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Optional
+
+# Module-level logger
+logger = logging.getLogger(__name__)
 
 import click
 import httpx
@@ -164,8 +168,8 @@ class OAuthLoginServer:
                 try:
                     error_json = response.json()
                     error_detail = error_json.get("error_description", error_detail)
-                except (ValueError, KeyError):
-                    pass
+                except (ValueError, KeyError) as exc:
+                    logger.debug("Failed to parse OAuth error JSON: %s", exc)
                 raise HTTPException(
                     status_code=response.status_code,
                     detail=f"Token exchange failed: {error_detail}",
