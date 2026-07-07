@@ -7,6 +7,7 @@ Usage:
 """
 
 import json
+import logging
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -20,6 +21,8 @@ try:
 except ImportError:
     print("Required packages not installed. Run: pip install streamlit pandas plotly")
     sys.exit(1)
+
+log = logging.getLogger(__name__)
 
 # Base directory for batch files
 BATCH_DIR = Path(__file__).parent.parent
@@ -108,8 +111,8 @@ def calculate_statistics(manifest: Dict[str, Any]) -> Dict[str, Any]:
         try:
             achieved, total = score_str.split("/")
             audit_scores.append(int(achieved))
-        except (ValueError, AttributeError):
-            pass
+        except (ValueError, AttributeError) as exc:
+            log.debug("malformed audit_score %r for session: %s", score_str, exc)
 
     # Get failed session reasons
     failed_sessions = []
