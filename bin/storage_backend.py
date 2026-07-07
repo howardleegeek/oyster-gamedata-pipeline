@@ -535,6 +535,23 @@ class S3StorageBackend(StorageBackend):
         )
 
     def delete(self, asset_name: str) -> bool:
+        """Delete an asset and its metadata from S3 storage.
+
+        Removes both the asset object and its associated metadata file from
+        the S3 bucket. This operation is idempotent — calling delete on a
+        non-existent asset succeeds without error, but returns False.
+
+        Args:
+            asset_name: The key/name of the asset to delete.
+
+        Returns:
+            True if the asset existed before deletion, False if it did not exist.
+
+        Note:
+            DeleteObject is idempotent in S3 (always returns 204), so we use
+            HeadObject first to determine whether the asset existed prior to
+            deletion.
+        """
         # HeadObject to determine existence (delete_object is idempotent and
         # always returns 204, so we can't otherwise tell).
         try:
