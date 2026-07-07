@@ -26,9 +26,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 import pathlib
 import subprocess
 import sys
+
+# Module-level logger for silent-error surfacing
+logger = logging.getLogger(__name__)
 
 
 def sha256_of(path: pathlib.Path) -> str:
@@ -104,7 +108,8 @@ def check_game_state(sess: pathlib.Path) -> dict:
         for line in f:
             try:
                 d = json.loads(line)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as exc:
+                logger.debug("skipping malformed JSON line in game_state.jsonl: %s", exc)
                 continue
             line_count += 1
             t = d.get("timestamp_ms", d.get("tick", 0))
@@ -153,7 +158,8 @@ def check_action_camera(sess: pathlib.Path) -> dict:
         return {"ok": False, "reason": "action_camera.json missing"}
     try:
         rows = json.load(ac.open())
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as exc:
+        logger.debug("action_camera.json not valid JSON, falling back to JSONL: %s", exc)
         # try JSONL
         rows = [json.loads(line) for line in ac.open() if line.strip()]
     if not rows:
@@ -184,7 +190,8 @@ def check_inputs(sess: pathlib.Path) -> dict:
         for line in f:
             try:
                 d = json.loads(line)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as exc:
+                logger.debug("skipping malformed JSON line in inputs.jsonl: %s", exc)
                 continue
             ev = d.get("event_type", "UNKNOWN")
             hist[ev] = hist.get(ev, 0) + 1
@@ -245,7 +252,8 @@ def check_manifest(sess: pathlib.Path) -> dict:
         return {"ok": False, "reason": "MANIFEST.json missing"}
     try:
         manifest = json.load(mp.open())
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as exc:
+        logger.debug("MANIFEST.json malformed: %s", exc)
         return {"ok": False, "reason": "MANIFEST.json malformed"}
     files = manifest.get("files", {})
     if not files:
