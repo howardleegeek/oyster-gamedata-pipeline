@@ -3,6 +3,10 @@
 - Picked: Surface silent errors in bin/diag_bundle_collector.py — resumed WIP from previous tick. Added logging import + module-level logger, bound exception 'exc' in 4 swallow sites (/proc/meminfo read, run_cmd_safe subprocess, log file copy, manifest file copy), each now calls logger.debug. Added regression test tests/bin/test_diag_bundle_collector_silent_error.py (7 passed: module compiles, logger defined, 4 swallow sites each bind exception + log, no bare except pass). Ruff clean; git add both files; committed 4a65e9b4 and pushed.
 - Result: committed 4a65e9b4, pushed to origin/main
 
+## Round 355 @ 2026-07-07T02:01:00Z
+- Picked: Surface silent errors in bin/oyster_monitor.py — WIP from previous tick (already had changes to UploadBacklogChecker and ErrorRateChecker swallow sites, plus untracked regression test). Fixed test bugs: _find_except_in_method returns (lineno, handler) tuples not just handler, and ErrorRateChecker has both inner and outer except handlers so need to filter by line number. Tests pass (5 passed). Ruff clean; git add both files; committed e69fc525 and pushed.
+- Result: committed e69fc525, pushed to origin/main
+
 ## Round 351 @ 2026-07-06T17:57:00Z
 - Picked: Resume in-progress silent-error sweep from previous tick (bin/alert_dispatcher.py::_time_ago ValueError/TypeError swallow + bin/recorder_consumer_lite.py::_fsync_file OSError swallow). Both files had WIP edits with regression tests already prepared and untracked. Verified py_compile clean, ruff clean, both regression tests pass (8 passed total). Committed as two single-file commits to keep one logical change per commit: 98ade1dc (alert_dispatcher) and 5b355293 (recorder_consumer_lite). Both pushed to origin/main. Self-review: silent error fixed, control flow preserved (returns "unknown" / returns None), exception name bound in both, no race/security/off-by-one, no false-success, no tests masked (regression tests check AST pattern: handler.name is not None + log.debug in unparsed body).
 - Result: committed 98ade1dc and 5b355293, pushed to origin/main
