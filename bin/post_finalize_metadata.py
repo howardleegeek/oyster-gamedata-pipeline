@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import platform
 import socket
@@ -24,6 +25,8 @@ import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+
+logger = logging.getLogger("bin.post_finalize_metadata")
 
 
 def _detect_recorder_version(session: Path) -> str | None:
@@ -42,8 +45,8 @@ def _detect_recorder_version(session: Path) -> str | None:
             v = rv_file.read_text(encoding="utf-8").strip()
             if v:
                 return v
-        except OSError:
-            pass
+        except OSError as exc:
+            logger.debug("_detect_recorder_version: read %s failed: %s", rv_file, exc)
     # 2. vendor/recorder/Cargo.toml — typical pipeline layout
     candidates = [
         Path(__file__).resolve().parent.parent / "vendor" / "recorder" / "Cargo.toml",
@@ -71,7 +74,8 @@ def _detect_recorder_version(session: Path) -> str | None:
                     # Skip ``version.workspace = true`` and ``version = { ... }``
                     if val and not val.startswith("{") and val != "true":
                         return val
-        except OSError:
+        except OSError as exc:
+            logger.debug("_detect_recorder_version: read %s failed: %s", cargo, exc)
             continue
     return None
 
@@ -124,7 +128,8 @@ def write_metadata(session: Path) -> dict:
     if mpath.exists():
         try:
             existing = json.loads(mpath.read_text())
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.debug("merge_existing: parse %s failed: %s", mpath, exc)
             existing = {}
 
     # Reasonable defaults; env vars override.
