@@ -23,11 +23,14 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import platform
 import re
 import subprocess
 import sys
+
+logger = logging.getLogger(__name__)
 from typing import Optional, Sequence, Tuple
 
 # ---------------------------------------------------------------------------
@@ -115,7 +118,8 @@ def _notify_macos(title: str, message: str) -> bool:
             timeout=5,
         )
         return True
-    except (subprocess.TimeoutExpired, FileNotFoundError):
+    except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
+        logger.debug("osascript notification failed: %s", exc)
         return False
 
 
@@ -129,7 +133,8 @@ def _notify_linux(title: str, message: str) -> bool:
             timeout=5,
         )
         return True
-    except (subprocess.TimeoutExpired, FileNotFoundError):
+    except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
+        logger.debug("notify-send notification failed: %s", exc)
         return False
 
 
@@ -157,7 +162,8 @@ def _notify_windows(title: str, message: str) -> bool:
             timeout=5,
         )
         return True
-    except (subprocess.TimeoutExpired, FileNotFoundError):
+    except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
+        logger.debug("PowerShell notification failed: %s", exc)
         return False
 
 
