@@ -12,12 +12,15 @@ Usage:
 
 import argparse
 import json
+import logging
 import random
 import subprocess
 import sys
 import tempfile
 import time
 from typing import Any, Dict, List
+
+logger = logging.getLogger(__name__)
 
 
 def _check_gpu() -> Dict[str, Any]:
@@ -45,8 +48,8 @@ def _check_gpu() -> Dict[str, Any]:
                 info["metal"] = True
                 info["fallback"] = False
                 info["reason"] = "Metal GPU available"
-        except OSError:
-            pass
+        except OSError as exc:
+            logger.debug("system_profiler SPDisplaysDataType failed: %s", exc)
     return info
 
 
