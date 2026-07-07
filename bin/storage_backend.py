@@ -109,6 +109,11 @@ class TarballMetadata:
             raise ValueError("tester_id must be non-empty")
 
     def to_dict(self) -> dict[str, Any]:
+        """Convert TarballMetadata to a dictionary.
+
+        Returns:
+            Dictionary representation of this metadata object.
+        """
         return asdict(self)
 
 
