@@ -167,7 +167,7 @@ def load_update_data(data_path: Path) -> dict[str, UpdateInfo]:
     return updates
 
 
-def create_app(data_path: Path):
+def create_app(data_path: Path) -> Any:
     """Create FastAPI application with update endpoint.
     
     Args:
