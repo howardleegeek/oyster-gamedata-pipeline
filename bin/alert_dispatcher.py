@@ -461,7 +461,8 @@ class AlertDispatcher:
                 return f"{int(diff / 60)} minutes ago"
             else:
                 return f"{int(diff / 3600)} hours ago"
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as exc:
+            log.debug("_time_ago failed to parse %s: %s", timestamp_str, exc)
             return "unknown"
 
     def evaluate_health(self, health_results: dict[str, dict]):
