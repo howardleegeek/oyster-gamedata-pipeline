@@ -637,6 +637,24 @@ class GitHubReleaseStorageBackend(StorageBackend):
             return []
 
     def upload(self, path: Path, metadata: TarballMetadata) -> UploadResult:
+        """Upload tarball to GitHub release as an asset.
+
+        Uploads the tarball to the configured GitHub release tag, with
+        idempotency checking to skip if the asset already exists (matched
+        by sha8 prefix in asset name).
+
+        Args:
+            path: Path to the tarball file to upload.
+            metadata: Metadata about the tarball (tester_id, sha256, etc.)
+
+        Returns:
+            UploadResult with storage_url, signed_url, and metadata.
+
+        Raises:
+            FileNotFoundError: If the tarball file does not exist.
+            ValueError: If the file exceeds the 2 GiB GitHub limit.
+            RuntimeError: If the `gh` CLI upload fails.
+        """
         if not path.is_file():
             raise FileNotFoundError(f"tarball not found: {path}")
         if metadata.size_bytes > GITHUB_ASSET_LIMIT_BYTES:
