@@ -61,7 +61,8 @@ def get_old_uploaded_files(days_old: int) -> List[Path]:
                     mtime = item.stat().st_mtime
                     if mtime < cutoff_timestamp:
                         old_files.append(item)
-                except (OSError, AttributeError):
+                except (OSError, AttributeError) as exc:
+                    logger.debug("auto_archive_old_uploaded: stat failed for %s: %s", item, exc)
                     continue
     except (OSError, FileNotFoundError) as exc:
         logger.debug("Failed to list session directory %s: %s", SESSION_DIR, exc)
@@ -163,7 +164,8 @@ def archive_old_files() -> dict:
                         if mtime < delete_cutoff_timestamp:
                             item.unlink()
                             stats["deleted"] += 1
-                    except (OSError, AttributeError):
+                    except (OSError, AttributeError) as exc:
+                        logger.debug("auto_archive_old_uploaded: stat/unlink failed for %s: %s", item, exc)
                         continue
         except (OSError, FileNotFoundError) as exc:
             logger.debug("Failed to iterate archive dir %s: %s", ARCHIVE_DIR, exc)
@@ -200,7 +202,8 @@ def cleanup_old_session_dirs() -> dict:
                             shutil.rmtree(item)
                             stats["directories_removed"] += 1
                             stats["total_space_freed_gb"] += dir_size / 1e9
-                    except (OSError, AttributeError):
+                    except (OSError, AttributeError) as exc:
+                        logger.debug("auto_archive_old_uploaded: rmtree/size failed for %s: %s", item, exc)
                         continue
     except (OSError, FileNotFoundError) as exc:
         logger.debug("Failed to iterate session dir %s for cleanup: %s", SESSION_DIR, exc)
