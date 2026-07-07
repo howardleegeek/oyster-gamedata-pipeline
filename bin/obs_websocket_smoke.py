@@ -12,6 +12,7 @@ Exit: 0=pass, 1=fail, 2=bad args, 3=OBS not found
 import argparse
 import asyncio
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -20,6 +21,8 @@ import tempfile
 import time
 from pathlib import Path
 from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
 
 
 def _import_websockets() -> Any:
@@ -107,8 +110,8 @@ class OBSSmokeTest:
         if self.temp_dir:
             try:
                 shutil.rmtree(self.temp_dir)
-            except OSError:
-                pass
+            except OSError as exc:
+                logger.debug("stop_obs: shutil.rmtree failed for %s: %s", self.temp_dir, exc)
             self.temp_dir = None
 
     async def wait_for_websocket(self) -> bool:
@@ -120,7 +123,8 @@ class OBSSmokeTest:
             try:
                 async with websockets.connect(self.ws_uri, timeout=5):
                     return True
-            except OSError:
+            except OSError as exc:
+                logger.debug("wait_for_websocket: connect to %s failed: %s", self.ws_uri, exc)
                 await asyncio.sleep(1)
         return False
 
