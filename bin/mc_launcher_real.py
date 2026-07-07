@@ -9,6 +9,7 @@ R001 · bin/mc_launcher_real.py — 启动真 Minecraft Java 1.20.4 客户端 (o
 
 import argparse
 import hashlib
+import logging
 import os
 import socket
 import struct
@@ -20,6 +21,8 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 def offline_uuid(username: str) -> str:
@@ -282,8 +285,8 @@ def wait_for_join(log_path: str, username: str, timeout_sec: float = 60.0) -> bo
 
             if connect_pattern in content or join_pattern in content:
                 return True
-        except (IOError, OSError):
-            pass
+        except (IOError, OSError) as exc:
+            logger.debug("log file read transient failure path=%s err=%s", log_file, exc)
 
         time.sleep(0.1)
 
