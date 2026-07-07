@@ -172,12 +172,13 @@ def parse_size(size_str: str) -> int:
         if size_str.endswith(unit):
             try:
                 return int(float(size_str[:-len(unit)]) * mult)
-            except ValueError:
-                pass
+            except ValueError as e:
+                logger.debug("parse_size: float conversion failed for %r: %s",
+                             size_str[:-len(unit)], e)
     try:
         return int(size_str)
-    except ValueError:
-        raise ValueError(f"Invalid size: {size_str}")
+    except ValueError as e:
+        raise ValueError(f"Invalid size: {size_str}") from e
 
 
 def main(argv: Optional[list[str]] = None) -> int:
