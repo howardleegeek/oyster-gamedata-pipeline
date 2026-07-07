@@ -232,7 +232,8 @@ def log_rejection(
         try:
             with open(log_path, "r") as f:
                 entries = json.load(f)
-        except (json.JSONDecodeError, IOError):
+        except (json.JSONDecodeError, IOError) as e:
+            logger.debug("Failed to load replay log %s: %s", log_path, e)
             entries = []
 
     entries.append(entry)

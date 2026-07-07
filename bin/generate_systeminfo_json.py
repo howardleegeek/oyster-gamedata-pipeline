@@ -5,9 +5,12 @@ Generate systeminfo.json file with Minecraft window information.
 
 import argparse
 import json
+import logging
 import subprocess
 import sys
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 def detect_screen_dpi() -> float:
@@ -44,11 +47,11 @@ def detect_screen_dpi() -> float:
                                 dpi = float(parts[1].strip())
                                 if dpi > 0:
                                     return dpi
-                            except ValueError:
-                                pass
-    except (subprocess.SubprocessError, FileNotFoundError, ValueError):
-        pass
-    
+                            except ValueError as e:
+                                logger.debug("generate_systeminfo: xrandr scale-factor parse failed on line %r: %s", line, e)
+    except (subprocess.SubprocessError, FileNotFoundError, ValueError) as e:
+        logger.debug("generate_systeminfo: detect_screen_dpi probe failed: %s", e)
+
     return 1.0
 
 
@@ -104,9 +107,9 @@ def detect_window_geometry(window_title: str = "Minecraft") -> dict:
                         "width": int(geometry["WIDTH"]),
                         "height": int(geometry["HEIGHT"]),
                     }
-    except (subprocess.SubprocessError, FileNotFoundError, ValueError, KeyError):
-        pass
-    
+    except (subprocess.SubprocessError, FileNotFoundError, ValueError, KeyError) as e:
+        logger.debug("generate_systeminfo: xdotool getwindowgeometry probe failed: %s", e)
+
     # Fallback to defaults
     return {
         "x": 0,
