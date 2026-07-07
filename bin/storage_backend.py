@@ -405,6 +405,25 @@ class S3StorageBackend(StorageBackend):
         return f"{asset_name}.metadata.json"
 
     def upload(self, path: Path, metadata: TarballMetadata) -> UploadResult:
+        """Upload a tarball to S3-compatible storage.
+
+        Copies the tarball to the S3 bucket along with a sidecar JSON file
+        containing the metadata. Supports idempotent re-uploads: if an object
+        with the same SHA256 already exists (checked via metadata sidecar),
+        returns early with idempotent_skip=True.
+
+        Args:
+            path: Path to the tarball file to upload.
+            metadata: Metadata including tester_id, sha256, d5_verdict, etc.
+
+        Returns:
+            UploadResult with storage_url, signed_url, metadata, asset_name,
+                backend, and idempotent_skip flag.
+
+        Raises:
+            FileNotFoundError: If the tarball path does not exist or is not a file.
+            ClientError: If the S3 upload fails.
+        """
         if not path.is_file():
             raise FileNotFoundError(f"tarball not found: {path}")
         asset_name = derive_asset_name(path, metadata)
