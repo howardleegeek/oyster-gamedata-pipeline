@@ -1,4 +1,8 @@
 
+## Round 360 @ 2026-07-07T13:29:27Z
+- Picked: Surface silent errors in bin/disk_health_check.py — 3 swallow sites unfixed (count_sessions_today iterdir, sum_pending_uploads_gb iterdir, archive rglob scan in main). Added logging import + module-level logger, bound exception 'exc' in each swallow site + added logger.debug with context (function name + path + exc). Control flow preserved (pass-thru after log = original return-defaults behavior intact). Added regression test tests/bin/test_disk_health_check_silent_error.py (6 passed: module compiles, logging+logger defined, 3 target handlers each bind exc+call logger.debug, no bare except(...): pass in target sites). Self-review: silent errors fixed (3 swallow sites), control flow preserved (return count 0 / total_bytes 0 fall-throughs intact), exception name bound in every target handler, lazy %s logging, no race/security/off-by-one/false-success, no tests masked. Ruff clean; git add source + test; committed 616cccd5 and pushed.
+- Result: committed 616cccd5, pushed to origin/main
+
 ## Round 354 @ 2026-07-07T00:08:00Z
 - Picked: Surface silent errors in bin/diag_bundle_collector.py — resumed WIP from previous tick. Added logging import + module-level logger, bound exception 'exc' in 4 swallow sites (/proc/meminfo read, run_cmd_safe subprocess, log file copy, manifest file copy), each now calls logger.debug. Added regression test tests/bin/test_diag_bundle_collector_silent_error.py (7 passed: module compiles, logger defined, 4 swallow sites each bind exception + log, no bare except pass). Ruff clean; git add both files; committed 4a65e9b4 and pushed.
 - Result: committed 4a65e9b4, pushed to origin/main
