@@ -1069,8 +1069,8 @@ def _fsync_file(path: Path) -> None:
     try:
         with path.open("rb") as fh:
             os.fsync(fh.fileno())
-    except OSError:
-        pass
+    except OSError as exc:
+        logger.debug("_fsync_file failed for %s: %s", path, exc)
 
 
 def _atomic_write_text(path: Path, data: str, *, encoding: str = "utf-8") -> None:
