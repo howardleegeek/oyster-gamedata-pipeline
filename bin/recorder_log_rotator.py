@@ -26,10 +26,13 @@ Programmatic usage::
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import sys
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_LOG_PATH = Path.home() / "OysterRecorder.log"
 DEFAULT_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
@@ -42,7 +45,8 @@ def _size_bytes(path: Path) -> int:
         return path.stat().st_size
     except FileNotFoundError:
         return 0
-    except OSError:
+    except OSError as exc:
+        logger.debug("recorder_log_rotator: stat %s failed: %s", path, exc)
         return 0
 
 
@@ -60,8 +64,8 @@ def rotate(log_path: Path, keep: int = KEEP_ROTATIONS) -> bool:
     if oldest.exists():
         try:
             oldest.unlink()
-        except OSError:
-            pass
+        except OSError as exc:
+            logger.debug("recorder_log_rotator: unlink %s failed: %s", oldest, exc)
 
     # Cascade .N -> .N+1 from the back so we never overwrite a survivor.
     for idx in range(keep - 1, 0, -1):
@@ -70,15 +74,23 @@ def rotate(log_path: Path, keep: int = KEEP_ROTATIONS) -> bool:
         if src.exists():
             try:
                 os.replace(src, dst)
-            except OSError:
-                pass
+            except OSError as exc:
+                logger.debug(
+                    "recorder_log_rotator: replace %s -> %s failed: %s", src, dst, exc
+                )
 
     # Active log -> .1
     first = log_path.with_suffix(log_path.suffix + ".1")
     try:
         os.replace(log_path, first)
         return True
-    except OSError:
+    except OSError as exc:
+        logger.debug(
+            "recorder_log_rotator: active rotate %s -> %s failed: %s",
+            log_path,
+            first,
+            exc,
+        )
         return False
 
 
