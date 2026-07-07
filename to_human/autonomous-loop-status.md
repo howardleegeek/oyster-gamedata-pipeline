@@ -7,6 +7,10 @@
 - Picked: Surface silent errors in bin/oyster_monitor.py — WIP from previous tick (already had changes to UploadBacklogChecker and ErrorRateChecker swallow sites, plus untracked regression test). Fixed test bugs: _find_except_in_method returns (lineno, handler) tuples not just handler, and ErrorRateChecker has both inner and outer except handlers so need to filter by line number. Tests pass (5 passed). Ruff clean; git add both files; committed e69fc525 and pushed.
 - Result: committed e69fc525, pushed to origin/main
 
+## Round 358 @ 2026-07-07T12:36:50Z
+- Picked: Surface silent errors in bin/audit_quality_metrics.py — WIP from previous tick (4 swallow sites uncommitted: QM2 check_frame_drops JSONDecodeError, QM7 check_action_diversity JSONDecodeError, QM8 check_world_coverage JSONDecodeError/KeyError/TypeError/ValueError, QM9 check_camera_position_range outer JSONDecodeError + inner JSONL fallback JSONDecodeError). Diff already in working tree + untracked regression test. Verified py_compile clean, ruff clean, regression test passes (3 passed: module compiles, all target handlers bind exception + call logger, no bare except: pass in targets). Self-review: silent errors fixed (5 swallow sites), control flow preserved (all continue), exception name bound in every handler, lazy %s logging, no race/security/off-by-one/false-success, no tests masked. Committed 2d90de5d and pushed to origin/main.
+- Result: committed 2d90de5d, pushed to origin/main
+
 ## Round 356 @ 2026-07-07T04:00:00Z
 - Picked: Surface silent errors in bin/anti_replay_check.py and bin/generate_systeminfo_json.py — found WIP edits from previous tick with regression tests. Fixed test logic bug in test_anti_replay_check_silent_error.py (was looking for json.load inside except body instead of in the Try body context). Tests pass (8 passed). Ruff clean; git add 4 files; committed cb7670c1 and pushed.
 - Result: committed cb7670c1, pushed to origin/main
