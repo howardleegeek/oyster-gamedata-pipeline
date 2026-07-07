@@ -116,8 +116,8 @@ def _run_gate(script_name: str, session_dir: str) -> dict:
             # If the gate itself reported a status, honour it
             if status in ("PASS", "FAIL", "SKIP", "PASS_OK", "PASS_DEGRADED"):
                 return {"status": status, "evidence": evidence}
-        except (json.JSONDecodeError, ValueError):
-            pass
+        except (json.JSONDecodeError, ValueError) as exc:
+            logger.debug("Failed to parse gate JSON output: %s", exc)
         stderr_snippet = (result.stderr or "").strip()
         if len(stderr_snippet) > 200:
             stderr_snippet = stderr_snippet[:200] + "…"
@@ -131,6 +131,7 @@ def _run_gate(script_name: str, session_dir: str) -> dict:
     try:
         data = json.loads(result.stdout.strip())
     except (json.JSONDecodeError, ValueError) as exc:
+        logger.debug("Failed to parse gate JSON output: %s", exc)
         return {
             "status": "ERROR",
             "evidence": f"JSON parse error: {exc}",
