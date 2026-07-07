@@ -1,3 +1,8 @@
+## Round 351 @ 2026-07-06T17:57:00Z
+- Picked: Resume in-progress silent-error sweep from previous tick (bin/alert_dispatcher.py::_time_ago ValueError/TypeError swallow + bin/recorder_consumer_lite.py::_fsync_file OSError swallow). Both files had WIP edits with regression tests already prepared and untracked. Verified py_compile clean, ruff clean, both regression tests pass (8 passed total). Committed as two single-file commits to keep one logical change per commit: 98ade1dc (alert_dispatcher) and 5b355293 (recorder_consumer_lite). Both pushed to origin/main. Self-review: silent error fixed, control flow preserved (returns "unknown" / returns None), exception name bound in both, no race/security/off-by-one, no false-success, no tests masked (regression tests check AST pattern: handler.name is not None + log.debug in unparsed body).
+- Result: committed 98ade1dc and 5b355293, pushed to origin/main
+
+## Round 328 @ 2026-07-05T22:36:35Z
 ## Round 302 @ 2026-07-05T07:00:00Z
 - Picked: Surface silent errors in bin/error_storage_postgres.py — added logger and bound exception 'e' in insert_error() and purge_old_errors() with debug logging. Control flow preserved (both still rollback and re-raise). Added regression test tests/bin/test_error_storage_postgres_silent_error.py (5 passed: no bare except, logger imported, insert_error debug log, purge_old_errors debug log, module compiles). py_compile clean; ruff clean; git add both files; committed 0ca19978 and pushed.
 - Result: committed 0ca19978, pushed to origin/main
