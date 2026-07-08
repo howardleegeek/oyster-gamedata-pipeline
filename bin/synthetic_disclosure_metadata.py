@@ -13,10 +13,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -32,7 +35,12 @@ def _load_yaml(path: Path) -> Dict[str, Any] | None:
         import yaml  # lazy import
         with open(path, "r", encoding="utf-8") as fh:
             return yaml.safe_load(fh) or {}
-    except ImportError:
+    except ImportError as exc:
+        # PyYAML missing — log so operators know YAML sidecars are not being
+        # validated (a sidecar with synthetic-disclosure metadata would be
+        # silently skipped, leaving an apparent-PASS that is actually a
+        # NO-OP). Caller still receives None to preserve control flow.
+        logger.debug("synthetic_disclosure_metadata: PyYAML unavailable for %s: %s", path, exc)
         return None
 
 
