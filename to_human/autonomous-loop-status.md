@@ -12,6 +12,11 @@
 - Picked: Remove redundant `pass` after logger.debug in bin/telemetry.py _mark_uploaded_today(). The logger.debug was already present but had a trailing `pass` statement which is unnecessary. Control flow unchanged (exception silently swallowed per design). Tests pass 4/4. Ruff clean. git add 1 file.
 - Result: committed a2d783cb, pushed to origin/main
 
+## Round 382 @ 2026-07-08T11:00:00Z
+
+- Picked: Surface silent error in bin/recorder_watchdog.py find_mc_hwnd() ImportError handler. The bare `except ImportError:` was silently swallowing import failures. Bound exception to `exc` and changed logger.debug from `exc_info=True` to lazy `%s` formatting with `exc`. Control flow preserved (returns None). Tests pass 10/10 (pytest -k watchdog). Ruff clean. git add 1 file.
+- Result: committed 24260379, pushed to origin/main
+
 ## Round 374 @ 2026-07-08T07:00:00Z
 - Picked: Surface silent errors in uncommitted changes: bin/battery_aware_pause.py (4 swallow sites: except (AttributeError, OSError), except (subprocess.TimeoutExpired, OSError, ValueError), except (ValueError, OSError), except (json.JSONDecodeError, OSError)), bin/disk_health_check.py (3 swallow sites: count_sessions_today, sum_pending_uploads_gb, main archive scan), bin/recorder_consumer_lite.py (6 swallow sites: _atomic_write_text unlink, _package_orphaned_active_session unlink, _ensure_recording_mp4_alias samefile, _remux_obs_recording_to_mp4 unlink, _move_obs_output_to_video_path unlink, RecorderApp package unlink). All bare `except ...: pass` now bind exception to variable and call logger.debug with context. Control flow preserved. Tests pass (14 + 4 = 18 tests). Ruff clean. git add 3 files; committed 4f3436e3 and pushed.
 - Result: committed 4f3436e3, pushed to origin/main
@@ -410,3 +415,8 @@
 ## Round 382 @ 2026-07-08T11:00:00Z
 - Picked: Surface silent error in bin/recorder_consumer_lite.py RecorderApp._set() UI update. The bare `except RuntimeError: pass` at line 7418 (the verdict/subtitle thread-safe updater) was silently swallowing a real race condition where Tkinter was closed between the after() scheduling and dispatch. Bound exception to `exc` and added logger.debug with context ("verdict _set: Tk after() raised RuntimeError: %s", exc). Control flow preserved (try/except still wraps self.after(0, apply)). New regression test: tests/bin/test_recorder_consumer_lite_verdict_set_silent_error.py with 6 tests (test_module_compiles, test_set_method_exists, test_set_binds_runtime_error, test_set_runtime_error_logs_at_debug, test_set_no_bare_runtime_error_pass, test_set_still_calls_after). Self-review: silent error now logged with context, control flow preserved, exception bound as `exc`, lazy %s logging, no race/security/off-by-one/false-success, no tests masked (no skip/xfail). Tests pass 6/6. Ruff clean (both source and test). git add 2 files.
 - Result: committed, pushed to origin/main
+
+## Round 382 @ 2026-07-08T12:16:35Z
+
+- Picked: Surface silent error in bin/recorder_watchdog.py find_mc_hwnd() ImportError handler. The bare  was silently swallowing import failures. Bound exception to  and changed logger.debug from  to lazy  formatting with . Control flow preserved (returns None). Tests pass 10/10 (pytest -k watchdog). Ruff clean. git add 1 file.
+- Result: committed 24260379, pushed to origin/main
