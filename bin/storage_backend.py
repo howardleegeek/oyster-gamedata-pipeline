@@ -245,8 +245,11 @@ class LocalFileStorageBackend(StorageBackend):
                         backend=self.name,
                         idempotent_skip=True,
                     )
-            except (json.JSONDecodeError, OSError):
-                pass  # corrupted sidecar — re-upload.
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.debug(
+                    "local: corrupted sidecar at %s — re-upload: %s",
+                    meta_path, exc,
+                )
 
         target.parent.mkdir(parents=True, exist_ok=True)
         # Use copy (not move) — the watcher may still need the original.
