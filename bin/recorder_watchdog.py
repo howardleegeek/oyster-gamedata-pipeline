@@ -148,8 +148,8 @@ def find_mc_hwnd() -> Optional[int]:
         win32gui.EnumWindows(enum_cb, results)
         if results:
             return results[0][0]
-    except ImportError:
-        log.debug("win32gui/win32process not available: %s", exc_info=True)
+    except ImportError as exc:
+        log.debug("win32gui/win32process not available: %s", exc)
     return None
 
 
