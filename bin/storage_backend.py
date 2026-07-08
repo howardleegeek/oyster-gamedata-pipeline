@@ -789,8 +789,19 @@ class GitHubReleaseStorageBackend(StorageBackend):
         return out
 
     def get_signed_url(self, asset_name: str, ttl_seconds: int = DEFAULT_SIGNED_URL_TTL_SECONDS) -> str:
-        # GitHub release assets are public; "signed URL" is just the canonical
-        # download URL. ttl_seconds is ignored.
+        """Get a public download URL for a GitHub release asset.
+
+        GitHub release assets are publicly accessible; this returns the canonical
+        download URL. The ttl_seconds parameter is ignored since GitHub doesn't
+        support presigned URLs for public release assets.
+
+        Args:
+            asset_name: Name of the asset (tarball) to download.
+            ttl_seconds: Ignored. Present for API compatibility with other backends.
+
+        Returns:
+            Public URL to download the asset from the GitHub release.
+        """
         return f"https://github.com/{self.repo}/releases/download/{self.tag}/{asset_name}"
 
     def delete(self, asset_name: str) -> bool:
