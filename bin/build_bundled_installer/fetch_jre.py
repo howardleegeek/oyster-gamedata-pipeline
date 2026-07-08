@@ -157,8 +157,8 @@ def _download_with_retries(url: str, dest: Path) -> None:
             if tmp.exists():
                 try:
                     tmp.unlink()
-                except OSError:
-                    pass
+                except OSError as cleanup_exc:
+                    _log(f"could not remove partial download {tmp}: {cleanup_exc}")
             if attempt < DOWNLOAD_RETRIES:
                 backoff = 2 ** (attempt - 1)
                 _log(f"retrying in {backoff}s")
@@ -182,8 +182,8 @@ def _verify_sha(path: Path, expected: str) -> None:
         _err(f"  got:      {got}")
         try:
             path.unlink()  # don't leave a poisoned cache file behind
-        except OSError:
-            pass
+        except OSError as cleanup_exc:
+            _log(f"could not remove poisoned cache file {path}: {cleanup_exc}")
         sys.exit(2)
     _log(f"SHA-256 OK: {got}")
 
@@ -270,10 +270,11 @@ def _dir_size_bytes(root: Path) -> int:
     total = 0
     for dp, _dn, fn in os.walk(root):
         for name in fn:
+            p = Path(dp) / name
             try:
-                total += (Path(dp) / name).stat().st_size
-            except OSError:
-                pass
+                total += p.stat().st_size
+            except OSError as stat_exc:
+                _log(f"could not stat {p} while measuring {root}: {stat_exc}")
     return total
 
 
