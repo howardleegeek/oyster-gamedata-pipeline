@@ -176,3 +176,90 @@ def test_module_logger_works_at_runtime() -> None:
     assert isinstance(mod.logger, logging.Logger)
     # The logger must be named after the module.
     assert mod.logger.name == "recorder_dav2_runner"
+
+
+# --- (7) ImportError fallback for huggingface_hub logs at DEBUG ---
+
+
+def test_hf_import_error_fallback_logs_at_debug() -> None:
+    """When ``huggingface_hub`` is not installed, the ImportError must
+    be logged at DEBUG (not silently swallowed via bare ``pass``) so
+    operators can distinguish "module missing" from "module present
+    but call failed"."""
+    src = _read_source()
+    # Look for `except ImportError as ...:` immediately following the
+    # `from huggingface_hub import hf_hub_download` line.
+    tree = ast.parse(src)
+    # Find the import statement.
+    import_lineno = None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Try):
+            for stmt in node.body:
+                if (
+                    isinstance(stmt, ast.ImportFrom)
+                    and stmt.module == "huggingface_hub"
+                ):
+                    import_lineno = stmt.lineno
+                    break
+        if import_lineno is not None:
+            break
+    assert import_lineno is not None, (
+        "expected `from huggingface_hub import hf_hub_download` in the module"
+    )
+    # The ImportError handler must bind the exception and log it.
+    found_import_handler = False
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ExceptHandler):
+            continue
+        if node.type is None:
+            continue
+        type_src = ast.unparse(node.type)
+        if "ImportError" not in type_src:
+            continue
+        # Must be inside the same try-block as the huggingface_hub import.
+        if node.lineno < import_lineno - 2:
+            continue
+        if node.lineno > import_lineno + 30:
+            continue
+        found_import_handler = True
+        assert node.name is not None, (
+            f"line {node.lineno}: ImportError handler must bind the "
+            f"exception (`as exc`) so the message can be logged"
+        )
+        # The handler must contain a logger.debug call referencing the
+        # bound name.
+        handler_src = ast.unparse(node)
+        assert "logger.debug" in handler_src, (
+            f"line {node.lineno}: ImportError handler must call "
+            f"logger.debug to surface the missing-module condition"
+        )
+        assert node.name in handler_src, (
+            f"line {node.lineno}: logger.debug should reference the "
+            f"bound exception name `{node.name}`"
+        )
+        # The handler must not re-raise (control flow preserved).
+        for child in ast.walk(node):
+            if isinstance(child, ast.Raise):
+                raise AssertionError(
+                    f"line {node.lineno}: ImportError handler must not "
+                    f"re-raise; it should fall through to urllib"
+                )
+    assert found_import_handler, (
+        "no ImportError handler found near the huggingface_hub import"
+    )
+
+
+# --- (8) ImportError handler preserves urllib fallback (no raise) ---
+
+
+def test_hf_import_error_fallback_preserves_urllib_fallback() -> None:
+    """After the ImportError handler, the urllib fallback must still
+    be reachable. This is a sanity check that the handler does not
+    accidentally return or raise, leaving urllib unreachable."""
+    src = _read_source()
+    # The urllib.request.urlopen call must still be present in the
+    # function body, after the huggingface_hub try/except.
+    assert "urllib.request.urlopen" in src, (
+        "urllib fallback must remain reachable after the ImportError "
+        "handler — if it disappeared, the handler probably raised"
+    )

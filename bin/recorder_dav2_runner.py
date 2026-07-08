@@ -112,8 +112,15 @@ def ensure_model(
             local_dir_use_symlinks=False,
         )
         return Path(local)
-    except ImportError:
-        pass
+    except ImportError as exc:
+        # huggingface_hub not installed — fall through to urllib. Surface
+        # at DEBUG so operators can distinguish "module missing" from
+        # "module present but call failed" (handled by the next handler).
+        logger.debug(
+            "huggingface_hub unavailable for %s/%s (%s); "
+            "falling back to urllib",
+            repo, filename, exc,
+        )
     except Exception as e:
         # Fall through to urllib fallback rather than aborting hard.
         # Surface the failure at DEBUG so operators can diagnose why
