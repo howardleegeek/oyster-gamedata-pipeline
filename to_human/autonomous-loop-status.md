@@ -406,3 +406,7 @@
 - Picked: No good candidate — systematic silent-error sweep of all bin/*.py files complete (378 rounds of work). All documented swallow sites have been fixed with regression tests. Production gaps (Vercel credentials, Supabase migrations, code signing) require Howard credentials. Ruff F-code checks clean, pytest sample pass. Exiting without commit.
 - Result: skipped (no good candidate)
 
+
+## Round 382 @ 2026-07-08T11:00:00Z
+- Picked: Surface silent error in bin/recorder_consumer_lite.py RecorderApp._set() UI update. The bare `except RuntimeError: pass` at line 7418 (the verdict/subtitle thread-safe updater) was silently swallowing a real race condition where Tkinter was closed between the after() scheduling and dispatch. Bound exception to `exc` and added logger.debug with context ("verdict _set: Tk after() raised RuntimeError: %s", exc). Control flow preserved (try/except still wraps self.after(0, apply)). New regression test: tests/bin/test_recorder_consumer_lite_verdict_set_silent_error.py with 6 tests (test_module_compiles, test_set_method_exists, test_set_binds_runtime_error, test_set_runtime_error_logs_at_debug, test_set_no_bare_runtime_error_pass, test_set_still_calls_after). Self-review: silent error now logged with context, control flow preserved, exception bound as `exc`, lazy %s logging, no race/security/off-by-one/false-success, no tests masked (no skip/xfail). Tests pass 6/6. Ruff clean (both source and test). git add 2 files.
+- Result: committed, pushed to origin/main

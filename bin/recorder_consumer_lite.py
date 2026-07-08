@@ -2463,8 +2463,8 @@ def _wait_for_obs_websocket(
         try:
             if proc.poll() is not None:
                 raise ObsWebSocketError(f"OBS exited during startup rc={proc.poll()}")
-        except AttributeError:
-            pass
+        except AttributeError as exc:
+            logger.debug("OBS websocket connect: proc.poll() raised AttributeError: %s", exc)
         client = client_factory()
         try:
             client.connect()
@@ -5778,9 +5778,9 @@ class RecorderApp(tk.Tk):
 
         try:
             self.after(0, _apply)
-        except RuntimeError:
+        except RuntimeError as exc:
             # Tk closed mid-inference; nothing to update.
-            pass
+            logger.debug("depth_progress: Tk after() raised RuntimeError: %s", exc)
 
     def _hide_depth_progress_ui(self) -> None:
         """Tear down the depth-progress widgets and restore normal UI.
@@ -7415,8 +7415,9 @@ class RecorderApp(tk.Tk):
         # Tk requires UI updates from the main thread.
         try:
             self.after(0, apply)
-        except RuntimeError:
-            pass
+        except RuntimeError as exc:
+            # Tk closed mid-shutdown; nothing to update.
+            logger.debug("verdict _set: Tk after() raised RuntimeError: %s", exc)
 
 
 def _emergency_error_box(exc: BaseException) -> None:
