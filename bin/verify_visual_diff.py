@@ -436,7 +436,17 @@ def render_terminal(
     Returns:
         Multi-line string containing the formatted diff output.
     """
+
     def c(text: str, code: str) -> str:
+        """Apply ANSI color code to text if color is enabled.
+
+        Args:
+            text: The string to colorize.
+            code: ANSI escape sequence (e.g., ANSI_RED, ANSI_BOLD).
+
+        Returns:
+            The text with ANSI reset codes, or original text if use_color=False.
+        """
         if not use_color:
             return text
         return f"{code}{text}{ANSI_RESET}"
