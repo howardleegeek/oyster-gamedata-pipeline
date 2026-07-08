@@ -57,12 +57,15 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import json
+import logging
 import re
 import sys
 import tarfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Paths & constants
@@ -270,8 +273,11 @@ def extract_version_from_manifest_text(text: str) -> Optional[str]:
                 v = data.get(key)
                 if isinstance(v, str) and v:
                     return v
-    except json.JSONDecodeError:
-        pass
+    except json.JSONDecodeError as exc:
+        # Manifest is not valid JSON; fall back to YAML line-scan below.
+        # Log the parse error at DEBUG so malformed manifests are diagnosable
+        # without aborting the version-extraction pipeline.
+        logger.debug("manifest text is not valid JSON, falling back to line scan: %s", exc)
     # Line-scan fallback for YAML / non-JSON.
     line_re = re.compile(
         r"^\s*(recorder_version|recorderVersion)\s*[:=]\s*['\"]?([^'\"\s]+)['\"]?\s*$"
