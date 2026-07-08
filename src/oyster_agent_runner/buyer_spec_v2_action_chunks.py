@@ -53,6 +53,12 @@ class ActionChunk:
 
     @property
     def data(self) -> np.ndarray:
+        """The action chunk data as a 2D float32 numpy array.
+
+        Returns:
+            A 2D numpy array of shape (horizon, action_dim) containing
+            the action values for each step in the chunk.
+        """
         return self._data
 
     @property
