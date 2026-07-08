@@ -3232,8 +3232,20 @@ def _enqueue_rawvideo_frame(handle: VideoCaptureHandle, frame: bytes) -> bool:
         try:
             frame_queue.get_nowait()
             handle.frames_dropped += 1
-        except queue.Empty:
-            pass
+        except queue.Empty as exc:
+            # Recovery drop failed (queue was empty between Full and get_nowait
+            # — race with the writer thread). Fall through and retry the put
+            # anyway; the second put will either succeed or report Full below.
+            # Surface at DEBUG so operators can diagnose "frame lost" reports
+            # in the field without a full stack trace at INFO.
+            logger.debug(
+                "_enqueue_rawvideo_frame: drop failed (queue empty) for "
+                "layer=%s out_path=%s frame_bytes=%d: %s",
+                getattr(handle, "layer", "<unknown>"),
+                getattr(handle, "out_path", "<unknown>"),
+                len(frame),
+                exc,
+            )
         try:
             frame_queue.put_nowait(frame)
             return True
