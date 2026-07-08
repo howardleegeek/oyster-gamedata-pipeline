@@ -452,7 +452,6 @@ def _yaw_pitch_from_obs(obs: dict[str, Any]) -> tuple[float, float] | None:
             return float(bot["yaw"]), float(bot["pitch"])
         except (TypeError, ValueError) as exc:
             logger.debug("Failed to convert bot yaw/pitch to float: %s", exc)
-            pass
     if "yaw" in obs and "pitch" in obs:
         try:
             return float(obs["yaw"]), float(obs["pitch"])
