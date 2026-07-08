@@ -53,22 +53,69 @@ def test_hide_depth_progress_ui_no_bare_except():
             break
     assert func_node is not None, "_hide_depth_progress_ui function must exist"
 
-    # Check both except handlers are bound (have an 'as' clause)
+    # Check all except handlers are bound (have an 'as' clause)
     for node in ast.walk(func_node):
         if isinstance(node, ast.ExceptHandler):
-            # Inner widget destroy / button repack handlers
+            # Inner widget destroy / button repack handlers + outer self.after handler
             if node.type is None:
                 raise AssertionError("Bare except: found bare except in _hide_depth_progress_ui")
             # Check that exception is bound to a name
             if (
                 isinstance(node.type, ast.Name)
-                and node.type.id == "Exception"
+                and node.type.id in ("Exception", "RuntimeError")
                 and node.name is None
             ):
                 raise AssertionError(
                     "Bare except: Exception handler must bind exception "
                     "(e.g., 'except Exception as e:')"
                 )
+
+
+def test_hide_depth_progress_ui_outer_runtime_error_binds_and_logs():
+    """Verify outer self.after() RuntimeError handler binds and logs."""
+    src = Path("bin/recorder_consumer_lite.py").read_text()
+    tree = ast.parse(src)
+
+    # Find _hide_depth_progress_ui function
+    func_node = None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "_hide_depth_progress_ui":
+            func_node = node
+            break
+
+    assert func_node is not None, "_hide_depth_progress_ui function must exist"
+
+    # Find the outer self.after() except RuntimeError handler
+    found_runtime_error_handler = False
+    for node in ast.walk(func_node):
+        if isinstance(node, ast.ExceptHandler):
+            # Look for RuntimeError handler at the outer level (not inside inner _apply)
+            if (
+                isinstance(node.type, ast.Name)
+                and node.type.id == "RuntimeError"
+                and node.name is not None
+            ):
+                found_runtime_error_handler = True
+                # Check it calls logger.debug
+                has_debug_log = False
+                for child in ast.walk(node):
+                    if isinstance(child, ast.Call):
+                        if isinstance(child.func, ast.Attribute):
+                            if (
+                                child.func.attr == "debug"
+                                and isinstance(child.func.value, ast.Name)
+                                and child.func.value.id == "logger"
+                            ):
+                                has_debug_log = True
+                assert has_debug_log, "RuntimeError handler must call logger.debug"
+                # Check it references the bound exception in the format string
+                has_exc_reference = False
+                for child in ast.walk(node):
+                    if isinstance(child, ast.Name) and child.id == node.name:
+                        has_exc_reference = True
+                assert has_exc_reference, "RuntimeError handler must reference bound exception in log"
+
+    assert found_runtime_error_handler, "Must find RuntimeError handler in _hide_depth_progress_ui"
 
 
 def test_widget_destroy_except_logs_debug():

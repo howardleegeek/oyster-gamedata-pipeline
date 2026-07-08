@@ -5808,8 +5808,8 @@ class RecorderApp(tk.Tk):
 
         try:
             self.after(0, _apply)
-        except RuntimeError:
-            pass
+        except RuntimeError as exc:
+            logger.debug("depth_progress: Tk after() in _hide raised RuntimeError: %s", exc)
 
     def _toggle_arm(self) -> None:
         """Tester clicked the arm button. Toggle recording state.
