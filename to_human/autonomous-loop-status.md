@@ -459,3 +459,8 @@
 ## Round 391 @ 2026-07-08T19:07:00Z
 - Picked: Surface silent errors in bin/build_bundled_installer/fetch_jre.py (3 bare `except OSError: pass` sites: _download_with_retries partial download cleanup, _verify_sha poisoned cache file removal, _dir_size_bytes stat failures). All bare `except OSError: pass` now bind exception and log context with _log(). Control flow preserved (fall-through / continue). No existing tests for this file. Module imports OK. Ruff clean.
 - Result: committed 0a0e14ba, pushed to origin/main
+
+## Round 392 @ 2026-07-08T20:38:30Z
+
+- Picked: Continue in-progress work from previous tick — remove the remaining 4 redundant `pass` lines after `logger.debug(...)` in bin/lint_v3_prd_grounded.py (3 of the 7 had already been done in the unstaged diff at the start of the tick; the 4 remaining were keycode range json, inputs.jsonl open/read, ffprobe nb_frames fast probe, metadata json parse). All 7 sites now have clean `except ...: logger.debug(...)` handlers. Self-review: no silent error introduced (logger.debug was already in place — the `pass` was a dead no-op after a working logger call); control flow preserved (all fall-through paths intact); no race/off-by-one/security/false-success risk; test_no_bare_except_pass_anywhere now passes since the targeted functions have zero `except ...: pass` patterns. Tests pass 26/26. Ruff clean. git add 1 file.
+- Result: committed 3cbbc971, pushed to origin/main
