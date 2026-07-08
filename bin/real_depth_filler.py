@@ -257,8 +257,8 @@ def infer_batch(
 
                     if device == "cuda":
                         torch.cuda.empty_cache()
-                except ImportError:
-                    pass
+                except ImportError as exc:
+                    logger.debug("real_depth_filler: torch not available for cache clear during OOM recovery: %s", exc)
                 continue
             else:
                 raise
