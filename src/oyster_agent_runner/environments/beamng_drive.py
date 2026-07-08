@@ -95,8 +95,15 @@ class BeamNGDriveExtractor:
         if not self.beamng_home.exists():
             raise FileNotFoundError(f"BeamNG not found at: {self.beamng_home}")
 
-    def connect(self):
-        """Connect to BeamNG.drive."""
+    def connect(self) -> None:
+        """Connect to BeamNG.drive.
+
+        Establishes a connection to the BeamNG.drive instance and launches
+        the simulator if not already running.
+
+        Raises:
+            Exception: If connection fails.
+        """
         logging.info(f"Connecting to {self.host}:{self.port}")
         self.beamng = BeamNGpy(
             host=self.host,
