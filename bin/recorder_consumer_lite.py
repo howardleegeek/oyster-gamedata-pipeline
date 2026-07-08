@@ -4255,9 +4255,11 @@ def _detect_gpu_available() -> bool:
                     return True
             except Exception as e:
                 logger.debug("_detect_gpu_available: cuInit call failed: %s", e)
-    except OSError:
+    except OSError as exc:
         # nvcuda.dll not present at all — no NVIDIA driver installed.
-        pass
+        # Bind and log at DEBUG so a missing-bundle case is visible in --verbose
+        # without spamming the default WARNING-level log.
+        logger.debug("_detect_gpu_available: nvcuda.dll not present (no NVIDIA driver): %s", exc)
     except Exception as exc:
         logger.debug("_detect_gpu_available: NVIDIA CUDA path failed: %s", exc)
     # 2. DirectML path — only meaningful if torch-directml made it into the
