@@ -6371,8 +6371,18 @@ class RecorderApp(tk.Tk):
             if profile is not None:
                 try:
                     fps = float(profile.fps)
-                except (AttributeError, TypeError):
-                    pass
+                except (AttributeError, TypeError) as exc:
+                    # Surface unexpected shape: a well-typed VideoOutputProfile
+                    # always has .fps as a float, so this should be impossible.
+                    # If it fires, downstream consumers (timestamps.json) will
+                    # see "fps": null — silently wrong for the PRD-side
+                    # frame-to-unix alignment that depends on a real number.
+                    logger.debug(
+                        "timestamps sidecar: profile.fps not coercable to float "
+                        "(profile=%r): %s; writing null",
+                        profile,
+                        exc,
+                    )
             timestamps_data: dict[str, Any] = {
                 "schema_version": 1,
                 "recording_started_unix_ns": recording_started_unix_ns,
