@@ -11,10 +11,13 @@ keys (clip_id, frame_idx) to shard file paths.
 
 import argparse
 import json
+import logging
 import sys
 import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 # Lazy imports for optional dependencies
 pandas = None
@@ -256,8 +259,20 @@ def main(argv: Optional[List[str]] = None) -> int:
             try:
                 output_path.unlink()
                 output_path.parent.rmdir()
-            except OSError:
-                pass  # Best effort cleanup
+            except OSError as exc:
+                # Best effort cleanup: surface transient filesystem errors
+                # (e.g. ENOENT from a parallel unlink, EBUSY on Windows AV
+                # scanners, permission errors on read-only mounts) at DEBUG
+                # so they are observable when the log level is raised,
+                # without promoting a routine cleanup race to a user-visible
+                # warning. The function has already produced (or failed to
+                # produce) its result; this only affects temp teardown.
+                logger.debug(
+                    "best-effort cleanup of %s (and parent %s) failed: %s",
+                    output_path,
+                    output_path.parent,
+                    exc,
+                )
 
 
 if __name__ == "__main__":
