@@ -114,8 +114,8 @@ def check_dpi() -> dict:
                                     # Calculate scaling factor (1.0 = 96 DPI baseline)
                                     scaling_factor = dpi_value / 96.0
                                     break
-                        except (ValueError, IndexError):
-                            pass
+                        except (ValueError, IndexError) as exc:
+                            logger.debug("DPI parse failed for %s: %s", part, exc)
 
         # If physical size is 0mm x 0mm, we can't determine DPI from xrandr
         # Check for scaling via X resources or gsettings
@@ -443,8 +443,8 @@ def check_fps() -> dict:
                             load_avg = float(load)
                             # If load is very high, FPS will be low
                             cpu_load_ok = load_avg < 4.0
-                        except ValueError:
-                            pass
+                        except ValueError as exc:
+                            logger.debug("CPU load parse failed for %s: %s", load, exc)
         except Exception as e:
             logger.debug("fps_capability check failed: %s", e)
 

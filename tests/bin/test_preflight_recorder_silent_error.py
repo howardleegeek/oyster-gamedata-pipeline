@@ -69,6 +69,26 @@ def test_exception_handlers_have_logger_debug() -> None:
     assert "tailscale status check failed:" in SRC
     assert "ping mac1.tailscale failed:" in SRC
     assert "ping %s failed:" in SRC
+    # Additional handlers we fixed in this round
+    assert "DPI parse failed for" in SRC
+    assert "CPU load parse failed for" in SRC
+
+
+def test_no_bare_except_pass_anywhere() -> None:
+    """No except block anywhere in module may end with bare 'pass'."""
+    tree = ast.parse(SRC)
+    bare_pass_lines = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Try):
+            for handler in node.handlers:
+                if handler.body and len(handler.body) == 1:
+                    if isinstance(handler.body[0], ast.Pass):
+                        type_src = ast.unparse(handler.type) if handler.type else "bare"
+                        bare_pass_lines.append((handler.lineno, type_src))
+    assert not bare_pass_lines, (
+        f"Found bare 'except ...: pass' at lines {bare_pass_lines}. "
+        f"Bind the exception and log via logger.debug(...)."
+    )
 
 
 def test_module_compiles() -> None:

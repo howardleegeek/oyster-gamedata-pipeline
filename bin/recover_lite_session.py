@@ -14,6 +14,7 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+import logging
 import math
 import os
 import re
@@ -23,6 +24,8 @@ import sys
 import uuid
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 BIN = Path(__file__).resolve().parent
 DEPTH_EXR_MAX_COUNT = 1800
@@ -128,8 +131,14 @@ def _parse_recorded_at(value: Any) -> dt.datetime | None:
     for fmt in ("%Y%m%d-%H%M%S", "%Y%m%d_%H%M%S"):
         try:
             return dt.datetime.strptime(value, fmt).replace(tzinfo=dt.timezone.utc)
-        except ValueError:
-            pass
+        except ValueError as recorded_exc:
+            # Format mismatch is normal here — we try multiple formats in a
+            # loop and any one that fails should fall through to the next.
+            # Log at debug so the reason is observable without spamming info.
+            logger.debug(
+                "_parse_recorded_at: format %r did not match value %r: %s",
+                fmt, value, recorded_exc,
+            )
     return None
 
 
@@ -140,8 +149,15 @@ def _session_dir_time_utc(s: Path) -> dt.datetime | None:
             return dt.datetime.strptime("".join(match.groups()), "%Y%m%d%H%M%S").replace(
                 tzinfo=dt.timezone.utc
             )
-        except ValueError:
-            pass
+        except ValueError as session_dir_exc:
+            # Regex matched the 8+6 digit pattern but strptime still
+            # rejected it (e.g. "20261332-999999" — invalid month/time
+            # components). Surface the parse error so the operator can
+            # see which session-dir name tripped it.
+            logger.debug(
+                "_session_dir_time_utc: strptime failed for %r: %s",
+                s.name, session_dir_exc,
+            )
     return None
 
 
@@ -240,8 +256,14 @@ def _video_info(s: Path) -> dict[str, Any]:
             num, den = float(num_s), float(den_s)
             if den:
                 fps = num / den
-        except ValueError:
-            pass
+        except ValueError as rate_exc:
+            # Fractional fps string was not parseable as two floats
+            # (e.g. "30/0" or "abc/def"). Surface it at debug so the
+            # operator can see why fps fell through to DEFAULT_FPS.
+            logger.debug(
+                "ffprobe avg_frame_rate parse failed for %r: %s",
+                rate, rate_exc,
+            )
     elif _float_or_none(rate):
         fps = float(rate)
 
