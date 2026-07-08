@@ -4255,13 +4255,11 @@ def _detect_gpu_available() -> bool:
                     return True
             except Exception as e:
                 logger.debug("_detect_gpu_available: cuInit call failed: %s", e)
-                pass
     except OSError:
         # nvcuda.dll not present at all — no NVIDIA driver installed.
         pass
     except Exception as exc:
         logger.debug("_detect_gpu_available: NVIDIA CUDA path failed: %s", exc)
-        pass
     # 2. DirectML path — only meaningful if torch-directml made it into the
     # bundle. Pure dxgi.dll presence isn't sufficient (every Win10+ has it).
     try:
@@ -4271,7 +4269,6 @@ def _detect_gpu_available() -> bool:
             return True
     except Exception as exc:
         logger.debug("_detect_gpu_available: DirectML path failed: %s", exc)
-        pass
     return False
 
 
@@ -6728,7 +6725,6 @@ class RecorderApp(tk.Tk):
                             shutil.rmtree(depth_dir, ignore_errors=True)
                     except Exception as _depth_rm_exc:  # noqa: BLE001
                         _trace(f"depth: rmtree failed during user skip (non-fatal): {_depth_rm_exc}")
-                        pass
                     _trace("package: depth skipped by user — partial tarball")
                     self._set(
                         "⚠️ 已跳过深度图",

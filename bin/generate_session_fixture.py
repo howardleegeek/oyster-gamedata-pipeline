@@ -289,7 +289,7 @@ def generate_session_fixture(
     except ImportError:
         # Fallback: write a minimal xlsx-like file (will fail xlsx audit but
         # that's OK — the fixture is for gate smoke, not full audit)
-        pass
+        ...
 
     return {
         "session_dir": str(base),
