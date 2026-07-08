@@ -468,3 +468,7 @@
 ## Round 394 @ 2026-07-08T22:09:08Z
 - Picked: Surface silent error in dashboard/server.py verify_session_provenance() Exception handler. The bare `except Exception as e: pass` was silently swallowing provenance verification failures (oyster_provenance.verify could fail for many reasons and operators would never know). Added logging import + module-level logger, bound exception to `exc`, added logger.debug with session_id + exc. Control flow preserved (falls through to mock verification). Added regression test tests/bin/test_dashboard_server_silent_error.py (4 tests: no bare pass in target, handler binds name and logs, module has logging import, module has logger definition). Tests pass 4/4. Ruff clean. git add 2 files.
 - Result: committed 9fc5020e, pushed to origin/main
+
+## Round 395 @ 2026-07-08T22:20:00Z
+- Picked: Surface silent error in bin/synthetic_disclosure_metadata.py _load_yaml() ImportError handler. The bare `except ImportError:` was silently swallowing PyYAML missing cases, causing YAML sidecar validation to be silently skipped without operators knowing. Added `import logging` + `logger = logging.getLogger(__name__)`, bound exception to `exc`, added logger.debug with path + exc context. Control flow preserved (still returns None to preserve caller contract). Added regression test tests/bin/test_synthetic_disclosure_metadata_silent_error.py (8 tests: AST scan for binding, logger.debug call, control flow preserved, logging import present). Tests pass 8/8. Ruff clean. git add 2 files.
+- Result: committed e42c0555, pushed to origin/main
