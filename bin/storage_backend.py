@@ -805,6 +805,14 @@ class GitHubReleaseStorageBackend(StorageBackend):
         return f"https://github.com/{self.repo}/releases/download/{self.tag}/{asset_name}"
 
     def delete(self, asset_name: str) -> bool:
+        """Delete an asset from a GitHub release.
+
+        Args:
+            asset_name: Name of the asset to delete from the release.
+
+        Returns:
+            True if the asset was deleted successfully, False if it did not exist.
+        """
         rc, out, err = self.gh_runner(
             ["release", "delete-asset", self.tag, asset_name, "--repo", self.repo, "--yes"]
         )
