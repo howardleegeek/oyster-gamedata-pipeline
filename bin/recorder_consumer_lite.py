@@ -954,8 +954,8 @@ def _attempt_mp4_remux_repair(mp4_path: Path) -> bool:
     fixed_path = mp4_path.with_name(f"{mp4_path.stem}.fixed{mp4_path.suffix}")
     try:
         fixed_path.unlink(missing_ok=True)
-    except OSError:
-        pass
+    except OSError as _remux_cleanup_exc:
+        _trace(f"mp4: remux cleanup failed to delete {fixed_path}: {_remux_cleanup_exc}")
 
     cmd = [
         str(_FFMPEG),
@@ -984,16 +984,16 @@ def _attempt_mp4_remux_repair(mp4_path: Path) -> bool:
         _trace(f"mp4: remux repair failed rc={result.returncode}: {stderr}")
         try:
             fixed_path.unlink(missing_ok=True)
-        except OSError:
-            pass
+        except OSError as _remux_fail_cleanup_exc:
+            _trace(f"mp4: remux fail cleanup failed to delete {fixed_path}: {_remux_fail_cleanup_exc}")
         return False
 
     if not fixed_path.exists() or not _mp4_has_moov_atom(fixed_path):
         _trace("mp4: remux repair did not produce a playable MP4 with moov atom")
         try:
             fixed_path.unlink(missing_ok=True)
-        except OSError:
-            pass
+        except OSError as _remux_noatom_cleanup_exc:
+            _trace(f"mp4: remux no-atom cleanup failed to delete {fixed_path}: {_remux_noatom_cleanup_exc}")
         return False
 
     try:
