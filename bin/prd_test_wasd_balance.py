@@ -16,9 +16,12 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import logging
 import sys
 from pathlib import Path
 from typing import NamedTuple
+
+logger = logging.getLogger(__name__)
 
 
 class KeyStats(NamedTuple):
@@ -60,8 +63,8 @@ def parse_keypress_file(path: Path) -> dict[str, int]:
                     k.upper(): v for k, v in data.items()
                     if k.upper() in counts
                 }
-        except (json.JSONDecodeError, ValueError):
-            pass
+        except (json.JSONDecodeError, ValueError) as exc:
+            logger.debug("JSON parse failed for %s: %s", path, exc)
 
     # Try CSV
     try:
@@ -71,8 +74,8 @@ def parse_keypress_file(path: Path) -> dict[str, int]:
             if key in counts:
                 counts[key] += 1
         return counts
-    except csv.Error:
-        pass
+    except csv.Error as exc:
+        logger.debug("CSV parse failed for %s: %s", path, exc)
 
     raise ValueError(f"Unsupported file format: {path}")
 
