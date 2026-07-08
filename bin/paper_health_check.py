@@ -3,9 +3,12 @@
 
 import argparse
 import json
+import logging
 import socket
 import struct
 import sys
+
+logger = logging.getLogger(__name__)
 
 
 def encode_varint(value):
@@ -59,6 +62,11 @@ def check_server(host, port):
         print("Status: WARNING (version mismatch)")
         return 1
     except Exception as e:
+        # Surface the underlying error (with traceback) to the module logger
+        # so operators can diagnose connection/protocol failures from logs,
+        # not just a one-line "Error: ..." printout on stdout. The print
+        # is preserved for the CLI use-case so behaviour is unchanged.
+        logger.exception("Paper health probe failed for %s:%s: %s", host, port, e)
         print(f"Error: {e}")
         return 1
 
