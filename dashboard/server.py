@@ -4,10 +4,13 @@ Provides REST API for session management, provenance verification, and payouts.
 """
 
 import hashlib
+import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import jwt
+
+logger = logging.getLogger(__name__)
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -326,8 +329,8 @@ async def verify_session_provenance(
                 hash_matches=result.get("hash_matches", False),
                 details=result
             )
-        except Exception as e:
-            pass
+        except Exception as exc:
+            logger.debug("verify_session_provenance: oyster_provenance.verify failed for %s: %s", session_id, exc)
     
     # Mock verification - hash should match the session_id
     expected_hash = hashlib.sha256(session_id.encode()).hexdigest()
