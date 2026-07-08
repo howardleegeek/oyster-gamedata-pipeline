@@ -1,4 +1,8 @@
 
+## Round 370 @ 2026-07-08T03:00:00Z
+- Picked: Surface silent errors in bin/i18n_zh_en_strings.py translate() (3 swallow sites: gettext path, locale fallback, en_US fallback) + bin/telemetry.py marker cleanup. Each except (KeyError, ValueError): pass now binds exc and calls logger.debug with context. telemetry.py FileNotFoundError handler now logs debug instead of bare pass. Control flow preserved: all paths return unformatted translated string / return default on failure. Added regression tests (10 tests pass: module compiles, logging+logger defined, no bare except pass, runtime verification of debug logging + fallback behavior). Ruff clean (fixed unused sys import + trailing whitespace in tests). git add 4 files; committed 62b2aa8d and pushed.
+- Result: committed 62b2aa8d, pushed to origin/main
+
 ## Round 369 @ 2026-07-08T02:40:00Z
 - Picked: Surface silent error in bin/red_team_wrong_obs_key.py — socket close OSError swallow in finally block (line ~88). Bound exception to sock_close_exc and replaced bare `pass` with logger.debug("socket close failed (non-fatal) [%s]: %s", type(sock_close_exc).__name__, sock_close_exc). Control flow preserved: cleanup swallow still returns, no result mutation. Added regression test tests/bin/test_red_team_wrong_obs_key_silent_error.py (4 passed: module compiles, logging+logger defined, OSError handler in finally binds exc + calls logger.debug, no bare except OSError: pass). Ruff clean; git add source + test; committed 2f8a4954 and pushed.
 - Result: committed 2f8a4954, pushed to origin/main
