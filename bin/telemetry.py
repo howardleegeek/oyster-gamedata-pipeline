@@ -235,7 +235,6 @@ def _mark_uploaded_today() -> None:
         )
     except OSError as exc:
         logger.debug("last-upload marker write failed: %s", exc)
-        pass
 
 
 async def _async_upload(payload: Dict[str, Any], timeout: float = 5.0) -> bool:
