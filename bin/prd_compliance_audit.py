@@ -1305,15 +1305,15 @@ def audit_group_session_sanity(session: Path) -> list[dict]:
                 timeout=10,
             )
             mp4_dur = float(r.stdout.strip() or 0) or None
-        except (FileNotFoundError, subprocess.TimeoutExpired, ValueError):
-            pass
+        except (FileNotFoundError, subprocess.TimeoutExpired, ValueError) as exc:
+            logger.debug("SS1 ffprobe read failed for %s: %s", mp4, exc)
 
     meta = {}
     if meta_path.exists():
         try:
             meta = json.loads(meta_path.read_text())
-        except (json.JSONDecodeError, OSError):
-            pass
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.debug("SS1 metadata.json read failed for %s: %s", meta_path, exc)
 
     # SS1: mp4 duration ≈ metadata.duration
     meta_dur = meta.get("duration")
@@ -1337,15 +1337,15 @@ def audit_group_session_sanity(session: Path) -> list[dict]:
             if isinstance(d, dict) and "frames" in d:
                 d = d["frames"]
             ac_n = len(d) if isinstance(d, list) else 0
-        except (json.JSONDecodeError, OSError):
-            pass
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.debug("SS2 action_camera.json read failed for %s: %s", ac_path, exc)
     frames_n = 0
     if frames_path.exists():
         try:
             with frames_path.open(encoding="utf-8") as fh:
                 frames_n = sum(1 for line in fh if line.strip())
-        except OSError:
-            pass
+        except OSError as exc:
+            logger.debug("SS2 frames.jsonl read failed for %s: %s", frames_path, exc)
     items.append(
         _result(
             "SS2",
@@ -1365,8 +1365,8 @@ def audit_group_session_sanity(session: Path) -> list[dict]:
                 t_first = d[0].get("time", 0) or 0
                 t_last = d[-1].get("time", 0) or 0
                 ac_span = float(t_last) - float(t_first)
-        except (json.JSONDecodeError, OSError, ValueError, TypeError):
-            pass
+        except (json.JSONDecodeError, OSError, ValueError, TypeError) as exc:
+            logger.debug("SS3 ac time-span parse failed for %s: %s", ac_path, exc)
     if mp4_dur is None or ac_span is None:
         items.append(_result("SS3", False, f"mp4_dur={mp4_dur} ac_span={ac_span} (need both)"))
     else:
@@ -1403,7 +1403,8 @@ def audit_group_session_sanity(session: Path) -> list[dict]:
                     f"recording_started_utc age: {age} (max 7d, no future)",
                 )
             )
-        except ValueError:
+        except ValueError as exc:
+            logger.debug("SS5 recording_started_utc parse failed for %r: %s", rs, exc)
             items.append(_result("SS5", False, f"unparseable timestamp: {rs!r}"))
 
     return items
