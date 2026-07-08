@@ -9,9 +9,12 @@ Logs deletion audit trail to ~/.oyster/deletions.jsonl
 import argparse
 import hashlib
 import json
+import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List
+
+logger = logging.getLogger(__name__)
 
 # Default config
 OYSTER_DIR = Path.home() / '.oyster'
@@ -39,7 +42,11 @@ def load_deletion_log() -> List[Dict[str, Any]]:
         for line in f:
             try:
                 entries.append(json.loads(line))
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as exc:
+                logger.debug(
+                    "deletion log line skipped (corrupt JSON) [%s]: %s",
+                    type(exc).__name__, exc,
+                )
                 continue
     return entries
 
@@ -72,7 +79,11 @@ def find_sessions_for_contributor(contributor_id_hash: str, sessions_dir: Path =
                 contrib_id = metadata.get('contributor_id_hash') or metadata.get('contributor_id')
                 if contrib_id == contributor_id_hash:
                     sessions.append(session_dir)
-            except (json.JSONDecodeError, IOError):
+            except (json.JSONDecodeError, IOError) as exc:
+                logger.debug(
+                    "find_sessions: metadata parse failed for %s [%s]: %s",
+                    metadata_file, type(exc).__name__, exc,
+                )
                 continue
         
         # Also check session.json
@@ -86,7 +97,11 @@ def find_sessions_for_contributor(contributor_id_hash: str, sessions_dir: Path =
                 if contrib_id == contributor_id_hash:
                     if session_dir not in sessions:
                         sessions.append(session_dir)
-            except (json.JSONDecodeError, IOError):
+            except (json.JSONDecodeError, IOError) as exc:
+                logger.debug(
+                    "find_sessions: session.json parse failed for %s [%s]: %s",
+                    session_file, type(exc).__name__, exc,
+                )
                 continue
     
     return sessions
