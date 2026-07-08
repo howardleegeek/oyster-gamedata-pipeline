@@ -455,3 +455,7 @@
 - Picked: Surface silent error in bin/paper_health_check.py check_server() exception handler. The bare  was silently swallowing connection/protocol failures, printing only a one-line error to stdout without logging the traceback. Added  +  and replaced the handler with  before the print statement. Control flow preserved: still prints the error line and returns 1 (CLI behavior unchanged). Regression test tests/bin/test_paper_health_check_silent_error.py covers: module compiles, logging imported + logger defined, handler binds exception and calls logger.exception, control flow preserved. 6/6 tests pass. Ruff clean. git add 2 files.
 - Result: committed 311e4a31, pushed to origin/main
 
+
+## Round 391 @ 2026-07-08T19:07:00Z
+- Picked: Surface silent errors in bin/build_bundled_installer/fetch_jre.py (3 bare `except OSError: pass` sites: _download_with_retries partial download cleanup, _verify_sha poisoned cache file removal, _dir_size_bytes stat failures). All bare `except OSError: pass` now bind exception and log context with _log(). Control flow preserved (fall-through / continue). No existing tests for this file. Module imports OK. Ruff clean.
+- Result: committed 0a0e14ba, pushed to origin/main
