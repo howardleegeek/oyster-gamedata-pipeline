@@ -706,8 +706,10 @@ def _check_quaternion(d: Path, rpt: LintReport) -> None:
                 declared_order = meta.get("quaternion_order")
                 if declared_order is not None:
                     break
-            except (json.JSONDecodeError, OSError):
-                pass
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.debug(
+                    "quaternion_order probe failed for %s: %s",
+                    metadata_path, exc)
 
     data, path = _load_action_camera(d)
     if data is None:
@@ -1802,8 +1804,10 @@ def _check_input_frame_latency(d: Path, rpt: LintReport) -> None:
                 if v is not None:
                     try:
                         values.append(float(v))
-                    except (TypeError, ValueError):
-                        pass
+                    except (TypeError, ValueError) as exc:
+                        logger.debug(
+                            "latency list item parse failed for %r: %s",
+                            v, exc)
     elif isinstance(data, dict):
         # First try the per-sample key.
         for key in ("latencies", "measurements", "values", "data"):
@@ -1817,8 +1821,10 @@ def _check_input_frame_latency(d: Path, rpt: LintReport) -> None:
                         if v is not None:
                             try:
                                 values.append(float(v))
-                            except (TypeError, ValueError):
-                                pass
+                            except (TypeError, ValueError) as exc:
+                                logger.debug(
+                                    "latency %s item parse failed for %r: %s",
+                                    key, v, exc)
                 break  # use first matching key
         # Fallback: summary-stat schema (recorder's finalize_session output).
         if not values:
@@ -1834,8 +1840,10 @@ def _check_input_frame_latency(d: Path, rpt: LintReport) -> None:
                     if v is not None:
                         try:
                             values.append(float(v))
-                        except (TypeError, ValueError):
-                            pass
+                        except (TypeError, ValueError) as exc:
+                            logger.debug(
+                                "latency summary %s parse failed for %r: %s",
+                                k, v, exc)
                 # If the producer reports `bound_ms` we honor it as the
                 # threshold; lint default stays 20 ms otherwise.
 
@@ -1978,8 +1986,9 @@ def _check_stationary_pct(d: Path, rpt: LintReport) -> None:
                 try:
                     fps = float(f)
                     break
-                except (TypeError, ValueError):
-                    pass
+                except (TypeError, ValueError) as exc:
+                    logger.debug(
+                        "wasd_balance fps parse failed for %r: %s", f, exc)
 
     stationary_count = 0
     max_stationary_run = 0
@@ -2083,8 +2092,10 @@ def _check_frozen_frames(d: Path, rpt: LintReport) -> None:
                     try:
                         fps = float(f)
                         break
-                    except (TypeError, ValueError):
-                        pass
+                    except (TypeError, ValueError) as exc:
+                        logger.debug(
+                            "frozen_frames fps parse failed for %r: %s",
+                            f, exc)
 
         # Check for consecutive frames with identical mouse_dx/dy and
         # identical camera_rotation_quaternion (proxy for frozen content)
@@ -2145,8 +2156,10 @@ def _check_frozen_frames(d: Path, rpt: LintReport) -> None:
             try:
                 val = float(line.split("=", 1)[1])
                 yavg_values.append(val)
-            except (TypeError, ValueError):
-                pass
+            except (TypeError, ValueError) as exc:
+                logger.debug(
+                    "signalstats YAVG parse failed for line %r: %s",
+                    line, exc)
 
     if not yavg_values:
         rpt.add(LintResult(
