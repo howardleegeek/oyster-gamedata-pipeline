@@ -85,8 +85,12 @@ def attempt_auth(host: str, port: int, obs_key: str, use_tls: bool = False,
         if sock:
             try:
                 sock.close()
-            except OSError:
-                pass
+            except OSError as sock_close_exc:
+                logger.debug(
+                    "socket close failed (non-fatal) [%s]: %s",
+                    type(sock_close_exc).__name__,
+                    sock_close_exc,
+                )
     return result
 
 def write_audit_entry(audit_path: Path, host: str, port: int,
