@@ -449,3 +449,9 @@
 ## Round 389 @ 2026-07-08T17:00:00Z
 - Picked: No good candidate — systematic silent-error sweep of all 344 bin/*.py files appears complete (verified: no bare `except: pass` patterns remain in grep search; 157 regression test files exist covering all major swallow sites; 1349/1350 bin tests pass with 1 skipped). Production gaps require Howard credentials (Vercel, Supabase, code signing). Exiting without commit.
 - Result: skipped (no good candidate)
+
+## Round 390 @ 2026-07-08T18:40:16Z
+
+- Picked: Surface silent error in bin/paper_health_check.py check_server() exception handler. The bare  was silently swallowing connection/protocol failures, printing only a one-line error to stdout without logging the traceback. Added  +  and replaced the handler with  before the print statement. Control flow preserved: still prints the error line and returns 1 (CLI behavior unchanged). Regression test tests/bin/test_paper_health_check_silent_error.py covers: module compiles, logging imported + logger defined, handler binds exception and calls logger.exception, control flow preserved. 6/6 tests pass. Ruff clean. git add 2 files.
+- Result: committed 311e4a31, pushed to origin/main
+
