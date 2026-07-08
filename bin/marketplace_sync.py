@@ -15,10 +15,14 @@ Environment variables:
 
 import argparse
 import json
+import logging
 import os
 import sys
 import time
 from typing import Any, Dict, Optional
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # Try to import requests, fall back to urllib
 try:
@@ -80,8 +84,13 @@ class FilterParser:
                         except ValueError:
                             try:
                                 value = float(value)
-                            except ValueError:
-                                pass  # Keep as string
+                            except ValueError as exc:
+                                # Value remains as string; log for debugging
+                                logger.debug(
+                                    "filter value %r could not be parsed as int or float: %s",
+                                    value,
+                                    exc,
+                                )
 
                     # Map to API parameter names
                     if op == ">=":
