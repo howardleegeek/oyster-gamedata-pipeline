@@ -244,7 +244,8 @@ def launch_minecraft(
 
     # Set up duration timer if specified
     if duration_sec:
-        def kill_after_duration():
+        def kill_after_duration() -> None:
+            """Terminate the Minecraft process after the specified duration."""
             time.sleep(duration_sec)
             if process.poll() is None:  # Still running
                 process.terminate()
