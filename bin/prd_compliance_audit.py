@@ -1030,8 +1030,15 @@ def audit_group_v_real_footage(session: Path) -> list[dict]:
             if "lavfi.signalstats.YAVG=" in line:
                 try:
                     yavgs.append(float(line.split("YAVG=", 1)[1].strip()))
-                except (ValueError, IndexError):
-                    pass
+                except (ValueError, IndexError) as exc:
+                    # Malformed ffmpeg output (e.g. "YAVG=NaN" or empty value).
+                    # Drop the data point but surface the failure at DEBUG so
+                    # operators can diagnose a buggy FFmpeg build or truncated
+                    # stderr without losing the whole B8 verdict.
+                    logger.debug(
+                        "B8 signalstats YAVG parse failed for %r (mp4=%s): %s",
+                        line, mp4, exc,
+                    )
         if yavgs:
             mean = sum(yavgs) / len(yavgs)
             var = sum((y - mean) ** 2 for y in yavgs) / len(yavgs)
