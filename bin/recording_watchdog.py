@@ -28,11 +28,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import signal
 import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Config
@@ -86,7 +89,8 @@ def count_lines_fast(path: Path) -> int:
                     break
                 count += chunk.count(b"\n")
         return count
-    except OSError:
+    except OSError as exc:
+        logger.debug("count_lines_fast: failed to read %s: %s", path, exc)
         return 0
 
 
