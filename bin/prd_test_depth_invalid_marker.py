@@ -42,8 +42,8 @@ def write_exr(filepath: Path, depth: np.ndarray) -> bool:
             out.write_image(depth)
             out.close()
             return True
-    except ImportError:
-        pass
+    except ImportError as exc:
+        logger.debug("write_exr: OpenImageIO import failed, trying OpenEXR fallback: %s", exc)
 
     try:
         import Imath
@@ -54,8 +54,8 @@ def write_exr(filepath: Path, depth: np.ndarray) -> bool:
         exr.writePixels({"Z": depth.tobytes()})
         exr.close()
         return True
-    except ImportError:
-        pass
+    except ImportError as exc:
+        logger.debug("write_exr: OpenEXR import failed, falling back to NPZ: %s", exc)
 
     # Fallback: NPZ for testing without EXR libs
     np.savez_compressed(filepath.with_suffix(".npz"), depth=depth)
@@ -71,8 +71,8 @@ def read_exr(filepath: Path) -> np.ndarray | None:
             img = inp.read_image()
             inp.close()
             return img.astype(np.float32)
-    except ImportError:
-        pass
+    except ImportError as exc:
+        logger.debug("read_exr: OpenImageIO import failed, trying OpenEXR fallback: %s", exc)
 
     try:
         import Imath
@@ -83,8 +83,8 @@ def read_exr(filepath: Path) -> np.ndarray | None:
         pt = Imath.PixelType(Imath.PixelType.FLOAT)
         depth = np.frombuffer(exr.channel("Z", pt), dtype=np.float32)
         return depth.reshape(h, w)
-    except ImportError:
-        pass
+    except ImportError as exc:
+        logger.debug("read_exr: OpenEXR import failed, falling back to NPZ: %s", exc)
 
     npz = filepath.with_suffix(".npz")
     if npz.exists():
