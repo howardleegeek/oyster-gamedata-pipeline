@@ -53,6 +53,11 @@ class Vector3:
         return [self.x, self.y, self.z]
 
     def length(self) -> float:
+        """Calculate the Euclidean length (magnitude) of this 3D vector.
+
+        Returns:
+            The square root of x^2 + y^2 + z^2.
+        """
         return math.sqrt(self.x**2 + self.y**2 + self.z**2)
 
 
