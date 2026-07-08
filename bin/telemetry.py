@@ -348,7 +348,7 @@ def main() -> None:
         try:
             LAST_UPLOAD_MARKER.unlink()
         except FileNotFoundError:
-            pass
+            logger.debug("telemetry marker file already absent: %s", LAST_UPLOAD_MARKER)
 
     if send_telemetry(consent_path=args.consent_file):
         print("Telemetry dispatched.")

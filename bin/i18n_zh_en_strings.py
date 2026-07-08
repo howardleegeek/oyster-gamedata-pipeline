@@ -142,24 +142,36 @@ class I18NStringLoader:
             if translated != message_id:
                 try:
                     return translated.format(**kwargs) if kwargs else translated
-                except (KeyError, ValueError):
+                except (KeyError, ValueError) as exc:
+                    logger.debug(
+                        "gettext translation format failed for %r in locale %s: %s",
+                        message_id, self.current_locale, exc,
+                    )
                     return translated
-        
+
         # Fall back to built-in strings
         if (self.current_locale in self.fallback_strings and
             message_id in self.fallback_strings[self.current_locale]):
             translated = self.fallback_strings[self.current_locale][message_id]
             try:
                 return translated.format(**kwargs) if kwargs else translated
-            except (KeyError, ValueError):
+            except (KeyError, ValueError) as exc:
+                logger.debug(
+                    "fallback translation format failed for %r in locale %s: %s",
+                    message_id, self.current_locale, exc,
+                )
                 return translated
-        
+
         # Fall back to English
         if message_id in self.fallback_strings['en_US']:
             translated = self.fallback_strings['en_US'][message_id]
             try:
                 return translated.format(**kwargs) if kwargs else translated
-            except (KeyError, ValueError):
+            except (KeyError, ValueError) as exc:
+                logger.debug(
+                    "en_US fallback translation format failed for %r: %s",
+                    message_id, exc,
+                )
                 return translated
         
         # Return original message ID if no translation found
