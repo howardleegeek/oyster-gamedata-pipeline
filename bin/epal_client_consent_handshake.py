@@ -10,10 +10,13 @@ Persists signed consent log per G221 specification.
 import argparse
 import hashlib
 import json
+import logging
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_CONSENT_LOG_DIR = Path("logs/consent")
 
@@ -106,16 +109,18 @@ def prompt_consent() -> tuple[bool, bool, Dict[str, bool]]:
     print("Consent to session recording for AI training? [y/N]: ", end="")
     try:
         ai_consent = input().strip().lower() in ('y', 'yes')
-    except EOFError:
+    except EOFError as exc:
+        logger.debug("prompt_consent: AI training consent input EOF: %s", exc)
         ai_consent = False
-    
+
     # Recording consent
     print("Consent to session recording for quality purposes? [y/N]: ", end="")
     try:
         rec_consent = input().strip().lower() in ('y', 'yes')
-    except EOFError:
+    except EOFError as exc:
+        logger.debug("prompt_consent: recording consent input EOF: %s", exc)
         rec_consent = False
-    
+
     # Opt-out options
     opt_out: Dict[str, bool] = {}
     if ai_consent:
@@ -125,8 +130,8 @@ def prompt_consent() -> tuple[bool, bool, Dict[str, bool]]:
             try:
                 if input().strip().lower() in ('y', 'yes'):
                     opt_out[opt] = True
-            except EOFError:
-                pass
+            except EOFError as exc:
+                logger.debug("prompt_consent: opt-out %s input EOF: %s", opt, exc)
     
     return ai_consent, rec_consent, opt_out
 
