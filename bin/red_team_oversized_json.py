@@ -10,11 +10,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sys
 import tempfile
 import tracemalloc
 from pathlib import Path
 from typing import Any, Iterator
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_SIZE_MB = 100
 BYTES_PER_MB = 1024 * 1024
@@ -120,8 +123,12 @@ def main(argv: list[str] | None = None) -> int:
             json_path.unlink()
             try:
                 output_dir.rmdir()
-            except OSError:
-                pass
+            except OSError as rmdir_exc:
+                logger.debug(
+                    "temp dir rmdir failed (non-fatal) [%s]: %s",
+                    type(rmdir_exc).__name__,
+                    rmdir_exc,
+                )
 
 
 if __name__ == "__main__":
