@@ -1089,8 +1089,8 @@ def _atomic_write_text(path: Path, data: str, *, encoding: str = "utf-8") -> Non
     except Exception as e:
         try:
             tmp_path.unlink()
-        except OSError:
-            pass
+        except OSError as unlink_exc:
+            logger.debug("temp file unlink failed: %s", unlink_exc)
         logger.debug("atomic_write_text failed for %s: %s", path, e)
         raise
 
@@ -1290,8 +1290,8 @@ def _package_orphaned_active_session(
             logger.debug("orphan package tarfile failed: %s", e)
             try:
                 tmp_tar.unlink()
-            except OSError:
-                pass
+            except OSError as unlink_exc:
+                logger.debug("orphan tarfile unlink failed: %s", unlink_exc)
             raise
 
         _reset_active_session_dir(active_dir)
@@ -1316,8 +1316,8 @@ def _ensure_recording_mp4_alias(clip_dir: Path) -> Path:
         try:
             if alias.samefile(source):
                 return alias
-        except OSError:
-            pass
+        except OSError as samefile_exc:
+            logger.debug("samefile check failed: %s", samefile_exc)
         if alias.is_dir():
             raise IsADirectoryError(f"recording.mp4 alias path is a directory: {alias}")
         alias.unlink()
@@ -2637,8 +2637,8 @@ def _remux_obs_recording_to_mp4(source: Path, target: Path) -> None:
     if result.returncode != 0 or not tmp_target.exists():
         try:
             tmp_target.unlink()
-        except OSError:
-            pass
+        except OSError as unlink_exc:
+            logger.debug("remux temp unlink failed: %s", unlink_exc)
         raise RuntimeError((result.stderr or result.stdout or "OBS remux failed")[-500:])
     os.replace(tmp_target, target)
 
@@ -2649,8 +2649,8 @@ def _move_obs_output_to_video_path(source: Path, target: Path) -> None:
         _remux_obs_recording_to_mp4(source, target)
         try:
             source.unlink()
-        except OSError:
-            pass
+        except OSError as unlink_exc:
+            logger.debug("source unlink after remux failed: %s", unlink_exc)
         return
     if not _same_file_best_effort(source, target):
         if target.exists():
@@ -7021,8 +7021,8 @@ class RecorderApp(tk.Tk):
             logger.debug("package: tarball write failed: %s", _tar_exc)
             try:
                 tmp_tar.unlink()
-            except OSError:
-                pass
+            except OSError as unlink_exc:
+                logger.debug("package: tarball temp unlink failed: %s", unlink_exc)
             raise
 
         _reset_active_session_dir(active_dir)

@@ -41,7 +41,6 @@ def detect_power_source() -> Tuple[str, Optional[float], bool]:
                 return ("ac" if b.power_plugged else "battery", b.percent, bool(b.power_plugged))
         except (AttributeError, OSError) as exc:
             logger.debug("detect_power_source: psutil.sensors_battery probe failed (non-fatal, will fall through to platform-specific detection): %s", exc)
-            pass
     if sys.platform == "darwin":
         return _detect_macos()
     if sys.platform.startswith("linux"):
@@ -63,7 +62,6 @@ def _detect_macos() -> Tuple[str, Optional[float], bool]:
             return "battery", float(m.group(1)) if m else None, False
     except (subprocess.TimeoutExpired, OSError, ValueError) as exc:
         logger.debug("_detect_macos: pmset probe failed (non-fatal, will return unknown): %s", exc)
-        pass
     return "unknown", None, False
 
 
@@ -82,14 +80,12 @@ def _detect_linux() -> Tuple[str, Optional[float], bool]:
                 pct = float(open(f"{p}/{d}/capacity").read().strip())
             except (ValueError, OSError) as exc:
                 logger.debug("_detect_linux: capacity read failed for %s/%s (non-fatal): %s", p, d, exc)
-                pass
             if status in ("charging", "full"):
                 return "ac", pct, True
             if status == "discharging":
                 return "battery", pct, False
     except OSError as exc:
         logger.debug("_detect_linux: listdir(%s) failed (non-fatal): %s", p, exc)
-        pass
     return "unknown", None, False
 
 
@@ -103,7 +99,6 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
             config.update(json.load(open(path)))
         except (json.JSONDecodeError, OSError) as exc:
             logger.debug("load_config: failed to read/parse %s (non-fatal, using defaults): %s", path, exc)
-            pass
     return config
 
 
