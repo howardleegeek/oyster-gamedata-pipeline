@@ -24,11 +24,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import re
 import sys
 import zipfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Pattern catalogue
@@ -232,8 +235,12 @@ def extract_run_info(log_text: str, sysinfo: dict[str, str]) -> RunInfo:
     if size := sysinfo.get("log_size_bytes"):
         try:
             info.log_size_bytes = int(size)
-        except ValueError:
-            pass
+        except ValueError as exc:
+            # log_size_bytes must parse as int; if it doesn't, fall through
+            # and leave info.log_size_bytes at its dataclass default (None).
+            # Log at DEBUG so future log-line drift is diagnosable without
+            # aborting the log-summary build.
+            logger.debug("log_size_bytes %r did not parse as int: %s", size, exc)
 
     # MC version is in the recorder log, embedded in mc_window dict.
     info.mc_version = _grep1(log_text, r"Minecraft\s+([\d\.]+(?:\s*Snapshot\s*\d+)?)")
