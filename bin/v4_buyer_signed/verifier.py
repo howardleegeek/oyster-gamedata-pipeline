@@ -15,10 +15,13 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # IL3 isolation: do NOT import from V₁/V₂/V₃ packages. Re-declare the
 # minimal ResidualResult shape locally to keep V₄ free of cross-tier
@@ -88,7 +91,14 @@ def load_buyer_reference(path: str | Path) -> dict[str, Any] | None:
         return None
     try:
         return json.loads(p.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError) as exc:
+        # Surface the failure (corrupt JSON, permission denied, race on
+        # temp file, etc.) at DEBUG so silent-returning sites in
+        # v4_buyer_reference_diff can still be diagnosed post-hoc.
+        logger.debug(
+            "load_buyer_reference: failed to read/parse %s: %s",
+            p, exc,
+        )
         return None
 
 
