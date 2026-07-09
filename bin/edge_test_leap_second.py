@@ -11,9 +11,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
-import json
 import sys
-import tempfile
 from typing import Any, Dict, List, Tuple
 
 LEAP_SECOND_SCENARIOS: List[Dict[str, Any]] = [
@@ -74,12 +72,6 @@ def main(argv: List[str] | None = None) -> int:
         entries.append({"scenario": sc["name"], "passed": passed, "detail": detail})
         if args.verbose:
             print(detail)
-
-    tmpdir = tempfile.mkdtemp(prefix="leap_second_test_")
-    with open(f"{tmpdir}/report.json", "w", encoding="utf-8") as fh:
-        json.dump(entries, fh, indent=2, default=str)
-    if args.verbose:
-        print(f"  Report → {tmpdir}/report.json")
 
     n = sum(1 for e in entries if e["passed"])
     print(f"Leap-second boundary test: {'PASS' if all_passed else 'FAIL'} ({n}/{len(entries)} passed)")
