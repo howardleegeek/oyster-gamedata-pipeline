@@ -536,3 +536,7 @@
 ## Round 408 @ 2026-07-09T10:46:28Z
 - Picked: Surface 2 silent psutil errors in bin/recorder_watchdog.py _check_alt_tab() and _check_recorder_alive() exception handlers. Both had bare  that silently swallowed process-not-found or permission-denied. Bound exception as  and added  with context (fg_pid, pid). Control flow preserved (mc_visible=False, continue). Added regression test test_recorder_watchdog_psutil_silent_error.py (7 tests: module_compiles, handler binds exc, logs at debug, preserves mc_visible false/continue). Tests pass 7/7. Ruff clean. git add 2 files.
 - Result: committed 8b88b59f, pushed to origin/main
+
+## Round 409 @ 2026-07-09T11:30:00Z
+- Picked: No good candidate — re-verified: systematic silent-error sweep complete (no bare except: pass in production code bin/, server/, src/, oyster_provenance, daemon, scripts, consent, sdk, tasks, active_session); 1432 tests pass in tests/bin/; ruff F821/F822/F823 clean on production code; PRODUCTION_GAPS.md documents production blockers requiring Howard credentials (Vercel, Supabase, code signing). Exiting without commit.
+- Result: skipped (no good candidate)
