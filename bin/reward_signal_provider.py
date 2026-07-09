@@ -13,10 +13,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 _numpy = None
 
@@ -165,7 +168,12 @@ def load_config_from_file(path: Path) -> RewardConfig:
         try:
             import yaml
             data = yaml.safe_load(content)
-        except ImportError:
+        except ImportError as exc:
+            logger.debug(
+                "reward_signal_provider: PyYAML not installed, "
+                "falling back to JSON parser for %s: %s",
+                path, exc,
+            )
             data = json.loads(content)
     else:
         data = json.loads(content)
