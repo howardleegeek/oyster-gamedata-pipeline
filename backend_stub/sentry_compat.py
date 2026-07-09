@@ -12,10 +12,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Tuple
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # In-memory store
@@ -137,16 +140,24 @@ def parse_envelope(raw: str) -> List[SentryEvent]:
             try:
                 payload = json.loads(lines[i])
                 events.append(_parse_event_payload(payload))
-            except json.JSONDecodeError:
-                pass
+            except json.JSONDecodeError as exc:
+                logger.debug(
+                    "sentry_compat: skipping malformed event item payload (line %d): %s",
+                    i,
+                    exc,
+                )
         # Exception items may appear as standalone payloads
         elif item_type == "error" or "exception" in (item_header.get("content_type", "")):
             try:
                 payload = json.loads(lines[i])
                 if "exception" in payload or "level" in payload:
                     events.append(_parse_event_payload(payload))
-            except json.JSONDecodeError:
-                pass
+            except json.JSONDecodeError as exc:
+                logger.debug(
+                    "sentry_compat: skipping malformed exception item payload (line %d): %s",
+                    i,
+                    exc,
+                )
 
         i += 1
 
