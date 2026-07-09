@@ -173,6 +173,15 @@ class MockEnvironment:
         return self._observation(), self.reward_per_step, done, info
 
     def render_frame(self) -> bytes | None:
+        """Render a deterministic test frame.
+
+        Generates a tiny 2x2 PNG where the grey channel encodes progress
+        through done_after_steps. Allows visual pipelines to be tested
+        without real screenshots.
+
+        Returns:
+            PNG bytes, or None if no frame has been rendered yet.
+        """
         # Deterministic tiny PNG whose grey channel encodes progress — lets
         # visual pipelines be tested without real screenshots.
         progress = min(255, int(255 * self._step_count / max(1, self.done_after_steps)))
