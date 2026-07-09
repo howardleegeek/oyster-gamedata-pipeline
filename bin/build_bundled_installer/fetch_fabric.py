@@ -183,8 +183,8 @@ def _download_with_retries(url: str, dest: Path) -> int:
             if tmp.exists():
                 try:
                     tmp.unlink()
-                except OSError:
-                    pass
+                except OSError as tmp_unlink_exc:
+                    _log(f"failed to clean up tmp file {tmp}: {tmp_unlink_exc}")
             if attempt < DOWNLOAD_RETRIES:
                 backoff = 2 ** (attempt - 1)
                 _log(
@@ -282,8 +282,8 @@ def _fetch_with_sha1_pin(
             return 0  # cache hit
         try:
             dest.unlink()
-        except OSError:
-            pass
+        except OSError as stale_cache_exc:
+            _log(f"failed to remove stale cache file {dest}: {stale_cache_exc}")
 
     try:
         bytes_dl = _download_with_retries(url, dest)
@@ -299,8 +299,8 @@ def _fetch_with_sha1_pin(
         )
         try:
             dest.unlink()
-        except OSError:
-            pass
+        except OSError as sha_mismatch_unlink_exc:
+            _log(f"failed to remove mismatched file {dest}: {sha_mismatch_unlink_exc}")
         sys.exit(2)
 
     return bytes_dl
@@ -613,8 +613,8 @@ def _dir_size_bytes(root: Path) -> int:
         for name in fn:
             try:
                 total += (Path(dp) / name).stat().st_size
-            except OSError:
-                pass
+            except OSError as stat_exc:
+                _log(f"failed to stat {Path(dp) / name} while measuring {root}: {stat_exc}")
     return total
 
 
