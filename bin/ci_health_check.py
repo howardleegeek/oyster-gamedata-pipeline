@@ -12,7 +12,6 @@ import argparse
 import json
 import logging
 import sys
-import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -112,10 +111,6 @@ def main(argv: Optional[List[str]] = None) -> int:
         with open(args.output, "w", encoding="utf-8") as fh:
             json.dump(report, fh, indent=2)
         logger.info("Report written to %s", args.output)
-
-    tmp_dir = tempfile.mkdtemp(prefix="ci_health_")
-    with open(Path(tmp_dir) / "report.json", "w", encoding="utf-8") as fh:
-        json.dump(report, fh, indent=2)
 
     if passed:
         logger.info("CI health check PASSED")
