@@ -766,8 +766,8 @@ def _fetch_one_asset_object(
     if got.lower() != sha1.lower():
         try:
             dest.unlink()
-        except OSError:
-            pass
+        except OSError as exc:
+            _log(f"failed to unlink stale dest {dest}: {exc}")
         raise RuntimeError(
             f"asset object {logical_name!r}: SHA-1 mismatch — "
             f"expected={sha1} got={got}"
@@ -777,8 +777,8 @@ def _fetch_one_asset_object(
     if actual != size:
         try:
             dest.unlink()
-        except OSError:
-            pass
+        except OSError as exc:
+            _log(f"failed to unlink stale dest {dest}: {exc}")
         raise RuntimeError(
             f"asset object {logical_name!r}: size mismatch — "
             f"expected={size} got={actual}"
@@ -913,8 +913,8 @@ def _dir_size_bytes(root: Path) -> int:
         for name in fn:
             try:
                 total += (Path(dp) / name).stat().st_size
-            except OSError:
-                pass
+            except OSError as exc:
+                _log(f"failed to stat {Path(dp) / name}: {exc}")
     return total
 
 
