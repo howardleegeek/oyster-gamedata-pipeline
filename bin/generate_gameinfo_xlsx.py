@@ -72,7 +72,8 @@ def parse_game_version_from_window_title(title: str) -> Optional[str]:
 def _load_json_object(path: Path) -> Optional[Any]:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.debug("generate_gameinfo_xlsx: failed to read %s: %s", path, exc)
         return None
 
 
