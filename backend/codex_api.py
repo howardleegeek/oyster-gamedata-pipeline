@@ -39,6 +39,7 @@ import time
 import uuid
 from pathlib import Path
 from threading import Lock, Thread
+import logging
 
 try:
     import uvicorn
@@ -47,6 +48,8 @@ try:
 except ImportError as e:
     msg = "missing deps: pip install fastapi uvicorn pydantic"
     raise SystemExit(msg) from e
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Config
@@ -155,8 +158,8 @@ def _run_codex_in_thread(job_id: str, task: CodexTask) -> None:
             proc.kill()
             try:
                 proc.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                pass
+            except subprocess.TimeoutExpired as exc:
+                logger.debug("proc.wait(timeout=10) timed out during cleanup for job_id=%s: %s", job_id, exc)
             _update_job(
                 job_id,
                 status="timeout",
