@@ -522,3 +522,8 @@
 ## Round 404 @ 2026-07-08T12:00:00Z
 - Picked: Surface silent json.JSONDecodeError in oyster_provenance/anchor.py collect_week_manifests() (line ~185). Bare `except json.JSONDecodeError: pass` was silently swallowing malformed manifest files. Bound exception to `exc` and added logger.debug with manifest_path context. Control flow preserved (for loop continues to next session). Regression test rewritten to AST-verify the binding + logger pattern (test_module_compiles, test_logging_imported_and_logger_defined, test_json_load_except_binds_and_logs, test_no_bare_except_pass). Self-review: silent error fixed, control flow preserved, logger is module-level, lazy %s formatting, no race/security/off-by-one, no skip/xfail tests, ruff clean. 4/4 pytest pass. git add 2 files (one logical change: fix + its regression test).
 - Result: committed 3f0b49aa, pushed to origin/main
+
+## Round 407 @ 2026-07-09T10:16:58Z
+
+- Picked: Complete in-progress fix from previous tick — surface silent ValueError in bin/extract_audio_event_track.py run_sox_stat() sox stat parse loop. Previous tick had applied the edit but did not commit/push. Bound exception to `exc` and added `logger.debug("extract_audio_event_track: failed to parse %r as float: %s", value, exc)`. Control flow preserved (stats[key] = value on parse failure, identical to original fall-through). Self-review: looked for silent error swallow, false-success, race, off-by-one, security, broken tests masked. Lazy %s logging, exception bound, fall-through intact, no tests masked. Tests pass 7/7 (pytest tests/bin/test_extract_audio_event_track_silent_error.py). Ruff clean. git add 1 file.
+- Result: committed 0c5b5680, pushed to origin/main
