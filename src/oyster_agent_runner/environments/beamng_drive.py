@@ -229,7 +229,7 @@ class BeamNGDriveExtractor:
 
         logging.info(f"Saved to {output_path}")
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         """Clean up resources."""
         if self.beamng:
             try:
