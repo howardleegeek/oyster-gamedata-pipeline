@@ -416,7 +416,9 @@ class Watchdog:
                     log.debug("_check_alt_tab: psutil not available, using hwnd fallback: %s", exc)
                     fg_hwnd = GetForegroundWindow()
                     mc_visible = (fg_hwnd == self.mc_hwnd) if self.mc_hwnd else True
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                except (psutil.NoSuchProcess, psutil.AccessDenied) as exc:
+                    # Process gone or inaccessible — treat as not-Minecraft
+                    log.debug("_check_alt_tab: fg_pid=%s psutil probe failed: %s", fg_pid, exc)
                     mc_visible = False
 
         if not mc_visible:
@@ -544,7 +546,10 @@ class Watchdog:
                             self.recorder_pid = proc.pid
                             log.info(f"Found recorder PID: {self.recorder_pid}")
                             break
-                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    except (psutil.NoSuchProcess, psutil.AccessDenied) as exc:
+                        # Process gone or inaccessible between iter and inspect;
+                        # skip and keep searching.
+                        log.debug("_check_recorder_alive: pid=%s process_iter inspect failed: %s", proc.pid, exc)
                         continue
             except ImportError as exc:
                 # Without psutil, we can't check — assume alive
