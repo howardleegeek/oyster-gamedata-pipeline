@@ -176,7 +176,8 @@ def sample_ui_zone(zone: Dict[str, int]) -> Optional[bytes]:
             }
             img = sct.grab(monitor)
             return bytes(img.raw)
-    except ImportError:
+    except ImportError as exc:
+        log.debug("sample_ui_zone: mss not available, pixel sampling disabled: %s", exc)
         return None
 
 
@@ -410,8 +411,9 @@ class Watchdog:
                     name = proc.name().lower()
                     if "java" in name or "minecraft" in name:
                         mc_visible = True
-                except ImportError:
+                except ImportError as exc:
                     # Fallback: check if mc_hwnd matches foreground
+                    log.debug("_check_alt_tab: psutil not available, using hwnd fallback: %s", exc)
                     fg_hwnd = GetForegroundWindow()
                     mc_visible = (fg_hwnd == self.mc_hwnd) if self.mc_hwnd else True
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
@@ -544,8 +546,9 @@ class Watchdog:
                             break
                     except (psutil.NoSuchProcess, psutil.AccessDenied):
                         continue
-            except ImportError:
+            except ImportError as exc:
                 # Without psutil, we can't check — assume alive
+                log.debug("_check_recorder_alive: psutil not available, assuming recorder alive: %s", exc)
                 return
 
         if self.recorder_pid is not None:
