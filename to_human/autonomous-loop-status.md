@@ -647,3 +647,4 @@
 
 - Picked: Finish aborted WIP from prior tick — remove two dead-code lines in oyster_provenance/merkle.py get_proof() (lines 117 + 148 wrote to local `current_hash` that was never read). This was leftover uncommitted work in the working tree. Verified: leaf hash already built in from_frame_hashes via tree.leaves; get_proof loop only needs `level` to advance. No behavioral change. Self-review: dead-code removal only; no race/off-by-one/security; tests pass 76/76 (provenance+merkle) and 55/55 (tests/test_provenance.py); ruff clean; no skip/xfail; single-file commit.
 - Result: committed 28e52e4b, pushed to origin/main
+
