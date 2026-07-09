@@ -88,7 +88,18 @@ def euler_zyx_to_quat(roll: float, pitch: float, yaw: float) -> tuple[float, ...
 
 
 def quat_angular_distance(q1: tuple[float, ...], q2: tuple[float, ...]) -> float:
-    """Angular distance between two quaternions (radians)."""
+    """Compute the angular distance between two quaternions.
+
+    Uses the arccosine of the absolute dot product to get the angular
+    distance in radians, ensuring the result is in [0, pi].
+
+    Args:
+        q1: First quaternion as a tuple of (x, y, z, w) components.
+        q2: Second quaternion as a tuple of (x, y, z, w) components.
+
+    Returns:
+        Angular distance in radians between the two quaternions.
+    """
     dot = sum(a * b for a, b in zip(q1, q2))
     dot = max(-1.0, min(1.0, dot))
     return 2 * math.acos(abs(dot))
