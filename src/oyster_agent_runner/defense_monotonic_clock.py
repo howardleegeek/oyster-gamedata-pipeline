@@ -86,7 +86,7 @@ def create_timestamped_event(event_type: str, data: dict) -> dict:
     }
 
 
-def main(argv=None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """CLI for defense monotonic clock."""
     parser = argparse.ArgumentParser(
         description="Use monotonic_ns() for timing, wall clock for stamps"
