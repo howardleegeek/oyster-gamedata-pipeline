@@ -636,3 +636,8 @@
 
 - Picked: No good candidate — exhausted 3 read passes per iron rules: (1) silent-error sweep: grep for `except ...: pass` and bare `except ...: ...` swallow patterns across bin/, src/, tasks/, scripts/, server/, daemon/, dashboard/, consent/, sdk/, active_session/, oyster_provenance/ returns 0 production hits. (2) TODO/FIXME/XXX/HACK sweep: only intentional linter subject (bin/spec_lint.py), explicit "future work" markers (recorder_replay_mod_postprocess.py TODO G27x successor, depth_from_mineflayer_raycast.py "when buyer ships"), and example-formatter placeholder (bin/macos_notarization.py) — none are bounded fix candidates. (3) Dead-code / 90d-stale sweep: 940 production .py files all touched within 90 days, no orphaned modules. Ruff clean (all E/F/W/I) on full production tree; 1437 tests pass in tests/bin/ (1 pre-existing skip for mss headless-runner absence); PRODUCTION_GAPS.md items require Howard credentials (Vercel deploy, Supabase migrations, code signing). No actionable items found this round.
 - Result: skipped (no good candidate)
+
+## Round 432 @ 2026-07-09T13:30:00Z
+
+- Picked: Finish aborted WIP from prior tick — remove two dead-code lines in oyster_provenance/merkle.py get_proof() (lines 117 + 148 wrote to local `current_hash` that was never read). This was leftover uncommitted work in the working tree. Verified: leaf hash already built in from_frame_hashes via tree.leaves; get_proof loop only needs `level` to advance. No behavioral change. Self-review: dead-code removal only; no race/off-by-one/security; tests pass 76/76 (provenance+merkle) and 55/55 (tests/test_provenance.py); ruff clean; no skip/xfail; single-file commit.
+- Result: committed 28e52e4b, pushed to origin/main
