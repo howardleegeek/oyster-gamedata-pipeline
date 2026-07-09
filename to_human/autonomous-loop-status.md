@@ -565,3 +565,7 @@
 - Picked: No good candidate — re-verified systematic silent-error sweep: 0 bare `except ...: pass` patterns across all production code directories; 1432 tests pass; ruff clean; PRODUCTION_GAPS.md items require Howard credentials. No actionable items found this round.
 - Result: skipped (no good candidate)
 
+
+## Round 415 @ 2026-07-09T07:10:00Z
+- Picked: Complete in-progress uncommitted refactor of tests/test_zbuffer_metric.py — convert script-style `print/return False` pattern to proper pytest `assert` statements. The original functions returned `False` on failure paths but the test file was being collected by pytest (note: test_metric_units, test_camera_matrices are pytest-compatible names), so failures were silently swallowed as 'passing' tests. Replaced all `if cond: print(...); return False` with `assert cond, msg`. Removed now-unused `import sys`, `import numpy as np`, the entire `__main__` block, and the test_data synthesis code that re-wrote the on-disk .source marker (test pollution risk). 2/2 pytest tests pass. Ruff clean. Self-review: silent error swallow FIXED (real bug — was exactly that), false-success claims, race, off-by-one, security, broken tests masked as passing (none). Single file, one logical change.
+- Result: committed 12a8d7d5, pushed to origin/main
