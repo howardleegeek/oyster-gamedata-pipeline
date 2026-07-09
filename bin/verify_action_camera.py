@@ -39,10 +39,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import math
 import sys
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 EPS_QUAT_NORM = 0.01           # ‖q‖ within ±1%
 EPS_PITCH_DEG = 0.1            # pitch in [-90.1°, 90.1°]
@@ -234,7 +237,8 @@ def layer3_behavioral(records: list[dict]) -> dict:
             continue
         try:
             t = datetime.strptime(raw[:23], "%Y-%m-%d %H:%M:%S.%f")
-        except (TypeError, ValueError):
+        except (TypeError, ValueError) as exc:
+            logger.debug("Failed to parse timestamp %r: %s", raw, exc)
             bad_time_reasons["unparseable"] = bad_time_reasons.get("unparseable", 0) + 1
             bad_time_frames += 1
             continue
