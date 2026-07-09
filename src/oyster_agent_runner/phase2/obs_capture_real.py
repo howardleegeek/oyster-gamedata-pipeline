@@ -91,7 +91,7 @@ class OBSRecorder:
             try:
                 await self._listener_task
             except asyncio.CancelledError:
-                pass
+                logger.debug("Listener task cancelled during shutdown")
             self._listener_task = None
         if self._ws:
             await self._ws.close()
