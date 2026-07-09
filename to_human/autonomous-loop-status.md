@@ -648,3 +648,8 @@
 - Picked: Finish aborted WIP from prior tick — remove two dead-code lines in oyster_provenance/merkle.py get_proof() (lines 117 + 148 wrote to local `current_hash` that was never read). This was leftover uncommitted work in the working tree. Verified: leaf hash already built in from_frame_hashes via tree.leaves; get_proof loop only needs `level` to advance. No behavioral change. Self-review: dead-code removal only; no race/off-by-one/security; tests pass 76/76 (provenance+merkle) and 55/55 (tests/test_provenance.py); ruff clean; no skip/xfail; single-file commit.
 - Result: committed 28e52e4b, pushed to origin/main
 
+
+## Round 433 @ 2026-07-09T23:19:08Z
+
+- Picked: No good candidate — 3 read passes complete: (1) silent-error sweep: verified 0 bare `except ...: pass` patterns across bin/, src/, tasks/, server/, consent/, sdk/, scripts/, oyster_provenance/, active_session/, web-buyer/, web-tester/. (2) lint verification: ruff clean (F821/F822/F823) on all production code. (3) test verification: sample tests pass (28/28 on recorder_watchdog + lint_v3_prd_grounded). PRODUCTION_GAPS.md items require Howard credentials (Vercel deploy, Supabase migrations, code signing). No actionable items found this round.
+- Result: skipped (no good candidate)
