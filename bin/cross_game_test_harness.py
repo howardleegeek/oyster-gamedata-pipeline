@@ -268,8 +268,16 @@ class TestHarness:
         print("=" * 50)
 
 
-def main(argv=None) -> int:
-    """Main entry point."""
+def main(argv: Optional[list[str]] = None) -> int:
+    """Main entry point for the cross-game integration test harness.
+
+    Args:
+        argv: Command-line arguments. If None, uses sys.argv.
+
+    Returns:
+        Exit code: 0 on success, 1 on test failures, 2 on usage error,
+            130 on interrupt.
+    """
     parser = argparse.ArgumentParser(
         description="Cross-game integration test harness"
     )
