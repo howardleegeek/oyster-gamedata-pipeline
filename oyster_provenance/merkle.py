@@ -114,7 +114,6 @@ class MerkleTree:
         
         # Start from leaf
         current_idx = frame_idx
-        current_hash = hash_leaf(frame_idx, frame_hash)
         
         # Build tree level by level
         level = self.leaves[:]
@@ -147,7 +146,6 @@ class MerkleTree:
                 parent = hash_node(left, right)
                 next_level.append(parent)
             
-            current_hash = next_level[current_idx]
             level = next_level
         
         return MerkleProof(
