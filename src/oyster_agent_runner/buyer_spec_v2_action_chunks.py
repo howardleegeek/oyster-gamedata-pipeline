@@ -63,14 +63,29 @@ class ActionChunk:
 
     @property
     def horizon(self) -> int:
+        """The action horizon (number of future steps predicted).
+
+        Returns:
+            Integer horizon value (4 or 10).
+        """
         return self._horizon
 
     @property
     def policy(self) -> str:
+        """The policy/model that generated this action chunk.
+
+        Returns:
+            Policy identifier string (e.g., 'octo', 'openvla', 'pi0').
+        """
         return self._policy
 
     @property
     def step_id(self) -> int:
+        """The step ID within the trajectory.
+
+        Returns:
+            Integer step index for ordering chunks in a sequence.
+        """
         return self._step_id
 
     def to_dict(self) -> dict[str, Any]:
