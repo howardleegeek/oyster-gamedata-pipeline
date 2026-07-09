@@ -597,3 +597,9 @@
 - Picked: Complete in-progress work from previous tick — surface silent error in bin/generate_gameinfo_xlsx._load_json_object(). The bare except (OSError, json.JSONDecodeError): return None was replaced with a bound exception + logger.debug(...) so a missing or malformed JSON file is no longer invisible to operators. Control flow preserved (still returns None). Tests pass 5/5. ruff clean. git add 2 files.
 - Result: committed 5c3b6262, pushed to origin/main
 
+
+## Round 422 @ 2026-07-09T17:00:00Z
+
+- Picked: No good candidate — final verification: systematic silent-error sweep complete (0 bare `except ...: pass` patterns across bin/, src/, tasks/, server/, daemon/, consent/, sdk/, scripts/, oyster_provenance/, active_session/, web-buyer/, web-tester/); ruff clean on all production code (E/F/W); 1437 tests pass, 1 skipped in tests/bin/; PRODUCTION_GAPS.md documents blockers requiring Howard credentials (Vercel deploy, Supabase migrations, code signing). No actionable items found this round.
+- Result: skipped (no good candidate)
+
