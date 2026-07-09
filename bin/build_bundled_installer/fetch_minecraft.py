@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import sys
 import time
@@ -57,6 +58,8 @@ import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Asset-object fetch tunables
@@ -203,8 +206,8 @@ def _download_with_retries(url: str, dest: Path) -> int:
             if tmp.exists():
                 try:
                     tmp.unlink()
-                except OSError:
-                    pass
+                except OSError as exc:
+                    _log(f"could not remove temp file {tmp}: {exc}")
             if attempt < DOWNLOAD_RETRIES:
                 backoff = 2 ** (attempt - 1)
                 _log(
@@ -263,8 +266,8 @@ def _fetch_with_sha1_pin(
         # Stale / corrupt cache — re-download.
         try:
             dest.unlink()
-        except OSError:
-            pass
+        except OSError as exc:
+            _log(f"could not remove stale cache {dest}: {exc}")
 
     try:
         bytes_dl = _download_with_retries(url, dest)
@@ -280,8 +283,8 @@ def _fetch_with_sha1_pin(
         )
         try:
             dest.unlink()
-        except OSError:
-            pass
+        except OSError as exc:
+            logger.debug("fetch_minecraft: failed to remove corrupt file %s: %s", dest, exc)
         sys.exit(2)
 
     if expected_size is not None and dest.stat().st_size != expected_size:
@@ -750,8 +753,8 @@ def _fetch_one_asset_object(
         # Stale / corrupt — re-download.
         try:
             dest.unlink()
-        except OSError:
-            pass
+        except OSError as exc:
+            logger.debug("fetch_minecraft: failed to remove stale file %s: %s", dest, exc)
 
     url = f"{ASSET_OBJECT_BASE_URL}/{sha1[:2]}/{sha1}"
     try:
