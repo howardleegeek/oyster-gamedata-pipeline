@@ -102,7 +102,8 @@ def run_sox_stat(audio_path):
             value = value.strip()
             try:
                 stats[key] = float(value)
-            except ValueError:
+            except ValueError as exc:
+                logger.debug("extract_audio_event_track: failed to parse %r as float: %s", value, exc)
                 stats[key] = value
 
     return stats
