@@ -631,3 +631,8 @@
 
 - Picked: No good candidate — final verification: (1) silent-error sweep: 0 bare `except ...: pass` patterns across bin/, src/, tasks/, scripts/, server/, dashboard/, consent/, sdk/, active_session/, oyster_provenance/, vendor/, patches/. (2) ruff clean on all production code. (3) All tests pass (1437 passed in tests/bin/, 6 in tests/server/, 10 in tests/utilities/workers/). PRODUCTION_GAPS.md items require Howard credentials (Vercel deploy, Supabase migrations, code signing). No actionable items found this round.
 - Result: skipped (no good candidate)
+
+## Round 431 @ 2026-07-09T19:59:32Z
+
+- Picked: No good candidate — exhausted 3 read passes per iron rules: (1) silent-error sweep: grep for `except ...: pass` and bare `except ...: ...` swallow patterns across bin/, src/, tasks/, scripts/, server/, daemon/, dashboard/, consent/, sdk/, active_session/, oyster_provenance/ returns 0 production hits. (2) TODO/FIXME/XXX/HACK sweep: only intentional linter subject (bin/spec_lint.py), explicit "future work" markers (recorder_replay_mod_postprocess.py TODO G27x successor, depth_from_mineflayer_raycast.py "when buyer ships"), and example-formatter placeholder (bin/macos_notarization.py) — none are bounded fix candidates. (3) Dead-code / 90d-stale sweep: 940 production .py files all touched within 90 days, no orphaned modules. Ruff clean (all E/F/W/I) on full production tree; 1437 tests pass in tests/bin/ (1 pre-existing skip for mss headless-runner absence); PRODUCTION_GAPS.md items require Howard credentials (Vercel deploy, Supabase migrations, code signing). No actionable items found this round.
+- Result: skipped (no good candidate)
