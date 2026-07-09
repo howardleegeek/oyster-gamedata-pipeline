@@ -525,5 +525,14 @@
 
 ## Round 407 @ 2026-07-09T10:16:58Z
 
-- Picked: Complete in-progress fix from previous tick — surface silent ValueError in bin/extract_audio_event_track.py run_sox_stat() sox stat parse loop. Previous tick had applied the edit but did not commit/push. Bound exception to `exc` and added `logger.debug("extract_audio_event_track: failed to parse %r as float: %s", value, exc)`. Control flow preserved (stats[key] = value on parse failure, identical to original fall-through). Self-review: looked for silent error swallow, false-success, race, off-by-one, security, broken tests masked. Lazy %s logging, exception bound, fall-through intact, no tests masked. Tests pass 7/7 (pytest tests/bin/test_extract_audio_event_track_silent_error.py). Ruff clean. git add 1 file.
+- Picked: Complete in-progress fix from previous tick — surface silent ValueError in bin/extract_audio_event_track.py run_sox_stat() sox stat parse loop. Previous tick had applied the edit but did not commit/push. Bound exception to `exc` and added `logger.debug("extract_audio_event_track: failed to parse %r as float: %s", value, exc)`. Control flow preserved (stats[key] = value on parse failure, identical to original fall-through). Self-review: looked for silent error swallow, false-success, race, off-by-one, security, broken tests masked. Lazy %s logging, exception bound, fall-through intact, no tests masked. Tests pass 7/7 (pytest tests/bin/test_extract_audio_event_track_silent_error.py). Ruff clean. git add 2 files. Committed as 1de2b993.
+- Result: committed 1de2b993, pushed to origin/main
+
+## Round 408 @ 2026-07-09T08:00:00Z
+- Picked: Surface 2 silent psutil errors in bin/recorder_watchdog.py _check_alt_tab() and _check_recorder_alive() exception handlers. Both had bare `except (psutil.NoSuchProcess, psutil.AccessDenied): pass` that silently swallowed process-not-found or permission-denied. Bound exception as `exc` and added `log.debug` with context (fg_pid, pid). Control flow preserved (mc_visible=False, continue). Added regression test test_recorder_watchdog_psutil_silent_error.py (7 tests: module_compiles, handler binds exc, logs at debug, preserves mc_visible false/continue). Tests pass 7/7. Ruff clean. git add 2 files.
+- Result: committed 8b88b59f, pushed to origin/mainevent_track_silent_error.py). Ruff clean. git add 1 file.
 - Result: committed 0c5b5680, pushed to origin/main
+
+## Round 408 @ 2026-07-09T10:46:28Z
+- Picked: Surface 2 silent psutil errors in bin/recorder_watchdog.py _check_alt_tab() and _check_recorder_alive() exception handlers. Both had bare  that silently swallowed process-not-found or permission-denied. Bound exception as  and added  with context (fg_pid, pid). Control flow preserved (mc_visible=False, continue). Added regression test test_recorder_watchdog_psutil_silent_error.py (7 tests: module_compiles, handler binds exc, logs at debug, preserves mc_visible false/continue). Tests pass 7/7. Ruff clean. git add 2 files.
+- Result: committed 8b88b59f, pushed to origin/main
