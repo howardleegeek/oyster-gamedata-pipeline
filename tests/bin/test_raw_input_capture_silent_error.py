@@ -91,6 +91,6 @@ def test_module_imports_clean():
 if __name__ == "__main__":
     test_no_bare_except_with_exception_binding()
     test_logger_imported()
-    test_all_exception_blocks_have_debug_logs()
+    test_fixed_exception_blocks_have_debug_logs()
     test_module_imports_clean()
     print("All tests passed!")
