@@ -14,7 +14,17 @@
 
 ## Round 382 @ 2026-07-08T11:00:00Z
 
-- Picked: Surface silent error in bin/recorder_watchdog.py find_mc_hwnd() ImportError handler. The bare `except ImportError:` was silently swallowing import failures. Bound exception to `exc` and changed logger.debug from `exc_info=True` to lazy `%s` formatting with `exc`. Control flow preserved (returns None). Tests pass 10/10 (pytest -k watchdog). Ruff clean. git add 1 file.
+- Picked: Surface silent error in bin/recorder_watchdog.py find_mc_hwnd() ImportError handler. The bare `except ImportError:` was silently swallowing import failures. Bound e
+
+## Round 405 @ 2026-07-09T02:39:00Z
+
+- Picked: Continue in-progress WIP from prior tick — surface silent subprocess.TimeoutExpired in backend/codex_api.py _run_codex_in_thread inner proc.wait(timeout=10) cleanup. The bare `except subprocess.TimeoutExpired: pass` (line 161) was swallowing child-process hang during timeout cleanup. Replaced with `except subprocess.TimeoutExpired as exc: logger.debug("proc.wait(timeout=10) timed out during cleanup for job_id=%s: %s", job_id, exc)`. Added `import logging` + module-level `logger = logging.getLogger(__name__)`. Control flow preserved: still falls through to `_update_job(... status="timeout" ...)` call. Added regression test tests/test_codex_api_silent_error.py (6 tests: module parses + has logger, no bare except-pass pattern in _run_codex_in_thread, inner handler binds exc + calls logger.debug with %s, status="timeout" update still present, live logger is a real logging.Logger). Self-review: silent error fixed (exception now logged at DEBUG), control flow preserved (no re-raise, update_job still runs), no race/off-by-one/security/false-success (best-effort cleanup; DEBUG not ERROR so no operator alert storm), no tests broken/masked (6 new tests assert distinct conditions, no skip/xfail). Tests pass 6/6. Ruff clean on both files. git add 2 files.
+- Result: committed ba9d6518, pushed to origin/main
+
+## Round 406 @ 2026-07-09T03:00:00Z
+
+- Picked: Scan for bare `except ...: pass` anti-pattern (AST scan of bin/ and src/ python files)
+- Result: skipped (no good candidate) — prior rounds already surfaced all silent error swallows in bin/ and src/. No failing tests, no documented PRD gaps, no measurable code smell. Ruff clean.xception to `exc` and changed logger.debug from `exc_info=True` to lazy `%s` formatting with `exc`. Control flow preserved (returns None). Tests pass 10/10 (pytest -k watchdog). Ruff clean. git add 1 file.
 - Result: committed 24260379, pushed to origin/main
 
 ## Round 374 @ 2026-07-08T07:00:00Z
