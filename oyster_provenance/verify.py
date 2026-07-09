@@ -141,7 +141,8 @@ def verify_manifest_exists(session_dir: str) -> Tuple[bool, Optional[SessionMani
     try:
         manifest = load_manifest(session_dir)
         return True, manifest
-    except Exception as e:
+    except Exception as exc:
+        logger.debug("verify_manifest_exists: load_manifest failed for %s: %s", session_dir, exc)
         return False, None
 
 
