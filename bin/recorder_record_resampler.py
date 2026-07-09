@@ -55,9 +55,12 @@ Standalone — stdlib only.
 from __future__ import annotations
 
 import json
+import logging
 import sys
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_HZ = 30
 DEFAULT_DURATION = 300.0  # 5 minutes
@@ -102,7 +105,11 @@ def _normalise_event(ev: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return None
     try:
         t = float(ev["t"])
-    except (TypeError, ValueError):
+    except (TypeError, ValueError) as exc:
+        logger.debug(
+            "recorder_record_resampler: dropping event with unparseable t=%r (type=%r): %s",
+            ev.get("t"), ev.get("type"), exc,
+        )
         return None
     return {**ev, "t": max(0.0, t)}
 
@@ -126,7 +133,11 @@ def _apply_event(state: _ResamplerState, ev: Dict[str, Any]) -> None:
     elif et == "hotbar":
         try:
             slot = int(ev.get("slot", 0))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError) as exc:
+            logger.debug(
+                "recorder_record_resampler: dropping hotbar event with unparseable slot=%r (t=%r): %s",
+                ev.get("slot"), ev.get("t"), exc,
+            )
             return
         state.active_slot = max(0, min(8, slot))
 
@@ -201,13 +212,17 @@ def _main(argv: List[str]) -> int:
     """CLI: read newline-delimited JSON events from stdin, write JSON to stdout."""
     duration = float(argv[0]) if argv else DEFAULT_DURATION
     events: List[Dict[str, Any]] = []
-    for line in sys.stdin:
-        line = line.strip()
+    for line_no, raw_line in enumerate(sys.stdin, start=1):
+        line = raw_line.strip()
         if not line:
             continue
         try:
             events.append(json.loads(line))
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as exc:
+            logger.debug(
+                "recorder_record_resampler: skipping malformed JSON on stdin line %d: %s",
+                line_no, exc,
+            )
             continue
     sys.stdout.write(resample_to_json(events, duration_seconds=duration))
     sys.stdout.write("\n")
