@@ -182,8 +182,8 @@ def collect_week_manifests(
                 try:
                     manifest = json.load(f)
                     manifests.append(manifest)
-                except json.JSONDecodeError:
-                    pass
+                except json.JSONDecodeError as exc:
+                    logger.debug("collect_week_manifests: failed to parse %s: %s", manifest_path, exc)
     
     return manifests
 
