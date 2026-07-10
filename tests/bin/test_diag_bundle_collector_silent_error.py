@@ -58,7 +58,7 @@ def _find_except_in_func(tree, func_name):
 
 def test_meminfo_except_binds_and_logs():
     """get_system_info's /proc/meminfo except must bind exception and log at DEBUG."""
-    src, tree = _load_source(), ast.parse(_load_source())
+    tree = ast.parse(_load_source())
     handlers = _find_except_in_func(tree, "get_system_info")
     assert handlers, "get_system_info has no except blocks"
     # Find the one referencing /proc/meminfo
@@ -74,7 +74,7 @@ def test_meminfo_except_binds_and_logs():
 
 def test_run_cmd_safe_except_binds_and_logs():
     """run_cmd_safe's subprocess except must bind exception and log at DEBUG."""
-    src, tree = _load_source(), ast.parse(_load_source())
+    tree = ast.parse(_load_source())
     handlers = _find_except_in_func(tree, "run_cmd_safe")
     assert handlers, "run_cmd_safe has no except blocks"
     _ln, h = handlers[0]
@@ -87,7 +87,7 @@ def test_run_cmd_safe_except_binds_and_logs():
 
 def test_collect_bundle_log_copy_except_binds_and_logs():
     """collect_bundle's log shutil.copy2 except must bind exception and log at DEBUG."""
-    src, tree = _load_source(), ast.parse(_load_source())
+    tree = ast.parse(_load_source())
     handlers = _find_except_in_func(tree, "collect_bundle")
     assert handlers, "collect_bundle has no except blocks"
     # Find the one referencing /logs_dir copy
@@ -103,7 +103,7 @@ def test_collect_bundle_log_copy_except_binds_and_logs():
 
 def test_collect_bundle_manifest_copy_except_binds_and_logs():
     """collect_bundle's manifest shutil.copy2 except must bind exception and log at DEBUG."""
-    src, tree = _load_source(), ast.parse(_load_source())
+    tree = ast.parse(_load_source())
     handlers = _find_except_in_func(tree, "collect_bundle")
     assert handlers, "collect_bundle has no except blocks"
     # Find the one referencing /manifests copy
