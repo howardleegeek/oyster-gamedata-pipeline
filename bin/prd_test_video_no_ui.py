@@ -67,8 +67,8 @@ def _get_ocr_engine():
         import pytesseract  # noqa: PLC0415
         logger.info("Using pytesseract for OCR")
         return lambda img: pytesseract.image_to_string(img)
-    except ImportError:
-        logger.warning("pytesseract not available; using heuristic fallback")
+    except ImportError as exc:
+        logger.warning("pytesseract not available; using heuristic fallback: %s", exc)
         return _heuristic_ocr
 
 
@@ -105,11 +105,11 @@ def _extract_frames(video_path: str, num_frames: int) -> Iterable:
     ]
     try:
         subprocess.run(cmd, check=True, capture_output=True, timeout=60)
-    except FileNotFoundError:
-        logger.error("ffmpeg not found; cannot extract frames from %s", video_path)
+    except FileNotFoundError as exc:
+        logger.error("ffmpeg not found; cannot extract frames from %s: %s", video_path, exc)
         return
-    except subprocess.TimeoutExpired:
-        logger.error("ffmpeg timed out on %s", video_path)
+    except subprocess.TimeoutExpired as exc:
+        logger.error("ffmpeg timed out on %s: %s", video_path, exc)
         return
 
     for fname in sorted(Path(tmpdir).glob("frame_*.png")):
