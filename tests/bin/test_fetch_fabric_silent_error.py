@@ -71,11 +71,6 @@ def test_all_oserror_handlers_bind_exception():
     )
     for handler in plain_oserror_handlers:
         assert handler.name is not None, "OSError handler must bind exception to a name"
-        # Body must NOT be a single `pass` statement
-        body_stmts = [
-            s for s in handler.body
-            if not (isinstance(s, ast.Pass))
-        ]
         # If body has only Pass, that's a silent swallow
         non_pass = [s for s in handler.body if not isinstance(s, ast.Pass)]
         assert non_pass, (
