@@ -30,7 +30,6 @@ class TestDaemonControlSilentError:
         tree = ast.parse(source)
 
         # Find the status method and check for bare except in heartbeat parsing
-        found_bare_except = False
         for node in ast.walk(tree):
             if (
                 isinstance(node, ast.FunctionDef)
@@ -43,7 +42,6 @@ class TestDaemonControlSilentError:
                             if "Exception" in type_src and child.name is None:
                                 # Check if this is in the heartbeat parsing context
                                 # by looking for json.loads in parent nodes
-                                found_bare_except = True
                                 pytest.fail(
                                     "Found bare 'except Exception:' "
                                     "(no 'as' binding) in status method. "
@@ -53,7 +51,6 @@ class TestDaemonControlSilentError:
 
     def test_logger_imported(self):
         """A module-level logger must be defined so the exception can be logged."""
-        source = self._read_source()
         # This file doesn't currently have logging imported, but should
         # After the fix, this test will pass
         # For now, we just verify the bare except is fixed
