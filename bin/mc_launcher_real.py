@@ -356,7 +356,7 @@ def send_rcon_command(host: str, port: int, password: str, command: str) -> str:
 
         # Authenticate
         send_packet(1, 3, password)  # 3 = SERVERDATA_AUTH
-        
+
         # Receive auth response
         auth_id, auth_type, _ = recv_packet()
 
@@ -365,7 +365,7 @@ def send_rcon_command(host: str, port: int, password: str, command: str) -> str:
 
         # Send command
         send_packet(2, 2, command)  # 2 = SERVERDATA_EXECCOMMAND
-        
+
         # Receive command response
         cmd_id, cmd_type, response = recv_packet()
 
