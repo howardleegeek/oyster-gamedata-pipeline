@@ -739,3 +739,8 @@
 
 - Picked: No good candidate — 3 read passes complete: (1) silent-error sweep: 0 bare `except ...: pass` patterns across bin/, src/, tasks/, scripts/, server/, daemon/, dashboard/, consent/, sdk/, active_session/, oyster_provenance/, vendor/, patches/. (2) ruff clean on all production code (E/F/W/I codes). (3) Tests: 1438 passed (1 skipped in tests/bin/), 12 passed in tests/server/ + tests/utilities/. PRODUCTION_GAPS.md items require Howard credentials (Vercel deploy, Supabase migrations, code signing). No actionable items found this round.
 - Result: skipped (no good candidate)
+
+## Round 452 @ 2026-07-10T05:30:00Z
+
+- Picked: Remove unused `exc` binding in scripts/pr_conflict_resolver.py rebase abort handler (ruff F841). The `except subprocess.CalledProcessError as exc:` bound the exception to a variable that was never used — the comment "best effort — rebase may already be in clean state" indicates intentional swallow. Removed the binding to clean up the unused variable warning. Tests pass 25/25 (pytest tests/test_pr_conflict_resolver.py). Ruff clean. git add 1 file.
+- Result: committed 2cc9dd4c, pushed to origin/main
