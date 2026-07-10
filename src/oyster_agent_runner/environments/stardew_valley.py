@@ -265,6 +265,11 @@ class StardewValleyEnv:
 
     @property
     def frame_count(self) -> int:
+        """Get the number of frames processed since reset.
+
+        Returns:
+            Total frame count as an integer.
+        """
         return self._frame_count
 
     @property
