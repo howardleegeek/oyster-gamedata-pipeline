@@ -413,7 +413,6 @@ def health():
 
 def cleanup_expired_uploads():
     """Clean up expired uploads periodically."""
-    current_time = time.time()
     expired = [
         session_id for session_id, upload in multipart_uploads.items()
         if upload.is_expired() and not upload.completed
