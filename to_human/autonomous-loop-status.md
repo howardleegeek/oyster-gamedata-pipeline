@@ -682,6 +682,11 @@
 - Result: committed a7e5865f, pushed to origin/main
 
 
+## Round 442 @ 2026-07-10T03:42:37Z
+
+- Picked: Remove unused lazy numpy/PIL imports in bin/c2pa_signer.py. Found pre-existing working tree change that removed dead code — the try/except ImportError blocks for numpy and PIL were never referenced anywhere in the file. Removed them and added explanatory comment. Tests pass 6/6 (test_c2pa_signer_silent_error.py). Ruff clean. git add 1 file.
+- Result: committed a3daf72d, pushed to origin/main
+
 ## Round 439 @ 2026-07-10T03:30:00Z
 
 - Picked: Remove unused `form_data` variable in `server/modal_depth_app.py` — ruff F841 flagged local variable assigned but never used. The code path at line ~207 assigned `req.form` to `form_data` but never read it. Simplified the conditional to directly use the fallback path and removed the dead assignment. Control flow preserved (form parsing was commented as "not yet implemented", not removed). Tests pass 6/6 (test_modal_depth_client.py) + 1437/1437 (tests/bin/). Ruff clean. git add 1 file.
