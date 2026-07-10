@@ -203,10 +203,12 @@ def depth_endpoint(req):
     video_bytes = None
     fps = 6
 
+    # Get form data (for multipart/form-data uploads)
+    # Note: form parsing would go here if needed; currently we accept raw bytes
+    # Fallback: treat body as raw video bytes
     if hasattr(req, "form"):
-        form_data = req.form  # This may be async
+        video_bytes = req.body if hasattr(req, "body") else bytes(req)
     else:
-        # Fallback: treat body as raw video bytes
         video_bytes = req.body if hasattr(req, "body") else bytes(req)
 
     # For simplicity with Modal's web_endpoint, we accept raw bytes
