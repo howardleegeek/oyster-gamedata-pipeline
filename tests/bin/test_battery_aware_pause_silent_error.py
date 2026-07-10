@@ -60,7 +60,7 @@ def _find_except_in_func(tree, func_name):
 
 def test_psutil_except_binds_and_logs():
     """detect_power_source's psutil except must bind exception and log at DEBUG."""
-    src, tree = _load_source(), ast.parse(_load_source())
+    tree = ast.parse(_load_source())
     handlers = _find_except_in_func(tree, "detect_power_source")
     assert handlers, "detect_power_source has no except blocks"
     # Find the one referencing sensors_battery

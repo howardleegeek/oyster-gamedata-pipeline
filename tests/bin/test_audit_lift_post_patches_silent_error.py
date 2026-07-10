@@ -52,8 +52,6 @@ def test_astats_parse_failure_logs_at_debug(
     """When astats key cannot be coerced to float, the failure is logged."""
     session = tmp_path
     (session / "metadata.json").write_text("{}", encoding="utf-8")
-    # astats line with a value that cannot be coerced to float
-    fake_astats = "Parsed_foo: nan-fail\nRMS_level_dB: -23.5\n"
     with caplog.at_level(logging.DEBUG, logger="audit_lift_post_patches"):
         # patch_audio_check tries to call ffmpeg; we cannot run ffmpeg here.
         # Instead, exercise the astats-parse path directly by calling
