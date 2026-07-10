@@ -9,10 +9,10 @@ This test verifies that:
 
 Round 297: Surface silent errors in recorder_consumer_lite.py upload/logging flow
 """
-import json
+
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+
 
 import pytest
 
