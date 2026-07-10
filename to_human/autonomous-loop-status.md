@@ -679,3 +679,9 @@
 
 - Picked: Remove dead `event` local-variable in `server/webhook_dispatcher.py emit_event()` — ruff F841 unused-variable flagged on a dict built with `{type, payload, timestamp}` keys that was never read. `dispatch_event(event_type, payload)` is called with raw args, not the `event` dict, and `dispatch_event` builds its own envelope at line ~261. Bounded single-file fix, clear acceptance (ruff clean + tests pass). The other F841 (server/modal_depth_app.py:207 `form_data`) noted for future round.
 - Result: committed a7e5865f, pushed to origin/main
+
+
+## Round 439 @ 2026-07-10T03:30:00Z
+
+- Picked: Remove unused `form_data` variable in `server/modal_depth_app.py` — ruff F841 flagged local variable assigned but never used. The code path at line ~207 assigned `req.form` to `form_data` but never read it. Simplified the conditional to directly use the fallback path and removed the dead assignment. Control flow preserved (form parsing was commented as "not yet implemented", not removed). Tests pass 6/6 (test_modal_depth_client.py) + 1437/1437 (tests/bin/). Ruff clean. git add 1 file.
+- Result: committed aeb2dfc8, pushed to origin/main
