@@ -76,7 +76,7 @@ def test_psutil_except_binds_and_logs():
 
 def test_pmset_except_binds_and_logs():
     """_detect_macos's pmset except must bind exception and log at DEBUG."""
-    src, tree = _load_source(), ast.parse(_load_source())
+    _, tree = _load_source(), ast.parse(_load_source())
     handlers = _find_except_in_func(tree, "_detect_macos")
     assert handlers, "_detect_macos has no except blocks"
     ln, h = handlers[0]
@@ -89,7 +89,7 @@ def test_pmset_except_binds_and_logs():
 
 def test_capacity_read_except_binds_and_logs():
     """_detect_linux capacity read except must bind exception and log at DEBUG."""
-    src, tree = _load_source(), ast.parse(_load_source())
+    _, tree = _load_source(), ast.parse(_load_source())
     handlers = _find_except_in_func(tree, "_detect_linux")
     assert handlers, "_detect_linux has no except blocks"
     # Find the inner except (ValueError, OSError) around capacity read
@@ -110,7 +110,7 @@ def test_capacity_read_except_binds_and_logs():
 
 def test_listdir_except_binds_and_logs():
     """_detect_linux listdir except must bind exception and log at DEBUG."""
-    src, tree = _load_source(), ast.parse(_load_source())
+    _, tree = _load_source(), ast.parse(_load_source())
     handlers = _find_except_in_func(tree, "_detect_linux")
     assert handlers, "_detect_linux has no except blocks"
     # The outer except is bare OSError
@@ -126,7 +126,7 @@ def test_listdir_except_binds_and_logs():
 
 def test_load_config_except_binds_and_logs():
     """load_config's json.load except must bind exception and log at DEBUG."""
-    src, tree = _load_source(), ast.parse(_load_source())
+    _, tree = _load_source(), ast.parse(_load_source())
     handlers = _find_except_in_func(tree, "load_config")
     assert handlers, "load_config has no except blocks"
     ln, h = handlers[0]
