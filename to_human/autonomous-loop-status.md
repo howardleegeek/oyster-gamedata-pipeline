@@ -685,3 +685,7 @@
 
 - Picked: Remove unused `form_data` variable in `server/modal_depth_app.py` — ruff F841 flagged local variable assigned but never used. The code path at line ~207 assigned `req.form` to `form_data` but never read it. Simplified the conditional to directly use the fallback path and removed the dead assignment. Control flow preserved (form parsing was commented as "not yet implemented", not removed). Tests pass 6/6 (test_modal_depth_client.py) + 1437/1437 (tests/bin/). Ruff clean. git add 1 file.
 - Result: committed aeb2dfc8, pushed to origin/main
+
+## Round 440 @ 2026-07-10T02:28:22Z
+- Picked: Remove unused `moto` binding in `tests/test_storage_backend.py` `s3_backend()` fixture — ruff F841. The line `moto = pytest.importorskip("moto")` assigned the imported module to a name that was never read (the next line does its own `from moto import mock_aws`). Replaced with bare `pytest.importorskip("moto")` — side effect (skip test if moto missing) preserved. Self-review: silent-error/false-success/race/off-by-one/security N/A; broken tests masked N/A (19/19 pass); brand isolation N/A (single-product). Tests pass 19/19 (pytest tests/test_storage_backend.py). Ruff clean. git add 1 file.
+- Result: committed beea8977, pushed to origin/main
