@@ -94,7 +94,7 @@ class FrameLighting:
 
 def compute_sun_position(lat: float, lon: float, utc_ts: float) -> SunDirection:
     """Compute sun azimuth/elevation from geo coords and UTC timestamp.
-    
+
     Uses simplified solar position algorithm (~±1° accuracy).
     """
     dt = datetime.datetime.utcfromtimestamp(utc_ts)
