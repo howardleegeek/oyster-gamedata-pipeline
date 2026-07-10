@@ -854,3 +854,21 @@
 
 - Picked: Wrap E501 long line (105>100) in bin/auto_fix_ci_failures.py — wrapped regex pattern in parentheses to split across lines. Found via `ruff check --select E501` (1 hit in file; lowest-density bounded candidate). Choice justification: measurable code smell; 1-file scope is the natural one-round unit; zero risk — pure line-wrap, identical regex output, AST parses. Self-review: line-wrap only, no runtime impact, no security/race/off-by-one/false-success, module still compiles (py_compile ok), ruff clean on file.
 - Result: committed 2803aee5, pushed to origin/main
+
+
+## Round 475 @ 2026-07-10T22:00:00Z
+
+- Picked: Wrap E501 long line (102>100) in bin/autoresearch_data_diversity.py — wrapped the --per-k argument help text across multiple lines. Found via `ruff check --select E501` (1 hit in file; lowest-density bounded candidate). Choice justification: measurable code smell; 1-file scope is natural one-round unit; zero risk — pure line-wrap, identical help text output, AST parses; --help works correctly. Self-review: line-wrap only, no runtime impact, no security/race/off-by-one/false-success, module compiles and --help works, ruff clean on file, one logical change, one file, brand isolation N/A (single product).
+- Result: committed 5482186f, pushed to origin/main
+
+
+## Round 476 @ 2026-07-10T22:02:34Z
+
+- Picked: Remove 25 W293 whitespace-only blank lines in bin/depth_shader_pack_minecraft.py. Found via `ruff check --select W293 bin/depth_shader_pack_minecraft.py` (25 hits, highest concentration in bin/). Choice justification: measurable code smell; 25 whitespace issues in single file is natural one-round unit; zero risk — pure whitespace cleanup; module still compiles and loads (py_compile OK), ruff clean on file. Self-review: whitespace-only change, no runtime impact, no security/race/off-by-one/false-success, tests pass 1448/1448 (pytest tests/bin/), ruff clean, one logical change, one file, git add single file (NEVER `git add .`).
+- Result: committed debf20ae, pushed to origin/main
+
+
+## Round 477 @ 2026-07-10T22:15:00Z
+
+- Picked: Remove 53 W293 whitespace-only blank lines in bin/material_albedo_provider.py. Found via `ruff check --select W293 bin/material_albedo_provider.py` (53 hits; after Round 471 the W293 sweep continued, and material_albedo_provider.py was the highest-density remaining W293 file in bin/ at 53 hits). Choice justification: measurable code smell; 3-pass survey exhausted for higher-value items (silent-error sweep: 0 bare `except ...: pass` patterns across all production code via `grep -rPzn 'except[^\n]*:\s*\n\s*pass' bin/` returns empty; ruff E/F/W clean for production; no failing tests in tests/bin/ — 1448 pass, 1 pre-existing skip for mss headless-runner absence; ruff W293 across bin/ has 1004 remaining but 1-file scope is the natural one-round unit); zero risk — pure whitespace cleanup (verified by `git diff -w` = empty output, meaning no non-whitespace changes); module still compiles (py_compile OK), ruff clean on file, tests pass 1448/1448 (pytest tests/bin/). Self-review: whitespace-only change, no runtime impact, no security/race/false-success/off-by-one, no tests masked as passing (no skip/xfail/disable), one logical change, one file, `git add 1 file` (NEVER `git add .`), brand isolation N/A (single product).
+- Result: committed afbdcb5a, pushed to origin/main
