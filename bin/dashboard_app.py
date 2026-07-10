@@ -87,7 +87,7 @@ def load_data(data_dir: Path) -> Tuple[List[str], List[Dict[str, str]], str]:
     """Load first supported file in data_dir."""
     if not data_dir.is_dir():
         return [], [], ""
-    
+
     for pattern, reader in [("*.csv", read_csv), ("*.tsv", read_csv),
                            ("*.xlsx", read_excel), ("*.xls", read_excel)]:
         for f in sorted(data_dir.glob(pattern)):
@@ -102,12 +102,12 @@ def create_app(data_dir: Path) -> Any:
     flask = _import_flask()
     app = flask.Flask(__name__)
     headers, rows, filename = load_data(data_dir)
-    
+
     def render_rows(rows_slice: List[Dict[str, str]], cols: int = 10) -> str:
         """Render table rows HTML."""
         if not rows_slice:
             return '<tr><td colspan="10" style="padding:2rem;text-align:center">No data</td></tr>'
-        
+
         html = []
         for r in rows_slice:
             cells = []
@@ -118,7 +118,7 @@ def create_app(data_dir: Path) -> Any:
                 cells.append(f"<td>{val}</td>")
             html.append(f"<tr>{''.join(cells)}</tr>")
         return "\n".join(html)
-    
+
     @app.route("/")
     def index() -> str:
         """Main dashboard."""
@@ -154,7 +154,7 @@ def create_app(data_dir: Path) -> Any:
             <h1>Vendor Submission Dashboard</h1>
             <div>{filename or 'No data file'}</div>
         </header>
-        
+
         <div class="stats" id="stats">
             <div class="stat">
                 <div class="stat-value">{len(rows)}</div>
@@ -169,7 +169,7 @@ def create_app(data_dir: Path) -> Any:
                 <div class="stat-label">Displayed</div>
             </div>
         </div>
-        
+
         <div class="controls">
             <input type="search" placeholder="Search..." hx-get="/search" hx-trigger="keyup changed delay:300ms" hx-target="#tbody" name="q">
             <select hx-get="/sort" hx-trigger="change" hx-target="#tbody" name="col">
@@ -177,9 +177,9 @@ def create_app(data_dir: Path) -> Any:
                 {"".join(f'<option value="{h}">{h}</option>' for h in headers[:cols])}
             </select>
         </div>
-        
+
         <div id="loading">Loading...</div>
-        
+
         <table>
             <thead>
                 <tr>{"".join(f'<th hx-get="/sort?col={h}" hx-trigger="click" hx-target="#tbody">{h}</th>' for h in headers[:cols])}</tr>
@@ -188,7 +188,7 @@ def create_app(data_dir: Path) -> Any:
                 {render_rows(rows[:50], cols)}
             </tbody>
         </table>
-        
+
         <div style="display: flex; justify-content: center; gap: 0.5rem; margin-top: 1rem;">
             <button hx-get="/page?p=0" hx-target="#tbody" disabled>First</button>
             <button hx-get="/page?p=0" hx-target="#tbody">Prev</button>
@@ -196,12 +196,12 @@ def create_app(data_dir: Path) -> Any:
             <button hx-get="/page?p=1" hx-target="#tbody">Next</button>
             <button hx-get="/page?p={(len(rows)-1)//50}" hx-target="#tbody">Last</button>
         </div>
-        
+
         <footer>
             <p>Vendor Dashboard • Read-only • Data from {data_dir.absolute()}</p>
         </footer>
     </div>
-    
+
     <script>
         document.addEventListener('htmx:beforeRequest', () => {{
             document.getElementById('loading').style.display = 'block';
@@ -212,29 +212,29 @@ def create_app(data_dir: Path) -> Any:
     </script>
 </body>
 </html>"""
-    
+
     @app.route("/search")
     def search() -> str:
         """Search endpoint."""
         q = flask.request.args.get("q", "").lower()
         if not q:
             return render_rows(rows[:50])
-        
+
         filtered = [r for r in rows if any(q in str(v).lower() for v in r.values())]
         return render_rows(filtered[:50])
-    
+
     @app.route("/sort")
     def sort() -> str:
         """Sort endpoint."""
         col = flask.request.args.get("col", "")
         if not col or col not in headers:
             return render_rows(rows[:50])
-        
+
         dir_param = flask.request.args.get("dir", "asc")
         reverse = dir_param == "desc"
         sorted_rows = sorted(rows, key=lambda x: x.get(col, "").lower(), reverse=reverse)
         return render_rows(sorted_rows[:50])
-    
+
     @app.route("/page")
     def page() -> str:
         """Pagination endpoint."""
@@ -245,7 +245,7 @@ def create_app(data_dir: Path) -> Any:
         page_size = 50
         start = p * page_size
         return render_rows(rows[start:start + page_size])
-    
+
     @app.route("/stats")
     def stats() -> str:
         """Stats update endpoint."""
@@ -263,7 +263,7 @@ def create_app(data_dir: Path) -> Any:
             <div class="stat-label">Displayed</div>
         </div>
         """
-    
+
     return app
 
 
@@ -271,27 +271,27 @@ def main(argv: Optional[List[str]] = None) -> int:
     """CLI entry point."""
     if argv is None:
         argv = sys.argv[1:]
-    
+
     parser = argparse.ArgumentParser(description="Vendor submission dashboard")
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind")
     parser.add_argument("--port", type=int, default=5000, help="Port to bind")
     parser.add_argument("--data-dir", type=Path, default=Path("."), help="Data directory")
     parser.add_argument("--debug", action="store_true", help="Debug mode")
-    
+
     args = parser.parse_args(argv)
-    
+
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO,
                        format="%(levelname)s: %(message)s")
-    
+
     if not args.data_dir.exists():
         logger.error(f"Data dir not found: {args.data_dir}")
         return 1
-    
+
     app = create_app(args.data_dir)
-    
+
     logger.info(f"Starting at http://{args.host}:{args.port}")
     logger.info(f"Data from {args.data_dir.absolute()}")
-    
+
     try:
         app.run(host=args.host, port=args.port, debug=args.debug, use_reloader=False)
     except KeyboardInterrupt:
@@ -299,7 +299,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     except Exception as e:
         logger.error(f"Error: {e}")
         return 1
-    
+
     return 0
 
 
