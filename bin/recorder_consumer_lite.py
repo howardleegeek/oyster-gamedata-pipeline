@@ -801,7 +801,8 @@ def _sample_recorded_video_frames(video_path: Path, duration_sec: float) -> list
                 timeout=15,
                 check=False,
             )
-        except (OSError, subprocess.TimeoutExpired):
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            logger.debug("ffmpeg frame sampling failed at %.1fs: %s", timestamp, exc)
             continue
         if proc.returncode != 0 or not proc.stdout:
             continue
@@ -2583,7 +2584,8 @@ def _latest_obs_recording_file(output_dir: Path, *, started_at: float) -> Option
         try:
             if candidate.stat().st_mtime >= started_at - 3.0:
                 fresh.append(candidate)
-        except OSError:
+        except OSError as exc:
+            logger.debug("failed to stat candidate %s: %s", candidate, exc)
             continue
     if not fresh:
         return None
@@ -2593,7 +2595,8 @@ def _latest_obs_recording_file(output_dir: Path, *, started_at: float) -> Option
         try:
             if candidate.stat().st_size > 0:
                 return candidate
-        except OSError:
+        except OSError as exc:
+            logger.debug("failed to stat candidate %s: %s", candidate, exc)
             return None
         time.sleep(0.1)
     _trace(f"obs: latest recording stayed empty: {candidate}")
