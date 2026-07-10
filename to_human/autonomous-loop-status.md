@@ -674,3 +674,8 @@
 - Picked: No good candidate — 3 read passes complete: (1) Silent-error sweep: verified 0 bare `except ...: pass` patterns across bin/, src/, tasks/, scripts/, server/, daemon/, dashboard/, consent/, sdk/, active_session/, oyster_provenance/, vendor/, patches/. All exception handlers properly bind exceptions. (2) Lint verification: ruff clean on all production directories (F821/F822/F823 undefined names). Full test suite: 1437 passed, 1 skipped in tests/bin/ (pre-existing mss skip). (3) Test failures: none. PRODUCTION_GAPS.md items require Howard credentials (Vercel deploy, Supabase migrations, code signing). No actionable items found this round.
 - Result: skipped (no good candidate)
 
+
+## Round 438 @ 2026-07-10T02:09:02Z
+
+- Picked: Remove dead `event` local-variable in `server/webhook_dispatcher.py emit_event()` — ruff F841 unused-variable flagged on a dict built with `{type, payload, timestamp}` keys that was never read. `dispatch_event(event_type, payload)` is called with raw args, not the `event` dict, and `dispatch_event` builds its own envelope at line ~261. Bounded single-file fix, clear acceptance (ruff clean + tests pass). The other F841 (server/modal_depth_app.py:207 `form_data`) noted for future round.
+- Result: committed a7e5865f, pushed to origin/main
