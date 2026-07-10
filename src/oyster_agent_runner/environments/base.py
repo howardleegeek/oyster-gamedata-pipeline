@@ -193,6 +193,16 @@ class MockEnvironment:
         return self._last_frame
 
     def shutdown(self) -> None:
+        """Shut down the environment, marking it as terminated.
+
+        After shutdown, any calls to reset() or step() will raise a
+        RuntimeError. This allows explicit cleanup of resources and
+        signals to any dependent code that the environment is no longer
+        usable.
+
+        Returns:
+            None.
+        """
         self._is_shutdown = True
 
     # Internals ---------------------------------------------------------------
