@@ -15,10 +15,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import re
 import subprocess
 import sys
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 from pathlib import Path
 from typing import Any
 
@@ -108,8 +111,9 @@ def rebase_pr(pr: PRInfo, *, dry_run: bool = False) -> RebaseResult:
     # Step 3: rebase onto origin/main
     try:
         run_cmd(["git", "rebase", "origin/main"])
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as exc:
         # Conflict detected — capture the diff
+        logger.debug("git rebase conflict on PR #%d: %s", pr.number, exc)
         conflict_diff = _capture_conflict_diff()
         _write_conflict_file(pr, conflict_diff)
         _comment_on_pr(pr, conflict_diff)
@@ -117,9 +121,9 @@ def rebase_pr(pr: PRInfo, *, dry_run: bool = False) -> RebaseResult:
         # Abort the rebase to leave repo in clean state
         try:
             run_cmd(["git", "rebase", "--abort"])
-        except subprocess.CalledProcessError:
+        except subprocess.CalledProcessError as exc:
             # best effort — rebase may already be in clean state
-            pass
+            logger.debug("git rebase --abort failed (may already be clean): %s", exc)
 
         return RebaseResult(pr=pr, success=False, conflict_diff=conflict_diff)
 
