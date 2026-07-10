@@ -749,3 +749,4 @@
 
 - Picked: Surface silent errors in scripts/pr_conflict_resolver.py _capture_conflict_diff() — two bare `except subprocess.CalledProcessError:` handlers (lines ~148 and ~159) silently swallowed git command failures. Bound exception to `exc` and included error message in the fallback output. Control flow preserved (fall-through to generic message unchanged). Tests pass 25/25 (pytest tests/test_pr_conflict_resolver.py). Ruff clean. git add 2 files.
 - Result: committed d812856d, pushed to origin/main
+
