@@ -117,7 +117,7 @@ def rebase_pr(pr: PRInfo, *, dry_run: bool = False) -> RebaseResult:
         # Abort the rebase to leave repo in clean state
         try:
             run_cmd(["git", "rebase", "--abort"])
-        except subprocess.CalledProcessError as exc:
+        except subprocess.CalledProcessError:
             # best effort — rebase may already be in clean state
             pass
 
