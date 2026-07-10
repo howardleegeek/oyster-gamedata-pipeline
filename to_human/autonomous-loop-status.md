@@ -744,3 +744,8 @@
 
 - Picked: Remove unused `exc` binding in scripts/pr_conflict_resolver.py rebase abort handler (ruff F841). The `except subprocess.CalledProcessError as exc:` bound the exception to a variable that was never used — the comment "best effort — rebase may already be in clean state" indicates intentional swallow. Removed the binding to clean up the unused variable warning. Tests pass 25/25 (pytest tests/test_pr_conflict_resolver.py). Ruff clean. git add 1 file.
 - Result: committed 2cc9dd4c, pushed to origin/main
+
+## Round 453 @ 2026-07-10T09:30:00Z
+
+- Picked: Surface silent errors in scripts/pr_conflict_resolver.py _capture_conflict_diff() — two bare `except subprocess.CalledProcessError:` handlers (lines ~148 and ~159) silently swallowed git command failures. Bound exception to `exc` and included error message in the fallback output. Control flow preserved (fall-through to generic message unchanged). Tests pass 25/25 (pytest tests/test_pr_conflict_resolver.py). Ruff clean. git add 2 files.
+- Result: committed d812856d, pushed to origin/main
