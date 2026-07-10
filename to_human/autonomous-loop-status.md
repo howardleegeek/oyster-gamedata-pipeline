@@ -907,3 +907,524 @@
 ## Round 482 @ 2026-07-10T23:07:45Z
 - Picked: Wrap E501 long line (106>100) in bin/upload_tarball.py _parse_args() — split argparse.ArgumentParser(...) call across 3 lines (description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter, closing paren on its own line). Found via `ruff check --select E501 bin/` (1 hit in file; lowest-density bounded candidate — 136-line file with exactly 1 E501, natural one-round unit). Choice justification: measurable code smell, 1-file scope, zero-risk cosmetic wrap with byte-identical argparse output (same args, same kwargs, same order). Self-review: line-wrap only, no runtime/behavior change, AST parses, module imports cleanly, tests 19/19 pass (pytest tests/test_storage_backend.py), no skip/xfail/disable, no silent error swallow, no race/security/off-by-one/false-success risk, one logical change, one file, brand isolation N/A (single product), `git add` 1 file (NEVER `git add .`).
 - Result: committed 3d5c313b, pushed to origin/main
+
+
+## Round 483 @ 2026-07-11T00:30:00Z
+
+- Picked: Remove 4 unused F841  variables in tests/bin/test_diag_bundle_collector_silent_error.py. Found via F841 Local variable `body_stmts` is assigned to but never used
+  --> tests/bin/test_fetch_fabric_silent_error.py:75:9
+   |
+73 |         assert handler.name is not None, "OSError handler must bind exception to a name"
+74 |         # Body must NOT be a single `pass` statement
+75 |         body_stmts = [
+   |         ^^^^^^^^^^
+76 |             s for s in handler.body
+77 |             if not (isinstance(s, ast.Pass))
+   |
+help: Remove assignment to unused variable `body_stmts`
+
+F841 Local variable `tmpdir` is assigned to but never used
+  --> tests/bin/test_graceful_shutdown_silent_error.py:62:5
+   |
+61 |     # Build a tarfile that raises on close().
+62 |     tmpdir = caplog._log_root if hasattr(caplog, "_log_root") else None
+   |     ^^^^^^
+63 |     import tempfile
+64 |     tmp = tempfile.mkdtemp(prefix="g130_handler_test_")
+   |
+help: Remove assignment to unused variable `tmpdir`
+
+F841 Local variable `found_await_after_handler` is assigned to but never used
+   --> tests/bin/test_obs_capture_real_silent_error.py:174:9
+    |
+172 |         # await self._listener_task  <- this should still exist after the handler
+173 |
+174 |         found_await_after_handler = False
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+175 |         in_except_block = False
+    |
+help: Remove assignment to unused variable `found_await_after_handler`
+
+F841 Local variable `in_except_block` is assigned to but never used
+   --> tests/bin/test_obs_capture_real_silent_error.py:182:29
+    |
+180 |                     if isinstance(node.type, ast.Name):
+181 |                         if node.type.id == "CancelledError":
+182 |                             in_except_block = True
+    |                             ^^^^^^^^^^^^^^^
+183 |                             break
+    |
+help: Remove assignment to unused variable `in_except_block`
+
+F841 Local variable `frames` is assigned to but never used
+  --> tests/bin/test_prd_test_video_no_ui_silent_error.py:91:13
+   |
+89 |         # Also need to ensure PIL fails first to trigger ffmpeg path
+90 |         with patch("PIL.Image.open", side_effect=OSError("PIL cannot open")):
+91 |             frames = list(ptv._extract_frames(video_path, 1))
+   |             ^^^^^^
+92 |
+93 |     # Should have logged at error level with the exception bound
+   |
+help: Remove assignment to unused variable `frames`
+
+F841 Local variable `frames` is assigned to but never used
+   --> tests/bin/test_prd_test_video_no_ui_silent_error.py:110:13
+    |
+108 |     ):
+109 |         with patch("PIL.Image.open", side_effect=OSError("PIL cannot open")):
+110 |             frames = list(ptv._extract_frames(video_path, 1))
+    |             ^^^^^^
+111 |
+112 |     # Should have logged at error level with the exception bound
+    |
+help: Remove assignment to unused variable `frames`
+
+F841 Local variable `src` is assigned to but never used
+  --> tests/bin/test_recorder_consumer_lite_fsync_silent_error.py:55:5
+   |
+53 | def test_fsync_file_oserror_except_binds_and_logs():
+54 |     """_fsync_file's OSError except must bind exception and log at DEBUG."""
+55 |     src, tree = _load_source(), ast.parse(_load_source())
+   |     ^^^
+56 |     handlers = _find_except_in_func(tree, "_fsync_file")
+57 |     assert handlers, "_fsync_file has no except blocks"
+   |
+help: Remove assignment to unused variable `src`
+
+F841 Local variable `start` is assigned to but never used
+  --> tests/bin/test_recorder_consumer_lite_mod_install_no_local_sys_import.py:63:5
+   |
+61 |     body_indent = header_indent + "    "
+62 |     lines = body.split("
+")
+63 |     start = m.end()
+   |     ^^^^^
+64 |     # Find the index of the header line
+65 |     header_line_idx = body[: m.start()].count("
+")
+   |
+help: Remove assignment to unused variable `start`
+
+F841 Local variable `orig_ctypes` is assigned to but never used
+  --> tests/bin/test_recorder_consumer_lite_monitor_bounds_silent_error.py:49:5
+   |
+48 |     # Save original
+49 |     orig_ctypes = sys.modules.get("ctypes")
+   |     ^^^^^^^^^^^
+50 |
+51 |     with mock.patch.dict(sys.modules, {"ctypes": None}):
+   |
+help: Remove assignment to unused variable `orig_ctypes`
+
+F841 Local variable `func_body` is assigned to but never used
+  --> tests/bin/test_recorder_consumer_lite_stat_failures_silent_error.py:50:9
+   |
+48 |         """The ffmpeg exception handler must bind the exception (as exc)."""
+49 |         source = self._read_source()
+50 |         func_body = self._get_function_body(source, "_sample_recorded_video_frames")
+   |         ^^^^^^^^^
+51 |
+52 |         # Should have `except (OSError, subprocess.TimeoutExpired) as exc:`
+   |
+help: Remove assignment to unused variable `func_body`
+
+F841 Local variable `func_body` is assigned to but never used
+  --> tests/bin/test_recorder_consumer_lite_stat_failures_silent_error.py:73:9
+   |
+71 |         """All OSError handlers in _latest_obs_recording_file must bind the exception."""
+72 |         source = self._read_source()
+73 |         func_body = self._get_function_body(source, "_latest_obs_recording_file")
+   |         ^^^^^^^^^
+74 |
+75 |         # Find all except handlers in the function
+   |
+help: Remove assignment to unused variable `func_body`
+
+F841 Local variable `source` is assigned to but never used
+  --> tests/bin/test_recorder_consumer_lite_trace_silent_error.py:71:9
+   |
+70 |         # Read the module source to extract _trace function
+71 |         source = self._read_source()
+   |         ^^^^^^
+72 |
+73 |         # Extract just the _trace function
+   |
+help: Remove assignment to unused variable `source`
+
+F841 Local variable `module` is assigned to but never used
+  --> tests/bin/test_recorder_consumer_lite_upload_log_silent_error.py:32:9
+   |
+30 |             Path(__file__).parent.parent.parent / "bin" / "recorder_consumer_lite.py"
+31 |         )
+32 |         module = importlib.util.module_from_spec(spec)
+   |         ^^^^^^
+33 |
+34 |         # We need to check that when _STARTUP_LOG.open fails, it calls _trace
+   |
+help: Remove assignment to unused variable `module`
+
+F841 Local variable `module` is assigned to but never used
+  --> tests/bin/test_recorder_consumer_lite_upload_log_silent_error.py:86:9
+   |
+84 |             Path(__file__).parent.parent.parent / "bin" / "recorder_consumer_lite.py"
+85 |         )
+86 |         module = importlib.util.module_from_spec(spec)
+   |         ^^^^^^
+87 |
+88 |         # We can't fully test without complex mocking, but verify the code path exists
+   |
+help: Remove assignment to unused variable `module`
+
+F841 Local variable `mock_tk` is assigned to but never used
+  --> tests/bin/test_recorder_eula_first_run_silent_error.py:95:5
+   |
+94 |     # Mock the tkinter components to avoid GUI creation
+95 |     mock_tk = MagicMock()
+   |     ^^^^^^^
+96 |     mock_frame = MagicMock()
+97 |     mock_label = MagicMock()
+   |
+help: Remove assignment to unused variable `mock_tk`
+
+F841 Local variable `mock_frame` is assigned to but never used
+  --> tests/bin/test_recorder_eula_first_run_silent_error.py:96:5
+   |
+94 |     # Mock the tkinter components to avoid GUI creation
+95 |     mock_tk = MagicMock()
+96 |     mock_frame = MagicMock()
+   |     ^^^^^^^^^^
+97 |     mock_label = MagicMock()
+98 |     mock_text = MagicMock()
+   |
+help: Remove assignment to unused variable `mock_frame`
+
+F841 Local variable `mock_label` is assigned to but never used
+  --> tests/bin/test_recorder_eula_first_run_silent_error.py:97:5
+   |
+95 |     mock_tk = MagicMock()
+96 |     mock_frame = MagicMock()
+97 |     mock_label = MagicMock()
+   |     ^^^^^^^^^^
+98 |     mock_text = MagicMock()
+99 |     mock_btn = MagicMock()
+   |
+help: Remove assignment to unused variable `mock_label`
+
+F841 Local variable `mock_text` is assigned to but never used
+  --> tests/bin/test_recorder_eula_first_run_silent_error.py:98:5
+   |
+96 |     mock_frame = MagicMock()
+97 |     mock_label = MagicMock()
+98 |     mock_text = MagicMock()
+   |     ^^^^^^^^^
+99 |     mock_btn = MagicMock()
+   |
+help: Remove assignment to unused variable `mock_text`
+
+F841 Local variable `mock_btn` is assigned to but never used
+   --> tests/bin/test_recorder_eula_first_run_silent_error.py:99:5
+    |
+ 97 |     mock_label = MagicMock()
+ 98 |     mock_text = MagicMock()
+ 99 |     mock_btn = MagicMock()
+    |     ^^^^^^^^
+100 |
+101 |     with patch.dict("sys.modules", {
+    |
+help: Remove assignment to unused variable `mock_btn`
+
+F841 Local variable `bare` is assigned to but never used
+  --> tests/bin/test_upload_to_web_tester_silent_error.py:60:5
+   |
+58 |     import re
+59 |     cleaned = _strip_strings_and_comments(SRC)
+60 |     bare = re.search(r"except[^
+]*Exception[^
+]*:\s*
+(?!\s+as)", cleaned)
+   |     ^^^^
+61 |     # The above matches `except Exception:` without an `as` binding.
+62 |     # We need a more precise check: an except clause whose type contains
+   |
+help: Remove assignment to unused variable `bare`
+
+F841 Local variable `src` is assigned to but never used
+  --> tests/bin/test_version_compat_checker_silent_error.py:61:5
+   |
+59 |     """The JSON manifest parse except in extract_version_from_manifest_text
+60 |     must bind the exception and call logger.debug instead of bare `pass`."""
+61 |     src, tree = _load_source(), ast.parse(_load_source())
+   |     ^^^
+62 |     handlers = _find_except_in_func(tree, "extract_version_from_manifest_text")
+63 |     assert handlers, "extract_version_from_manifest_text has no except blocks"
+   |
+help: Remove assignment to unused variable `src`
+
+F841 Local variable `src` is assigned to but never used
+  --> tests/bin/test_version_compatibility_check_silent_error.py:60:5
+   |
+58 | def test_notify_macos_except_binds_and_logs():
+59 |     """_notify_macos's osascript except must bind exception and log at DEBUG."""
+60 |     src, tree = _load_source(), ast.parse(_load_source())
+   |     ^^^
+61 |     handlers = _find_except_in_func(tree, "_notify_macos")
+62 |     assert handlers, "_notify_macos has no except blocks"
+   |
+help: Remove assignment to unused variable `src`
+
+F841 Local variable `src` is assigned to but never used
+  --> tests/bin/test_version_compatibility_check_silent_error.py:76:5
+   |
+74 | def test_notify_linux_except_binds_and_logs():
+75 |     """_notify_linux's notify-send except must bind exception and log at DEBUG."""
+76 |     src, tree = _load_source(), ast.parse(_load_source())
+   |     ^^^
+77 |     handlers = _find_except_in_func(tree, "_notify_linux")
+78 |     assert handlers, "_notify_linux has no except blocks"
+   |
+help: Remove assignment to unused variable `src`
+
+F841 Local variable `src` is assigned to but never used
+  --> tests/bin/test_version_compatibility_check_silent_error.py:92:5
+   |
+90 | def test_notify_windows_except_binds_and_logs():
+91 |     """_notify_windows's PowerShell except must bind exception and log at DEBUG."""
+92 |     src, tree = _load_source(), ast.parse(_load_source())
+   |     ^^^
+93 |     handlers = _find_except_in_func(tree, "_notify_windows")
+94 |     assert handlers, "_notify_windows has no except blocks"
+   |
+help: Remove assignment to unused variable `src`
+
+F841 Local variable `result` is assigned to but never used
+   --> tests/phase2/test_depth_inference_pipeline.py:216:9
+    |
+214 |         monkeypatch.setattr("depth_inference_pipeline.infer_depth", mock_infer_depth)
+215 |
+216 |         result = video_to_depth(video_path, output_dir, cleanup=True)
+    |         ^^^^^^
+217 |
+218 |         # Verify temp directory was created
+    |
+help: Remove assignment to unused variable `result`
+
+F841 Local variable `result` is assigned to but never used
+   --> tests/phase2/test_obs_capture_real.py:144:9
+    |
+142 |         obs._ws = mock_ws
+143 |
+144 |         result = await obs.stop_record()
+    |         ^^^^^^
+145 |
+146 |         # Verify opcode 6 was sent
+    |
+help: Remove assignment to unused variable `result`
+
+F841 Local variable `module` is assigned to but never used
+  --> tests/test_cluster_dispatcher_silent_error.py:71:5
+   |
+69 | def test_parse_spec_header_debug_log() -> None:
+70 |     """``_parse_spec_header`` reads the path with a debug log on failure."""
+71 |     module = _load_module()
+   |     ^^^^^^
+72 |     src = TARGET.read_text()
+73 |     # Locate the function body and confirm the new log + bound name exist
+   |
+help: Remove assignment to unused variable `module`
+
+F841 Local variable `module` is assigned to but never used
+  --> tests/test_cluster_dispatcher_silent_error.py:91:5
+   |
+89 | def test_create_pr_debug_log() -> None:
+90 |     """``create_pr`` wraps the git diff probe in a debug log on failure."""
+91 |     module = _load_module()
+   |     ^^^^^^
+92 |     src = TARGET.read_text()
+93 |     func_src_match_start = src.find("def create_pr")
+   |
+help: Remove assignment to unused variable `module`
+
+F841 Local variable `response` is assigned to but never used
+   --> tests/test_dashboard_api.py:314:9
+    |
+312 |     def test_reject_requires_reason(self, client, auth_headers_buyer):
+313 |         """Test that rejection requires a reason."""
+314 |         response = client.post(
+    |         ^^^^^^^^
+315 |             "/api/sessions/session_005/reject", headers=auth_headers_buyer, json={"reason": ""}
+316 |         )
+    |
+help: Remove assignment to unused variable `response`
+
+F841 Local variable `proc` is assigned to but never used
+  --> tests/test_e2e_orchestrator.py:37:35
+   |
+35 |         mock_proc.stdout = MagicMock()
+36 |         mock_proc.stderr = MagicMock()
+37 |         mock_popen.return_value = proc = mock_proc
+   |                                   ^^^^
+38 |
+39 |         # Mock tar extract
+   |
+help: Remove assignment to unused variable `proc`
+
+F841 Local variable `result` is assigned to but never used
+   --> tests/test_input_latency_telemetry.py:264:9
+    |
+263 |         latencies = compute_latencies(self.inputs_path, self.game_state_path)
+264 |         result = write_output(latencies, self.output_path)
+    |         ^^^^^^
+265 |
+266 |         # Verify output file
+    |
+help: Remove assignment to unused variable `result`
+
+F841 Local variable `response` is assigned to but never used
+   --> tests/test_marketplace_api.py:502:9
+    |
+500 |     def test_invalid_auth_returns_401(self, client):
+501 |         """Test invalid auth token is rejected."""
+502 |         response = client.get("/api/v1/sessions", headers={"Authorization": "Bearer invalid"})
+    |         ^^^^^^^^
+503 |         # Our mock accepts any token with length >= 10
+504 |         # In production, this would be 401
+    |
+help: Remove assignment to unused variable `response`
+
+F841 Local variable `result` is assigned to but never used
+   --> tests/test_mod_build.py:247:9
+    |
+246 |         # Run zbuffer_to_exr.py
+247 |         result = subprocess.run(
+    |         ^^^^^^
+248 |             [sys.executable, str(script_path)], cwd=tmpdir, capture_output=True, text=True
+249 |         )
+    |
+help: Remove assignment to unused variable `result`
+
+F841 Local variable `dummy_data` is assigned to but never used
+   --> tests/test_onnx_inference.py:203:9
+    |
+202 |         dummy_onnx = b" " * 100
+203 |         dummy_data = b"" * 200
+    |         ^^^^^^^^^^
+204 |
+205 |         with patch("urllib.request.urlopen") as mock_urlopen:
+    |
+help: Remove assignment to unused variable `dummy_data`
+
+F841 Local variable `content_after_first` is assigned to but never used
+   --> tests/test_pii_auditor.py:320:17
+    |
+318 |             # Read the file after first redaction
+319 |             with open(game_state, "r") as f:
+320 |                 content_after_first = f.read()
+    |                 ^^^^^^^^^^^^^^^^^^^
+321 |
+322 |             # Second redaction (should be idempotent - same pseudonym)
+    |
+help: Remove assignment to unused variable `content_after_first`
+
+F841 Local variable `loaded_key` is assigned to but never used
+   --> tests/test_provenance.py:171:9
+    |
+169 |         from oyster_provenance.sign import load_or_create_keypair
+170 |
+171 |         loaded_key = load_or_create_keypair(key_dir)
+    |         ^^^^^^^^^^
+172 |
+173 |         from oyster_provenance.sign import verify_json_signature as verify
+    |
+help: Remove assignment to unused variable `loaded_key`
+
+F841 Local variable `keydir` is assigned to but never used
+  --> tests/test_provenance_offline_bundle.py:48:5
+   |
+46 |     pubkey = private_key.public_key().public_bytes_raw()
+47 |
+48 |     keydir = os.path.dirname(tmp_keyfile)
+   |     ^^^^^^
+49 |     with open(tmp_keyfile, "wb") as f:
+50 |         f.write(seed)
+   |
+help: Remove assignment to unused variable `keydir`
+
+F841 Local variable `original_mtime` is assigned to but never used
+   --> tests/test_provenance_sign_verify.py:204:9
+    |
+202 |         with open(tmp_keyfile, "wb") as f:
+203 |             f.write(b" " * 32)
+204 |         original_mtime = os.path.getmtime(tmp_keyfile)
+    |         ^^^^^^^^^^^^^^
+205 |
+206 |         _run([sys.executable, SIGN_SCRIPT, tmp_manifest, "--keyfile", tmp_keyfile])
+    |
+help: Remove assignment to unused variable `original_mtime`
+
+F841 Local variable `count1` is assigned to but never used
+   --> tests/test_rate_limiter.py:143:9
+    |
+141 |         """Test that session count persists across calls."""
+142 |         # First call should create counter file
+143 |         count1 = count_sessions_today()
+    |         ^^^^^^
+144 |
+145 |         # Create a session directory with yesterday's timestamp
+    |
+help: Remove assignment to unused variable `count1`
+
+F841 Local variable `count1` is assigned to but never used
+   --> tests/test_rate_limiter.py:311:9
+    |
+309 |         """Test that daily counter persists across restarts."""
+310 |         # First call creates counter
+311 |         count1 = count_sessions_today()
+    |         ^^^^^^
+312 |
+313 |         # Increment a few times
+    |
+help: Remove assignment to unused variable `count1`
+
+F841 Local variable `capture` is assigned to but never used
+   --> tests/test_raw_input_capture.py:252:5
+    |
+250 |             return 0xFFFFFFFF
+251 |
+252 |     capture = ric.RawInputCapture(lambda _dx, _dy, _ts: None, user32=_FailingUser32())
+    |     ^^^^^^^
+    |
+help: Remove assignment to unused variable `capture`
+
+F841 Local variable `extract_dir` is assigned to but never used
+   --> tests/test_recorder_lite_timestamp_sidecar.py:198:5
+    |
+196 |     tar_path = app._package_tarball("20260527-654321")
+197 |
+198 |     extract_dir = tmp_path / "extract"
+    |     ^^^^^^^^^^^
+199 |     with tarfile.open(tar_path, "r:gz") as tf:
+200 |         names = set(tf.getnames())
+    |
+help: Remove assignment to unused variable `extract_dir`
+
+F841 Local variable `args` is assigned to but never used
+   --> tests/test_remote_recorder_backend_e2e.py:503:13
+    |
+501 |             sys, "argv", ["remote_recorder_backend_e2e.py", "--backend-url", "https://example.com"]
+502 |         ):
+503 |             args = e2e_mod.main.__code__  # just verify the module loads
+    |             ^^^^
+504 |         # Verify the parser accepts --backend-url
+505 |         import argparse
+    |
+help: Remove assignment to unused variable `args`
+
+Found 43 errors.
+No fixes available (43 hidden fixes can be enabled with the `--unsafe-fixes` option). (4 hits). Removed unused  variable assignments from 4 test functions - each test only needed the parsed AST tree, not the raw source string. Choice justification: measurable code smell (F841 lint error); 1-file scope; zero risk — removed unused variable assignments, no runtime behavior change; tests pass 7/7; ruff clean. Self-review: removed 4 unused variables; no silent error swallows introduced; no runtime/behavior change; one logical change; one file.
+- Result: committed 082988c8, pushed to origin/main
+
+## Round 483 @ 2026-07-11T00:30:00Z
+
+- Picked: Remove 4 unused F841 `src` variables in tests/bin/test_diag_bundle_collector_silent_error.py. Found via `ruff check --select F841` (4 hits). Removed unused `src` variable assignments from 4 test functions - each test only needed the parsed AST tree, not the raw source string. Choice justification: measurable code smell (F841 lint error); 1-file scope; zero risk — removed unused variable assignments, no runtime behavior change; tests pass 7/7; ruff clean. Self-review: removed 4 unused variables; no silent error swallows introduced; no runtime/behavior change; one logical change; one file.
+- Result: committed 082988c8, pushed to origin/main
