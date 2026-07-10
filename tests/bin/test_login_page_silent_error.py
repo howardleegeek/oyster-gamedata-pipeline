@@ -9,8 +9,6 @@ exception binding and logging for diagnostics.
 import ast
 from pathlib import Path
 
-import pytest
-
 
 def get_login_page_path():
     """Get path to login_page.py."""
