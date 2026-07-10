@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Regression tests for silent error swallows in bin/recorder_consumer_lite.py 
+Regression tests for silent error swallows in bin/recorder_consumer_lite.py
 function _windows_process_name_for_pid.
 
 This function has two bare except blocks that were silently swallowing errors.
