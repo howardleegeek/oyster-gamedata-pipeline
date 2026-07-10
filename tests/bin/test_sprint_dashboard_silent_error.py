@@ -8,8 +8,6 @@ These tests verify that failed operations are logged at debug level
 import ast
 from pathlib import Path
 
-import pytest
-
 
 class TestSprintDashboardSilentError:
     """Tests for silent error handling in sprint_dashboard.py."""
