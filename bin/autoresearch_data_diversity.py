@@ -142,7 +142,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--biome-col", default="biome", help="Column name for biome (default: biome)")
     p.add_argument("--tod-col", default="time_of_day", help="Column name for time-of-day")
     p.add_argument("--weather-col", default="weather", help="Column name for weather")
-    p.add_argument("--per-k", type=int, default=1000, help="Normalise to per-K clips (default: 1000)")
+    p.add_argument(
+        "--per-k",
+        type=int,
+        default=1000,
+        help="Normalise to per-K clips (default: 1000)",
+    )
     p.add_argument(
         "--threshold",
         type=float,
