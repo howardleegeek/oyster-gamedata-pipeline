@@ -150,7 +150,7 @@ def test_local_backend_idempotent_upload(
 @pytest.fixture
 def s3_backend():
     """Spin up an in-memory S3 with moto and return a configured backend."""
-    moto = pytest.importorskip("moto")
+    pytest.importorskip("moto")
     import boto3
     from moto import mock_aws
 
