@@ -1,5 +1,6 @@
 ## Round 479 @ 2026-07-10T22:28:03Z
 
+
 - Picked: Wrap E501 long line (112>100) in bin/bft_adversarial_harness.py _safe_call() V1 branch — extracted `getattr(out, 'note', '')` to a local var `note`, then used it in the f-string. Found via `ruff check --select E501 bin/` (1 hit in file; lowest-density bounded candidate — file has exactly 1 E501 across its 200+ lines, the natural one-round unit). Choice justification: measurable code smell; 1-file scope is natural one-round unit; zero risk — pure local-var extraction, f-string output byte-for-byte identical for matching inputs (verified in-process with PASS/FAIL/missing-note cases against V1-shaped object); AST parses; module still imports cleanly (`from bin.bft_adversarial_harness import _safe_call` works); tests pass 13/13 (pytest tests/bin/test_bft_orchestrator.py). Self-review: line-wrap + local-var extraction only; no runtime/behavior change (semantic identity preserved per smoke test); no security/race/off-by-one/false-success risk; no tests masked as passing (no skip/xfail/disable, 13/13 pass cleanly); one logical change; one file; brand isolation N/A (single product); `git add` 1 file (NEVER `git add .`).
 - Result: committed f7ba5867, pushed to origin/main
 
