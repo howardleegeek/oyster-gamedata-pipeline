@@ -817,3 +817,8 @@
 - Picked: Remove 15 W293 whitespace-only blank lines in tests/bin/test_anti_replay_check_silent_error.py (2 instances) and tests/bin/test_c2pa_signer_silent_error.py (13 instances). Found via ruff check --select W293. Choice justification: measurable code smell; zero risk — pure whitespace cleanup; tests pass 10/10 (pytest tests/bin/test_anti_replay_check_silent_error.py tests/bin/test_c2pa_signer_silent_error.py). Self-review: whitespace-only change, no runtime impact, no security/race/false-success/off-by-one, tests pass 10/10, ruff clean, one logical change, 2 files. git add 2 files.
 - Result: committed c5a6d234, pushed to origin/main
 
+
+## Round 465 @ 2026-07-10T15:06:21Z
+
+- Picked: Remove 2 W293 whitespace-only blank lines in bin/mc_launcher_real.py (lines 359, 368 inside send_rcon_command between send_packet and recv_packet blocks). Found via `ruff check --select W293 bin/mc_launcher_real.py` (2 hits, lowest-concentration W293 file in bin/). Choice justification: measurable code smell; 3-pass survey exhausted for higher-value items (silent-error sweep: 0 bare except:pass; ruff E/F/W clean; W293 across repo is 1934 errors but mc_launcher_real.py is the lowest-density W293 file with 2 hits, fit-for-one-round); zero risk — pure whitespace cleanup; tests pass 6/6 (pytest tests/bin/test_mc_launcher_real_silent_error.py), ruff clean on file, AST parses OK, diff is 2 lines changed 1 file, no production logic touched. Self-review: whitespace-only change, no runtime/security/race/false-success/off-by-one impact, no test masked as passing (no skip/xfail/disable), one logical change, one file, brand isolation N/A (single product).
+- Result: committed a2ac01ef, pushed to origin/main
