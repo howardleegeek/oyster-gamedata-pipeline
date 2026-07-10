@@ -269,6 +269,12 @@ class StardewValleyEnv:
 
     @property
     def is_running(self) -> bool:
+        """Check whether the environment is currently running.
+
+        Returns:
+            True if the environment is active and responding to queries,
+            False if it has been stopped or not yet started.
+        """
         return self._running
 
     @property
