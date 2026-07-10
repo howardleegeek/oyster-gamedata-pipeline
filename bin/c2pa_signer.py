@@ -19,16 +19,10 @@ from typing import Any, Dict, List, Optional
 # Module-level logger so silent error handlers can surface failures at DEBUG.
 logger = logging.getLogger("c2pa_signer")
 
-# Lazy imports for optional dependencies
-try:
-    import numpy as np  # type: ignore
-except ImportError:
-    np = None
-
-try:
-    from PIL import Image  # type: ignore
-except ImportError:
-    Image = None
+# Note: numpy and PIL imports were previously probed here but neither
+# module is referenced anywhere in this file, so the lazy-import blocks
+# have been removed. If a future change needs them, re-add a real
+# import at the top of the file.
 
 
 class C2PASigner:
