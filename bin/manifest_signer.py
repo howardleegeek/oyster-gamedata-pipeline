@@ -109,7 +109,8 @@ def verify_manifest(manifest_path: Path, signature_path: Path) -> int:
     returncode, stdout, stderr = run_gpg(gpg_args)
 
     if returncode != 0:
-        print(f"Signature verification failed: {stderr.decode('utf-8', errors='replace')}", file=sys.stderr)
+        decoded = stderr.decode("utf-8", errors="replace")
+        print(f"Signature verification failed: {decoded}", file=sys.stderr)
         return 1
 
     print(f"Signature verified successfully for: {manifest_path}")
