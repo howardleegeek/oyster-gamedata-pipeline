@@ -42,13 +42,13 @@ def test_logging_imported_and_logger_defined():
 
 def _find_json_load_except(tree):
     """Find the json.load except handler that swallows JSONDecodeError/IOError.
-    
+
     The pattern we look for is:
         try:
             ... json.load(...)
         except (json.JSONDecodeError, IOError) as e:
             logger.debug(...)
-    
+
     We find the ExceptHandler with the right type and verify it binds + logs.
     """
     for node in ast.walk(tree):

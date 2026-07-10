@@ -35,16 +35,16 @@ def test_embed_manifest_no_bare_except():
     source = Path(__file__).parent.parent.parent / "bin" / "c2pa_signer.py"
     content = source.read_text()
     tree = ast.parse(content)
-    
+
     # Find the embed_manifest function
     embed_func = None
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef) and node.name == "embed_manifest":
             embed_func = node
             break
-    
+
     assert embed_func is not None, "embed_manifest function not found"
-    
+
     # Find the try/except block inside embed_manifest
     except_binds_exception = False
     for node in ast.walk(embed_func):
@@ -53,7 +53,7 @@ def test_embed_manifest_no_bare_except():
             if node.type is not None:
                 except_binds_exception = True
                 break
-    
+
     assert except_binds_exception, "embed_manifest should bind exception in except block"
 
 
@@ -62,16 +62,16 @@ def test_embed_manifest_logs_on_failure():
     source = Path(__file__).parent.parent.parent / "bin" / "c2pa_signer.py"
     content = source.read_text()
     tree = ast.parse(content)
-    
+
     # Find the embed_manifest function
     embed_func = None
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef) and node.name == "embed_manifest":
             embed_func = node
             break
-    
+
     assert embed_func is not None
-    
+
     # Look for logger.debug or logger.error call in the except block
     has_log_call = False
     for node in ast.walk(embed_func):
@@ -83,7 +83,7 @@ def test_embed_manifest_logs_on_failure():
                         if child.func.attr in ("debug", "error", "warning", "info"):
                             has_log_call = True
                             break
-    
+
     assert has_log_call, "embed_manifest should call logger in except block"
 
 
@@ -92,16 +92,16 @@ def test_parse_params_no_bare_except():
     source = Path(__file__).parent.parent.parent / "bin" / "c2pa_signer.py"
     content = source.read_text()
     tree = ast.parse(content)
-    
+
     # Find parse_params function
     parse_func = None
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef) and node.name == "parse_params":
             parse_func = node
             break
-    
+
     assert parse_func is not None, "parse_params function not found"
-    
+
     # Check for bound exception (ExceptionHandler with type != None)
     has_bound_exception = False
     for node in ast.walk(parse_func):
@@ -109,7 +109,7 @@ def test_parse_params_no_bare_except():
             if node.type is not None:
                 has_bound_exception = True
                 break
-    
+
     assert has_bound_exception, "parse_params should bind exception in except block"
 
 
@@ -117,7 +117,7 @@ def test_parse_params_logs_on_failure():
     """Ensure parse_params logs when JSON parsing fails."""
     source = Path(__file__).parent.parent.parent / "bin" / "c2pa_signer.py"
     content = source.read_text()
-    
+
     # Check that logger.debug is called in parse_params after JSONDecodeError
     assert "logger.debug" in content, "parse_params should use logger.debug"
     assert "JSONDecodeError" in content, "parse_params should handle JSONDecodeError"
