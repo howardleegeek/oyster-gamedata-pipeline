@@ -39,7 +39,7 @@ class TestLoginPageSilentErrorHandling:
                 elif isinstance(node.type, ast.Name) and node.type.id == "Exception":
                     if node.name is None:
                         bare_excepts.append(node.lineno)
-        
+
         assert len(bare_excepts) == 0, f"Found bare 'except Exception:' at lines: {bare_excepts}"
 
     def test_logger_imported(self):

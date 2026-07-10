@@ -57,7 +57,7 @@ def test_oom_recovery_import_error_logs_at_debug():
             if node.type and isinstance(node.type, ast.Name) and node.type.id == "ImportError":
                 handler_start = node.lineno
                 handler_end = node.end_lineno if hasattr(node, 'end_lineno') else handler_start + len(node.body)
-                
+
                 for line in source_lines[handler_start-1:handler_end]:
                     if 'logger.debug' in line:
                         has_logger_debug = True
