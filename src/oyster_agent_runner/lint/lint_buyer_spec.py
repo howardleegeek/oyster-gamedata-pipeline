@@ -100,6 +100,11 @@ class LintIssue:
     severity: str = "error"
 
     def to_dict(self) -> dict[str, str]:
+        """Convert this LintIssue to a dictionary representation.
+
+        Returns:
+            Dictionary with keys: code, file, location, message, severity.
+        """
         return {
             "code": self.code,
             "file": self.file,
