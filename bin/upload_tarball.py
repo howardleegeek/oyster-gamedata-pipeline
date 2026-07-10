@@ -47,7 +47,10 @@ from bin.storage_backend import (  # noqa: E402  (sys.path tweak above)
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     p.add_argument("tarball", type=Path, help="Path to the .tar.gz tarball.")
     p.add_argument("--tester-id", required=True, help="Stable tester identifier.")
     p.add_argument(
