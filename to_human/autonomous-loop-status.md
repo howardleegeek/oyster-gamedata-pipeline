@@ -642,6 +642,11 @@
 - Picked: No good candidate — exhausted 3 read passes per iron rules: (1) silent-error sweep: grep for `except ...: pass` and bare `except ...: ...` swallow patterns across bin/, src/, tasks/, scripts/, server/, daemon/, dashboard/, consent/, sdk/, active_session/, oyster_provenance/ returns 0 production hits. (2) TODO/FIXME/XXX/HACK sweep: only intentional linter subject (bin/spec_lint.py), explicit "future work" markers (recorder_replay_mod_postprocess.py TODO G27x successor, depth_from_mineflayer_raycast.py "when buyer ships"), and example-formatter placeholder (bin/macos_notarization_check.py). (3) dead-code sweep: verified previous rounds removed all identified dead code. ruff clean across all production directories. PRODUCTION_GAPS.md items require Howard credentials. No actionable items found this round.
 - Result: skipped (no good candidate)
 
+## Round 437 @ 2026-07-10T04:00:00Z
+
+- Picked: No good candidate — 3 read passes: (1) silent-error sweep: verified 0 bare `except ...: pass` patterns across bin/, src/, tasks/, scripts/, server/, dashboard/, consent/, sdk/, active_session/, oyster_provenance/, vendor/, patches/. (2) ruff clean on all production code. (3) 1437 passed, 1 skipped in tests/bin/. PRODUCTION_GAPS.md items require Howard credentials (Vercel deploy, Supabase migrations, code signing). No actionable items found this round.
+- Result: skipped (no good candidate)
+
 ## Round 433 @ 2026-07-10T01:00:00Z
 
 - Picked: No good candidate — 3 read passes: (1) silent-error sweep: verified 0 bare `except ...: pass` patterns across bin/, src/, tasks/, scripts/, server/, dashboard/, consent/, sdk/, active_session/, oyster_provenance/, vendor/, patches/. (2) ruff lint: clean across all production code. (3) test verification: 1437 passed, 1 skipped in tests/bin/. PRODUCTION_GAPS.md items require Howard credentials (Vercel deploy, Supabase migrations, code signing). No actionable items found this round.
