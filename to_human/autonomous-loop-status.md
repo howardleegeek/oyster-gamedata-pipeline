@@ -498,6 +498,7 @@
 
 ## Round 398 @ 2026-07-09T02:00:00Z
 - Picked: Continue in-progress WIP from prior tick — surface silent OSError swallows in bin/build_bundled_installer/fetch_fabric.py (4 sites: tmp.unlink cleanup in download retry, stale cache dest.unlink, SHA mismatch dest.unlink, _dir_size_bytes stat()). All bare `except OSError: pass` now bind exception to name and call _log() with context. Control flow preserved (fall-through unchanged). Added regression test tests/bin/test_fetch_fabric_silent_error.py (9 tests: AST scan + regex checks that handlers bind exception and call _log with bound name). Self-review: silent error fixed in all 4 sites, control flow preserved everywhere (fall-through / return unchanged), exception bound to name in every handler, lazy %s formatting in _log, no race/off-by-one/security/false-success, no tests masked (9/9 pass), ruff clean. git add 2 files.
+
 - Result: committed 8c41d4a2, pushed to origin/main
 
 ## Round 399 @ 2026-07-08T13:30:00Z
