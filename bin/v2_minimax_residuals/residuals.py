@@ -89,7 +89,19 @@ def r05_dt(rec_n: Dict[str, Any], rec_n1: Dict[str, Any]) -> Dict[str, Any]:
 
     from datetime import datetime
 
-    def pad_ms_to_us(time_str):
+    def pad_ms_to_us(time_str: str) -> str:
+        """Pad milliseconds to microseconds in timestamp string.
+
+        Timestamps from the game recorder have 3-digit millisecond precision,
+        but Python datetime expects 6-digit microsecond precision. This function
+        pads the millisecond portion to microseconds.
+
+        Args:
+            time_str: Timestamp string in format "YYYY-MM-DD HH:MM:SS.sss"
+
+        Returns:
+            Timestamp string in format "YYYY-MM-DD HH:MM:SS.ssssss"
+        """
         if '.' in time_str:
             base, ms = time_str.rsplit('.', 1)
             if len(ms) == 3:
