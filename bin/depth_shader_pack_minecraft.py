@@ -107,22 +107,22 @@ def generate_gbuffers_fsh() -> str:
     return _fsh_header() + """void main() {
     // Sample depth from depthtex0 (linearized depth buffer)
     float depth = texture2D(depthtex0, v_texcoord).r;
-    
+
     // Convert to linear depth in view space
     float linearDepth = (2.0 * near * far) / (far + near - depth * (far - near));
-    
+
     // Normalize depth to 0-1 range for export
     float normalizedDepth = clamp(linearDepth / far, 0.0, 1.0);
-    
+
     // Pack depth into RGB channels (24-bit precision)
     vec3 depthRGB;
     depthRGB.r = fract(normalizedDepth * 255.0);
     depthRGB.g = fract(normalizedDepth * 255.0 * 255.0);
     depthRGB.b = fract(normalizedDepth * 255.0 * 255.0 * 255.0);
-    
+
     // Output depth in RGB, alpha for mask
     gl_FragData[0] = vec4(depthRGB, 1.0);
-    
+
     // Also write to gbuffer for compatibility
     gl_FragData[1] = vec4(0.0, 0.0, 0.0, 1.0); // gnormal
     gl_FragData[2] = vec4(0.0, 0.0, 0.0, 1.0); // gdepth
@@ -155,19 +155,19 @@ uniform int frameCounter;
 void main() {
     // Read packed depth from gbuffer pass
     vec3 packedDepth = texture2D(colortex0, v_texcoord).rgb;
-    
+
     // Unpack depth from RGB channels
     float depth = (packedDepth.r / 255.0) +
                   (packedDepth.g / (255.0 * 255.0)) +
                   (packedDepth.b / (255.0 * 255.0 * 255.0));
-    
+
     // Apply temporal dithering to reduce banding
     float dither = fract(sin(dot(v_texcoord, vec2(12.9898, 78.233))) * 43758.5453);
     depth += dither * (1.0 / 255.0);
-    
+
     // Export depth as grayscale
     gl_FragData[0] = vec4(vec3(depth), 1.0);
-    
+
     // Frame counter check for 6fps export
     int framesPerExport = int(60.0 / 6.0); // 60Hz / 6fps = 10 frames
     if (frameCounter % framesPerExport == 0) {
@@ -294,7 +294,7 @@ class DepthCapture:
 def main() -> int:
     """Main entry point."""
     import argparse
-    
+
     parser = argparse.ArgumentParser(
         description="Depth buffer capture helper for Minecraft shader pack"
     )
@@ -304,14 +304,14 @@ def main() -> int:
                        help=f"Capture FPS (default: {fps})")
     parser.add_argument("--duration", type=float, default=0,
                        help="Capture duration in seconds (0 = infinite)")
-    
+
     args = parser.parse_args()
-    
+
     capture = DepthCapture(args.output_dir, args.fps)
-    
+
     try:
         capture.start()
-        
+
         if args.duration > 0:
             time.sleep(args.duration)
             capture.stop()
@@ -319,14 +319,14 @@ def main() -> int:
             print("Press Ctrl+C to stop capture...")
             while True:
                 time.sleep(1)
-                
+
     except KeyboardInterrupt:
         capture.stop()
         print("\\nCapture interrupted by user")
     except Exception as e:
         print(f"Error: {{e}}", file=sys.stderr)
         return 1
-        
+
     return 0
 
 
@@ -372,21 +372,21 @@ const bool showPosition = false;
 def create_shader_pack(output_dir: Path, fps: int) -> Dict[str, int]:
     """Create complete shader pack directory structure."""
     counts = {"shaders": 0, "configs": 0, "assets": 0}
-    
+
     # Create directories
     shaders_dir = output_dir / "shaders"
     shaders_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Create pack.mcmeta
     pack_mcmeta = output_dir / "pack.mcmeta"
     pack_mcmeta.write_text(generate_pack_mcmeta(fps))
     counts["assets"] += 1
-    
+
     # Create icon.png
     icon_path = output_dir / "icon.png"
     icon_path.write_bytes(generate_icon_png())
     counts["assets"] += 1
-    
+
     # Create shaders
     shader_files = [
         ("gbuffers_basic.vsh", generate_gbuffers_vsh()),
@@ -394,22 +394,22 @@ def create_shader_pack(output_dir: Path, fps: int) -> Dict[str, int]:
         ("composite.vsh", generate_composite_vsh()),
         ("composite.fsh", generate_composite_fsh()),
     ]
-    
+
     for filename, content in shader_files:
         (shaders_dir / filename).write_text(content)
         counts["shaders"] += 1
-    
+
     # Create config file
     config_path = shaders_dir / "depth_export.properties"
     config_path.write_text(generate_shader_config(fps))
     counts["configs"] += 1
-    
+
     # Create helper script
     helper_path = output_dir / "depth_capture_helper.py"
     helper_path.write_text(generate_depth_capture_helper(fps))
     helper_path.chmod(0o755)  # Make executable
     counts["assets"] += 1
-    
+
     # Create README
     readme_path = output_dir / "README.md"
     readme_content = f"""# Depth Export Shader Pack for Minecraft
@@ -442,7 +442,7 @@ python3 depth_capture_helper.py ./capture_output --fps {fps}
 """
     readme_path.write_text(readme_content)
     counts["assets"] += 1
-    
+
     return counts
 
 
