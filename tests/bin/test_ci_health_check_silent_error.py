@@ -80,11 +80,41 @@ def test_stat_except_does_not_bare_pass():
     match = re.search(pattern, src, re.MULTILINE)
     assert match is None, (
         "stat() except block must bind exception and log — "
-        "bare `except OSError: continue` is the silent-swallow pattern"
+        "bare `except OSError: continue` is the anti-pattern"
     )
 
 
-def test_module_compiles():
-    """Module must compile without syntax errors."""
+def test_safe_json_except_binds_exception():
+    """The _safe_json() except block must bind the exception to a name."""
+    src, tree = _load_tree()
+    # Find the _safe_json function and its Try node
+    found = False
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "_safe_json":
+            # Find the Try node within the function body
+            for child in ast.walk(node):
+                if isinstance(child, ast.Try) and child.handlers:
+                    found = True
+                    for handler in child.handlers:
+                        assert handler.name is not None, (
+                            "_safe_json() except block must bind exception (e.g., 'as exc')"
+                        )
+                    break
+    assert found, (
+        "_safe_json() except block must bind exception "
+        "(e.g., 'except (json.JSONDecodeError, OSError) as exc:')"
+    )
+
+
+def test_safe_json_except_logs_error():
+    """The _safe_json() except block must call logger.debug."""
     src = SRC_PATH.read_text()
-    compile(src, str(SRC_PATH), "exec")  # raises SyntaxError on failure
+    # Pattern: _safe_json → except (JSONDecodeError, OSError) as <name>: → logger.debug
+    pattern = (
+        r"def _safe_json.*?except\s+\([^)]+\)\s+as\s+\w+:\s*\n"
+        r"\s+logger\.debug\("
+    )
+    match = re.search(pattern, src, re.DOTALL)
+    assert match is not None, (
+        "_safe_json() except block must call logger.debug with the error"
+    )

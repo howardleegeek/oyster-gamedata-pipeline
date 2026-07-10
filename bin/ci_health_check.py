@@ -37,7 +37,8 @@ def _safe_json(path: Path) -> Optional[Dict[str, Any]]:
     try:
         with open(path, "r", encoding="utf-8") as fh:
             return json.load(fh)
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.debug("ci_health_check: failed to parse JSON %s: %s", path, exc)
         return None
 
 
