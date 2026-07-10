@@ -35,8 +35,6 @@ Round 390: Surface silent error in bin/paper_health_check.py check_server().
 import ast
 from pathlib import Path
 
-import pytest
-
 SRC_PATH = Path("bin/paper_health_check.py")
 
 

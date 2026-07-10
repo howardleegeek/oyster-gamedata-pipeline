@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Regression tests: error_storage_postgres.py should not silently swallow exceptions."""
 import ast
-import sys
 from pathlib import Path
 
 # Test 1: No bare except blocks

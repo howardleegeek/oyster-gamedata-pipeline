@@ -8,7 +8,6 @@ that emits a debug log so failures are observable in debug runs.
 """
 
 import ast
-import logging
 from pathlib import Path
 
 import pytest
