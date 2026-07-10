@@ -159,7 +159,10 @@ def parse_missing_imports(logs: str) -> Dict[str, List[str]]:
                             imports_by_file[file_path].append(module_name)
 
     # Look for specific import errors
-    import_name_pattern = r"ImportError: cannot import name ['\"]([^'\"]+)['\"] from ['\"]([^'\"]+)['\"]"
+    # Regex to match: ImportError: cannot import name 'X' from 'Y'
+    import_name_pattern = (
+        r"ImportError: cannot import name ['\"]([^'\"]+)['\"] from ['\"]([^'\"]+)['\"]"
+    )
     for match in re.finditer(import_name_pattern, logs):
         import_name = match.group(1)
         module_name = match.group(2)
