@@ -37,7 +37,7 @@ class ContinuousCaptureDaemon:
         self.active_session_dir = project_root / "active_session"
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
         self.heartbeat_log.parent.mkdir(parents=True, exist_ok=True)
-        
+
         # State persistence
         self.persisted_state = self._load_state()
         if self.persisted_state.get("current_state"):
@@ -45,7 +45,7 @@ class ContinuousCaptureDaemon:
                 self.state = DaemonState(self.persisted_state["current_state"])
             except ValueError:
                 self.state = DaemonState.IDLE
-        
+
         # Session tracking
         self.session_id = self.persisted_state.get("session_id")
         self.session_started = None
@@ -54,26 +54,26 @@ class ContinuousCaptureDaemon:
                 self.session_started = datetime.fromisoformat(self.persisted_state["started_at"])
             except (ValueError, TypeError):
                 self.session_started = None
-        
+
         # Statistics
         self.total_sessions_today = self.persisted_state.get("total_sessions_today", 0)
         self.total_uptime_hours = self.persisted_state.get("total_uptime_hours", 0.0)
         self.sessions_completed_this_hour = 0
         self.uploads_completed_this_hour = 0
         self.errors_this_hour = []
-        
+
         # Thread control
         self.running = True
         self.paused = False
         self.last_heartbeat = datetime.now()
         self.last_state_change = datetime.now()
-        
+
         # Cooldown tracking
         self.cooldown_until = None
-        
+
         # Setup logging
         self._setup_logging()
-        
+
     def _setup_logging(self):
         """Setup logging to both file and console"""
         log_file = self.oyster_dir / "daemon.log"
@@ -86,7 +86,7 @@ class ContinuousCaptureDaemon:
             ]
         )
         self.logger = logging.getLogger("oyster_daemon")
-    
+
     def _load_state(self):
         """Load persisted state from file"""
         if self.state_file.exists():
@@ -101,7 +101,7 @@ class ContinuousCaptureDaemon:
                     "corrupt daemon state file %s: %s", self.state_file, e
                 )
         return {}
-    
+
     def _save_state(self):
         """Save current state to file"""
         state_data = {
@@ -117,14 +117,14 @@ class ContinuousCaptureDaemon:
                 json.dump(state_data, f, indent=2)
         except IOError as e:
             self.logger.error(f"Failed to save state: {e}")
-    
+
     def _log_heartbeat(self):
         """Log hourly heartbeat with statistics"""
         now = datetime.now()
         if (now - self.last_heartbeat).total_seconds() >= 3600:  # 1 hour
             # Check disk space
             disk_free_gb = self._get_free_disk_gb()
-            
+
             heartbeat_data = {
                 "timestamp": now.isoformat(),
                 "state": self.state.value,
@@ -135,24 +135,24 @@ class ContinuousCaptureDaemon:
                 "total_sessions_today": self.total_sessions_today,
                 "total_uptime_hours": self.total_uptime_hours
             }
-            
+
             try:
                 with open(self.heartbeat_log, 'a') as f:
                     f.write(json.dumps(heartbeat_data) + "\n")
             except IOError as e:
                 self.logger.error(f"Failed to write heartbeat: {e}")
-            
+
             # Reset hourly counters
             self.sessions_completed_this_hour = 0
             self.uploads_completed_this_hour = 0
             self.errors_this_hour = []
             self.last_heartbeat = now
-            
+
             # Check disk space and pause if needed
             if disk_free_gb < 10:
                 self.logger.warning(f"Low disk space: {disk_free_gb:.1f} GB free. Pausing auto-arm.")
                 self.paused = True
-    
+
     def _get_free_disk_gb(self):
         """Get free disk space in GB"""
         try:
@@ -161,7 +161,7 @@ class ContinuousCaptureDaemon:
         except Exception as e:
             self.logger.error(f"Failed to get disk space: {e}")
             return 100.0  # Assume plenty of space
-    
+
     def _is_minecraft_running(self):
         """Check if Minecraft is running"""
         system = platform.system()
@@ -187,7 +187,7 @@ class ContinuousCaptureDaemon:
         except Exception as e:
             self.logger.error(f"Failed to check Minecraft: {e}")
             return False
-    
+
     def _is_recorder_running(self):
         """Check if OysterRecorder is running"""
         system = platform.system()
@@ -213,7 +213,7 @@ class ContinuousCaptureDaemon:
         except Exception as e:
             self.logger.error(f"Failed to check recorder: {e}")
             return False
-    
+
     def _start_recorder(self):
         """Start the Oyster recorder"""
         try:
@@ -228,13 +228,13 @@ class ContinuousCaptureDaemon:
         except Exception as e:
             self.logger.error(f"Failed to start recorder: {e}")
             return False
-    
+
     def _check_session_active(self):
         """Check if session is active by looking at game_state.jsonl mtime"""
         game_state_file = self.active_session_dir / "game_state.jsonl"
         if not game_state_file.exists():
             return False
-        
+
         try:
             mtime = datetime.fromtimestamp(game_state_file.stat().st_mtime)
             # If modified within last 5 minutes, consider session active
@@ -242,7 +242,7 @@ class ContinuousCaptureDaemon:
         except Exception as e:
             self.logger.error(f"Failed to check session activity: {e}")
             return False
-    
+
     def _check_finalize_complete(self):
         """Check if finalize completed by looking for clip-*.tar.gz files"""
         try:
@@ -251,7 +251,7 @@ class ContinuousCaptureDaemon:
         except Exception as e:
             self.logger.error(f"Failed to check finalize: {e}")
             return False
-    
+
     def _run_finalize(self):
         """Run the canonical pipeline finalization"""
         try:
@@ -273,22 +273,22 @@ class ContinuousCaptureDaemon:
         except Exception as e:
             self.logger.error(f"Failed to run finalize: {e}")
             return False
-    
+
     def _queue_upload(self):
         """Queue the session for upload"""
         try:
             # Create upload marker file
             upload_queue_dir = self.oyster_dir / "upload_queue"
             upload_queue_dir.mkdir(exist_ok=True)
-            
+
             # Find the latest clip file
             clip_files = list(project_root.glob("clip-*.tar.gz"))
             if not clip_files:
                 self.logger.error("No clip files found to upload")
                 return False
-            
+
             latest_clip = max(clip_files, key=lambda p: p.stat().st_mtime)
-            
+
             # Create upload job file
             upload_job = {
                 "clip_file": str(latest_clip),
@@ -296,11 +296,11 @@ class ContinuousCaptureDaemon:
                 "created_at": datetime.now().isoformat(),
                 "status": "pending"
             }
-            
+
             job_file = upload_queue_dir / f"upload_{self.session_id}.json"
             with open(job_file, 'w') as f:
                 json.dump(upload_job, f, indent=2)
-            
+
             self.logger.info(f"Queued upload for session {self.session_id}")
             self.uploads_completed_this_hour += 1
             return True
@@ -308,43 +308,43 @@ class ContinuousCaptureDaemon:
             self.logger.error(f"Failed to queue upload: {e}")
             self.errors_this_hour.append(f"upload_failed: {str(e)}")
             return False
-    
+
     def _cleanup_session(self):
         """Clean up session files"""
         try:
             # Remove clip files
             for clip_file in project_root.glob("clip-*.tar.gz"):
                 clip_file.unlink()
-            
+
             # Clear active session directory
             if self.active_session_dir.exists():
                 for item in self.active_session_dir.iterdir():
                     if item.is_file():
                         item.unlink()
-            
+
             self.logger.info("Cleaned up session files")
             return True
         except Exception as e:
             self.logger.error(f"Failed to cleanup session: {e}")
             return False
-    
+
     def _transition_to(self, new_state):
         """Transition to a new state with logging"""
         old_state = self.state
         self.state = new_state
         self.last_state_change = datetime.now()
-        
+
         self.logger.info(f"State transition: {old_state.value} → {new_state.value}")
-        
+
         # Handle state-specific actions
         if new_state == DaemonState.ARMED:
             self.session_id = f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             self.session_started = datetime.now()
             self._start_recorder()
-        
+
         elif new_state == DaemonState.RECORDING:
             self.logger.info(f"Recording session {self.session_id}")
-        
+
         elif new_state == DaemonState.FINALIZING:
             self.logger.info(f"Finalizing session {self.session_id}")
             if self._run_finalize():
@@ -352,7 +352,7 @@ class ContinuousCaptureDaemon:
             else:
                 self.logger.error("Finalize failed, going to COOLDOWN")
                 self._transition_to(DaemonState.COOLDOWN)
-        
+
         elif new_state == DaemonState.UPLOADING:
             if self._queue_upload():
                 self.total_sessions_today += 1
@@ -362,42 +362,42 @@ class ContinuousCaptureDaemon:
             else:
                 self.logger.error("Upload queue failed, going to COOLDOWN")
                 self._transition_to(DaemonState.COOLDOWN)
-        
+
         elif new_state == DaemonState.COOLDOWN:
             self.cooldown_until = datetime.now() + timedelta(seconds=30)
             self.session_id = None
             self.session_started = None
-        
+
         elif new_state == DaemonState.IDLE:
             self.cooldown_until = None
-        
+
         # Save state after transition
         self._save_state()
-    
+
     def run(self):
         """Main daemon loop"""
         self.logger.info("Starting Oyster continuous capture daemon")
-        
+
         # Resume from persisted state
         if self.state != DaemonState.IDLE:
             self.logger.info(f"Resuming from state: {self.state.value}")
-        
+
         try:
             while self.running:
                 # Log heartbeat if needed
                 self._log_heartbeat()
-                
+
                 # Skip state machine if paused
                 if self.paused:
                     time.sleep(5)
                     continue
-                
+
                 # State machine logic
                 if self.state == DaemonState.IDLE:
                     # Check for Minecraft
                     if self._is_minecraft_running():
                         self._transition_to(DaemonState.ARMED)
-                
+
                 elif self.state == DaemonState.ARMED:
                     # Check if recorder is running
                     if self._is_recorder_running():
@@ -408,7 +408,7 @@ class ContinuousCaptureDaemon:
                         if not self._is_recorder_running():
                             self.logger.warning("Recorder failed to start, returning to IDLE")
                             self._transition_to(DaemonState.IDLE)
-                
+
                 elif self.state == DaemonState.RECORDING:
                     # Check if Minecraft is still running
                     if not self._is_minecraft_running():
@@ -417,26 +417,26 @@ class ContinuousCaptureDaemon:
                     elif not self._check_session_active():
                         self.logger.info("Session appears to have ended")
                         self._transition_to(DaemonState.FINALIZING)
-                
+
                 elif self.state == DaemonState.FINALIZING:
                     # Already handled in transition
                     pass
-                
+
                 elif self.state == DaemonState.UPLOADING:
                     # Already handled in transition
                     pass
-                
+
                 elif self.state == DaemonState.COOLDOWN:
                     # Wait for cooldown period
                     if self.cooldown_until and datetime.now() >= self.cooldown_until:
                         self._transition_to(DaemonState.IDLE)
-                
+
                 # Update uptime
                 self.total_uptime_hours += 5 / 3600  # 5 second sleep = 5/3600 hours
-                
+
                 # Sleep to prevent CPU spinning
                 time.sleep(5)
-                
+
         except KeyboardInterrupt:
             self.logger.info("Received shutdown signal")
         except Exception as e:
@@ -446,17 +446,17 @@ class ContinuousCaptureDaemon:
             self.running = False
             self._save_state()
             self.logger.info("Daemon stopped")
-    
+
     def stop(self):
         """Stop the daemon gracefully"""
         self.logger.info("Stopping daemon...")
         self.running = False
-    
+
     def pause(self):
         """Pause auto-arming"""
         self.logger.info("Pausing daemon auto-arm")
         self.paused = True
-    
+
     def resume(self):
         """Resume auto-arming"""
         self.logger.info("Resuming daemon auto-arm")
@@ -465,7 +465,7 @@ class ContinuousCaptureDaemon:
 def main():
     """Main entry point"""
     daemon = ContinuousCaptureDaemon()
-    
+
     # Handle command line arguments
     if len(sys.argv) > 1:
         if sys.argv[1] == "stop":
@@ -476,7 +476,7 @@ def main():
             # Run in foreground
             daemon.run()
             return
-    
+
     # Default: run as daemon
     import daemon.pidfile
 
