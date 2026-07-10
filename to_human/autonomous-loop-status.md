@@ -750,3 +750,14 @@
 - Picked: Surface silent errors in scripts/pr_conflict_resolver.py _capture_conflict_diff() — two bare `except subprocess.CalledProcessError:` handlers (lines ~148 and ~159) silently swallowed git command failures. Bound exception to `exc` and included error message in the fallback output. Control flow preserved (fall-through to generic message unchanged). Tests pass 25/25 (pytest tests/test_pr_conflict_resolver.py). Ruff clean. git add 2 files.
 - Result: committed d812856d, pushed to origin/main
 
+
+## Round 454 @ 2026-07-10T10:18:52Z
+
+- Picked: Surface silent errors in scripts/pr_conflict_resolver.py rebase handlers — two bare  handlers (lines 111 and 120) silently swallowed git rebase conflict and abort failures. Bound exception to  and added logger.debug with context (PR number for conflict, error message for abort). Control flow preserved (conflict diff capture + abort unchanged). Tests pass 25/25 (pytest tests/test_pr_conflict_resolver.py). Ruff clean. git add 1 file.
+- Result: committed 12048aa8, pushed to origin/main
+
+
+## Round 176 @ 2026-07-08T12:00:00Z
+
+- Picked: Surface silent errors in bin/prd_test_video_no_ui.py (3 swallow sites: _get_ocr_engine() except ImportError, _extract_frames() except FileNotFoundError, _extract_frames() except subprocess.TimeoutExpired). Bound all exceptions to exc variable and added logger with context. Created tests/bin/test_prd_test_video_no_ui_silent_error.py with AST test for no bare except:pass pattern, and runtime tests for fallback control flow preserved. Self-review: all 3 handlers now bind exception and log, control flow unchanged (fallback paths intact), no silent swallows, no race/security/off-by-one/false-success, tests pass 5/5, ruff clean. git add 2 files.
+- Result: committed 3af8d99c, pushed to origin/main
