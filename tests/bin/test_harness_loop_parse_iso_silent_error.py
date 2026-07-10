@@ -1,17 +1,17 @@
 """Regression test for the silent-error swallow in
 `bin/harness_loop.py` `_parse_iso`.
 
-The handler used to be `except Exception:` which silently dropped 
-parse failures. The fix replaces it with a `log.debug(...)` call 
-that binds the exception so failures are visible in daemon logs 
+The handler used to be `except Exception:` which silently dropped
+parse failures. The fix replaces it with a `log.debug(...)` call
+that binds the exception so failures are visible in daemon logs
 (at DEBUG level) without changing the control flow (still returns 0.0).
 
 Checks:
-  1. Static guard: the `_parse_iso` Exception handler body must NOT 
+  1. Static guard: the `_parse_iso` Exception handler body must NOT
      be a bare `return 0.0`.
-  2. Static guard: the same handler body must include `log.debug` 
+  2. Static guard: the same handler body must include `log.debug`
      to surface the swallow.
-  3. Behavioural guard: _parse_iso with invalid input produces a 
+  3. Behavioural guard: _parse_iso with invalid input produces a
      debug log and returns 0.0.
 """
 
@@ -21,7 +21,6 @@ import ast
 import logging
 import sys
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -84,6 +83,7 @@ def test_parse_iso_returns_zero_on_invalid_input(caplog: pytest.LogCaptureFixtur
     assert result == 0.0
     
     # Should have logged the error
-    assert any("parse" in record.message.lower() or "timestamp" in record.message.lower() 
-               for record in caplog.records), \
-        "Expected a debug log about the parse failure"
+    assert any(
+        "parse" in record.message.lower() or "timestamp" in record.message.lower()
+        for record in caplog.records
+    ), "Expected a debug log about the parse failure"
