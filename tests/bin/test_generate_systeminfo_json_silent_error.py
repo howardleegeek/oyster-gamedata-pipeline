@@ -37,7 +37,7 @@ TARGET = REPO_ROOT / "bin" / "generate_systeminfo_json.py"
 
 # Anchor line numbers (will shift slightly if the file is refactored, but
 # the pattern is: parse ValueError < outer SubprocessError < xdotool outer).
-SITE_LINES = (50, 52, 110)
+SITE_LINES = (50, 52, 111)
 
 
 def _load_module():
