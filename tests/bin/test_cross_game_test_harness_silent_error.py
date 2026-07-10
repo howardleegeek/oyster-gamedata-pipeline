@@ -17,9 +17,7 @@ import logging
 import re
 import sys
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-from types import SimpleNamespace
-from typing import List
+from unittest.mock import patch
 
 import pytest
 
