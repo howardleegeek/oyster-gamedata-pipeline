@@ -297,10 +297,8 @@ class TestIntegration:
         # be referenced from {src} (installer source directory)
         files_match = re.search(r"\[Files\](.*?)(?=\n\[|\Z)", content, re.DOTALL)
         assert files_match, "[Files] section not found"
-        # Either explicitly included or referenced from source
-        files_content = files_match.group(1)
         # The batch is called from {src} in InitializeSetup, so it needs
-        # to be in the installer source files
+        # to be referenced somewhere in the .iss (either in [Files] or [Run])
         assert "check_runtime" in content, "check_runtime.bat must be referenced somewhere in .iss"
 
     def test_initialize_setup_returns_false_on_missing_runtime(self):
