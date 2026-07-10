@@ -811,3 +811,9 @@
 
 - Picked: Remove 52 W293 whitespace-only blank lines in bin/cross_game_test_harness.py. Found via ruff check --select W293 (52 hits in single file, highest concentration in bin/). Choice justification: measurable code smell; highest-density W293 file in bin/; zero risk — pure whitespace cleanup; tests pass 2/2 (pytest tests/bin/test_cross_game_test_harness_silent_error.py), ruff clean on file. Self-review: whitespace-only change, no runtime impact, no security/race/false-success/off-by-one, tests pass 2/2, ruff clean, one logical change, one file. git add 1 file.
 - Result: committed bcff880d, pushed to origin/main
+
+## Round 464 @ 2026-07-10T15:00:36Z
+
+- Picked: Remove 15 W293 whitespace-only blank lines in tests/bin/test_anti_replay_check_silent_error.py (2 instances) and tests/bin/test_c2pa_signer_silent_error.py (13 instances). Found via ruff check --select W293. Choice justification: measurable code smell; zero risk — pure whitespace cleanup; tests pass 10/10 (pytest tests/bin/test_anti_replay_check_silent_error.py tests/bin/test_c2pa_signer_silent_error.py). Self-review: whitespace-only change, no runtime impact, no security/race/false-success/off-by-one, tests pass 10/10, ruff clean, one logical change, 2 files. git add 2 files.
+- Result: committed c5a6d234, pushed to origin/main
+
