@@ -495,4 +495,4 @@ class TestCaptureConflictDiff:
             result = _capture_conflict_diff()
 
         assert "Unmerged files" in result
-        assert "(could not capture diff)" in result
+        assert "could not capture diff" in result

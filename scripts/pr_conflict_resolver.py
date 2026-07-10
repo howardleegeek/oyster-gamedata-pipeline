@@ -145,8 +145,9 @@ def _capture_conflict_diff() -> str:
         parts.append(f"Unmerged files ({len(unmerged)}):")
         for f in unmerged:
             parts.append(f"  {f}")
-    except subprocess.CalledProcessError:
-        parts.append("Could not list unmerged files.")
+    except subprocess.CalledProcessError as exc:
+        err_msg = exc.stderr.strip() if exc.stderr else str(exc)
+        parts.append(f"Could not list unmerged files: {err_msg}")
 
     parts.append("")
     parts.append("--- Conflict diff ---")
@@ -155,8 +156,9 @@ def _capture_conflict_diff() -> str:
     try:
         result = run_cmd(["git", "diff"])
         parts.append(result.stdout)
-    except subprocess.CalledProcessError:
-        parts.append("(could not capture diff)")
+    except subprocess.CalledProcessError as exc:
+        err_msg = exc.stderr.strip() if exc.stderr else str(exc)
+        parts.append(f"(could not capture diff: {err_msg})")
 
     return "\n".join(parts)
 
