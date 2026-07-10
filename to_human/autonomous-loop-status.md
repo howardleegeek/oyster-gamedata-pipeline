@@ -761,3 +761,9 @@
 
 - Picked: Surface silent errors in bin/prd_test_video_no_ui.py (3 swallow sites: _get_ocr_engine() except ImportError, _extract_frames() except FileNotFoundError, _extract_frames() except subprocess.TimeoutExpired). Bound all exceptions to exc variable and added logger with context. Created tests/bin/test_prd_test_video_no_ui_silent_error.py with AST test for no bare except:pass pattern, and runtime tests for fallback control flow preserved. Self-review: all 3 handlers now bind exception and log, control flow unchanged (fallback paths intact), no silent swallows, no race/security/off-by-one/false-success, tests pass 5/5, ruff clean. git add 2 files.
 - Result: committed 3af8d99c, pushed to origin/main
+
+## Round 455 @ 2026-07-10T11:41:49Z
+
+- Picked: No good candidate — 3 read passes complete: (1) silent-error sweep: 0 bare `except ...: pass` patterns across bin/, src/, tasks/, scripts/, server/, daemon/, dashboard/, consent/, sdk/, active_session/. (2) ruff clean on all production code (E/F/W/I codes). (3) Tests: 1443 passed (1 skipped in tests/bin/), 12 passed in tests/server/ + tests/utilities/. PRODUCTION_GAPS.md items require Howard credentials (Vercel deploy, Supabase migrations, code signing). No actionable items found this round.
+- Result: skipped (no good candidate)
+
