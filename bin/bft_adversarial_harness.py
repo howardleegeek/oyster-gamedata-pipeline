@@ -109,9 +109,10 @@ def _safe_call(fn: Callable[..., Any], rec: dict) -> tuple[bool, str]:
         return False, f"PASS residual={out.residual:.4g}"
     if hasattr(out, "passed"):  # V1 ResidualResult dataclass
         passed = bool(out.passed)
+        note = getattr(out, "note", "")
         return (
             (not passed),
-            f"{'FAIL' if not passed else 'PASS'} residual={out.residual:.4g} note={getattr(out, 'note', '')!r}",
+            f"{'FAIL' if not passed else 'PASS'} residual={out.residual:.4g} note={note!r}",
         )
     if isinstance(out, dict) and "passed" in out:  # V2 dict result
         return (
