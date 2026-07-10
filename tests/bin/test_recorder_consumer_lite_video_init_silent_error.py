@@ -45,7 +45,7 @@ def test_windows_capture_layer_init_binds_exception():
     """Verify _start_windows_capture_layer binds exception in init failure handler."""
     src = Path("bin/recorder_consumer_lite.py").read_text()
     tree = ast.parse(src)
-    
+
     # Find _start_windows_capture_layer function
     func_node = None
     for node in ast.walk(tree):
@@ -75,7 +75,7 @@ def test_mss_layer_init_binds_exception():
     """Verify _start_mss_layer binds exception in init failure handler."""
     src = Path("bin/recorder_consumer_lite.py").read_text()
     tree = ast.parse(src)
-    
+
     # Find _start_mss_layer function
     func_node = None
     for node in ast.walk(tree):
@@ -105,7 +105,7 @@ def test_windows_capture_layer_init_logs_debug():
     """Verify _start_windows_capture_layer logs at DEBUG level on init failure."""
     src = Path("bin/recorder_consumer_lite.py").read_text()
     tree = ast.parse(src)
-    
+
     # Find _start_windows_capture_layer function
     func_node = None
     for node in ast.walk(tree):
@@ -135,7 +135,7 @@ def test_mss_layer_init_logs_debug():
     """Verify _start_mss_layer logs at DEBUG level on init failure."""
     src = Path("bin/recorder_consumer_lite.py").read_text()
     tree = ast.parse(src)
-    
+
     # Find _start_mss_layer function
     func_node = None
     for node in ast.walk(tree):
