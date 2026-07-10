@@ -729,3 +729,8 @@
 
 - Picked: Remove unused `import pytest` and `import logging` in `tests/bin/test_recorder_consumer_lite_monitor_bounds_silent_error.py` — ruff F401. The top-level `import pytest` was never referenced (no decorators/fixtures in file); the function-local `import logging` inside `test_ctypes_import_failure_logs_at_debug` was never used (the test does a regex-string assert on source, no logger). Two-line removal, no behavioral impact. Tests pass 5/5 (pytest tests/bin/test_recorder_consumer_lite_monitor_bounds_silent_error.py). Ruff clean on file. Self-review: silent-error/false-success/race/off-by-one/security N/A (import-only diff); no tests masked as passing (5/5 pass, none skipped/xfail/disabled); brand isolation N/A (single-product); one logical change, one file. git add 1 file.
 - Result: committed 3180a203, pushed to origin/main
+
+## Round 450 @ 2026-07-10T08:09:08Z
+
+- Picked: Surface silent error in scripts/pr_conflict_resolver.py rebase abort handler. The bare `except subprocess.CalledProcessError:` was silently swallowing errors when git rebase --abort fails (e.g., if rebase was already clean). Bound exception to `exc` and improved comment. Control flow preserved (best-effort, returns conflict_diff regardless). No tests in tests/scripts/ to run. Ruff clean. git add 1 file.
+- Result: committed 95cbfdde, pushed to origin/main
