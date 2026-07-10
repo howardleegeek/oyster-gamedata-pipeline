@@ -91,13 +91,6 @@ def test_mainloop_crash_emits_debug_log(refu) -> None:
     # Skip if tkinter is not available (headless CI)
     pytest.importorskip("tkinter")
 
-    # Mock the tkinter components to avoid GUI creation
-    mock_tk = MagicMock()
-    mock_frame = MagicMock()
-    mock_label = MagicMock()
-    mock_text = MagicMock()
-    mock_btn = MagicMock()
-
     with patch.dict("sys.modules", {
         "tkinter": MagicMock(),
         "tkinter.scrolledtext": MagicMock(),
