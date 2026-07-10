@@ -41,18 +41,18 @@ def validate_exr_files(depth_dir):
     if not depth_path.exists():
         print(f"Error: Directory '{depth_dir}' does not exist", file=sys.stderr)
         sys.exit(1)
-    
+
     exr_files = sorted(depth_path.rglob('*.exr'))
     total = len(exr_files)
     valid = 0
     invalid_files = []
-    
+
     if total == 0:
         return {'total': 0, 'valid': 0, 'invalid_files': []}
-    
+
     # Files for structural check: first, middle, last
     structural_indices = {0, total - 1, total // 2}
-    
+
     for idx, filepath in enumerate(exr_files):
         if not check_magic_byte(filepath):
             invalid_files.append(str(filepath))
@@ -61,7 +61,7 @@ def validate_exr_files(depth_dir):
             invalid_files.append(str(filepath))
             continue
         valid += 1
-    
+
     return {'total': total, 'valid': valid, 'invalid_files': invalid_files}
 
 
@@ -69,9 +69,9 @@ def main():
     parser = argparse.ArgumentParser(description='Validate depth/*.exr files')
     parser.add_argument('--depth-dir', required=True, help='Directory containing depth EXR files')
     args = parser.parse_args()
-    
+
     result = validate_exr_files(args.depth_dir)
-    
+
     print(f"Total: {result['total']}")
     print(f"Valid: {result['valid']}")
     if result['invalid_files']:
@@ -80,7 +80,7 @@ def main():
             print(f"  - {f}")
     else:
         print("Invalid files: []")
-    
+
     sys.exit(0 if not result['invalid_files'] else 1)
 
 
