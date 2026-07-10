@@ -20,10 +20,10 @@ MIN_BASELINE_SCORE = 89
 def run_canonical_pipeline_skip_depth(session_dir: str) -> Dict[str, Any]:
     """Run canonical_pipeline.py with --skip-depth flag."""
     pipeline_script = Path(__file__).parent.parent / "canonical_pipeline.py"
-    
+
     if not pipeline_script.exists():
         return {"status": "SKIP", "evidence": "canonical_pipeline.py not found"}
-    
+
     # Run with --skip-depth
     try:
         result = subprocess.run(
@@ -33,9 +33,9 @@ def run_canonical_pipeline_skip_depth(session_dir: str) -> Dict[str, Any]:
             text=True,
             timeout=600
         )
-        
+
         output = result.stdout + result.stderr
-        
+
         # Parse score from output
         score_match = re.search(r"(\d+)/(\d+)", output)
         if score_match:
@@ -44,9 +44,9 @@ def run_canonical_pipeline_skip_depth(session_dir: str) -> Dict[str, Any]:
         else:
             score = 0
             max_score = 0
-        
+
         status = "PASS" if result.returncode == 0 else "FAIL"
-        
+
         return {
             "status": status,
             "score": score,
@@ -62,7 +62,7 @@ def run_canonical_pipeline_skip_depth(session_dir: str) -> Dict[str, Any]:
 def validate_baseline_score(result: Dict[str, Any]) -> Dict[str, Any]:
     """Validate that baseline score >= 89."""
     score = result.get("score", 0)
-    
+
     if score >= MIN_BASELINE_SCORE:
         return {
             "status": "PASS",
@@ -81,21 +81,21 @@ def main():
     parser.add_argument("--min-score", type=int, default=MIN_BASELINE_SCORE,
                         help=f"Minimum baseline score (default: {MIN_BASELINE_SCORE})")
     args = parser.parse_args()
-    
+
     # Run canonical pipeline with --skip-depth
     result = run_canonical_pipeline_skip_depth(args.session_dir)
-    
+
     if result["status"] == "SKIP":
         print(f"SKIP: {result.get('evidence', 'skipped')}")
         sys.exit(0)
-    
+
     if result["status"] == "FAIL":
         print(f"FAIL: {result.get('evidence', 'failed')}")
         sys.exit(1)
-    
+
     # Validate baseline score
     validation = validate_baseline_score(result)
-    
+
     if validation["status"] == "PASS":
         print(f"PASS: {validation['evidence']}")
         sys.exit(0)
