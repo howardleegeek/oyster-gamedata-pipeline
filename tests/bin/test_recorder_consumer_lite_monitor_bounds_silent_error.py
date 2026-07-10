@@ -1,6 +1,5 @@
 """Regression test: recorder_consumer_lite _get_windows_monitor_bounds silent error surface."""
 import ast
-import pytest
 
 
 def test_no_bare_except_in_get_windows_monitor_bounds():
@@ -41,7 +40,6 @@ def test_logger_imported():
 def test_ctypes_import_failure_logs_at_debug():
     """ctypes import failure in _get_windows_monitor_bounds logs at DEBUG."""
     import bin.recorder_consumer_lite as module
-    import logging
 
     # Mock to simulate ctypes import failure by patching sys.modules
     import sys
