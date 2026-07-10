@@ -320,19 +320,15 @@ async def event_worker():
 def emit_event(event_type: str, payload: Dict[str, Any]) -> None:
     """
     Emit an event to the internal event bus.
-    
+
     Args:
         event_type: Event type string
         payload: Event data
     """
-    event = {
-        "type": event_type,
-        "payload": payload,
-        "timestamp": datetime.utcnow().isoformat(),
-    }
-    
     # In production, publish to message queue
     # For now, schedule async dispatch
+    # Note: dispatch_event builds its own {type, payload, timestamp} envelope
+    # at line ~261; we deliberately do not pre-build it here to avoid drift.
     asyncio.create_task(dispatch_event(event_type, payload))
 
 
