@@ -132,13 +132,13 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--timeout", type=float, default=10.0, help="Timeout in seconds")
     parser.add_argument("--audit-log", help="Audit log file path")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
-    
+
     args = parser.parse_args(argv)
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
     )
-    
+
     attempt_id = str(uuid.uuid4())
     obs_key_hash = hashlib.sha256(args.obs_key.encode("utf-8")).hexdigest()
     logger.info("Red-team attempt %s — target %s:%d (key hash: %s…)",
@@ -146,10 +146,10 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     result = attempt_auth(args.host, args.port, args.obs_key,
                           args.tls, args.timeout, args.path)
-    
+
     audit_path = resolve_audit_log(args.audit_log)
     write_audit_entry(audit_path, args.host, args.port, obs_key_hash, result, attempt_id)
-    
+
     if result["error"] is not None:
         logger.error("Connection error: %s", result["error"])
         return 2
