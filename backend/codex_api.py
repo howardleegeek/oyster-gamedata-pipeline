@@ -159,7 +159,11 @@ def _run_codex_in_thread(job_id: str, task: CodexTask) -> None:
             try:
                 proc.wait(timeout=10)
             except subprocess.TimeoutExpired as exc:
-                logger.debug("proc.wait(timeout=10) timed out during cleanup for job_id=%s: %s", job_id, exc)
+                logger.debug(
+                    "proc.wait(timeout=10) timed out during cleanup for job_id=%s: %s",
+                    job_id,
+                    exc,
+                )
             _update_job(
                 job_id,
                 status="timeout",
