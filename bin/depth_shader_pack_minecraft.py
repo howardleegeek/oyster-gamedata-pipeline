@@ -486,7 +486,8 @@ def main(argv: List[str] | None = None) -> int:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 
-    print(f"\nCreated: {counts['shaders']} shaders, {counts['configs']} configs, {counts['assets']} assets")
+    print(f"\nCreated: {counts['shaders']} shaders, {counts['configs']} configs,"
+          f" {counts['assets']} assets")
     print(f"Install: .minecraft/shaderpacks/{args.output.name}/")
     return 0
 
