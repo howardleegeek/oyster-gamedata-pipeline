@@ -16,7 +16,13 @@
 
 ## Round 482 @ 2026-07-11T00:20:00Z
 
-- Picked: Remove unused variables in tests/bin/test_daemon_control_silent_error.py. Found via `ruff check --select F841` which flagged `found_bare_except` and `source` as unused. Removed both unused variable assignments. Choice justification: measurable code smell (F841 lint error); 1-file scope; zero risk — only removed unused variable assignments, no runtime behavior change; tests pass 2/2; ruff clean. Self-review: removed 2 unused variables; no silent error swallows introduced; no runtime/behavior change; one logical change; o
+- Picked: Remove unused variables in tests/bin/test_daemon_control_silent_error.py. Found via `ruff check --select F841` which flagged `found_bare_except` and `source` as unused. Removed both unused variable assignments. Choice justification: measurable code smell (F841 lint error); 1-file scope; zero risk — only removed unused variable assignments, no runtime behavior change; tests pass 2/2; ruff clean. Self-review: removed 2 unused variables; no silent error swallows introduced; no runtime/behavior change; one logical change; one file; brand isolation N/A (single product); `git add` 1 file.
+- Result: committed <sha>, pushed to origin/main
+
+## Round 483 @ 2026-07-11T00:30:00Z
+
+- Picked: Fix ruff lint errors in test_raw_input_capture_silent_error.py and test_recorder_consumer_lite_finalize_silent_error.py. Removed unused `sys` import and f-string without placeholders (F401, F541). Removed unused `pytest` import (F401). Found via `ruff check --select F401,F541`. Tests pass 7/7 for both files. Self-review: removed unused imports only; no runtime/behavior change; no silent error swallows introduced; one logical change per commit; brand isolation N/A (single product); `git add` single file each commit.
+- Result: committed ac807d5f and 4e2b7da1, pushed to origin/main
 
 ## Round 483 @ 2026-07-11T00:58:39Z
 
