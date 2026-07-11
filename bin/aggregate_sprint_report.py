@@ -119,12 +119,19 @@ def aggregate(log_dir: str, output_md: str) -> dict:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Aggregate sprint iteration logs into a markdown report.")
+    parser = argparse.ArgumentParser(
+        description="Aggregate sprint iteration logs into a markdown report."
+    )
     parser.add_argument("--log-dir", required=True, help="Directory containing iter_*.json files")
     parser.add_argument("--output", required=True, help="Output markdown file path")
     args = parser.parse_args()
     result = aggregate(args.log_dir, args.output)
     print(f"Report written to {args.output}")
-    print(f"  Iterations: {result['iter_count']}, Pass: {result['pass_count']}, Fail: {result['fail_count']}")
+    summary = (
+        f"  Iterations: {result['iter_count']}, "
+        f"Pass: {result['pass_count']}, "
+        f"Fail: {result['fail_count']}"
+    )
+    print(summary)
     print(f"  Mean total_seconds: {result['total_seconds_mean']:.1f}s")
     print(f"  Cumulative compute: {result['cumulative_compute_minutes']:.1f} min")
