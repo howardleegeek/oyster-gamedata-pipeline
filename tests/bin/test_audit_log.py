@@ -36,7 +36,9 @@ class TestAuditLog:
             # Check tables exist
             cursor = audit.conn.cursor()
             cursor.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('submissions', 'events')"
+                "SELECT name FROM sqlite_master "
+                "WHERE type='table' "
+                "AND name IN ('submissions', 'events')"
             )
             tables = {row[0] for row in cursor.fetchall()}
             assert "submissions" in tables
