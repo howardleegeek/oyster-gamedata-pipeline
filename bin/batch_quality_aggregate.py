@@ -9,7 +9,8 @@ For a batch of N sessions, computes:
   - Summary statistics
 
 Usage:
-    python bin/batch_quality_aggregate.py <quality_scores_dir> [--config <config.yaml>] [--output <output.json>]
+    python bin/batch_quality_aggregate.py <quality_scores_dir> \\
+        [--config <config.yaml>] [--output <output.json>]
 """
 
 import json
@@ -152,7 +153,12 @@ def aggregate_batch(
     # Summary statistics
     mean_score = sum(scores) / n
     sorted_scores = sorted(scores)
-    median_score = sorted_scores[n // 2] if n % 2 == 1 else (sorted_scores[n // 2 - 1] + sorted_scores[n // 2]) / 2
+    mid_idx = n // 2
+    median_score = (
+        sorted_scores[mid_idx]
+        if n % 2 == 1
+        else (sorted_scores[mid_idx - 1] + sorted_scores[mid_idx]) / 2
+    )
     variance = sum((s - mean_score) ** 2 for s in scores) / n
     std_dev = math.sqrt(variance)
 
@@ -171,11 +177,12 @@ def aggregate_batch(
     recommendations = []
     top_tier_sessions = [s for s in enriched_sessions if s["tier"] == "top_tier"]
     if top_tier_sessions:
+        top_pct = int((1 - tiers["top_tier"]) * 100)
         recommendations.append({
             "action": "flag_for_top_tier",
             "sessions": [s["session_id"] for s in top_tier_sessions],
             "count": len(top_tier_sessions),
-            "rationale": f"{len(top_tier_sessions)} sessions in top {int((1 - tiers['top_tier']) * 100)}% by quality score",
+            "rationale": f"{len(top_tier_sessions)} sessions in top {top_pct}% by quality score",
         })
 
     if low_outliers:
@@ -212,7 +219,8 @@ def main():
     CLI: aggregate quality scores for a batch of sessions.
 
     Usage:
-        python bin/batch_quality_aggregate.py <scores_dir> [--config <config.yaml>] [--output <output.json>]
+        python bin/batch_quality_aggregate.py <scores_dir> \\
+            [--config <config.yaml>] [--output <output.json>]
     """
     import argparse
 
