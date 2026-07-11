@@ -111,7 +111,11 @@ def run_comparison(
             frame_metrics.append(_compute_metrics(gt, pred))
         keys = ["abs_rel", "rmse", "delta_1"]
         agg = {k: float(np.mean([m[k] for m in frame_metrics])) for k in keys}
-        results["models"][model_name] = {"n_frames": len(frame_metrics), "per_frame": frame_metrics, "aggregate": agg}
+        results["models"][model_name] = {
+            "n_frames": len(frame_metrics),
+            "per_frame": frame_metrics,
+            "aggregate": agg,
+        }
     results["summary"] = {m: d["aggregate"] for m, d in results["models"].items()}
     return results
 
@@ -148,11 +152,15 @@ def _write_excel(results: Dict[str, Any], output_path: Path) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     """Construct the argument parser for the CLI."""
-    p = argparse.ArgumentParser(description="Compare DepthAnything V2 vs Marigold MAE on Minecraft Z-buffer frames.")
+    p = argparse.ArgumentParser(
+        description="Compare DepthAnything V2 vs Marigold MAE on Minecraft Z-buffer frames."
+    )
     p.add_argument("--gt-dir", type=Path, required=True, help="Ground-truth Z-buffer directory")
     p.add_argument("--da-dir", type=Path, required=True, help="DepthAnything V2 predictions")
     p.add_argument("--mg-dir", type=Path, required=True, help="Marigold MAE predictions")
-    p.add_argument("--max-frames", type=int, default=50, help="Max frames to evaluate (default: 50)")
+    p.add_argument(
+        "--max-frames", type=int, default=50, help="Max frames to evaluate (default: 50)"
+    )
     p.add_argument("--output", type=Path, default=None, help="Optional Excel output path")
     p.add_argument("--verbose", "-v", action="store_true", help="Enable debug logging")
     return p
