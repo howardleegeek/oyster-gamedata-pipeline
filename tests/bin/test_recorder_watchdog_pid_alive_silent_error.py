@@ -8,8 +8,6 @@ Verifies that the bare `except OSError:` has been replaced with
 
 import ast
 import inspect
-import os
-import sys
 
 import pytest
 
