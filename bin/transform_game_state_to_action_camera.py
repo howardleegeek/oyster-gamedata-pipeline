@@ -552,7 +552,8 @@ def main(argv: list[str]) -> int:
         session_start_unix = ticks[0].get("timestamp_ms", 0) / 1000.0
         n = merge_inputs(rows, inputs_path, session_start_unix=session_start_unix)
         print(
-            f"[transform] merged {n} input events (anchored to game_state t0={session_start_unix:.3f})"
+            f"[transform] merged {n} input events "
+            f"(anchored to game_state t0={session_start_unix:.3f})"
         )
 
     # Write action_camera.json
