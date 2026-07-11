@@ -88,7 +88,7 @@ def test_file_not_found_error_binds_and_logs(tmp_path, caplog) -> None:
     with patch.object(subprocess, "run", side_effect=FileNotFoundError("ffmpeg not found")):
         # Also need to ensure PIL fails first to trigger ffmpeg path
         with patch("PIL.Image.open", side_effect=OSError("PIL cannot open")):
-            frames = list(ptv._extract_frames(video_path, 1))
+            list(ptv._extract_frames(video_path, 1))
 
     # Should have logged at error level with the exception bound
     records = [r for r in caplog.records if r.levelno >= logging.ERROR]
@@ -107,7 +107,7 @@ def test_timeout_expired_binds_and_logs(tmp_path, caplog) -> None:
         subprocess, "run", side_effect=subprocess.TimeoutExpired("ffmpeg", 60)
     ):
         with patch("PIL.Image.open", side_effect=OSError("PIL cannot open")):
-            frames = list(ptv._extract_frames(video_path, 1))
+            list(ptv._extract_frames(video_path, 1))
 
     # Should have logged at error level with the exception bound
     records = [r for r in caplog.records if r.levelno >= logging.ERROR]
