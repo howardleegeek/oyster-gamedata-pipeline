@@ -240,9 +240,15 @@ def build_parser() -> argparse.ArgumentParser:
         epilog="Event classes: silence, ambient, footstep, speech, music, impact, noise, unknown.",
     )
     parser.add_argument("audio", type=str, help="Path to audio file (WAV supported natively).")
-    parser.add_argument("--frame-ms", type=int, default=50, help="Frame length in ms (default: 50).")
-    parser.add_argument("--hop-ms", type=int, default=None, help="Hop size in ms (default: frame_ms//2).")
-    parser.add_argument("--out", type=str, default=None, help="Output JSON file path (default: stdout).")
+    parser.add_argument(
+        "--frame-ms", type=int, default=50, help="Frame length in ms (default: 50)."
+    )
+    parser.add_argument(
+        "--hop-ms", type=int, default=None, help="Hop size in ms (default: frame_ms//2)."
+    )
+    parser.add_argument(
+        "--out", type=str, default=None, help="Output JSON file path (default: stdout)."
+    )
     parser.add_argument("--quiet", action="store_true", help="Suppress summary output.")
     return parser
 

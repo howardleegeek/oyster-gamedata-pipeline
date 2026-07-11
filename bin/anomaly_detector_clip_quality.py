@@ -165,7 +165,11 @@ def load_clips(path: Path) -> list[dict[str, Any]]:
     return clips
 
 
-def run_detection(input_path: Path, config: dict[str, Any], output_path: Optional[Path] = None) -> dict[str, Any]:
+def run_detection(
+    input_path: Path,
+    config: dict[str, Any],
+    output_path: Optional[Path] = None,
+) -> dict[str, Any]:
     """Run full anomaly detection pipeline."""
     clips = load_clips(input_path)
     if not clips:
@@ -185,7 +189,11 @@ def run_detection(input_path: Path, config: dict[str, Any], output_path: Optiona
     all_anomalies = []
     for result in clip_results:
         if result['anomalies']:
-            all_anomalies.append({'clip_id': result['clip_id'], 'anomalies': result['anomalies'], 'metrics': result['metrics']})
+            all_anomalies.append({
+                'clip_id': result['clip_id'],
+                'anomalies': result['anomalies'],
+                'metrics': result['metrics'],
+            })
     all_anomalies.extend(farming_patterns)
 
     results = {
@@ -205,12 +213,29 @@ def run_detection(input_path: Path, config: dict[str, Any], output_path: Optiona
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description='Detect low-quality or farmed vendor clip submissions')
+    parser = argparse.ArgumentParser(
+        description='Detect low-quality or farmed vendor clip submissions'
+    )
     parser.add_argument('input', type=Path, help='Input file (.json, .jsonl) or directory')
     parser.add_argument('-o', '--output', type=Path, help='Output file for results')
-    parser.add_argument('--action-entropy-threshold', type=float, default=2.0, help='Min action entropy (default: 2.0)')
-    parser.add_argument('--camera-variance-threshold', type=float, default=0.5, help='Min camera variance (default: 0.5)')
-    parser.add_argument('--farming-n-clips', type=int, default=3, help='Clips to flag as farming (default: 3)')
+    parser.add_argument(
+        '--action-entropy-threshold',
+        type=float,
+        default=2.0,
+        help='Min action entropy (default: 2.0)',
+    )
+    parser.add_argument(
+        '--camera-variance-threshold',
+        type=float,
+        default=0.5,
+        help='Min camera variance (default: 0.5)',
+    )
+    parser.add_argument(
+        '--farming-n-clips',
+        type=int,
+        default=3,
+        help='Clips to flag as farming (default: 3)',
+    )
     parser.add_argument('-q', '--quiet', action='store_true', help='Suppress output')
     return parser.parse_args(argv)
 
@@ -251,9 +276,11 @@ def main(argv: list[str]) -> int:
                     if 'clip_id' in anomaly:
                         print(f"  - {anomaly['clip_id']}: {anomaly.get('anomalies', [])}")
                     else:
-                        print(f"  - Farming: {anomaly.get('count')} clips with identical trajectory")
+                        cnt = anomaly.get('count')
+                        print(f"  - Farming: {cnt} clips with identical trajectory")
 
-    return 1 if (results['clips_with_anomalies'] > 0 or results['farming_patterns_detected'] > 0) else 0
+    has_anomalies = results['clips_with_anomalies'] > 0 or results['farming_patterns_detected'] > 0
+    return 1 if has_anomalies else 0
 
 
 if __name__ == '__main__':
