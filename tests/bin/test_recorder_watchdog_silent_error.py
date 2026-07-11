@@ -5,7 +5,6 @@ These tests verify that error conditions are logged rather than silently swallow
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
 
 
 class TestRecorderWatchdogSilentError:
@@ -14,7 +13,6 @@ class TestRecorderWatchdogSilentError:
     def test_no_bare_pass_in_find_mc_hwnd(self):
         """Verify find_mc_hwnd doesn't have bare 'pass' in ImportError handler."""
         import ast
-        import sys
 
         # Read the source file
         from pathlib import Path
@@ -44,7 +42,6 @@ class TestRecorderWatchdogSilentError:
         """Verify ImportError in find_mc_hwnd logs at debug level."""
         # This test verifies the behavior by mocking the import to fail
         import sys
-        from pathlib import Path
 
         # Save original modules
         original_win32gui = sys.modules.get("win32gui")
