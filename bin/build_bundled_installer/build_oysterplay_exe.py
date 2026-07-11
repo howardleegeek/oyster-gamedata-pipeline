@@ -77,7 +77,7 @@ def _verify_sources() -> tuple[bool, list[str]]:
         repo_bin if not env.get("PYTHONPATH") else
         f"{repo_bin}{os.pathsep}{env['PYTHONPATH']}"
     )
-    for module_name, source in (
+    for module_name, _source in (
         ("oyster_launch_mc", LAUNCHER_MODULE),
         ("oyster_play", ENTRY_SCRIPT),
     ):
