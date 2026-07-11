@@ -70,9 +70,8 @@ def _function_param_names(node: ast.FunctionDef) -> list[str]:
 def _body_has_abstain_string(node: ast.FunctionDef) -> bool:
     """True if any string literal in the function body contains 'ABSTAIN'."""
     for sub in ast.walk(node):
-        if isinstance(sub, ast.Constant) and isinstance(sub.value, str):
-            if "ABSTAIN" in sub.value:
-                return True
+        if isinstance(sub, ast.Constant) and isinstance(sub.value, str) and "ABSTAIN" in sub.value:
+            return True
     return False
 
 
@@ -88,20 +87,24 @@ def _body_has_nan_or_inf_residual(node: ast.FunctionDef) -> bool:
         if not isinstance(sub, ast.Return):
             continue
         for inner in ast.walk(sub):
-            if isinstance(inner, ast.Attribute):
-                if (
-                    isinstance(inner.value, ast.Name)
-                    and inner.value.id == "math"
-                    and inner.attr in {"nan", "inf"}
-                ):
-                    return True
+            if (
+                isinstance(inner, ast.Attribute)
+                and isinstance(inner.value, ast.Name)
+                and inner.value.id == "math"
+                and inner.attr in {"nan", "inf"}
+            ):
+                return True
             if isinstance(inner, ast.Call):
                 fn = inner.func
-                if isinstance(fn, ast.Name) and fn.id == "float":
-                    if inner.args and isinstance(inner.args[0], ast.Constant):
-                        v = inner.args[0].value
-                        if isinstance(v, str) and v.lower() in {"nan", "inf", "+inf", "-inf"}:
-                            return True
+                if (
+                    isinstance(fn, ast.Name)
+                    and fn.id == "float"
+                    and inner.args
+                    and isinstance(inner.args[0], ast.Constant)
+                ):
+                    v = inner.args[0].value
+                    if isinstance(v, str) and v.lower() in {"nan", "inf", "+inf", "-inf"}:
+                        return True
     return False
 
 
