@@ -142,9 +142,9 @@ def should_pause(config: Dict[str, Any], game: Optional[str] = None,
     if src == "unknown":
         return False, "Power state unknown"
     # On battery
-    if game and game in config.get("game_overrides", {}):
-        if not config["game_overrides"][game].get("pause_on_battery", True):
-            return False, f"Game '{game}' override"
+    if (game and game in config.get("game_overrides", {})
+            and not config["game_overrides"][game].get("pause_on_battery", True)):
+        return False, f"Game '{game}' override"
     if not config.get("pause_on_battery", True):
         return False, "Config: pause_on_battery=False"
     min_pct = config.get("min_battery_percent", 20)
