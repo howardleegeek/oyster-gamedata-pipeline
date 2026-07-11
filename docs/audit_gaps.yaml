@@ -2612,6 +2612,6 @@ gaps:
   completed_at: '2026-05-05 20:31:48'
   dispatched_at: '2026-05-05 20:31:12'
 harness_lock:
-  host: Howards-MacBook-Pro-2.local
-  pid: 93795
-  last_heartbeat: '2026-05-17T01:55:23Z'
+  host: MacBookPro
+  pid: 57754
+  last_heartbeat: '2026-07-11T13:10:26Z'
