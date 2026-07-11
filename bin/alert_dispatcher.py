@@ -275,11 +275,12 @@ class AlertStateManager:
     def record_fire(self, alert_id: str, fire_type: str):
         """Record that an alert was fired."""
         now = time.time()
+        prev = self.state.get(alert_id, {})
         entry = {
             "alert_id": alert_id,
             "last_fired": now,
-            "fire_count": self.state.get(alert_id, {}).get("fire_count", 0) + 1,
-            "last_escalated": now if fire_type == "escalation" else self.state.get(alert_id, {}).get("last_escalated", now),
+            "fire_count": prev.get("fire_count", 0) + 1,
+            "last_escalated": now if fire_type == "escalation" else prev.get("last_escalated", now),
             "cleared": fire_type == "cleared",
             "fire_type": fire_type,
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -338,7 +339,11 @@ class WebhookSender:
                 return False
         except requests.exceptions.RequestException as e:
             log.error(f"Failed to send Slack alert: {e}")
-            self.offline_queue.append({"channel": "slack", "payload": payload, "timestamp": time.time()})
+            self.offline_queue.append({
+                "channel": "slack",
+                "payload": payload,
+                "timestamp": time.time(),
+            })
             self._save_queue()
             return False
 
@@ -359,7 +364,11 @@ class WebhookSender:
                 return False
         except requests.exceptions.RequestException as e:
             log.error(f"Failed to send Discord alert: {e}")
-            self.offline_queue.append({"channel": "discord", "payload": payload, "timestamp": time.time()})
+            self.offline_queue.append({
+                "channel": "discord",
+                "payload": payload,
+                "timestamp": time.time(),
+            })
             self._save_queue()
             return False
 
