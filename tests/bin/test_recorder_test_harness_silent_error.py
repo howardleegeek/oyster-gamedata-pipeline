@@ -8,8 +8,6 @@ These tests verify that failed operations are logged at debug level
 import ast
 from pathlib import Path
 
-import pytest
-
 
 class TestRecorderTestHarnessSilentError:
     """Tests for silent error handling in recorder_test_harness.py."""
