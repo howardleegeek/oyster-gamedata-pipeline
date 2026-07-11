@@ -1554,3 +1554,8 @@ No fixes available (43 hidden fixes can be enabled with the `--unsafe-fixes` opt
 
 - Picked: Remove unused F401 `sys` import in tests/bin/test_recorder_consumer_lite_on_close_silent_error.py (line 3). Found via `ruff check --select F401` (1 hit, lowest-density candidate — file has exactly 1 F401 across 15 lines, natural one-round unit). The `import sys` was unused — test only uses `ast` module for AST inspection. Removed unused import. Choice justification: measurable code smell (F401 lint error); 1-file scope; zero risk — removed unused import, no runtime behavior change; tests pass 2/2; ruff clean. Self-review: one-line removal; no silent error swallow introduced; no runtime/behavior change; no security/race/off-by-one/false-success risk; tests pass cleanly (no skip/xfail/disable); one logical change; one file; brand isolation N/A (single product); git add single file as required.
 - Result: committed 0489d7e2, pushed to origin/main
+
+## Round 502 @ 2026-07-11T00:30:00Z
+
+- Picked: Remove unused pytest and sys imports in tests/bin/test_recorder_consumer_lite_orphan_pkg_silent_error.py. Found via `ruff check` which flagged 1 unused pytest import and 3 unused sys imports (lines 4, 9, 38, 50). Choice justification: measurable code smell (F401 lint errors); 1-file scope; zero risk — only removed unused imports, no runtime behavior change; tests pass 4/4; ruff clean. Self-review: removed 4 unused imports; no silent error swallows introduced; no runtime/behavior change; one logical change; one file; brand isolation N/A (single product); git add 1 file.
+- Result: committed 17efb62c, pushed to origin/main
