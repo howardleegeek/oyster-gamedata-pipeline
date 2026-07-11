@@ -46,9 +46,6 @@ class TestRecorderConsumerLiteStatFailuresSilentError:
 
     def test_sample_recorded_video_frames_binds_exception(self):
         """The ffmpeg exception handler must bind the exception (as exc)."""
-        source = self._read_source()
-        func_body = self._get_function_body(source, "_sample_recorded_video_frames")
-
         # Should have `except (OSError, subprocess.TimeoutExpired) as exc:`
         assert "except (OSError, subprocess.TimeoutExpired) as exc:", (
             "Exception must be bound to 'exc' for logging"
@@ -69,11 +66,8 @@ class TestRecorderConsumerLiteStatFailuresSilentError:
 
     def test_latest_obs_recording_file_binds_exception(self):
         """All OSError handlers in _latest_obs_recording_file must bind the exception."""
-        source = self._read_source()
-        func_body = self._get_function_body(source, "_latest_obs_recording_file")
-
         # Find all except handlers in the function
-        tree = ast.parse(source)
+        tree = ast.parse(self._read_source())
         unbound_exceptions = []
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef) and node.name == "_latest_obs_recording_file":
