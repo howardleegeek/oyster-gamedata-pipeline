@@ -201,7 +201,6 @@ class TestKeyGeneration:
         os.makedirs(os.path.dirname(tmp_keyfile), exist_ok=True)
         with open(tmp_keyfile, "wb") as f:
             f.write(b"\x00" * 32)
-        original_mtime = os.path.getmtime(tmp_keyfile)
 
         _run([sys.executable, SIGN_SCRIPT, tmp_manifest, "--keyfile", tmp_keyfile])
 
