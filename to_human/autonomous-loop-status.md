@@ -1,4 +1,5 @@
 
+
 ## Round 479 @ 2026-07-10T22:28:03Z
 
 
@@ -17,7 +18,13 @@
 
 ## Round 482 @ 2026-07-11T00:20:00Z
 
-- Picked: Remove unused variables in tests/bin/test_daemon_control_silent_error.py. Found via `ruff check --select F841` which flagged `found_bare_except` and `source` as unused. Removed both unused variable assignments. Choice justification: measurable code smell (F841 lint error); 1-file scope; zero risk — only removed unused variable assignments, no runtime behavior change; tests pass 2/2; ruff clean. Self-review: removed 2 unused variables; no silent error swallows introduced; no runtime/behavior change; one logical change; one file; brand isolation N/A.
+- Picked: Remove unused variables in tests/bin/test_daemon_control_silent_error.py. Found via `ruff check --select F841` which flagged `found_bare_except` and `source` as unused. Removed both unused variable assignments. Choice justification: measurable code smell (F841 lint error); 1-file scope; zero risk — only removed unused variable assignments, no runtime behavior change; tests pass 2/2; ruff clean. Self-review: removed 2 unused variables; no silent error swallows introduced; no runtime/behavior change; one logical change;
+- Result: committed 54a8fd9d, pushed to origin/main
+
+## Round 483 @ 2026-07-11T12:00:00Z
+
+- Picked: Fix E501 long lines in bin/buyer_dashboard_html.py. Found 2 violations: line 51 (203 chars) and line 124 (107 chars). Wrapped img_data f-string into multi-line tuple, extracted color_map dict to fix line too long. Choice justification: measurable code smell (E501 lint error); 1-file scope; zero risk — line-wrap only, no runtime behavior change; module imports cleanly; tests pass 13/13; ruff clean after fix. Self-review: line-wrap only; no runtime/behavior change; no silent error swallows; no security/race/off-by-one/false-success risk; one logical change; one file.
+- Result: committed 7ff9fd71, pushed to origin/main one file; brand isolation N/A.
 - Result: committed <sha>, pushed to origin/main
 
 ## Round 483 @ 2026-07-11T09:30:00Z
@@ -1833,3 +1840,9 @@ No fixes available (4 hidden fixes can be enabled with the `--unsafe-fixes` opti
 
 - Picked: Add strict=True to zip() in bin/bft_adversarial_harness.py (B905). Found via `ruff check --select B905` — labels and fns are both 3-tuples (V1,V2,V3) so strict=True is safe. Tests pass 13/13 (test_bft_orchestrator.py), ruff clean. Self-review: line change only; no silent error swallow; no runtime behavior change; no false-success/race/off-by-one/security risk; one logical change; one file; git add single file.
 - Result: committed 07fc9fb5, pushed to origin/main
+
+## Round 528 @ 2026-07-11T19:00:00Z
+
+- Picked: Fix B904 raise-from in bin/backend_stub.py line 87. Found via `ruff check --select B904 bin/`. Added `from None` to the raise statement in the json.JSONDecodeError except handler to distinguish from errors in exception handling. Choice justification: measurable code smell (B904 lint error); 1-file scope; zero risk — adding explicit exception chaining preserves original error type/message; AST parses; module imports cleanly; tests pass 23/23 (test_backend_stub.py); ruff B904 clean after fix. Self-review: added explicit exception chaining (from None), preserving error type/message; no silent error swallows introduced; no tests masked as passing; one logical change; one file; git add single file as required; brand isolation N/A (single product).
+- Result: committed 7b56aea9, pushed to origin/main
+
