@@ -132,7 +132,11 @@ def calculate_statistics(manifest: Dict[str, Any]) -> Dict[str, Any]:
         "quota_status": quota_status,
         "audit_scores": audit_scores,
         "failed_sessions": failed_sessions,
-        "pass_rate": sum(1 for s in sessions if s.get("grade") == "PASS") / max(len(sessions), 1) * 100
+        "pass_rate": (
+            sum(1 for s in sessions if s.get("grade") == "PASS")
+            / max(len(sessions), 1)
+            * 100
+        )
     }
 
 
