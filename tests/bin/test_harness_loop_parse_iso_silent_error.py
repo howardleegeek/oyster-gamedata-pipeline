@@ -78,10 +78,10 @@ def test_parse_iso_returns_zero_on_invalid_input(caplog: pytest.LogCaptureFixtur
     spec = importlib.util.spec_from_file_location("harness_loop", SRC_PATH)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    
+
     result = module._parse_iso("not-a-valid-timestamp")
     assert result == 0.0
-    
+
     # Should have logged the error
     assert any(
         "parse" in record.message.lower() or "timestamp" in record.message.lower()
