@@ -29,7 +29,7 @@ def _np() -> Any:
             import numpy
             _numpy = numpy
         except ImportError:
-            raise ImportError("numpy is required")
+            raise ImportError("numpy is required") from None
     return _numpy
 
 

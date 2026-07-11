@@ -197,7 +197,7 @@ def _hash_similarity(hash_a: str, hash_b: str) -> float:
     if len(bits_a) != len(bits_b):
         return 0.0
 
-    matching = sum(1 for a, b in zip(bits_a, bits_b) if a == b)
+    matching = sum(1 for a, b in zip(bits_a, bits_b, strict=True) if a == b)
     return matching / len(bits_a)
 
 
