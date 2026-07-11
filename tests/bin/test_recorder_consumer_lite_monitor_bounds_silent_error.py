@@ -45,9 +45,6 @@ def test_ctypes_import_failure_logs_at_debug():
     import sys
     import unittest.mock as mock
 
-    # Save original
-    orig_ctypes = sys.modules.get("ctypes")
-
     with mock.patch.dict(sys.modules, {"ctypes": None}):
         # Need to reload to pick up the mock, but that's complex
         # Instead, just check that the logger.debug call exists in source
