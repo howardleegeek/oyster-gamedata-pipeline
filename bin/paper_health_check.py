@@ -40,7 +40,8 @@ def check_server(host, port):
         sock.settimeout(5.0)
         sock.connect((host, port))
         # Send handshake
-        data = encode_varint(0) + encode_varint(765) + encode_varint(len(host)) + host.encode() + struct.pack(">H", port) + encode_varint(1)
+        data = (encode_varint(0) + encode_varint(765) + encode_varint(len(host))
+                + host.encode() + struct.pack(">H", port) + encode_varint(1))
         sock.sendall(encode_varint(len(data)) + data)
         # Send status request
         sock.sendall(encode_varint(1) + encode_varint(0))
