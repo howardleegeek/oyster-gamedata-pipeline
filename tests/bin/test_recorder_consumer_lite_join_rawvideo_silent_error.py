@@ -13,8 +13,6 @@ import logging
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
-
 # Import the module to test
 import bin.recorder_consumer_lite as rcl
 
