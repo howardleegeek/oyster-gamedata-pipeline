@@ -49,7 +49,8 @@ def detect_screen_dpi() -> float:
                                     return dpi
                             except ValueError as e:
                                 logger.debug(
-                                    "generate_systeminfo: xrandr scale-factor parse failed on line %r: %s",
+                                    "generate_systeminfo: xrandr scale-factor "
+                                    "parse failed on line %r: %s",
                                     line,
                                     e,
                                 )
