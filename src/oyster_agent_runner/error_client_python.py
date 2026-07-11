@@ -303,7 +303,11 @@ def install_handlers(endpoint: Optional[str] = None) -> None:
     try:
         asyncio.get_event_loop().set_exception_handler(_asyncio_handler)
     except RuntimeError as exc:
-        logger.debug("error_client_python: no event loop running, skipping asyncio handler: %s", exc)
+        logger.debug(
+            "error_client_python: no event loop running, "
+            "skipping asyncio handler: %s",
+            exc,
+        )
     atexit.register(_atexit_handler)
 
 
