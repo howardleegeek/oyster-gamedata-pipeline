@@ -293,7 +293,8 @@ class SupabaseClient:
             "idempotency_key": idempotency_key,
             "status": status,
             "stripe_transfer_id": stripe_transfer_id,
-            "stripe_payout_id": stripe_transfer_id,  # stripe_payout_id mirrored for backwards compat
+            # stripe_payout_id mirrored for backwards compat
+            "stripe_payout_id": stripe_transfer_id,
             "failure_reason": failure_reason,
             "paid_at": datetime.now(timezone.utc).isoformat() if status == "paid" else None,
         }
