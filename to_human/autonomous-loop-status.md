@@ -19,6 +19,12 @@
 ## Round 483 @ 2026-07-11T00:30:00Z
 
 - Picked: Fix B007 unused loop variable in bin/audit_quality_metrics.py check_recording_continuity(). The loop variable `source_type` was defined but never used. Renamed to `_source_type` per ruff convention. Choice justification: measurable code smell (B007 lint error); 1-file scope; zero risk — only renamed unused loop variable, no runtime behavior change; tests pass 3/3; ruff clean. Self-review: B007 fix only, no silent error swallows introduced, no runtime/behavior change; one logical change; one file; `git add` 1 file (NEVER `git add .`).
+- Result: committed 34a57838, pushed to origin/main
+
+## Round 484 @ 2026-07-11T15:40:00Z
+
+- Picked: Fix W293 blank line whitespace in bin/disk_health_check.py (19 violations). Found via `ruff check --select W293`. Choice justification: measurable code smell (W293 lint errors); 1-file scope; zero risk — only whitespace cleanup on blank lines, no runtime behavior change; tests pass 6/6. Self-review: checked for silent error swallow, false-success, race, off-by-one, security issue, broken tests masked as passing. None present. One logical change; one file; git add single file as required; brand isolation N/A (single product).
+- Result: committed c69914d3, pushed to origin/mainER `git add .`).
 - Result: committed 9b97eaf8, pushed to origin/main
 
 - Picked: Remove unused variables in tests/bin/test_daemon_control_silent_error.py. Found via `ruff check --select F841` which flagged `found_bare_except` and `source` as unused. Removed both unused variable assignments. Choice justification: measurable code smell (F841 lint error); 1-file scope; zero risk — only removed unused variable assignments, no runtime behavior change; tests pass 2/2; ruff clean. Self-review: removed 2 unused variables; no silent error swallows introduced; no runtime/behavior change; one logical change;
@@ -1868,3 +1874,8 @@ No fixes available (4 hidden fixes can be enabled with the `--unsafe-fixes` opti
 
 - Picked: Fix B904 raise-from in bin/buyer_download_api_handler.py (2 sites) and bin/consent_log_signed.py (2 sites). Added 'from None' or 'from e' to raise statements in exception handlers to distinguish from errors in exception handling. Found via `ruff check --select B904 bin/`. Choice justification: measurable code smell (B904 lint errors); 2-file scope (4 total B904 violations, bounded candidates); zero risk — adding explicit exception chaining preserves original error type/message; AST parses; modules import cleanly; ruff B904 clean after fix. Self-review: added explicit exception chaining preserving error type/message; no silent error swallows introduced; no tests masked as passing; one logical change per file; git add single file per commit (NOT git add .); brand isolation N/A (single product).
 - Result: committed d7a141d6 (consent_log_signed.py), 8af4dba6 (buyer_download_api_handler.py), pushed to origin/main
+
+## Round 530 @ 2026-07-11T20:30:00Z
+
+- Picked: Add `from e` to the inner raise in OysterClient._request() at bin/marketplace_sync.py line 185 — the 429 handler raised a fresh `Exception(...)` without chaining the underlying urllib HTTPError, hiding the original cause from tracebacks. Found via `ruff check --select B904 .` (1 hit in bin/marketplace_sync.py, lowest-density bounded candidate — file has exactly 1 B904 across its 200+ lines, the natural one-round unit). Choice justification: measurable code smell (B904 lint error); 1-file scope; zero risk on non-429 paths (the bare `raise` is untouched); preserved the 429 raise behavior (still raises) but chains the HTTPError as `__cause__` for full debug context; tests pass 79/79 (tests/bin/test_marketplace_sync_silent_error.py + tests/test_marketplace_api.py + tests/test_gen_marketplace_listing.py); ruff clean; AST parses; module still imports cleanly (`import bin.marketplace_sync` works). Self-review: B904 fix only — no silent error swallow introduced (raise still propagates, now with full cause chain); no false-success (the 429 path still raises, just with `__cause__` populated); no race/off-by-one/security risk; no tests masked as passing (no skip/xfail/disable, 79/79 pass cleanly); one logical change (B904); one file; brand isolation N/A (single product); `git add` 1 file (NEVER `git add .`).
+- Result: committed e9ab5989, pushed to origin/main
