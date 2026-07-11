@@ -1,6 +1,5 @@
 """Regression test: _on_close() logs upload failures instead of silent swallow."""
 import ast
-import sys
 
 
 def test_on_close_upload_logs_debug():
