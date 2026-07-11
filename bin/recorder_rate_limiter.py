@@ -176,8 +176,12 @@ def can_record_now() -> Tuple[bool, str]:
     # 3. Pending upload backlog
     pending_gb = sum_pending_uploads_gb()
     if pending_gb > config["max_pending_gb"]:
-        return False, f"upload backlog {pending_gb:.1f}GB > {config['max_pending_gb']}GB; pause until cleared"
-    
+        msg = (
+            f"upload backlog {pending_gb:.1f}GB > "
+            f"{config['max_pending_gb']}GB; pause until cleared"
+        )
+        return False, msg
+
     return True, "ok"
 
 
