@@ -60,7 +60,6 @@ def _get_inner_except_body(body: str) -> str:
     header_indent = m.group(1)
     body_indent = header_indent + "    "
     lines = body.split("\n")
-    start = m.end()
     # Find the index of the header line
     header_line_idx = body[: m.start()].count("\n")
     collected = []
