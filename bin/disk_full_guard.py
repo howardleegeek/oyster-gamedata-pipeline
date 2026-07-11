@@ -15,7 +15,6 @@ import shutil
 import signal
 import sys
 import time
-from typing import Optional
 
 # Configure logging to stderr
 logging.basicConfig(
