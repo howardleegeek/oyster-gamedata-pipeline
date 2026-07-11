@@ -266,7 +266,10 @@ def classify(log_text: str) -> tuple[list[Issue], list[str]]:
             m = pat["regex"].search(log_text)
             if m:
                 start_line = log_text[: m.start()].count("\n") + 1
-                evidence = lines[start_line - 1] if 0 < start_line <= len(lines) else m.group(0).splitlines()[0]
+                if 0 < start_line <= len(lines):
+                    evidence = lines[start_line - 1]
+                else:
+                    evidence = m.group(0).splitlines()[0]
                 issues.append(
                     Issue(
                         code=pat["code"],
