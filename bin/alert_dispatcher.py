@@ -111,7 +111,11 @@ class Alert:
 
     def format_slack(self) -> dict:
         """Format for Slack webhook."""
-        emoji = "🔴" if self.severity == AlertSeverity.CRITICAL else "🟡" if self.severity == AlertSeverity.WARNING else "🔵"
+        emoji = (
+            "🔴" if self.severity == AlertSeverity.CRITICAL
+            else "🟡" if self.severity == AlertSeverity.WARNING
+            else "🔵"
+        )
         return {
             "text": f"{emoji} [oyster-prod] {self.title}",
             "blocks": [
@@ -134,7 +138,11 @@ class Alert:
 
     def format_discord(self) -> dict:
         """Format for Discord webhook."""
-        color = 0xFF0000 if self.severity == AlertSeverity.CRITICAL else 0xFFA500 if self.severity == AlertSeverity.WARNING else 0x0000FF
+        color = (
+            0xFF0000 if self.severity == AlertSeverity.CRITICAL
+            else 0xFFA500 if self.severity == AlertSeverity.WARNING
+            else 0x0000FF
+        )
         fields = []
         if self.last_success:
             fields.append({"name": "Last success", "value": self.last_success, "inline": True})
@@ -191,7 +199,8 @@ class AlertStateManager:
     ):
         self.dedup_window = dedup_window_seconds
         self.escalation_seconds = escalation_seconds
-        self.alerts_file = expand_oyster_path(alerts_file) if alerts_file else "~/.oyster/monitor_alerts.jsonl"
+        default_alerts_file = "~/.oyster/monitor_alerts.jsonl"
+        self.alerts_file = expand_oyster_path(alerts_file) if alerts_file else default_alerts_file
 
         # In-memory state: alert_id -> {last_fired, fire_count, last_escalated, cleared}
         self.state: dict[str, dict] = {}
