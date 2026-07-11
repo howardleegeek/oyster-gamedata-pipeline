@@ -79,10 +79,10 @@ def _classify_video(p: Path) -> tuple[str, str]:
                      str(Path(td) / f"f{idx}.gray")],
                     capture_output=True, check=False, timeout=10,
                 )
-            sizes = [
-                (Path(td) / f"f{i}.gray").stat().st_size if (Path(td) / f"f{i}.gray").exists() else 0
-                for i in range(5)
-            ]
+            sizes = []
+            for i in range(5):
+                fp = Path(td) / f"f{i}.gray"
+                sizes.append(fp.stat().st_size if fp.exists() else 0)
             if len(set(sizes)) == 1 and sizes[0] > 0:
                 contents = []
                 for i in range(5):
@@ -125,8 +125,15 @@ def _classify_depth_dir(d: Path) -> tuple[str, str]:
     unique = len(hashes)
     ratio = unique / n
     if ratio < 0.05:
-        return PLACEHOLDER, f"{unique} unique / {n} files ({ratio:.1%}) — likely hardlinked or copies of one file"
-    return REAL, f"{unique} unique / {n} files ({ratio:.1%}) — real per-frame variation"
+        return (
+            PLACEHOLDER,
+            f"{unique} unique / {n} files ({ratio:.1%}) — "
+            "likely hardlinked or copies of one file",
+        )
+    return (
+        REAL,
+        f"{unique} unique / {n} files ({ratio:.1%}) — real per-frame variation",
+    )
 
 
 def _classify_action_camera(p: Path) -> tuple[str, str]:
@@ -176,8 +183,16 @@ def _classify_action_camera(p: Path) -> tuple[str, str]:
         real_count = sum(1 for r in d if not r.get("is_padded"))
         ratio = real_count / n if n else 0
         if ratio < 0.02:  # less than 2% real records → effectively all padded
-            return PLACEHOLDER, f"{real_count}/{n} records non-padded ({ratio:.1%}) — almost entirely synthetic"
-        return REAL, f"{real_count}/{n} records non-padded ({ratio:.1%}, is_padded flag present) — real bot data + transparent padding"
+            return (
+                PLACEHOLDER,
+                f"{real_count}/{n} records non-padded ({ratio:.1%}) — "
+                "almost entirely synthetic",
+            )
+        return (
+            REAL,
+            f"{real_count}/{n} records non-padded ({ratio:.1%}, "
+            "is_padded flag present) — real bot data + transparent padding",
+        )
 
     # Tier 2: multi-field fingerprint (position, rotation, speed, intrinsics)
     fingerprint_keys = (
@@ -194,8 +209,16 @@ def _classify_action_camera(p: Path) -> tuple[str, str]:
     unique = len(fingerprints)
     ratio = unique / n if n else 0
     if ratio < 0.05:
-        return PLACEHOLDER, f"{unique} distinct multi-field fingerprints / {n} records ({ratio:.1%}) — mostly identical"
-    return REAL, f"{unique} distinct multi-field fingerprints / {n} records ({ratio:.1%}) — real frame variation"
+        return (
+            PLACEHOLDER,
+            f"{unique} distinct multi-field fingerprints / {n} records "
+            f"({ratio:.1%}) — mostly identical",
+        )
+    return (
+        REAL,
+        f"{unique} distinct multi-field fingerprints / {n} records "
+        f"({ratio:.1%}) — real frame variation",
+    )
 
 
 def _classify_gameinfo_xlsx(p: Path) -> tuple[str, str]:
@@ -344,7 +367,11 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  [{f['status']:11}] {f['name']:25} — {f['evidence']}")
         print()
         s = report["summary"]
-        print(f"  REAL={s['real_count']}  PLACEHOLDER={s['placeholder_count']}  UNKNOWN={s['unknown_count']}")
+        print(
+            f"  REAL={s['real_count']}  "
+            f"PLACEHOLDER={s['placeholder_count']}  "
+            f"UNKNOWN={s['unknown_count']}"
+        )
 
     return 0 if report["verdict"] == REAL else 1
 
