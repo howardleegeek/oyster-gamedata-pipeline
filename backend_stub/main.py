@@ -279,7 +279,7 @@ def _empty_income_summary(today: str) -> dict[str, Any]:
 def _admin_state_summary() -> dict[str, Any]:
     today = _today_iso()
     testers = tester_invite.get_store().list_all()
-    tester_statuses = {status: 0 for status in sorted(tester_invite.VALID_STATUSES)}
+    tester_statuses = dict.fromkeys(sorted(tester_invite.VALID_STATUSES), 0)
     for tester in testers:
         tester_statuses[tester.status] = tester_statuses.get(tester.status, 0) + 1
 
