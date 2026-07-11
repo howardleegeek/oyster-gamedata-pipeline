@@ -200,7 +200,6 @@ class TestDownloadModel(unittest.TestCase):
         from bin.download_da_v2_onnx import download_file
 
         dummy_onnx = b"\x00" * 100
-        dummy_data = b"\x01" * 200
 
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_urlopen.return_value = self._make_mock_response(dummy_onnx)
