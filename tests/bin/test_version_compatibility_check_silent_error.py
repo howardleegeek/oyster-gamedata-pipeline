@@ -57,7 +57,7 @@ def _find_except_in_func(tree, func_name):
 
 def test_notify_macos_except_binds_and_logs():
     """_notify_macos's osascript except must bind exception and log at DEBUG."""
-    src, tree = _load_source(), ast.parse(_load_source())
+    tree = ast.parse(_load_source())
     handlers = _find_except_in_func(tree, "_notify_macos")
     assert handlers, "_notify_macos has no except blocks"
     # Find the one referencing osascript or subprocess
@@ -73,7 +73,7 @@ def test_notify_macos_except_binds_and_logs():
 
 def test_notify_linux_except_binds_and_logs():
     """_notify_linux's notify-send except must bind exception and log at DEBUG."""
-    src, tree = _load_source(), ast.parse(_load_source())
+    tree = ast.parse(_load_source())
     handlers = _find_except_in_func(tree, "_notify_linux")
     assert handlers, "_notify_linux has no except blocks"
     # Find the one referencing subprocess
@@ -89,7 +89,7 @@ def test_notify_linux_except_binds_and_logs():
 
 def test_notify_windows_except_binds_and_logs():
     """_notify_windows's PowerShell except must bind exception and log at DEBUG."""
-    src, tree = _load_source(), ast.parse(_load_source())
+    tree = ast.parse(_load_source())
     handlers = _find_except_in_func(tree, "_notify_windows")
     assert handlers, "_notify_windows has no except blocks"
     # Find the one referencing subprocess
