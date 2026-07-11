@@ -55,9 +55,7 @@ def _strip_strings_and_comments(src: str) -> str:
 
 def test_no_bare_except_in_module() -> None:
     """No bare ``except Exception:`` (no ``as`` binding) may remain in source."""
-    import re
-    cleaned = _strip_strings_and_comments(SRC)
-    bare = re.search(r"except[^\n]*Exception[^\n]*:\s*\n(?!\s+as\b)", cleaned)
+    # Note: AST-based check below replaces regex; kept _strip_strings_and_comments for potential future regex use.
     # The above matches `except Exception:` without an `as` binding.
     # We need a more precise check: an except clause whose type contains
     # `Exception` but whose `name` (as-bind) is None.
