@@ -315,10 +315,6 @@ class TestPIIRedactor:
             result1 = redact_session(session_dir)
             pseudonym1 = result1["pseudonymized_to"]
 
-            # Read the file after first redaction
-            with open(game_state, "r") as f:
-                content_after_first = f.read()
-
             # Second redaction (should be idempotent - same pseudonym)
             result2 = redact_session(session_dir)
             pseudonym2 = result2["pseudonymized_to"]
