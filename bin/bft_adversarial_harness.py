@@ -173,7 +173,7 @@ def _votes_for(rec: dict, residual_id: str) -> list[VerifierVote]:
     fns = _TRIPLES[residual_id]
     labels = ("V1", "V2", "V3")
     out = []
-    for label, fn in zip(labels, fns):
+    for label, fn in zip(labels, fns, strict=True):
         detected, detail = _safe_call(fn, rec)
         out.append(VerifierVote(label, residual_id, detected, detail))
     return out
