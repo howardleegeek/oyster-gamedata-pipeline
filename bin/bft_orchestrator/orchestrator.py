@@ -108,7 +108,8 @@ def _to_vote_v2(name: str, vid: str, r: dict) -> Vote:
 
 def _to_vote_v3(name: str, vid: str, r: Any) -> Vote:
     verdict = r.verdict.value if hasattr(r.verdict, "value") else str(r.verdict)
-    val = math.nan if (isinstance(r.residual, float) and math.isnan(r.residual)) else float(r.residual)
+    is_nan = isinstance(r.residual, float) and math.isnan(r.residual)
+    val = math.nan if is_nan else float(r.residual)
     return Vote(vid, name, verdict, val, 0.0, getattr(r, "note", "") or "")
 
 
@@ -452,7 +453,9 @@ def aggregate_dataset(records: list[dict], fps: float = 30.0,
         votes = collect_votes(records[i], records[i + 1], fps=fps,
                               inputs_path=inputs_path)
         for r_name, info in tally(votes).items():
-            bucket = by_res.setdefault(r_name, {"COMMIT": 0, "REJECT": 0, "VIEW_CHANGE": 0, "INSUFFICIENT": 0})
+            bucket = by_res.setdefault(r_name, {
+                "COMMIT": 0, "REJECT": 0, "VIEW_CHANGE": 0, "INSUFFICIENT": 0
+            })
             bucket[info["decision"]] += 1
 
     # Dataset-level residuals (R15, R16, R20a..e, R22, R23) — fire once each.
@@ -481,7 +484,9 @@ def aggregate_dataset(records: list[dict], fps: float = 30.0,
         dataset_votes.append(v)
     if dataset_votes:
         for r_name, info in tally(dataset_votes).items():
-            bucket = by_res.setdefault(r_name, {"COMMIT": 0, "REJECT": 0, "VIEW_CHANGE": 0, "INSUFFICIENT": 0})
+            bucket = by_res.setdefault(r_name, {
+                "COMMIT": 0, "REJECT": 0, "VIEW_CHANGE": 0, "INSUFFICIENT": 0
+            })
             bucket[info["decision"]] += 1
 
     all_commit = True
@@ -493,7 +498,9 @@ def aggregate_dataset(records: list[dict], fps: float = 30.0,
         if counts["COMMIT"] / total < 0.95:
             all_commit = False
 
-    verdict = "PASS" if (all_commit and not any_reject) else ("FAIL" if any_reject else "NEEDS_HUMAN")
+    verdict = "PASS" if (all_commit and not any_reject) else (
+        "FAIL" if any_reject else "NEEDS_HUMAN"
+    )
     return {"frames": n_pairs, "residuals": by_res, "dataset_decision": verdict}
 
 
