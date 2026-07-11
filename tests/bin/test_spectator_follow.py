@@ -153,7 +153,8 @@ def test_spectate_loop_respects_duration():
                 )
 
     # Should send 2 commands (at t=0, t=5) not 3 because duration is 10s
-    # Actually with our time values: t=0 (send), t=1 (sleep done), t=6 (send), t=11 (check duration > 10, break)
+    # Actually with our time values:
+    # t=0 (send), t=1 (sleep done), t=6 (send), t=11 (check duration > 10, break)
     assert commands_sent == 2
     assert mock_rcon.send.call_count == 2
 
