@@ -182,7 +182,9 @@ class OysterClient:
             except urllib.error.HTTPError as e:
                 if e.code == 429:
                     retry_after = e.headers.get("Retry-After", "60")
-                    raise Exception(f"Rate limited. Retry after {retry_after} seconds.")
+                    raise Exception(
+                        f"Rate limited. Retry after {retry_after} seconds."
+                    ) from e
                 raise
 
     def list_sessions(self, params: Optional[Dict] = None) -> Dict:
