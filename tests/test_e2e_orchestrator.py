@@ -34,7 +34,7 @@ class TestTarOverSSH(unittest.TestCase):
         mock_proc.returncode = 0
         mock_proc.stdout = MagicMock()
         mock_proc.stderr = MagicMock()
-        mock_popen.return_value = proc = mock_proc
+        mock_popen.return_value = mock_proc
 
         # Mock tar extract
         mock_tar_run.return_value = MagicMock(returncode=0)
