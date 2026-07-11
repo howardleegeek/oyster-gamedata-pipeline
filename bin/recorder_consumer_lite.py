@@ -655,7 +655,15 @@ class InputCapture:
         def on_release(key):  # noqa: ANN001
             self._record_key(key, "key_up")
 
-        def on_move(x, y):  # noqa: ANN001
+        def on_move(x: float, y: float) -> None:
+            """Handle mouse move events from pynput.
+
+            Records mouse position updates to the event log for later replay.
+
+            Args:
+                x: Current X coordinate of the mouse.
+                y: Current Y coordinate of the mouse.
+            """
             with self._lock:
                 self.events.append({
                     "timestamp_ms": self._now_ms(),
