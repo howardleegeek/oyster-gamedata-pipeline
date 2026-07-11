@@ -171,15 +171,11 @@ class TestObsCaptureRealSilentError:
         #     logger.debug(...)
         # await self._listener_task  <- this should still exist after the handler
 
-        found_await_after_handler = False
-        in_except_block = False
-
-        for i, node in enumerate(ast.walk(aexit_method)):
+        for node in ast.walk(aexit_method):
             if isinstance(node, ast.ExceptHandler):
                 if node.type is not None:
                     if isinstance(node.type, ast.Name):
                         if node.type.id == "CancelledError":
-                            in_except_block = True
                             break
 
         # Alternative: check the overall method has at least one await after try/except
