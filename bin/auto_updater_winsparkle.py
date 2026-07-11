@@ -186,7 +186,12 @@ class AutoUpdater:
             self._emit("error", exc)
             return None
 
-    def _download_file(self, url: str, dest: Path, progress_cb: Optional[Callable[[float], None]] = None) -> bool:
+    def _download_file(
+        self,
+        url: str,
+        dest: Path,
+        progress_cb: Optional[Callable[[float], None]] = None,
+    ) -> bool:
         """Download a file with optional progress reporting."""
         self.state.status = UpdateStatus.DOWNLOADING
         try:
@@ -321,7 +326,11 @@ class AutoUpdater:
             logger.warning("Daemon already running")
             return
         self._stop_event.clear()
-        self._daemon_thread = threading.Thread(target=self._daemon_loop, name="updater-daemon", daemon=True)
+        self._daemon_thread = threading.Thread(
+            target=self._daemon_loop,
+            name="updater-daemon",
+            daemon=True,
+        )
         self._daemon_thread.start()
         logger.info("Updater daemon started (interval=%dh)", self.config.poll_interval_hours)
 
@@ -334,13 +343,32 @@ class AutoUpdater:
 
 def _build_parser() -> argparse.ArgumentParser:
     """Construct the argument parser for the CLI."""
-    parser = argparse.ArgumentParser(description="Auto-update mechanism (WinSparkle / Squirrel.Mac style)")
-    parser.add_argument("--url", required=True, help="Update server URL (XML appcast or JSON feed)")
-    parser.add_argument("--version", required=True, help="Current application version (e.g. 1.2.3)")
-    parser.add_argument("--app-name", default="MyApp", help="Application name for User-Agent header")
-    parser.add_argument("--poll-hours", type=int, default=24, help="Polling interval in hours (default: 24)")
-    parser.add_argument("--auto-install-critical", action="store_true", help="Auto-install critical updates")
-    parser.add_argument("--download-dir", type=Path, default=None, help="Directory for downloaded installers")
+    parser = argparse.ArgumentParser(
+        description="Auto-update mechanism (WinSparkle / Squirrel.Mac style)",
+    )
+    parser.add_argument(
+        "--url", required=True, help="Update server URL (XML appcast or JSON feed)"
+    )
+    parser.add_argument(
+        "--version", required=True, help="Current application version (e.g. 1.2.3)"
+    )
+    parser.add_argument(
+        "--app-name", default="MyApp", help="Application name for User-Agent header"
+    )
+    parser.add_argument(
+        "--poll-hours", type=int, default=24, help="Polling interval in hours (default: 24)"
+    )
+    parser.add_argument(
+        "--auto-install-critical",
+        action="store_true",
+        help="Auto-install critical updates",
+    )
+    parser.add_argument(
+        "--download-dir",
+        type=Path,
+        default=None,
+        help="Directory for downloaded installers",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("check", help="Check for available updates")
     sub.add_parser("download", help="Download the latest update")
