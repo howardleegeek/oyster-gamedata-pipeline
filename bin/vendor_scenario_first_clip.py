@@ -44,7 +44,13 @@ def _setup_logging(verbose: bool) -> None:
 
 def _ensure_workspace(workspace: Path) -> None:
     """Create the vendor workspace directory tree."""
-    for d in [workspace / "clips", workspace / "metadata", workspace / "logs", workspace / "config"]:
+    subdirs = [
+        workspace / "clips",
+        workspace / "metadata",
+        workspace / "logs",
+        workspace / "config",
+    ]
+    for d in subdirs:
         d.mkdir(parents=True, exist_ok=True)
     logger.info("Workspace initialised at %s", workspace)
 
