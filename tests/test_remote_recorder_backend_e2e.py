@@ -500,7 +500,7 @@ class TestCLI:
         with mock.patch.object(
             sys, "argv", ["remote_recorder_backend_e2e.py", "--backend-url", "https://example.com"]
         ):
-            args = e2e_mod.main.__code__  # just verify the module loads
+            e2e_mod.main.__code__  # just verify the module loads
         # Verify the parser accepts --backend-url
         import argparse
 
