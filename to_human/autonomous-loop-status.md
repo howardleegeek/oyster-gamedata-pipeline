@@ -498,6 +498,7 @@
 - Result: committed 93306a7d, pushed to origin/main
 
 ## Round 388 @ 2026-07-08T16:07:26Z
+
 - Picked: Continue in-progress WIP from prior tick — surface silent error in bin/recorder_consumer_lite.py _detect_gpu_available() nvcuda.dll OSError handler. Bound exception to `exc` and added logger.debug with context ('nvcuda.dll not present (no NVIDIA driver)') so the missing-driver case is visible in --verbose without spamming default WARNING-level log. Control flow preserved (falls through to DirectML path then returns False). Lazy %s logging (no eager formatting). Self-review: silent error fixed, no race/off-by-one/security, no tests masked (5/5 tests/bin/test_recorder_consumer_lite_gpu_detection_silent_error.py pass, ruff clean on changed file). git add 1 file.
 - Result: committed 279da28c, pushed to origin/main
 
@@ -1501,3 +1502,8 @@ No fixes available (43 hidden fixes can be enabled with the `--unsafe-fixes` opt
 
 - Picked: Remove unused F841 `keydir` variable in tests/test_provenance_offline_bundle.py (line 48). Found via `ruff check --select F841` (1 hit, lowest-density candidate — file has exactly 1 F841 across its 500 lines, the natural one-round unit). Variable was assigned `os.path.dirname(tmp_keyfile)` but never referenced anywhere in file (verified via grep — only 1 occurrence at assignment). Choice justification: measurable code smell (F841 lint error); 1-file scope; zero risk — removed dead local variable assignment, no runtime behavior change; tests pass 20/20 (pytest tests/test_provenance_offline_bundle.py); ruff F841 clean for file; AST parses; module still imports cleanly (`from tests.test_provenance_offline_bundle import real_keypair` works). Self-review: removed 1 unused local variable; no silent error swallows introduced; no runtime/behavior change; no security/race/off-by-one/false-success risk; no tests masked as passing (no skip/xfail/disable, 20/20 pass cleanly); one logical change; one file; brand isolation N/A (single product); `git add` 1 file (NEVER `git add .`).
 - Result: committed 47aab042, pushed to origin/main
+
+## Round 493 @ 2026-07-11T02:40:00Z
+
+- Picked: Remove unused F841 `result` variable in tests/test_input_latency_telemetry.py (line 264). Found via `ruff check --select F841` (1 hit, lowest-density candidate — file has exactly 1 F841 across its 300+ lines, the natural one-round unit). Variable was assigned `write_output(latencies, self.output_path)` but never used — function called for side effects (file write + stderr print), return value unused. Choice justification: measurable code smell (F841 lint error); 1-file scope; zero risk — removed unused variable assignment, no runtime behavior change; tests pass 10/10 (pytest tests/test_input_latency_telemetry.py); ruff F841 clean for file. Self-review: removed 1 unused local variable; confirmed write_output() still called for side effects (file write + stderr print); no runtime behavior change; no silent error swallows; one logical change; one file; brand isolation N/A (single product); `git add` 1 file (NEVER `git add .`).
+- Result: committed 46a463ab, pushed to origin/main
