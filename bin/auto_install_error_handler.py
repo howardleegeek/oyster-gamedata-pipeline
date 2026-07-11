@@ -31,7 +31,6 @@ from typing import Any, Optional, Type
 
 # Module-level constants
 _MODULE_NAME = "auto_install_error_handler"
-_G234_HOOK_INSTALLED_FLAG = "_g234_error_hooks_installed"
 _LOGGER_NAME = "g234.error_handler"
 
 # Configure module logger
@@ -96,7 +95,7 @@ def _install_hooks() -> bool:
         True if hooks were installed, False if already installed.
     """
     # Check if already installed
-    if getattr(sys, _G234_HOOK_INSTALLED_FLAG, False):
+    if getattr(sys, "_g234_error_hooks_installed", False):
         _logger.debug("G234 hooks already installed, skipping")
         return False
 
@@ -105,13 +104,13 @@ def _install_hooks() -> bool:
     sys.excepthook = _g234_excepthook
 
     # Store original for potential restoration
-    setattr(sys, "_g234_original_excepthook", original_excepthook)
+    sys._g234_original_excepthook = original_excepthook
 
     # Register cleanup
     atexit.register(_cleanup_temp_resources)
 
     # Mark as installed
-    setattr(sys, _G234_HOOK_INSTALLED_FLAG, True)
+    sys._g234_error_hooks_installed = True
 
     _logger.info("G234 error handling hooks installed successfully")
     return True
@@ -124,7 +123,7 @@ def _uninstall_hooks() -> bool:
     Returns:
         True if hooks were uninstalled, False if not installed.
     """
-    if not getattr(sys, _G234_HOOK_INSTALLED_FLAG, False):
+    if not getattr(sys, "_g234_error_hooks_installed", False):
         return False
 
     # Restore original excepthook
@@ -132,7 +131,8 @@ def _uninstall_hooks() -> bool:
     sys.excepthook = original
 
     # Clear flags
-    delattr(sys, _G234_HOOK_INSTALLED_FLAG)
+    if hasattr(sys, "_g234_error_hooks_installed"):
+        delattr(sys, "_g234_error_hooks_installed")
     if hasattr(sys, "_g234_original_excepthook"):
         delattr(sys, "_g234_original_excepthook")
 
