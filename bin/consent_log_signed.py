@@ -96,7 +96,7 @@ class ConsentLogSigned:
         try:
             return base64.b64decode(self.key_file.read_text().strip())
         except Exception as e:
-            raise ConsentLogError(f"Failed to load key file: {e}")
+            raise ConsentLogError(f"Failed to load key file: {e}") from None
 
     def _save_key(self) -> None:
         self.key_file.parent.mkdir(parents=True, exist_ok=True)
@@ -121,7 +121,7 @@ class ConsentLogSigned:
             data = json.loads(self.log_file.read_text())
             return [ConsentEntry.from_dict(e) for e in data.get("entries", [])]
         except json.JSONDecodeError as e:
-            raise ConsentLogError(f"Invalid log file format: {e}")
+            raise ConsentLogError(f"Invalid log file format: {e}") from None
 
     def _write_entries(self, entries: List[ConsentEntry]) -> None:
         data = {
