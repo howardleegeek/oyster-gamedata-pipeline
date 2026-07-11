@@ -1915,3 +1915,9 @@ No fixes available (4 hidden fixes can be enabled with the `--unsafe-fixes` opti
 
 - Picked: Wrap E501 long line (103>100) in bin/transform_game_state_to_action_camera.py:555 — the `[transform] merged N input events` f-string in main(). Split the literal into a parenthesized two-line form with adjacent string literals. Found via `ruff check --select E501 bin/ | sort | uniq -c` (1 hit in file, lowest-density bounded candidate). Choice justification: measurable code smell (E501 lint error); 1-file scope; zero risk — pure parenthesized f-string concatenation, output byte-for-byte identical (verified in-process for n=5, t0=1234.5678); AST parses; module imports cleanly (`from bin.transform_game_state_to_action_camera import main` works); tests pass 4/4 (pytest tests/bin/test_transform_game_state_to_action_camera.py) + 9/9 other affected tests (test_mc_pause_aware, test_canonical_pipeline_score, test_transform_freeze — 2 pre-existing skips not added by me); ruff clean. Self-review: pure line-wrap / parenthesized f-string concatenation only; no runtime/behavior change; no silent error swallow; no false-success; no race/off-by-one/security risk; no tests masked as passing (no skip/xfail/disable added, 4/4 + 9/9 pass cleanly); one logical change (E501 wrap); one file; brand isolation N/A (single product); `git add` 1 file (NEVER `git add .`).
 - Result: committed 1d89ec43, pushed to origin/main
+
+## Round 535 @ 2026-07-11T20:00:00Z
+
+- Picked: no good candidate found this round — exiting
+- Result: skipped (no clear-bounded lint/test/PRD gap found)
+
