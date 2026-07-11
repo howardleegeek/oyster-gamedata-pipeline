@@ -52,7 +52,7 @@ def _find_except_in_func(tree, func_name):
 
 def test_fsync_file_oserror_except_binds_and_logs():
     """_fsync_file's OSError except must bind exception and log at DEBUG."""
-    src, tree = _load_source(), ast.parse(_load_source())
+    tree = ast.parse(_load_source())
     handlers = _find_except_in_func(tree, "_fsync_file")
     assert handlers, "_fsync_file has no except blocks"
     # _fsync_file only has one except block - check it binds and logs
