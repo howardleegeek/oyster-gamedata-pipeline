@@ -200,9 +200,18 @@ def extract_attributes(scenes: list[dict[str, Any]]) -> tuple[list[str], list[st
 
     for scene in scenes:
         # Handle various field name conventions
-        biome_val = scene.get("biome") or scene.get("environment") or scene.get("biome_type", "unknown")
-        time_val = scene.get("time_of_day") or scene.get("time") or scene.get("tod", "unknown")
-        weather_val = scene.get("weather") or scene.get("weather_condition") or scene.get("conditions", "unknown")
+        biome_val = (
+            scene.get("biome") or scene.get("environment") or scene.get("biome_type", "unknown")
+        )
+        time_val = (
+            scene.get("time_of_day") or scene.get("time") or scene.get("tod", "unknown")
+        )
+        weather_key = "weather"
+        weather_val = (
+            scene.get(weather_key)
+            or scene.get("weather_condition")
+            or scene.get("conditions", "unknown")
+        )
 
         biome.append(str(biome_val))
         time_of_day.append(str(time_val))
