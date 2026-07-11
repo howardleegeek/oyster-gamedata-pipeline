@@ -118,7 +118,10 @@ def pick_next_route_type(scene: str, manifest: Dict[str, Any]) -> tuple:
     target = quota.get(route_type_str, 10)
     
     if current < target:
-        reason = f"scene quota: route_type={selected_route_type} has only {current} of {target} needed"
+        reason = (
+            f"scene quota: route_type={selected_route_type} "
+            f"has only {current} of {target} needed"
+        )
     else:
         reason = f"quota met for all types, picking route_type={selected_route_type} (lowest count)"
     
