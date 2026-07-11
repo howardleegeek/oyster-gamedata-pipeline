@@ -336,7 +336,8 @@ def main(provider: str, port: int):
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
         print(
-            f"Please set OYSTER_{provider.upper()}_CLIENT_ID and OYSTER_{provider.upper()}_CLIENT_SECRET environment variables",
+            f"Please set OYSTER_{provider.upper()}_CLIENT_ID and "
+            f"OYSTER_{provider.upper()}_CLIENT_SECRET environment variables",
             file=sys.stderr,
         )
         sys.exit(1)
