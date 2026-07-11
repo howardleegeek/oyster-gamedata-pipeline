@@ -68,7 +68,6 @@ def test_module_logger_present() -> None:
 
 def test_parse_spec_header_debug_log() -> None:
     """``_parse_spec_header`` reads the path with a debug log on failure."""
-    module = _load_module()
     src = TARGET.read_text()
     # Locate the function body and confirm the new log + bound name exist
     func_src_match_start = src.find("def _parse_spec_header")
@@ -88,7 +87,6 @@ def test_parse_spec_header_debug_log() -> None:
 
 def test_create_pr_debug_log() -> None:
     """``create_pr`` wraps the git diff probe in a debug log on failure."""
-    module = _load_module()
     src = TARGET.read_text()
     func_src_match_start = src.find("def create_pr")
     assert func_src_match_start != -1, "create_pr not found"
