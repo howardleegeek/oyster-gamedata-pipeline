@@ -140,7 +140,7 @@ class TestRateLimiter:
     def test_count_sessions_persisted(self):
         """Test that session count persists across calls."""
         # First call should create counter file
-        count1 = count_sessions_today()
+        count_sessions_today()
 
         # Create a session directory with yesterday's timestamp
         dir_path = self.session_dir / "clip-test"
@@ -308,7 +308,7 @@ class TestRateLimiter:
     def test_daily_counter_persists_restarts(self):
         """Test that daily counter persists across restarts."""
         # First call creates counter
-        count1 = count_sessions_today()
+        count_sessions_today()
 
         # Increment a few times
         increment_daily_counter()
