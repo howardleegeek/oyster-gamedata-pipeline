@@ -19,6 +19,12 @@
 ## Round 483 @ 2026-07-11T00:30:00Z
 
 - Picked: Fix B007 unused loop variable in bin/audit_quality_metrics.py check_recording_continuity(). The loop variable `source_type` was defined but never used. Renamed to `_source_type` per ruff convention. Choice justification: measurable code smell (B007 lint error); 1-file scope; zero risk — only renamed unused loop variable, no runtime behavior change; tests pass 3/3; ruff clean. Self-review: B007 fix only, no silent error swallows introduced, no runtime/behavior change; one logical change; one file; `git add` 1 file (NEVER `git add .`).
+- Result: committed 54a8fd9d, pushed to origin/main
+
+## Round 484 @ 2026-07-11T00:40:00Z
+
+- Picked: Fix B010 setattr with constant attribute value in bin/auto_install_error_handler.py. Replaced `setattr(sys, "_g234_original_excepthook", original_excepthook)` and `setattr(sys, _G234_HOOK_INSTALLED_FLAG, True)` with direct attribute assignments per ruff recommendation. Removed unused _G234_HOOK_INSTALLED_FLAG constant. Choice justification: measurable code smell (B010 lint error); 1-file scope; zero risk — direct attribute assignment is equivalent to setattr for known attributes; module imports cleanly; syntax verified. Self-review: B010 fix only, no silent error swallows introduced, no runtime/behavior change; one logical change; one file; `git add` 1 file (NEVER `git add .`).
+- Result: committed 55c41df5, pushed to origin/mainER `git add .`).
 - Result: committed 34a57838, pushed to origin/main
 
 ## Round 484 @ 2026-07-11T15:40:00Z
