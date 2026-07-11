@@ -48,7 +48,12 @@ class ClipAnalyzer:
             if HAS_PIL:
                 # Create colored placeholder
                 color_val = 50 + i * 30
-                img_data = f'<svg width="320" height="180"><rect width="320" height="180" fill="rgb({color_val},100,150)"/><text x="160" y="90" text-anchor="middle" fill="white">Frame {i+1}</text></svg>'
+                img_data = (
+                    f'<svg width="320" height="180">'
+                    f'<rect width="320" height="180" fill="rgb({color_val},100,150)"/>'
+                    f'<text x="160" y="90" text-anchor="middle" fill="white">Frame {i+1}</text>'
+                    f'</svg>'
+                )
                 self.preview_frames.append((img_data, timestamp))
             else:
                 self.preview_frames.append((None, timestamp))
@@ -121,7 +126,8 @@ class ClipAnalyzer:
         # Prepare lint issues
         lint_html = ""
         for issue in self.lint_results.get("issues", []):
-            color = {"critical": "danger", "warning": "warning", "info": "info"}.get(issue["type"], "info")
+            color_map = {"critical": "danger", "warning": "warning", "info": "info"}
+            color = color_map.get(issue["type"], "info")
             lint_html += f'''
             <div class="alert alert-{color}">
                 <strong>{issue["type"].upper()}</strong>: {issue["description"]}
