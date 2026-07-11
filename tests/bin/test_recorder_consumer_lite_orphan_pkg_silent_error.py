@@ -1,12 +1,10 @@
 """Regression test: _package_orphaned_active_session should log exceptions, not swallow silently."""
 
 import ast
-import pytest
 
 
 def test_no_bare_except_in_orphan_package():
     """Verify the orphan package function doesn't use bare except Exception."""
-    import sys
     from pathlib import Path
 
     source = (Path(__file__).parent.parent.parent / "bin" / "recorder_consumer_lite.py").read_text(encoding="utf-8")
@@ -35,7 +33,6 @@ def test_no_bare_except_in_orphan_package():
 
 def test_logger_imported_for_orphan_package():
     """Verify logger is imported in recorder_consumer_lite.py."""
-    import sys
     from pathlib import Path
 
     source = (Path(__file__).parent.parent.parent / "bin" / "recorder_consumer_lite.py").read_text(encoding="utf-8")
@@ -47,7 +44,6 @@ def test_logger_imported_for_orphan_package():
 
 def test_orphan_package_logs_exception():
     """Verify the orphan package function logs debug message on exception."""
-    import sys
     from pathlib import Path
 
     source = (Path(__file__).parent.parent.parent / "bin" / "recorder_consumer_lite.py").read_text(encoding="utf-8")
