@@ -333,7 +333,9 @@ def test_buyer_pdf_requirements():
         print("✓ Coordinate system: view-space")
     else:
         print(f"✗ Coordinate system: {source_info.get('coordinate_system')}")
-        assert False, f"Coordinate system is {source_info.get('coordinate_system')}, expected view_space"
+        assert False, (
+            f"Coordinate system is {source_info.get('coordinate_system')}, expected view_space"
+        )
 
     # 4. Check linearized
     if source_info.get("linearized", False):
