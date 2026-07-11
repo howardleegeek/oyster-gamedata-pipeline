@@ -249,4 +249,4 @@ def test_get_raw_input_data_failure_increments_diagnostics() -> None:
         def GetRawInputData(self, *_args: Any) -> int:
             return 0xFFFFFFFF
 
-    capture = ric.RawInputCapture(lambda _dx, _dy, _ts: None, user32=_FailingUser32())
+    ric.RawInputCapture(lambda _dx, _dy, _ts: None, user32=_FailingUser32())
