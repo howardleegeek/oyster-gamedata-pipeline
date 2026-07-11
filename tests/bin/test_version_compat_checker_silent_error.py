@@ -58,7 +58,7 @@ def _find_except_in_func(tree, func_name):
 def test_extract_version_json_except_binds_and_logs():
     """The JSON manifest parse except in extract_version_from_manifest_text
     must bind the exception and call logger.debug instead of bare `pass`."""
-    src, tree = _load_source(), ast.parse(_load_source())
+    tree = ast.parse(_load_source())
     handlers = _find_except_in_func(tree, "extract_version_from_manifest_text")
     assert handlers, "extract_version_from_manifest_text has no except blocks"
     # Find the JSONDecodeError handler
