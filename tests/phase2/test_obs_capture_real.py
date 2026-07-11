@@ -141,7 +141,7 @@ class TestOBSCaptureReal:
         mock_ws.close = AsyncMock()
         obs._ws = mock_ws
 
-        result = await obs.stop_record()
+        await obs.stop_record()
 
         # Verify opcode 6 was sent
         send_data = json.loads(mock_ws.send.call_args[0][0])
