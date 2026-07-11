@@ -165,7 +165,9 @@ def archive_old_files() -> dict:
                             item.unlink()
                             stats["deleted"] += 1
                     except (OSError, AttributeError) as exc:
-                        logger.debug("auto_archive_old_uploaded: stat/unlink failed for %s: %s", item, exc)
+                        logger.debug(
+                            "auto_archive_old_uploaded: stat/unlink failed for %s: %s", item, exc
+                        )
                         continue
         except (OSError, FileNotFoundError) as exc:
             logger.debug("Failed to iterate archive dir %s: %s", ARCHIVE_DIR, exc)
@@ -194,7 +196,9 @@ def cleanup_old_session_dirs() -> dict:
                             # Calculate size before deletion
                             dir_size = 0
                             try:
-                                dir_size = sum(f.stat().st_size for f in item.rglob('*') if f.is_file())
+                                dir_size = sum(
+                                f.stat().st_size for f in item.rglob("*") if f.is_file()
+                            )
                             except (OSError, AttributeError) as exc:
                                 logger.debug("Failed to compute size of %s: %s", item, exc)
 
@@ -203,7 +207,9 @@ def cleanup_old_session_dirs() -> dict:
                             stats["directories_removed"] += 1
                             stats["total_space_freed_gb"] += dir_size / 1e9
                     except (OSError, AttributeError) as exc:
-                        logger.debug("auto_archive_old_uploaded: rmtree/size failed for %s: %s", item, exc)
+                        logger.debug(
+                            "auto_archive_old_uploaded: rmtree/size failed for %s: %s", item, exc
+                        )
                         continue
     except (OSError, FileNotFoundError) as exc:
         logger.debug("Failed to iterate session dir %s for cleanup: %s", SESSION_DIR, exc)
