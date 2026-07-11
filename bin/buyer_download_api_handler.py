@@ -72,7 +72,7 @@ def decode_jwt(token: str, secret: str) -> Dict[str, Any]:
         payload_json = base64.urlsafe_b64decode(parts[1] + "=" * (4 - len(parts[1]) % 4))
         payload = json.loads(payload_json)
     except Exception as e:
-        raise JWTAuthError(f"Invalid payload: {e}")
+        raise JWTAuthError(f"Invalid payload: {e}") from None
     if "exp" in payload and datetime.now(timezone.utc).timestamp() > payload["exp"]:
         raise JWTAuthError("Token expired")
     signing_input = f"{parts[0]}.{parts[1]}".encode()
@@ -200,7 +200,7 @@ def create_app(jwt_secret: str, download_base_url: str) -> "FastAPI":
         try:
             return decode_jwt(credentials.credentials, jwt_secret)
         except JWTAuthError as e:
-            raise HTTPException(status_code=401, detail=str(e))
+            raise HTTPException(status_code=401, detail=str(e)) from e
 
     @app.get("/v1/buyer/clips")
     async def list_clips(
