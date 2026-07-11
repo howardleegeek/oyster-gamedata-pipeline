@@ -84,7 +84,7 @@ def create_app() -> FastAPI:
             try:
                 meta = json.loads(metadata_json)
             except json.JSONDecodeError:
-                raise HTTPException(status_code=400, detail="Invalid metadata_json")
+                raise HTTPException(status_code=400, detail="Invalid metadata_json") from None
 
         # Override with form fields
         if game:
