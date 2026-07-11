@@ -86,7 +86,10 @@ def run_tests(dns_hosts: List[str], latency_host: str, latency_port: int,
     ok, speed, elapsed = measure_upload(upload_host, upload_port, upload_size_kb, timeout)
     if not ok:
         all_passed = False
-    print(f"  {upload_host}:{upload_port}: {'PASS' if ok else 'FAIL'} ({speed:.2f} Mbps, {elapsed:.3f}s)")
+    print(
+        f"  {upload_host}:{upload_port}: {'PASS' if ok else 'FAIL'} "
+        f"({speed:.2f} Mbps, {elapsed:.3f}s)"
+    )
 
     print("\n" + "=" * 60)
     print(f"Overall: {'ALL PASSED' if all_passed else 'SOME FAILED'}")
