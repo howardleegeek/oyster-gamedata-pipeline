@@ -91,6 +91,12 @@ def _recompute_sha256sums(staging: Path) -> None:
 def _write_truthful_readme(staging: Path, *, capture_info: dict, depth_info: dict) -> None:
     """Step 5 — replace README.md with all-real disclosure."""
     readme = staging / "README.md"
+    # Build video source string inline to stay under 100 chars
+    video_src = (
+        f"{capture_info.get('width')}×{capture_info.get('height')} @ "
+        f"{capture_info.get('actual_fps', 30)} fps, "
+        f"{capture_info.get('frames_captured', 0)} frames"
+    )
     body = f"""# Oyster Buyer-Spec v1 — ALL-REAL bundle
 
 This bundle contains 100% real captured/inferred data. No placeholders.
@@ -99,7 +105,7 @@ This bundle contains 100% real captured/inferred data. No placeholders.
 
 | File | Status | Source |
 |------|--------|--------|
-| `video.mp4`           | ✅ REAL | mss screen capture, {capture_info.get('width')}×{capture_info.get('height')} @ {capture_info.get('actual_fps', 30)} fps, {capture_info.get('frames_captured', 0)} frames |
+| `video.mp4`           | ✅ REAL | mss screen capture, {video_src} |
 | `depth/*.exr`         | ✅ REAL | DepthAnything V2 ViT-S, {depth_info['frames_inferred']} frames |
 | `action_camera.json`  | ✅ REAL | per-frame bot telemetry from Mineflayer + buyer_spec_adapter |
 | `gameinfo.xlsx`       | ✅ REAL | bin/generate_gameinfo_xlsx.py |
