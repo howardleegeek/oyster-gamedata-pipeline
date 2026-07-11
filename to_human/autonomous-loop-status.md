@@ -1584,3 +1584,60 @@ No fixes available (43 hidden fixes can be enabled with the `--unsafe-fixes` opt
 
 - Picked: Remove unused F841 `result` variable in tests/phase2/test_depth_inference_pipeline.py:216 (test_video_to_depth_cleanup). Found via `ruff check --select F841` (1 hit in file; lowest-density candidate — file has exactly 1 F841 across 225+ lines, natural one-round unit). The variable was assigned the return value of `video_to_depth()` but never used — the test verifies cleanup via mkdtemp/rmtree mock tracking. Choice justification: measurable code smell (F841 lint error); 1-file scope; zero risk — removed unused local variable assignment, no runtime behavior change (the function is still called, its side effects still occur, and test assertions below are unaffected); tests pass 2/2 for this test class; ruff F841 clean. Self-review: removed 1 unused local variable; no silent error swallow, no false-success, no race/off-by-one/security risk; tests' actual logic (cleanup verification via mock tracking) unaffected; no tests masked as passing (no skip/xfail/disable); one logical change; one file; `git add` 1 file (NEVER `git add .`); brand isolation N/A (single product).
 - Result: committed 634faa6d, pushed to origin/main
+
+## Round 507 @ 2026-07-11T05:50:00Z
+
+- Picked: Remove unused F841 `original_mtime` variable in tests/test_provenance_sign_verify.py:204. Found via `ruff check --select F841` (1 hit in file; lowest-density candidate — file has exactly 1 F841 across 280+ lines, natural one-round unit). The variable was assigned but never used — test verifies keyfile behavior via existence/size checks, not via mtime comparison. Choice justification: measurable code smell (F841 lint error); 1-file scope; zero risk — removed unused local variable assignment, no runtime behavior change (test logic unchanged); tests pass 10/10; ruff F841 clean. Self-review: removed 1 unused local variable; no silent error swallow, no false-success, no race/off-by-one/security risk; test's actual logic (keyfile existence/size verification) unaffected; no tests masked as passing (no skip/xfail/disable); one logical change; one file; git add single file as required; brand isolation N/A (single product).
+- Result: committed 6c8bc50a, pushed to origin/main
+
+
+## Round 507 @ 2026-07-11T05:50:00Z
+
+- Picked: Remove unused F841  variable in tests/test_provenance_sign_verify.py:204. Found via F841 Local variable `result` is assigned to but never used
+   --> tests/phase2/test_obs_capture_real.py:144:9
+    |
+142 |         obs._ws = mock_ws
+143 |
+144 |         result = await obs.stop_record()
+    |         ^^^^^^
+145 |
+146 |         # Verify opcode 6 was sent
+    |
+help: Remove assignment to unused variable `result`
+
+F841 Local variable `dummy_data` is assigned to but never used
+   --> tests/test_onnx_inference.py:203:9
+    |
+202 |         dummy_onnx = b" " * 100
+203 |         dummy_data = b"" * 200
+    |         ^^^^^^^^^^
+204 |
+205 |         with patch("urllib.request.urlopen") as mock_urlopen:
+    |
+help: Remove assignment to unused variable `dummy_data`
+
+F841 Local variable `capture` is assigned to but never used
+   --> tests/test_raw_input_capture.py:252:5
+    |
+250 |             return 0xFFFFFFFF
+251 |
+252 |     capture = ric.RawInputCapture(lambda _dx, _dy, _ts: None, user32=_FailingUser32())
+    |     ^^^^^^^
+    |
+help: Remove assignment to unused variable `capture`
+
+F841 Local variable `extract_dir` is assigned to but never used
+   --> tests/test_recorder_lite_timestamp_sidecar.py:198:5
+    |
+196 |     tar_path = app._package_tarball("20260527-654321")
+197 |
+198 |     extract_dir = tmp_path / "extract"
+    |     ^^^^^^^^^^^
+199 |     with tarfile.open(tar_path, "r:gz") as tf:
+200 |         names = set(tf.getnames())
+    |
+help: Remove assignment to unused variable `extract_dir`
+
+Found 4 errors.
+No fixes available (4 hidden fixes can be enabled with the `--unsafe-fixes` option). (1 hit in file; lowest-density candidate — file has exactly 1 F841 across 280+ lines, natural one-round unit). The variable was assigned but never used — test verifies keyfile behavior via existence/size checks, not via mtime comparison. Choice justification: measurable code smell (F841 lint error); 1-file scope; zero risk — removed unused local variable assignment, no runtime behavior change (test logic unchanged); tests pass 10/10; ruff F841 clean. Self-review: removed 1 unused local variable; no silent error swallow, no false-success, no race/off-by-one/security risk; test's actual logic (keyfile existence/size verification) unaffected; no tests masked as passing (no skip/xfail/disable); one logical change; one file; git add single file as required; brand isolation N/A (single product).
+- Result: committed 6c8bc50a, pushed to origin/main
