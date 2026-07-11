@@ -666,9 +666,11 @@ def step10_manifest_audit(sess: pathlib.Path, target_score: Optional[int] = None
     counts: dict[str, int] = {}
     for it in items:
         counts[it.get("status", "U")] = counts.get(it.get("status", "U"), 0) + 1
-    print(
-        f"  AUDIT: PASS={counts.get('PASS', 0)} FAIL={counts.get('FAIL', 0)} SKIP={counts.get('SKIP', 0)} TOTAL={sum(counts.values())}"
-    )
+    pass_n = counts.get("PASS", 0)
+    fail_n = counts.get("FAIL", 0)
+    skip_n = counts.get("SKIP", 0)
+    total_n = sum(counts.values())
+    print(f"  AUDIT: PASS={pass_n} FAIL={fail_n} SKIP={skip_n} TOTAL={total_n}")
     fails = [it for it in items if it.get("status") == "FAIL"]
     if fails:
         print("  REMAINING FAILS:")
