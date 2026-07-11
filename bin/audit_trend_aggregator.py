@@ -72,7 +72,7 @@ def linear_slope(values):
     xs = list(range(n))
     x_mean = mean(xs)
     y_mean = mean(values)
-    num = sum((x - x_mean) * (y - y_mean) for x, y in zip(xs, values))
+    num = sum((x - x_mean) * (y - y_mean) for x, y in zip(xs, values, strict=True))
     den = sum((x - x_mean) ** 2 for x in xs)
     if den == 0:
         return 0.0

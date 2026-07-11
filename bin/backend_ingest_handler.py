@@ -379,7 +379,7 @@ def create_app() -> Any:
             raise
         except Exception as e:
             logger.error(f"Ingest error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail=str(e)) from None
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
