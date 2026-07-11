@@ -67,9 +67,6 @@ class TestRecorderConsumerLiteTraceSilentError:
         # We'll do a more direct test by re-executing the _trace logic
         # in an isolated context with a mock Path that raises on open.
 
-        # Read the module source to extract _trace function
-        source = self._read_source()
-
         # Extract just the _trace function
         import textwrap
         trace_func = textwrap.dedent("""

@@ -29,7 +29,7 @@ class TestRecorderConsumerLiteSilentError:
             "recorder_consumer_lite",
             Path(__file__).parent.parent.parent / "bin" / "recorder_consumer_lite.py"
         )
-        module = importlib.util.module_from_spec(spec)
+        importlib.util.module_from_spec(spec)
 
         # We need to check that when _STARTUP_LOG.open fails, it calls _trace
         # Read the source to verify the pattern
@@ -83,7 +83,7 @@ class TestRecorderConsumerLiteErrorSurface:
             "rcl_module",
             Path(__file__).parent.parent.parent / "bin" / "recorder_consumer_lite.py"
         )
-        module = importlib.util.module_from_spec(spec)
+        importlib.util.module_from_spec(spec)
 
         # We can't fully test without complex mocking, but verify the code path exists
         source = Path(__file__).parent.parent.parent / "bin" / "recorder_consumer_lite.py"
