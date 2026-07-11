@@ -311,7 +311,7 @@ class TestRejectSession:
 
     def test_reject_requires_reason(self, client, auth_headers_buyer):
         """Test that rejection requires a reason."""
-        response = client.post(
+        client.post(
             "/api/sessions/session_005/reject", headers=auth_headers_buyer, json={"reason": ""}
         )
         # Should still work as reason is provided (even if empty string)
