@@ -25,7 +25,9 @@ logger = logging.getLogger(__name__)
 def find_adapter_pid(adapter_name: str = "adapter") -> Optional[int]:
     """Find PID of running adapter process by name."""
     try:
-        result = subprocess.run(["pgrep", "-f", adapter_name], capture_output=True, text=True, check=False)
+        result = subprocess.run(
+            ["pgrep", "-f", adapter_name], capture_output=True, text=True, check=False
+        )
         if result.returncode == 0 and result.stdout.strip():
             return int(result.stdout.strip().split()[0])
     except (OSError, ValueError) as e:
@@ -57,7 +59,9 @@ def start_adapter(adapter_cmd: List[str], workdir: str) -> Optional[subprocess.P
         return None
 
 
-def wait_for_first_clip(clip_dir: Path, timeout: float = 60.0, poll_interval: float = 0.5) -> Tuple[bool, float]:
+def wait_for_first_clip(
+    clip_dir: Path, timeout: float = 60.0, poll_interval: float = 0.5
+) -> Tuple[bool, float]:
     """Wait for first new clip file to appear after restart."""
     start_time = time.time()
     initial_files = set(clip_dir.glob("*")) if clip_dir.exists() else set()
@@ -65,7 +69,9 @@ def wait_for_first_clip(clip_dir: Path, timeout: float = 60.0, poll_interval: fl
 
     while time.time() - start_time < timeout:
         current_files = set(clip_dir.glob("*")) if clip_dir.exists() else set()
-        new_clips = [f for f in (current_files - initial_files) if f.suffix.lower() in clip_extensions]
+        new_clips = [
+            f for f in (current_files - initial_files) if f.suffix.lower() in clip_extensions
+        ]
         if new_clips:
             logger.info("Detected new clip: %s", new_clips[0].name)
             return True, time.time() - start_time
@@ -73,7 +79,9 @@ def wait_for_first_clip(clip_dir: Path, timeout: float = 60.0, poll_interval: fl
     return False, timeout
 
 
-def run_single_trial(adapter_cmd: List[str], clip_dir: Path, workdir: str, adapter_name: str) -> Optional[float]:
+def run_single_trial(
+    adapter_cmd: List[str], clip_dir: Path, workdir: str, adapter_name: str
+) -> Optional[float]:
     """Run single crash-recovery trial and return recovery time."""
     pid = find_adapter_pid(adapter_name)
     if pid is not None and not kill_adapter(pid):
@@ -92,9 +100,15 @@ def run_single_trial(adapter_cmd: List[str], clip_dir: Path, workdir: str, adapt
 
 def main(argv: Optional[List[str]] = None) -> int:
     """Main entry point for recovery time measurement."""
-    parser = argparse.ArgumentParser(description="Measure mean time to first clip after adapter crash recovery")
-    parser.add_argument("--adapter-cmd", nargs="+", required=True, help="Command to start the adapter")
-    parser.add_argument("--clip-dir", type=Path, required=True, help="Directory to monitor for new clips")
+    parser = argparse.ArgumentParser(
+        description="Measure mean time to first clip after adapter crash recovery"
+    )
+    parser.add_argument(
+        "--adapter-cmd", nargs="+", required=True, help="Command to start the adapter"
+    )
+    parser.add_argument(
+        "--clip-dir", type=Path, required=True, help="Directory to monitor for new clips"
+    )
     parser.add_argument("--adapter-name", default="adapter", help="Adapter process name pattern")
     parser.add_argument("--trials", type=int, default=5, help="Number of crash-recovery trials")
     parser.add_argument("--timeout", type=float, default=60.0, help="Timeout per trial in seconds")
@@ -118,13 +132,21 @@ def main(argv: Optional[List[str]] = None) -> int:
             logger.error("No successful trials")
             return 1
 
+        mean_rt = sum(recovery_times) / len(recovery_times)
         results = {
-            "trials": args.trials, "successful_trials": len(recovery_times),
-            "recovery_times": recovery_times, "mean_recovery_time": sum(recovery_times) / len(recovery_times),
-            "min_recovery_time": min(recovery_times), "max_recovery_time": max(recovery_times)
+            "trials": args.trials,
+            "successful_trials": len(recovery_times),
+            "recovery_times": recovery_times,
+            "mean_recovery_time": mean_rt,
+            "min_recovery_time": min(recovery_times),
+            "max_recovery_time": max(recovery_times),
         }
-        logger.info("=== Results ===\nMean: %.2fs, Min: %.2fs, Max: %.2fs",
-                    results["mean_recovery_time"], results["min_recovery_time"], results["max_recovery_time"])
+        logger.info(
+            "=== Results ===\nMean: %.2fs, Min: %.2fs, Max: %.2fs",
+            results["mean_recovery_time"],
+            results["min_recovery_time"],
+            results["max_recovery_time"],
+        )
 
         if args.output:
             args.output.write_text(json.dumps(results, indent=2))
