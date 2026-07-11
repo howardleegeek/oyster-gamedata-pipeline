@@ -1652,3 +1652,9 @@ No fixes available (4 hidden fixes can be enabled with the `--unsafe-fixes` opti
 
 - Picked: Remove unused imports (F401) in tests/bin/test_recorder_watchdog_silent_error.py. Found 4 unused imports: patch, MagicMock, sys, Path. Choice justification: measurable code smell (F401 lint errors); 1-file scope; zero risk — only removed unused imports, no runtime behavior change; tests pass 2/2; ruff clean. Self-review: removed 4 unused imports; no silent error swallows introduced; no runtime/behavior change; one logical change; one file; brand isolation N/A (single product); git add 1 file (NEVER git add .).
 - Result: committed 213488f1, pushed to origin/main
+
+
+## Round 508 @ 2026-07-11T06:55:55Z
+
+- Picked: Remove unused F841 `extract_dir` variable in tests/test_recorder_lite_timestamp_sidecar.py:198. Found via F841 lint — variable was assigned via `tmp_path / "extract"` but never used (test verifies tarball contents via tarfile.getnames(), not extraction to disk). Choice justification: measurable code smell (F841 lint error); 1-file scope; zero risk — removed unused local variable assignment, no runtime behavior change (test logic unchanged); tests pass 4/4; ruff F841 clean. Self-review: removed 1 unused local variable; no silent error swallow, no false-success, no race/off-by-one/security risk; test's actual logic (tarfile.getnames() content verification) unaffected; no tests masked as passing (no skip/xfail/disable); one logical change; one file; git add single file as required; brand isolation N/A (single product).
+- Result: committed 35cc3b14, pushed to origin/main
