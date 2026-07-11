@@ -8,8 +8,10 @@ action metadata, and optional payload details.
 
 Usage:
     python3 bin/audit_log_writer.py --log-path audit.log --action capture --status ok
-    python3 bin/audit_log_writer.py --log-path audit.log --action lint --status error --detail "syntax error"
-    python3 bin/audit_log_writer.py --log-path audit.log --action upload --status ok --file report.xlsx
+    python3 bin/audit_log_writer.py --log-path audit.log --action lint --status \\
+        error --detail "syntax error"
+    python3 bin/audit_log_writer.py --log-path audit.log --action upload --status \\
+        ok --file report.xlsx
 """
 
 from __future__ import annotations
