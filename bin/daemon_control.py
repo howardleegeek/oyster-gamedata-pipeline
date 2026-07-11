@@ -82,7 +82,11 @@ class DaemonControl:
                             uploads = data.get('uploads_completed_last_hour', 0)
                             disk_free = data.get('disk_free_gb', 0)
 
-                            print(f"  {timestamp}: {state} | Sessions: {sessions} | Uploads: {uploads} | Disk: {disk_free:.1f} GB")
+                            msg = (
+                                f"  {timestamp}: {state} | Sessions: {sessions} | "
+                                f"Uploads: {uploads} | Disk: {disk_free:.1f} GB"
+                            )
+                            print(msg)
                         except Exception as e:
                             logger.debug("Failed to parse heartbeat line: %s", e)
                             print(f"  {line.strip()}")
