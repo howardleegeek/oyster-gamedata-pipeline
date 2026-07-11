@@ -117,7 +117,8 @@ def ensure_glacier_lifecycle(
     bucket: str, region: str, prefix: str = "backups/",
     transition_days: int = 90, expiration_days: int = 365,
 ) -> None:
-    """Apply idempotent S3 lifecycle rule: GLACIER after *transition_days*, expire after *expiration_days*."""
+    """Apply idempotent S3 lifecycle rule: GLACIER after *transition_days*,
+    expire after *expiration_days*."""
     env = os.environ.copy()
     env["AWS_DEFAULT_REGION"] = region
     policy = {
@@ -143,7 +144,11 @@ def ensure_glacier_lifecycle(
         if result.returncode != 0:
             logger.warning("Lifecycle policy rc=%d: %s", result.returncode, result.stderr)
         else:
-            logger.info("Lifecycle rule set: transition=%dd, expire=%dd", transition_days, expiration_days)
+            logger.info(
+                "Lifecycle rule set: transition=%dd, expire=%dd",
+                transition_days,
+                expiration_days,
+            )
     finally:
         os.unlink(policy_path)
 
@@ -183,7 +188,10 @@ def run_backup(
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser."""
-    p = argparse.ArgumentParser(prog="backup_orchestrator", description="Daily backup: pg_dump → S3 → Glacier.")
+    p = argparse.ArgumentParser(
+        prog="backup_orchestrator",
+        description="Daily backup: pg_dump → S3 → Glacier.",
+    )
     p.add_argument("--db-host", required=True, help="PostgreSQL host.")
     p.add_argument("--db-port", type=int, default=5432, help="PostgreSQL port (default: 5432).")
     p.add_argument("--db-name", required=True, help="Database name.")
