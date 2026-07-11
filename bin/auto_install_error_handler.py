@@ -142,7 +142,7 @@ def _uninstall_hooks() -> bool:
 
 def is_installed() -> bool:
     """Check if G234 hooks are currently installed."""
-    return getattr(sys, _G234_HOOK_INSTALLED_FLAG, False)
+    return getattr(sys, "_g234_error_hooks_installed", False)
 
 
 def main(argv: Optional[list[str]] = None) -> int:
