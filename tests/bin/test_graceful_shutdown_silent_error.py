@@ -59,7 +59,6 @@ def test_handler_swallows_close_exception_with_log(
     manager._original_handler = None
 
     # Build a tarfile that raises on close().
-    tmpdir = caplog._log_root if hasattr(caplog, "_log_root") else None
     import tempfile
     tmp = tempfile.mkdtemp(prefix="g130_handler_test_")
     path = Path(tmp) / "boom.tar"
