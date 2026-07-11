@@ -7,7 +7,6 @@ have been fixed to bind the exception and log at DEBUG level.
 """
 
 import ast
-import sys
 from pathlib import Path
 
 
@@ -32,7 +31,7 @@ def test_no_bare_except_with_exception_binding():
                     )
 
     assert not bare_except_violations, (
-        f"Found bare except Exception without binding:\n" + "\n".join(bare_except_violations)
+        "Found bare except Exception without binding:\n" + "\n".join(bare_except_violations)
     )
 
 
