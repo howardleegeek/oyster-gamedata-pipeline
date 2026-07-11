@@ -103,11 +103,16 @@ class AuditLog:
         cursor = self.conn.cursor()
         uploaded_at = datetime.now(timezone.utc).isoformat()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO submissions
-            (vendor_id, batch_id, clip_id, sha256, size_bytes, uploaded_at, lint_status, lint_details)
+            (vendor_id, batch_id, clip_id, sha256, size_bytes,
+             uploaded_at, lint_status, lint_details)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (vendor_id, batch_id, clip_id, sha256, size_bytes, uploaded_at, lint_status, lint_details))
+            """,
+            (vendor_id, batch_id, clip_id, sha256,
+             size_bytes, uploaded_at, lint_status, lint_details),
+        )
 
         self.conn.commit()
         return cursor.lastrowid
@@ -118,7 +123,11 @@ class AuditLog:
         event_type: str,
         message: str,
     ) -> None:
-        """Insert event. event_type in {received, lint_pass, lint_fail, accepted, rejected, billed}."""
+        """Insert event.
+
+        event_type in {received, lint_pass, lint_fail,
+                       accepted, rejected, billed}.
+        """
         if not self.conn:
             raise RuntimeError("Database not connected. Use with context manager.")
 
