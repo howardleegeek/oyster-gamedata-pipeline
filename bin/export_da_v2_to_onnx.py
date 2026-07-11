@@ -203,7 +203,8 @@ def main():
         mean_diff = diff.mean()
         rel_diff = mean_diff / (np.abs(pt_depth).mean() + 1e-9)
         print(
-            f"  Output diff vs PyTorch: max={max_diff:.4f}, mean={mean_diff:.4f}, rel={rel_diff * 100:.2f}%"
+            f"  Output diff vs PyTorch: max={max_diff:.4f}, mean={mean_diff:.4f}, "
+            f"rel={rel_diff * 100:.2f}%"
         )
         status = "PASS" if rel_diff < 0.01 else "WARN" if rel_diff < 0.05 else "FAIL"
         print(f"  EQUIVALENCE: {status}")
