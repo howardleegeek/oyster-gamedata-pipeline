@@ -516,27 +516,43 @@ class AlertDispatcher:
                 threshold = self.thresholds["health_check_consecutive_failures"]
 
                 if failures >= threshold:
-                    should_fire, fire_type = self.state_manager.should_fire(alert_id, is_active=True)
+                    should_fire, fire_type = self.state_manager.should_fire(
+                        alert_id, is_active=True
+                    )
                     if should_fire:
                         self.state_manager.record_fire(alert_id, fire_type)
 
                         last_success = self._time_ago(
-                            result.get("timestamp") if self.last_success_time.get(name) else None
+                            result.get("timestamp")
+                            if self.last_success_time.get(name)
+                            else None
                         )
                         if self.last_success_time.get(name):
+                            ts = self.last_success_time[name]
                             last_success = self._time_ago(
-                                datetime.fromtimestamp(self.last_success_time[name], tz=timezone.utc).isoformat()
+                                datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
                             )
 
-                        severity = AlertSeverity.CRITICAL if fire_type == "escalation" else AlertSeverity.WARNING
-                        title_suffix = "still failing" if fire_type == "escalation" else "health check failed"
+                        is_escalation = fire_type == "escalation"
+                        severity = (
+                            AlertSeverity.CRITICAL
+                            if is_escalation
+                            else AlertSeverity.WARNING
+                        )
+                        title_suffix = (
+                            "still failing" if is_escalation else "health check failed"
+                        )
 
+                        msg = (
+                            f"{name} health check has failed {failures} consecutive "
+                            f"times (threshold: {threshold})."
+                        )
                         alert = Alert(
                             alert_id=alert_id,
                             component=name,
                             severity=severity,
                             title=f"{name} {title_suffix}",
-                            message=f"{name} health check has failed {failures} consecutive times (threshold: {threshold}).",
+                            message=msg,
                             action=f"Check {name} service status and logs.",
                             last_success=last_success,
                             last_error=self.last_error_msg.get(name, "Unknown"),
@@ -569,14 +585,28 @@ class AlertDispatcher:
                     action="No action needed — auto-cleared.",
                 )
             else:
-                severity = AlertSeverity.CRITICAL if fire_type == "escalation" else AlertSeverity.WARNING
-                title_suffix = "still exceeding threshold" if fire_type == "escalation" else "exceeds threshold"
+                is_escalation = fire_type == "escalation"
+                severity = (
+                    AlertSeverity.CRITICAL
+                    if is_escalation
+                    else AlertSeverity.WARNING
+                )
+                title_suffix = (
+                    "still exceeding threshold"
+                    if is_escalation
+                    else "exceeds threshold"
+                )
+                file_count = backlog.get("file_count", 0)
+                msg = (
+                    f"Upload backlog is {backlog_gb} GB (threshold: {threshold} GB). "
+                    f"{file_count} files pending."
+                )
                 alert = Alert(
                     alert_id=alert_id,
                     component="upload_backlog",
                     severity=severity,
                     title=f"Upload backlog {title_suffix}",
-                    message=f"Upload backlog is {backlog_gb} GB (threshold: {threshold} GB). {backlog.get('file_count', 0)} files pending.",
+                    message=msg,
                     action="Check upload daemon and network connectivity.",
                     recent_samples=f"{backlog_gb} GB / {threshold} GB limit",
                 )
@@ -607,18 +637,29 @@ class AlertDispatcher:
                     action="No action needed — auto-cleared.",
                 )
             else:
-                severity = AlertSeverity.CRITICAL if fire_type == "escalation" else AlertSeverity.WARNING
-                title_suffix = "still high" if fire_type == "escalation" else "exceeds threshold"
+                is_escalation = fire_type == "escalation"
+                severity = (
+                    AlertSeverity.CRITICAL
+                    if is_escalation
+                    else AlertSeverity.WARNING
+                )
+                title_suffix = "still high" if is_escalation else "exceeds threshold"
                 sample_errors = error_rate.get("sample_errors", [])
+                error_count = error_rate.get("error_count", 0)
+                window_minutes = error_rate.get("window_minutes", 5)
+                msg = (
+                    f"Error rate is {rate}/min (threshold: {threshold}/min). "
+                    f"{error_count} errors in last {window_minutes} min."
+                )
                 alert = Alert(
                     alert_id=alert_id,
                     component="error_rate",
                     severity=severity,
                     title=f"Error rate {title_suffix}",
-                    message=f"Error rate is {rate}/min (threshold: {threshold}/min). {error_rate.get('error_count', 0)} errors in last {error_rate.get('window_minutes', 5)} min.",
+                    message=msg,
                     action="Check log files in ~/.oyster/ for root cause.",
                     last_error=sample_errors[0] if sample_errors else None,
-                    recent_samples=f"{error_rate.get('error_count', 0)} errors in {error_rate.get('window_minutes', 5)} min",
+                    recent_samples=f"{error_count} errors in {window_minutes} min",
                 )
             alerts.append(alert)
 
@@ -641,24 +682,38 @@ class AlertDispatcher:
         if should_fire:
             self.state_manager.record_fire(alert_id, fire_type)
 
+            host = disk.get("host", "minipc1")
             if fire_type == "cleared":
+                msg = (
+                    f"Free disk on {host} is now {free_gb} GB "
+                    f"(threshold: {threshold} GB)."
+                )
                 alert = Alert(
                     alert_id=alert_id,
                     component="disk",
                     severity=AlertSeverity.INFO,
                     title="Disk space recovered",
-                    message=f"Free disk on {disk.get('host', 'minipc1')} is now {free_gb} GB (threshold: {threshold} GB).",
+                    message=msg,
                     action="No action needed — auto-cleared.",
                 )
             else:
-                severity = AlertSeverity.CRITICAL if fire_type == "escalation" else AlertSeverity.WARNING
-                title_suffix = "critically low" if fire_type == "escalation" else "low"
+                is_escalation = fire_type == "escalation"
+                severity = (
+                    AlertSeverity.CRITICAL
+                    if is_escalation
+                    else AlertSeverity.WARNING
+                )
+                title_suffix = "critically low" if is_escalation else "low"
+                msg = (
+                    f"Free disk on {host} is {free_gb} GB "
+                    f"(threshold: {threshold} GB)."
+                )
                 alert = Alert(
                     alert_id=alert_id,
                     component="disk",
                     severity=severity,
-                    title=f"Disk space {title_suffix} on {disk.get('host', 'minipc1')}",
-                    message=f"Free disk on {disk.get('host', 'minipc1')} is {free_gb} GB (threshold: {threshold} GB).",
+                    title=f"Disk space {title_suffix} on {host}",
+                    message=msg,
                     action="Clean up old logs, recordings, or expand storage.",
                     recent_samples=f"{free_gb} GB free / {threshold} GB minimum",
                 )
@@ -678,26 +733,39 @@ class AlertDispatcher:
         if should_fire:
             self.state_manager.record_fire(alert_id, fire_type)
 
+            daemon_state = daemon_stuck.get("daemon_state", "unknown")
+            state_age = daemon_stuck.get("state_age_minutes", 0)
             if fire_type == "cleared":
+                msg = f"Daemon state changed from {daemon_state}."
                 alert = Alert(
                     alert_id=alert_id,
                     component="daemon",
                     severity=AlertSeverity.INFO,
                     title="Daemon recovered from stuck state",
-                    message=f"Daemon state changed from {daemon_stuck.get('daemon_state', 'unknown')}.",
+                    message=msg,
                     action="No action needed — auto-cleared.",
                 )
             else:
-                severity = AlertSeverity.CRITICAL if fire_type == "escalation" else AlertSeverity.WARNING
-                title_suffix = "still stuck" if fire_type == "escalation" else "stuck"
+                is_escalation = fire_type == "escalation"
+                severity = (
+                    AlertSeverity.CRITICAL
+                    if is_escalation
+                    else AlertSeverity.WARNING
+                )
+                title_suffix = "still stuck" if is_escalation else "stuck"
+                game_growing = daemon_stuck.get("game_state_growing", "unknown")
+                msg = (
+                    f"Daemon has been in state '{daemon_state}' for {state_age} min "
+                    f"(threshold: {threshold} min). Game state growing: {game_growing}."
+                )
                 alert = Alert(
                     alert_id=alert_id,
                     component="daemon",
                     severity=severity,
                     title=f"Recorder daemon {title_suffix}",
-                    message=f"Daemon has been in state '{daemon_stuck.get('daemon_state', 'unknown')}' for {daemon_stuck.get('state_age_minutes', 0)} min (threshold: {threshold} min). Game state growing: {daemon_stuck.get('game_state_growing', 'unknown')}.",
+                    message=msg,
                     action="Restart recorder daemon or check for disk I/O issues.",
-                    recent_samples=f"State: {daemon_stuck.get('daemon_state', 'unknown')}, Age: {daemon_stuck.get('state_age_minutes', 0)} min",
+                    recent_samples=f"State: {daemon_state}, Age: {state_age} min",
                 )
             alerts.append(alert)
 
@@ -725,7 +793,10 @@ class AlertDispatcher:
 
         # Send all alerts
         for alert in all_alerts:
-            log.info(f"Firing alert [{alert.fire_type if hasattr(alert, 'fire_type') else 'unknown'}]: {alert.title}")
+            fire_type = (
+                alert.fire_type if hasattr(alert, "fire_type") else "unknown"
+            )
+            log.info(f"Firing alert [{fire_type}]: {alert.title}")
             self.webhook_sender.send_all(alert)
 
         # Try to flush offline queue
