@@ -1428,3 +1428,18 @@ No fixes available (43 hidden fixes can be enabled with the `--unsafe-fixes` opt
 
 - Picked: Remove 4 unused F841 `src` variables in tests/bin/test_diag_bundle_collector_silent_error.py. Found via `ruff check --select F841` (4 hits). Removed unused `src` variable assignments from 4 test functions - each test only needed the parsed AST tree, not the raw source string. Choice justification: measurable code smell (F841 lint error); 1-file scope; zero risk — removed unused variable assignments, no runtime behavior change; tests pass 7/7; ruff clean. Self-review: removed 4 unused variables; no silent error swallows introduced; no runtime/behavior change; one logical change; one file.
 - Result: committed 082988c8, pushed to origin/main
+
+## Round 484 @ 2026-07-11T00:40:00Z
+
+- Picked: Remove 5 unused MagicMock vars in tests/bin/test_recorder_eula_first_run_silent_error.py. Found via `ruff check --select F841` (5 hits: mock_tk, mock_frame, mock_label, mock_text, mock_btn). Removed unused variable assignments - test uses AST inspection rather than runtime mocking, so these were dead code. Choice justification: measurable code smell (F841 lint error); 1-file scope; zero risk — only removed unused variable assignments, no runtime behavior change; tests pass 2/2 (2 skipped due to no tkinter in CI); ruff clean. Self-review: removed 5 unused variables; no silent error swallows introduced; no runtime/behavior change; one logical change; one file.
+- Result: committed 7ebb64bb, pushed to origin/main
+
+## Round 485 @ 2026-07-10T23:56:35Z
+
+- Picked: Remove unused F841 body_stmts variable in tests/bin/test_fetch_fabric_silent_error.py. Found via `ruff check --select F841` (1 hit). Removed unused body_stmts variable assignment - the code filtered for Pass statements but never used the result (only non_pass was used later). Choice justification: measurable code smell (F841 lint error); 1-file scope; zero risk — removed unused variable assignment, no runtime behavior change; tests pass 9/9; ruff clean. Self-review: removed 1 unused variable; no silent error swallows introduced; no runtime/behavior change; one logical change; one file.
+- Result: committed ef853e72, pushed to origin/main
+
+## Round 486 @ 2026-07-11T01:00:00Z
+
+- Picked: Remove unused F841 `src` variable in tests/bin/test_recorder_consumer_lite_fsync_silent_error.py. Found via `ruff check --select F841 tests/` (1 hit in file). The line `src, tree = _load_source(), ast.parse(_load_source())` had `src` unused — only `tree` is consumed by `_find_except_in_func`. Replaced with `tree = ast.parse(_load_source())`. Choice justification: measurable code smell (F841 lint error); 1-file scope; 1-line fix; zero risk — removed unused local variable in test code, no runtime behavior change; tests pass 4/4 (no skip/xfail/disable); ruff F841 clean for the file. Self-review: one-line removal; no silent error swallow, no false-success, no race/off-by-one/security risk; tree still derived from same `_load_source()` call (same source string); `ast.unparse(h)` inside the test still produces the same body check; one logical change; one file; `git add` 1 file (NEVER `git add .`); brand isolation N/A (single product).
+- Result: committed 5e4dde48, pushed to origin/main
