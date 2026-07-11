@@ -24,12 +24,12 @@ def find_node_executable() -> str:
             capture_output=True, text=True, timeout=10,
         )
     except subprocess.TimeoutExpired:
-        raise RuntimeError("node --version timed out")
+        raise RuntimeError("node --version timed out") from None
     version_str = result.stdout.strip().lstrip("v")
     try:
         major = int(version_str.split(".")[0])
     except (ValueError, IndexError):
-        raise RuntimeError(f"Cannot parse node version: {version_str!r}")
+        raise RuntimeError(f"Cannot parse node version: {version_str!r}") from None
     if major < 18:
         raise RuntimeError(f"node >= 18 required, found {version_str}")
     return node
