@@ -16,6 +16,11 @@
 - Picked: Re-fix test_generate_systeminfo_json_silent_error.py line number drift (Round 480 had wrong direction). The test was updated to 111 but the actual except handler is at line 110. Corrected SITE_LINES from 111 back to 110. Verified via AST that line 110 has the except handler for xdotool getwindowgeometry. Tests pass 4/4, ruff clean. Self-review: line number update only, no code behavior change, no silent error swallow introduced.
 - Result: committed 54a8fd9d, pushed to origin/main
 
+## Round 536 @ 2026-07-11T23:27:32Z
+
+- Picked: Wrap E501 long line (101>100) in bin/vendor_scenario_first_clip.py:47 — extracted the inline `[workspace / "clips", ...]` list to a local `subdirs` variable. Found via `ruff check --select E501 bin/` (1 hit in file; lowest-density bounded candidate — file has exactly 1 E501). Choice justification: measurable code smell (E501 lint); 1-file scope is natural one-round unit; zero risk — pure list-extraction, loop body and Path operands unchanged, semantically identical (verified: pytest tests/bin/test_vendor_scenario_first_clip_silent_error.py 4/4 pass). Self-review: E501 line-wrap + list-extraction only; no runtime/behavior change; no silent error swallow introduced; no security/race/off-by-one/false-success risk; no tests masked as passing (no skip/xfail/disable, 4/4 pass cleanly); one logical change; one file; brand isolation N/A (single product); `git add` 1 file (NEVER `git add .`).
+- Result: committed 1a8d7404, pushed to origin/main
+
 ## Round 483 @ 2026-07-11T00:30:00Z
 
 - Picked: Fix B007 unused loop variable in bin/audit_quality_metrics.py check_recording_continuity(). The loop variable `source_type` was defined but never used. Renamed to `_source_type` per ruff convention. Choice justification: measurable code smell (B007 lint error); 1-file scope; zero risk — only renamed unused loop variable, no runtime behavior change; tests pass 3/3; ruff clean. Self-review: B007 fix only, no silent error swallows introduced, no runtime/behavior change; one logical change; one file; `git add` 1 file (NEVER `git add .`).
