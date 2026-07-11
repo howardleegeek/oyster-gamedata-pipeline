@@ -441,17 +441,14 @@ def main(argv: List[str]) -> int:
     # Apply fixes
     success = True
 
-    if black_files:
-        if not apply_black_fix(black_files):
-            success = False
+    if black_files and not apply_black_fix(black_files):
+        success = False
 
-    if ruff_files:
-        if not apply_ruff_fix(ruff_files):
-            success = False
+    if ruff_files and not apply_ruff_fix(ruff_files):
+        success = False
 
-    if missing_imports:
-        if not add_missing_imports(missing_imports):
-            success = False
+    if missing_imports and not add_missing_imports(missing_imports):
+        success = False
 
     if not success:
         print("Some fixes failed to apply.", file=sys.stderr)
