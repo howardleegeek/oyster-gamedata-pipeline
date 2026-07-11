@@ -436,7 +436,8 @@ def main():
     CLI: score a session from a JSON input file.
 
     Usage:
-        python bin/quality_scorer.py <session_data.json> [--batch <batch_scores.json>] [--config <config.yaml>] [--output <output.json>]
+        python bin/quality_scorer.py <session_data.json>
+            [--batch <batch_scores.json>] [--config <config.yaml>] [--output <output.json>]
     """
     import argparse
 
