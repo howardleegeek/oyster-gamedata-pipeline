@@ -95,7 +95,11 @@ def test_no_bare_time_ago_except():
 
         if in_time_ago:
             # Look for bare except pattern
-            if "except (ValueError, TypeError):" in line or "except (TypeError, ValueError):" in line:
+            is_valueerror_typeerror_except = (
+                "except (ValueError, TypeError):" in line
+                or "except (TypeError, ValueError):" in line
+            )
+            if is_valueerror_typeerror_except:
                 # Check next few lines for just 'pass' or 'return'
                 next_lines = "\n".join(lines[i+1:i+3])
                 assert "pass" not in next_lines or "log.debug" in next_lines, (
