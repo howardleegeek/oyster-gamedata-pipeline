@@ -116,7 +116,7 @@ def _parse_options_txt(path: Path, warnings: List[str]) -> Dict[str, Any]:
     except OSError as exc:
         warnings.append(f"options.txt unreadable: {exc}")
         return parsed
-    for line_no, raw_line in enumerate(text.splitlines(), start=1):
+    for _line_no, raw_line in enumerate(text.splitlines(), start=1):
         line = raw_line.strip()
         if not line or line.startswith("#") or ":" not in line:
             continue
