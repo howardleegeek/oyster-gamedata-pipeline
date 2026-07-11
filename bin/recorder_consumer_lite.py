@@ -672,7 +672,17 @@ class InputCapture:
                     "mouseY": int(y),
                 })
 
-        def on_click(x, y, button, pressed):  # noqa: ANN001
+        def on_click(x: float, y: float, button: Any, pressed: bool) -> None:
+            """Handle mouse click events from pynput.
+
+            Records mouse click events to the event log for later replay.
+
+            Args:
+                x: X coordinate where the click occurred.
+                y: Y coordinate where the click occurred.
+                button: The mouse button that was clicked.
+                pressed: True if button was pressed, False if released.
+            """
             with self._lock:
                 self.events.append({
                     "timestamp_ms": self._now_ms(),
