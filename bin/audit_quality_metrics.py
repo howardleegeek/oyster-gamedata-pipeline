@@ -625,7 +625,7 @@ def check_camera_position_range(session) -> Dict[str, Any]:
             ('frames_jsonl_path', 'frames')  # frames might have camera info
         ]
 
-        for attr_name, source_type in sources:
+        for attr_name, _source_type in sources:
             path = getattr(session, attr_name, None)
             if path and os.path.exists(path):
                 # Bug-fix 2026-05-16: action_camera.json is a single JSON ARRAY of
