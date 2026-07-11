@@ -649,7 +649,14 @@ class InputCapture:
 
         self._start_time = time.time()
 
-        def on_press(key):  # noqa: ANN001
+        def on_press(key: Any) -> None:
+            """Handle keyboard key press events from pynput.
+
+            Records key-down events to the event log for later replay.
+
+            Args:
+                key: The pynput key object (Key or KeyCode) that was pressed.
+            """
             self._record_key(key, "key_down")
 
         def on_release(key):  # noqa: ANN001
