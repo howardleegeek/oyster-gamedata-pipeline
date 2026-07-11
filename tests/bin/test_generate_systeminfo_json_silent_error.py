@@ -5,10 +5,10 @@ dropped with bare ``except SomeError: pass``:
 
   1. ``detect_screen_dpi`` (line 50): xrandr ``scale factor: 1.5`` parser
      that drops ValueError when the line is unparseable.
-  2. ``detect_screen_dpi`` (line 52): outer catch for the whole probe
+  2. ``detect_screen_dpi`` (line 56): outer catch for the whole probe
      block (subprocess failure / file not found / value error) — used to
      fall through to the default DPI without any log trail.
-  3. ``detect_window_geometry`` (line 110): xdotool ``getwindowgeometry``
+  3. ``detect_window_geometry`` (line 115): xdotool ``getwindowgeometry``
      outer catch — used to silently fall through to the 1920x1080 default
      even when the host was missing xdotool.
 
@@ -37,7 +37,7 @@ TARGET = REPO_ROOT / "bin" / "generate_systeminfo_json.py"
 
 # Anchor line numbers (will shift slightly if the file is refactored, but
 # the pattern is: parse ValueError < outer SubprocessError < xdotool outer).
-SITE_LINES = (50, 52, 110)
+SITE_LINES = (50, 56, 115)
 
 
 def _load_module():

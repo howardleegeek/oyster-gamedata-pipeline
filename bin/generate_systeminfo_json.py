@@ -48,7 +48,11 @@ def detect_screen_dpi() -> float:
                                 if dpi > 0:
                                     return dpi
                             except ValueError as e:
-                                logger.debug("generate_systeminfo: xrandr scale-factor parse failed on line %r: %s", line, e)
+                                logger.debug(
+                                    "generate_systeminfo: xrandr scale-factor parse failed on line %r: %s",
+                                    line,
+                                    e,
+                                )
     except (subprocess.SubprocessError, FileNotFoundError, ValueError) as e:
         logger.debug("generate_systeminfo: detect_screen_dpi probe failed: %s", e)
 
@@ -99,8 +103,9 @@ def detect_window_geometry(window_title: str = "Minecraft") -> dict:
                     if "=" in line:
                         key, value = line.split("=", 1)
                         geometry[key] = value
-                
-                if "X" in geometry and "Y" in geometry and "WIDTH" in geometry and "HEIGHT" in geometry:
+
+                has_all_geo = all(k in geometry for k in ("X", "Y", "WIDTH", "HEIGHT"))
+                if has_all_geo:
                     return {
                         "x": int(geometry["X"]),
                         "y": int(geometry["Y"]),
