@@ -27,7 +27,8 @@ class TestDashboardServerSilentError:
                         if len(child.body) == 1 and isinstance(child.body[0], ast.Pass):
                             exc_type = ast.unparse(child.type) if child.type else "Exception"
                             pytest.fail(
-                                f"Found bare pass in {exc_type} handler in verify_session_provenance. "
+                                f"Found bare pass in {exc_type} handler in "
+                                f"verify_session_provenance. "
                                 "Should use logger.debug() to bind the exception."
                             )
 

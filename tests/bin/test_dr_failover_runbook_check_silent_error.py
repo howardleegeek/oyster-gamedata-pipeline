@@ -75,9 +75,10 @@ class TestDRFailoverRunbookCheckSilentError:
         debug_records = [
             r for r in caplog.records if r.levelno == logging.DEBUG
         ]
+        bound_msg = [r.getMessage() for r in debug_records]
         assert any(
-            "synthetic urlparse failure" in r.getMessage() for r in debug_records
-        ), f"Expected DEBUG log to bind the exception, got: {[r.getMessage() for r in debug_records]}"
+            "synthetic urlparse failure" in msg for msg in bound_msg
+        ), f"Expected DEBUG log to bind the exception, got: {bound_msg}"
 
     def test_parse_url_happy_path_unaffected(self):
         """Valid URL still returns the expected component dict — no

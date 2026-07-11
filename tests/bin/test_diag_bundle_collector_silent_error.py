@@ -91,7 +91,10 @@ def test_collect_bundle_log_copy_except_binds_and_logs():
     handlers = _find_except_in_func(tree, "collect_bundle")
     assert handlers, "collect_bundle has no except blocks"
     # Find the one referencing /logs_dir copy
-    log_handlers = [h for ln, h in handlers if "lf, exc" in ast.unparse(h) or " lf," in ast.unparse(h) or "lf " in ast.unparse(h)]
+    log_handlers = [
+        h for ln, h in handlers
+        if "lf, exc" in ast.unparse(h) or " lf," in ast.unparse(h) or "lf " in ast.unparse(h)
+    ]
     assert log_handlers, "log copy except block not found"
     h = log_handlers[0]
     assert h.name is not None, "log copy except must bind exception to a name"
@@ -121,8 +124,8 @@ def test_collect_bundle_manifest_copy_except_binds_and_logs():
 def test_no_bare_except_pass_silent_swallows():
     """None of the 4 swallow sites may be a bare `except X: pass` pattern."""
     src = _load_source()
-    # 4 targeted lines must all bind 'as exc' (or another name) AND call logger.debug
-    # Simple check: no `except ...:\n        pass` or `except ...:\n            pass` near logger.debug lines
+    # 4 targeted lines must all bind 'as exc' (or another name)
+    # AND call logger.debug. Simple check: no `except ...:\n pass`
     bad_swallows = []
     tree = ast.parse(src)
     for node in ast.walk(tree):

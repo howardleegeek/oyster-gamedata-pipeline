@@ -40,7 +40,8 @@ class TestCanonicalPipelineSilentError:
                             for stmt in node.body:
                                 for child in ast.walk(stmt):
                                     if isinstance(child, ast.Call):
-                                        if hasattr(child.func, 'id') and child.func.id == 'ffprobe_frames':
+                                        if (hasattr(child.func, 'id')
+                                        and child.func.id == 'ffprobe_frames'):
                                             pytest.fail(
                                                 f"Found bare 'except Exception:' "
                                                 f"(no 'as' binding) around ffprobe_frames() call "

@@ -12,9 +12,13 @@ def test_no_bare_except():
     for node in ast.walk(tree):
         if isinstance(node, ast.ExceptHandler):
             # Bare except or except Exception without binding
-            if node.type is None or (
-                isinstance(node.type, ast.Name) and node.type.id == "Exception" and node.name is None
-            ):
+            is_bare = node.type is None
+            is_unbound_exception = (
+                isinstance(node.type, ast.Name)
+                and node.type.id == "Exception"
+                and node.name is None
+            )
+            if is_bare or is_unbound_exception:
                 raise AssertionError(f"Bare except at line {node.lineno}: {ast.unparse(node)}")
 
 

@@ -163,9 +163,13 @@ def generate_template(
     main_class = str(leaf.get("mainClass") or "")
     expected_main = str(fabric_pin.get("expected_main_class") or EXPECTED_MAIN_CLASS)
     if main_class != expected_main:
-        raise RuntimeError(f"Fabric mainClass mismatch: got {main_class!r}, expected {expected_main!r}")
+        raise RuntimeError(
+            f"Fabric mainClass mismatch: got {main_class!r}, expected {expected_main!r}"
+        )
 
-    asset_index = str(((parent.get("assetIndex") or {}).get("id")) or mc_pin.get("asset_index_id") or "19")
+    asset_index = str(
+        (parent.get("assetIndex") or {}).get("id")
+    ) or mc_pin.get("asset_index_id") or "19"
     classpath = _resolve_classpath(
         instance_dir=instance_dir,
         leaf=leaf,
