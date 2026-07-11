@@ -166,10 +166,6 @@ class TestSigning:
         signature = signing_key.sign_json(data)
 
         # Need to use the same key_dir for verification
-        from oyster_provenance.sign import load_or_create_keypair
-
-        loaded_key = load_or_create_keypair(key_dir)
-
         from oyster_provenance.sign import verify_json_signature as verify
 
         assert verify(data, signature, Path(key_dir) / "signing_key.pub") is True
