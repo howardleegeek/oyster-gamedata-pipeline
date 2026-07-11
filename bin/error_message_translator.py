@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""error_message_translator.py — Convert internal exception traces into vendor-friendly remediation messages.
+"""error_message_translator.py — Convert internal exception traces into
+vendor-friendly remediation messages.
 
 Usage:
     python3 bin/error_message_translator.py [--input FILE] [--format text|json] [--verbose]
