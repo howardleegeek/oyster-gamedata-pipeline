@@ -213,7 +213,7 @@ class TestVideoToDepth:
         monkeypatch.setattr("depth_inference_pipeline.extract_frames", mock_extract_frames)
         monkeypatch.setattr("depth_inference_pipeline.infer_depth", mock_infer_depth)
 
-        result = video_to_depth(video_path, output_dir, cleanup=True)
+        video_to_depth(video_path, output_dir, cleanup=True)
 
         # Verify temp directory was created
         assert len(mkdtemp_calls) == 1
