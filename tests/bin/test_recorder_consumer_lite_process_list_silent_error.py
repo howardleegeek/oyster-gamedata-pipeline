@@ -12,7 +12,6 @@ Round 325: Surface silent errors in _list_windows_processes()
 """
 
 import ast
-import sys
 from pathlib import Path
 
 

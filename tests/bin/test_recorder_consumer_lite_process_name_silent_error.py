@@ -12,8 +12,6 @@ Round 322: Fix silent errors in _windows_process_name_for_pid
 import ast
 from pathlib import Path
 
-import pytest
-
 
 class TestRecorderConsumerLiteProcessNameSilentError:
     """Tests for silent error handling in _windows_process_name_for_pid()."""
