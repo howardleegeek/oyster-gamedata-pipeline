@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""G127 · Idempotency Token Generator — per-clip UUID with at-least-once dedup on backend ingest path."""
+"""G127 · Idempotency Token Generator — per-clip UUID with at-least-once dedup."""
 
 import argparse
 import hashlib
