@@ -209,7 +209,7 @@ def render_dashboard():
 
     with col2:
         st.subheader("Session Distribution")
-        labels = [f"Type {rt}" for rt in stats["route_counts"].keys()]
+        labels = [f"Type {rt}" for rt in stats["route_counts"]]
         values = [rc["total"] for rc in stats["route_counts"].values()]
         if sum(values) > 0:
             fig = px.pie(values=values, names=labels, title="Sessions by Route Type")
