@@ -14,9 +14,13 @@ def test_no_bare_except():
         if isinstance(node, ast.ExceptHandler):
             # Bare except or except Exception without binding
             if node.type is None or (
-                isinstance(node.type, ast.Name) and node.type.id == "Exception" and node.name is None
+                isinstance(node.type, ast.Name)
+                and node.type.id == "Exception"
+                and node.name is None
             ):
-                raise AssertionError(f"Bare except at line {node.lineno}: {ast.unparse(node)}")
+                raise AssertionError(
+                    f"Bare except at line {node.lineno}: {ast.unparse(node)}"
+                )
 
 # Test 2: logger is imported
 def test_logger_imported():
