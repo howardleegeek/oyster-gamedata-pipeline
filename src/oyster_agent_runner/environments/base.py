@@ -155,6 +155,14 @@ class MockEnvironment:
         self._last_frame: bytes | None = None
 
     def reset(self, seed: int | None = None) -> Observation:
+        """Start a fresh episode, optionally seeded for determinism.
+
+        Args:
+            seed: Optional seed for reproducible episodes. Defaults to 0.
+
+        Returns:
+            Initial observation dict with {"step": 0, "last_action": None, "seed": seed}.
+        """
         if self._is_shutdown:
             raise RuntimeError("MockEnvironment is shut down; create a new instance.")
         self._step_count = 0
