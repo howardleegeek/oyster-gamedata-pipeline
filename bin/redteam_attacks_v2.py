@@ -70,7 +70,10 @@ def attack_timestamp_regression(inp: str, out: str, factor: float = 0.5) -> int:
         if not lines:
             return 1
         header = lines[0].split(',')
-        ts_idx = next((i for i, c in enumerate(header) if 'ts' in c.lower() or 'time' in c.lower()), 0)
+        ts_idx = next(
+            (i for i, c in enumerate(header) if 'ts' in c.lower() or 'time' in c.lower()),
+            0,
+        )
         out_lines, prev_ts = [lines[0]], None
         for line in lines[1:]:
             if not line.strip():
