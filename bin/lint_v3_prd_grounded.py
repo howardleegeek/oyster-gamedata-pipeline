@@ -133,7 +133,8 @@ class LintReport:
     """Complete lint report for a data package."""
     data_dir: Path
     results: List[LintResult] = field(default_factory=list)
-    total_checks: int = 38  # rc19: 32 base + #38 audio continuity + #39-43 (latency, WASD, stationary, frozen, AAC)
+    # rc19: 32 base + #38 audio continuity + #39-43 (latency, WASD, stationary, frozen, AAC)
+    total_checks: int = 38
     passed_count: int = 0
     failed_count: int = 0
 
