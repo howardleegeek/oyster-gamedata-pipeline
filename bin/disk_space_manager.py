@@ -141,7 +141,8 @@ class DiskSpaceManager:
             if not clip.file_path.exists():
                 continue
             if dry_run:
-                logger.info(f"[DRY] Would delete {clip.file_path.name} ({clip.size_bytes/BYTE_TO_GB:.4f} GB)")
+                size_gb = clip.size_bytes / BYTE_TO_GB
+                logger.info(f"[DRY] Would delete {clip.file_path.name} ({size_gb:.4f} GB)")
             else:
                 try:
                     clip.file_path.unlink()
@@ -159,9 +160,10 @@ class DiskSpaceManager:
         counts = {"uploaded": 0, "pending": 0, "local_only": 0}
         for c in clips:
             counts[c.status] = counts.get(c.status, 0) + 1
+        usage_pct = self.get_usage_percentage()
         return {"current_bytes": self.get_current_usage(), "cap_bytes": self.cap_bytes,
-                "usage_percentage": self.get_usage_percentage(), "total_clips": len(clips),
-                "status_counts": counts, "above_warning": self.get_usage_percentage() >= WARNING_THRESHOLD}
+                "usage_percentage": usage_pct, "total_clips": len(clips),
+                "status_counts": counts, "above_warning": usage_pct >= WARNING_THRESHOLD}
 
 
 def parse_size(size_str: str) -> int:
