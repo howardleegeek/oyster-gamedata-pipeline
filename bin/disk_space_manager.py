@@ -33,7 +33,7 @@ BYTE_TO_GB = 1024**3
 
 class ClipMetadata:
     """Represents metadata for a local clip."""
-    
+
     def __init__(self, clip_id: str, file_path: Path, size_bytes: int,
                  last_accessed: datetime, status: str) -> None:
         self.clip_id = clip_id
@@ -41,12 +41,12 @@ class ClipMetadata:
         self.size_bytes = size_bytes
         self.last_accessed = last_accessed
         self.status = status  # "uploaded", "pending", "local_only"
-    
+
     def to_dict(self) -> dict:
         return {"clip_id": self.clip_id, "file_path": str(self.file_path),
                 "size_bytes": self.size_bytes, "last_accessed": self.last_accessed.isoformat(),
                 "status": self.status}
-    
+
     @classmethod
     def from_dict(cls, data: dict) -> "ClipMetadata":
         return cls(data["clip_id"], Path(data["file_path"]), data["size_bytes"],
@@ -55,7 +55,7 @@ class ClipMetadata:
 
 class DiskSpaceManager:
     """Manages disk space for local clips with LRU cleanup."""
-    
+
     def __init__(self, clips_dir: Path, metadata_path: Optional[Path] = None,
                  cap_bytes: Optional[int] = None) -> None:
         self.clips_dir = clips_dir
@@ -63,7 +63,7 @@ class DiskSpaceManager:
         self.cap_bytes = cap_bytes or DEFAULT_CAP_GB * BYTE_TO_GB
         if not self.clips_dir.exists():
             raise FileNotFoundError(f"Clips directory not found: {clips_dir}")
-    
+
     def get_current_usage(self) -> int:
         """Calculate current disk usage in bytes."""
         total = 0
@@ -72,10 +72,10 @@ class DiskSpaceManager:
                 if item.is_file() and not item.name.startswith("."):
                     total += item.stat().st_size
         return total
-    
+
     def get_usage_percentage(self) -> float:
         return self.get_current_usage() / self.cap_bytes
-    
+
     def load_metadata(self) -> dict:
         """Load clip metadata from JSON file."""
         metadata = {}
@@ -88,13 +88,13 @@ class DiskSpaceManager:
             except (json.JSONDecodeError, KeyError) as e:
                 logger.warning(f"Failed to load metadata: {e}")
         return metadata
-    
+
     def save_metadata(self, metadata: dict) -> None:
         """Save clip metadata to JSON file."""
         data = {cid: clip.to_dict() for cid, clip in metadata.items()}
         with open(self.metadata_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
-    
+
     def get_clips_sorted_by_lru(self) -> list[ClipMetadata]:
         """Get all clips sorted by last access time (LRU first)."""
         metadata = self.load_metadata()
@@ -109,11 +109,11 @@ class DiskSpaceManager:
                 clips.append(clip)
         clips.sort(key=lambda c: c.last_accessed)
         return clips
-    
+
     def get_deletable_clips(self) -> list[ClipMetadata]:
         """Get clips that can be safely deleted (not pending)."""
         return [c for c in self.get_clips_sorted_by_lru() if c.status != "pending"]
-    
+
     def check_and_warn(self) -> bool:
         """Check storage usage and warn if above threshold. Returns True if warning issued."""
         usage_pct = self.get_usage_percentage()
@@ -124,7 +124,7 @@ class DiskSpaceManager:
             return True
         logger.info(f"Storage: {usage_pct*100:.1f}% ({current_gb:.2f} / {cap_gb:.2f} GB)")
         return False
-    
+
     def cleanup(self, dry_run: bool = False, force: bool = False) -> tuple[int, int]:
         """Clean up old clips to stay under cap. Returns (files_deleted, bytes_freed)."""
         current = self.get_current_usage()
@@ -152,7 +152,7 @@ class DiskSpaceManager:
             files_deleted += 1
             bytes_freed += clip.size_bytes
         return files_deleted, bytes_freed
-    
+
     def get_status_summary(self) -> dict:
         """Get summary of current disk space status."""
         clips = self.get_clips_sorted_by_lru()
