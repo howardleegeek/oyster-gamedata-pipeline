@@ -6,8 +6,10 @@ Provides drop-in VPT compatibility with encoding, decoding, and validation.
 
 Usage:
     python -m src.oyster_agent_runner.buyer_spec_v2_vpt_mouse --help
-    python -m src.oyster_agent_runner.buyer_spec_v2_vpt_mouse encode --x 0.5 --y -0.3 --buttons 1
-    python -m src.oyster_agent_runner.buyer_spec_v2_vpt_mouse decode --payload '{"scaledX":0.5,"scaledY":-0.3,"buttons":1,"newButtons":1}'
+    python -m src.oyster_agent_runner.buyer_spec_v2_vpt_mouse encode --x 0.5 --y -0.3 \\
+        --buttons 1
+    python -m src.oyster_agent_runner.buyer_spec_v2_vpt_mouse decode --payload \\
+        '{"scaledX":0.5,"scaledY":-0.3,"buttons":1,"newButtons":1}'
 """
 
 from __future__ import annotations
