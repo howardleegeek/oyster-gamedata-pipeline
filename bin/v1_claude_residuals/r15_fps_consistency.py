@@ -88,5 +88,9 @@ def r15_fps_consistency(rec: dict, video_path: str | None = None) -> ResidualRes
 
     diff = abs(declared_f - probed)
     threshold = 0.5
-    note = "" if diff < threshold else f"declared={declared_f:.3f} probed={probed:.3f} diff={diff:.3f}"
+    note = (
+        ""
+        if diff < threshold
+        else f"declared={declared_f:.3f} probed={probed:.3f} diff={diff:.3f}"
+    )
     return ResidualResult("R15", diff < threshold, diff, threshold, note)
