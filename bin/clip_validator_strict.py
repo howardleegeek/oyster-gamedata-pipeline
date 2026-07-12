@@ -283,10 +283,12 @@ def validate_clip(
 
     if mute_ratio >= thresholds.max_audio_mute_ratio:
         result.warnings.append(
-            f"Audio mute ratio {mute_ratio:.2%} exceeds threshold {thresholds.max_audio_mute_ratio:.2%}")
+            f"Audio mute ratio {mute_ratio:.2%} exceeds "
+            f"threshold {thresholds.max_audio_mute_ratio:.2%}")
     if silent_ratio >= thresholds.max_audio_silent_ratio:
         result.warnings.append(
-            f"Audio silent ratio {silent_ratio:.2%} exceeds threshold {thresholds.max_audio_silent_ratio:.2%}")
+            f"Audio silent ratio {silent_ratio:.2%} exceeds "
+            f"threshold {thresholds.max_audio_silent_ratio:.2%}")
 
     black_ratio, repeated_ratio, motion_ent = compute_video_metrics(
         video_path, thresholds, sample_interval)
@@ -296,10 +298,12 @@ def validate_clip(
 
     if black_ratio >= thresholds.max_black_frame_ratio:
         result.warnings.append(
-            f"Black frame ratio {black_ratio:.2%} exceeds threshold {thresholds.max_black_frame_ratio:.2%}")
+            f"Black frame ratio {black_ratio:.2%} exceeds "
+            f"threshold {thresholds.max_black_frame_ratio:.2%}")
     if repeated_ratio >= thresholds.max_repeated_frame_ratio:
         result.warnings.append(
-            f"Repeated frame ratio {repeated_ratio:.2%} exceeds threshold {thresholds.max_repeated_frame_ratio:.2%}")
+            f"Repeated frame ratio {repeated_ratio:.2%} exceeds "
+            f"threshold {thresholds.max_repeated_frame_ratio:.2%}")
     if motion_ent < thresholds.min_motion_entropy:
         result.warnings.append(
             f"Motion entropy {motion_ent:.4f} below threshold {thresholds.min_motion_entropy}")
