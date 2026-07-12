@@ -29,16 +29,15 @@ from bin.v3_physics_oracle.residuals import r09_keycode_vk_known as v3_r09
 
 
 def _build_inputs_jsonl(events: list[dict], fps: float = 30.0) -> Path:
-    f = tempfile.NamedTemporaryFile(
+    with tempfile.NamedTemporaryFile(
         mode="w", suffix=".jsonl", delete=False, encoding="utf-8"
-    )
-    f.write(json.dumps({
-        "event_type": "session_start", "timestamp_ms": 0,
-        "fps": fps, "frame_count": 9000,
-    }) + "\n")
-    for ev in events:
-        f.write(json.dumps(ev) + "\n")
-    f.close()
+    ) as f:
+        f.write(json.dumps({
+            "event_type": "session_start", "timestamp_ms": 0,
+            "fps": fps, "frame_count": 9000,
+        }) + "\n")
+        for ev in events:
+            f.write(json.dumps(ev) + "\n")
     return Path(f.name)
 
 
