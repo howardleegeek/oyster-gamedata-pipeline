@@ -153,7 +153,9 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(result, indent=2))
         else:
             print(f"Median APS: {result['median_actions_per_second']}")
-            print(f"Range: [{result['min_actions_per_second']}, {result['max_actions_per_second']}]")
+            print(
+                f"Range: [{result['min_actions_per_second']}, {result['max_actions_per_second']}]"
+            )
             print(f"Samples: {result['sample_count']}")
             print(f"Quality: {result['quality_status']}")
 
