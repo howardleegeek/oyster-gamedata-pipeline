@@ -156,7 +156,8 @@ def watch_session(
                     health.last_change_ts = time.time()
                     if health.stall_warned:
                         # Recovered from stall
-                        msg = f"recovered: {name} resumed growing after {health.stall_duration_sec():.1f}s"
+                        stall_dur = health.stall_duration_sec()
+                        msg = f"recovered: {name} resumed growing after {stall_dur:.1f}s"
                         print(f"  ✓ {msg}")
                         logf.write(json.dumps({
                             "ts": time.time(), "event": "stall_recovered", "file": name,
