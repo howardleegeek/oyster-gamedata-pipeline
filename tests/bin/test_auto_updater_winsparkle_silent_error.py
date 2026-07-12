@@ -74,4 +74,4 @@ def test_module_compiles():
     try:
         compile(source, str(source_path), "exec")
     except SyntaxError as e:
-        raise AssertionError(f"Module failed to compile: {e}")
+        raise AssertionError(f"Module failed to compile: {e}") from e
