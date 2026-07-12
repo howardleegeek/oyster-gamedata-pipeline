@@ -533,7 +533,7 @@ class UploadDaemon:
         total_completed_size = 0
         total_completed_count = 0
 
-        for session_id, session in sessions.items():
+        for _session_id, session in sessions.items():
             if isinstance(session, UploadSession):
                 state = session.state
                 file_size = session.file_size
