@@ -100,8 +100,8 @@ def store_auth_tokens(access_token: str, refresh_token: str) -> Path:
     # Verify the token before storing
     try:
         payload = jwt.decode(access_token, options={"verify_signature": False})
-    except jwt.InvalidTokenError:
-        raise ValueError("Invalid access token received")
+    except jwt.InvalidTokenError as e:
+        raise ValueError("Invalid access token received") from e
     
     auth_data = {
         "access_token": access_token,
