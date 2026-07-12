@@ -141,13 +141,18 @@ class ClipAnalyzer:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clip Analysis - {self.clip_path.name}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+          rel="stylesheet">
     <style>
         body {{ background: #f8f9fa; font-family: system-ui, -apple-system, sans-serif; }}
-        .header {{ background: linear-gradient(135deg, #2E4057, #048BA8); color: white; padding: 2rem 0; }}
-        .preview-frame {{ border: 2px solid #2E4057; border-radius: 8px; padding: 10px; background: white; min-height: 150px; }}
-        .timestamp {{ background: rgba(0,0,0,0.7); color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.8rem; }}
-        .color-swatch {{ display: inline-block; width: 25px; height: 25px; border-radius: 3px; margin-right: 3px; }}
+        .header {{ background: linear-gradient(135deg, #2E4057, #048BA8); color: white;
+                  padding: 2rem 0; }}
+        .preview-frame {{ border: 2px solid #2E4057; border-radius: 8px; padding: 10px;
+                         background: white; min-height: 150px; }}
+        .timestamp {{ background: rgba(0,0,0,0.7); color: white; padding: 2px 6px;
+                     border-radius: 3px; font-size: 0.8rem; }}
+        .color-swatch {{ display: inline-block; width: 25px; height: 25px; border-radius: 3px;
+                         margin-right: 3px; }}
         .score {{ font-size: 2.5rem; font-weight: bold; color: #2E4057; }}
         .footer {{ background: #2E4057; color: white; padding: 1rem 0; margin-top: 2rem; }}
     </style>
@@ -176,15 +181,21 @@ class ClipAnalyzer:
                     <div class="card-body">
                         <div class="row mb-3">
                             <div class="col-4 text-center">
-                                <div class="h2 text-danger">{self.lint_results["summary"]["critical"]}</div>
+                                <div class="h2 text-danger">
+                                    {self.lint_results["summary"]["critical"]}
+                                </div>
                                 <div>Critical</div>
                             </div>
                             <div class="col-4 text-center">
-                                <div class="h2 text-warning">{self.lint_results["summary"]["warning"]}</div>
+                                <div class="h2 text-warning">
+                                    {self.lint_results["summary"]["warning"]}
+                                </div>
                                 <div>Warnings</div>
                             </div>
                             <div class="col-4 text-center">
-                                <div class="h2 text-info">{self.lint_results["summary"]["info"]}</div>
+                                <div class="h2 text-info">
+                                    {self.lint_results["summary"]["info"]}
+                                </div>
                                 <div>Info</div>
                             </div>
                         </div>
@@ -203,7 +214,12 @@ class ClipAnalyzer:
 
                         <h6>Color Palette:</h6>
                         <div class="mb-3">
-                            {"".join(f'<span class="color-swatch" style="background:{c}" title="{c}"></span>' for c in self.diversity_stats["color"]["palette"])}
+                            {"".join(
+                                f'<span class="color-swatch" style="background:{c}" '
+                                f'title="{c}"></span>'
+                                for c in self.diversity_stats["color"]["palette"]
+                                if c
+                            )}
                         </div>
 
                         <h6>Shot Types:</h6>
@@ -213,14 +229,19 @@ class ClipAnalyzer:
                         <p>{" • ".join(self.diversity_stats["summary"]["strengths"])}</p>
 
                         <h6>Improvements:</h6>
-                        <p>{" • ".join(self.diversity_stats["summary"]["areas_for_improvement"])}</p>
+                        <p>{" • ".join(
+                            self.diversity_stats["summary"]["areas_for_improvement"]
+                        )}</p>
                     </div>
                 </div>
 
                 <div class="card">
                     <div class="card-header"><h4>Clip Info</h4></div>
                     <div class="card-body">
-                        {"".join(f'<p><strong>{k}:</strong> {v}</p>' for k, v in self.lint_results["metadata"].items())}
+                        {"".join(
+                            f'<p><strong>{k}:</strong> {v}</p>'
+                            for k, v in self.lint_results["metadata"].items()
+                        )}
                     </div>
                 </div>
             </div>
