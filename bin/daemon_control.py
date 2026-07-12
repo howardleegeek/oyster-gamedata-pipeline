@@ -217,12 +217,13 @@ class DaemonControl:
             stderr_file = self.oyster_dir / "daemon.err"
 
             # Start the daemon
-            proc = subprocess.Popen(
-                [python_exec, str(daemon_script), "run"],
-                stdout=open(stdout_file, 'w'),
-                stderr=open(stderr_file, 'w'),
-                start_new_session=True
-            )
+            with open(stdout_file, 'w') as stdout_f, open(stderr_file, 'w') as stderr_f:
+                proc = subprocess.Popen(
+                    [python_exec, str(daemon_script), "run"],
+                    stdout=stdout_f,
+                    stderr=stderr_f,
+                    start_new_session=True,
+                )
 
             # Write PID file
             with open(self.pid_file, 'w') as f:
