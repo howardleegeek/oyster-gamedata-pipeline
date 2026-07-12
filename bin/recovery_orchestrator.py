@@ -113,7 +113,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--quarantine", type=Path, required=True, help="Quarantine directory")
     parser.add_argument("--no-resume", action="store_true", help="Skip resume, quarantine all")
     parser.add_argument("--dry-run", action="store_true", help="Log actions without executing")
-    parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="INFO")
+    parser.add_argument(
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        default="INFO",
+    )
     return parser.parse_args(argv)
 
 
