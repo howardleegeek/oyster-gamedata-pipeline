@@ -91,18 +91,16 @@ def _run_test() -> int:
     """Smoke-test: create a temp tarball, register it, self-SIGTERM."""
     tmpdir = tempfile.mkdtemp(prefix="g130_shutdown_")
     tar_path = os.path.join(tmpdir, "test.tar")
-    tf = tarfile.open(tar_path, "w")
-    register_tarball(tf)
-    data = b"graceful-shutdown-test-payload\n"
-    info = tarfile.TarInfo(name="test.txt")
-    info.size = len(data)
-    tf.addfile(info, fileobj=__import__("io").BytesIO(data))
-    logger.info("Test tarball at %s — sending SIGTERM to PID %d", tar_path, os.getpid())
-    os.kill(os.getpid(), signal.SIGTERM)
-    try:
-        tf.close()
-    except Exception as e:
-        logger.debug("Could not close test tarball %r: %s", tf, e, exc_info=True)
+    with tarfile.open(tar_path, "w") as tf:
+        register_tarball(tf)
+        data = b"graceful-shutdown-test-payload\n"
+        info = tarfile.TarInfo(name="test.txt")
+        info.size = len(data)
+        tf.addfile(info, fileobj=__import__("io").BytesIO(data))
+        logger.info(
+            "Test tarball at %s — sending SIGTERM to PID %d", tar_path, os.getpid()
+        )
+        os.kill(os.getpid(), signal.SIGTERM)
     return 0
 
 
