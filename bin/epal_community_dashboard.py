@@ -225,7 +225,10 @@ def build_dashboard(
 ) -> DashboardSnapshot:
     """Build complete dashboard snapshot for a user."""
     week_start, week_end = get_week_bounds()
-    week_label = f"{week_start.strftime('%b %d')} - {(week_end - timedelta(seconds=1)).strftime('%b %d, %Y')}"
+    week_label = (
+        f"{week_start.strftime('%b %d')} - "
+        f"{(week_end - timedelta(seconds=1)).strftime('%b %d, %Y')}"
+    )
 
     user_stats = aggregate_user_stats(clips, user_id)
     user_stats.display_name = users.get(user_id, user_id)
