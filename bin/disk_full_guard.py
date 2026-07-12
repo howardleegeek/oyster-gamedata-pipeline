@@ -70,7 +70,9 @@ def watch_loop(path: str, min_gb: float, parent_pid: int,
                 logger.debug(f"Free space: {free_gb:.2f} GB (threshold: {min_gb} GB)")
 
                 if free_gb < min_gb:
-                    logger.error(f"CRITICAL: Free space {free_gb:.2f} GB below threshold {min_gb} GB")
+                    logger.error(
+                        f"CRITICAL: Free space {free_gb:.2f} GB below threshold {min_gb} GB"
+                    )
                     logger.error(f"Sending SIGTERM to parent process {parent_pid}")
 
                     try:
@@ -81,7 +83,9 @@ def watch_loop(path: str, min_gb: float, parent_pid: int,
                         logger.error(f"Parent process {parent_pid} not found")
                         return 0
                     except PermissionError:
-                        logger.error(f"Permission denied sending signal to parent process {parent_pid}")
+                        logger.error(
+                            f"Permission denied sending signal to parent process {parent_pid}"
+                        )
                         return 1
                     except Exception as e:
                         logger.error(f"Failed to send signal to parent process {parent_pid}: {e}")
