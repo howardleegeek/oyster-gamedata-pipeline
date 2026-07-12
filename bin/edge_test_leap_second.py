@@ -60,7 +60,9 @@ def main(argv: List[str] | None = None) -> int:
     """Entry point — parse args, run scenarios, report results."""
     parser = argparse.ArgumentParser(description="Leap-second boundary test at 23:59:60")
     parser.add_argument("--verbose", "-v", action="store_true", help="Per-scenario details")
-    parser.add_argument("--strict", action="store_true", help="Require adapter to accept leap seconds")
+    parser.add_argument(
+        "--strict", action="store_true", help="Require adapter to accept leap seconds"
+    )
     args = parser.parse_args(argv)
 
     all_passed = True
@@ -74,7 +76,8 @@ def main(argv: List[str] | None = None) -> int:
             print(detail)
 
     n = sum(1 for e in entries if e["passed"])
-    print(f"Leap-second boundary test: {'PASS' if all_passed else 'FAIL'} ({n}/{len(entries)} passed)")
+    status = "PASS" if all_passed else "FAIL"
+    print(f"Leap-second boundary test: {status} ({n}/{len(entries)} passed)")
     return 0 if all_passed else 1
 
 

@@ -87,7 +87,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     parser.add_argument("--angle", "-a", type=float, help="Test specific pitch angle (degrees)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed output")
-    parser.add_argument("--temp-dir", action="store_true", help="Use temp directory (no hardcoded paths)")
+    parser.add_argument(
+        "--temp-dir", action="store_true", help="Use temp directory (no hardcoded paths)"
+    )
 
     args = parser.parse_args(argv if argv is not None else sys.argv[1:])
 
@@ -101,7 +103,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             success, msg = test_singularity_behavior(args.angle)
             print(msg)
             if args.verbose:
-                print(f"  Input: {args.angle}°, Clamped: {clamp_pitch(args.angle)}°, Is singularity: {is_singularity(args.angle)}")
+                clamped = clamp_pitch(args.angle)
+                singular = is_singularity(args.angle)
+                print(f"  Input: {args.angle}°, Clamped: {clamped}, Is singularity: {singular}")
             return 0 if success else 1
         else:
             print("Camera Pitch Singularity Edge Test")
