@@ -75,7 +75,11 @@ def read_excel(path: Path) -> Tuple[List[str], List[Dict[str, str]]]:
         headers = [str(c) if c is not None else "" for c in rows[0]]
         data = []
         for row in rows[1:]:
-            data.append({h: str(v) if v is not None else "" for h, v in zip(headers, row, strict=True)})
+            # Convert row values to strings, preserving None as empty string
+            row_dict = {}
+            for h, v in zip(headers, row, strict=True):
+                row_dict[h] = str(v) if v is not None else ""
+            data.append(row_dict)
         wb.close()
         return headers, data
     except Exception as e:
@@ -133,7 +137,13 @@ def create_app(data_dir: Path) -> Any:
     <style>
         body {{ font-family: sans-serif; margin: 0; background: #f5f7fa; }}
         .container {{ max-width: 1200px; margin: auto; padding: 1rem; }}
-        header {{ background: #2563eb; color: white; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem; }}
+        header {{
+            background: #2563eb;
+            color: white;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+        }}
         .stats {{ display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }}
         .stat {{ background: white; padding: 1rem; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); flex: 1; min-width: 150px; }}
         .stat-value {{ font-size: 2rem; font-weight: bold; color: #2563eb; }}
