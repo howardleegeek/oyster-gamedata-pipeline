@@ -219,6 +219,14 @@ def download_jar(
     return out
 
 
+def _format_jar_name(release: ReplayModRelease) -> str:
+    """Return the canonical Replay Mod jar filename for ``release``."""
+    return JAR_NAME_TEMPLATE.format(
+        mc_version=release.mc_version,
+        mod_version=release.mod_version,
+    )
+
+
 def write_usage_doc(
     repo_root: Path,
     release: ReplayModRelease,
@@ -247,7 +255,7 @@ def write_usage_doc(
         "trail.\n\n"
         "## Installed jar\n\n"
         f"- Mods directory: `{mods_dir}`\n"
-        f"- Jar filename: `{JAR_NAME_TEMPLATE.format(mc_version=release.mc_version, mod_version=release.mod_version)}`\n"
+        f"- Jar filename: `{_format_jar_name(release)}`\n"
         f"- Download URL: {release.download_url}\n\n"
         "## In-game workflow\n\n"
         "1. Launch Minecraft with the matching version profile.\n"
