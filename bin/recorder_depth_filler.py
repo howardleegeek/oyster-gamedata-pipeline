@@ -231,7 +231,9 @@ def main(argv: Optional[list] = None) -> int:
         description="Generate per-clip DepthAnything-V2 EXR depth maps."
     )
     parser.add_argument("--clip-dir", required=True, help="Directory containing video.mp4")
-    parser.add_argument("--fps", type=int, default=DEFAULT_FPS, help="Frame extraction fps (default 6)")
+    parser.add_argument(
+        "--fps", type=int, default=DEFAULT_FPS, help="Frame extraction fps (default 6)"
+    )
     parser.add_argument("--expected-frames", type=int, default=EXPECTED_FRAME_COUNT,
                         help="Expected EXR count (warn-only)")
     parser.add_argument("--model-id", default="depth-anything/Depth-Anything-V2-Small-hf")
