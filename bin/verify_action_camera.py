@@ -229,7 +229,7 @@ def layer3_behavioral(records: list[dict]) -> dict:
     bad_time_frames = 0
     bad_time_reasons: dict[str, int] = {}
     from datetime import datetime  # local import keeps top-level lean
-    for i, r in enumerate(records[:1000]):
+    for _i, r in enumerate(records[:1000]):
         raw = r.get("time")
         if raw is None:
             bad_time_reasons["missing_field"] = bad_time_reasons.get("missing_field", 0) + 1
