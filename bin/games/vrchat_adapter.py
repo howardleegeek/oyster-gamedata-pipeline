@@ -330,6 +330,7 @@ class VRChatAdapter(GameAdapter, BaseAdapter):
                 "name": "vrchat_instance_type",
                 "event": "on_instance_join",
                 "filter_fn": "check_instance_privacy",
-                "description": "Check instance type (public/friends/invite/hidden) before recording",
+                "description": "Check instance type "
+                "(public/friends/invite/hidden) before recording",
             },
         ]
