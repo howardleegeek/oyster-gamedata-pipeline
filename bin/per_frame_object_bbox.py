@@ -24,7 +24,7 @@ def _lazy_yaml():
         import yaml
         return yaml
     except ImportError:
-        raise ImportError("PyYAML required: pip install pyyaml")
+        raise ImportError("PyYAML required: pip install pyyaml") from None
 
 
 def _lazy_pil():
@@ -32,7 +32,7 @@ def _lazy_pil():
         from PIL import Image, ImageDraw
         return Image, ImageDraw
     except ImportError:
-        raise ImportError("Pillow required: pip install pillow")
+        raise ImportError("Pillow required: pip install pillow") from None
 
 
 # -- data models ------------------------------------------------------------
