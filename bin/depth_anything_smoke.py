@@ -65,13 +65,13 @@ def load_depth_anything_v2_small():
         model.eval()
         print("Model loaded successfully")
         return model
-    except ImportError:
+    except ImportError as e:
         raise RuntimeError(
             "depth_anything_smoke requires the depth_anything_v2 package. "
             "Install it or provide a real ONNX model path. "
             "Iron-law: never return a mock depth model — fake depth "
             "contaminates downstream tarball quality checks."
-        )
+        ) from e
 
 
 def preprocess_for_depth(image: Image.Image, target_size: int = 518) -> "torch.Tensor":
