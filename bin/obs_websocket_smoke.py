@@ -170,7 +170,8 @@ class OBSSmokeTest:
                 "op": 6, "d": {"requestType": "StartRecord", "requestId": "r1"}
             }))
             start_resp = json.loads(await ws.recv())
-            print(f"[WS] StartRecord: {start_resp.get('d', {}).get('requestStatus', {}).get('code')}")
+            _code = start_resp.get('d', {}).get('requestStatus', {}).get('code')
+            print(f"[WS] StartRecord: {_code}")
 
             await asyncio.sleep(2)
 
