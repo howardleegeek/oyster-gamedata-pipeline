@@ -100,7 +100,11 @@ class TestNoBareExceptPass:
 
     def test_no_bare_eof_error_pass(self):
         """Verify there are no bare 'except EOFError: pass' patterns."""
-        source_path = Path(__file__).parent.parent.parent / "bin" / "epal_client_consent_handshake.py"
+        source_path = (
+            Path(__file__).parent.parent.parent
+            / "bin"
+            / "epal_client_consent_handshake.py"
+        )
         source = source_path.read_text()
         tree = ast.parse(source)
 
