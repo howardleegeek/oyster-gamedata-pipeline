@@ -92,7 +92,10 @@ def validate_zbuffer_marker(source_marker: Dict[str, Any]) -> Dict[str, Any]:
 def main():
     parser = argparse.ArgumentParser(description="ZBuffer integration test")
     parser.add_argument("--session-dir", required=True, help="Session directory")
-    parser.add_argument("--force", action="store_true", help="Force test even if patch not deployed")
+    parser.add_argument(
+        "--force", action="store_true",
+        help="Force test even if patch not deployed",
+    )
     args = parser.parse_args()
     
     # Check if mod patch is deployed (unless --force)
