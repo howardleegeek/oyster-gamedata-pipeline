@@ -659,7 +659,14 @@ class InputCapture:
             """
             self._record_key(key, "key_down")
 
-        def on_release(key):  # noqa: ANN001
+        def on_release(key: Any) -> None:
+            """Handle keyboard key release events from pynput.
+
+            Records key-up events to the event log for later replay.
+
+            Args:
+                key: The pynput key object (Key or KeyCode) that was released.
+            """
             self._record_key(key, "key_up")
 
         def on_move(x: float, y: float) -> None:
