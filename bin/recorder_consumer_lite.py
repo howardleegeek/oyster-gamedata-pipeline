@@ -3178,7 +3178,7 @@ def _start_rawvideo_frame_writer(
                             break
                         rc = proc.poll()
                         if rc is not None:
-                            raise BrokenPipeError(f"ffmpeg exited rc={rc}")
+                            raise BrokenPipeError(f"ffmpeg exited rc={rc}") from None
                         continue
 
                     if stdin is None:

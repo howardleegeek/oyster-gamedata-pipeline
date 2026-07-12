@@ -401,7 +401,7 @@ def synthesize_depth_dir(out_dir: str, count: int = 1800) -> int:
             "sample_tarball_builder requires OpenEXR + Imath to create depth EXRs. "
             "Install with: pip install OpenEXR. "
             "Iron-law: never write fake EXR bytes — they corrupt D5 authenticity checks."
-        )
+        ) from None
 
     # Fix #2 + #3: real 1920x1080 depth (was 16x16 stub, ~310 bytes per file).
     # Fix #11: PXR24_COMPRESSION (lossy 24-bit float per pixel) reduces
