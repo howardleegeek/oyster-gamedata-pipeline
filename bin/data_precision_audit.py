@@ -278,7 +278,11 @@ def p3_input_to_effect_latency(inputs: list, game_state: list) -> dict:
                 latencies_ms.append((tick_t - w_ts) * 1000)
                 break
     if len(latencies_ms) < 3:
-        return {"ok": True, "matched": 0, "verdict": "TOO FEW W-press→velocity matches (decoupled?)"}
+        return {
+            "ok": True,
+            "matched": 0,
+            "verdict": "TOO FEW W-press→velocity matches (decoupled?)",
+        }
 
     latencies_ms.sort()
     p50 = latencies_ms[len(latencies_ms) // 2]
@@ -335,7 +339,10 @@ def p4_coord_handedness(game_state: list) -> dict:
     if len(sustained_falling_v_y) < 10:
         return {
             "ok": False,
-            "reason": f"only {len(sustained_falling_v_y)} sustained-fall ticks (need ≥3 consecutive airborne)",
+            "reason": (
+                f"only {len(sustained_falling_v_y)} sustained-fall ticks "
+                f"(need ≥3 consecutive airborne)"
+            ),
         }
     coarse_neg = sum(1 for v in sustained_falling_v_y if v < 0)
     coarse_pct = 100 * coarse_neg / len(sustained_falling_v_y)
@@ -357,9 +364,12 @@ def p4_coord_handedness(game_state: list) -> dict:
         "coarse_pct_negative_all_airborne": round(coarse_pct, 1),
         "deep_pct_negative_postapex": round(deep_pct, 1),
         "verdict": (
-            f"Y_UP convention CONFIRMED ({deep_pct:.0f}% negative on deep-fall ticks)" if deep_pct >= 95
-            else f"Y_UP probable but some sign-flip ({deep_pct:.0f}% — investigate)" if deep_pct >= 70
-            else f"INVERTED or mixed Y-axis sign (only {deep_pct:.0f}% negative on deep-fall)"
+            f"Y_UP convention CONFIRMED "
+            f"({deep_pct:.0f}% negative on deep-fall ticks)" if deep_pct >= 95
+            else f"Y_UP probable but some sign-flip "
+            f"({deep_pct:.0f}% — investigate)" if deep_pct >= 70
+            else f"INVERTED or mixed Y-axis sign "
+            f"(only {deep_pct:.0f}% negative on deep-fall)"
         ),
     }
 
@@ -452,7 +462,10 @@ def p7_bot_detection(inputs: list) -> dict:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     ap.add_argument("session_dir")
     ap.add_argument("--json-out", help="optional: write raw results to this path")
     args = ap.parse_args()
@@ -461,31 +474,66 @@ def main() -> int:
     print(f"\n=== Data PRECISION audit: {sess.name} ===\n")
 
     inputs = load_jsonl(sess / "inputs.jsonl") if (sess / "inputs.jsonl").exists() else []
-    game_state = load_jsonl(sess / "game_state.jsonl") if (sess / "game_state.jsonl").exists() else []
-    action_camera = load_action_camera(sess / "action_camera.json") if (sess / "action_camera.json").exists() else []
-    print(f"Loaded: {len(inputs)} input events, {len(game_state)} game_state ticks, {len(action_camera)} action_camera rows")
+    game_state = (
+        load_jsonl(sess / "game_state.jsonl")
+        if (sess / "game_state.jsonl").exists()
+        else []
+    )
+    action_camera = (
+        load_action_camera(sess / "action_camera.json")
+        if (sess / "action_camera.json").exists()
+        else []
+    )
+    print(
+        f"Loaded: {len(inputs)} input events, "
+        f"{len(game_state)} game_state ticks, "
+        f"{len(action_camera)} action_camera rows"
+    )
 
     results = {}
     results["p1_trajectory_smoothness"] = p1_trajectory_smoothness(game_state)
-    print("\n[P1] Trajectory smoothness:", json.dumps(results["p1_trajectory_smoothness"], indent=2))
+    print(
+        "\n[P1] Trajectory smoothness:",
+        json.dumps(results["p1_trajectory_smoothness"], indent=2),
+    )
 
-    results["p2_mouse_camera_coherence"] = p2_mouse_camera_coherence(inputs, action_camera, game_state)
-    print("\n[P2] Mouse↔camera coherence:", json.dumps(results["p2_mouse_camera_coherence"], indent=2))
+    results["p2_mouse_camera_coherence"] = p2_mouse_camera_coherence(
+        inputs, action_camera, game_state
+    )
+    print(
+        "\n[P2] Mouse↔camera coherence:",
+        json.dumps(results["p2_mouse_camera_coherence"], indent=2),
+    )
 
     results["p3_input_to_effect_latency"] = p3_input_to_effect_latency(inputs, game_state)
-    print("\n[P3] Input→effect latency:", json.dumps(results["p3_input_to_effect_latency"], indent=2))
+    print(
+        "\n[P3] Input→effect latency:",
+        json.dumps(results["p3_input_to_effect_latency"], indent=2),
+    )
 
     results["p4_coord_handedness"] = p4_coord_handedness(game_state)
-    print("\n[P4] Coordinate handedness (gravity test):", json.dumps(results["p4_coord_handedness"], indent=2))
+    print(
+        "\n[P4] Coordinate handedness (gravity test):",
+        json.dumps(results["p4_coord_handedness"], indent=2),
+    )
 
     results["p5_velocity_unit"] = p5_velocity_unit_verification(action_camera)
-    print("\n[P5] Velocity unit verification:", json.dumps(results["p5_velocity_unit"], indent=2))
+    print(
+        "\n[P5] Velocity unit verification:",
+        json.dumps(results["p5_velocity_unit"], indent=2),
+    )
 
     results["p6_event_diversity"] = p6_gameplay_event_diversity(inputs)
-    print("\n[P6] Gameplay event diversity (lifecycle excluded):", json.dumps(results["p6_event_diversity"], indent=2))
+    print(
+        "\n[P6] Gameplay event diversity (lifecycle excluded):",
+        json.dumps(results["p6_event_diversity"], indent=2),
+    )
 
     results["p7_bot_detection"] = p7_bot_detection(inputs)
-    print("\n[P7] Bot-detection (mouse dt CV):", json.dumps(results["p7_bot_detection"], indent=2))
+    print(
+        "\n[P7] Bot-detection (mouse dt CV):",
+        json.dumps(results["p7_bot_detection"], indent=2),
+    )
 
     # Tally
     print("\n=== HIGH-GRADE QUALITY VERDICT ===")
@@ -513,7 +561,10 @@ def main() -> int:
         flags.append(f"P4: HANDEDNESS BUG ({p4.get('pct_negative')}% negative V_y on falling)")
 
     p5 = results["p5_velocity_unit"]
-    if p5.get("ok") and ("blocks/tick" in (p5.get("verdict") or "") or "UNKNOWN" in (p5.get("verdict") or "")):
+    if p5.get("ok") and (
+        "blocks/tick" in (p5.get("verdict") or "")
+        or "UNKNOWN" in (p5.get("verdict") or "")
+    ):
         flags.append(f"P5: velocity UNIT MISMATCH ({p5.get('verdict')})")
 
     p6 = results["p6_event_diversity"]
