@@ -150,7 +150,9 @@ class ContinuousCaptureDaemon:
 
             # Check disk space and pause if needed
             if disk_free_gb < 10:
-                self.logger.warning(f"Low disk space: {disk_free_gb:.1f} GB free. Pausing auto-arm.")
+                self.logger.warning(
+                    f"Low disk space: {disk_free_gb:.1f} GB free. Pausing auto-arm."
+                )
                 self.paused = True
 
     def _get_free_disk_gb(self):
@@ -169,7 +171,9 @@ class ContinuousCaptureDaemon:
             if system == "Windows":
                 result = subprocess.run(
                     ['tasklist', '/FI', 'IMAGENAME eq javaw.exe'],
-                    capture_output=True, text=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)
+                    capture_output=True,
+                    text=True,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                 )
                 return "javaw.exe" in result.stdout
             elif system == "Darwin":  # macOS
@@ -195,7 +199,8 @@ class ContinuousCaptureDaemon:
             if system == "Windows":
                 result = subprocess.run(
                     ['tasklist', '/FI', 'IMAGENAME eq OysterRecorder.exe'],
-                    capture_output=True, text=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)
+                    capture_output=True, text=True,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)
                 )
                 return "OysterRecorder.exe" in result.stdout
             elif system == "Darwin":  # macOS
@@ -426,7 +431,8 @@ class ContinuousCaptureDaemon:
                     # Already handled in transition
                     pass
 
-                elif self.state == DaemonState.COOLDOWN and self.cooldown_until and datetime.now() >= self.cooldown_until:
+                elif (self.state == DaemonState.COOLDOWN and self.cooldown_until
+                      and datetime.now() >= self.cooldown_until):
                     # Wait for cooldown period, then transition
                     self._transition_to(DaemonState.IDLE)
 
