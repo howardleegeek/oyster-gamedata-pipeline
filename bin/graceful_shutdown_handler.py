@@ -179,9 +179,9 @@ class GracefulShutdownHandler:
     
     def open_tarball(self, path: Path, mode: str = "w:gz") -> tarfile.TarFile:
         with self._lock:
-            tar = tarfile.open(path, mode)
-            self._tarballs[str(path)] = tar
-            return tar
+            with tarfile.open(path, mode) as tar:
+                self._tarballs[str(path)] = tar
+                return tar
     
     def update_queue(self, items: List[Dict[str, Any]], cursor: int = 0):
         with self._lock:
