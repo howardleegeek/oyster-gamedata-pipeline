@@ -56,7 +56,7 @@ def read_game_ticks(session_dir: Path) -> List[Tuple[int, float]]:
                 if tick_id is not None and timestamp_ms is not None:
                     ticks.append((tick_id, timestamp_ms))
     except (json.JSONDecodeError, KeyError) as e:
-        raise ValueError(f"Failed to parse game_state.jsonl: {e}")
+        raise ValueError(f"Failed to parse game_state.jsonl: {e}") from e
 
     # Sort by timestamp_ms for consistency
     ticks.sort(key=lambda x: x[1])
