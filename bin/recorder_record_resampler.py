@@ -135,7 +135,8 @@ def _apply_event(state: _ResamplerState, ev: Dict[str, Any]) -> None:
             slot = int(ev.get("slot", 0))
         except (TypeError, ValueError) as exc:
             logger.debug(
-                "recorder_record_resampler: dropping hotbar event with unparseable slot=%r (t=%r): %s",
+                "recorder_record_resampler: dropping hotbar event"
+                " with unparseable slot=%r (t=%r): %s",
                 ev.get("slot"), ev.get("t"), exc,
             )
             return
