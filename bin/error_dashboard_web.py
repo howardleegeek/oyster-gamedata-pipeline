@@ -85,7 +85,7 @@ def generate_sample_errors(count: int = 200) -> List[Dict[str, Any]]:
     ]
     errors: List[Dict[str, Any]] = []
     now = _now_utc()
-    for i in range(count):
+    for _i in range(count):
         msg = random.choice(messages)
         sev = random.choices(severities, weights=[5, 15, 30, 40, 10])[0]
         src = random.choice(sources)
@@ -212,7 +212,7 @@ class ErrorStore:
 
         # Convert sets to lists for JSON serialization
         result = []
-        for key, group in groups.items():
+        for _key, group in groups.items():
             group["users"] = sorted(group["users"])
             result.append(group)
 
