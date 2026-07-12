@@ -36,7 +36,11 @@ STORAGE_PRICING: Dict[StorageClass, float] = {
 EGRESS_PRICING = [(1, 0.00), (10, 0.09), (50, 0.085), (150, 0.07), (float('inf'), 0.05)]
 
 # Lifecycle thresholds (days -> storage class)
-LIFECYCLE_THRESHOLDS = {30: StorageClass.STANDARD_IA, 90: StorageClass.GLACIER, 180: StorageClass.DEEP_ARCHIVE}
+LIFECYCLE_THRESHOLDS = {
+    30: StorageClass.STANDARD_IA,
+    90: StorageClass.GLACIER,
+    180: StorageClass.DEEP_ARCHIVE,
+}
 
 
 @dataclass
@@ -143,10 +147,34 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
     parser.add_argument("--bucket", "-b", required=True, help="S3 bucket name")
     parser.add_argument("--size-gb", "-s", type=float, required=True, help="Storage size in GB")
     parser.add_argument("--objects", "-o", type=int, required=True, help="Number of objects")
-    parser.add_argument("--storage-class", "-c", default="STANDARD", choices=[sc.value for sc in StorageClass], help="S3 storage class")
-    parser.add_argument("--egress-gb", "-e", type=float, default=0.0, help="Egress data transfer in GB")
-    parser.add_argument("--avg-age-days", "-a", type=int, default=0, help="Average object age in days")
-    parser.add_argument("--format", "-f", choices=["text", "json"], default="text", help="Output format")
+    parser.add_argument(
+        "--storage-class",
+        "-c",
+        default="STANDARD",
+        choices=[sc.value for sc in StorageClass],
+        help="S3 storage class",
+    )
+    parser.add_argument(
+        "--egress-gb",
+        "-e",
+        type=float,
+        default=0.0,
+        help="Egress data transfer in GB",
+    )
+    parser.add_argument(
+        "--avg-age-days",
+        "-a",
+        type=int,
+        default=0,
+        help="Average object age in days",
+    )
+    parser.add_argument(
+        "--format",
+        "-f",
+        choices=["text", "json"],
+        default="text",
+        help="Output format",
+    )
     return parser.parse_args(argv)
 
 
