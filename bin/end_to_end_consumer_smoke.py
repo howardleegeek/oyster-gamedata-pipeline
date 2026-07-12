@@ -234,7 +234,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description="G228 End-to-End Consumer Smoke Test",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="Validates: installer -> game launch -> trajectory -> auto-stop -> tarball -> G165 lint",
+        epilog=(
+            "Validates: installer -> game launch -> trajectory -> "
+            "auto-stop -> tarball -> G165 lint"
+        ),
     )
     parser.add_argument("--fast", action="store_true", help="Run with reduced timing")
     parser.add_argument("--output-dir", type=Path, default=TARBALL_OUTPUT_DIR,
