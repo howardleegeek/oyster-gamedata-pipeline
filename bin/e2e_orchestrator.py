@@ -420,9 +420,8 @@ def main():
     
     # Send notification on failure
     notifications_sent = []
-    if overall == "FAIL":
-        if send_notification(args.notify_on_fail, session_id, report):
-            notifications_sent.append(args.notify_on_fail)
+    if overall == "FAIL" and send_notification(args.notify_on_fail, session_id, report):
+        notifications_sent.append(args.notify_on_fail)
     
     report["notifications_sent"] = notifications_sent
     
