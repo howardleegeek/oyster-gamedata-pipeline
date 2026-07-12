@@ -56,7 +56,8 @@ def offline_uuid(username: str) -> str:
 
 def find_minecraft_launcher() -> str:
     """
-    Locate Minecraft launcher executable (minecraft-launcher-lib OR system 'minecraft-launcher' binary).
+    Locate Minecraft launcher executable (minecraft-launcher-lib OR
+    system 'minecraft-launcher' binary).
 
     Returns:
         Path to launcher executable or command name
