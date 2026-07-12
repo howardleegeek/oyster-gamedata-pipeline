@@ -210,7 +210,9 @@ def p2_mouse_camera_coherence(inputs: list, action_camera: list, game_state: lis
     y_var = sum((x - y_mean) ** 2 for x in yaw_per_window) / n_w
     if m_var == 0 or y_var == 0:
         return {"ok": True, "windowed_correlation": 0.0, "verdict": "one channel is constant"}
-    cov = sum((mouse_per_window[i] - m_mean) * (yaw_per_window[i] - y_mean) for i in range(n_w)) / n_w
+    # Extract to local var to avoid E501 line-length
+    cov_terms = ((mouse_per_window[i] - m_mean) * (yaw_per_window[i] - y_mean) for i in range(n_w))
+    cov = sum(cov_terms) / n_w
     corr = cov / (m_var * y_var) ** 0.5
 
     # Also: % of windows with significant activity in BOTH
