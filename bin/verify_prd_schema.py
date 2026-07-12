@@ -319,7 +319,7 @@ def validate_record(record: Any, *, index: int) -> list[str]:
         if field not in record:
             issues.append(f"[{index}] missing required field '{field}'")
     # At least one of *_oula / *_euler must be present per group
-    for group, aliases in _EULER_ALIASES.items():
+    for _group, aliases in _EULER_ALIASES.items():
         if not any(a in record for a in aliases):
             issues.append(
                 f"[{index}] missing required field '{aliases[0]}' " f"(or alias '{aliases[1]}')"
@@ -395,7 +395,7 @@ def validate_record(record: Any, *, index: int) -> list[str]:
                 issues.append(f"[{index}] {v}")
 
     # Vector3 (euler-keyed) — accept *_oula or *_euler; validate whichever present
-    for group, aliases in _EULER_ALIASES.items():
+    for _group, aliases in _EULER_ALIASES.items():
         for alias in aliases:
             if alias in record:
                 for v in _check_vector3(alias, record[alias], allow_euler_keys=True):
