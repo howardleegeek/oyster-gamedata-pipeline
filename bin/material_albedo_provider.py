@@ -251,7 +251,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description='Material Albedo Provider - Generate G-buffers for Sora 2/Cosmos training data.'
     )
-    parser.add_argument('--input-dir', type=Path, help='Directory containing material subdirectories.')
+    parser.add_argument(
+        '--input-dir', type=Path, help='Directory containing material subdirectories.'
+    )
     parser.add_argument('--yaml-config', type=Path, help='YAML configuration file for materials.')
     parser.add_argument('--output-dir', type=Path, help='Output directory for G-buffers.')
     parser.add_argument('--material', type=str, help='Process specific material only.')
