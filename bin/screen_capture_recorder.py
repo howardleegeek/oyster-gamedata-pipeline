@@ -12,7 +12,7 @@ try:
     import mss
     import mss.tools
 except ImportError:
-    raise ImportError("mss library required for screen capture")
+    raise ImportError("mss library required for screen capture") from None
 
 def record_screen_region(
     output_path: Path,
@@ -82,7 +82,7 @@ def record_screen_region(
                             frames_captured += 1
                         except Exception as e:
                             capture_errors.append(str(e))
-                            raise RuntimeError(f"Frame capture failed: {e}")
+                            raise RuntimeError(f"Frame capture failed: {e}") from e
 
                         next_frame_time += frame_interval
                         sleep_time = next_frame_time - time.perf_counter()
