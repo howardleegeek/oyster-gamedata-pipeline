@@ -25,9 +25,10 @@ def run_canonical_pipeline_skip_depth(session_dir: str) -> Dict[str, Any]:
         return {"status": "SKIP", "evidence": "canonical_pipeline.py not found"}
 
     # Run with --skip-depth
+    target_score = str(MIN_BASELINE_SCORE)
     try:
         result = subprocess.run(
-            [sys.executable, str(pipeline_script), "--skip-depth", "--target-score", str(MIN_BASELINE_SCORE)],
+            [sys.executable, str(pipeline_script), "--skip-depth", "--target-score", target_score],
             cwd=session_dir,
             capture_output=True,
             text=True,
