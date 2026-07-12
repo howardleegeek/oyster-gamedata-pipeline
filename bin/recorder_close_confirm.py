@@ -63,9 +63,8 @@ def attach_to_root(root: Any, is_armed_callable, on_close_confirmed) -> None:
                               (typical: ``root.destroy``).
     """
     def _handler() -> None:
-        if is_armed_callable():
-            if not confirm_close_while_recording(parent=root):
-                return
+        if is_armed_callable() and not confirm_close_while_recording(parent=root):
+            return
         on_close_confirmed()
 
     root.protocol("WM_DELETE_WINDOW", _handler)
