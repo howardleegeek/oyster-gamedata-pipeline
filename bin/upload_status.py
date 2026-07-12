@@ -51,7 +51,7 @@ def get_status() -> Dict[str, Any]:
     total_pending_size = 0
     total_completed_size = 0
     
-    for session_id, session in sessions.items():
+    for _session_id, session in sessions.items():
         state_val = session.get("state", "pending")
         file_size = session.get("file_size", 0)
         
