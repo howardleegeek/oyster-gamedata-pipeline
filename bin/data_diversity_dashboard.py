@@ -222,13 +222,13 @@ def dashboard(records: List[Dict], output: Path, cohort_field: str = "cohort") -
         ws = wb.active
         ws.title = "Summary"
         ws.append(["Cohort", "N", "Route Types", "Biomes", "Times of Day", "Entropies"])
-        for i, (lbl, cnt) in enumerate(zip(route_lbl, route_cnt)):
+        for _i, (lbl, cnt) in enumerate(zip(route_lbl, route_cnt)):
             ws.append([f"Route: {lbl}", "", cnt, "", "", ""])
-        for i, (lbl, cnt) in enumerate(zip(biome_lbl, biome_cnt)):
+        for _i, (lbl, cnt) in enumerate(zip(biome_lbl, biome_cnt)):
             ws.append([f"Biome: {lbl}", "", "", cnt, "", ""])
-        for i, (lbl, cnt) in enumerate(zip(tod_lbl, tod_cnt)):
+        for _i, (lbl, cnt) in enumerate(zip(tod_lbl, tod_cnt)):
             ws.append([f"Time: {lbl}", "", "", "", cnt, ""])
-        for i, (lbl, cnt) in enumerate(zip(ent_lbl, ent_cnt)):
+        for _i, (lbl, cnt) in enumerate(zip(ent_lbl, ent_cnt)):
             ws.append([f"Entropy: {lbl}", "", "", "", "", cnt])
         wb.save(output / f"{cohort}_dashboard.xlsx")
     wb_summary = openpyxl.Workbook()
