@@ -156,7 +156,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     if result["refused"]:
         logger.info("PASS — server correctly refused wrong key (HTTP %d)", result["status_code"])
         return 0
-    logger.critical("FAIL — server ACCEPTED wrong observation key! (HTTP %d)", result["status_code"])
+    logger.critical(
+        "FAIL — server ACCEPTED wrong observation key! (HTTP %d)", result["status_code"]
+    )
     return 1
 
 if __name__ == "__main__":
