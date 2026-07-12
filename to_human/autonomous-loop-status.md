@@ -20,7 +20,12 @@
 
 ## Round 536 @ 2026-07-11T23:27:32Z
 
-- Picked: Wrap E501 long line (101>100) in bin/vendor_scenario_first_clip.py:47 — extracted the inline `[workspace / "clips", ...]` list to a local `subdirs` variable. Found via `ruff check --select E501 bin/` (1 hit in file; lowest-density bounded candidate — file has exactly 1 E501). Choice justification: measurable code smell (E501 lint); 1-file scope is natural one-round unit; zero risk — pure list-extraction, loop body and Path operands unchanged, semantically identical (verified: pytest tests/bin/test_vendor_scenario_fir
+- Picked: Wrap E501 long line (101>100) in bin/vendor_scenario_first_clip.py:47 — extracted the inline `[workspace / "clips", ...]` list to a local `subdirs` variable. Found via `ruff check --select E501 bin/` (1 hit in file; lowest-density bounded candidate — file has exactly 1 E501). Choice justification: measurable code smell (E501 lint); 1-file scope is natural one-round unit; zero risk — pure list-extraction, loop body and Path operands unchanged, semantically identical (verified: pytest tests/bin/test_vendor_scenario_fi
+
+## Round 537 @ 2026-07-12T00:00:00Z
+
+- Picked: Wrap E501 long line (115>100) in bin/oyster_launch_mc.py:390 — split docstring over two lines. Found via `ruff check --select E501 bin/oyster_launch_mc.py` (1 hit in file). Choice justification: measurable code smell (E501 lint); 1-file scope is natural one-round unit; zero risk — docstring only, no code behavior change; tests pass 25/25, ruff clean. Self-review: line-wrap only; no runtime behavior change; no security/race/off-by-one/false-success risk.
+- Result: committed f92cb4c0, pushed to origin/mainr
 
 ## Round 554 @ 2026-07-12T05:35:42Z
 
