@@ -160,7 +160,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"Workers:       {info['workers']}")
         print(f"Successes:     {info['successes']}")
         print(f"Tarball valid: {info['tarball_valid']}")
-        for _, s, e in info["results"]:
+        for _, _s, e in info["results"]:
             if e:
                 print(f"  Error: {e}")
     if ok:
