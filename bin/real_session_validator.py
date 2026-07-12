@@ -594,9 +594,8 @@ def main():
             }
             print(json.dumps(report, indent=2))
         else:
-            print(
-                f"REAL SESSION VALIDATOR — {datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}"
-            )
+            ts = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+            print(f"REAL SESSION VALIDATOR — {ts}")
             print(f"  Scanning: {sessions_root}")
             print("  Found: 0 session dirs")
             print("  No sessions found.")
