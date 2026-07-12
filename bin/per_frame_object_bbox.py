@@ -168,7 +168,8 @@ def load_frames(path: Path, fmt: str) -> List[FrameData]:
         data = json.load(fh)
     if isinstance(data, dict):
         # Check if dict is a single frame (has frame_id or bboxes)
-        if any(k in data for k in ("frame_id", "bboxes_2d", "bboxes_3d", "objects_2d", "objects_3d")):
+        single_frame_keys = ("frame_id", "bboxes_2d", "bboxes_3d", "objects_2d", "objects_3d")
+        if any(k in data for k in single_frame_keys):
             frames_raw = [data]  # Single frame object
         else:
             frames_raw = (data.get("frames") or data.get("data") or
