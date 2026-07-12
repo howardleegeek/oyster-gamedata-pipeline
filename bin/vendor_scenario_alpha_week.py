@@ -103,7 +103,9 @@ def run_scenario(vendor_count: int, workers: int, quota: int) -> List[IngestResu
 
     try:
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            futures = {executor.submit(ingest_vendor, vid, quota_mgr, work_dir): vid for vid in vendor_ids}
+            futures = {
+                executor.submit(ingest_vendor, vid, quota_mgr, work_dir): vid for vid in vendor_ids
+            }
             for future in concurrent.futures.as_completed(futures):
                 try:
                     results.append(future.result())
