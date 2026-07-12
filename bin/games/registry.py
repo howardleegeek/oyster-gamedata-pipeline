@@ -39,7 +39,7 @@ def _discover_adapters() -> List[Type["BaseAdapter"]]:
     adapters: List[Type["BaseAdapter"]] = []
     seen_names: set[str] = set()
 
-    for importer, modname, ispkg in pkgutil.iter_modules([str(_GAMES_DIR)]):
+    for _importer, modname, _ispkg in pkgutil.iter_modules([str(_GAMES_DIR)]):
         # Only consider *_adapter.py files (skip base_adapter.py)
         if not modname.endswith("_adapter"):
             continue
