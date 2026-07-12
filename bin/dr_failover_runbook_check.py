@@ -24,11 +24,11 @@ logger = logging.getLogger(__name__)
 
 class DRFailoverValidator:
     """Disaster Recovery Failover Validator for runbook validation."""
-    
+
     DEFAULT_TIMEOUT = 60
     CHECK_INTERVAL = 5
     INGEST_PATH = "/v1/ingest"
-    
+
     def __init__(
         self,
         primary_url: Optional[str] = None,
@@ -53,7 +53,7 @@ class DRFailoverValidator:
         if config_path:
             self._load_config(config_path)
         self._setup_logging()
-    
+
     def _setup_logging(self) -> None:
         """Configure logging output."""
         if not logger.handlers:
@@ -63,7 +63,7 @@ class DRFailoverValidator:
             )
             logger.addHandler(handler)
             logger.setLevel(logging.INFO)
-    
+
     def _load_config(self, config_path: str) -> None:
         """Load configuration from YAML file."""
         try:
@@ -78,20 +78,20 @@ class DRFailoverValidator:
             logger.warning(f"Config not found: {config_path}")
         except Exception as e:
             logger.error(f"Config load error: {e}")
-    
+
     def _get_temp_dir(self) -> str:
         """Create or return temporary directory."""
         if self._temp_dir is None:
             self._temp_dir = tempfile.mkdtemp(prefix="dr_failover_")
         return self._temp_dir
-    
+
     def _cleanup(self) -> None:
         """Remove temporary directory."""
         if self._temp_dir and os.path.exists(self._temp_dir):
             import shutil
             shutil.rmtree(self._temp_dir, ignore_errors=True)
             self._temp_dir = None
-    
+
     def _add_result(self, name: str, status: str, message: str,
                     details: Optional[Dict] = None) -> None:
         """Record a check result."""
@@ -100,7 +100,7 @@ class DRFailoverValidator:
             "timestamp": datetime.utcnow().isoformat() + "Z",
             **({"details": details} if details else {})
         })
-    
+
     def _parse_url(self, url: str) -> Optional[Dict[str, Any]]:
         """Parse URL into components."""
         try:
@@ -117,7 +117,7 @@ class DRFailoverValidator:
                 url, e, exc_info=True,
             )
             return None
-    
+
     def _check_endpoint(self, url: str, timeout: int = 10) -> Tuple[bool, str]:
         """Check if endpoint is reachable via TCP connection."""
         parsed = self._parse_url(url)
@@ -131,7 +131,7 @@ class DRFailoverValidator:
             return result == 0, f"Endpoint {parsed['host']}:{parsed['port']}"
         except Exception as e:
             return False, str(e)
-    
+
     def check_primary_health(self) -> Tuple[bool, str]:
         """Check primary region health before outage simulation."""
         if not self.primary_url:
@@ -143,7 +143,7 @@ class DRFailoverValidator:
         ok, msg = self._check_endpoint(self.primary_url)
         self._add_result("primary_health", "SUCCESS" if ok else "WARNING", msg)
         return ok, msg
-    
+
     def simulate_outage(self) -> Tuple[bool, str]:
         """Simulate primary region outage."""
         logger.info("Simulating primary region outage...")
@@ -161,7 +161,7 @@ class DRFailoverValidator:
         except Exception as e:
             self._add_result("outage_simulation", "FAILURE", str(e))
             return False, str(e)
-    
+
     def verify_failover_ingest(self) -> Tuple[bool, str]:
         """Verify failover region serves /v1/ingest within timeout."""
         if not self.failover_url:
@@ -186,7 +186,7 @@ class DRFailoverValidator:
         self._add_result("failover_ingest", "FAILURE",
                         f"Timeout after {self.timeout}s", {"url": ingest_url})
         return False, f"Timeout after {self.timeout}s"
-    
+
     def verify_postgres_backup(self) -> Tuple[bool, str]:
         """Verify last-good Postgres backup exists and is restorable."""
         logger.info("Verifying Postgres backup...")
@@ -210,7 +210,7 @@ class DRFailoverValidator:
         except Exception as e:
             self._add_result("postgres_backup", "FAILURE", str(e), details)
             return False, str(e)
-    
+
     def run_all_checks(self) -> Dict[str, Any]:
         """Execute all DR validation checks."""
         logger.info("Starting DR failover runbook validation...")
@@ -257,19 +257,19 @@ def main(argv: Optional[List[str]] = None) -> int:
                        help="Output format")
     parser.add_argument("-v", "--verbose", action="store_true",
                        help="Enable verbose logging")
-    
+
     args = parser.parse_args(argv)
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
         logger.setLevel(logging.DEBUG)
-    
+
     validator = DRFailoverValidator(
         primary_url=args.primary_url, failover_url=args.failover_url,
         backup_dir=args.backup_dir, timeout=args.timeout,
         dry_run=args.dry_run, config_path=args.config
     )
     results = validator.run_all_checks()
-    
+
     if args.output == "json":
         print(json.dumps(results, indent=2, default=str))
     else:
@@ -281,7 +281,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             icon = "✓" if check["status"] in ("SUCCESS", "SKIPPED") else "✗"
             print(f"  [{icon}] {check['name']}: {check['status']} - {check['message']}")
         print("=" * 60)
-    
+
     return 0 if results["overall_status"] == "SUCCESS" else (
         1 if results["overall_status"] == "PARTIAL" else 2)
 
