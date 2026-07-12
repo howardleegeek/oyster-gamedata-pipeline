@@ -139,8 +139,8 @@ class NotarizationWorkflow:
             if status == "Accepted":
                 return submission_id
             raise NotarizationError(f"Notarization failed with status: {status}")
-        except json.JSONDecodeError:
-            raise NotarizationError(f"Failed to parse notarytool output: {stdout}")
+        except json.JSONDecodeError as e:
+            raise NotarizationError(f"Failed to parse notarytool output: {stdout}") from e
 
     def staple(self, target_path: Path) -> bool:
         """Staple notarization ticket to app/pkg."""
