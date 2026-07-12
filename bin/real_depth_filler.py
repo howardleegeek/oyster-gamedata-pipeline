@@ -202,7 +202,7 @@ def infer_batch(
             results = pipe(images)
 
             # Process each result
-            for idx, (png_file, result) in enumerate(zip(batch_files, results)):
+            for _idx, (png_file, result) in enumerate(zip(batch_files, results)):
                 # Extract depth from result
                 if hasattr(result, "depth"):
                     depth_relative = np.array(result.depth)
