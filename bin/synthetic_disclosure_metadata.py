@@ -6,7 +6,8 @@ are present in every JSON / manifest / video-sidecar file.
 
 Usage:
     python bin/synthetic_disclosure_metadata.py scan  <dir>
-    python bin/synthetic_disclosure_metadata.py patch <dir> [--engine NAME] [--version VER] [--date DATE]
+    python bin/synthetic_disclosure_metadata.py patch <dir> \
+        [--engine NAME] [--version VER] [--date DATE]
 """
 
 from __future__ import annotations
