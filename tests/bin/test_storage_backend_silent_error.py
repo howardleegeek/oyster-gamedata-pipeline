@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression test: storage_backend.py silent error surface in local backend upload idempotency check.
+"""Regression test: storage_backend.py silent error surface in local backend upload.
 
 Verifies the `except (json.JSONDecodeError, OSError)` handler in
 LocalBackend.upload is no longer a bare `pass` and now binds the exception
