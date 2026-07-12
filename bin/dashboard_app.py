@@ -145,13 +145,17 @@ def create_app(data_dir: Path) -> Any:
             margin-bottom: 1rem;
         }}
         .stats {{ display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }}
-        .stat {{ background: white; padding: 1rem; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); flex: 1; min-width: 150px; }}
+        .stat {{ background: white; padding: 1rem; border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); flex: 1; min-width: 150px; }}
         .stat-value {{ font-size: 2rem; font-weight: bold; color: #2563eb; }}
         .stat-label {{ color: #64748b; font-size: 0.875rem; }}
         .controls {{ display: flex; gap: 1rem; margin-bottom: 1rem; }}
-        input[type="search"] {{ flex: 1; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; }}
-        table {{ width: 100%; border-collapse: collapse; background: white; border-radius: 0.5rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }}
-        th {{ padding: 0.75rem; text-align: left; background: #f1f5f9; border-bottom: 2px solid #cbd5e1; cursor: pointer; }}
+        input[type="search"] {{ flex: 1; padding: 0.5rem; border: 1px solid #cbd5e1;
+            border-radius: 0.375rem; }}
+        table {{ width: 100%; border-collapse: collapse; background: white;
+            border-radius: 0.5rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }}
+        th {{ padding: 0.75rem; text-align: left; background: #f1f5f9;
+            border-bottom: 2px solid #cbd5e1; cursor: pointer; }}
         td {{ padding: 0.5rem 0.75rem; border-bottom: 1px solid #e2e8f0; }}
         tr:hover {{ background: #f8fafc; }}
         footer {{ text-align: center; margin-top: 2rem; color: #64748b; font-size: 0.875rem; }}
@@ -181,7 +185,8 @@ def create_app(data_dir: Path) -> Any:
         </div>
 
         <div class="controls">
-            <input type="search" placeholder="Search..." hx-get="/search" hx-trigger="keyup changed delay:300ms" hx-target="#tbody" name="q">
+            <input type="search" placeholder="Search..."
+                hx-get="/search" hx-trigger="keyup changed delay:300ms" hx-target="#tbody" name="q">
             <select hx-get="/sort" hx-trigger="change" hx-target="#tbody" name="col">
                 <option value="">Sort by</option>
                 {"".join(f'<option value="{h}">{h}</option>' for h in headers[:cols])}
@@ -192,7 +197,10 @@ def create_app(data_dir: Path) -> Any:
 
         <table>
             <thead>
-                <tr>{"".join(f'<th hx-get="/sort?col={h}" hx-trigger="click" hx-target="#tbody">{h}</th>' for h in headers[:cols])}</tr>
+                <tr>{"".join((
+                    f'<th hx-get="/sort?col={h}" hx-trigger="click" hx-target="#tbody">{h}</th>'
+                    for h in headers[:cols]
+                ))}</tr>
             </thead>
             <tbody id="tbody">
                 {render_rows(rows[:50], cols)}
