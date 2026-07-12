@@ -224,7 +224,7 @@ class I18NStringLoader:
         """Export strings as JSON file."""
         output_file = output_dir / f'{self.DOMAIN}.json'
         translations = {}
-        for msgid in self.fallback_strings['en_US'].keys():
+        for msgid in self.fallback_strings['en_US']:
             translations[msgid] = self.fallback_strings.get(locale, {}).get(
                 msgid, self.fallback_strings['en_US'][msgid]
             )
