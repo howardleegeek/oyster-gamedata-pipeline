@@ -697,7 +697,7 @@ def audit_group_f(session: Path) -> list[dict]:
                 _result(f"F{i}", ok, f"{fld}: {'present in xlsx' if ok else 'NOT in xlsx'}")
             )
     except ImportError:
-        for i, fld in enumerate(GAMEINFO_FIELDS_14, 1):
+        for i, _fld in enumerate(GAMEINFO_FIELDS_14, 1):
             items.append(_result(f"F{i}", False, "openpyxl not installed — cannot audit xlsx"))
     except Exception as exc:  # noqa: BLE001 — corrupt xlsx, badzipfile, etc.
         # Bug-fix 2026-05-15: a corrupt or partially-written xlsx used to raise
