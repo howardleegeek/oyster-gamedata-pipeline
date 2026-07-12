@@ -164,9 +164,8 @@ def replay_key_events(events: list[tuple[int, str, int]],
             if et == "key_down":
                 if kc not in cur_keys:
                     cur_keys.append(kc)
-            elif et == "key_up":
-                if kc in cur_keys:
-                    cur_keys.remove(kc)
+            elif et == "key_up" and kc in cur_keys:
+                cur_keys.remove(kc)
             ev_idx += 1
         out.append(list(cur_keys))
     return out
