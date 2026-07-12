@@ -152,10 +152,14 @@ class AuditLogger:
             conn.execute(
                 "INSERT INTO audit_log (timestamp, buyer_id, action, resource, "
                 "ip_address, user_agent, status_code, details) VALUES (?,?,?,?,?,?,?,?)",
-                (timestamp, buyer_id, action, resource, ip_address, user_agent, status_code, details_json)
+                (timestamp, buyer_id, action, resource, ip_address,
+                 user_agent, status_code, details_json)
             )
             conn.commit()
-        logger.info(f"AUDIT: buyer={buyer_id} action={action} resource={resource} status={status_code}")
+        logger.info(
+            f"AUDIT: buyer={buyer_id} action={action} "
+            f"resource={resource} status={status_code}"
+        )
 
 
 class ClipStore:
@@ -195,7 +199,9 @@ def create_app(jwt_secret: str, download_base_url: str) -> "FastAPI":
 
     app = FastAPI(title="Buyer Download API", version="1.0.0")
 
-    def get_current_buyer(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
+    def get_current_buyer(
+        credentials: HTTPAuthorizationCredentials = Depends(security),
+    ) -> Dict[str, Any]:
         """Extract and validate buyer from JWT token."""
         try:
             return decode_jwt(credentials.credentials, jwt_secret)
@@ -232,8 +238,11 @@ def create_app(jwt_secret: str, download_base_url: str) -> "FastAPI":
             })
 
         total_pages = (total + page_size - 1) // page_size
-        audit_logger.log(buyer_id, "list_clips", ip_address=client_ip,
-                        user_agent=user_agent, status_code=200, details={"page": page, "count": len(clips)})
+        audit_logger.log(
+            buyer_id, "list_clips", ip_address=client_ip,
+            user_agent=user_agent, status_code=200,
+            details={"page": page, "count": len(clips)},
+        )
         return {"clips": clip_responses, "page": page, "page_size": page_size,
                 "total_count": total, "total_pages": total_pages}
 
