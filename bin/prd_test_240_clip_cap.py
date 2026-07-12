@@ -77,7 +77,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("-o", "--output", type=Path, help="Output JSON report")
     
     args = parser.parse_args(argv)
-    test_cases = ["at_limit", "below_limit", "over_limit", "way_over"] if args.test == "all" else [args.test]
+    test_cases = (
+        ["at_limit", "below_limit", "over_limit", "way_over"]
+        if args.test == "all"
+        else [args.test]
+    )
     
     results = {}
     for tc in test_cases:
