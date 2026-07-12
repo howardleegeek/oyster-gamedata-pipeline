@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Stress test: build 5 GB tarball (long capture + 6fps depth) — verify upload_s3.sh chunked path holds.
+Stress test: build 5 GB tarball (long capture + 6fps depth) —
+verify upload_s3.sh chunked path holds.
 """
 
 import argparse
