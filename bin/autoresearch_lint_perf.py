@@ -42,11 +42,11 @@ def discover_corpus(corpus_path: Path) -> List[Path]:
         raise ValueError(f"Not a directory: {corpus_path}")
     files = []
     for entry in corpus_path.iterdir():
-        if entry.is_file():
-            if entry.suffix.lower() in (".tar", ".gz", ".bz2", ".xz", ".json", ".yaml", ".yml"):
-                files.append(entry)
-            elif entry.name.endswith((".tar.gz", ".tar.bz2", ".tar.xz")):
-                files.append(entry)
+        if entry.is_file() and (
+            entry.suffix.lower() in (".tar", ".gz", ".bz2", ".xz", ".json", ".yaml", ".yml")
+            or entry.name.endswith((".tar.gz", ".tar.bz2", ".tar.xz"))
+        ):
+            files.append(entry)
     return sorted(files)
 
 
