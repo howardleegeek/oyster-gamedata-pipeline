@@ -31,8 +31,8 @@ def _lazy_import_pandas():
         try:
             import pandas as pd
             pandas = pd
-        except ImportError:
-            raise ImportError("pandas is required for parquet operations")
+        except ImportError as e:
+            raise ImportError("pandas is required for parquet operations") from e
     return pandas
 
 
@@ -43,8 +43,8 @@ def _lazy_import_pyarrow():
         try:
             import pyarrow as pa
             pyarrow = pa
-        except ImportError:
-            raise ImportError("pyarrow is required for parquet operations")
+        except ImportError as e:
+            raise ImportError("pyarrow is required for parquet operations") from e
     return pyarrow
 
 
