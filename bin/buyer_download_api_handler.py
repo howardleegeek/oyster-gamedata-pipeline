@@ -256,9 +256,18 @@ def create_app(jwt_secret: str, download_base_url: str) -> "FastAPI":
 def populate_demo_data(store: ClipStore) -> None:
     """Populate store with demo clips for testing."""
     demo_clips = [
-        Clip("clip001", "Demo Video 1", 120.5, 52428800, "2024-01-15T10:30:00Z", "/storage/clips/clip001.mp4"),
-        Clip("clip002", "Demo Video 2", 45.0, 20971520, "2024-01-16T14:20:00Z", "/storage/clips/clip002.mp4"),
-        Clip("clip003", "Demo Video 3", 300.0, 131072000, "2024-01-17T09:00:00Z", "/storage/clips/clip003.mp4"),
+        Clip(
+            "clip001", "Demo Video 1", 120.5, 52428800,
+            "2024-01-15T10:30:00Z", "/storage/clips/clip001.mp4"
+        ),
+        Clip(
+            "clip002", "Demo Video 2", 45.0, 20971520,
+            "2024-01-16T14:20:00Z", "/storage/clips/clip002.mp4"
+        ),
+        Clip(
+            "clip003", "Demo Video 3", 300.0, 131072000,
+            "2024-01-17T09:00:00Z", "/storage/clips/clip003.mp4"
+        ),
     ]
     for clip in demo_clips:
         store.add_clip("demo_buyer", clip)
@@ -278,11 +287,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     if not HAS_FASTAPI:
-        print("Error: FastAPI is required. Install with: pip install fastapi uvicorn", file=sys.stderr)
+        print(
+            "Error: FastAPI is required. Install with: pip install fastapi uvicorn",
+            file=sys.stderr
+        )
         return 1
 
     global rate_limiter
-    rate_limiter = RateLimiter(per_minute=args.rate_limit_per_minute, per_hour=args.rate_limit_per_minute * 20)
+    rate_limiter = RateLimiter(
+        per_minute=args.rate_limit_per_minute,
+        per_hour=args.rate_limit_per_minute * 20
+    )
 
     if args.demo:
         populate_demo_data(clip_store)
