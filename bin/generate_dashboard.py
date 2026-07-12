@@ -43,7 +43,7 @@ def count_test_files(root="src/tests"):
     counts = {}
     total = 0
     if os.path.isdir(root):
-        for dirpath, _, filenames in os.walk(root):
+        for _dirpath, _, filenames in os.walk(root):
             for fn in filenames:
                 ext = os.path.splitext(fn)[1] or "(no ext)"
                 counts[ext] = counts.get(ext, 0) + 1
