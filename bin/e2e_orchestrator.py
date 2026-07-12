@@ -210,7 +210,12 @@ def check_idempotent(session_id: str, archive_dir: str) -> bool:
     return report_file.exists()
 
 
-def archive_artifacts(session_id: str, session_dir: str, archive_dir: str, report: Dict) -> List[str]:
+def archive_artifacts(
+    session_id: str,
+    session_dir: str,
+    archive_dir: str,
+    report: Dict,
+) -> List[str]:
     """Archive test artifacts."""
     session_archive = Path(archive_dir) / session_id
     session_archive.mkdir(parents=True, exist_ok=True)
@@ -380,7 +385,9 @@ def main():
     # Run canonical pipeline
     print(f"Running canonical_pipeline on {session_id}...")
     pipeline_result = run_canonical_pipeline(session_dir, args.target_score)
-    print(f"Canonical pipeline: {pipeline_result['status']} ({pipeline_result.get('score', 'N/A')})")
+    pipeline_status = pipeline_result['status']
+    pipeline_score = pipeline_result.get('score', 'N/A')
+    print(f"Canonical pipeline: {pipeline_status} ({pipeline_score})")
     
     # Run feature tests
     features = {}
