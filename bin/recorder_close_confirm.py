@@ -43,7 +43,11 @@ def confirm_close_while_recording(
     return bool(result)
 
 
-def attach_to_root(root: Any, is_armed_callable, on_close_confirmed) -> None:
+def attach_to_root(
+    root: Any,
+    is_armed_callable: "Callable[[], bool]",
+    on_close_confirmed: "Callable[[], None]",
+) -> None:
     """Wire WM_DELETE_WINDOW so the dialog gates window destruction.
 
     ``is_armed_callable``  -> bool: returns True when a clip is in flight.
