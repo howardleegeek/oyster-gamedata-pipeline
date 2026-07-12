@@ -246,10 +246,14 @@ class BuyerSpecValidator:
         in_list = False
         for i, line in enumerate(lines):
             stripped = line.strip()
-            if stripped.startswith('- ') or stripped.startswith('* ') or stripped.startswith('1. '):
+            list_starters = ('- ', '* ', '1. ')
+            is_list_item = stripped.startswith(list_starters)
+            if is_list_item:
                 in_list = True
-            elif stripped and in_list and not (stripped.startswith('  ') or stripped.startswith('\t')):
-                result.add_warning(f"List continuation issue at line {i+1}")
+            elif stripped and in_list:
+                not_continuation = not (stripped.startswith('  ') or stripped.startswith('\t'))
+                if not_continuation:
+                    result.add_warning(f"List continuation issue at line {i+1}")
 
         # Check for secrets
         self._check_secrets(content, result)
