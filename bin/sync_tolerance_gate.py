@@ -82,7 +82,7 @@ def calculate_gaps(
     le_100ms = 0
     gt_100ms = 0
 
-    for frame_id, frame_ts_ns in frames:
+    for _frame_id, frame_ts_ns in frames:
         # Find the closest tick using bisect
         pos = bisect.bisect_left(tick_timestamps_ns, frame_ts_ns)
 
