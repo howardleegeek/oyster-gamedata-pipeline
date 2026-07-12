@@ -74,10 +74,11 @@ def main():
             elapsed = time.time() - t0
             rate = (i + 1) / elapsed if elapsed else 0
             eta = (len(frame_files) - i - 1) / rate if rate else 0
-            print(
-                f"  [{i+1}/{len(frame_files)}] elapsed={elapsed:.1f}s rate={rate:.2f}/s eta={eta:.0f}s",
-                flush=True,
+            msg = (
+                f"  [{i+1}/{len(frame_files)}] "
+                f"elapsed={elapsed:.1f}s rate={rate:.2f}/s eta={eta:.0f}s"
             )
+            print(msg, flush=True)
 
     # 2026-05-28 Howard PM directive: production depth is server-side
     # post-processing. DA-V2 monocular depth is first-class production evidence,
