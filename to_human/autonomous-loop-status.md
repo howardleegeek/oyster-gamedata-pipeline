@@ -2094,3 +2094,8 @@ No fixes available (4 hidden fixes can be enabled with the `--unsafe-fixes` opti
 
 - Picked: Wrap E501 long lines in tests/bin/test_qa_validator_gui_silent_error.py — 2 long lines (101-103 chars) wrapped to <=100 chars: split the isinstance-chain across 3 lines with `and` continuations, and split the AssertionError raise across 3 lines. Found in working tree (in-progress from prior round). Choice justification: measurable code smell (E501 lint); 1-file scope; zero risk — pure line-wrap, semantically identical (same AST, same condition, same f-string error message); tests pass 4/4 (pytest tests/bin/test_qa_validator_gui_silent_error.py); ruff clean. Self-review: line-wrap only; no runtime/behavior change (AST byte-equivalent); no silent error swallow introduced; no race/off-by-one/security/false-success risk; no tests masked as passing (4/4 pass cleanly, no skip/xfail/disable); one logical change (E501); one file; brand isolation N/A (single product); git add 1 file (NEVER git add .).
 - Result: committed e39dc486, pushed to origin/main
+
+## Round 567 @ 2026-07-12T15:00:00Z
+
+- Picked: Fix B007 unused loop variable dirpath in bin/generate_dashboard.py:46 — renamed dirpath to _dirpath in the os.walk() loop since only filenames is used. Found via ruff check --select B007 bin/ (1 hit in file). Choice justification: measurable code smell (B007 lint); 1-file scope is natural one-round unit; zero risk — pure unused-variable rename, no runtime behavior change; AST parses; ruff clean on file; tests pass 73/73 (pytest -k dashboard). Self-review: B007 rename only; verified dirpath is genuinely unused; no silent error swallow; no false-success; one logical change; one file; brand isolation N/A.
+- Result: committed 612c6a77, pushed to origin/main
