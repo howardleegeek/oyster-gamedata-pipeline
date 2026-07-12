@@ -60,7 +60,11 @@ except ImportError:
                     except (OSError, AttributeError):
                         continue
         except (OSError, FileNotFoundError) as exc:
-            logger.debug("count_sessions_today: iterdir(%s) failed (non-fatal, returning 0): %s", SESSION_DIR, exc)
+            logger.debug(
+                "count_sessions_today: iterdir(%s) failed (non-fatal, returning 0): %s",
+                SESSION_DIR,
+                exc,
+            )
         return count
 
     def sum_pending_uploads_gb():
@@ -73,7 +77,11 @@ except ImportError:
                     except (OSError, AttributeError):
                         continue
         except (OSError, FileNotFoundError) as exc:
-            logger.debug("sum_pending_uploads_gb: iterdir(%s) failed (non-fatal, returning 0): %s", SESSION_DIR, exc)
+            logger.debug(
+                "sum_pending_uploads_gb: iterdir(%s) failed (non-fatal, returning 0): %s",
+                SESSION_DIR,
+                exc,
+            )
         return total_bytes / 1e9
 
     def can_record_now():
@@ -159,7 +167,11 @@ def main():
             print(f"  Size: {archive_gb:.1f} GB")
             print(f"  Files: {archive_count}")
         except (OSError, AttributeError) as exc:
-            logger.debug("disk_health_check: archive rglob/scan of %s failed (non-fatal): %s", archive_dir, exc)
+            logger.debug(
+                "disk_health_check: archive rglob/scan of %s failed (non-fatal): %s",
+                archive_dir,
+                exc,
+            )
 
     # Return exit code based on health status
     sys.exit(0 if allowed else 1)
@@ -183,7 +195,9 @@ if __name__ == "__main__":
 
         result = {
             "free_gb": round(free_gb, 2),
-            "free_percent": round((free_gb / (disk_usage.total / 1e9)) * 100, 1) if disk_usage.total > 0 else 0,
+            "free_percent": round(
+                (free_gb / (disk_usage.total / 1e9)) * 100, 1
+            ) if disk_usage.total > 0 else 0,
             "sessions_today": today_count,
             "pending_gb": round(pending_gb, 2),
             "allowed": allowed,
