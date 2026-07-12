@@ -188,7 +188,9 @@ def create_app(data_path: Path):
     
     @app.get("/api/updates/check")
     async def check_update(
-        platform: str = fastapi.Query(..., description="Target platform (e.g., windows, macos, linux)"),
+        platform: str = fastapi.Query(
+            ..., description="Target platform (e.g., windows, macos, linux)"
+        ),
         current: str = fastapi.Query(..., description="Current version string"),
     ) -> dict[str, Any]:
         """Check for available updates.
