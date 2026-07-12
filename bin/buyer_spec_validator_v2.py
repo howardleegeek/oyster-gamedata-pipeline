@@ -248,10 +248,8 @@ class BuyerSpecValidator:
             stripped = line.strip()
             if stripped.startswith('- ') or stripped.startswith('* ') or stripped.startswith('1. '):
                 in_list = True
-            elif stripped and in_list:
-                # Check for continuation without proper indentation
-                if not (stripped.startswith('  ') or stripped.startswith('\t')):
-                    result.add_warning(f"List continuation issue at line {i+1}")
+            elif stripped and in_list and not (stripped.startswith('  ') or stripped.startswith('\t')):
+                result.add_warning(f"List continuation issue at line {i+1}")
 
         # Check for secrets
         self._check_secrets(content, result)
