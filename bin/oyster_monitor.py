@@ -167,7 +167,7 @@ class UploadBacklogChecker:
         file_count = 0
 
         if os.path.isdir(backlog_dir):
-            for root, dirs, files in os.walk(backlog_dir):
+            for root, _dirs, files in os.walk(backlog_dir):
                 for f in files:
                     fp = os.path.join(root, f)
                     try:
