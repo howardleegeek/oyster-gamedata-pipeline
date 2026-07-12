@@ -387,7 +387,8 @@ def resolve_profile_chain(
 
 
 def _maven_artifact_to_relpath(artifact: str) -> Path:
-    """``net.fabricmc:fabric-loader:0.16.10`` → ``net/fabricmc/fabric-loader/0.16.10/fabric-loader-0.16.10.jar``"""
+    """``net.fabricmc:fabric-loader:0.16.10`` →
+    ``net/fabricmc/fabric-loader/0.16.10/fabric-loader-0.16.10.jar``"""
     parts = artifact.split(":")
     if len(parts) < 3:
         raise ValueError(f"bad maven coordinate: {artifact}")
