@@ -75,7 +75,7 @@ def read_excel(path: Path) -> Tuple[List[str], List[Dict[str, str]]]:
         headers = [str(c) if c is not None else "" for c in rows[0]]
         data = []
         for row in rows[1:]:
-            data.append({h: str(v) if v is not None else "" for h, v in zip(headers, row)})
+            data.append({h: str(v) if v is not None else "" for h, v in zip(headers, row, strict=True)})
         wb.close()
         return headers, data
     except Exception as e:
