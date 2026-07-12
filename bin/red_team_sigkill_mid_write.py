@@ -92,7 +92,8 @@ def _run_sigkill_trial(
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Entry-point with argparse CLI."""
-    parser = argparse.ArgumentParser(description="Red-team: SIGKILL adapter mid action_camera write")
+    parser = argparse.ArgumentParser(
+        description="Red-team: SIGKILL adapter mid action_camera write")
     parser.add_argument("--iterations", type=int, default=5, help="Number of SIGKILL trials")
     parser.add_argument("--delay-ms", type=float, default=10.0, help="Sleep per chunk (ms)")
     parser.add_argument("--payload-kb", type=int, default=64, help="Total payload size (KB)")
