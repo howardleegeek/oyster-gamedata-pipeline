@@ -276,7 +276,7 @@ def diff_frame(
     rows: list[FieldRow] = []
 
     # Pass 1: keys present in A (with possible alias mapping).
-    for ka in rec_a.keys():
+    for ka in rec_a:
         kb = alias_map_a_to_b.get(ka, ka)
         if kb in rec_b:
             note = f"alias: {ka} ↔ {kb}" if ka != kb else ""
@@ -300,7 +300,7 @@ def diff_frame(
             ))
 
     # Pass 2: keys only in B.
-    for kb in rec_b.keys():
+    for kb in rec_b:
         if kb in consumed_b:
             continue
         # If kb is the second half of an alias whose first half wasn't in A,
