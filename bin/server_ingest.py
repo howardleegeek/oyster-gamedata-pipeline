@@ -27,7 +27,7 @@ def _get_boto3():
             import boto3 as _boto3
             boto3 = _boto3
         except ImportError:
-            raise ImportError("boto3 is required. Install with: pip install boto3")
+            raise ImportError("boto3 is required. Install with: pip install boto3") from None
     return boto3
 
 
