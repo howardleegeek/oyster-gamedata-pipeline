@@ -345,7 +345,7 @@ def parse_frames_arg(arg: str | None, n_a: int, n_b: int) -> list[int]:
         try:
             out.append(int(chunk))
         except ValueError:
-            raise SystemExit(f"--frames: invalid frame index '{chunk}'")
+            raise SystemExit(f"--frames: invalid frame index '{chunk}'") from None
     return out
 
 
