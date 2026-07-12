@@ -74,7 +74,12 @@ def install_system_deps(mgr: str) -> Tuple[bool, str]:
         ],
         "yum": [["sudo", "yum", "install", "-y", "python3-pip", "python3-devel", "gcc"]],
         "dnf": [["sudo", "dnf", "install", "-y", "python3-pip", "python3-devel", "gcc"]],
-        "pacman": [["sudo", "pacman", "-Sy", "--noconfirm", "python-pip", "python-virtualenv", "base-devel"]],
+        "pacman": [
+            [
+                "sudo", "pacman", "-Sy", "--noconfirm",
+                "python-pip", "python-virtualenv", "base-devel",
+            ],
+        ],
         "brew": [["brew", "install", "python"]],
         "choco": [["choco", "install", "python3", "-y"]],
         "winget": [["winget", "install", "Python.Python.3", "-y"]],
