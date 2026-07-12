@@ -86,7 +86,8 @@ def run_stress_test(duration_min: float = 5.0, burst_size: int = 50,
     }
     logger.info("=" * 50)
     logger.info(f"Complete: {burst_count} bursts, {total} clips, {stats['success_rate']:.1%} OK")
-    logger.info(f"Throughput: {stats['clips_per_minute']:.1f} clips/min, Time: {total_elapsed:.1f}s")
+    throughput = stats['clips_per_minute']
+    logger.info(f"Throughput: {throughput:.1f} clips/min, Time: {total_elapsed:.1f}s")
     return not deadlock and stats["success_rate"] >= 0.9, stats
 
 
