@@ -277,7 +277,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
-    clip_dirs = _load_manifest(args.manifest) if args.manifest else [p.resolve() for p in args.clips]
+    if args.manifest:
+        clip_dirs = _load_manifest(args.manifest)
+    else:
+        clip_dirs = [p.resolve() for p in args.clips]
     for cd in clip_dirs:
         if not cd.is_dir():
             logger.error("Clip directory does not exist: %s", cd)
