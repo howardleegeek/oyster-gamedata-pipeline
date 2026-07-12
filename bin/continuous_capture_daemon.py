@@ -426,10 +426,9 @@ class ContinuousCaptureDaemon:
                     # Already handled in transition
                     pass
 
-                elif self.state == DaemonState.COOLDOWN:
-                    # Wait for cooldown period
-                    if self.cooldown_until and datetime.now() >= self.cooldown_until:
-                        self._transition_to(DaemonState.IDLE)
+                elif self.state == DaemonState.COOLDOWN and self.cooldown_until and datetime.now() >= self.cooldown_until:
+                    # Wait for cooldown period, then transition
+                    self._transition_to(DaemonState.IDLE)
 
                 # Update uptime
                 self.total_uptime_hours += 5 / 3600  # 5 second sleep = 5/3600 hours
