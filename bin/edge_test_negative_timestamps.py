@@ -160,7 +160,8 @@ def test_pre_2020_dates() -> List[Dict[str, Any]]:
 
         # Python datetime objects
         (datetime.datetime(2020, 1, 1, tzinfo=datetime.timezone.utc), "Python datetime 2020"),
-        (datetime.datetime(2019, 12, 31, 23, 59, 59, tzinfo=datetime.timezone.utc), "Python datetime pre-2020"),
+        (datetime.datetime(2019, 12, 31, 23, 59, 59, tzinfo=datetime.timezone.utc),
+         "Python datetime pre-2020"),
     ]
 
     for ts, description in pre_2020_dates:
