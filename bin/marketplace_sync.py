@@ -66,7 +66,7 @@ class FilterParser:
     def _parse_condition(self, condition: str) -> None:
         """Parse a single condition."""
         # Try each operator
-        for op, op_name in self.OPERATORS.items():
+        for op, _op_name in self.OPERATORS.items():
             if op in condition:
                 parts = condition.split(op, 1)
                 if len(parts) == 2:
