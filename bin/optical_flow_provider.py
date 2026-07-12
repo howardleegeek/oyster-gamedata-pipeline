@@ -238,7 +238,7 @@ class OpticalFlowProvider:
                 "optical_flow_provider requires imageio to extract video frames. "
                 "Install it with: pip install imageio[ffmpeg]. "
                 "Iron-law: never generate placeholder frames."
-            )
+            ) from None
 
     def _load_image(self, path: Path) -> np.ndarray:
         from PIL import Image
