@@ -106,7 +106,11 @@ def _group_into_clips(frames: List[Path], clip_size: int = 8) -> List[List[Path]
     return clips
 
 
-def _split_clips(clips: List[List[Path]], test_ratio: float, seed: int = 42) -> Tuple[List[List[Path]], List[List[Path]]]:
+def _split_clips(
+    clips: List[List[Path]],
+    test_ratio: float,
+    seed: int = 42,
+) -> Tuple[List[List[Path]], List[List[Path]]]:
     """Split clips into train/test sets based on test_ratio."""
     random.seed(seed)
     indices = list(range(len(clips)))
@@ -168,7 +172,12 @@ class TinyWorldModel:
         opt.step()
         return loss.item()
 
-    def fit(self, train_clips: List[List[Path]], epochs: int = 3, batch_size: int = 4) -> Dict[str, float]:
+    def fit(
+        self,
+        train_clips: List[List[Path]],
+        epochs: int = 3,
+        batch_size: int = 4,
+    ) -> Dict[str, float]:
         """Train the model on provided clips."""
         torch = _torch()
         self._encoders = torch.nn.ModuleDict(self._make_encoder())
@@ -308,9 +317,15 @@ def _parse_args(argv: List[str]) -> argparse.Namespace:
         description="G210 Buyer Evaluation Harness: train tiny world model and evaluate.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--data-dir", type=str, required=True, help="Directory containing video clips")
-    parser.add_argument("--num-clips", type=int, default=100, help="Number of clips to use for training")
-    parser.add_argument("--test-ratio", type=float, default=0.2, help="Fraction of data for testing")
+    parser.add_argument(
+        "--data-dir", type=str, required=True, help="Directory containing video clips"
+    )
+    parser.add_argument(
+        "--num-clips", type=int, default=100, help="Number of clips to use for training"
+    )
+    parser.add_argument(
+        "--test-ratio", type=float, default=0.2, help="Fraction of data for testing"
+    )
     parser.add_argument("--clip-size", type=int, default=8, help="Frames per clip")
     parser.add_argument("--image-size", type=int, default=64, help="Resize frames to this size")
     parser.add_argument("--epochs", type=int, default=3, help="Training epochs")
@@ -363,7 +378,11 @@ def main(argv: List[str]) -> int:
     # Evaluate
     logger.info("Evaluating on test set...")
     eval_metrics = evaluate_model(model, test_clips)
-    logger.info(f"MSE: {eval_metrics['mse']:.4f}, SSIM: {eval_metrics['ssim']:.4f}, FID: {eval_metrics['fid']:.2f}")
+    logger.info(
+        f"MSE: {eval_metrics['mse']:.4f}, "
+        f"SSIM: {eval_metrics['ssim']:.4f}, "
+        f"FID: {eval_metrics['fid']:.2f}"
+    )
 
     # Write results
     results = {
