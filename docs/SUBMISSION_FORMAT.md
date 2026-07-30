@@ -87,6 +87,90 @@ tar -tzf vendor-001_batch-2026-05-A_clip-00042_v1.tar.gz | head -10
 
 ## 3. 上传方式
 
+### 3.0 Tester portal: direct-to-Supabase signed URL (recorder v0.27.0+) {#direct-to-supabase-upload}
+
+> 适用于 **tester portal 通过 OysterRecorder.exe 上传 Minecraft 单段录像**(每段
+> 500 MB–1.5 GB)。Vendor 批量上传仍走 §3.1–§3.4 的 S3/SFTP/OSS 通道。
+>
+> Why this flow exists (Gap #8): Vercel route handlers 限制 request body ≤ 4.5 MB。
+> 任何真实游戏录像通过 POST `/api/upload-tarball` 都会 413。我们把上传拆成三步,
+> 二进制走 recorder → Supabase Storage,完全绕过 Vercel。
+
+**Protocol (three calls, all idempotent):**
+
+1. `POST /api/upload-tarball/sign` — JSON body
+   ```json
+   {
+     "tester_id":        "<uuid>",
+     "filename":         "<safe>.tar.gz",
+     "size_bytes":       12345,
+     "sha256":           "<64 lowercase hex>",
+     "duration_seconds": 1800
+   }
+   ```
+   Header: `X-Tester-Auth: v1 <tester_id> <ts_ms> <hex_sha256_hmac>` (Gap #6).
+   Returns `{ tarball_id, signed_url, storage_bucket, storage_path, expires_at, ttl_seconds: 900 }`.
+   The signed URL is good for **15 min** — enough to start the upload, short enough
+   to limit blast radius if it leaks.
+
+2. `PUT <signed_url>` — `Content-Type: application/gzip`, header `x-upsert: true`,
+   body = raw tarball bytes. **Recorder uploads directly to Supabase, Vercel sees nothing.**
+
+3. `POST /api/upload-tarball/finalize` — JSON body `{ tarball_id, sha256 }`.
+   Header: same `X-Tester-Auth`. Server HEADs the storage object, verifies size
+   matches what step 1 declared, flips `upload_status` from `pending_upload` to
+   `uploaded`. Returns the canonical tarball row.
+
+**Reference client:** `bin/upload_tarball_signed.py`
+```bash
+TESTER_AUTH_HMAC_SECRET=<from onboarding email> \
+  bin/upload_tarball_signed.py /path/to/clip.tar.gz \
+    --tester-id <uuid> \
+    --duration-seconds 1800 \
+    --base-url https://tester.oysterworld.dev
+```
+
+**Idempotency:**
+- Repeating sign with the same sha256 returns the existing `tarball_id` (no
+  duplicate rows). If the previous upload completed, the response carries
+  `already_uploaded: true` and the recorder skips step 2.
+- Repeating finalize on an already-finalized row returns the canonical row
+  with `duplicate: true`.
+
+**Error semantics:**
+- `400` — malformed body / bad sha256 shape.
+- `401` — missing or invalid `X-Tester-Auth` (Gap #6).
+- `403` — HMAC `tester_id` doesn't match body `tester_id`.
+- `404` (finalize) — `tarball_id` unknown.
+- `409` (sign) — sha256 already owned by a different tester (replay attack).
+- `409` (finalize) — storage object missing, size mismatch, or row marked
+  `failed` from a previous attempt.
+- `410` — caller hit the legacy `/api/upload-tarball` endpoint; response body
+  spells out the new three-call migration.
+- `413` — declared `size_bytes` > 1 GiB.
+- `422` — `sha256` in finalize body doesn't match the sha256 reserved at sign time.
+- `429` — rate limit (30/min/IP, 60/hour/tester for sign; cheaper PUT is the
+  Supabase bucket's responsibility).
+- `503` — Supabase env vars missing on server.
+
+**Env vars (server side):**
+- `NEXT_PUBLIC_SUPABASE_URL` (or alias `SUPABASE_URL`)
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (or alias `SUPABASE_SERVICE_KEY`)
+- `SUPABASE_TARBALL_UPLOAD_BUCKET` (or alias `SUPABASE_BUCKET`, default `tarball-uploads`)
+- `SUPABASE_SIGNED_UPLOAD_URL_TTL_SECONDS` (default `900`)
+- `TESTER_AUTH_HMAC_SECRET` — when set, gap #6 HMAC verification is enforced.
+  When unset, the server logs a warning per request and accepts unsigned calls
+  (stub_mode mode — only safe in dev/preview until gap #6 ships).
+
+**Abandoned uploads:** if a recorder gets a signed URL and crashes before
+PUTting or finalizing, the `tarballs` row sticks at `upload_status =
+'pending_upload'` with `signed_url_expires_at` in the past. A follow-up reaper
+(out of scope here — see `bin/storage_reaper.py` TODO) should sweep these and
+either retry or delete.
+
+---
+
 ### 3.1 默认方式: S3 (推荐,海外 vendor)
 
 #### 3.1.1 我方提供
@@ -372,9 +456,9 @@ Self-lint: 200/200 PASS
 
 ### 7.6 EXR
 ```
-[7/8] FAIL: depth/000123.exr is 4 bytes (placeholder, not real depth)
+[7/8] FAIL: depth/000123.exr is 4 bytes (stub_mode, not real depth)
 ```
-**原因**: 跑了 placeholder e2e,没装 PyTorch / DepthAnything
+**原因**: 跑了 stub_mode e2e,没装 PyTorch / DepthAnything
 **修复**: 完成 [STEP 5/8](VENDOR_ONBOARDING.md#step-5--装-obs-studio--depthanything-v2真画面真深度) 装真推理
 
 ### 7.7 EXR_COUNT

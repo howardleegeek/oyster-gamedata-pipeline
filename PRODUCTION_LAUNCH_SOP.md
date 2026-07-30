@@ -116,7 +116,7 @@ require credentials or decisions only Howard can supply.
 | 3 | Code-signing cert for the recorder `.exe` | 24-72h provisioning | $80-$200/yr | NO (testers can click through SmartScreen) |
 | 4 | Stripe Connect strategy decision | 30 min decision + 1d wire | varies | NO for buyer-browse-only launch; YES for buyer purchases or tester payouts |
 | 6a | Set `UPLOAD_HMAC_SECRET` (server) + roll out recorder v0.27.0 with `X-Upload-Token` | ~1h server + 1h recorder | $0 | NO at launch (warn-only fallback); YES before flipping `UPLOAD_REQUIRE_TOKEN=true` |
-| 6b + 8 | Direct-to-Supabase signed-URL upload (lifts the 4.5 MB Vercel body cap) | ~3h | $0 | NO at launch (current upload route works for <4.5 MB tarballs); YES for real-sized recordings on Vercel |
+| 6b + 8 | Direct-to-Supabase signed-URL upload (lifts the 4.5 MB Vercel body cap) | ~3h | $0 | NO at launch (current upload route works for <4.5 MB tarballs); YES for real-sized recordings on Vercel. **Server-side Gap #8 is closed on `cluster/gap8-signed-url` — `/api/upload-tarball/sign` + `/api/upload-tarball/finalize` live, legacy `/api/upload-tarball` returns 410. Recorder upgrade still required to use the new routes.** |
 
 **Order of operations** (recommended):
 
@@ -254,11 +254,23 @@ verified end-to-end.
 
 ### Symptom: tester upload returns 413
 
-This means the tarball is >4.5 MB on Vercel (platform body-size cap, gap
-#8). **This is expected once recordings get larger than test-size.** Two
-remedies:
-- **Short term:** ask tester to record shorter sessions (under ~5 MB).
-- **Permanent:** complete gap #8 — server-side direct-to-Supabase signed-URL split (designed in PRODUCTION_GAPS.md, ships with recorder v0.27.0).
+If the recorder is **v0.27.0+** and hits `/api/upload-tarball/sign` or
+`/api/upload-tarball/finalize`, a 413 means the recorder claimed a
+`size_bytes` > 1 GiB. That's the hard ceiling — tell the tester to split the
+session.
+
+If the recorder is **<v0.27.0** and hits the legacy `/api/upload-tarball`,
+they now get a **410 Gone** (not 413), with a JSON body spelling out the new
+three-call protocol. Action: have the tester re-run the installer and pick
+up the v0.27.0 build. The 4.5 MB Vercel cap is no longer in the path because
+v0.27.0+ PUTs the binary directly to Supabase Storage via a signed URL —
+Vercel never sees the bytes.
+
+### Symptom: tester upload returns 410
+
+The recorder is on a pre-v0.27.0 build. The response body contains the
+migration recipe. Push the tester to upgrade — there is no server-side
+fallback because there's no way to accept a >4.5 MB body on Vercel.
 
 ### Symptom: real CVE / security advisory on a dependency
 
